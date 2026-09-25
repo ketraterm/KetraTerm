@@ -299,7 +299,6 @@ class SessionHostEventBridgeTest {
                 TerminalClipboardAuditEvent(
                     operation = TerminalClipboardOperation.WRITE,
                     selection = "c",
-                    origin = TerminalClipboardOrigin.LOCAL,
                     encodedLength = 8,
                     decodedBytes = text.encodeToByteArray().size,
                     maxDecodedBytes = 1024,
@@ -315,7 +314,6 @@ class SessionHostEventBridgeTest {
                 TerminalClipboardAuditEvent(
                     operation = TerminalClipboardOperation.WRITE,
                     selection = "c",
-                    origin = TerminalClipboardOrigin.LOCAL,
                     encodedLength = 8,
                     decodedBytes = text.encodeToByteArray().size,
                     maxDecodedBytes = 1024,

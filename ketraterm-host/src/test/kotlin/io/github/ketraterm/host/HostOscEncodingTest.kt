@@ -74,7 +74,7 @@ class HostOscEncodingTest {
 
     @Test
     fun `clipboard raw envelope ceiling precedes decoded size and permission callbacks`() {
-        val f = Fixture(HostPolicy(clipboardPolicy = TerminalClipboardPolicy(remoteWritePermission = TerminalClipboardPermission.ALLOW)))
+        val f = Fixture(HostPolicy(clipboardPolicy = TerminalClipboardPolicy(writePermission = TerminalClipboardPermission.ALLOW)))
         val accepted = "a".repeat(3066)
         f.accept("\u001B]52;c;" + Base64.getEncoder().encodeToString(accepted.encodeToByteArray()) + "\u0007")
         assertEquals(listOf(accepted), f.writes)
@@ -155,33 +155,28 @@ class HostOscEncodingTest {
                 byteArrayOf(0xED.toByte(), 0xA0.toByte(), 0x80.toByte()),
                 byteArrayOf(0xF4.toByte(), 0x90.toByte(), 0x80.toByte(), 0x80.toByte()),
             )
-        for (origin in TerminalClipboardOrigin.entries) {
-            for (permission in TerminalClipboardPermission.entries) {
-                for (bytes in invalid) {
-                    val policy =
-                        TerminalClipboardPolicy(
-                            origin = origin,
-                            localWritePermission = permission,
-                            remoteWritePermission = permission,
-                            allowlisted = true,
-                        )
-                    val f = Fixture(HostPolicy(clipboardPolicy = policy))
-                    val encoded = Base64.getEncoder().encodeToString(bytes)
-                    val stream = "\u001B]52;c;$encoded\u001B\\".encodeToByteArray()
-                    for (byte in stream) f.parser.accept(byteArrayOf(byte))
-                    assertEquals(TerminalClipboardDecision.DENIED_MALFORMED_PAYLOAD, f.audits.single().decision)
-                    assertEquals(bytes.size, f.audits.single().decodedBytes)
-                    assertTrue(f.writes.isEmpty())
-                    assertTrue(f.prompts.isEmpty())
+        for (permission in TerminalClipboardPermission.entries) {
+            for (bytes in invalid) {
+                val policy =
+                    TerminalClipboardPolicy(
+                        writePermission = permission,
+                    )
+                val f = Fixture(HostPolicy(clipboardPolicy = policy))
+                val encoded = Base64.getEncoder().encodeToString(bytes)
+                val stream = "\u001B]52;c;$encoded\u001B\\".encodeToByteArray()
+                for (byte in stream) f.parser.accept(byteArrayOf(byte))
+                assertEquals(TerminalClipboardDecision.DENIED_MALFORMED_PAYLOAD, f.audits.single().decision)
+                assertEquals(bytes.size, f.audits.single().decodedBytes)
+                assertTrue(f.writes.isEmpty())
+                assertTrue(f.prompts.isEmpty())
 
-                    f.accept("\u001B]52;c;" + Base64.getEncoder().encodeToString("é🙂�".encodeToByteArray()) + "\u0007")
-                    when (permission) {
-                        TerminalClipboardPermission.DENY -> {
-                            assertEquals(TerminalClipboardDecision.DENIED_BY_POLICY, f.audits.last().decision)
-                        }
-                        TerminalClipboardPermission.PROMPT -> assertEquals(listOf("é🙂�"), f.prompts)
-                        else -> assertEquals(listOf("é🙂�"), f.writes)
+                f.accept("\u001B]52;c;" + Base64.getEncoder().encodeToString("é🙂�".encodeToByteArray()) + "\u0007")
+                when (permission) {
+                    TerminalClipboardPermission.DENY -> {
+                        assertEquals(TerminalClipboardDecision.DENIED_BY_POLICY, f.audits.last().decision)
                     }
+                    TerminalClipboardPermission.PROMPT -> assertEquals(listOf("é🙂�"), f.prompts)
+                    else -> assertEquals(listOf("é🙂�"), f.writes)
                 }
             }
         }
@@ -191,8 +186,7 @@ class HostOscEncodingTest {
     fun `clipboard bounds precede decoding and malformed envelopes emit no request`() {
         val policy =
             TerminalClipboardPolicy(
-                origin = TerminalClipboardOrigin.LOCAL,
-                localWritePermission = TerminalClipboardPermission.ALLOW,
+                writePermission = TerminalClipboardPermission.ALLOW,
                 maxDecodedBytes = 1,
             )
         val f = Fixture(HostPolicy(clipboardPolicy = policy))
@@ -226,7 +220,7 @@ class HostOscEncodingTest {
         assertEquals("bad�", f.terminal.windowTitle)
         f.sink.setHostPolicy(
             HostPolicy(
-                titlePolicy = TerminalTitlePolicy(localPermission = TerminalTitlePermission.DENY),
+                titlePolicy = TerminalTitlePolicy(permission = TerminalTitlePermission.DENY),
                 notificationPolicy = HostControlPolicy.DENY,
             ),
         )

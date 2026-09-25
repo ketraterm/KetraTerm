@@ -16,7 +16,9 @@
 package io.github.ketraterm.intellij.settings
 
 import com.intellij.openapi.progress.ProcessCanceledException
-import io.github.ketraterm.host.*
+import io.github.ketraterm.host.HostControlPolicy
+import io.github.ketraterm.host.TerminalClipboardPermission
+import io.github.ketraterm.host.TerminalTitlePermission
 import io.github.ketraterm.input.policy.PasteControlPolicy
 import io.github.ketraterm.render.api.TerminalRenderCursorShape
 import io.github.ketraterm.ui.swing.settings.SwingPadding
@@ -33,9 +35,7 @@ class KetraTermIntellijSettingsTest {
     @Test
     fun `IDE host denies application window and column mode requests`() {
         val settings = KetraTermIntellijSettings()
-        for (command in listOf(listOf("powershell.exe"), listOf("ssh", "example.com"))) {
-            assertEquals(HostControlPolicy.DENY, settings.createHostPolicy(command).windowManipulationPolicy)
-        }
+        assertEquals(HostControlPolicy.DENY, settings.createHostPolicy().windowManipulationPolicy)
         val swingSettings = KetraTermIntellijSettingsMapper.toSwingSettings(settings.state.copy(themeId = "nord"))
         assertFalse(swingSettings.shellRequestResizeWindow)
     }
@@ -355,38 +355,29 @@ class KetraTermIntellijSettingsTest {
         val state =
             KetraTermIntellijSettingsNormalizer.normalize(
                 KetraTermIntellijSettings.State(
-                    clipboardLocalWrite = "invalid",
-                    clipboardRemoteWrite = "invalid",
+                    clipboardWrite = "invalid",
                     clipboardRead = "invalid",
-                    titleLocalPermission = "invalid",
-                    titleRemotePermission = "invalid",
+                    titlePermission = "invalid",
                 ),
             )
 
-        assertEquals(TerminalClipboardPermission.PROMPT.name.lowercase(), state.clipboardLocalWrite)
-        assertEquals(TerminalClipboardPermission.DENY.name.lowercase(), state.clipboardRemoteWrite)
+        assertEquals(TerminalClipboardPermission.ALLOW.name.lowercase(), state.clipboardWrite)
         assertEquals(TerminalClipboardPermission.DENY.name.lowercase(), state.clipboardRead)
-        assertEquals(TerminalTitlePermission.ALLOW.name.lowercase(), state.titleLocalPermission)
-        assertEquals(TerminalTitlePermission.DENY.name.lowercase(), state.titleRemotePermission)
+        assertEquals(TerminalTitlePermission.ALLOW.name.lowercase(), state.titlePermission)
     }
 
     @Test
-    fun `host policy maps ssh executable names to remote origin only`() {
+    fun `host policy applies configured permissions to the whole session`() {
         val settings = KetraTermIntellijSettings()
+        val defaults = settings.createHostPolicy()
+        assertEquals(TerminalClipboardPermission.ALLOW, defaults.clipboardPolicy.writePermission)
+        assertEquals(TerminalClipboardPermission.DENY, defaults.clipboardPolicy.readPermission)
+        assertEquals(TerminalTitlePermission.ALLOW, defaults.titlePolicy.permission)
 
-        val localPolicy = settings.createHostPolicy(listOf("powershell.exe"))
-        val remotePolicy = settings.createHostPolicy(listOf("ssh", "example.com"))
-        val remoteWindowsPathPolicy = settings.createHostPolicy(listOf("""C:\Windows\System32\OpenSSH\ssh.exe"""))
-        val nonSshPrefixPolicy = settings.createHostPolicy(listOf("sshuttle"))
-
-        assertEquals(TerminalClipboardOrigin.LOCAL, localPolicy.clipboardPolicy.origin)
-        assertEquals(TerminalTitleOrigin.LOCAL, localPolicy.titlePolicy.origin)
-        assertEquals(TerminalClipboardOrigin.REMOTE, remotePolicy.clipboardPolicy.origin)
-        assertEquals(TerminalTitleOrigin.REMOTE, remotePolicy.titlePolicy.origin)
-        assertEquals(TerminalClipboardOrigin.REMOTE, remoteWindowsPathPolicy.clipboardPolicy.origin)
-        assertEquals(TerminalTitleOrigin.REMOTE, remoteWindowsPathPolicy.titlePolicy.origin)
-        assertEquals(TerminalClipboardOrigin.LOCAL, nonSshPrefixPolicy.clipboardPolicy.origin)
-        assertEquals(TerminalTitleOrigin.LOCAL, nonSshPrefixPolicy.titlePolicy.origin)
+        settings.loadState(settings.state.copy(clipboardWrite = "deny", titlePermission = "deny"))
+        val policy = settings.createHostPolicy()
+        assertEquals(TerminalClipboardPermission.DENY, policy.clipboardPolicy.writePermission)
+        assertEquals(TerminalTitlePermission.DENY, policy.titlePolicy.permission)
     }
 
     @Test

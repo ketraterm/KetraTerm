@@ -18,7 +18,6 @@ package io.github.ketraterm.intellij.services
 import io.github.ketraterm.host.TerminalClipboardAuditEvent
 import io.github.ketraterm.host.TerminalClipboardDecision
 import io.github.ketraterm.host.TerminalClipboardOperation
-import io.github.ketraterm.host.TerminalClipboardOrigin
 import io.github.ketraterm.host.TerminalClipboardPromptEvent
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -43,8 +42,8 @@ class IntellijOsc52ClipboardSelectionsTest {
     fun `prompt text names profile and hides protocol details`() {
         val message = IntellijOsc52ClipboardPromptText.message("PowerShell", promptEvent("OSC 52 works"))
 
-        assertTrue(message.contains("Allow PowerShell to write 12 characters to the IDE clipboard?"))
-        assertTrue(message.contains("Local terminal session"))
+        assertTrue(message.contains("Allow an application in PowerShell to write 12 characters to the IDE clipboard?"))
+        assertFalse(message.contains("Local terminal session"))
         assertFalse(message.contains("OSC 52"))
         assertFalse(message.contains("Selection:"))
         assertFalse(message.contains("bytes"))
@@ -54,7 +53,7 @@ class IntellijOsc52ClipboardSelectionsTest {
     fun `empty prompt text is shown as clipboard clear`() {
         val message = IntellijOsc52ClipboardPromptText.message("PowerShell", promptEvent(""))
 
-        assertTrue(message.contains("Allow PowerShell to clear the IDE clipboard?"))
+        assertTrue(message.contains("Allow an application in PowerShell to clear the IDE clipboard?"))
     }
 
     private fun promptEvent(text: String): TerminalClipboardPromptEvent =
@@ -65,7 +64,6 @@ class IntellijOsc52ClipboardSelectionsTest {
                 TerminalClipboardAuditEvent(
                     operation = TerminalClipboardOperation.WRITE,
                     selection = "c",
-                    origin = TerminalClipboardOrigin.LOCAL,
                     encodedLength = 0,
                     decodedBytes = text.toByteArray().size,
                     maxDecodedBytes = 1024,

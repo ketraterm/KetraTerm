@@ -72,7 +72,7 @@ internal class KetraTermTerminalPane private constructor(
         terminal.reloadSettings()
         component.background = terminal.background
         searchBar.refreshColors()
-        tab.session.setHostPolicy(KetraTermIntellijSettings.getInstance().createHostPolicy(tab.profile.command))
+        tab.session.setHostPolicy(KetraTermIntellijSettings.getInstance().createHostPolicy())
         reconcileCompletion()
     }
 

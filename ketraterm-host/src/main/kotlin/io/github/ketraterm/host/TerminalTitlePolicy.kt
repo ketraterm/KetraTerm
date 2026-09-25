@@ -19,24 +19,17 @@ package io.github.ketraterm.host
  * Host policy for terminal-triggered icon and window title metadata updates.
  *
  * OSC 0/1/2 and xterm title-stack restore operations can rename host UI
- * surfaces. That is convenient for a standalone local terminal, but product
- * hosts such as IDE tabs, workspace panes, and SSH sessions may want stricter
- * behavior to prevent confusing or spoofed labels. The host chooses [origin]
- * per session and this policy applies the matching permission before adapter or
- * core title metadata is changed.
+ * surfaces. The permission applies to all output in the session, including
+ * nested SSH and multiplexer output, before adapter or core metadata changes.
+ * A title is application-provided display text, never an authenticated identity.
  *
- * @property origin whether the terminal stream comes from a local or remote
- * session from the host product's perspective.
- * @property localPermission permission for local terminal streams.
- * @property remotePermission permission for remote terminal streams.
+ * @property permission permission for title updates throughout the session.
  * @property overflowPolicy handling for titles longer than [maxLength].
  * @property maxLength maximum retained title length in UTF-16 code units.
  * Clamping never splits a valid surrogate pair.
  */
 data class TerminalTitlePolicy(
-    val origin: TerminalTitleOrigin = TerminalTitleOrigin.LOCAL,
-    val localPermission: TerminalTitlePermission = TerminalTitlePermission.ALLOW,
-    val remotePermission: TerminalTitlePermission = TerminalTitlePermission.ALLOW,
+    val permission: TerminalTitlePermission = TerminalTitlePermission.ALLOW,
     val overflowPolicy: TerminalTitleOverflowPolicy = TerminalTitleOverflowPolicy.CLAMP,
     val maxLength: Int = DEFAULT_MAX_LENGTH,
 ) {
@@ -46,28 +39,10 @@ data class TerminalTitlePolicy(
         }
     }
 
-    internal val permission: TerminalTitlePermission
-        get() =
-            when (origin) {
-                TerminalTitleOrigin.LOCAL -> localPermission
-                TerminalTitleOrigin.REMOTE -> remotePermission
-            }
-
     /** Shared default maximum retained title length in UTF-16 code units. */
     companion object {
         const val DEFAULT_MAX_LENGTH: Int = 4096
     }
-}
-
-/**
- * Terminal stream origin used when evaluating title update policy.
- */
-enum class TerminalTitleOrigin {
-    /** A local process attached through a local PTY or equivalent connector. */
-    LOCAL,
-
-    /** A remote process reached through SSH or another remote transport. */
-    REMOTE,
 }
 
 /**

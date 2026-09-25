@@ -17,7 +17,9 @@ package io.github.ketraterm.app.ui
 
 import io.github.ketraterm.app.config.KetraTermSettings
 import io.github.ketraterm.completion.persistence.TerminalCompletionLearningCoordinator
-import io.github.ketraterm.host.*
+import io.github.ketraterm.host.HostControlPolicy
+import io.github.ketraterm.host.TerminalClipboardPermission
+import io.github.ketraterm.host.TerminalTitlePermission
 import io.github.ketraterm.ui.swing.settings.TerminalTheme
 import io.github.ketraterm.workspace.TerminalProfileRegistry
 import io.github.ketraterm.workspace.config.TerminalConfig
@@ -163,15 +165,6 @@ class SettingsModelTest {
     }
 
     @Test
-    fun `clipboard choices preserve configured allowlist without offering new allowlists`() {
-        for (permission in TerminalClipboardPermission.entries) {
-            val options = clipboardPermissionOptions(permission)
-            assertTrue(permission in options)
-            assertEquals(permission == TerminalClipboardPermission.ALLOWLIST, TerminalClipboardPermission.ALLOWLIST in options)
-        }
-    }
-
-    @Test
     fun testInitialStateMatchesSettings() {
         val state = model.initialUiState
         assertEquals(settings.theme.id, state.theme)
@@ -219,12 +212,10 @@ class SettingsModelTest {
                 pasteControlPolicy = io.github.ketraterm.input.policy.PasteControlPolicy.STRIP_C0_EXCEPT_TAB_CR_LF,
                 shellRequestResizeWindow = true,
                 shellRequestWindowManipulation = true,
-                clipboardLocalWrite = TerminalClipboardPermission.ALLOW,
-                clipboardRemoteWrite = TerminalClipboardPermission.ALLOWLIST,
+                clipboardWrite = TerminalClipboardPermission.ALLOW,
                 clipboardRead = TerminalClipboardPermission.PROMPT,
                 clipboardMaxDecodedBytes = 2048,
-                titleLocalPermission = TerminalTitlePermission.DENY,
-                titleRemotePermission = TerminalTitlePermission.ALLOW,
+                titlePermission = TerminalTitlePermission.DENY,
                 scrollOnOutput = false,
             )
 
@@ -240,12 +231,10 @@ class SettingsModelTest {
         )
         assertTrue(settings.config.shellRequestResizeWindow)
         assertTrue(settings.config.shellRequestWindowManipulation)
-        assertEquals(TerminalClipboardPermission.ALLOW, settings.config.clipboardLocalWrite)
-        assertEquals(TerminalClipboardPermission.ALLOWLIST, settings.config.clipboardRemoteWrite)
+        assertEquals(TerminalClipboardPermission.ALLOW, settings.config.clipboardWrite)
         assertEquals(TerminalClipboardPermission.PROMPT, settings.config.clipboardRead)
         assertEquals(2048, settings.config.clipboardMaxDecodedBytes)
-        assertEquals(TerminalTitlePermission.DENY, settings.config.titleLocalPermission)
-        assertEquals(TerminalTitlePermission.ALLOW, settings.config.titleRemotePermission)
+        assertEquals(TerminalTitlePermission.DENY, settings.config.titlePermission)
         assertFalse(settings.config.scrollOnOutput)
 
         // Snapshot should be updated, so it shouldn't show changes against modified state anymore
@@ -256,40 +245,33 @@ class SettingsModelTest {
     fun testHostPolicyAllowsResizeControlWhenResizeSettingIsEnabled() {
         settings.update(settings.config.copy(shellRequestResizeWindow = true, shellRequestWindowManipulation = false))
 
-        val policy = settings.createHostPolicy(listOf(settings.config.shellPath))
+        val policy = settings.createHostPolicy()
 
         assertEquals(HostControlPolicy.ALLOW, policy.windowManipulationPolicy)
     }
 
     @Test
-    fun testHostPolicyMapsLocalAndRemoteTrustBoundaries() {
+    fun `host policy applies configured permissions to the whole session`() {
+        val defaults = settings.createHostPolicy()
+        for (command in listOf("powershell.exe", "ssh example.com", "sshuttle")) {
+            settings.update(settings.config.copy(shellPath = command))
+            assertEquals(defaults, settings.createHostPolicy())
+        }
+        assertEquals(TerminalClipboardPermission.ALLOW, defaults.clipboardPolicy.writePermission)
+        assertEquals(TerminalClipboardPermission.DENY, defaults.clipboardPolicy.readPermission)
+        assertEquals(TerminalTitlePermission.ALLOW, defaults.titlePolicy.permission)
+
         settings.update(
             settings.config.copy(
-                clipboardLocalWrite = TerminalClipboardPermission.PROMPT,
-                clipboardRemoteWrite = TerminalClipboardPermission.DENY,
+                clipboardWrite = TerminalClipboardPermission.DENY,
                 clipboardRead = TerminalClipboardPermission.DENY,
-                titleLocalPermission = TerminalTitlePermission.ALLOW,
-                titleRemotePermission = TerminalTitlePermission.DENY,
+                titlePermission = TerminalTitlePermission.DENY,
             ),
         )
 
-        val localPolicy = settings.createHostPolicy(listOf("powershell.exe"))
-        val remotePolicy = settings.createHostPolicy(listOf("ssh", "example.com"))
-        val remoteWindowsPathPolicy = settings.createHostPolicy(listOf("""C:\Windows\System32\OpenSSH\ssh.exe"""))
-        val nonSshPrefixPolicy = settings.createHostPolicy(listOf("sshuttle"))
-
-        assertEquals(TerminalClipboardOrigin.LOCAL, localPolicy.clipboardPolicy.origin)
-        assertEquals(TerminalTitleOrigin.LOCAL, localPolicy.titlePolicy.origin)
-        assertEquals(TerminalClipboardPermission.PROMPT, localPolicy.clipboardPolicy.localWritePermission)
-        assertEquals(TerminalTitlePermission.ALLOW, localPolicy.titlePolicy.localPermission)
-
-        assertEquals(TerminalClipboardOrigin.REMOTE, remotePolicy.clipboardPolicy.origin)
-        assertEquals(TerminalTitleOrigin.REMOTE, remotePolicy.titlePolicy.origin)
-        assertEquals(TerminalClipboardPermission.DENY, remotePolicy.clipboardPolicy.remoteWritePermission)
-        assertEquals(TerminalTitlePermission.DENY, remotePolicy.titlePolicy.remotePermission)
-        assertEquals(TerminalClipboardOrigin.REMOTE, remoteWindowsPathPolicy.clipboardPolicy.origin)
-        assertEquals(TerminalTitleOrigin.REMOTE, remoteWindowsPathPolicy.titlePolicy.origin)
-        assertEquals(TerminalClipboardOrigin.LOCAL, nonSshPrefixPolicy.clipboardPolicy.origin)
-        assertEquals(TerminalTitleOrigin.LOCAL, nonSshPrefixPolicy.titlePolicy.origin)
+        val policy = settings.createHostPolicy()
+        assertEquals(TerminalClipboardPermission.DENY, policy.clipboardPolicy.writePermission)
+        assertEquals(TerminalClipboardPermission.DENY, policy.clipboardPolicy.readPermission)
+        assertEquals(TerminalTitlePermission.DENY, policy.titlePolicy.permission)
     }
 }

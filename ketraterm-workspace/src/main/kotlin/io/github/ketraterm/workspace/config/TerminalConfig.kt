@@ -81,12 +81,10 @@ private fun defaultFontFamily(): String {
  * the shell.
  * @property persistentSuggestionLearningEnabled whether supporting product hosts
  * persist compact command-completion learning metadata across application restarts.
- * @property clipboardLocalWrite OSC 52 write permission for local sessions.
- * @property clipboardRemoteWrite OSC 52 write permission for remote sessions.
+ * @property clipboardWrite OSC 52 write permission for all output in a session, including nested SSH.
  * @property clipboardRead OSC 52 read/query permission.
  * @property clipboardMaxDecodedBytes maximum decoded clipboard payload size.
- * @property titleLocalPermission window/tab renaming permission for local sessions.
- * @property titleRemotePermission window/tab renaming permission for remote sessions.
+ * @property titlePermission window/tab renaming permission for all output in a session.
  */
 data class TerminalConfig(
     val theme: String = DEFAULT_THEME,
@@ -113,12 +111,10 @@ data class TerminalConfig(
     val shellSuggestionsEnabled: Boolean = DEFAULT_SHELL_SUGGESTIONS_ENABLED,
     val acceptSelectedSuggestionWithEnter: Boolean = DEFAULT_ACCEPT_SELECTED_SUGGESTION_WITH_ENTER,
     val persistentSuggestionLearningEnabled: Boolean = DEFAULT_PERSISTENT_SUGGESTION_LEARNING_ENABLED,
-    val clipboardLocalWrite: TerminalClipboardPermission = DEFAULT_CLIPBOARD_LOCAL_WRITE,
-    val clipboardRemoteWrite: TerminalClipboardPermission = DEFAULT_CLIPBOARD_REMOTE_WRITE,
+    val clipboardWrite: TerminalClipboardPermission = DEFAULT_CLIPBOARD_WRITE,
     val clipboardRead: TerminalClipboardPermission = DEFAULT_CLIPBOARD_READ,
     val clipboardMaxDecodedBytes: Int = DEFAULT_CLIPBOARD_MAX_DECODED_BYTES,
-    val titleLocalPermission: TerminalTitlePermission = DEFAULT_TITLE_LOCAL_PERMISSION,
-    val titleRemotePermission: TerminalTitlePermission = DEFAULT_TITLE_REMOTE_PERMISSION,
+    val titlePermission: TerminalTitlePermission = DEFAULT_TITLE_PERMISSION,
     val scrollOnOutput: Boolean = DEFAULT_SCROLL_ON_OUTPUT,
     val startupCommand: String = "",
     val showForegroundProcessName: Boolean = DEFAULT_SHOW_FOREGROUND_PROCESS_NAME,
@@ -189,12 +185,10 @@ data class TerminalConfig(
         const val DEFAULT_PERSISTENT_SUGGESTION_LEARNING_ENABLED: Boolean = false
         const val DEFAULT_SCROLL_ON_OUTPUT: Boolean = true
 
-        val DEFAULT_CLIPBOARD_LOCAL_WRITE: TerminalClipboardPermission = TerminalClipboardPermission.PROMPT
-        val DEFAULT_CLIPBOARD_REMOTE_WRITE: TerminalClipboardPermission = TerminalClipboardPermission.DENY
+        val DEFAULT_CLIPBOARD_WRITE: TerminalClipboardPermission = TerminalClipboardPermission.ALLOW
         val DEFAULT_CLIPBOARD_READ: TerminalClipboardPermission = TerminalClipboardPermission.DENY
         const val DEFAULT_CLIPBOARD_MAX_DECODED_BYTES: Int = TerminalClipboardPolicy.DEFAULT_MAX_DECODED_BYTES
-        val DEFAULT_TITLE_LOCAL_PERMISSION: TerminalTitlePermission = TerminalTitlePermission.ALLOW
-        val DEFAULT_TITLE_REMOTE_PERMISSION: TerminalTitlePermission = TerminalTitlePermission.DENY
+        val DEFAULT_TITLE_PERMISSION: TerminalTitlePermission = TerminalTitlePermission.ALLOW
 
         val DEFAULT_FONT_FAMILY: String get() = defaultFontFamily()
         val DEFAULT_SHELL_PATH: String get() = defaultShellPath()

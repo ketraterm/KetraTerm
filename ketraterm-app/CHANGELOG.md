@@ -2,6 +2,7 @@
 
 ## [Unreleased]
 
+- Simplified clipboard and title permissions so they apply consistently throughout a terminal, including SSH sessions. Clipboard choices are now Deny, Ask, and Allow, with writes allowed and reads blocked by default. Previous separate local/remote settings reset to the new defaults.
 - Improved protection when pasting copied terminal sequences and simplified paste handling settings.
 - Improved compatibility with combined text formatting commands and prevented oversized terminal commands from changing formatting or terminal settings unexpectedly.
 

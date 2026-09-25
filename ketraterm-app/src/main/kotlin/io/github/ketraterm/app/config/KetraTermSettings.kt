@@ -16,7 +16,10 @@
 package io.github.ketraterm.app.config
 
 import io.github.ketraterm.completion.persistence.TerminalCompletionLearningCoordinator
-import io.github.ketraterm.host.*
+import io.github.ketraterm.host.HostControlPolicy
+import io.github.ketraterm.host.HostPolicy
+import io.github.ketraterm.host.TerminalClipboardPolicy
+import io.github.ketraterm.host.TerminalTitlePolicy
 import io.github.ketraterm.ui.swing.settings.SwingSettings
 import io.github.ketraterm.ui.swing.settings.TerminalTheme
 import io.github.ketraterm.workspace.config.TerminalConfig
@@ -77,24 +80,18 @@ internal class KetraTermSettings(
         )
     }
 
-    fun createHostPolicy(command: List<String>): HostPolicy {
+    /** Builds permissions for all output in a session, independent of its launch command. */
+    fun createHostPolicy(): HostPolicy {
         val config = config
-        val isRemote = command.firstOrNull()?.let(::isSshExecutable) == true
-        val clipboardOrigin = if (isRemote) TerminalClipboardOrigin.REMOTE else TerminalClipboardOrigin.LOCAL
-        val titleOrigin = if (isRemote) TerminalTitleOrigin.REMOTE else TerminalTitleOrigin.LOCAL
 
         return HostPolicy(
             titlePolicy =
                 TerminalTitlePolicy(
-                    origin = titleOrigin,
-                    localPermission = config.titleLocalPermission,
-                    remotePermission = config.titleRemotePermission,
+                    permission = config.titlePermission,
                 ),
             clipboardPolicy =
                 TerminalClipboardPolicy(
-                    origin = clipboardOrigin,
-                    localWritePermission = config.clipboardLocalWrite,
-                    remoteWritePermission = config.clipboardRemoteWrite,
+                    writePermission = config.clipboardWrite,
                     readPermission = config.clipboardRead,
                     maxDecodedBytes = config.clipboardMaxDecodedBytes,
                 ),
@@ -113,17 +110,6 @@ internal class KetraTermSettings(
             "underline" -> io.github.ketraterm.render.api.TerminalRenderCursorShape.UNDERLINE
             else -> io.github.ketraterm.render.api.TerminalRenderCursorShape.BLOCK
         }
-
-    private fun isSshExecutable(command: String): Boolean {
-        val executable =
-            command
-                .trim()
-                .trim('"')
-                .replace('\\', '/')
-                .substringAfterLast('/')
-                .lowercase(Locale.ROOT)
-        return executable == "ssh" || executable == "ssh.exe"
-    }
 
     /** Registers a consumer notified on the EDT after a successfully persisted update. */
     fun addChangeListener(listener: () -> Unit) {

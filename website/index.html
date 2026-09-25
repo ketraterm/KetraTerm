@@ -150,7 +150,7 @@
                         <span style="color: var(--accent-primary); font-weight: bold;">✔</span>
                         <div>
                             <strong style="color: white; display: block; margin-bottom: 4px;">Audited OSC 52 Clipboard</strong>
-                            <span class="text-dim" style="font-size: 14px;">Read/query is blocked entirely by default to prevent malicious processes from stealing secrets. Writes are audited, size-checked, and gatekeeper-prompted before modifying the platform clipboard.</span>
+                            <span class="text-dim" style="font-size: 14px;">Read/query is blocked entirely by default to prevent malicious processes from stealing secrets. Writes are allowed by default, audited, and size-checked; settings can require confirmation or deny them.</span>
                         </div>
                     </li>
                     <li style="display: flex; gap: 12px;">
@@ -163,8 +163,8 @@
                     <li style="display: flex; gap: 12px;">
                         <span style="color: var(--accent-primary); font-weight: bold;">✔</span>
                         <div>
-                            <strong style="color: white; display: block; margin-bottom: 4px;">Origin-Aware Window Title Updates</strong>
-                            <span class="text-dim" style="font-size: 14px;">Evaluates title rename sequences based on origin (local shells vs remote SSH). Long values are clamped or rejected, preventing confusion and phishing.</span>
+                            <strong style="color: white; display: block; margin-bottom: 4px;">Session-Wide Title Permissions</strong>
+                            <span class="text-dim" style="font-size: 14px;">Title permissions apply throughout a session, including nested SSH. Long titles are clamped or rejected; application titles are display text, not verified identities.</span>
                         </div>
                     </li>
                 </ul>
@@ -178,7 +178,7 @@
                     </tr>
                     <tr style="border-bottom: 1px solid var(--border-color);">
                         <td style="padding: 12px 0;">OSC 52 Clipboard Write</td>
-                        <td style="padding: 12px 0; text-align: right; color: #fbbf24;">Prompt on Local / Deny on Remote</td>
+                        <td style="padding: 12px 0; text-align: right; color: #fbbf24;">Allow (Session-wide)</td>
                     </tr>
                     <tr style="border-bottom: 1px solid var(--border-color);">
                         <td style="padding: 12px 0;">OSC 52 Clipboard Read</td>
@@ -264,7 +264,7 @@
                 </tr>
                 <tr>
                     <td><strong>Audited OSC 52 Clipboard Gate</strong></td>
-                    <td><span class="table-check">✔</span> (Origin & write prompt)</td>
+                    <td><span class="table-check">✔</span> (Session permissions & optional write prompt)</td>
                     <td><span class="table-cross">✘</span></td>
                     <td><span class="table-cross">✘</span></td>
                     <td><span class="table-cross">✘</span></td>
@@ -334,15 +334,12 @@
                 <div><span class="toml-key">request_resize_window</span> = <span class="toml-bool">false</span> <span class="toml-cmt"># Allow shell to programmatically resize window</span></div>
                 <div><span class="toml-key">request_window_manipulation</span> = <span class="toml-bool">false</span> <span class="toml-cmt"># Gated window operations (minimize/maximize)</span></div>
                 <br>
-                <div><span class="toml-sec">[security.clipboard]</span></div>
-                <div><span class="toml-key">local_write</span> = <span class="toml-str">"prompt"</span>      <span class="toml-cmt"># Local OSC 52 permissions: allow, prompt, deny</span></div>
-                <div><span class="toml-key">remote_write</span> = <span class="toml-str">"deny"</span>       <span class="toml-cmt"># SSH or remote session OSC 52 write permissions</span></div>
-                <div><span class="toml-key">read</span> = <span class="toml-str">"deny"</span>               <span class="toml-cmt"># Clipboard read attempts (always deny to prevent extraction)</span></div>
-                <div><span class="toml-key">max_decoded_bytes</span> = <span class="toml-num">1048576</span> <span class="toml-cmt"># Payload write size ceiling (1MB)</span></div>
+                <div><span class="toml-sec">[security]</span></div>
+                <div><span class="toml-key">clipboard_write</span> = <span class="toml-str">"allow"</span>      <span class="toml-cmt"># Session-wide clipboard writes: allow, prompt, deny</span></div>
+                <div><span class="toml-key">clipboard_read</span> = <span class="toml-str">"deny"</span>               <span class="toml-cmt"># Clipboard read attempts (always deny to prevent extraction)</span></div>
+                <div><span class="toml-key">clipboard_max_decoded_bytes</span> = <span class="toml-num">1048576</span> <span class="toml-cmt"># Payload write size ceiling (1MB)</span></div>
                 <br>
-                <div><span class="toml-sec">[security.title]</span></div>
-                <div><span class="toml-key">local_permission</span> = <span class="toml-str">"allow"</span>  <span class="toml-cmt"># Local title update permission: allow, deny</span></div>
-                <div><span class="toml-key">remote_permission</span> = <span class="toml-str">"deny"</span>  <span class="toml-cmt"># Remote SSH session title updates</span></div>
+                <div><span class="toml-key">title_permission</span> = <span class="toml-str">"allow"</span>  <span class="toml-cmt"># Session-wide title updates: allow, deny</span></div>
             </div>
         </div>
     </section>

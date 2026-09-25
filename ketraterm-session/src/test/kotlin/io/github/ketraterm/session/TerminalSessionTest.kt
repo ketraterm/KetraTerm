@@ -40,7 +40,7 @@ import org.junit.jupiter.params.ParameterizedTest
 import org.junit.jupiter.params.provider.CsvSource
 import org.junit.jupiter.params.provider.ValueSource
 import java.nio.charset.StandardCharsets
-import java.util.Base64
+import java.util.*
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicInteger
@@ -49,74 +49,56 @@ import kotlin.time.Duration.Companion.milliseconds
 @OptIn(ExperimentalCoroutinesApi::class)
 class TerminalSessionTest {
     @Test
-    fun `large clipboard writes follow origin permissions and allowlists through real session parsing`() =
+    fun `large clipboard writes follow session permissions through real session parsing`() =
         runTest {
             val text = "é🙂".repeat(1024)
             val bytes = ("\u001B]52;c;" + Base64.getEncoder().encodeToString(text.encodeToByteArray()) + "\u001B\\").ascii()
-            for (origin in TerminalClipboardOrigin.entries) {
-                for (permission in TerminalClipboardPermission.entries) {
-                    for (allowlisted in listOf(false, true)) {
-                        val connector = MockConnector()
-                        val events = RecordingHostEvents()
-                        val writeAllowed =
-                            permission == TerminalClipboardPermission.ALLOW ||
-                                (permission == TerminalClipboardPermission.ALLOWLIST && allowlisted)
-                        val policy =
-                            TerminalClipboardPolicy(
-                                origin = origin,
-                                localWritePermission =
-                                    if (origin == TerminalClipboardOrigin.LOCAL) {
-                                        permission
-                                    } else {
-                                        TerminalClipboardPermission.DENY
-                                    },
-                                remoteWritePermission =
-                                    if (origin == TerminalClipboardOrigin.REMOTE) {
-                                        permission
-                                    } else {
-                                        TerminalClipboardPermission.DENY
-                                    },
-                                allowlisted = allowlisted,
-                            )
-                        TerminalSession
-                            .create(
-                                TerminalBuffers.create(10, 3),
-                                connector,
-                                events,
-                                HostPolicy(clipboardPolicy = policy),
-                                workerDispatcher = StandardTestDispatcher(testScheduler),
-                            ).use { session ->
-                                session.start(10, 3)
-                                for (offset in bytes.indices step 511) {
-                                    connector.feedFromHost(bytes, offset, minOf(511, bytes.size - offset))
-                                }
-                                when {
-                                    permission == TerminalClipboardPermission.PROMPT -> {
-                                        assertEquals(text, events.clipboardPrompts.single().text)
-                                        assertTrue(events.clipboardWrites.isEmpty())
-                                        assertEquals(
-                                            TerminalClipboardDecision.PROMPT_REQUIRED,
-                                            events.clipboardAudits.single().decision,
-                                        )
-                                    }
-                                    writeAllowed -> {
-                                        assertEquals(text, events.clipboardWrites.single().text)
-                                        assertTrue(events.clipboardPrompts.isEmpty())
-                                        assertEquals(
-                                            TerminalClipboardDecision.ALLOWED_BY_POLICY,
-                                            events.clipboardAudits.single().decision,
-                                        )
-                                    }
-                                    else -> {
-                                        assertTrue(events.clipboardAudits.isEmpty())
-                                        assertTrue(events.clipboardWrites.isEmpty())
-                                        assertTrue(events.clipboardPrompts.isEmpty())
-                                    }
-                                }
-                                assertTrue(connector.writtenBytes.isEmpty())
+            for (permission in TerminalClipboardPermission.entries) {
+                val connector = MockConnector()
+                val events = RecordingHostEvents()
+                val writeAllowed =
+                    permission == TerminalClipboardPermission.ALLOW
+                val policy =
+                    TerminalClipboardPolicy(
+                        writePermission = permission,
+                    )
+                TerminalSession
+                    .create(
+                        TerminalBuffers.create(10, 3),
+                        connector,
+                        events,
+                        HostPolicy(clipboardPolicy = policy),
+                        workerDispatcher = StandardTestDispatcher(testScheduler),
+                    ).use { session ->
+                        session.start(10, 3)
+                        for (offset in bytes.indices step 511) {
+                            connector.feedFromHost(bytes, offset, minOf(511, bytes.size - offset))
+                        }
+                        when {
+                            permission == TerminalClipboardPermission.PROMPT -> {
+                                assertEquals(text, events.clipboardPrompts.single().text)
+                                assertTrue(events.clipboardWrites.isEmpty())
+                                assertEquals(
+                                    TerminalClipboardDecision.PROMPT_REQUIRED,
+                                    events.clipboardAudits.single().decision,
+                                )
                             }
+                            writeAllowed -> {
+                                assertEquals(text, events.clipboardWrites.single().text)
+                                assertTrue(events.clipboardPrompts.isEmpty())
+                                assertEquals(
+                                    TerminalClipboardDecision.ALLOWED_BY_POLICY,
+                                    events.clipboardAudits.single().decision,
+                                )
+                            }
+                            else -> {
+                                assertTrue(events.clipboardAudits.isEmpty())
+                                assertTrue(events.clipboardWrites.isEmpty())
+                                assertTrue(events.clipboardPrompts.isEmpty())
+                            }
+                        }
+                        assertTrue(connector.writtenBytes.isEmpty())
                     }
-                }
             }
         }
 
@@ -129,7 +111,7 @@ class TerminalSessionTest {
                 HostPolicy(
                     clipboardPolicy =
                         TerminalClipboardPolicy(
-                            remoteWritePermission = TerminalClipboardPermission.ALLOW,
+                            writePermission = TerminalClipboardPermission.ALLOW,
                             maxDecodedBytes = 8192,
                         ),
                 )
@@ -175,11 +157,11 @@ class TerminalSessionTest {
                 HostPolicy(
                     clipboardPolicy =
                         TerminalClipboardPolicy(
-                            remoteWritePermission = TerminalClipboardPermission.ALLOW,
+                            writePermission = TerminalClipboardPermission.ALLOW,
                             maxDecodedBytes = 16384,
                         ),
                 )
-            val denied = original.clipboardPolicy.copy(remoteWritePermission = TerminalClipboardPermission.DENY)
+            val denied = original.clipboardPolicy.copy(writePermission = TerminalClipboardPermission.DENY)
             val changes =
                 listOf(
                     original.copy(clipboardPolicy = denied) to
@@ -225,7 +207,7 @@ class TerminalSessionTest {
                         TerminalBuffers.create(10, 3),
                         connector,
                         events,
-                        HostPolicy(clipboardPolicy = TerminalClipboardPolicy(remoteWritePermission = TerminalClipboardPermission.ALLOW)),
+                        HostPolicy(clipboardPolicy = TerminalClipboardPolicy(writePermission = TerminalClipboardPermission.ALLOW)),
                         workerDispatcher = StandardTestDispatcher(testScheduler),
                     ).use { session ->
                         session.start(10, 3)
@@ -942,8 +924,7 @@ class TerminalSessionTest {
                     HostPolicy(
                         clipboardPolicy =
                             TerminalClipboardPolicy(
-                                origin = TerminalClipboardOrigin.LOCAL,
-                                localWritePermission = TerminalClipboardPermission.ALLOW,
+                                writePermission = TerminalClipboardPermission.ALLOW,
                             ),
                     ),
             )
@@ -970,8 +951,7 @@ class TerminalSessionTest {
                     HostPolicy(
                         clipboardPolicy =
                             TerminalClipboardPolicy(
-                                origin = TerminalClipboardOrigin.LOCAL,
-                                localWritePermission = TerminalClipboardPermission.PROMPT,
+                                writePermission = TerminalClipboardPermission.PROMPT,
                             ),
                     ),
             )
