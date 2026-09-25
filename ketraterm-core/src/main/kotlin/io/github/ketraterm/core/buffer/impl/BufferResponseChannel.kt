@@ -15,6 +15,8 @@
  */
 package io.github.ketraterm.core.buffer.impl
 
+import io.github.ketraterm.core.api.TerminalInputState
+import io.github.ketraterm.core.api.TerminalModeBits
 import io.github.ketraterm.core.api.TerminalResponseChannel
 import io.github.ketraterm.core.codec.AttributeCodec
 import io.github.ketraterm.core.model.CellColor
@@ -22,6 +24,7 @@ import io.github.ketraterm.core.model.CellColorKind
 import io.github.ketraterm.core.model.TerminalConstants
 import io.github.ketraterm.core.model.UnderlineStyle
 import io.github.ketraterm.core.state.TerminalState
+import io.github.ketraterm.protocol.*
 import io.github.ketraterm.protocol.keyboard.XtermKeyModifierResource
 
 internal class BufferResponseChannel(
@@ -39,6 +42,111 @@ internal class BufferResponseChannel(
     override fun clearResponseBytes() {
         state.hostResponses.clear()
     }
+
+    override fun requestModeStatus(
+        mode: Int,
+        decPrivate: Boolean,
+        hostCapabilities: Int,
+        defaultBackarrowSendsBackspace: Boolean,
+    ) {
+        if (mode < 0) return
+        val bits = state.modes.getModeBitsSnapshot()
+        val status =
+            if (decPrivate) {
+                privateModeStatus(mode, bits, hostCapabilities, defaultBackarrowSendsBackspace)
+            } else {
+                when (mode) {
+                    AnsiMode.INSERT -> flagStatus(bits, TerminalModeBits.INSERT_MODE)
+                    AnsiMode.NEW_LINE -> flagStatus(bits, TerminalModeBits.NEW_LINE_MODE)
+                    else -> TerminalModeStatus.UNRECOGNIZED
+                }
+            }
+        enqueueCsiPrefix()
+        if (decPrivate) state.hostResponses.enqueueByte('?'.code)
+        state.hostResponses.enqueuePositiveDecimal(mode)
+        state.hostResponses.enqueueByte(';'.code)
+        state.hostResponses.enqueuePositiveDecimal(status)
+        state.hostResponses.enqueueByte('$'.code)
+        state.hostResponses.enqueueByte('y'.code)
+    }
+
+    private fun privateModeStatus(
+        mode: Int,
+        bits: Long,
+        hostCapabilities: Int,
+        defaultBackarrowSendsBackspace: Boolean,
+    ): Int =
+        when (mode) {
+            DecPrivateMode.APPLICATION_CURSOR_KEYS -> flagStatus(bits, TerminalModeBits.APPLICATION_CURSOR_KEYS)
+            DecPrivateMode.REVERSE_VIDEO -> flagStatus(bits, TerminalModeBits.REVERSE_VIDEO)
+            DecPrivateMode.ORIGIN -> flagStatus(bits, TerminalModeBits.ORIGIN_MODE)
+            DecPrivateMode.AUTO_WRAP -> flagStatus(bits, TerminalModeBits.AUTO_WRAP)
+            DecPrivateMode.CURSOR_BLINK -> flagStatus(bits, TerminalModeBits.CURSOR_BLINKING)
+            DecPrivateMode.CURSOR_VISIBLE -> flagStatus(bits, TerminalModeBits.CURSOR_VISIBLE)
+            DecPrivateMode.APPLICATION_KEYPAD -> flagStatus(bits, TerminalModeBits.APPLICATION_KEYPAD)
+            DecPrivateMode.LEFT_RIGHT_MARGIN -> flagStatus(bits, TerminalModeBits.LEFT_RIGHT_MARGIN_MODE)
+            DecPrivateMode.FOCUS_REPORTING -> flagStatus(bits, TerminalModeBits.FOCUS_REPORTING)
+            DecPrivateMode.BRACKETED_PASTE -> flagStatus(bits, TerminalModeBits.BRACKETED_PASTE)
+            DecPrivateMode.SYNCHRONIZED_OUTPUT -> flagStatus(bits, TerminalModeBits.SYNCHRONIZED_OUTPUT)
+            DecPrivateMode.DECCOLM ->
+                hostFlagStatus(
+                    bits,
+                    TerminalModeBits.COLUMN_MODE_132,
+                    hostCapabilities,
+                    TerminalHostModeCapability.COLUMN_MODE,
+                )
+            DecPrivateMode.BELL_IS_URGENT ->
+                hostFlagStatus(
+                    bits,
+                    TerminalModeBits.BELL_IS_URGENT,
+                    hostCapabilities,
+                    TerminalHostModeCapability.URGENT_BELL,
+                )
+            DecPrivateMode.POP_ON_BELL ->
+                hostFlagStatus(
+                    bits,
+                    TerminalModeBits.POP_ON_BELL,
+                    hostCapabilities,
+                    TerminalHostModeCapability.POP_ON_BELL,
+                )
+            DecPrivateMode.BACKARROW_KEY -> booleanStatus(TerminalInputState.backarrowSendsBackspace(bits, defaultBackarrowSendsBackspace))
+            DecPrivateMode.ALT_SCREEN, DecPrivateMode.ALT_SCREEN_BUFFER, DecPrivateMode.ALT_SCREEN_SAVE_CURSOR ->
+                booleanStatus(
+                    state.isAltScreenActive,
+                )
+            DecPrivateMode.MOUSE_X10 -> booleanStatus(TerminalInputState.mouseTrackingMode(bits) == MouseTrackingMode.X10.ordinal)
+            DecPrivateMode.MOUSE_NORMAL -> booleanStatus(TerminalInputState.mouseTrackingMode(bits) == MouseTrackingMode.NORMAL.ordinal)
+            DecPrivateMode.MOUSE_BUTTON_EVENT ->
+                booleanStatus(
+                    TerminalInputState.mouseTrackingMode(bits) == MouseTrackingMode.BUTTON_EVENT.ordinal,
+                )
+            DecPrivateMode.MOUSE_ANY_EVENT ->
+                booleanStatus(
+                    TerminalInputState.mouseTrackingMode(bits) == MouseTrackingMode.ANY_EVENT.ordinal,
+                )
+            DecPrivateMode.MOUSE_UTF8 -> booleanStatus(TerminalInputState.mouseEncodingMode(bits) == MouseEncodingMode.UTF8.ordinal)
+            DecPrivateMode.MOUSE_SGR -> booleanStatus(TerminalInputState.mouseEncodingMode(bits) == MouseEncodingMode.SGR.ordinal)
+            DecPrivateMode.MOUSE_URXVT -> booleanStatus(TerminalInputState.mouseEncodingMode(bits) == MouseEncodingMode.URXVT.ordinal)
+            DecPrivateMode.MOUSE_SGR_PIXELS ->
+                booleanStatus(
+                    TerminalInputState.mouseEncodingMode(bits) == MouseEncodingMode.SGR_PIXELS.ordinal,
+                )
+            else -> TerminalModeStatus.UNRECOGNIZED
+        }
+
+    private fun hostFlagStatus(
+        bits: Long,
+        flag: Long,
+        capabilities: Int,
+        required: Int,
+    ): Int = if (capabilities and required != 0) flagStatus(bits, flag) else TerminalModeStatus.UNRECOGNIZED
+
+    private fun flagStatus(
+        bits: Long,
+        flag: Long,
+    ): Int = booleanStatus(TerminalModeBits.hasFlag(bits, flag))
+
+    private fun booleanStatus(enabled: Boolean): Int = if (enabled) TerminalModeStatus.SET else TerminalModeStatus.RESET
 
     override fun requestDeviceStatusReport(
         mode: Int,
@@ -178,7 +286,7 @@ internal class BufferResponseChannel(
         requestId: Int,
         checksum: Int,
     ) {
-        state.hostResponses.enqueueByte(io.github.ketraterm.protocol.ControlCode.ESC)
+        state.hostResponses.enqueueByte(ControlCode.ESC)
         state.hostResponses.enqueueByte('P'.code)
         state.hostResponses.enqueuePositiveDecimal(requestId)
         state.hostResponses.enqueueByte('!'.code)
@@ -238,26 +346,26 @@ internal class BufferResponseChannel(
     private fun enqueuePrimaryDeviceAttributes() {
         enqueueCsiPrefix()
         state.hostResponses.enqueueByte('?'.code)
-        state.hostResponses.enqueuePositiveDecimal(io.github.ketraterm.protocol.TerminalCapabilityIdentity.PRIMARY_DA_TERMINAL_CLASS)
+        state.hostResponses.enqueuePositiveDecimal(TerminalCapabilityIdentity.PRIMARY_DA_TERMINAL_CLASS)
         state.hostResponses.enqueueByte(';'.code)
-        state.hostResponses.enqueuePositiveDecimal(io.github.ketraterm.protocol.TerminalCapabilityIdentity.PRIMARY_DA_132_COLUMNS)
+        state.hostResponses.enqueuePositiveDecimal(TerminalCapabilityIdentity.PRIMARY_DA_132_COLUMNS)
         state.hostResponses.enqueueByte(';'.code)
-        state.hostResponses.enqueuePositiveDecimal(io.github.ketraterm.protocol.TerminalCapabilityIdentity.PRIMARY_DA_SELECTIVE_ERASE)
+        state.hostResponses.enqueuePositiveDecimal(TerminalCapabilityIdentity.PRIMARY_DA_SELECTIVE_ERASE)
         state.hostResponses.enqueueByte(';'.code)
-        state.hostResponses.enqueuePositiveDecimal(io.github.ketraterm.protocol.TerminalCapabilityIdentity.PRIMARY_DA_ANSI_COLOR)
+        state.hostResponses.enqueuePositiveDecimal(TerminalCapabilityIdentity.PRIMARY_DA_ANSI_COLOR)
         state.hostResponses.enqueueByte(';'.code)
-        state.hostResponses.enqueuePositiveDecimal(io.github.ketraterm.protocol.TerminalCapabilityIdentity.PRIMARY_DA_RECTANGULAR_EDITING)
+        state.hostResponses.enqueuePositiveDecimal(TerminalCapabilityIdentity.PRIMARY_DA_RECTANGULAR_EDITING)
         state.hostResponses.enqueueByte('c'.code)
     }
 
     private fun enqueueSecondaryDeviceAttributes() {
         enqueueCsiPrefix()
         state.hostResponses.enqueueByte('>'.code)
-        state.hostResponses.enqueuePositiveDecimal(io.github.ketraterm.protocol.TerminalCapabilityIdentity.SECONDARY_DA_TERMINAL_ID)
+        state.hostResponses.enqueuePositiveDecimal(TerminalCapabilityIdentity.SECONDARY_DA_TERMINAL_ID)
         state.hostResponses.enqueueByte(';'.code)
-        state.hostResponses.enqueuePositiveDecimal(io.github.ketraterm.protocol.TerminalCapabilityIdentity.SECONDARY_DA_VERSION)
+        state.hostResponses.enqueuePositiveDecimal(TerminalCapabilityIdentity.SECONDARY_DA_VERSION)
         state.hostResponses.enqueueByte(';'.code)
-        state.hostResponses.enqueuePositiveDecimal(io.github.ketraterm.protocol.TerminalCapabilityIdentity.SECONDARY_DA_OPTIONS)
+        state.hostResponses.enqueuePositiveDecimal(TerminalCapabilityIdentity.SECONDARY_DA_OPTIONS)
         state.hostResponses.enqueueByte('c'.code)
     }
 
@@ -374,7 +482,7 @@ internal class BufferResponseChannel(
         status: Int,
         responseData: String,
     ) {
-        state.hostResponses.enqueueByte(io.github.ketraterm.protocol.ControlCode.ESC)
+        state.hostResponses.enqueueByte(ControlCode.ESC)
         state.hostResponses.enqueueByte('P'.code)
         state.hostResponses.enqueuePositiveDecimal(status)
         state.hostResponses.enqueueByte('$'.code)
@@ -450,7 +558,7 @@ internal class BufferResponseChannel(
 
     /** Emits `ESC P [statusChar] + r`. */
     private fun enqueueXtgettcapPrefix(statusChar: Char) {
-        state.hostResponses.enqueueByte(io.github.ketraterm.protocol.ControlCode.ESC)
+        state.hostResponses.enqueueByte(ControlCode.ESC)
         state.hostResponses.enqueueByte('P'.code)
         state.hostResponses.enqueueByte(statusChar.code)
         state.hostResponses.enqueueByte('+'.code)
@@ -465,10 +573,10 @@ internal class BufferResponseChannel(
      */
     private fun resolveCapability(name: String): String? =
         when (name) {
-            "Co", "colors" -> io.github.ketraterm.protocol.TerminalCapabilityIdentity.TERMINFO_COLOR_COUNT
-            "TN", "name" -> io.github.ketraterm.protocol.TerminalCapabilityIdentity.TERM_NAME
+            "Co", "colors" -> TerminalCapabilityIdentity.TERMINFO_COLOR_COUNT
+            "TN", "name" -> TerminalCapabilityIdentity.TERM_NAME
             "RGB", "Tc" ->
-                if (io.github.ketraterm.protocol.TerminalCapabilityIdentity.TERMINFO_TRUECOLOR_SUPPORTED) {
+                if (TerminalCapabilityIdentity.TERMINFO_TRUECOLOR_SUPPORTED) {
                     ""
                 } else {
                     null
@@ -647,17 +755,17 @@ internal class BufferResponseChannel(
     }
 
     private fun enqueueOscPrefix() {
-        state.hostResponses.enqueueByte(io.github.ketraterm.protocol.ControlCode.ESC)
+        state.hostResponses.enqueueByte(ControlCode.ESC)
         state.hostResponses.enqueueByte(']'.code)
     }
 
     private fun enqueueStSuffix() {
-        state.hostResponses.enqueueByte(io.github.ketraterm.protocol.ControlCode.ESC)
+        state.hostResponses.enqueueByte(ControlCode.ESC)
         state.hostResponses.enqueueByte('\\'.code)
     }
 
     private fun enqueueCsiPrefix() {
-        state.hostResponses.enqueueByte(io.github.ketraterm.protocol.ControlCode.ESC)
+        state.hostResponses.enqueueByte(ControlCode.ESC)
         state.hostResponses.enqueueByte('['.code)
     }
 

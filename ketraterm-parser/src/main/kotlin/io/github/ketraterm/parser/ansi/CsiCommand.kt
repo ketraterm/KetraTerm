@@ -84,4 +84,6 @@ internal object CsiCommand {
     const val DECDC: Int = 56
     const val DECRQCRA: Int = 57
     const val SCORC: Int = 58
+    const val DECRQM_ANSI: Int = 59
+    const val DECRQM_DEC: Int = 60
 }

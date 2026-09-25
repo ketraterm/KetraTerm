@@ -131,6 +131,9 @@ object TerminalModeBits {
     /** Whether the host has explicitly selected a DECBKM value for this reset epoch. */
     const val BACKARROW_KEY_MODE_EXPLICIT: Long = 1L shl 35
 
+    /** Last accepted DECCOLM selection, independent of ordinary window resizing. */
+    const val COLUMN_MODE_132: Long = 1L shl 36
+
     /**
      * Returns true when [flag] is set in [bits].
      *

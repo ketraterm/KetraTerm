@@ -191,6 +191,13 @@ class ActionEngineTest {
     }
 
     private class RecordingTerminalCommandSink : TerminalCommandSink {
+        override fun requestModeStatus(
+            mode: Int,
+            decPrivate: Boolean,
+        ) {
+            sinkCalls += "requestModeStatus:$mode:$decPrivate"
+        }
+
         val sinkCalls = mutableListOf<String>()
 
         override fun writeCodepoint(codepoint: Int) {

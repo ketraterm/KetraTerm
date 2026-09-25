@@ -21,6 +21,7 @@ import io.github.ketraterm.host.*
 import io.github.ketraterm.input.TerminalInputEncoders
 import io.github.ketraterm.input.api.TerminalInputEncoder
 import io.github.ketraterm.input.event.*
+import io.github.ketraterm.input.policy.BackspacePolicy
 import io.github.ketraterm.input.policy.PasteControlPolicy
 import io.github.ketraterm.input.policy.TerminalInputPolicy
 import io.github.ketraterm.parser.api.TerminalOutputParser
@@ -371,12 +372,19 @@ class TerminalSession(
     /**
      * Updates the active terminal input policy dynamically.
      *
+     * Serializes with outbound encoding and publishes the Backarrow default for
+     * mode queries. Must not hold [mutationLock] while waiting for the writer:
+     * ingress may need to drain child output before a blocked write can finish.
+     *
      * @param policy new input policy.
      */
     override fun setInputPolicy(policy: TerminalInputPolicy) {
         synchronized(outboundWriteLock) {
             inputPolicy = policy
             inputEncoder.setInputPolicy(policy)
+            hostCommandAdapter?.setDefaultBackarrowSendsBackspace(
+                policy.backspacePolicy == BackspacePolicy.BACKSPACE,
+            )
         }
     }
 
@@ -936,6 +944,7 @@ class TerminalSession(
          * @param hostEvents metadata events target.
          * @param hostPolicy safety policy.
          * @param inputPolicy key-encoding policy.
+         * @param modeReportCapabilities implemented host actions from TerminalHostModeCapability; defaults to none.
          * @param kittyKeyboardSupportedFlags progressive Kitty keyboard flags
          * the active input host can provide truthfully. Defaults to the
          * conservative portable-host profile.
@@ -957,6 +966,7 @@ class TerminalSession(
             workerDispatcher: CoroutineDispatcher = Dispatchers.Default,
             startupCommand: TerminalStartupCommand? = null,
             ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
+            modeReportCapabilities: Int = 0,
         ): TerminalSession {
             val outboundWriteLock = Any()
             val hostOutput = ConnectorTerminalHostOutput(connector, outboundWriteLock)
@@ -971,7 +981,15 @@ class TerminalSession(
                     state = shellIntegrationState,
                     connector = connector,
                 )
-            val sink = HostCommandAdapter(terminal, recordingHostEvents, hostPolicy, kittyKeyboardSupportedFlags)
+            val sink =
+                HostCommandAdapter(
+                    terminal,
+                    recordingHostEvents,
+                    hostPolicy,
+                    kittyKeyboardSupportedFlags,
+                    modeReportCapabilities = modeReportCapabilities,
+                    defaultBackarrowSendsBackspace = inputPolicy.backspacePolicy == BackspacePolicy.BACKSPACE,
+                )
             val parser = TerminalParsers.create(sink, clipboardWriteLimitBytes = sink::clipboardWriteLimitBytes)
             val inputEncoder = TerminalInputEncoders.create(terminal, hostOutput, inputPolicy)
 

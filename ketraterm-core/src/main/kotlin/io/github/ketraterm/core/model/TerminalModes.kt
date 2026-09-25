@@ -30,6 +30,11 @@ import java.util.concurrent.atomic.AtomicLong
 internal class TerminalModes : TerminalInputState {
     private val modeBits = AtomicLong(DEFAULT_MODE_BITS)
 
+    /** Last accepted DECCOLM selection; preserved by soft reset and ordinary resize. */
+    var is132ColumnMode: Boolean
+        get() = TerminalModeBits.hasFlag(currentBits, TerminalModeBits.COLUMN_MODE_132)
+        set(value) = setFlag(TerminalModeBits.COLUMN_MODE_132, value)
+
     /** Mode 4: Insert/Replace Mode (IRM). False = replace (default), true = insert. */
     var isInsertMode: Boolean
         get() = TerminalModeBits.hasFlag(currentBits, TerminalModeBits.INSERT_MODE)
@@ -278,7 +283,7 @@ internal class TerminalModes : TerminalInputState {
         private const val DEFAULT_MODE_BITS: Long =
             TerminalModeBits.AUTO_WRAP or TerminalModeBits.CURSOR_VISIBLE or TerminalModeBits.CURSOR_BLINKING
         private const val SOFT_RESET_PRESERVE_MASK: Long =
-            TerminalModeBits.AMBIGUOUS_WIDE or TerminalModeBits.MOUSE_ENCODING_MASK
+            TerminalModeBits.AMBIGUOUS_WIDE or TerminalModeBits.MOUSE_ENCODING_MASK or TerminalModeBits.COLUMN_MODE_132
         private const val SOFT_RESET_MODE_BITS: Long = DEFAULT_MODE_BITS
 
         private fun decodeMouseTracking(bits: Long): io.github.ketraterm.protocol.MouseTrackingMode {

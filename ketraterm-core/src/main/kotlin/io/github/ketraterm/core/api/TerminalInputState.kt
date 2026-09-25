@@ -31,6 +31,16 @@ interface TerminalInputState {
      */
     companion object {
         /**
+         * Resolves the unmodified legacy Backspace selection. An explicit DECBKM
+         * override takes precedence over the host's current configured default.
+         */
+        @JvmStatic
+        fun backarrowSendsBackspace(
+            bits: Long,
+            defaultSendsBackspace: Boolean,
+        ): Boolean = if (isBackarrowKeyModeExplicit(bits)) isBackarrowKeySendsBackspace(bits) else defaultSendsBackspace
+
+        /**
          * Returns true when application cursor keys mode is enabled in [bits].
          *
          * @param bits The packed mode bits snapshot.

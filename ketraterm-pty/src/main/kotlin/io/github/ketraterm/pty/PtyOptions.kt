@@ -20,6 +20,7 @@ import io.github.ketraterm.input.policy.EnterNewLineModePolicy
 import io.github.ketraterm.input.policy.PasteLineEndingPolicy
 import io.github.ketraterm.input.policy.TerminalInputPolicy
 import io.github.ketraterm.protocol.TerminalCapabilityIdentity
+import io.github.ketraterm.protocol.TerminalHostModeCapability
 import io.github.ketraterm.session.TerminalStartupCommand
 import java.nio.file.Path
 
@@ -48,6 +49,7 @@ import java.nio.file.Path
  * @param eventListener host callbacks for parser-discovered PTY metadata
  * events such as BEL and title changes.
  * @param hostPolicy safety policy for terminal-triggered host actions.
+ * @param modeReportCapabilities implemented host actions from TerminalHostModeCapability.
  * @param startupCommand command to submit once the shell emits a complete OSC 133 prompt.
  * The caller is responsible for installing shell integration before launch.
  */
@@ -68,8 +70,12 @@ data class PtyOptions
         val eventListener: PtyEventListener = PtyEventListener.NONE,
         val hostPolicy: HostPolicy = HostPolicy(),
         val startupCommand: TerminalStartupCommand? = null,
+        val modeReportCapabilities: Int = 0,
     ) {
         init {
+            require(modeReportCapabilities and TerminalHostModeCapability.ALL.inv() == 0) {
+                "invalid host mode-report capabilities: $modeReportCapabilities"
+            }
             require(command.isNotEmpty()) { "PTY command must not be empty" }
             require(command.none { it.isEmpty() }) { "PTY command elements must not be empty" }
             require(columns > 0) { "PTY columns must be positive, got $columns" }

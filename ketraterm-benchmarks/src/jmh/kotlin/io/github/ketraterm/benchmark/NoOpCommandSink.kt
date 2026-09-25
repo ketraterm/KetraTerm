@@ -24,6 +24,11 @@ import io.github.ketraterm.protocol.ShellIntegrationEvent
  * pure parser throughput.
  */
 internal class NoOpCommandSink : TerminalCommandSink {
+    override fun requestModeStatus(
+        mode: Int,
+        decPrivate: Boolean,
+    ) = Unit
+
     override fun writeCodepoint(codepoint: Int) {}
 
     override fun writeCluster(

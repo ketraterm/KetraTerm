@@ -51,6 +51,15 @@ internal interface CommandDispatcher {
 internal object AnsiCommandDispatcher : CommandDispatcher {
     private const val RECTANGLE_ATTRIBUTE_START: Int = 4
 
+    private fun dispatchModeStatus(
+        sink: TerminalCommandSink,
+        state: ParserState,
+        decPrivate: Boolean,
+    ) {
+        if (state.paramCount > 1 || state.subParameterMask != 0 || state.parameterValueSaturated) return
+        sink.requestModeStatus(modeParam(state, 0), decPrivate)
+    }
+
     override fun executeControl(
         sink: TerminalCommandSink,
         state: ParserState,
@@ -121,6 +130,8 @@ internal object AnsiCommandDispatcher : CommandDispatcher {
 
         when (GeneratedCsiDispatchTable.lookup(signature)) {
             CsiCommand.UNKNOWN -> Unit
+            CsiCommand.DECRQM_ANSI -> dispatchModeStatus(sink, state, decPrivate = false)
+            CsiCommand.DECRQM_DEC -> dispatchModeStatus(sink, state, decPrivate = true)
 
             CsiCommand.CUU -> sink.cursorUp(countParam(state, 0))
             CsiCommand.CUD -> sink.cursorDown(countParam(state, 0))

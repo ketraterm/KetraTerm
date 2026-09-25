@@ -34,6 +34,27 @@ interface TerminalResponseChannel : TerminalHostResponseReader {
     fun clearResponseBytes()
 
     /**
+     * Enqueues one ANSI or DEC private DECRPM reply (`CSI [?] mode;status $ y`).
+     * The explicit mode allowlist returns status 0 for unsupported queries.
+     * Negative identifiers produce no response. Queries do not mutate modes or
+     * invalidate rendering. Invoke under the same synchronization as core mutation.
+     * Host adapters must enforce terminal-response policy before calling this API.
+     *
+     * @param mode nonnegative mode identifier; zero denotes an unsupported mode.
+     * @param decPrivate selects DEC private modes rather than ANSI modes.
+     * @param hostCapabilities implemented actions from TerminalHostModeCapability;
+     * zero conservatively excludes host-dependent modes.
+     * @param defaultBackarrowSendsBackspace current host default for legacy Backspace
+     * before an explicit DECBKM override; false selects DEL, true selects BS.
+     */
+    fun requestModeStatus(
+        mode: Int,
+        decPrivate: Boolean,
+        hostCapabilities: Int = 0,
+        defaultBackarrowSendsBackspace: Boolean = false,
+    )
+
+    /**
      * Enqueues a device status report (DSR) response.
      *
      * Allowlisted requests are ANSI 5 (operating status), ANSI/private 6 (cursor

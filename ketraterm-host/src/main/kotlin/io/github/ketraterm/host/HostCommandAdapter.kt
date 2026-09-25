@@ -43,6 +43,8 @@ import kotlin.collections.ArrayDeque
  * @param terminal public core buffer API mutated by parser semantic commands.
  * @param hostEvents optional sink for accepted host metadata and requests.
  * @param hostPolicy safety limits for host-owned metadata.
+ * @param modeReportCapabilities implemented host actions from TerminalHostModeCapability.
+ * @param defaultBackarrowSendsBackspace current legacy Backspace default before DECBKM overrides it.
  * @param kittyKeyboardSupportedFlags progressive Kitty keyboard flags the
  * active input host can provide truthfully. The value must be a subset of the
  * input encoder's implemented protocol mask.
@@ -52,8 +54,17 @@ class HostCommandAdapter(
     private val hostEvents: HostEventSink = HostEventSink.NONE,
     @Volatile private var hostPolicy: HostPolicy = HostPolicy(),
     private val kittyKeyboardSupportedFlags: Int = KittyKeyboardProgressiveFlag.DEFAULT_HOST_SUPPORTED_MASK,
+    private val modeReportCapabilities: Int = 0,
+    @Volatile private var defaultBackarrowSendsBackspace: Boolean = false,
 ) : TerminalCommandSink {
     init {
+        require(
+            modeReportCapabilities and
+                TerminalHostModeCapability.ALL
+                    .inv() == 0,
+        ) {
+            "invalid host mode-report capabilities: $modeReportCapabilities"
+        }
         require(
             kittyKeyboardSupportedFlags >= 0 &&
                 kittyKeyboardSupportedFlags and KittyKeyboardProgressiveFlag.ENCODER_SUPPORTED_MASK == kittyKeyboardSupportedFlags,
@@ -648,6 +659,24 @@ class HostCommandAdapter(
 
     override fun popKittyKeyboardFlags(count: Int) {
         terminal.popKittyKeyboardFlags(count)
+    }
+
+    /**
+     * Publishes the host default without requiring parser synchronization.
+     *
+     * The host serializes publication with its input-policy update. Mode queries
+     * read the last published default without waiting for outbound writes.
+     */
+    fun setDefaultBackarrowSendsBackspace(value: Boolean) {
+        defaultBackarrowSendsBackspace = value
+    }
+
+    override fun requestModeStatus(
+        mode: Int,
+        decPrivate: Boolean,
+    ) {
+        if (!hostPolicy.terminalResponsePolicy.isAllowed) return
+        terminal.requestModeStatus(mode, decPrivate, modeReportCapabilities, defaultBackarrowSendsBackspace)
     }
 
     override fun requestDeviceStatusReport(

@@ -74,8 +74,10 @@ Prefer the smallest design that satisfies current behavior:
 - Before finishing, remove unused extension points and collapse one-use wrappers
   when doing so preserves ownership and makes the data flow easier to follow.
 
-- Query/response features must update the explicit security allowlist and return
-  protocol-defined failure responses for unsupported or unauthorized queries.
+- Query/response features must update the explicit security allowlist and use
+  protocol-defined failure responses for unsupported queries when replies are
+  permitted. Denying the terminal-response family suppresses all its replies,
+  including failure responses.
 - Keep parser/core hot paths allocation-minimal; avoid regex, ICU,
   `BreakIterator`, and object-heavy parsing there.
 - Prefer table-driven protocol and Unicode classification.
