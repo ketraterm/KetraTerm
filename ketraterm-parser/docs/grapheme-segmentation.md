@@ -44,3 +44,26 @@ To resolve this, the [GraphemeAssembler](../src/main/kotlin/io/github/ketraterm/
 
 1. **`flushForRender`**: When the current read block ends, the assembler emits the current pending grapheme immediately to the command sink to allow the terminal UI to draw it.
 2. **`appendToPreviousCluster`**: If subsequent bytes on a new read loop extend the recently flushed grapheme (e.g. a combining character), the assembler notifies the command sink to append this codepoint to the previous cell instead of creating a new cell.
+
+### Bounded retention
+
+The production parser retains the first **32 Unicode codepoints** of each grapheme,
+including its base, in one reusable `IntArray`. This is a terminal resource policy,
+not a Unicode grapheme boundary or a byte/UTF-16 limit.
+
+Once the buffer is full, continuing codepoints are discarded without sink writes.
+They still update segmentation context, including ZWJ, Hangul, and regional-indicator
+state. The next actual boundary starts a new cluster. Filling the buffer never
+flushes or resets the active grapheme. Read-boundary publication also preserves
+context; explicit termination and reset clear it.
+
+Only retained codepoints reach core and influence width, rendering, and copied text.
+For example, a base plus 40 combining marks retains the base and first 31 marks;
+the remaining marks create no cells. A variation selector beyond the limit cannot
+change the retained prefix's width. UTF-8 recovery and structural controls continue
+through their normal parser paths after overflow.
+
+The host adapter forwards these operations. Core owns cluster storage, width, cursor,
+and wrapping; its direct cluster-writing API has no new 32-codepoint restriction.
+The renderer consumes the retained text through its existing cache and shaping
+contracts. No grapheme policy is duplicated in those modules.

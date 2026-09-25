@@ -16,6 +16,7 @@
 package io.github.ketraterm.parser.text
 
 import io.github.ketraterm.parser.ansi.RecordingTerminalCommandSink
+import io.github.ketraterm.parser.fixture.ParserEvents.appendToPreviousCluster
 import io.github.ketraterm.parser.fixture.ParserEvents.writeCluster
 import io.github.ketraterm.parser.fixture.ParserEvents.writeCodepoint
 import io.github.ketraterm.parser.runtime.ParserState
@@ -23,6 +24,8 @@ import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
+import org.junit.jupiter.params.ParameterizedTest
+import org.junit.jupiter.params.provider.ValueSource
 
 @DisplayName("PrintableProcessor")
 class PrintableProcessorTest {
@@ -354,19 +357,96 @@ class PrintableProcessorTest {
     @DisplayName("cluster capacity and state")
     inner class ClusterCapacityAndState {
         @Test
-        fun `cluster buffer capacity flushes safely instead of writing out of bounds`() {
+        fun `cluster capacity retains its prefix until the next actual boundary`() {
             val f = Fixture(state = ParserState(maxCluster = 2))
 
-            f.acceptUtf8Codepoints(0x1F468, 0x200D, 0x1F469)
+            f.acceptUtf8Codepoints(0x1F468, 0x200D, 0x1F469, 0x200D, 0x1F467, 'X'.code)
             f.flush()
 
             assertEquals(
                 listOf(
                     writeCluster(0x1F468, 0x200D),
-                    writeCodepoint(0x1F469),
+                    writeCodepoint('X'.code),
                 ),
                 f.sink.events,
             )
+        }
+
+        @ParameterizedTest
+        @ValueSource(ints = [15, 16, 17, 31, 32, 33, 256])
+        fun `retains at most 32 codepoints without splitting a grapheme`(length: Int) {
+            val f = Fixture()
+            val cluster = IntArray(length) { if (it == 0) 'a'.code else 0x0301 }
+            f.acceptUtf8Codepoints(*cluster)
+            f.acceptAscii("X")
+            f.flush()
+
+            assertEquals(listOf(writeCluster(*cluster.copyOf(minOf(length, 32))), writeCodepoint('X'.code)), f.sink.events)
+        }
+
+        @Test
+        fun `overflow after render publication emits no further continuations or duplicate cluster`() {
+            val f = Fixture()
+            val buffer = f.state.clusterBuffer
+            f.acceptAscii("a")
+            f.processor.flushForRender(f.state)
+            repeat(31) {
+                f.acceptUtf8Codepoints(0x0301)
+                f.processor.flushForRender(f.state)
+            }
+            repeat(100_000) {
+                f.acceptUtf8Codepoints(0x0300)
+                f.processor.flushForRender(f.state)
+            }
+
+            assertSame(buffer, f.state.clusterBuffer)
+            assertEquals(32, f.state.clusterLength)
+            assertEquals(32, f.state.clusterEmittedLength)
+            assertEquals(listOf(writeCodepoint('a'.code)) + List(31) { appendToPreviousCluster(0x0301) }, f.sink.events)
+            f.acceptAscii("X")
+            f.flush()
+            assertEquals(writeCodepoint('X'.code), f.sink.events.last())
+            assertEquals(33, f.sink.events.size)
+        }
+
+        @Test
+        fun `discarded codepoints still update ZWJ Hangul prepend and RI context`() {
+            val sequences =
+                listOf(
+                    intArrayOf(0x1F468, 0x200D, 0x1F469, 0x200D, 0x1F467),
+                    intArrayOf(0x1100, 0x1161, 0x11A8),
+                    intArrayOf(0x0600, 'a'.code),
+                    intArrayOf(0x1F1FA, 0x1F1F8),
+                )
+            for (sequence in sequences) {
+                val f = Fixture(state = ParserState(maxCluster = 1))
+                f.acceptUtf8Codepoints(*sequence)
+                f.acceptAscii("X")
+                f.flush()
+                assertEquals(listOf(writeCodepoint(sequence[0]), writeCodepoint('X'.code)), f.sink.events)
+            }
+            val flags = Fixture(state = ParserState(maxCluster = 1))
+            flags.acceptUtf8Codepoints(0x1F1FA, 0x1F1F8, 0x1F1E8, 0x1F1E6)
+            flags.flush()
+            assertEquals(listOf(writeCodepoint(0x1F1FA), writeCodepoint(0x1F1E8)), flags.sink.events)
+        }
+
+        @Test
+        fun `flush and reset clear segmentation context after overflow`() {
+            for (published in listOf(false, true)) {
+                for (reset in listOf(false, true)) {
+                    val f = Fixture(state = ParserState(maxCluster = 1))
+                    f.acceptUtf8Codepoints(0x1F468, 0x0301, 0x200D)
+                    if (published) f.processor.flushForRender(f.state)
+                    if (reset) f.reset() else f.flush()
+                    f.sink.events.clear()
+                    f.acceptUtf8Codepoints(0x1F469)
+                    f.flush()
+                    assertEquals(listOf(writeCodepoint(0x1F469)), f.sink.events)
+                    assertEquals(0, f.state.clusterLength)
+                    assertEquals(0, f.state.clusterEmittedLength)
+                }
+            }
         }
 
         @Test

@@ -232,7 +232,7 @@ internal class ParserState(
 
     companion object {
         const val DEFAULT_MAX_PARAMS: Int = 32
-        const val DEFAULT_MAX_CLUSTER_CODEPOINTS: Int = 16
+        const val DEFAULT_MAX_CLUSTER_CODEPOINTS: Int = 32
         const val DEFAULT_MAX_PAYLOAD_BYTES: Int = ControlStringPolicy.MAX_PAYLOAD_BYTES
 
         const val CHARSET_ASCII: Int = 0

@@ -33,7 +33,7 @@ No remaining prioritized items in this tier.
 
 ### Tier 2: Regression coverage and modern compatibility
 
-- Resolve the [long-grapheme boundary](#text-and-unicode) and [legacy text-only key encoding](#input-module-gaps) before richer hosts rely on them.
+- Resolve [legacy text-only key encoding](#input-module-gaps) before richer hosts rely on it.
 - Add [DEC mode status reports](#csi-protocols) with truthful unsupported-mode responses and terminal-response policy.
 - Complete the [xterm key-resource state and query path](#input-module-gaps) and [host metadata for richer Kitty keyboard flags](#deferred-kitty-keyboard-protocol-scope).
 
@@ -88,10 +88,11 @@ These are not badges of compatibility for this project. They expand attack surfa
 - `TODO(parser/core/render/ui)`: Kitty graphics use APC (`ESC _ G ... ESC \`), not DCS. The parser currently consumes APC without dispatch; image storage and rendering are also absent. Transfer and retained-image policy is tracked [below](#session-transport-rendering-and-host-integration-gaps).
 
 ### Text and Unicode
+- `TODO(core)`: a retained variation selector arriving after prefix publication can change width without correctly updating right-margin wrapping. Reproduction: in a four-column terminal, position at zero-based column 2, publish U+2764, then parse U+FE0F followed by `X`; the streamed path can overwrite the cluster, while an unsplit cluster wraps `X`. A width-two prefix published at the last column can already wrap or scroll before a later U+FE0E narrows it. This predates the grapheme-length limit and also affects two-codepoint clusters; resolving placement requires an explicit policy for provisional width and already performed wrapping/scrolling.
 - `DONE(parser)`: malformed UTF-8 recovery is exercised immediately before and inside ESC, CSI,
   OSC (BEL/ST/CAN/SUB), DCS ST, and end-of-input, with every split boundary proving that malformed
   bytes do not print or complete stale structural commands.
-- `TODO(parser)`: valid grapheme clusters longer than the parser's 16-codepoint staging buffer are flushed as multiple clusters even when Unicode grapheme rules say they continue. This can shift cursor position, wrapping, and copied text; core storage already supports longer clusters. Preserve one-cell ownership or define and test an explicit bounded fallback.
+- `DONE(parser/core)`: long-grapheme retention has an explicit bounded fallback: retain the first 32 codepoints, discard excess continuations while advancing segmentation context, and resume storage at the next actual boundary. Overflow introduces no additional cell writes, and discarded selectors do not affect width. Core preserves existing text when continuation scratch grows. Parser/host regressions cover read boundaries, overflow recovery, and retained content; selection tests cover copying through wrapping and reflow. Exact text beyond the retained prefix is intentionally unavailable; direct core cluster writes keep their existing contract. See the [grapheme retention contract](../ketraterm-parser/docs/grapheme-segmentation.md#bounded-retention).
 
 ---
 

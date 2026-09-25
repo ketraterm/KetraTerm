@@ -21,6 +21,20 @@ import org.junit.jupiter.api.Test
 
 class TerminalWriterUnicodeTest {
     @Test
+    fun `streamed clusters preserve their prefix when scratch capacity grows`() {
+        val buffer = TerminalBuffers.create(width = 6, height = 2)
+        buffer.writeCodepoint('a'.code)
+        val expected = IntArray(129) { if (it == 0) 'a'.code else 0x0301 }
+        val actual = IntArray(expected.size)
+        for (length in 2..expected.size) {
+            buffer.appendToPreviousCluster(expected[length - 1])
+            assertEquals(length, buffer.getLine(0).readCluster(0, actual))
+            assertArrayEquals(expected.copyOf(length), actual.copyOf(length), "length=$length")
+            assertEquals(1, buffer.cursorCol)
+        }
+    }
+
+    @Test
     fun `invalid scalar ingress preserves wide cell and pending wrap atomically`() {
         for (invalid in intArrayOf(Int.MIN_VALUE, -2, -1, 0xD800, 0xDBFF, 0xDC00, 0xDFFF, 0x110000, Int.MAX_VALUE)) {
             val buffer = TerminalBuffers.create(width = 2, height = 2)

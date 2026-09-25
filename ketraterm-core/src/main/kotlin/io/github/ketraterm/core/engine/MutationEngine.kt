@@ -289,9 +289,7 @@ internal class MutationEngine(
 
             if (raw <= TerminalConstants.CLUSTER_HANDLE_MAX) {
                 val cpLen = src.store.length(raw)
-                if (clusterScratch.size < cpLen) {
-                    clusterScratch = IntArray(cpLen)
-                }
+                ensureClusterScratchCapacity(cpLen)
                 src.store.readInto(raw, clusterScratch, 0)
                 dest.setCluster(col, clusterScratch, cpLen, attr, extendedAttr)
             } else {
@@ -358,7 +356,7 @@ internal class MutationEngine(
         while (nextSize < required) {
             nextSize *= 2
         }
-        clusterScratch = IntArray(nextSize)
+        clusterScratch = clusterScratch.copyOf(nextSize)
     }
 
     private fun copyCellCodepoints(

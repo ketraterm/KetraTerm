@@ -17,6 +17,8 @@ package io.github.ketraterm.ui.swing.api
 
 import io.github.ketraterm.core.TerminalBuffers
 import io.github.ketraterm.core.api.TerminalBuffer
+import io.github.ketraterm.host.HostCommandAdapter
+import io.github.ketraterm.parser.api.TerminalParsers
 import io.github.ketraterm.render.api.TerminalRenderFrameReader
 import io.github.ketraterm.render.cache.TerminalRenderCache
 import org.junit.jupiter.api.Assertions.assertAll
@@ -26,6 +28,24 @@ import org.junit.jupiter.params.ParameterizedTest
 import org.junit.jupiter.params.provider.ValueSource
 
 class TerminalSelectionReflowTest {
+    @ParameterizedTest
+    @ValueSource(ints = [17, 31, 32, 33, 256])
+    fun `copy preserves the parser retained grapheme prefix through wrapping and reflow`(length: Int) {
+        for (base in listOf("a", "\uD83D\uDC69")) {
+            val terminal = TerminalBuffers.create(width = 4, height = 4, maxHistory = 8)
+            val parser = TerminalParsers.create(HostCommandAdapter(terminal))
+            val input = "abc" + base + "\u0301".repeat(length - 1) + "X"
+            val expected = "abc" + base + "\u0301".repeat(minOf(length, 32) - 1) + "X"
+            for (byte in input.encodeToByteArray()) parser.acceptByte(byte.toInt() and 0xff)
+            parser.endOfInput()
+            assertEquals(expected, copyFirstLogicalLine(terminal))
+            for (width in intArrayOf(2, 12, 4)) {
+                terminal.resize(newWidth = width, newHeight = 4)
+                assertEquals(expected, copyFirstLogicalLine(terminal), "length=$length width=$width")
+            }
+        }
+    }
+
     @Test
     fun `uncertain scalars and repaired UTF16 survive selection and reflow`() {
         val input = "A\u0378\uD87F\uDFFD\uFDD0\uE000\uD800Z"
