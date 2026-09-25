@@ -43,8 +43,11 @@ internal class RecordingTerminalCommandSink : TerminalCommandSink {
         events += "writeCluster:$length:${codepoints.take(length).joinToString(":")}"
     }
 
-    override fun appendToPreviousCluster(codepoint: Int) {
-        events += "appendToPreviousCluster:$codepoint"
+    override fun updatePreviousCluster(
+        codepoints: IntArray,
+        length: Int,
+    ) {
+        events += "updatePreviousCluster:$length:${codepoints.take(length).joinToString(":")}"
     }
 
     override fun bell() {

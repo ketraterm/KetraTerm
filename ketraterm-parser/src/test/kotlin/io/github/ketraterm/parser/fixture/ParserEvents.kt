@@ -20,5 +20,5 @@ internal object ParserEvents {
 
     fun writeCluster(vararg codepoints: Int): String = "writeCluster:${codepoints.size}:${codepoints.joinToString(":")}"
 
-    fun appendToPreviousCluster(codepoint: Int): String = "appendToPreviousCluster:$codepoint"
+    fun updatePreviousCluster(vararg codepoints: Int): String = "updatePreviousCluster:${codepoints.size}:${codepoints.joinToString(":")}"
 }

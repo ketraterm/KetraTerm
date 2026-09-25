@@ -69,6 +69,8 @@ interface TerminalWriter {
      * combining-mark clusters, ZWJ emoji, and variation-selector sequences.
      * The core computes the final display width from its active width policy,
      * including East Asian ambiguous-width mode.
+     * The used prefix is copied into core-owned storage before returning; the caller
+     * may immediately reuse the array.
      *
      * @param codepoints Codepoints that make up the grapheme cluster.
      * @param length Number of valid codepoints in [codepoints].
@@ -82,19 +84,27 @@ interface TerminalWriter {
     )
 
     /**
-     * Appends one grapheme-continuation codepoint to the most recently written
-     * printable cell without moving the cursor.
+     * Updates the most recently written printable cell with a complete grapheme sequence.
      *
-     * Parser layers call this when a cluster prefix was already published for
-     * live rendering and a later byte extends that same grapheme. Core owns the
-     * remembered printable-cell target, cluster storage mutation, wide spacer
-     * invariants, and cursor preservation.
+     * The caller owns segmentation and supplies the entire retained sequence, including
+     * the previously published prefix. Core preserves the target's attributes, recalculates
+     * width, and adjusts its occupied span and following cursor. This does not insert a new
+     * cell or advance past a second grapheme. If no remembered printable target remains,
+     * valid input is ignored. This operation does not validate grapheme boundaries or
+     * compare the supplied prefix with stored text.
      *
-     * @param codepoint Unicode codepoint to append to the previous grapheme.
-     * @throws IllegalArgumentException if [codepoint] is outside `0..0x10FFFF` or a surrogate,
-     * even when there is no previous cell. Invalid input never mutates state.
+     * The used prefix is copied into core-owned storage before returning; the caller may
+     * immediately reuse the array. No parser retention limit is imposed on direct callers.
+     *
+     * @param codepoints Complete retained codepoints of the same grapheme.
+     * @param length Number of valid codepoints in [codepoints].
+     * @throws IllegalArgumentException if [length] is outside `1..codepoints.size` or any
+     * used entry is not a Unicode scalar, even without a target. Validation precedes mutation.
      */
-    fun appendToPreviousCluster(codepoint: Int)
+    fun updatePreviousCluster(
+        codepoints: IntArray,
+        length: Int = codepoints.size,
+    )
 
     /**
      * Executes a line feed (LF, `0x0A`).

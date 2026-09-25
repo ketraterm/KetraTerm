@@ -84,10 +84,16 @@ Render frames distinguish stored content from its global presentation:
 - `writeText(text)` writes the string as a sequence of scalar codepoints.
 - `writeCluster(codepoints, length)` writes one pre-segmented visual cluster.
   The core computes its grid width from the active width policy.
-- `appendToPreviousCluster(codepoint)` appends a parser-identified grapheme
-  continuation to the most recently written printable cell without moving the
-  cursor. This supports live rendering at host read boundaries while preserving
-  chunk-boundary combining marks and ZWJ continuations.
+- `updatePreviousCluster(codepoints, length)` applies the complete retained sequence
+  to the most recently written printable cell. The caller owns segmentation and
+  includes the previously published prefix; core preserves the original attributes
+  and applies width, occupied-span, and following-cursor changes. No new printable
+  cell is inserted. Valid updates without a remembered target are ignored.
+- Both cluster APIs consume the borrowed array synchronously, copying its used prefix
+  into core storage. Callers may reuse it immediately. Core neither compares prefixes
+  nor validates grapheme boundaries, and imposes no parser retention limit.
+- The former scalar `appendToPreviousCluster` API is replaced by full-prefix updates.
+  Core scratch is used only for copying stored clusters during grid operations.
 
 Guaranteed behavior:
 
@@ -216,10 +222,10 @@ Guaranteed behavior:
 
 ## Unicode scalar and width policy
 
-`writeCodepoint`, `writeCluster`, and `appendToPreviousCluster` accept Unicode
+`writeCodepoint`, `writeCluster`, and `updatePreviousCluster` accept Unicode
 scalar values: `0..0x10FFFF`, excluding `0xD800..0xDFFF`. Invalid input throws
 `IllegalArgumentException` before grid, cursor, or pending-wrap mutation, even
-for an append without a target. Clusters validate their entire used prefix;
+for an update without a target. Clusters validate their entire used prefix;
 unused array entries are ignored. `writeText` repairs each unpaired UTF-16
 surrogate with U+FFFD and preserves valid surrogate pairs. Parser UTF-8 recovery
 remains parser-owned; an emitted U+FFFD uses the same width as a literal U+FFFD.

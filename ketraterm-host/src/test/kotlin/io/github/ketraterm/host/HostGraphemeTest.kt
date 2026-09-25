@@ -27,6 +27,23 @@ import org.junit.jupiter.params.provider.ValueSource
 
 class HostGraphemeTest {
     @Test
+    fun `full updates preserve original styling and precede structural commands`() {
+        for (suffix in listOf("X", "\u001B[32mX", "\r\nX")) {
+            val terminal = TerminalBuffers.create(6, 2)
+            val parser = TerminalParsers.create(HostCommandAdapter(terminal))
+            parser.accept("\u001B[31me".encodeToByteArray())
+            parser.accept(("\u0301\u0300" + suffix).encodeToByteArray())
+            assertCluster(terminal, 0, 0, intArrayOf('e'.code, 0x0301, 0x0300), suffix)
+            assertEquals(CellColor.indexed(1), terminal.getAttrAt(0, 0)?.foreground)
+            val newLine = suffix.startsWith("\r")
+            val column = if (newLine) 0 else 1
+            val row = if (newLine) 1 else 0
+            assertEquals('X'.code, terminal.getCodepointAt(column, row))
+            assertEquals(CellColor.indexed(if (suffix.startsWith("\u001B")) 2 else 1), terminal.getAttrAt(column, row)?.foreground)
+        }
+    }
+
+    @Test
     fun `long graphemes retain one span across every byte split`() {
         val clusters =
             listOf(

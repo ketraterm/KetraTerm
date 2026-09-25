@@ -59,9 +59,13 @@ internal class BufferWriter(
         }
     }
 
-    override fun appendToPreviousCluster(codepoint: Int) {
-        UnicodeWidth.requireScalar(codepoint)
-        mutationEngine.appendToPreviousCluster(codepoint)
+    override fun updatePreviousCluster(
+        codepoints: IntArray,
+        length: Int,
+    ) {
+        require(length in 1..codepoints.size) { "length must be in 1..${codepoints.size}, was $length" }
+        val charWidth = UnicodeWidth.calculateCluster(codepoints, length, state.modes.treatAmbiguousAsWide)
+        mutationEngine.updatePreviousCluster(codepoints, length, charWidth)
     }
 
     override fun newLine() = mutationEngine.newLine()

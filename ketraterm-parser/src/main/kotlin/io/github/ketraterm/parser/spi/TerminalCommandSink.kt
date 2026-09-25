@@ -45,6 +45,9 @@ interface TerminalCommandSink {
     /**
      * Writes a pre-segmented multi-codepoint grapheme cluster to the grid.
      *
+     * The array is borrowed for this call only; the sink must consume or copy its used
+     * prefix synchronously. The parser reuses it for subsequent publications.
+     *
      * @param codepoints The array of Unicode codepoints forming the cluster.
      * @param length The number of valid codepoints in the array.
      */
@@ -54,18 +57,20 @@ interface TerminalCommandSink {
     )
 
     /**
-     * Appends one grapheme-continuation codepoint to the most recently written
-     * printable cell without moving the cursor.
+     * Updates the most recently published grapheme with its complete retained sequence.
      *
-     * The parser uses this when a host read boundary forced an already complete
-     * printable prefix to be published for interactive latency, and a later
-     * byte proves that the grapheme continues with a combining mark, variation
-     * selector, ZWJ sequence member, or similar continuation. The sink/core owns
-     * locating and mutating the previous cell.
+     * The sequence includes the previously published prefix and newly retained continuations.
+     * Updates are published at read boundaries or before the next grapheme or structural
+     * command. The sink owns the target cell, original attributes, width, and cursor effects.
+     * As with [writeCluster], the array is borrowed only for the duration of this call.
      *
-     * @param codepoint Unicode codepoint to append to the previous grapheme.
+     * @param codepoints Complete retained codepoints of the same grapheme.
+     * @param length Number of valid codepoints in the array.
      */
-    fun appendToPreviousCluster(codepoint: Int)
+    fun updatePreviousCluster(
+        codepoints: IntArray,
+        length: Int,
+    )
 
     // -------------------------------------------------------------------------
     // C0 / ESC structural controls

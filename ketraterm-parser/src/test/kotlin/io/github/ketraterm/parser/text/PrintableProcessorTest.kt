@@ -16,7 +16,7 @@
 package io.github.ketraterm.parser.text
 
 import io.github.ketraterm.parser.ansi.RecordingTerminalCommandSink
-import io.github.ketraterm.parser.fixture.ParserEvents.appendToPreviousCluster
+import io.github.ketraterm.parser.fixture.ParserEvents.updatePreviousCluster
 import io.github.ketraterm.parser.fixture.ParserEvents.writeCluster
 import io.github.ketraterm.parser.fixture.ParserEvents.writeCodepoint
 import io.github.ketraterm.parser.runtime.ParserState
@@ -402,7 +402,11 @@ class PrintableProcessorTest {
             assertSame(buffer, f.state.clusterBuffer)
             assertEquals(32, f.state.clusterLength)
             assertEquals(32, f.state.clusterEmittedLength)
-            assertEquals(listOf(writeCodepoint('a'.code)) + List(31) { appendToPreviousCluster(0x0301) }, f.sink.events)
+            assertEquals(
+                listOf(writeCodepoint('a'.code)) +
+                    List(31) { index -> updatePreviousCluster(*IntArray(index + 2) { if (it == 0) 'a'.code else 0x0301 }) },
+                f.sink.events,
+            )
             f.acceptAscii("X")
             f.flush()
             assertEquals(writeCodepoint('X'.code), f.sink.events.last())

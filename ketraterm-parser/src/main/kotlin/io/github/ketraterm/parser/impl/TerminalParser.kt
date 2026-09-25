@@ -212,7 +212,7 @@ internal class TerminalParser(
     }
 
     private fun flushPrintableForRender() {
-        if (!utf8Decoder.hasPendingSequence() && state.fsmState == AnsiState.GROUND) {
+        if (state.fsmState == AnsiState.GROUND) {
             printableProcessor.flushForRender(state)
         }
     }

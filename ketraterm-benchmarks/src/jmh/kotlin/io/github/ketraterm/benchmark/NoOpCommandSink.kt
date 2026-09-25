@@ -31,7 +31,10 @@ internal class NoOpCommandSink : TerminalCommandSink {
         length: Int,
     ) {}
 
-    override fun appendToPreviousCluster(codepoint: Int) {}
+    override fun updatePreviousCluster(
+        codepoints: IntArray,
+        length: Int,
+    ) {}
 
     override fun bell() {}
 

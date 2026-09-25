@@ -41,35 +41,27 @@ internal class GraphemeAssembler(
 
         if (state.clusterLength < state.clusterBuffer.size) {
             state.clusterBuffer[state.clusterLength++] = codepoint
-            if (state.clusterEmittedLength > 0) {
-                sink.appendToPreviousCluster(codepoint)
-                state.clusterEmittedLength = state.clusterLength
-            }
         }
         GraphemeSegmenter.updateContext(state, codepoint, currentClass)
     }
 
     fun flush(state: ParserState) {
-        if (state.clusterEmittedLength == 0) flushUnemitted(state)
+        flushForRender(state)
         state.clearActiveClusterAfterFlush()
     }
 
     fun flushForRender(state: ParserState) {
         if (state.clusterLength == 0 || state.clusterEmittedLength == state.clusterLength) return
-        flushUnemitted(state)
-        state.clusterEmittedLength = state.clusterLength
-    }
-
-    private fun flushUnemitted(state: ParserState) {
-        when (state.clusterLength) {
-            0 -> return
-            1 -> sink.writeCodepoint(state.clusterBuffer[0])
+        when {
+            state.clusterEmittedLength > 0 -> sink.updatePreviousCluster(state.clusterBuffer, state.clusterLength)
+            state.clusterLength == 1 -> sink.writeCodepoint(state.clusterBuffer[0])
             else ->
                 sink.writeCluster(
                     codepoints = state.clusterBuffer,
                     length = state.clusterLength,
                 )
         }
+        state.clusterEmittedLength = state.clusterLength
     }
 
     fun reset(state: ParserState) {
