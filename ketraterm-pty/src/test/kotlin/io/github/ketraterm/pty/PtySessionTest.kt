@@ -86,6 +86,41 @@ class PtySessionTest {
     }
 
     @Test
+    fun invalidModeReportCapabilitiesCannotLaunchAProcess() {
+        var starts = 0
+        val factory =
+            object : PtyProcessFactory {
+                override fun start(options: PtyOptions): PtyProcess {
+                    starts++
+                    error("must not launch")
+                }
+            }
+        for (invalid in listOf(-1, 8)) {
+            assertThrows(IllegalArgumentException::class.java) {
+                startSession(
+                    options = PtyOptions(command = listOf("fake"), modeReportCapabilities = invalid),
+                    processFactory = factory,
+                )
+            }
+        }
+        assertEquals(0, starts)
+    }
+
+    @Test
+    fun modeReportCapabilitiesReachPtyResponses() {
+        for (capabilities in listOf(0, io.github.ketraterm.protocol.TerminalHostModeCapability.POP_ON_BELL)) {
+            val process = FakePtyProcess(inputBytes = "\u001B[?1043h\u001B[?1043\$p".ascii())
+            val session =
+                startSession(
+                    options = PtyOptions(command = listOf("fake"), columns = 10, rows = 3, modeReportCapabilities = capabilities),
+                    processFactory = FixedProcessFactory(process),
+                )
+            awaitClosed(session)
+            assertEquals(if (capabilities == 0) "\u001B[?1043;0\$y" else "\u001B[?1043;1\$y", process.outputText())
+        }
+    }
+
+    @Test
     fun `input events are encoded to pty stdin through session serialization point`() {
         val process = FakePtyProcess.running()
         val session =

@@ -208,13 +208,10 @@ internal class LegacyKeyboardEncoder(
         if (!writeModifierPrefixOrSuppress(modifiers)) return
 
         val baseByte =
-            if (TerminalInputState.isBackarrowKeyModeExplicit(modeBits)) {
-                if (TerminalInputState.isBackarrowKeySendsBackspace(modeBits)) BS else ControlCode.DEL
+            if (TerminalInputState.backarrowSendsBackspace(modeBits, policy.backspacePolicy == BackspacePolicy.BACKSPACE)) {
+                BS
             } else {
-                when (policy.backspacePolicy) {
-                    BackspacePolicy.DELETE -> ControlCode.DEL
-                    BackspacePolicy.BACKSPACE -> BS
-                }
+                ControlCode.DEL
             }
 
         if (TerminalModifiers.hasCtrl(modifiers)) {

@@ -183,6 +183,10 @@ Guaranteed behavior:
   parameter 9
 - Backspace byte selection follows `BackspacePolicy` until the host explicitly
   selects DECBKM; DECSET 67 sends BS and DECRST 67 sends DEL until reset
+- DECRQM mode 67 and legacy Backspace share the same effective-selection helper;
+  session input-policy changes publish the default after updating the encoder,
+  without holding the parser mutation lock while awaiting outbound writes;
+  queries read the last published default through a volatile field
 - Enter follows newline mode for unmodified or policy-accepted events unless
   the active input policy forces CR-only Return for cooked PTY hosts
 - application cursor and application keypad modes are read from the per-event

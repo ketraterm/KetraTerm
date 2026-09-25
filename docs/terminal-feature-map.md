@@ -156,7 +156,7 @@ mode 2031 application-facing notifications are outside this slice.
 
 ## 4. Query-Response Channels
 
-- **Host Security Policy**: Host-affecting terminal controls are gated at the `ketraterm-host` adapter boundary before they mutate host metadata, call host event sinks, alter palette state, or enqueue terminal-to-host response bytes. `HostPolicy` provides explicit controls for title/icon updates, OSC 8 hyperlinks, OSC 7 current-working-directory reports, desktop notifications, window manipulation requests, OSC palette controls, terminal response channels, and clipboard request auditing. Implemented controls default to allowed for compatibility, while OSC 52 clipboard writes remain deny-by-default and execute only when a product host explicitly enables the permission surface. Host-owned payloads are bounded per feature, including title clamp/reject policy, hyperlink URIs/IDs and registry size, notification title/body text, OSC 7 directory URI length, and OSC 52 decoded payload size. Clipboard and title permissions cover all output in a terminal session, including nested SSH and multiplexer output. Launch commands, process names, and reported hostnames do not select permissions. Standalone and IntelliJ default to allowing clipboard writes, denying reads, and allowing bounded title updates.
+- **Host Security Policy**: Host-affecting terminal controls are gated at the `ketraterm-host` adapter boundary before they mutate host metadata, call host event sinks, alter palette state, or enqueue terminal-to-host response bytes. `HostPolicy` provides explicit controls for title/icon updates, OSC 8 hyperlinks, OSC 7 current-working-directory reports, desktop notifications, window manipulation requests, OSC palette controls, terminal response channels (including mode status queries), and clipboard request auditing. Implemented controls default to allowed for compatibility, while OSC 52 clipboard writes remain deny-by-default and execute only when a product host explicitly enables the permission surface. Host-owned payloads are bounded per feature, including title clamp/reject policy, hyperlink URIs/IDs and registry size, notification title/body text, OSC 7 directory URI length, and OSC 52 decoded payload size. Clipboard and title permissions cover all output in a terminal session, including nested SSH and multiplexer output. Launch commands, process names, and reported hostnames do not select permissions. Standalone and IntelliJ default to allowing clipboard writes, denying reads, and allowing bounded title updates.
 - **OSC 52 Clipboard Policy Surface**: OSC 52 clipboard requests are parsed as bounded semantic requests and evaluated by a deny-by-default host policy. The policy models one session-wide write permission (`deny`, `prompt`, or `allow`), disabled read/query behavior by default, a maximum decoded payload size. Host audit events report operation type, selection, encoded length, decoded byte count, limit, and decision without including clipboard contents. Allowed write requests are decoded to UTF-8 text and forwarded through host, PTY, workspace, standalone Swing, and IntelliJ plugin clipboard callbacks. Prompt-required write requests are decoded only for product-host prompt callbacks, and standalone plus IntelliJ hosts show a confirmation dialog before writing. Denied, malformed, oversized, and read/query requests never carry clipboard contents. OSC 52 read/query responses remain unsupported. Both product settings UIs currently expose read `allow` and `prompt` choices, but these affect audit decisions only and cannot produce a read callback, prompt, or response.
 - **Session Permission API and Settings**: `TerminalClipboardPolicy.writePermission` and `TerminalTitlePolicy.permission` replace the local/remote pairs. The origin enums, clipboard audit origin field, `ALLOWLIST` mode, and `allowlisted` marker are removed. Both products offer Deny / Ask / Allow; persisted `allowlist` values use the invalid-value defaults (allow for writes, deny for reads) and are saved as canonical supported values. Product prompts identify an application in the named terminal without claiming local or remote provenance. Standalone uses `[security].clipboard_write` and `[security].title_permission`; IntelliJ state uses `clipboardWrite` and `titlePermission`. The former local/remote settings are no longer read or written. Existing installations without the new keys use the product defaults above; users who configured stricter title restrictions must select the new session-wide restriction. Library embedders must supply one explicit permission per operation; clipboard access remains denied by default at the library boundary.
 - **Terminal Capability Identity**: A shared `TerminalCapabilityIdentity` contract owns all advertised identity constants used by launch environments and terminal query responses. Local PTYs always receive `$TERM=xterm-256color` and `COLORTERM=truecolor`, independently of the launcher environment. KetraTerm reports VT420-class primary DA `CSI ? 64 ; 1 ; 6 ; 22 ; 28 c` with an explicit allowlist of implemented 132-column, selective-erase, ANSI-color, and rectangular-editing capabilities, plus secondary DA `CSI > 41 ; 0 ; 0 c`. XTGETTCAP reports `TN`/`name=xterm-256color`, `Co`/`colors=256`, boolean `RGB`/`Tc`, and the conservative Kitty keyboard progressive flag mask. Per-session host integration can explicitly expose a broader encoder-supported mask; parameterless `CSI ? u` queries return only active flags admitted by that host mask and terminal-response policy. DA3 remains silent to avoid stable unit-id fingerprinting.
@@ -167,6 +167,60 @@ mode 2031 application-facing notifications are outside this slice.
 - **Window Size/State Reporting**: Responds window minimized/normal state (`CSI 11 t`), screen size in cells (`CSI 19 t`), grid dimensions in characters (`CSI 18 t`), or pixel dimensions (`CSI 14 t`).
 
 ---
+
+### Mode Status Reports
+
+ANSI `CSI Ps $ p` and DEC private `CSI ? Ps $ p` requests return
+`CSI Ps ; Pm $ y` and `CSI ? Ps ; Pm $ y`, respectively. The namespaces are
+independent. The explicit core allowlist returns `1` for set, `2` for reset,
+and `0` for unsupported status queries. No modes currently claim permanent
+set/reset (`3`/`4`) status.
+
+| Namespace | Queryable modes |
+|---|---|
+| ANSI | `4` insert; `20` newline. |
+| DEC core state | `1`, `5`, `6`, `7`, `12`, `25`, `66`, `69`, `1004`, `2004`, `2026`. |
+| DEC mouse tracking | `9`, `1000`, `1002`, `1003`, compared with the active selection. |
+| DEC mouse encoding | `1005`, `1006`, `1015`, `1016`, compared with the active selection. |
+| DEC alternate screen | `47`, `1047`, `1049` all report the active buffer. |
+| DEC Backarrow | `67` reports the explicit DECBKM selection or the current host Backspace default before an override. |
+| DEC host actions | `3`, `1042`, `1043` require the corresponding `TerminalHostModeCapability` declaration. |
+
+Mode `3` reports the last accepted DECCOLM selection, initially reset, independently
+of window width. Ordinary resizes and screen switches preserve it; soft reset
+preserves it, and hard reset restores the reset state. A rejected switch leaves it
+unchanged. Capability describes host implementation, not permission or acceptance
+of an individual resize. Queries never invoke host action callbacks.
+
+Mode `67` follows the same selection rule as unmodified legacy Backspace encoding.
+Input-policy updates serialize with input encoding, then publish the new default
+through a volatile field. Queries read the last published default without acquiring
+the outbound write lock. Policy updates never hold the parser mutation lock while
+waiting for an outbound write, allowing ingress to unblock a backpressured paste.
+Hard and soft reset remove the explicit override. Enhanced keyboard protocols
+continue to govern their own key representation.
+
+Host capability declarations default to none. Standalone declares column switching
+and pop-on-bell, plus urgent-bell where the platform exposes an attention action.
+IntelliJ does not declare these host actions and returns `0` for them. Platform
+window actions remain best effort. Embedders pass the declared bits through
+`TerminalSession.create`, `PtyOptions`, or `TerminalWorkspaceOpenOptions`.
+
+All other modes return `0`, including `1048` (cursor save/restore is an action,
+not persistent mode state) and `2031` (unsolicited theme notifications). Global
+`terminalResponsePolicy = DENY` suppresses every reply, including unsupported-mode
+responses. Mode queries never mutate grid/cursor/mode state or invalidate rendering.
+
+Requests accept one mode parameter; omission means unsupported mode zero.
+Leading zeroes are accepted, and decimal values through `Int.MAX_VALUE` are
+retained exactly. Numeric overflow, extra parameters, colon subparameters,
+field overflow, malformed signatures, cancellation, and incomplete requests
+produce no reply. Incoming `$y` reports are ignored without replying. Parser
+recovery and arbitrary byte chunking preserve these rules.
+
+Responses use the existing reusable byte queue and serialized session output.
+Warmed query-and-drain workloads with adequate queue capacity allocate no response
+objects; initialization and queue growth can allocate.
 
 ## 5. Text & Unicode Engine
 
@@ -241,4 +295,3 @@ For detailed dialect contracts, host capabilities, and specification tables, see
 - **Smart Suggestions Lifecycle**: Smart suggestions are early alpha and default off (`smart_suggestions_enabled = false` in standalone configuration; `smartSuggestionsEnabled` in IntelliJ state). Suggestion settings controls are retained as commented `SUGGESTION_SETTINGS` blocks in both forms, with restoration tracked by `TODO(host/profile)` in the feature gap map. They remain hidden, and saving unrelated settings preserves their stored values. The master switch gates automatic requests, explicit requests, acceptance, completion resources, and learning. Disabled startup creates no engines, providers, learning stores, persistence workers, or live bindings, and performs no completion-file I/O. Session command-line revision tracking is lazy and shared only while observed, outside render publication. Its buffers and history scans stop after the last observer leaves; restarting observation samples the current live frame. The independent `shellSuggestionsEnabled` preference retains its existing default of true and controls only automatic popup observation; explicit requests and configured learning remain available when automatic popup is off. Persistence is effective only while both the master switch and the opt-in persistence preference are enabled. Disabling cancels requests and observation, hides the popup, releases pane resources, and stops the old runtime asynchronously without a final save. Existing files are retained; an in-flight file operation may finish before a replacement runtime starts. Re-enabling creates fresh resources for open panes after teardown completes. Normal shutdown retains its bounded final flush. Disabled completion actions leave shortcuts available to terminal/IDE handling.
 - **Bounded Local Learning**: Exact-command executions and suggestion feedback adjust matching outcomes with bounded context and recency boosts. Executions contribute usage regardless of exit status, while explicit acceptance and dismissal provide positive and negative popup feedback; nonzero exits never penalize ordering. One product-lifetime aggregate publishes opaque ranking evidence and a separately policy-approved plaintext replay projection; one immutable split view is captured per completion request. Only successful executions may create replay rows, which alone feed history and observed-token inference; accepting an existing suggestion never creates a learned candidate. Well-formed commands rejected by the replay policy can still update opaque evidence, but never enter retained replay or observed-token inference; malformed UTF-16 is not learned. Persistence is opt-in and uses the fixed product-owned `command-completion-learning-v3.tsv` path. One conflated worker hydrates once, checkpoints dirty state every 30 seconds, and forces the final dirty write at shutdown. The learning reset operation clears both replay and ranking evidence in memory and replaces persisted learning through the same worker; its settings control is currently hidden. The strict version 3 file stores opaque counters separately from optional replay text and rejects legacy schemas. This cannot guarantee that every plaintext argument, path, URL, or secret is recognized, and deterministic digests of common commands remain guessable. Base64URL fields are encoded, not encrypted.
 - **Zero-Latency Spec Catalog**: Bundled specifications for 18+ standard developer tools: `git`, `gradle`, `kotlin`, `kotlinc`, `adb`, `docker`, `docker-compose`, `kubectl`, `cargo`, `npm`, `pnpm`, `yarn`, `bun`, `gh`, `pip`, `go`, `aws`, and `ketra`.
-

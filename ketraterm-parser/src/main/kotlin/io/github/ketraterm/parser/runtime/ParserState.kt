@@ -69,6 +69,9 @@ internal class ParserState(
     var subParameterMask: Int = 0
     var paramsOverflowed: Boolean = false
 
+    /** A decimal parameter could not be retained exactly by the bounded collector. */
+    var parameterValueSaturated: Boolean = false
+
     // Intermediates invariant:
     // - packed low-to-high into a 32-bit integer.
     // - first byte is bits 0..7, second is bits 8..15, etc.
@@ -167,6 +170,7 @@ internal class ParserState(
         currentParamStarted = false
         subParameterMask = 0
         paramsOverflowed = false
+        parameterValueSaturated = false
         intermediates = 0
         intermediateCount = 0
         privateMarker = 0

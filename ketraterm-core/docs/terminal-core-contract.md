@@ -327,6 +327,12 @@ Guaranteed behavior:
 
 `executeDeccolm(newWidth)` accepts only `80` or `132`.
 
+A successful operation retains the selected column mode for DECRQM independently
+of current geometry. It starts reset, survives ordinary resizes, screen changes,
+and soft reset, and returns to reset on hard reset. Invalid widths leave it unchanged.
+Mode status queries observe state without modifying grid, cursor, modes, or render
+generations; the canonical feature map defines the response allowlist.
+
 Guaranteed sequence:
 
 1. resize both buffers to the new width

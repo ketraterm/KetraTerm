@@ -611,8 +611,12 @@ class TerminalSessionTest {
         )
     }
 
-    @Test
-    fun `response write and key write do not interleave`() {
+    @ParameterizedTest
+    @CsvSource("5n,0n", "?2004\$p,?2004;2\$y")
+    fun `response write and key write do not interleave`(
+        query: String,
+        expected: String,
+    ) {
         lateinit var session: TerminalSession
         val connector =
             SlowFirstWriteConnector {
@@ -622,10 +626,10 @@ class TerminalSessionTest {
             }
         session = createStartedSession(connector)
         session.use {
-            connector.feedFromHost("\u001B[5n".ascii())
+            connector.feedFromHost(("\u001B[" + query).ascii())
 
             connector.awaitWrites()
-            assertEquals("\u001B[0na", connector.writtenBytes.asciiText())
+            assertEquals("\u001B[" + expected + "a", connector.writtenBytes.asciiText())
         }
     }
 

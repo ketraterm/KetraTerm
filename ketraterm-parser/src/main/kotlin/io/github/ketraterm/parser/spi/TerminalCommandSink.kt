@@ -31,6 +31,12 @@ import io.github.ketraterm.protocol.ShellIntegrationEvent
  * - The parser must not know terminal width, height, cursor bounds, or rendering details.
  */
 interface TerminalCommandSink {
+    /** Requests one ANSI or DEC private mode status; host policy controls replies. */
+    fun requestModeStatus(
+        mode: Int,
+        decPrivate: Boolean,
+    )
+
     // -------------------------------------------------------------------------
     // Printable ingress
     // -------------------------------------------------------------------------

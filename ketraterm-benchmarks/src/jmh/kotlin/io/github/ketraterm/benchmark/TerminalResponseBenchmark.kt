@@ -19,6 +19,10 @@ import io.github.ketraterm.core.TerminalBuffers
 import io.github.ketraterm.core.api.TerminalBuffer
 import io.github.ketraterm.core.api.TerminalResponseChannel
 import io.github.ketraterm.core.model.CellColor
+import io.github.ketraterm.host.HostCommandAdapter
+import io.github.ketraterm.parser.api.TerminalOutputParser
+import io.github.ketraterm.parser.api.TerminalParsers
+import io.github.ketraterm.protocol.TerminalHostModeCapability
 import org.openjdk.jmh.annotations.*
 import org.openjdk.jmh.infra.Blackhole
 import java.util.concurrent.TimeUnit
@@ -27,7 +31,7 @@ import java.util.concurrent.TimeUnit
  * Benchmarks the terminal response channel query throughput.
  *
  * Measures the allocation profile and throughput of DECRQSS, XTGETTCAP,
- * DSR, and DA queries. Each benchmark calls a query method, drains the
+ * DSR, DA, and DECRQM queries. Each benchmark calls a query method, drains the
  * response queue, and blackholes the byte count. The `gc` profiler reports
  * `gc.alloc.rate.norm` (B/op) to verify allocation-free response generation.
  */
@@ -41,12 +45,60 @@ open class TerminalResponseBenchmark {
     private lateinit var buffer: TerminalBuffer
     private lateinit var complexBuffer: TerminalBuffer
     private lateinit var drainBuffer: ByteArray
+    private lateinit var parser: TerminalOutputParser
+    private lateinit var modeRequest: ByteArray
+
+    /** Supported ANSI mode with the response drained into reusable storage. */
+    @Benchmark
+    open fun queryModeAnsi(bh: Blackhole) {
+        buffer.requestModeStatus(4, false)
+        bh.consume(buffer.readResponseBytes(drainBuffer))
+    }
+
+    /** Supported DEC mode with no allocated mode snapshot. */
+    @Benchmark
+    open fun queryModePrivate(bh: Blackhole) {
+        buffer.requestModeStatus(2004, true)
+        bh.consume(buffer.readResponseBytes(drainBuffer))
+    }
+
+    /** Unknown mode still produces a complete protocol-defined reply. */
+    @Benchmark
+    open fun queryModeUnsupported(bh: Blackhole) {
+        buffer.requestModeStatus(2031, true)
+        bh.consume(buffer.readResponseBytes(drainBuffer))
+    }
+
+    /** Mouse selection is read from the packed mode word. */
+    @Benchmark
+    open fun queryModeMouse(bh: Blackhole) {
+        buffer.requestModeStatus(1006, true)
+        bh.consume(buffer.readResponseBytes(drainBuffer))
+    }
+
+    /** Host-dependent state passes through an explicit capability check. */
+    @Benchmark
+    open fun queryModeHost(bh: Blackhole) {
+        buffer.requestModeStatus(1043, true, TerminalHostModeCapability.POP_ON_BELL)
+        bh.consume(buffer.readResponseBytes(drainBuffer))
+    }
+
+    /** Real parser-to-core path, including the response policy boundary. */
+    @Benchmark
+    open fun queryModePipeline(bh: Blackhole) {
+        parser.accept(modeRequest)
+        bh.consume(buffer.readResponseBytes(drainBuffer))
+    }
 
     @Setup(Level.Trial)
     open fun setup() {
         drainBuffer = ByteArray(512)
 
         buffer = TerminalBuffers.create(width = 80, height = 24)
+        parser = TerminalParsers.create(HostCommandAdapter(buffer))
+        modeRequest = "\u001B[?2004\$p".encodeToByteArray()
+        parser.accept(modeRequest)
+        buffer.readResponseBytes(drainBuffer)
 
         // Pre-configure a terminal with complex pen for DECRQSS SGR worst case.
         complexBuffer = TerminalBuffers.create(width = 80, height = 24)

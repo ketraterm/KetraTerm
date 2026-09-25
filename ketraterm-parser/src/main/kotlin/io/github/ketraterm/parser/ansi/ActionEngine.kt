@@ -255,7 +255,12 @@ internal class ActionEngine(
             if (!state.currentParamStarted || current < 0) {
                 digit
             } else {
-                saturatingAppendDecimal(current, digit)
+                if (current > (Int.MAX_VALUE - digit) / 10) {
+                    state.parameterValueSaturated = true
+                    Int.MAX_VALUE
+                } else {
+                    current * 10 + digit
+                }
             }
 
         state.currentParamStarted = true
@@ -393,16 +398,6 @@ internal class ActionEngine(
         state.payloadLength++
         return true
     }
-
-    private fun saturatingAppendDecimal(
-        value: Int,
-        digit: Int,
-    ): Int =
-        if (value > 214_748_363) {
-            Int.MAX_VALUE
-        } else {
-            value * 10 + digit
-        }
 }
 
 /**

@@ -20,6 +20,7 @@ import io.github.ketraterm.app.completion.completionShellCapabilities
 import io.github.ketraterm.app.config.KetraTermSettings
 import io.github.ketraterm.host.TerminalClipboardPromptEvent
 import io.github.ketraterm.host.TerminalClipboardWriteEvent
+import io.github.ketraterm.protocol.TerminalHostModeCapability
 import io.github.ketraterm.session.TerminalShellIntegrationCommandLifecycle
 import io.github.ketraterm.session.TerminalStartupCommand
 import io.github.ketraterm.ui.swing.api.SwingTerminalContextMenuRequest
@@ -58,6 +59,24 @@ internal class TabManager(
 ) {
     private val panes = ArrayList<TerminalPane>(INITIAL_TAB_CAPACITY)
     private val workspace = TerminalWorkspace(StandaloneWorkspaceListener())
+    private val attentionTaskbar: Taskbar? =
+        try {
+            if (Taskbar.isTaskbarSupported()) {
+                Taskbar.getTaskbar().takeIf {
+                    it.isSupported(Taskbar.Feature.USER_ATTENTION_WINDOW) || it.isSupported(Taskbar.Feature.USER_ATTENTION)
+                }
+            } else {
+                null
+            }
+        } catch (_: UnsupportedOperationException) {
+            null
+        } catch (_: SecurityException) {
+            null
+        }
+    private val modeReportCapabilities =
+        TerminalHostModeCapability.COLUMN_MODE or
+            TerminalHostModeCapability.POP_ON_BELL or
+            (if (attentionTaskbar != null) TerminalHostModeCapability.URGENT_BELL else 0)
     private val tabRoots = HashMap<String, SplitNode>()
     private val tabContainers = HashMap<String, JPanel>()
 
@@ -220,6 +239,7 @@ internal class TabManager(
                                 pasteControlPolicy = snapshot.pasteControlPolicy,
                                 hostPolicy = settings.createHostPolicy(),
                                 showForegroundProcessName = settings.config.showForegroundProcessName,
+                                modeReportCapabilities = modeReportCapabilities,
                             )
                         },
                 )
@@ -452,6 +472,7 @@ internal class TabManager(
                                 pasteControlPolicy = snapshot.pasteControlPolicy,
                                 hostPolicy = settings.createHostPolicy(),
                                 showForegroundProcessName = settings.config.showForegroundProcessName,
+                                modeReportCapabilities = modeReportCapabilities,
                             )
                         },
                 )
@@ -892,8 +913,7 @@ internal class TabManager(
             if (modes.isBellIsUrgent) {
                 SwingUtilities.invokeLater {
                     try {
-                        if (Taskbar.isTaskbarSupported()) {
-                            val taskbar = Taskbar.getTaskbar()
+                        attentionTaskbar?.let { taskbar ->
                             if (taskbar.isSupported(Taskbar.Feature.USER_ATTENTION_WINDOW)) {
                                 taskbar.requestWindowUserAttention(frame)
                             } else if (taskbar.isSupported(Taskbar.Feature.USER_ATTENTION)) {

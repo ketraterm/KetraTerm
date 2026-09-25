@@ -201,6 +201,7 @@ internal class DefaultTerminalBuffer private constructor(
 
         primarySaved.restoreInto(state.primaryBuffer.savedCursor)
         altSaved.restoreInto(state.altBuffer.savedCursor)
+        state.modes.is132ColumnMode = newWidth == 132
     }
 
     private fun resetSavedCursorToHome(target: SavedCursorState) {

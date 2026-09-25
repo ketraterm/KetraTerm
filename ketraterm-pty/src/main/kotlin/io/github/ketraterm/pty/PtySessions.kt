@@ -59,6 +59,7 @@ internal object PtySessions {
                 hostPolicy = options.hostPolicy,
                 inputPolicy = options.inputPolicy,
                 startupCommand = options.startupCommand,
+                modeReportCapabilities = options.modeReportCapabilities,
             )
         hostEventBridge.attach(session)
         session.start(options.columns, options.rows)

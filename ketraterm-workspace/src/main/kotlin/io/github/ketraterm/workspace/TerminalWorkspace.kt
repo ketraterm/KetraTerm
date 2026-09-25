@@ -398,6 +398,7 @@ private object LocalPtyWorkspaceSessionFactory : TerminalWorkspaceSessionFactory
                 eventListener = eventListener,
                 hostPolicy = options.hostPolicy,
                 startupCommand = launchProfile.startupCommand,
+                modeReportCapabilities = options.modeReportCapabilities,
             ),
         )
     }
@@ -418,6 +419,7 @@ private object LocalPtyWorkspaceSessionFactory : TerminalWorkspaceSessionFactory
  * install shell hooks that emit OSC 7 and OSC 133 metadata.
  * @property hostPolicy safety policy.
  * @property showForegroundProcessName whether detected processes provide automatic title fallbacks.
+ * @property modeReportCapabilities implemented host actions from TerminalHostModeCapability.
  */
 data class TerminalWorkspaceOpenOptions(
     val columns: Int,
@@ -428,6 +430,7 @@ data class TerminalWorkspaceOpenOptions(
     val shellIntegrationEnabled: Boolean = true,
     val hostPolicy: HostPolicy = HostPolicy(),
     val showForegroundProcessName: Boolean = true,
+    val modeReportCapabilities: Int = 0,
 ) {
     init {
         require(columns > 0) { "columns must be > 0, was $columns" }

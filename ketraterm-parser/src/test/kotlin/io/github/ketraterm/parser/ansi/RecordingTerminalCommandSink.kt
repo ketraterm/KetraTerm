@@ -20,6 +20,13 @@ import io.github.ketraterm.protocol.NotificationLevel
 import io.github.ketraterm.protocol.ShellIntegrationEvent
 
 internal class RecordingTerminalCommandSink : TerminalCommandSink {
+    override fun requestModeStatus(
+        mode: Int,
+        decPrivate: Boolean,
+    ) {
+        events += "requestModeStatus:$mode:$decPrivate"
+    }
+
     val events = ArrayList<String>()
     var isLeftRightMarginMode: Boolean = false
 
