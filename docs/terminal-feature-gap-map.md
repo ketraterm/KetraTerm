@@ -33,7 +33,6 @@ No remaining prioritized items in this tier.
 
 ### Tier 2: Regression coverage and modern compatibility
 
-- Resolve [legacy text-only key encoding](#input-module-gaps) before richer hosts rely on it.
 - Add [DEC mode status reports](#csi-protocols) with truthful unsupported-mode responses and terminal-response policy.
 - Complete the [xterm key-resource state and query path](#input-module-gaps) and [host metadata for richer Kitty keyboard flags](#deferred-kitty-keyboard-protocol-scope).
 
@@ -129,7 +128,7 @@ These are not badges of compatibility for this project. They expand attack surfa
 - `TODO(input)`: broader modified-key encoding:
   - xterm modifyOtherKeys subparameter mask support such as `CSI > 4 : 1 m`; this factors modifiers out of the source keysym and therefore remains deferred with rich layout-aware input metadata.
 - `TODO(parser/core/host/input)`: xterm key resources beyond implemented `modifyOtherKeys` and `formatOtherKeys` are incomplete. The parser accepts generic XTMODKEYS/XTFMTKEYS set/reset commands, but the host drops keyboard, cursor, function, keypad, modifier, and special-key resources; core has no per-resource state and input has no matching encodings. XTQMODKEYS replies only for `modifyOtherKeys`, while XTQFMTKEYS (`CSI ? Pp g`) recognition is missing. Query, reset, and explicit-disable behavior need matching mode state and response policy before broader compatibility can be claimed.
-- `TODO(input)`: a valid text-only `TerminalKeyEvent.text(...)` passed through default legacy keyboard mode emits NUL from its Kitty sentinel codepoint `0`, rather than the associated text or an explicit unsupported result. Current Swing does not construct text-only events, but embedders and future rich-input hosts can hit this public API path.
+- `DONE(input)`: text-only `TerminalKeyEvent.text(...)` emits complete committed UTF-8 for press/repeat in legacy and Kitty text modes; release is suppressed and the key-code marker never becomes NUL. Physical-key modifier transformations and modifyOtherKeys do not reinterpret committed text. Kitty report-all mode still requires associated-text reporting, otherwise the event is explicitly suppressed. Exact-byte, long-text, validation, scratch-reuse, mode-snapshot, and real session mode-negotiation regressions cover this public API path. Portable Swing still does not construct text-only events; rich-host capability admission is unchanged. See the [keyboard contract](../ketraterm-input/docs/terminal-input-contract.md#keyboard-contract).
 - `TODO(input/policy)`: additional xterm-compatible key policies when a real ambiguity exists, such as Delete behavior and optional eight-bit Meta output.
 - `DONE(protocol/core/host/input/ui)`: DECBKM mode 67, conventional Ctrl+2 through Ctrl+8 control bytes, xterm modified F3, legacy F13-F35 aliases, and lossless Shift/Ctrl fallback for base Enter/Escape/Backspace/keypad keys are implemented through allocation-free packed mode state and primitive lookup tables.
 - `TODO(parser/core/input)`: xterm highlight mouse tracking (`?1001`) if full xterm mouse parity is required.

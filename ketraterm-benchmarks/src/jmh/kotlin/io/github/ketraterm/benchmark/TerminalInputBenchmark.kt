@@ -41,6 +41,8 @@ open class TerminalInputBenchmark {
     private lateinit var mouseEncoder: io.github.ketraterm.input.api.TerminalInputEncoder
 
     private lateinit var asciiKeyEvent: TerminalKeyEvent
+    private lateinit var textOnlyEvent: TerminalKeyEvent
+    private lateinit var longTextOnlyEvent: TerminalKeyEvent
     private lateinit var specialKeyEvent: TerminalKeyEvent
     private lateinit var modifiedSpecialKeyEvent: TerminalKeyEvent
     private lateinit var mouseEvent: TerminalMouseEvent
@@ -92,6 +94,8 @@ open class TerminalInputBenchmark {
 
         // Pre-built events
         asciiKeyEvent = TerminalKeyEvent.codepoint('a'.code)
+        textOnlyEvent = TerminalKeyEvent.text("a\u00e9\u4e2d\uD83D\uDE00e\u0301")
+        longTextOnlyEvent = TerminalKeyEvent.text("\u00e9\u4e2d\uD83D\uDE00".repeat(128))
         specialKeyEvent = TerminalKeyEvent.key(TerminalKey.UP)
         modifiedSpecialKeyEvent =
             TerminalKeyEvent.key(
@@ -114,6 +118,20 @@ open class TerminalInputBenchmark {
     }
 
     // -- Legacy keyboard --
+
+    /** Committed text without physical-key identity, including supplementary scalars. */
+    @Benchmark
+    open fun encodeTextOnlyLegacy(bh: Blackhole) {
+        legacyEncoder.encodeKey(textOnlyEvent)
+        bh.consume(countingSink.count)
+    }
+
+    /** Text larger than the encoding scratch buffer, with no per-commit staging array. */
+    @Benchmark
+    open fun encodeLongTextOnlyLegacy(bh: Blackhole) {
+        legacyEncoder.encodeKey(longTextOnlyEvent)
+        bh.consume(countingSink.count)
+    }
 
     /** Legacy encoding for a printable ASCII key. */
     @Benchmark

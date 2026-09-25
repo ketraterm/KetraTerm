@@ -15,16 +15,16 @@
  */
 package io.github.ketraterm.input.event
 
-import io.github.ketraterm.input.event.TerminalKeyEvent.Companion.NO_CODEPOINT
-
 /**
  * One keyboard event accepted by the terminal input encoder.
  *
  * Exactly one of [key] or [codepoint] must be provided. Non-printable keys use
- * [key]; printable text uses a Unicode scalar [codepoint].
+ * [key]; printable keys use a Unicode scalar [codepoint]. Text without key identity
+ * uses [TEXT_ONLY_CODEPOINT] together with non-empty [associatedText].
  *
  * @property key non-printable key, or null when this is printable input.
- * @property codepoint Unicode scalar value for printable input, or
+ * @property codepoint Unicode scalar value for a printable key, [TEXT_ONLY_CODEPOINT]
+ * for a text-only commit, or
  * [NO_CODEPOINT] when this is a non-printable key.
  * @property unshiftedCodepoint unshifted Unicode scalar identifying the physical
  * text-producing key for Kitty-compatible protocols, or [NO_CODEPOINT] when
@@ -34,8 +34,8 @@ import io.github.ketraterm.input.event.TerminalKeyEvent.Companion.NO_CODEPOINT
  * alternate-key reporting, or [NO_CODEPOINT] when unknown.
  * @property baseLayoutCodepoint standard PC-101 base-layout key scalar for
  * Kitty alternate-key reporting, or [NO_CODEPOINT] when unknown.
- * @property associatedText host-owned text produced by this key for Kitty
- * associated-text reporting, or null when unknown or inapplicable.
+ * @property associatedText host-owned committed text for a text-only event, or optional
+ * text produced by a known key for Kitty associated-text reporting.
  * @property modifiers active keyboard modifiers using [TerminalModifiers] bits.
  * @property type physical lifecycle phase as reported by the host adapter.
  */
@@ -173,7 +173,12 @@ data class TerminalKeyEvent(
             )
 
         /**
-         * Creates a Kitty text-only event with no known physical key identity.
+         * Creates a committed text event with no known physical key identity.
+         *
+         * In legacy and Kitty text modes, press/repeat emits the validated text as UTF-8
+         * without reapplying modifiers; release emits nothing. Kitty report-all mode
+         * requires associated-text reporting to encode this event, otherwise it is suppressed.
+         * This event is not a paste and does not receive bracketed-paste framing.
          *
          * @param associatedText text produced by the host or IME.
          * @param modifiers active keyboard modifiers.

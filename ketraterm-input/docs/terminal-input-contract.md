@@ -53,8 +53,8 @@ Keyboard events contain exactly one of:
 
 - a `TerminalKey` for non-printable physical keys
 - a printable Unicode scalar codepoint
-- Kitty text-only key code `0` with non-empty associated text when an IME or
-  host text API has no physical-key identity
+- text-only marker `0` with non-empty committed text when an IME or host text
+  API has no physical-key identity (also Kitty's text-only key code)
 
 Each event also carries a host-reported lifecycle phase: press, repeat, or
 release. Hosts must not infer repeat or release semantics they cannot observe.
@@ -149,6 +149,27 @@ uses the configured paste policy.
 
 Printable codepoints encode as UTF-8 when unmodified and supported by the active
 keyboard mode.
+
+`TerminalKeyEvent.text(...)` represents committed text with no physical-key identity.
+In legacy mode, including modifyOtherKeys/formatOtherKeys, and in Kitty modes without
+report-all flag `8`, press and repeat emit the complete associated text as UTF-8.
+Release emits nothing in these text modes, even if Kitty event-type flag `2` is set.
+Modifiers are metadata already accounted for by the host's text production: they do
+not trigger Ctrl mappings, ESC prefixes, or physical-key suppression policies.
+The marker `0` is never emitted as NUL. Known-key events retain their existing modifier
+and associated-text behavior.
+
+When Kitty report-all flag `8` is set, text-only events require associated-text flag
+`16` and use the existing CSI-u report with key code `0`. Without `16`, they are
+explicitly suppressed: no physical identity can be reported, and the application
+has disabled plain text. Host capability admission for these flags is unchanged.
+See the [Kitty text and key reporting rules](https://sw.kovidgoyal.net/kitty/keyboard-protocol/#an-overview).
+
+Text-only commits are not paste events and receive no bracketed-paste framing or
+paste transformations. Construction rejects empty strings, C0/C1 controls, DEL,
+and malformed UTF-16. Encoding walks validated scalars through the existing reusable
+UTF-8 scratch buffer, so commits larger than its capacity are not truncated and do
+not require a temporary byte array. Session serialization covers the entire commit.
 
 Guaranteed behavior:
 
