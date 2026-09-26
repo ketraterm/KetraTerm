@@ -18,81 +18,33 @@ package io.github.ketraterm.ui.swing.host
 import kotlinx.coroutines.CancellableContinuation
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.suspendCancellableCoroutine
-import java.awt.BorderLayout
-import java.awt.GridLayout
-import java.awt.KeyboardFocusManager
-import java.awt.event.ActionEvent
-import java.awt.event.KeyEvent
-import javax.swing.*
+import javax.swing.SwingUtilities
 import kotlin.coroutines.resume
 
 /**
- * Nonmodal clipboard consent owned by one terminal pane. All operations belong
- * to the EDT. Showing it never requests focus; the host installs [component] in
- * its pane and routes terminal Escape to [dismiss]. Close with the pane.
+ * Cancellable read consent owned by one terminal pane. All operations belong to
+ * the EDT. The product presents its standard dialog and returns a handle that
+ * closes it. No clipboard content is passed to the dialog.
  *
- * Cancellation hides the prompt. Blocking persists for this pane's lifetime,
- * including later requests admitted with Allow. No clipboard content is shown.
- * @param focusTarget terminal component to refocus only when a decision control held focus.
+ * Cancellation, expiry and pane disposal close the dialog. Blocking persists
+ * for this pane's lifetime, including later requests admitted with Allow.
+ * @param showDialog opens product UI, delivers a decision on the EDT, and returns its disposal handle.
  */
 class SwingClipboardReadPrompt(
-    private val focusTarget: JComponent,
+    private val showDialog: (request: SwingDialogRequest, decide: (Int?) -> Unit) -> AutoCloseable,
 ) : AutoCloseable {
+    /** Choices shared by both products' standard clipboard dialogs. */
+    enum class Decision(
+        val label: String,
+    ) {
+        ALLOW_ONCE("Allow once"),
+        DENY("Deny"),
+        BLOCK("Block for this terminal"),
+    }
+
     private var pending: CancellableContinuation<Boolean>? = null
     private var blocked = false
     private var closed = false
-    private val question =
-        JTextArea(3, 38).apply {
-            isEditable = false
-            isFocusable = false
-            lineWrap = true
-            wrapStyleWord = true
-            isOpaque = false
-            font = JLabel().font
-        }
-
-    /** Host-owned overlay chrome, hidden outside a pending request. */
-    val component: JPanel =
-        JPanel(BorderLayout(0, 6)).apply {
-            check(SwingUtilities.isEventDispatchThread())
-            border =
-                BorderFactory.createCompoundBorder(
-                    BorderFactory.createEtchedBorder(),
-                    BorderFactory.createEmptyBorder(10, 10, 10, 10),
-                )
-            add(question, BorderLayout.NORTH)
-            add(JLabel("This request expires automatically."), BorderLayout.CENTER)
-            add(
-                JPanel(GridLayout(0, 1, 0, 4)).apply {
-                    add(JButton("Allow once").apply { addActionListener { complete(true) } })
-                    add(JButton("Deny").apply { addActionListener { complete(false) } })
-                    add(
-                        JButton("Block for this terminal").apply {
-                            addActionListener {
-                                if (pending?.isActive == true) {
-                                    blocked = true
-                                    complete(false)
-                                }
-                            }
-                        },
-                    )
-                },
-                BorderLayout.SOUTH,
-            )
-            getInputMap(JComponent.WHEN_ANCESTOR_OF_FOCUSED_COMPONENT).put(
-                KeyStroke.getKeyStroke(KeyEvent.VK_ESCAPE, 0),
-                "denyClipboardRead",
-            )
-            actionMap.put(
-                "denyClipboardRead",
-                object : AbstractAction() {
-                    override fun actionPerformed(event: ActionEvent) {
-                        dismiss()
-                    }
-                },
-            )
-            isVisible = false
-        }
 
     /** Whether this pane has been blocked or closed. */
     val isBlocked: Boolean
@@ -101,34 +53,43 @@ class SwingClipboardReadPrompt(
             return blocked || closed
         }
 
-    /** Suspends for one decision; concurrent requests are declined without replacing it. */
+    /** Suspends for one decision; concurrent requests cannot replace the current dialog. */
     suspend fun request(message: String): Boolean {
         check(SwingUtilities.isEventDispatchThread())
         if (isBlocked || pending != null) return false
+        var dialog: AutoCloseable? = null
         try {
             return suspendCancellableCoroutine { continuation ->
                 pending = continuation
-                question.text = message
-                component.isVisible = true
-                component.revalidate()
+                dialog =
+                    showDialog(
+                        SwingDialogRequest(
+                            SwingClipboardPrompts.TITLE,
+                            message,
+                            SwingDialogRequest.Severity.WARNING,
+                            Decision.entries.map { it.label },
+                            defaultOption = Decision.DENY.ordinal,
+                        ),
+                    ) { option ->
+                        check(SwingUtilities.isEventDispatchThread())
+                        if (pending === continuation && continuation.isActive) {
+                            val decision = Decision.entries.getOrNull(option ?: -1) ?: Decision.DENY
+                            if (decision == Decision.BLOCK) blocked = true
+                            continuation.resume(decision == Decision.ALLOW_ONCE)
+                        }
+                    }
             }
         } finally {
-            val focused = KeyboardFocusManager.getCurrentKeyboardFocusManager().focusOwner
-            val restoreFocus = focused != null && SwingUtilities.isDescendingFrom(focused, component)
             pending = null
-            question.text = ""
-            component.isVisible = false
-            component.revalidate()
-            component.parent?.repaint()
-            if (restoreFocus && !closed) focusTarget.requestFocusInWindow()
+            dialog?.close()
         }
     }
 
-    /** Denies a pending request, returning whether Escape was consumed. */
+    /** Denies a pending request, returning whether terminal Escape was consumed. */
     fun dismiss(): Boolean {
         check(SwingUtilities.isEventDispatchThread())
-        if (pending == null) return false
-        complete(false)
+        val continuation = pending ?: return false
+        if (continuation.isActive) continuation.resume(false)
         return true
     }
 
@@ -137,10 +98,5 @@ class SwingClipboardReadPrompt(
         check(SwingUtilities.isEventDispatchThread())
         closed = true
         pending?.cancel(CancellationException("Terminal pane closed"))
-    }
-
-    private fun complete(allowed: Boolean) {
-        val continuation = pending ?: return
-        if (continuation.isActive) continuation.resume(allowed)
     }
 }

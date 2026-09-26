@@ -18,23 +18,27 @@ package io.github.ketraterm.intellij.services
 import com.intellij.codeWithMe.ClientId
 import com.intellij.codeWithMe.asContextElement
 import com.intellij.openapi.Disposable
+import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.components.service
 import com.intellij.openapi.ide.CopyPasteManager
+import com.intellij.openapi.ui.messages.MessageDialog
 import com.intellij.openapi.util.Disposer
 import com.intellij.testFramework.PlatformTestUtil
 import com.intellij.testFramework.fixtures.BasePlatformTestCase
+import com.intellij.ui.UiInterceptors
 import io.github.ketraterm.core.TerminalBuffers
 import io.github.ketraterm.host.*
+import io.github.ketraterm.intellij.ui.IntellijMessageDialogs
 import io.github.ketraterm.intellij.ui.IntellijTerminalClipboardHandler
 import io.github.ketraterm.session.TerminalClipboardReader
 import io.github.ketraterm.session.TerminalSession
 import io.github.ketraterm.session.TerminalSessionState
 import io.github.ketraterm.testkit.MockConnector
+import io.github.ketraterm.ui.swing.host.SwingClipboardPrompts
 import io.github.ketraterm.ui.swing.host.SwingClipboardReadPrompt
 import io.github.ketraterm.ui.swing.host.SwingClipboardReader
 import io.github.ketraterm.ui.swing.settings.TerminalClipboardHandler
 import kotlinx.coroutines.*
-import java.awt.Container
 import java.awt.datatransfer.DataFlavor
 import java.awt.datatransfer.StringSelection
 import java.awt.datatransfer.Transferable
@@ -43,8 +47,6 @@ import java.util.concurrent.CancellationException
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicInteger
-import javax.swing.JButton
-import javax.swing.JPanel
 import javax.swing.SwingUtilities
 
 /** Real IDE dispatch and session byte streams, with a fake native clipboard boundary. */
@@ -61,6 +63,63 @@ class IntellijClipboardSessionTest : BasePlatformTestCase() {
             Disposer.dispose(lifetime)
         } finally {
             super.tearDown()
+        }
+    }
+
+    fun testProductReadDialogUsesLockCompatibleContextAndClosesOnSessionCancellation() {
+        val shown = CompletableDeferred<MessageDialog>()
+        UiInterceptors.registerPossible(
+            testRootDisposable,
+            object : UiInterceptors.UiInterceptor<MessageDialog>(MessageDialog::class.java) {
+                override fun doIntercept(component: MessageDialog) {
+                    // Interception skips DialogWrapper's show path. The platform's
+                    // dispatch-thread check includes its required write-intent access.
+                    assertTrue(ApplicationManager.getApplication().isDispatchThread)
+                    shown.complete(component)
+                }
+            },
+        )
+        val prompt = SwingClipboardReadPrompt { request, decide -> IntellijMessageDialogs.showModeless(project, request, decide) }
+        val f = Fixture(Client("product-read", "secret"), TerminalClipboardPermission.PROMPT, consent = prompt)
+        f.attach()
+        f.query()
+        waitFor("product consent or provider failure") { shown.isCompleted || f.completed.isCompleted }
+        assertTrue("The clipboard dispatcher must permit the platform dialog's lock", shown.isCompleted)
+        val dialog = runBlocking { shown.await() }
+        assertFalse(f.completed.isCompleted)
+        f.session.close()
+        await("product consent disposal", f.providerDone)
+        assertTrue(dialog.isDisposed)
+        assertEquals(0, f.client.reads.get())
+        assertEquals("", f.output())
+    }
+
+    fun testProductWriteDialogUsesOwningClientAndExplicitConsent() {
+        for (allow in listOf(false, true)) {
+            val f = Fixture(Client("product-write-$allow", "old"))
+            UiInterceptors.registerPossible(
+                testRootDisposable,
+                object : UiInterceptors.UiInterceptor<MessageDialog>(MessageDialog::class.java) {
+                    override fun doIntercept(component: MessageDialog) {
+                        assertEquals(f.client.id, ClientId.current)
+                        component.close(if (allow) 0 else 1)
+                    }
+                },
+            )
+            val finished = CompletableDeferred<Unit>()
+            f.binding.postIfAlive {
+                try {
+                    if (IntellijMessageDialogs.show(project, SwingClipboardPrompts.writeConfirmation("Terminal", "new")) == 0) {
+                        f.binding.clipboard.copyText("new")
+                    }
+                    finished.complete(Unit)
+                } catch (failure: Throwable) {
+                    finished.completeExceptionally(failure)
+                }
+            }
+            await("product write consent", finished)
+            runBlocking { finished.await() }
+            assertEquals(if (allow) "new" else "old", f.client.text)
         }
     }
 
@@ -96,7 +155,7 @@ class IntellijClipboardSessionTest : BasePlatformTestCase() {
         f.session.close()
         await("cancelled request", f.completed)
         f.attach()
-        assertFalse(f.prompt.component.isVisible)
+        assertFalse(f.promptVisible)
         assertEquals(0, client.reads.get())
         assertEquals("", f.output())
     }
@@ -108,14 +167,14 @@ class IntellijClipboardSessionTest : BasePlatformTestCase() {
         first.attach()
         second.attach()
         first.query()
-        waitFor("first consent") { first.prompt.component.isVisible }
+        waitFor("first consent") { first.promptVisible }
         assertEquals(0, first.client.reads.get())
         second.query()
         await("second query denial", second.completed)
         assertEquals("\u001b]52;c;\u001b\\", second.output())
-        assertFalse(second.prompt.component.isVisible)
-        assertTrue(first.prompt.component.isVisible)
-        allowOnce(first.prompt)
+        assertFalse(second.promptVisible)
+        assertTrue(first.promptVisible)
+        first.decide(SwingClipboardReadPrompt.Decision.ALLOW_ONCE.ordinal)
         await("first query approval", first.completed)
         assertEquals("\u001b]52;c;Zmlyc3QtY2xpZW50\u001b\\", first.output())
         assertEquals(1, first.client.reads.get())
@@ -127,11 +186,11 @@ class IntellijClipboardSessionTest : BasePlatformTestCase() {
         val f = Fixture(client, TerminalClipboardPermission.PROMPT)
         f.attach()
         f.query()
-        waitFor("consent") { f.prompt.component.isVisible }
+        waitFor("consent") { f.promptVisible }
         Disposer.dispose(client.owner)
-        waitFor("consent cancellation") { !f.prompt.component.isVisible }
+        waitFor("consent cancellation") { !f.promptVisible }
         await("request retirement", f.completed)
-        allowOnce(f.prompt)
+        f.decide(SwingClipboardReadPrompt.Decision.ALLOW_ONCE.ordinal)
         assertTrue(f.session.state.value is TerminalSessionState.Closed)
         assertFalse(f.binding.isAlive)
         assertEquals(0, client.reads.get())
@@ -156,10 +215,10 @@ class IntellijClipboardSessionTest : BasePlatformTestCase() {
         val f = Fixture(projectClient, TerminalClipboardPermission.PROMPT, applicationClient = applicationClient)
         f.attach()
         f.query()
-        waitFor("consent") { f.prompt.component.isVisible }
+        waitFor("consent") { f.promptVisible }
         Disposer.dispose(applicationClient.owner)
         await("application client retirement", f.completed)
-        waitFor("consent cancellation") { !f.prompt.component.isVisible }
+        waitFor("consent cancellation") { !f.promptVisible }
         assertTrue(projectClient.owner.isAlive)
         assertFalse(f.binding.isAlive)
         assertTrue(f.session.state.value is TerminalSessionState.Closed)
@@ -321,12 +380,20 @@ class IntellijClipboardSessionTest : BasePlatformTestCase() {
         reader: SwingClipboardReader = SwingClipboardReader(),
         applicationClient: Client = client,
         clipboard: TerminalClipboardHandler = applicationClient.clipboard,
+        consent: SwingClipboardReadPrompt? = null,
     ) {
         val connector = MockConnector()
         val entered = CompletableDeferred<Unit>()
         val providerDone = CompletableDeferred<Unit>()
         val completed = CompletableDeferred<TerminalClipboardReadOutcome>()
-        val prompt = SwingClipboardReadPrompt(JPanel())
+        var promptVisible = false
+        var decide: (Int?) -> Unit = {}
+        val prompt =
+            consent ?: SwingClipboardReadPrompt { _, decision ->
+                promptVisible = true
+                decide = decision
+                AutoCloseable { promptVisible = false }
+            }
         val session: TerminalSession =
             TerminalSession.create(
                 TerminalBuffers.create(10, 3),
@@ -439,16 +506,5 @@ class IntellijClipboardSessionTest : BasePlatformTestCase() {
         condition: () -> Boolean,
     ) {
         PlatformTestUtil.waitWithEventsDispatching(description, condition, 10)
-    }
-
-    private fun allowOnce(prompt: SwingClipboardReadPrompt) {
-        fun find(container: Container): JButton? {
-            for (child in container.components) {
-                if (child is JButton && child.text == "Allow once") return child
-                if (child is Container) find(child)?.let { return it }
-            }
-            return null
-        }
-        requireNotNull(find(prompt.component)).doClick(0)
     }
 }

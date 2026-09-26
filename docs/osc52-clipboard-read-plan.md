@@ -133,7 +133,7 @@ XTGETTCAP advertisement for this capability.
 - Present a cancellable prompt associated with its terminal, identifying an
   application in that terminal without claiming a verified process or SSH
   origin. Show no clipboard preview. Offer Allow once and Deny; Escape/close
-  denies. A nonmodal prompt should not steal keyboard focus from another tab.
+  denies. Nonmodal consent requests focus with Deny initially selected, so keyboard navigation works immediately.
 - Bound visible prompts per product window, and provide a session-level way
   to block repeated requests. A terminal cannot create a stack of dialogs.
   Share lifecycle mechanics where both products use the same Swing behavior;
@@ -343,7 +343,7 @@ session, and revocation cannot release an uncommitted successful response.
   clipboard abstraction gains optional native primary-selection access. A
   shared Swing reader resolves requested selections in order, treats empty text
   as success, and retains one process-wide native-read slot until actual return,
-  even after cancellation. Consent is nonmodal and pane-owned, with Allow once,
+  even after cancellation. Read and write consent use the shared standard-dialog contract and product presenters also used by terminal-close and ordinary message dialogs. Clipboard wording is shared across products. Read consent is nonmodal and pane-owned, with Allow once,
   Deny, Escape, and Block for this terminal; one prompt may be pending per window.
   The original session deadline dismisses consent, and no clipboard preview is
   shown. Closing a pane cancels its session before disposing the UI. Standalone
@@ -357,7 +357,7 @@ session, and revocation cannot release an uncommitted successful response.
   a clipboard session to the client captured when its pending tab was created.
   Allowed writes use that binding before the Swing pane exists; reads await the
   pane inside the original session deadline. Both posted writes and consent run
-  under the captured IDE client, with nonmodal IDE dispatch. The shared reader
+  under the captured IDE client, with nonmodal, lock-compatible EDT dispatch required by platform dialog show/dispose operations. The shared reader
   receives the request's clipboard explicitly, retaining one prompt per window
   and the shared native-read bound. Client disposal and project closing close
   the actual terminal session, also revoking already queued replies.
@@ -468,40 +468,21 @@ output. For tmux, record the tested version and configuration: multiplexer
 filtering/passthrough can prevent the request reaching KetraTerm and is not a
 reason to weaken permission or framing checks.
 
-## 7. Product clipboard manual verification
+## 7. Acceptance execution
 
-Run the rebuilt standalone app or IntelliJ plugin with a harmless clipboard marker such as
-`KetraTerm clipboard test`. In its settings, set clipboard reads to Ask. Start
-`nvim --clean` directly in that terminal, outside tmux for the first check, then:
+The [OSC 52 testing guide](osc52-testing.md) owns runnable automation commands,
+manual product checks, Neovim/SSH/tmux instructions, and evidence recording.
 
-```vim
-:lua print(vim.inspect(require('vim.ui.clipboard.osc52').paste('+')()))
-```
-
-This calls Neovim's OSC 52 provider explicitly instead of its ordinary platform
-clipboard provider. Its [implementation](https://github.com/neovim/neovim/blob/master/runtime/lua/vim/ui/clipboard/osc52.lua)
-maps `+` to clipboard `c` and `*` to primary selection `p`.
-
-- Allow once returns the marker; repeating the command asks again.
-- Deny, Escape, or leaving consent unanswered returns empty text. Expiry hides
-  consent after the original eight-second session deadline.
-- Block for this terminal prevents subsequent reads and prompts in that pane,
-  including after changing the global read setting to Allow. A new pane follows
-  the configured permission again.
-- Allow reads without prompting; Deny never reads or prompts.
-- Switch tabs while consent is visible: it stays in the requesting pane. Close
-  that pane: the prompt disappears without a later reply to another terminal.
-- Repeat with `paste('*')` where the runtime exposes a primary selection. An
-  unavailable primary selection returns empty text; it must not return `c`.
-
-Repeat with UTF-8, multiline, and empty clipboard text, and with Neovim over SSH.
-Record app/runtime/OS and Neovim versions with the result. These checks have not
-been performed by the automated fake-provider tests and do not establish
-cross-platform native acceptance. For IntelliJ, also close the project while
-consent is pending and confirm it disappears. Where multiple IDE clients are
-available, use distinct harmless markers and verify that a terminal always
-reads its owning client's clipboard, including across tab changes and client
-disconnection.
+The acceptance checkpoint adds session regressions for UTF-8 byte boundaries
+and sequential recovery after failed, denied, unavailable and invalid reads.
+A dependency-free Node harness asserts exact replies, selector normalization,
+BEL/ST requests, return-path status responses and terminal-mode cleanup. Its
+self-tests use controlled events/timers for fragmentation, duplicate frames,
+failures and cancellation. Opt-in PTY tests launch that same executable against
+a real session with known clipboard data; both Allow and Deny passed through
+Windows ConPTY. These tests do not access the system clipboard. Actual native
+clipboard, consent UI, other platforms and multiple IDE clients still require
+the documented manual acceptance checks.
 
 ## 8. Known limits to keep honest
 

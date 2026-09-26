@@ -22,10 +22,7 @@ import io.github.ketraterm.session.TerminalClipboardReadResult
 import io.github.ketraterm.ui.swing.settings.TerminalClipboardHandler
 import kotlinx.coroutines.*
 import kotlinx.coroutines.swing.Swing
-import java.awt.Container
 import java.util.concurrent.CountDownLatch
-import javax.swing.JButton
-import javax.swing.JPanel
 import javax.swing.SwingUtilities
 import kotlin.test.*
 import kotlin.time.Duration.Companion.milliseconds
@@ -37,7 +34,8 @@ class SwingClipboardReaderTest {
             withContext(Dispatchers.Swing) {
                 val clipboard = Clipboard()
                 val reader = SwingClipboardReader()
-                val prompt = SwingClipboardReadPrompt(JPanel())
+                val dialog = ClipboardDialogFixture()
+                val prompt = dialog.prompt
 
                 suspend fun read(selectors: String): TerminalClipboardReadResult {
                     clipboard.calls.clear()
@@ -71,29 +69,30 @@ class SwingClipboardReaderTest {
             withContext(Dispatchers.Swing) {
                 val clipboard = Clipboard()
                 val reader = SwingClipboardReader()
-                val prompt = SwingClipboardReadPrompt(JPanel())
+                val dialog = ClipboardDialogFixture()
+                val prompt = dialog.prompt
                 val ask = request(permission = TerminalClipboardPermission.PROMPT)
 
                 suspend fun decide(button: String): TerminalClipboardReadResult =
                     coroutineScope {
                         val result = async(start = CoroutineStart.UNDISPATCHED) { reader.read(ask, prompt, "Read?", clipboard) }
-                        assertTrue(prompt.component.isVisible)
+                        assertTrue(dialog.isVisible)
                         assertTrue(clipboard.calls.isEmpty())
-                        prompt.click(button)
+                        dialog.click(button)
                         result.await()
                     }
                 assertSame(
                     TerminalClipboardReadResult.Denied,
                     reader.read(request(permission = TerminalClipboardPermission.DENY), prompt, "Read?", clipboard),
                 )
-                assertFalse(prompt.component.isVisible)
+                assertFalse(dialog.isVisible)
                 assertSame(TerminalClipboardReadResult.Denied, decide("Deny"))
                 assertEquals("clipboard", assertIs<TerminalClipboardReadResult.Text>(decide("Allow once")).text)
                 clipboard.calls.clear()
                 assertSame(TerminalClipboardReadResult.Denied, decide("Block for this terminal"))
                 assertSame(TerminalClipboardReadResult.Denied, reader.read(request(), prompt, "Read?", clipboard))
                 assertTrue(clipboard.calls.isEmpty())
-                assertFalse(prompt.component.isVisible)
+                assertFalse(dialog.isVisible)
                 prompt.close()
             }
         }
@@ -104,19 +103,21 @@ class SwingClipboardReaderTest {
             withContext(Dispatchers.Swing) {
                 val clipboard = Clipboard()
                 val reader = SwingClipboardReader()
-                val first = SwingClipboardReadPrompt(JPanel())
-                val second = SwingClipboardReadPrompt(JPanel())
+                val firstDialog = ClipboardDialogFixture()
+                val first = firstDialog.prompt
+                val secondDialog = ClipboardDialogFixture()
+                val second = secondDialog.prompt
                 val ask = request(permission = TerminalClipboardPermission.PROMPT)
                 val pending = async(start = CoroutineStart.UNDISPATCHED) { reader.read(ask, first, "First terminal", clipboard) }
                 assertSame(TerminalClipboardReadResult.Denied, reader.read(ask, second, "Second terminal", clipboard))
-                assertFalse(second.component.isVisible)
-                assertTrue(first.component.isVisible)
+                assertFalse(secondDialog.isVisible)
+                assertTrue(firstDialog.isVisible)
                 pending.cancelAndJoin()
-                assertFalse(first.component.isVisible)
-                first.click("Allow once")
+                assertFalse(firstDialog.isVisible)
+                firstDialog.click("Allow once")
                 assertTrue(clipboard.calls.isEmpty())
                 val replacement = async(start = CoroutineStart.UNDISPATCHED) { reader.read(ask, second, "Second terminal", clipboard) }
-                assertTrue(second.component.isVisible)
+                assertTrue(secondDialog.isVisible)
                 assertTrue(second.dismiss())
                 assertSame(TerminalClipboardReadResult.Denied, replacement.await())
                 assertFalse(second.dismiss())
@@ -143,8 +144,8 @@ class SwingClipboardReaderTest {
                         }
                     }
                 val clipboard = Clipboard()
-                val firstPrompt = withContext(Dispatchers.Swing) { SwingClipboardReadPrompt(JPanel()) }
-                val secondPrompt = withContext(Dispatchers.Swing) { SwingClipboardReadPrompt(JPanel()) }
+                val firstPrompt = withContext(Dispatchers.Swing) { SwingClipboardReadPrompt { _, _ -> error("Allow must not prompt") } }
+                val secondPrompt = withContext(Dispatchers.Swing) { SwingClipboardReadPrompt { _, _ -> error("Allow must not prompt") } }
                 val secondReader = SwingClipboardReader()
                 val pending =
                     async {
@@ -180,7 +181,8 @@ class SwingClipboardReaderTest {
 
                         override fun readText(): String = throw failure
                     }
-                val prompt = SwingClipboardReadPrompt(JPanel())
+                val dialog = ClipboardDialogFixture()
+                val prompt = dialog.prompt
                 val caught =
                     assertFailsWith<IllegalStateException> {
                         SwingClipboardReader().read(request(), prompt, "Read?", clipboard)
@@ -218,15 +220,4 @@ class SwingClipboardReaderTest {
         selectors: String = "c",
         permission: TerminalClipboardPermission = TerminalClipboardPermission.ALLOW,
     ) = TerminalClipboardReadRequest(requireNotNull(TerminalClipboardSelection.parse(selectors)), permission, 1024)
-}
-
-internal fun SwingClipboardReadPrompt.click(text: String) {
-    fun find(container: Container): JButton? {
-        for (child in container.components) {
-            if (child is JButton && child.text == text) return child
-            if (child is Container) find(child)?.let { return it }
-        }
-        return null
-    }
-    requireNotNull(find(component)).doClick(0)
 }

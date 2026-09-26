@@ -15,10 +15,6 @@
  */
 package io.github.ketraterm.intellij.services
 
-import io.github.ketraterm.host.TerminalClipboardAuditEvent
-import io.github.ketraterm.host.TerminalClipboardDecision
-import io.github.ketraterm.host.TerminalClipboardOperation
-import io.github.ketraterm.host.TerminalClipboardPromptEvent
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -37,37 +33,4 @@ class IntellijOsc52ClipboardSelectionsTest {
         assertFalse(IntellijOsc52ClipboardSelections.targetsIdeClipboard("s"))
         assertFalse(IntellijOsc52ClipboardSelections.targetsIdeClipboard("ps"))
     }
-
-    @Test
-    fun `prompt text names profile and hides protocol details`() {
-        val message = IntellijOsc52ClipboardPromptText.message("PowerShell", promptEvent("OSC 52 works"))
-
-        assertTrue(message.contains("Allow an application in PowerShell to write 12 characters to the IDE clipboard?"))
-        assertFalse(message.contains("Local terminal session"))
-        assertFalse(message.contains("OSC 52"))
-        assertFalse(message.contains("Selection:"))
-        assertFalse(message.contains("bytes"))
-    }
-
-    @Test
-    fun `empty prompt text is shown as clipboard clear`() {
-        val message = IntellijOsc52ClipboardPromptText.message("PowerShell", promptEvent(""))
-
-        assertTrue(message.contains("Allow an application in PowerShell to clear the IDE clipboard?"))
-    }
-
-    private fun promptEvent(text: String): TerminalClipboardPromptEvent =
-        TerminalClipboardPromptEvent(
-            selection = "c",
-            text = text,
-            audit =
-                TerminalClipboardAuditEvent(
-                    operation = TerminalClipboardOperation.WRITE,
-                    selection = "c",
-                    encodedLength = 0,
-                    decodedBytes = text.toByteArray().size,
-                    maxDecodedBytes = 1024,
-                    decision = TerminalClipboardDecision.PROMPT_REQUIRED,
-                ),
-        )
 }

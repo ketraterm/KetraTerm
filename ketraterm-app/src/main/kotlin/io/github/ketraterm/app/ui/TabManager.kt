@@ -26,7 +26,10 @@ import io.github.ketraterm.session.TerminalClipboardReadResult
 import io.github.ketraterm.session.TerminalShellIntegrationCommandLifecycle
 import io.github.ketraterm.session.TerminalStartupCommand
 import io.github.ketraterm.ui.swing.api.SwingTerminalContextMenuRequest
+import io.github.ketraterm.ui.swing.host.SwingClipboardPrompts
 import io.github.ketraterm.ui.swing.host.SwingClipboardReader
+import io.github.ketraterm.ui.swing.host.SwingDialogRequest
+import io.github.ketraterm.ui.swing.host.SwingMessageDialogs
 import io.github.ketraterm.ui.swing.settings.TerminalClipboardHandler
 import io.github.ketraterm.workspace.*
 import kotlinx.coroutines.*
@@ -745,11 +748,13 @@ internal class TabManager(
         runCatching {
             Files.writeString(chooser.selectedFile.toPath(), output, StandardCharsets.UTF_8)
         }.onFailure { exception ->
-            JOptionPane.showMessageDialog(
+            SwingMessageDialogs.show(
                 frame,
-                exception.message ?: exception.javaClass.name,
-                "Unable to export command output",
-                JOptionPane.ERROR_MESSAGE,
+                SwingDialogRequest(
+                    "Unable to export command output",
+                    exception.message ?: exception.javaClass.name,
+                    SwingDialogRequest.Severity.ERROR,
+                ),
             )
         }
     }
@@ -875,11 +880,13 @@ internal class TabManager(
         profile: TerminalProfile,
         exception: Exception,
     ) {
-        JOptionPane.showMessageDialog(
+        SwingMessageDialogs.show(
             frame,
-            exception.message ?: exception.javaClass.name,
-            "Unable to start ${profile.displayName}",
-            JOptionPane.ERROR_MESSAGE,
+            SwingDialogRequest(
+                "Unable to start ${profile.displayName}",
+                exception.message ?: exception.javaClass.name,
+                SwingDialogRequest.Severity.ERROR,
+            ),
         )
     }
 
@@ -970,11 +977,13 @@ internal class TabManager(
         override fun startupCommandCancelled(tab: TerminalWorkspaceTab) {
             SwingUtilities.invokeLater {
                 if (panes.none { it.tab == tab }) return@invokeLater
-                JOptionPane.showMessageDialog(
+                SwingMessageDialogs.show(
                     frame,
-                    "The startup command was skipped because you entered input before the shell was ready.",
-                    "Startup Command Skipped",
-                    JOptionPane.INFORMATION_MESSAGE,
+                    SwingDialogRequest(
+                        "Startup Command Skipped",
+                        "The startup command was skipped because you entered input before the shell was ready.",
+                        SwingDialogRequest.Severity.INFORMATION,
+                    ),
                 )
             }
         }
@@ -1001,7 +1010,7 @@ internal class TabManager(
                 clipboardReader.read(
                     request,
                     pane.clipboardReadPrompt,
-                    Osc52ClipboardPromptText.readQuestion(tab.profile.displayName),
+                    SwingClipboardPrompts.readQuestion(tab.profile.displayName),
                     TerminalClipboardHandler.SYSTEM,
                 )
             }
@@ -1023,15 +1032,8 @@ internal class TabManager(
             if (!targetsHostClipboard(event.selection)) return
             SwingUtilities.invokeLater {
                 val pane = panes.firstOrNull { it.tab == tab } ?: return@invokeLater
-                val answer =
-                    JOptionPane.showConfirmDialog(
-                        frame,
-                        clipboardPromptComponent(tab.profile.displayName, event),
-                        Osc52ClipboardPromptText.title(),
-                        JOptionPane.YES_NO_OPTION,
-                        JOptionPane.WARNING_MESSAGE,
-                    )
-                if (answer == JOptionPane.YES_OPTION) {
+                val request = SwingClipboardPrompts.writeConfirmation(tab.profile.displayName, event.text)
+                if (SwingMessageDialogs.show(frame, request) == 0) {
                     pane.terminal.copyTextToClipboard(event.text)
                 }
             }
@@ -1165,16 +1167,6 @@ internal class TabManager(
         private const val COMPLETION_PERSISTENCE_DURABILITY_BUDGET_MILLIS = 500L
 
         private fun targetsHostClipboard(selection: String): Boolean = selection.isEmpty() || selection.indexOf('c') >= 0
-
-        private fun clipboardPromptComponent(
-            profileName: String,
-            event: TerminalClipboardPromptEvent,
-        ): JComponent =
-            JPanel(BorderLayout(0, 6)).apply {
-                isOpaque = false
-                border = BorderFactory.createEmptyBorder(2, 0, 0, 0)
-                add(JLabel(Osc52ClipboardPromptText.htmlQuestion(profileName, event)), BorderLayout.NORTH)
-            }
     }
 }
 

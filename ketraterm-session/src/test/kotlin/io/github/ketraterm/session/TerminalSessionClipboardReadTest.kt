@@ -32,6 +32,77 @@ import kotlin.time.TimeSource
 @OptIn(ExperimentalCoroutinesApi::class)
 class TerminalSessionClipboardReadTest {
     @Test
+    fun `UTF-8 byte limit applies to complete replies and rejected reads release the next query`() =
+        runTest {
+            val cases =
+                listOf(
+                    "" to "",
+                    "\u00e9\ud83d\ude42" to "w6nwn5mC",
+                    "\u00e9\ud83d\ude42x" to "",
+                    "\ud800" to "",
+                    "ok" to "b2s=",
+                )
+            var reads = 0
+            Fixture(this, limit = 6, reader = TerminalClipboardReader { TerminalClipboardReadResult.Text(cases[reads++].first) }).use { f ->
+                val expected = StringBuilder()
+                for ((text, base64) in cases) {
+                    f.query()
+                    runCurrent()
+                    expected.append("\u001b]52;c;").append(base64).append("\u001b\\")
+                    assertEquals(expected.toString(), f.output(), "UTF-16 length ${text.length}")
+                }
+                assertEquals(cases.size, reads)
+                assertEquals(
+                    listOf(
+                        TerminalClipboardReadOutcome.SENT,
+                        TerminalClipboardReadOutcome.SENT,
+                        TerminalClipboardReadOutcome.INVALID_DATA,
+                        TerminalClipboardReadOutcome.INVALID_DATA,
+                        TerminalClipboardReadOutcome.SENT,
+                    ),
+                    f.outcomes,
+                )
+                assertNull(f.session.failure)
+            }
+        }
+
+    @Test
+    fun `failed denied and unavailable providers release the slot for the next successful read`() =
+        runTest {
+            var reads = 0
+            Fixture(
+                this,
+                reader =
+                    TerminalClipboardReader {
+                        when (reads++) {
+                            0 -> throw IllegalStateException("provider-secret")
+                            1 -> TerminalClipboardReadResult.Denied
+                            2 -> TerminalClipboardReadResult.Unavailable
+                            else -> TerminalClipboardReadResult.Text("ok")
+                        }
+                    },
+            ).use { f ->
+                repeat(4) {
+                    f.query()
+                    runCurrent()
+                }
+                assertEquals(4, reads)
+                assertEquals("\u001b]52;c;\u001b\\".repeat(3) + "\u001b]52;c;b2s=\u001b\\", f.output())
+                assertEquals(
+                    listOf(
+                        TerminalClipboardReadOutcome.FAILED,
+                        TerminalClipboardReadOutcome.DENIED,
+                        TerminalClipboardReadOutcome.UNAVAILABLE,
+                        TerminalClipboardReadOutcome.SENT,
+                    ),
+                    f.outcomes,
+                )
+                assertFalse(f.audits.toString().contains("provider-secret"))
+                assertNull(f.session.failure)
+            }
+        }
+
+    @Test
     fun `real OSC queries preserve normalized selectors and accept every byte split`() =
         runTest {
             for (query in listOf("\u001b]52;ppccsp;?\u0007", "\u001b]52;;?\u001b\\")) {

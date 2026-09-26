@@ -25,7 +25,6 @@ import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionHandler
 import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionKeymap
 import io.github.ketraterm.workspace.TerminalWorkspaceTab
 import java.util.concurrent.atomic.AtomicBoolean
-import javax.swing.BoxLayout
 import javax.swing.JPanel
 
 /**
@@ -161,9 +160,12 @@ internal class TerminalPane private constructor(
 
                 val searchBar = SwingTerminalSearchBar(terminal)
                 ownedSearchBar = searchBar
-                val clipboardReadPrompt = SwingClipboardReadPrompt(terminal)
+                val clipboardReadPrompt =
+                    SwingClipboardReadPrompt { message, decide ->
+                        SwingMessageDialogs.showModeless(terminal, message, decide)
+                    }
                 ownedClipboardReadPrompt = clipboardReadPrompt
-                val component = terminalPanel(terminal, searchBar, clipboardReadPrompt)
+                val component = terminalPanel(terminal, searchBar)
                 val pane =
                     TerminalPane(
                         tab = tab,
@@ -201,21 +203,12 @@ internal class TerminalPane private constructor(
         private fun terminalPanel(
             terminal: SwingTerminal,
             searchBar: SwingTerminalSearchBar,
-            clipboardReadPrompt: SwingClipboardReadPrompt,
-        ): JPanel {
-            val chrome =
-                JPanel().apply {
-                    layout = BoxLayout(this, BoxLayout.Y_AXIS)
-                    isOpaque = false
-                    add(clipboardReadPrompt.component)
-                    add(searchBar.component)
-                }
-            return SwingTerminalOverlayPane(terminal, chrome).apply {
+        ): JPanel =
+            SwingTerminalOverlayPane(terminal, searchBar.component).apply {
                 background = terminal.background
                 border = null
                 terminal.border = null
             }
-        }
     }
 }
 

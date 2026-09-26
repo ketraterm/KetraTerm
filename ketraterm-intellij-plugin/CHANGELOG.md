@@ -3,7 +3,7 @@
 ## [Unreleased]
 
 - Improved responsiveness and reliability when pasting large text into busy terminals.
-- Compatible terminal apps can now read the IDE clipboard when permitted, with an Ask option to approve once or block requests from that terminal. Requests stay bound to their terminal and are cancelled when it closes. New settings ask before reading; saved permission choices are preserved.
+- Compatible terminal apps can now read IDE clipboard text, including Unicode and multiple lines, when permitted, with consistent, keyboard-accessible confirmation dialogs to approve once or block requests from that terminal. Requests stay bound to their terminal and are cancelled when it closes. New settings ask before reading; saved permission choices are preserved.
 - Improved keyboard compatibility with terminal apps that configure and query modifier handling.
 - Improved compatibility with terminal apps that query active terminal settings and supported features. Input settings can be changed safely during large pastes.
 - Simplified clipboard and title permissions so they apply consistently throughout a terminal, including SSH sessions. Clipboard choices are now Deny, Ask, and Allow, with writes allowed by default. Previous separate local/remote settings reset to the new defaults.

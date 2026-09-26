@@ -15,11 +15,16 @@
  */
 package io.github.ketraterm.pty
 
+import io.github.ketraterm.host.HostPolicy
+import io.github.ketraterm.host.TerminalClipboardPermission
+import io.github.ketraterm.host.TerminalClipboardPolicy
+import io.github.ketraterm.host.TerminalClipboardReadRequest
 import io.github.ketraterm.input.event.TerminalKey
 import io.github.ketraterm.input.event.TerminalKeyEvent
 import io.github.ketraterm.input.event.TerminalPasteEvent
 import io.github.ketraterm.render.api.TerminalRenderCursorShape
 import io.github.ketraterm.render.api.TerminalRenderFrameReader
+import io.github.ketraterm.session.TerminalClipboardReadResult
 import io.github.ketraterm.session.TerminalSession
 import io.github.ketraterm.session.TerminalSessionState
 import kotlinx.coroutines.flow.first
@@ -29,11 +34,15 @@ import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.Assumptions.assumeTrue
 import org.junit.jupiter.api.Test
+import org.junit.jupiter.params.ParameterizedTest
+import org.junit.jupiter.params.provider.ValueSource
 import java.nio.charset.StandardCharsets
+import java.nio.file.Files
 import java.nio.file.Path
 import java.util.*
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicInteger
 import kotlin.time.Duration.Companion.seconds
 
 class PtyRealProcessTest {
@@ -43,6 +52,50 @@ class PtyRealProcessTest {
     fun closeSessions() {
         sessions.forEach(TerminalSession::close)
     }
+
+    @ParameterizedTest
+    @ValueSource(booleans = [false, true])
+    fun `OSC 52 harness validates real PTY request and reply bytes`(deny: Boolean) =
+        runBlocking {
+            assumeTrue(System.getProperty("terminal.pty.host") == "true", "Set -Dterminal.pty.host=true to run native PTY host tests")
+            val script = Path.of("../tools/osc52/osc52.mjs").toAbsolutePath().normalize()
+            assertTrue(Files.isRegularFile(script), "OSC 52 harness is missing")
+            val expectedFile = Files.createTempFile("ketraterm-osc52-", ".txt")
+            val text = "e\u0301\u00e9\ud83d\ude42\r\n\u0000\u001b"
+            val reads = AtomicInteger()
+            val permission = if (deny) TerminalClipboardPermission.DENY else TerminalClipboardPermission.ALLOW
+            try {
+                Files.writeString(expectedFile, if (deny) "" else text)
+                val session =
+                    TerminalSessions.localPty(
+                        PtyOptions(
+                            command = listOf("node", script.toString(), "--expect-file", expectedFile.toString(), "--suite"),
+                            columns = 160,
+                            rows = 24,
+                            hostPolicy = HostPolicy(clipboardPolicy = TerminalClipboardPolicy(readPermission = permission)),
+                            eventListener =
+                                object : PtyEventListener by PtyEventListener.NONE {
+                                    override suspend fun readClipboard(
+                                        session: TerminalSession,
+                                        request: TerminalClipboardReadRequest,
+                                    ): TerminalClipboardReadResult {
+                                        reads.incrementAndGet()
+                                        return TerminalClipboardReadResult.Text(text)
+                                    }
+                                },
+                        ),
+                    )
+                sessions += session
+                withTimeout(30.seconds) { session.state.first { it is TerminalSessionState.Closed } }
+                // The child exits successfully only after comparing every reply and its
+                // following status response. No assertion depends on final screen flushing.
+                assertEquals(0, session.exitCode, session.terminal.getAllAsString())
+                assertEquals(if (deny) 0 else 8, reads.get())
+                assertNull(session.failure)
+            } finally {
+                Files.deleteIfExists(expectedFile)
+            }
+        }
 
     @Test
     fun `real PTY detects a running executable and clears it after exit`() =

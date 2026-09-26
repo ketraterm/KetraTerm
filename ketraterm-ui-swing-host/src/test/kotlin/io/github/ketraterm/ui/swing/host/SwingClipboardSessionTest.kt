@@ -26,7 +26,6 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.swing.Swing
 import kotlinx.coroutines.test.*
 import kotlinx.coroutines.withContext
-import javax.swing.JPanel
 import javax.swing.SwingUtilities
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -60,10 +59,10 @@ class SwingClipboardSessionTest {
                 f.query()
                 runCurrent()
                 SwingUtilities.invokeAndWait {
-                    assertTrue(f.prompt.component.isVisible)
+                    assertTrue(f.dialog.isVisible)
                     assertEquals(0, f.reads)
                     assertEquals("", f.output())
-                    f.prompt.click("Allow once")
+                    f.dialog.click("Allow once")
                 }
                 completeRead()
                 assertEquals("\u001b]52;c;w6kNChsA\u001b\\", f.output())
@@ -78,12 +77,12 @@ class SwingClipboardSessionTest {
                 SwingUtilities.invokeAndWait { f.attachPane() }
                 f.query()
                 runCurrent()
-                SwingUtilities.invokeAndWait { assertTrue(f.prompt.component.isVisible) }
+                SwingUtilities.invokeAndWait { assertTrue(f.dialog.isVisible) }
                 advanceTimeBy(8_000.milliseconds)
                 runCurrent()
                 SwingUtilities.invokeAndWait {
-                    assertFalse(f.prompt.component.isVisible)
-                    f.prompt.click("Allow once")
+                    assertFalse(f.dialog.isVisible)
+                    f.dialog.click("Allow once")
                 }
                 runCurrent()
                 assertEquals("\u001b]52;c;\u001b\\", f.output())
@@ -98,8 +97,8 @@ class SwingClipboardSessionTest {
                 SwingUtilities.invokeAndWait { f.attachPane() }
                 f.query()
                 runCurrent()
-                SwingUtilities.invokeAndWait { f.prompt.click("Allow once") }
-                SwingUtilities.invokeAndWait { assertFalse(f.prompt.component.isVisible) }
+                SwingUtilities.invokeAndWait { f.dialog.click("Allow once") }
+                SwingUtilities.invokeAndWait { assertFalse(f.dialog.isVisible) }
                 f.session.setHostPolicy(
                     f.policy.copy(clipboardPolicy = f.policy.clipboardPolicy.copy(readPermission = TerminalClipboardPermission.DENY)),
                 )
@@ -119,10 +118,10 @@ class SwingClipboardSessionTest {
                 SwingUtilities.invokeAndWait { f.attachPane() }
                 f.query()
                 runCurrent()
-                SwingUtilities.invokeAndWait { assertTrue(f.prompt.component.isVisible) }
+                SwingUtilities.invokeAndWait { assertTrue(f.dialog.isVisible) }
                 f.session.close()
                 completeRead()
-                SwingUtilities.invokeAndWait { assertFalse(f.prompt.component.isVisible) }
+                SwingUtilities.invokeAndWait { assertFalse(f.dialog.isVisible) }
                 assertEquals(0, f.reads)
                 assertEquals("", f.output())
             }
@@ -142,6 +141,7 @@ class SwingClipboardSessionTest {
         permission: TerminalClipboardPermission,
     ) : AutoCloseable {
         val connector = MockConnector()
+        val dialog = ClipboardDialogFixture()
         lateinit var prompt: SwingClipboardReadPrompt
         var text = "old"
         var reads = 0
@@ -189,7 +189,7 @@ class SwingClipboardSessionTest {
                 ).also { it.start(10, 3) }
 
         fun attachPane() {
-            prompt = SwingClipboardReadPrompt(JPanel())
+            prompt = dialog.prompt
         }
 
         fun query() {

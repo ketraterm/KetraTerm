@@ -15,8 +15,9 @@
  */
 package io.github.ketraterm.app.ui
 
+import io.github.ketraterm.ui.swing.host.SwingDialogRequest
+import io.github.ketraterm.ui.swing.host.SwingMessageDialogs
 import java.awt.Component
-import javax.swing.JOptionPane
 
 /**
  * User-facing confirmation for closing live terminal sessions.
@@ -53,15 +54,14 @@ internal class SwingTerminalCloseConfirmation(
 ) : TerminalCloseConfirmation {
     override fun confirmClose(request: TerminalCloseRequest): Boolean {
         val answer =
-            JOptionPane.showOptionDialog(
+            SwingMessageDialogs.show(
                 owner,
-                TerminalClosePromptText.message(request),
-                TerminalClosePromptText.title(request),
-                JOptionPane.YES_NO_OPTION,
-                JOptionPane.WARNING_MESSAGE,
-                null,
-                TerminalClosePromptText.options(),
-                TerminalClosePromptText.cancelOption(),
+                SwingDialogRequest(
+                    TerminalClosePromptText.title(request),
+                    TerminalClosePromptText.message(request),
+                    SwingDialogRequest.Severity.WARNING,
+                    TerminalClosePromptText.options().toList(),
+                ),
             )
         return answer == 0
     }

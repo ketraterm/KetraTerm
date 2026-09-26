@@ -26,7 +26,6 @@ import com.intellij.openapi.editor.colors.EditorColorsManager
 import com.intellij.openapi.progress.ProcessCanceledException
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.project.ProjectCloseListener
-import com.intellij.openapi.ui.Messages
 import com.intellij.openapi.util.Disposer
 import com.intellij.openapi.util.Key
 import com.intellij.openapi.wm.ToolWindow
@@ -37,6 +36,7 @@ import io.github.ketraterm.host.TerminalClipboardReadRequest
 import io.github.ketraterm.host.TerminalClipboardWriteEvent
 import io.github.ketraterm.intellij.settings.KetraTermIntellijSettings
 import io.github.ketraterm.intellij.settings.KetraTermProjectSettings
+import io.github.ketraterm.intellij.ui.IntellijMessageDialogs
 import io.github.ketraterm.intellij.ui.KetraTermTerminalPane
 import io.github.ketraterm.intellij.ui.KetraTermTerminalPaneHostActions
 import io.github.ketraterm.intellij.ui.KetraTermTerminalStartupView
@@ -46,7 +46,9 @@ import io.github.ketraterm.protocol.ShellIntegrationMarker
 import io.github.ketraterm.session.TerminalClipboardReadResult
 import io.github.ketraterm.session.TerminalSessionState
 import io.github.ketraterm.session.TerminalStartupCommand
+import io.github.ketraterm.ui.swing.host.SwingClipboardPrompts
 import io.github.ketraterm.ui.swing.host.SwingClipboardReader
+import io.github.ketraterm.ui.swing.host.SwingDialogRequest
 import io.github.ketraterm.ui.swing.settings.SwingSettings
 import io.github.ketraterm.workspace.*
 import java.awt.BorderLayout
@@ -580,15 +582,16 @@ class KetraTermProjectTerminalService internal constructor(
     private fun confirmLiveProcessClose(tab: TerminalWorkspaceTab): Boolean {
         if (!tab.session.shellIntegrationState.hasRunningCommand()) return true
         val answer =
-            Messages.showYesNoDialog(
+            IntellijMessageDialogs.show(
                 project,
-                "Closing \"${tab.title}\" will terminate its running process.",
-                "Terminate Terminal Process?",
-                "Terminate",
-                "Cancel",
-                Messages.getWarningIcon(),
+                SwingDialogRequest(
+                    "Terminate Terminal Process?",
+                    "Closing \"${tab.title}\" will terminate its running process.",
+                    SwingDialogRequest.Severity.WARNING,
+                    listOf("Terminate", "Cancel"),
+                ),
             )
-        return answer == Messages.YES
+        return answer == 0
     }
 
     private inner class TerminalTabDisposable(
@@ -625,7 +628,7 @@ class KetraTermProjectTerminalService internal constructor(
             request: TerminalClipboardReadRequest,
         ): TerminalClipboardReadResult {
             val binding = clipboardSessions[tab.id] ?: return TerminalClipboardReadResult.Unavailable
-            return binding.read(request, IntellijOsc52ClipboardPromptText.readMessage(tab.profile.displayName))
+            return binding.read(request, SwingClipboardPrompts.readQuestion(tab.profile.displayName, "IDE clipboard"))
         }
 
         override fun shellIntegrationMarker(
@@ -702,14 +705,12 @@ class KetraTermProjectTerminalService internal constructor(
             if (!IntellijOsc52ClipboardSelections.targetsIdeClipboard(event.selection)) return
             val binding = clipboardSessions[tab.id] ?: return
             binding.postIfAlive {
-                val answer =
-                    Messages.showYesNoDialog(
+                val allowed =
+                    IntellijMessageDialogs.show(
                         project,
-                        IntellijOsc52ClipboardPromptText.message(tab.profile.displayName, event),
-                        IntellijOsc52ClipboardPromptText.title(),
-                        Messages.getWarningIcon(),
-                    )
-                if (answer == Messages.YES && binding.isAlive) {
+                        SwingClipboardPrompts.writeConfirmation(tab.profile.displayName, event.text, "IDE clipboard"),
+                    ) == 0
+                if (allowed && binding.isAlive) {
                     binding.clipboard.copyText(event.text)
                 }
             }
@@ -790,32 +791,4 @@ class KetraTermProjectTerminalService internal constructor(
 
 internal object IntellijOsc52ClipboardSelections {
     fun targetsIdeClipboard(selection: String): Boolean = selection.isEmpty() || selection.indexOf('c') >= 0
-}
-
-internal object IntellijOsc52ClipboardPromptText {
-    fun title(): String = "Clipboard Access"
-
-    fun readMessage(profileName: String): String {
-        val terminalName = profileName.trim().ifBlank { "this terminal" }
-        return "Allow an application in $terminalName to read your IDE clipboard? Only allow applications you trust."
-    }
-
-    fun message(
-        profileName: String,
-        event: TerminalClipboardPromptEvent,
-    ): String {
-        val terminalName = profileName.trim().ifBlank { "this terminal" }
-        if (event.text.isEmpty()) {
-            return "Allow an application in $terminalName to clear the IDE clipboard?"
-        }
-        val count = event.text.codePointCount(0, event.text.length)
-        return "Allow an application in $terminalName to write ${count.formatCount("character")} to the IDE clipboard?"
-    }
-
-    private fun Int.formatCount(unit: String): String =
-        if (this == 1) {
-            "1 $unit"
-        } else {
-            "$this ${unit}s"
-        }
 }

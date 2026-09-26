@@ -17,8 +17,8 @@ package io.github.ketraterm.intellij.services
 
 import com.intellij.codeWithMe.asContextElement
 import com.intellij.openapi.Disposable
+import com.intellij.openapi.application.EDT
 import com.intellij.openapi.application.ModalityState
-import com.intellij.openapi.application.UI
 import com.intellij.openapi.application.asContextElement
 import com.intellij.openapi.util.Disposer
 import io.github.ketraterm.host.TerminalClipboardReadRequest
@@ -40,7 +40,10 @@ internal class IntellijClipboardSession(
     private val reader: SwingClipboardReader,
     val clipboard: TerminalClipboardHandler = IntellijTerminalClipboardHandler(applicationClient),
 ) : Disposable {
-    private val uiContext = Dispatchers.UI + ModalityState.nonModal().asContextElement() + projectClient.clientId.asContextElement()
+    // DialogWrapper show/dispose require write-intent access, which Dispatchers.UI forbids.
+    // Keep writes, reads and consent cleanup on one dispatcher to preserve event ordering.
+    @Suppress("ObsoleteDispatchersEdt")
+    private val uiContext = Dispatchers.EDT + ModalityState.nonModal().asContextElement() + projectClient.clientId.asContextElement()
     private val paneReady = CompletableDeferred<SwingClipboardReadPrompt>()
     private val disposed = AtomicBoolean()
     private val applicationLifetime = Disposable { session.close() }

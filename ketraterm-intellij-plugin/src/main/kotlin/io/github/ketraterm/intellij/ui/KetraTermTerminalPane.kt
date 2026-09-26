@@ -33,7 +33,6 @@ import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionHandler
 import io.github.ketraterm.workspace.TerminalWorkspaceTab
 import java.awt.Adjustable
 import java.awt.BorderLayout
-import javax.swing.BoxLayout
 import javax.swing.JPanel
 
 /**
@@ -331,15 +330,11 @@ internal class KetraTermTerminalPane private constructor(
             terminal.bind(tab.session)
 
             val searchBar = SwingTerminalSearchBar(terminal)
-            val clipboardReadPrompt = SwingClipboardReadPrompt(terminal)
-            val chrome =
-                JPanel().apply {
-                    layout = BoxLayout(this, BoxLayout.Y_AXIS)
-                    isOpaque = false
-                    add(clipboardReadPrompt.component)
-                    add(searchBar.component)
+            val clipboardReadPrompt =
+                SwingClipboardReadPrompt { message, decide ->
+                    IntellijMessageDialogs.showModeless(project, message, decide)
                 }
-            val terminalArea = SwingTerminalOverlayPane(terminal, chrome)
+            val terminalArea = SwingTerminalOverlayPane(terminal, searchBar.component)
             val component =
                 JPanel(BorderLayout()).apply {
                     border = null
