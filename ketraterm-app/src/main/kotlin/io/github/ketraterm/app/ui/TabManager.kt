@@ -83,8 +83,7 @@ internal class TabManager(
             null
         }
     private val modeReportCapabilities =
-        TerminalHostModeCapability.COLUMN_MODE or
-            TerminalHostModeCapability.POP_ON_BELL or
+        TerminalHostModeCapability.POP_ON_BELL or
             (if (attentionTaskbar != null) TerminalHostModeCapability.URGENT_BELL else 0)
     private val tabRoots = HashMap<String, SplitNode>()
     private val tabContainers = HashMap<String, JPanel>()
@@ -1049,11 +1048,13 @@ internal class TabManager(
             }
         }
 
-        override fun requestColumnMode(
+        override fun columnModeChanged(
             tab: TerminalWorkspaceTab,
             rows: Int,
             columns: Int,
-        ): Boolean = windowResizeController.request(tab.session, rows, columns)
+        ) {
+            windowResizeController.request(tab.session, rows, columns, preserveGrid = true)
+        }
 
         override fun moveWindow(
             tab: TerminalWorkspaceTab,

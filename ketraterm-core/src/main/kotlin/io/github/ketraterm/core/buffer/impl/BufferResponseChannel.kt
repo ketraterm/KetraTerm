@@ -88,13 +88,7 @@ internal class BufferResponseChannel(
             DecPrivateMode.FOCUS_REPORTING -> flagStatus(bits, TerminalModeBits.FOCUS_REPORTING)
             DecPrivateMode.BRACKETED_PASTE -> flagStatus(bits, TerminalModeBits.BRACKETED_PASTE)
             DecPrivateMode.SYNCHRONIZED_OUTPUT -> flagStatus(bits, TerminalModeBits.SYNCHRONIZED_OUTPUT)
-            DecPrivateMode.DECCOLM ->
-                hostFlagStatus(
-                    bits,
-                    TerminalModeBits.COLUMN_MODE_132,
-                    hostCapabilities,
-                    TerminalHostModeCapability.COLUMN_MODE,
-                )
+            DecPrivateMode.DECCOLM -> flagStatus(bits, TerminalModeBits.COLUMN_MODE_132)
             DecPrivateMode.BELL_IS_URGENT ->
                 hostFlagStatus(
                     bits,

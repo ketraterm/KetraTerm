@@ -63,16 +63,9 @@ class HostModeStatusTest {
         initial: Int,
     ) {
         val buffer = TerminalBuffers.create(80, 3)
-        val events =
-            object : HostEventSink by HostEventSink.NONE {
-                override fun requestColumnMode(
-                    rows: Int,
-                    columns: Int,
-                ): Boolean = true
-            }
         val parser =
             TerminalParsers.create(
-                HostCommandAdapter(buffer, events, modeReportCapabilities = TerminalHostModeCapability.ALL),
+                HostCommandAdapter(buffer, modeReportCapabilities = TerminalHostModeCapability.ALL),
             )
         val prefix = if (privateMode) "?" else ""
         val sequence = "\u001B[$prefix$mode"
@@ -142,34 +135,39 @@ class HostModeStatusTest {
     }
 
     @Test
-    fun rejectedColumnSwitchesPreserveReportedSelectionAndQueriesDoNotCallHost() {
-        val buffer = TerminalBuffers.create(80, 3)
-        var accepted = true
-        var requests = 0
-        val events =
-            object : HostEventSink by HostEventSink.NONE {
-                override fun requestColumnMode(
-                    rows: Int,
-                    columns: Int,
-                ): Boolean {
-                    requests++
-                    return accepted
+    fun columnModeReportsLogicalSelectionWithoutHostCapabilitiesOrWindowPermission() {
+        for (permission in HostControlPolicy.entries) {
+            val buffer = TerminalBuffers.create(90, 3)
+            var notifications = 0
+            val events =
+                object : HostEventSink by HostEventSink.NONE {
+                    override fun columnModeChanged(
+                        rows: Int,
+                        columns: Int,
+                    ) {
+                        assertEquals(columns, buffer.width)
+                        notifications++
+                    }
                 }
-            }
-        val adapter = HostCommandAdapter(buffer, events, modeReportCapabilities = TerminalHostModeCapability.COLUMN_MODE)
-        val parser = TerminalParsers.create(adapter)
-        parser.accept("\u001B[?3h\u001B[?3\$p".encodeToByteArray())
-        assertEquals("\u001B[?3;1\$y", drain(buffer))
-        assertEquals(1, requests)
-        accepted = false
-        parser.accept("\u001B[?3l\u001B[?3\$p".encodeToByteArray())
-        assertEquals("\u001B[?3;1\$y", drain(buffer))
-        assertEquals(2, requests)
-        adapter.setHostPolicy(HostPolicy(windowManipulationPolicy = HostControlPolicy.DENY))
-        parser.accept("\u001B[?3l\u001B[?3\$p".encodeToByteArray())
-        assertEquals("\u001B[?3;1\$y", drain(buffer))
-        assertEquals(2, requests)
-        assertEquals(132, buffer.width)
+            val parser =
+                TerminalParsers.create(
+                    HostCommandAdapter(
+                        buffer,
+                        events,
+                        HostPolicy(
+                            windowManipulationPolicy = HostControlPolicy.DENY,
+                            terminalResponsePolicy = permission,
+                        ),
+                    ),
+                )
+            parser.accept("\u001B[?3\$p\u001B[?3h\u001B[?3\$p\u001B[?3l\u001B[?3\$p".encodeToByteArray())
+            assertEquals(
+                if (permission == HostControlPolicy.ALLOW) "\u001B[?3;2\$y\u001B[?3;1\$y\u001B[?3;2\$y" else "",
+                drain(buffer),
+            )
+            assertEquals(2, notifications)
+            assertEquals(80, buffer.width)
+        }
     }
 
     @Test

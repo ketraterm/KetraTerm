@@ -35,7 +35,7 @@ class TerminalModeStatusTest {
         }
         buffer.setBellIsUrgent(true)
         buffer.setPopOnBell(true)
-        for (mode in listOf(3, 1042, 1043)) {
+        for (mode in listOf(1042, 1043)) {
             buffer.requestModeStatus(mode, true)
             assertEquals("\u001B[?$mode;0\$y", drain(buffer))
         }
@@ -102,7 +102,7 @@ class TerminalModeStatusTest {
         buffer: TerminalBuffer,
         expected: Int,
     ) {
-        buffer.requestModeStatus(3, true, TerminalHostModeCapability.COLUMN_MODE)
+        buffer.requestModeStatus(3, true)
         assertEquals("\u001B[?3;$expected\$y", drain(buffer))
     }
 

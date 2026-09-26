@@ -128,15 +128,15 @@ interface PtyEventListener {
     )
 
     /**
-     * Accepts a DECCOLM grid change before terminal/transport mutation. Defaults
-     * to rejection. See [io.github.ketraterm.host.HostEventSink.requestColumnMode]
-     * for the synchronous, nonblocking host acceptance contract.
+     * Receives a completed logical column switch with synchronized grid and PTY dimensions.
+     * Hosts may schedule a window resize according to their own layout policy.
+     * See [io.github.ketraterm.host.HostEventSink.columnModeChanged].
      */
-    fun requestColumnMode(
+    fun columnModeChanged(
         session: TerminalSession,
         rows: Int,
         columns: Int,
-    ): Boolean = false
+    ) = Unit
 
     /**
      * Called when the shell requests moving the window.

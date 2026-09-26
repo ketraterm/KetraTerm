@@ -295,23 +295,21 @@ class TerminalWorkspaceTest {
     }
 
     @Test
-    fun `column mode requests require acceptance from the owning tab host`() {
+    fun `column mode notifications reach only the owning open tab`() {
         val session = testSession()
         lateinit var events: PtyEventListener
-        var accept = false
         var requestedTab: TerminalWorkspaceTab? = null
         TerminalWorkspace(
             listener =
                 object : TerminalWorkspaceListener {
-                    override fun requestColumnMode(
+                    override fun columnModeChanged(
                         tab: TerminalWorkspaceTab,
                         rows: Int,
                         columns: Int,
-                    ): Boolean {
+                    ) {
                         requestedTab = tab
                         assertEquals(24, rows)
                         assertEquals(132, columns)
-                        return accept
                     }
                 },
             sessionFactory =
@@ -325,12 +323,12 @@ class TerminalWorkspaceTest {
                     TerminalProfile("test", "Test", listOf("unused-shell")),
                     TerminalWorkspaceOpenOptions(80, 24, false, 100),
                 )
-            assertFalse(events.requestColumnMode(session, 24, 132))
+            events.columnModeChanged(session, 24, 132)
             assertSame(tab, requestedTab)
-            accept = true
-            assertTrue(events.requestColumnMode(session, 24, 132))
             workspace.closeTab(tab.id)
-            assertFalse(events.requestColumnMode(session, 24, 132))
+            requestedTab = null
+            events.columnModeChanged(session, 24, 132)
+            assertNull(requestedTab)
         }
     }
 

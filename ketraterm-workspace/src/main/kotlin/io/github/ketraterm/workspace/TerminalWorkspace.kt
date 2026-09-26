@@ -265,11 +265,13 @@ class TerminalWorkspace internal constructor(
                 tabBySession(session)?.let { listener.resizeWindow(it, rows, columns) }
             }
 
-            override fun requestColumnMode(
+            override fun columnModeChanged(
                 session: TerminalSession,
                 rows: Int,
                 columns: Int,
-            ): Boolean = tabBySession(session)?.let { listener.requestColumnMode(it, rows, columns) } ?: false
+            ) {
+                tabBySession(session)?.let { listener.columnModeChanged(it, rows, columns) }
+            }
 
             override fun moveWindow(
                 session: TerminalSession,
@@ -732,15 +734,15 @@ interface TerminalWorkspaceListener {
     ) = Unit
 
     /**
-     * Accepts an 80/132-column switch before the session changes core and PTY.
-     * Defaults to rejection. Implementations must obey the nonblocking contract
-     * of [io.github.ketraterm.host.HostEventSink.requestColumnMode].
+     * Receives a logical column switch for an open tab. Hosts may schedule an
+     * optional window resize without changing the session grid.
+     * See [io.github.ketraterm.host.HostEventSink.columnModeChanged].
      */
-    fun requestColumnMode(
+    fun columnModeChanged(
         tab: TerminalWorkspaceTab,
         rows: Int,
         columns: Int,
-    ): Boolean = false
+    ) = Unit
 
     /**
      * Called when the shell requests moving the terminal window.

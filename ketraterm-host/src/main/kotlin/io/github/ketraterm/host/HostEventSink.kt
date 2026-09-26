@@ -101,24 +101,32 @@ interface HostEventSink {
     )
 
     /**
-     * Accepts an application-requested 80/132-column switch before core changes.
+     * Prepares an 80/132-column switch before the destructive core reset.
      *
-     * Return `true` only when the host can display this grid. TerminalSession
-     * synchronizes the connector before the adapter applies DECCOLM's destructive
-     * reset. Returning `false` leaves the terminal untouched. A direct adapter
-     * embedder must also arrange transport synchronization before returning true.
+     * TerminalSession implements this hook by resizing its connector. Direct adapter
+     * embedders must synchronize their transport here; failures must throw before core changes.
+     * Window-resize permission does not govern the logical column switch.
      *
-     * Called synchronously during parsing: do not mutate core or session state,
-     * or wait for a UI thread. UI hosts should use published geometry
-     * and schedule their window update. The default rejects the request.
+     * Called synchronously during parsing. Do not mutate core/session state or
+     * wait for the EDT. UI hosts should use [columnModeChanged] instead.
      *
      * @param rows unchanged terminal row count.
-     * @param columns requested width, either 80 or 132.
+     * @param columns target width, either 80 or 132.
      */
-    fun requestColumnMode(
+    fun resizeForColumnMode(
         rows: Int,
         columns: Int,
-    ): Boolean = false
+    ) = Unit
+
+    /**
+     * Reports a completed logical column switch with synchronized core/transport dimensions.
+     * Hosts may schedule a physical window resize according to their own permission
+     * and layout policy. Called during parsing; do not wait for the EDT or mutate the grid.
+     */
+    fun columnModeChanged(
+        rows: Int,
+        columns: Int,
+    ) = Unit
 
     /**
      * Called when the shell requests moving the window.

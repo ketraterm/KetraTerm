@@ -36,8 +36,8 @@ package io.github.ketraterm.host
  * @property notificationPolicy whether terminal-triggered desktop notification
  * requests may be forwarded to the host.
  * @property windowManipulationPolicy whether terminal-triggered window movement,
- * resize (including DECCOLM), minimize, raise, lower, and maximize requests may
- * be forwarded. DECCOLM additionally requires explicit host acceptance.
+ * resize, minimize, raise, lower, and maximize requests may be forwarded.
+ * Logical DECCOLM column switches are independent of this policy.
  * @property palettePolicy whether OSC palette updates and palette query
  * responses may affect core palette state or enqueue terminal-to-host bytes.
  * @property terminalResponsePolicy whether DA, DSR/CPR (including light/dark
