@@ -132,22 +132,21 @@ class SessionHostEventBridgeTest {
     }
 
     @Test
-    fun `column mode acceptance is explicit and listener failures reject the request`() {
+    fun `column mode notifications isolate listener failures`() {
         val session = testSession()
-        var accept = false
-        var fail = false
+        var calls = 0
         val failures = mutableListOf<String?>()
         val listener =
             object : PtyEventListener by PtyEventListener.NONE {
-                override fun requestColumnMode(
+                override fun columnModeChanged(
                     session: TerminalSession,
                     rows: Int,
                     columns: Int,
-                ): Boolean {
+                ) {
                     assertEquals(24, rows)
                     assertEquals(132, columns)
-                    if (fail) error("resize rejected")
-                    return accept
+                    calls++
+                    error("window unavailable")
                 }
 
                 override fun listenerFailed(
@@ -160,15 +159,12 @@ class SessionHostEventBridgeTest {
         try {
             val bridge = SessionHostEventBridge(listener)
             bridge.attach(session)
-            assertEquals(false, bridge.requestColumnMode(24, 132))
-            accept = true
-            assertEquals(true, bridge.requestColumnMode(24, 132))
-            fail = true
-            assertEquals(false, bridge.requestColumnMode(24, 132))
-            assertEquals(listOf("resize rejected"), failures)
+            bridge.columnModeChanged(24, 132)
+            assertEquals(1, calls)
+            assertEquals(listOf("window unavailable"), failures)
             val defaultBridge = SessionHostEventBridge(PtyEventListener.NONE)
             defaultBridge.attach(session)
-            assertEquals(false, defaultBridge.requestColumnMode(24, 132))
+            defaultBridge.columnModeChanged(24, 132)
         } finally {
             session.close()
         }

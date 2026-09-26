@@ -17,7 +17,7 @@ package io.github.ketraterm.app.ui
 
 import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.Test
-import java.awt.Dimension
+import java.awt.Rectangle
 
 class WindowResizeGeometryTest {
     private val geometry =
@@ -34,25 +34,71 @@ class WindowResizeGeometryTest {
             minimumHeight = 100,
             availableWidth = 1600,
             availableHeight = 1000,
-            windowOriginFits = true,
+            windowX = 0,
+            windowY = 0,
+            availableX = 0,
+            availableY = 0,
         )
 
     @Test
     fun `column switches preserve rows and account for active screen chrome`() {
-        assertEquals(Dimension(1088, 428), geometry.targetSize(132, 24, alternate = false))
-        assertEquals(Dimension(672, 428), geometry.targetSize(80, 24, alternate = false))
-        assertEquals(Dimension(1076, 424), geometry.targetSize(132, 24, alternate = true))
+        assertEquals(Rectangle(0, 0, 1088, 428), geometry.targetBounds(132, 24, alternate = false))
+        assertEquals(Rectangle(0, 0, 672, 428), geometry.targetBounds(80, 24, alternate = false))
+        assertEquals(Rectangle(0, 0, 1076, 424), geometry.targetBounds(132, 24, alternate = true))
+    }
+
+    @Test
+    fun `growth moves only the edges that would exceed the work area`() {
+        val nearRightEdge = geometry.copy(windowX = 700, windowY = 100)
+        assertEquals(Rectangle(700, 100, 672, 428), nearRightEdge.targetBounds(80, 24, false))
+        assertEquals(Rectangle(512, 100, 1088, 428), nearRightEdge.targetBounds(132, 24, false))
+        assertEquals(
+            Rectangle(512, 572, 1088, 428),
+            nearRightEdge.copy(windowY = 800).targetBounds(132, 24, false),
+        )
+    }
+
+    @Test
+    fun `work area offsets support reserved desktop space and negative monitor coordinates`() {
+        val secondaryMonitor =
+            geometry.copy(
+                windowX = -700,
+                windowY = 900,
+                availableX = -1912,
+                availableY = 32,
+                availableWidth = 1904,
+                availableHeight = 1000,
+            )
+        assertEquals(Rectangle(-1096, 604, 1088, 428), secondaryMonitor.targetBounds(132, 24, false))
+        assertEquals(
+            Rectangle(-1912, 32, 672, 428),
+            secondaryMonitor.copy(windowX = -2000, windowY = 0).targetBounds(80, 24, false),
+        )
+    }
+
+    @Test
+    fun `work area edge arithmetic does not wrap at integer limits`() {
+        val extremeOrigin =
+            geometry.copy(
+                availableX = Int.MAX_VALUE - 100,
+                availableY = Int.MIN_VALUE,
+                windowX = Int.MAX_VALUE,
+                windowY = Int.MIN_VALUE,
+            )
+        assertEquals(
+            Rectangle(Int.MAX_VALUE, Int.MIN_VALUE, 1088, 428),
+            extremeOrigin.targetBounds(132, 24, false),
+        )
     }
 
     @Test
     fun `requests cannot overflow or exceed desktop and minimum window bounds`() {
-        assertNull(geometry.targetSize(Int.MAX_VALUE, 24, false))
-        assertNull(geometry.targetSize(80, Int.MAX_VALUE, false))
-        assertNull(geometry.targetSize(0, 24, false))
-        assertNull(geometry.targetSize(80, -1, false))
-        assertNull(geometry.targetSize(1, 1, false))
-        assertNull(geometry.copy(availableWidth = 1087).targetSize(132, 24, false))
-        assertNotNull(geometry.copy(availableWidth = 1088).targetSize(132, 24, false))
-        assertNull(geometry.copy(windowOriginFits = false).targetSize(80, 24, false))
+        assertNull(geometry.targetBounds(Int.MAX_VALUE, 24, false))
+        assertNull(geometry.targetBounds(80, Int.MAX_VALUE, false))
+        assertNull(geometry.targetBounds(0, 24, false))
+        assertNull(geometry.targetBounds(80, -1, false))
+        assertNull(geometry.targetBounds(1, 1, false))
+        assertNull(geometry.copy(availableWidth = 1087).targetBounds(132, 24, false))
+        assertNotNull(geometry.copy(availableWidth = 1088).targetBounds(132, 24, false))
     }
 }

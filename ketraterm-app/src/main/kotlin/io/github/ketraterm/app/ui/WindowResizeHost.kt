@@ -17,8 +17,8 @@ package io.github.ketraterm.app.ui
 
 import io.github.ketraterm.render.api.TerminalRenderBufferKind
 import io.github.ketraterm.ui.swing.api.SwingTerminal
-import java.awt.Dimension
 import java.awt.Frame
+import java.awt.Rectangle
 import java.awt.event.ComponentAdapter
 import java.awt.event.ComponentEvent
 import java.awt.event.WindowStateListener
@@ -28,7 +28,7 @@ import javax.swing.JFrame
 internal interface WindowResizeHost {
     fun readGeometry(terminal: SwingTerminal): WindowResizeGeometry?
 
-    fun resize(size: Dimension)
+    fun resize(bounds: Rectangle)
 
     fun observeGeometryChanges(refresh: () -> Unit): AutoCloseable
 }
@@ -58,14 +58,17 @@ internal class SwingWindowResizeHost(
             alternateInsetHeight = alternate.height,
             minimumWidth = frame.minimumSize.width,
             minimumHeight = frame.minimumSize.height,
-            availableWidth = bounds.x + bounds.width - insets.right - frame.x,
-            availableHeight = bounds.y + bounds.height - insets.bottom - frame.y,
-            windowOriginFits = frame.x >= bounds.x + insets.left && frame.y >= bounds.y + insets.top,
+            availableWidth = bounds.width - insets.left - insets.right,
+            availableHeight = bounds.height - insets.top - insets.bottom,
+            windowX = frame.x,
+            windowY = frame.y,
+            availableX = bounds.x + insets.left,
+            availableY = bounds.y + insets.top,
         )
     }
 
-    override fun resize(size: Dimension) {
-        frame.size = size
+    override fun resize(bounds: Rectangle) {
+        frame.bounds = bounds
         frame.validate()
     }
 

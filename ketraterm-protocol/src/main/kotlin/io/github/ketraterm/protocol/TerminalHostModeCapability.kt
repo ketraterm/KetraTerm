@@ -20,9 +20,6 @@ package io.github.ketraterm.protocol
  * or acceptance of an individual request. Embedders opt in only for implemented actions.
  */
 object TerminalHostModeCapability {
-    /** Host implements accepted 80/132-column switches. */
-    const val COLUMN_MODE: Int = 1
-
     /** Host can request user attention on BEL. */
     const val URGENT_BELL: Int = 2
 
@@ -30,5 +27,5 @@ object TerminalHostModeCapability {
     const val POP_ON_BELL: Int = 4
 
     /** All defined bits, for validating host configuration. */
-    const val ALL: Int = COLUMN_MODE or URGENT_BELL or POP_ON_BELL
+    const val ALL: Int = URGENT_BELL or POP_ON_BELL
 }
