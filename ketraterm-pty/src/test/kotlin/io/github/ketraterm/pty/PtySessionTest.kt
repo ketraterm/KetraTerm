@@ -33,6 +33,7 @@ import java.io.InputStream
 import java.io.OutputStream
 import java.nio.charset.StandardCharsets
 import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
 import kotlin.time.Duration.Companion.seconds
 
 class PtySessionTest {
@@ -72,14 +73,14 @@ class PtySessionTest {
 
     @Test
     fun `parser core responses are written back to pty stdin`() {
-        val process = FakePtyProcess(inputBytes = "\u001B[6n".ascii())
+        val process = FakePtyProcess.running(inputBytes = "\u001B[6n".ascii())
         val session =
             startSession(
                 options = PtyOptions(command = listOf("fake"), columns = 10, rows = 3),
                 processFactory = FixedProcessFactory(process),
             )
 
-        awaitClosed(session)
+        process.awaitWrite()
 
         assertEquals("\u001B[1;1R", process.outputText())
         assertEquals(0, session.terminal.pendingResponseBytes)
@@ -109,13 +110,13 @@ class PtySessionTest {
     @Test
     fun modeReportCapabilitiesReachPtyResponses() {
         for (capabilities in listOf(0, io.github.ketraterm.protocol.TerminalHostModeCapability.POP_ON_BELL)) {
-            val process = FakePtyProcess(inputBytes = "\u001B[?1043h\u001B[?1043\$p".ascii())
+            val process = FakePtyProcess.running(inputBytes = "\u001B[?1043h\u001B[?1043\$p".ascii())
             val session =
                 startSession(
                     options = PtyOptions(command = listOf("fake"), columns = 10, rows = 3, modeReportCapabilities = capabilities),
                     processFactory = FixedProcessFactory(process),
                 )
-            awaitClosed(session)
+            process.awaitWrite()
             assertEquals(if (capabilities == 0) "\u001B[?1043;0\$y" else "\u001B[?1043;1\$y", process.outputText())
         }
     }
@@ -131,6 +132,7 @@ class PtySessionTest {
 
         session.encodeKey(TerminalKeyEvent.codepoint('a'.code))
 
+        process.awaitWrite()
         assertEquals("a", process.outputText())
     }
 
@@ -146,6 +148,7 @@ class PtySessionTest {
         session.terminal.setNewLineMode(true)
         session.encodeKey(TerminalKeyEvent.key(TerminalKey.ENTER))
 
+        process.awaitWrite()
         assertEquals("\r", process.outputText())
     }
 
@@ -160,6 +163,7 @@ class PtySessionTest {
 
         session.encodePaste(TerminalPasteEvent("first\r\nsecond\nthird\rfourth"))
 
+        process.awaitWrite()
         assertEquals("first\rsecond\rthird\rfourth", process.outputText())
     }
 
@@ -323,7 +327,27 @@ class PtySessionTest {
         ) : this(DrainingByteArrayInputStream(inputBytes), null, exitCode)
 
         private val capturedOutput = ByteArrayOutputStream()
-        override val output: OutputStream = capturedOutput
+        private val firstWrite = CountDownLatch(1)
+        override val output: OutputStream =
+            object : OutputStream() {
+                override fun write(byte: Int) {
+                    capturedOutput.write(byte)
+                    firstWrite.countDown()
+                }
+
+                override fun write(
+                    bytes: ByteArray,
+                    offset: Int,
+                    length: Int,
+                ) {
+                    capturedOutput.write(bytes, offset, length)
+                    firstWrite.countDown()
+                }
+            }
+
+        fun awaitWrite() {
+            check(firstWrite.await(10, TimeUnit.SECONDS)) { "PTY did not receive expected output" }
+        }
 
         @Volatile
         var destroyed: Boolean = false
@@ -358,8 +382,11 @@ class PtySessionTest {
         fun outputText(): String = capturedOutput.toString(StandardCharsets.UTF_8)
 
         companion object {
-            fun running(exitCode: Int = 0): FakePtyProcess {
-                val input = BlockingInputStream()
+            fun running(
+                exitCode: Int = 0,
+                inputBytes: ByteArray = byteArrayOf(),
+            ): FakePtyProcess {
+                val input = BlockingInputStream(inputBytes)
                 return FakePtyProcess(input, input.released, exitCode)
             }
         }
@@ -387,10 +414,14 @@ class PtySessionTest {
         }
     }
 
-    private class BlockingInputStream : InputStream() {
+    private class BlockingInputStream(
+        bytes: ByteArray,
+    ) : InputStream() {
+        private val initial = ByteArrayInputStream(bytes)
         val released = CountDownLatch(1)
 
         override fun read(): Int {
+            if (initial.available() > 0) return initial.read()
             released.await()
             return -1
         }
@@ -400,6 +431,7 @@ class PtySessionTest {
             offset: Int,
             length: Int,
         ): Int {
+            if (initial.available() > 0) return initial.read(buffer, offset, length)
             released.await()
             return -1
         }

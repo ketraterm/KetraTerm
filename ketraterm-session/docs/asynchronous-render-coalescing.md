@@ -18,4 +18,4 @@ Synchronized-output mode defers publication. A cancellable child job disables th
 
 ## Allocation boundary
 
-Invalidation allocates no render-request object. Parser/core mutation, per-cell copying, codepoint handling, and ordinary input encoding contain no coroutine dispatch. Core response bytes continue to use the preallocated session response buffer.
+Invalidation allocates no render-request object. Parser/core mutation, per-cell copying, and codepoint handling contain no coroutine dispatch. Input encoding remains synchronous; accepted bytes wake the separate outbound I/O worker. Core response bytes use the preallocated session response buffer before copying into that queue.

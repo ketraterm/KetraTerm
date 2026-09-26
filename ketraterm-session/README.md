@@ -2,7 +2,7 @@
 
 `ketraterm-session` is the runtime synchronization boundary between transport, parser, core, input encoding, and render publication.
 
-It uses coroutines for lifecycle orchestration, synchronized-output timeout handling, and conflated render publication. Transport byte consumption, parser/core mutation, input encoding, response writes, and borrowed frame reads remain synchronous.
+It uses coroutines for lifecycle orchestration, synchronized-output timeout handling, and conflated render publication. Transport byte consumption, parser/core mutation, input encoding and borrowed frame reads remain synchronous. Input and responses are copied into a bounded queue; one I/O coroutine performs ordered connector writes.
 
 ## Runtime model
 
@@ -11,7 +11,8 @@ It uses coroutines for lifecycle orchestration, synchronized-output timeout hand
 - `TerminalSession.renderPublisher` owns the leased primitive cache consumed by renderers.
 - A session has one active render viewport. Use separate sessions for independently scrolling views.
 - `mutationLock` protects parser/core mutation and borrowed frame reads.
-- Reentrant `outboundWriteLock` preserves exact input and core-response ordering.
+- Reentrant `outboundWriteLock` protects encoding and atomic admission; native writes never hold it.
+- Input return means acceptance, not write completion. Queue exhaustion or write failure closes the session with a failure; close discards pending bytes.
 - The transport contract already guarantees serial, ordered inbound byte delivery, so no additional inbound lock is used.
 
 See [session-concurrency-locks.md](docs/session-concurrency-locks.md) and [asynchronous-render-coalescing.md](docs/asynchronous-render-coalescing.md).

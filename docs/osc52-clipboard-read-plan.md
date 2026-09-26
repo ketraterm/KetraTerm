@@ -39,12 +39,13 @@ Useful existing building blocks:
 - Existing PTY/workspace event bridges, tab identity, product disposal paths,
   settings persistence, and testkit connectors.
 
-Two additional problems matter for a complete implementation:
+The initial investigation identified two outbound problems, addressed for existing
+synchronous input APIs by checkpoint 2a:
 
-- `drainResponses` takes the outbound lock separately for each 1,024-byte
-  scratch-buffer write. Feeding a large reply through that path would permit
+- `drainResponses` previously took the outbound lock separately for each 1,024-byte
+  scratch-buffer write. Feeding a large reply through that path would have permitted
   input to appear inside the OSC sequence.
-- `PtyConnector.write` writes and flushes synchronously. Input encoding holds
+- `PtyConnector.write` writes and flushes synchronously. Input encoding previously held
   the same session outbound lock while writing. Holding it around a large
   clipboard reply would prevent interleaving, but a subsequent EDT input event
   could block behind the slow write. A coroutine around clipboard access alone
@@ -276,13 +277,25 @@ public API exists solely for a possible later protocol.
 
 ### Part 2 — Ordered output under backpressure
 
-- Implement the outbound prerequisite as a separate focused change.
+- Checkpoint 2a implements bounded atomic admission for existing synchronous
+  input APIs, one I/O writer, coherent core-response draining, and failure/close
+  handling. Admission replaces synchronous write completion. This is a review
+  boundary within Part 2; it does not complete the outbound prerequisite.
+- Checkpoint 2b must add background backpressure for bulk producers while keeping
+  ordinary input bounded and whole operations ordered. Do not treat the current
+  hard-limit failure behavior as the final large-paste path.
+- Clipboard-owned payload reservation and cancellation/revalidation at write
+  start belong with their first consuming read implementation in Part 3.
+- Implementation details and acceptance semantics are in the
+  [session concurrency contract](../ketraterm-session/docs/session-concurrency-locks.md).
 - Keep connector ownership, parser/core mutation ownership, and module
   dependencies unchanged.
 - Cover input, paste, core replies, large logical frames, scratch reuse,
   saturation, write failure, and close while output is blocked.
 - Compare existing input/session allocation and throughput benchmarks with the
-  baseline. Settle byte budgets and acceptance/completion semantics here.
+  baseline. Checkpoint 2a measurements, including dispatch overhead and their
+  limitations, are recorded in the [benchmark notes](../ketraterm-session/docs/outbound-writer-benchmarks.md).
+  Settle byte budgets and acceptance/completion semantics here.
 
 Gate: a blocked connector cannot block the EDT/parser or interleave bytes;
 memory is bounded and ordinary input does not gain avoidable allocation.

@@ -22,11 +22,13 @@ import io.github.ketraterm.input.policy.PasteControlPolicy
 import io.github.ketraterm.input.policy.PasteLineEndingPolicy
 import io.github.ketraterm.input.policy.TerminalInputPolicy
 import io.github.ketraterm.testkit.MockConnector
+import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertThrows
 import org.junit.jupiter.api.Test
 import java.nio.charset.StandardCharsets
 
+@OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
 class TerminalSessionHeadlessTest {
     @Test
     fun `host mode driven paste and completion replacement protect framing across policy updates`() {
@@ -197,7 +199,7 @@ class TerminalSessionHeadlessTest {
         inputPolicy: TerminalInputPolicy = TerminalInputPolicy(),
     ): TerminalSession {
         val terminal = TerminalBuffers.create(width = columns, height = rows)
-        val session = TerminalSession.create(terminal, connector, inputPolicy = inputPolicy)
+        val session = TerminalSession.create(terminal, connector, inputPolicy = inputPolicy, ioDispatcher = UnconfinedTestDispatcher())
         session.start(columns, rows)
         return session
     }

@@ -23,6 +23,7 @@ import io.github.ketraterm.render.api.TerminalRenderFrameReader
 import io.github.ketraterm.testkit.MockConnector
 import kotlinx.coroutines.*
 import kotlinx.coroutines.test.StandardTestDispatcher
+import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Assertions.*
@@ -275,7 +276,7 @@ class TerminalShellCommandLineObservationTest {
     ) : AutoCloseable {
         val terminal = HistoryCountingBuffer(TerminalBuffers.create(width = 30, height = 2))
         private val connector = MockConnector()
-        val session = TerminalSession.create(terminal, connector, workerDispatcher = dispatcher)
+        val session = TerminalSession.create(terminal, connector, workerDispatcher = dispatcher, ioDispatcher = UnconfinedTestDispatcher())
 
         init {
             session.start(columns = 30, rows = 2)
