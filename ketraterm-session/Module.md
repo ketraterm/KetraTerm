@@ -6,6 +6,8 @@
 
 It uses coroutines for lifecycle orchestration, synchronized-output timeout handling, and conflated render publication. Transport byte consumption, parser/core mutation, ordinary input encoding and borrowed frame reads remain synchronous. Ordinary input and core-response batches use a bounded byte queue. Paste and text replacement retain bounded source data with admission-time modes and policy; one I/O coroutine streams their encoding and performs all ordered connector writes outside parser/input locks.
 
+OSC 52 reads use an optional session-bound suspending provider. Session owns the deadline, permission revalidation, one active request, and a bounded owned reply; product hosts supply consent and native access. Missing providers return an empty reply when terminal responses are permitted.
+
 ## Runtime model
 
 - `TerminalSession.state` retains `Created`, `Running`, or `Closed(TerminalSessionCloseEvent)`.

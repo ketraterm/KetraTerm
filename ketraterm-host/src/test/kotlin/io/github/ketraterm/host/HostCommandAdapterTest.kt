@@ -2987,6 +2987,13 @@ class HostCommandAdapterTest {
                 },
                 f.events.clipboardAudits,
             )
+            val readRequests = f.events.clipboardReads
+            assertEquals(if (responsePermission == HostControlPolicy.ALLOW) 2 else 0, readRequests.size)
+            for (request in readRequests) {
+                assertEquals("c", request.selection.value)
+                assertEquals(readPermission, request.permission)
+                assertEquals(0, request.maxDecodedBytes)
+            }
             assertTrue(f.events.clipboardWrites.isEmpty())
             assertTrue(f.events.clipboardPrompts.isEmpty())
             assertEquals(0, f.terminal.pendingResponseBytes)
@@ -3011,6 +3018,13 @@ class HostCommandAdapterTest {
                     decision = TerminalClipboardDecision.ALLOWED_BY_POLICY,
                 ),
                 f.events.clipboardAudits.single(),
+            )
+            val normalized = if (selection.isEmpty()) "c" else selection.toList().distinct().joinToString("")
+            assertEquals(
+                normalized,
+                f.events.clipboardReads
+                    .single()
+                    .selection.value,
             )
             assertTrue(f.events.clipboardWrites.isEmpty())
             assertTrue(f.events.clipboardPrompts.isEmpty())
@@ -3038,6 +3052,7 @@ class HostCommandAdapterTest {
                     )
                     assertEquals(selection, audit.selection)
                     assertEquals(TerminalClipboardOperation.READ_QUERY, audit.operation)
+                    assertTrue(f.events.clipboardReads.isEmpty())
                     assertEquals('X'.code, f.terminal.getCodepointAt(0, 0))
                     assertTrue(f.events.clipboardWrites.isEmpty())
                     assertTrue(f.events.clipboardPrompts.isEmpty())
@@ -3493,6 +3508,12 @@ class HostCommandAdapterTest {
 
         val notifications = mutableListOf<Triple<String, String, NotificationLevel>>()
         val clipboardAudits = mutableListOf<TerminalClipboardAuditEvent>()
+        val clipboardReads = mutableListOf<TerminalClipboardReadRequest>()
+
+        override fun terminalClipboardReadRequested(request: TerminalClipboardReadRequest) {
+            clipboardReads += request
+        }
+
         val clipboardWrites = mutableListOf<TerminalClipboardWriteEvent>()
         val clipboardPrompts = mutableListOf<TerminalClipboardPromptEvent>()
 

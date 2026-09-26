@@ -26,11 +26,12 @@ import io.github.ketraterm.render.api.TerminalColorPalette
  * Grid mutation and terminal modes remain owned by core; session coordinates
  * transport changes and terminal-to-host byte responses.
  *
- * Callbacks are synchronous and ordered on the mutation caller's thread. A
+ * Parser metadata callbacks are synchronous and ordered on the mutation caller's thread. A
  * TerminalSession holds its mutation lock during delivery. Return promptly;
  * do not mutate the session or wait for a UI thread. Schedule UI work using
  * the product's lifecycle. Direct sinks propagate exceptions to the caller;
  * the PTY convenience bridge isolates and reports listener failures.
+ * Read-execution audits may arrive on session workers as documented below.
  * No initial state replay or per-frame delivery is performed.
  */
 interface HostEventSink {
@@ -189,6 +190,21 @@ interface HostEventSink {
      * @param event clipboard request audit record.
      */
     fun terminalClipboardRequest(event: TerminalClipboardAuditEvent) = Unit
+
+    /**
+     * Admits a validated read for session execution, including read denial when
+     * terminal replies are permitted. Direct adapter embedders own the response.
+     * This synchronous callback must not access the clipboard or wait for consent.
+     */
+    fun terminalClipboardReadRequested(request: TerminalClipboardReadRequest) = Unit
+
+    /**
+     * Content-free execution audit. Unlike parser metadata, this callback can
+     * arrive on a session worker; it must be thread-safe and return promptly.
+     * Do not reenter session mutation or wait for a UI thread from this callback.
+     * Never infer execution from the earlier admission decision alone.
+     */
+    fun terminalClipboardReadCompleted(event: TerminalClipboardReadAuditEvent) = Unit
 
     /**
      * Called when an OSC 52 clipboard write request has been allowed by host

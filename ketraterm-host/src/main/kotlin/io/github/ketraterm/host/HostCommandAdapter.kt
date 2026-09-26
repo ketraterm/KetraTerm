@@ -84,6 +84,10 @@ class HostCommandAdapter(
         this.hostPolicy = policy
     }
 
+    /** Immutable active policy snapshot for asynchronous host-operation revalidation. */
+    val currentPolicy: HostPolicy
+        get() = hostPolicy
+
     @Volatile
     private var currentWorkingDirectory: String? = null
 
@@ -941,6 +945,12 @@ class HostCommandAdapter(
             } else {
                 TerminalClipboardOperation.WRITE
             }
+        val readSelection =
+            if (operation == TerminalClipboardOperation.READ_QUERY) {
+                TerminalClipboardSelection.parse(selection)
+            } else {
+                null
+            }
         val decodedBytes = if (operation == TerminalClipboardOperation.WRITE) decodedBase64ByteCount(encodedData) else 0
         // Bound allocation before decoding, and validate the text before publishing
         // permission outcomes. Reuse the decoded text for the write or prompt.
@@ -952,7 +962,7 @@ class HostCommandAdapter(
             }
         val decision =
             when {
-                operation == TerminalClipboardOperation.READ_QUERY -> clipboardDecisionForRead(selection, requestPolicy)
+                operation == TerminalClipboardOperation.READ_QUERY -> clipboardDecisionForRead(readSelection, requestPolicy)
                 decodedBytes < 0 -> TerminalClipboardDecision.DENIED_MALFORMED_PAYLOAD
                 decodedBytes > policy.maxDecodedBytes -> TerminalClipboardDecision.DENIED_PAYLOAD_TOO_LARGE
                 decodedText == null -> TerminalClipboardDecision.DENIED_MALFORMED_PAYLOAD
@@ -968,6 +978,12 @@ class HostCommandAdapter(
                 decision = decision,
             )
         hostEvents.terminalClipboardRequest(audit)
+        if (readSelection != null && requestPolicy.terminalResponsePolicy.isAllowed) {
+            hostEvents.terminalClipboardReadRequested(
+                TerminalClipboardReadRequest(readSelection, policy.readPermission, policy.maxDecodedBytes),
+            )
+            return
+        }
         if (decodedText == null) return
         when (audit.decision) {
             TerminalClipboardDecision.ALLOWED_BY_POLICY ->
@@ -1130,11 +1146,11 @@ class HostCommandAdapter(
         }
 
     private fun clipboardDecisionForRead(
-        selection: String,
+        selection: TerminalClipboardSelection?,
         policy: HostPolicy,
     ): TerminalClipboardDecision {
         // This is the protocol allowlist, independent of the host's available clipboards.
-        if (!selection.all { it in "cpqs01234567" }) return TerminalClipboardDecision.DENIED_MALFORMED_PAYLOAD
+        if (selection == null) return TerminalClipboardDecision.DENIED_MALFORMED_PAYLOAD
         if (!policy.terminalResponsePolicy.isAllowed) return TerminalClipboardDecision.DENIED_BY_POLICY
         return when (policy.clipboardPolicy.readPermission) {
             TerminalClipboardPermission.DENY -> TerminalClipboardDecision.DENIED_READ_DISABLED

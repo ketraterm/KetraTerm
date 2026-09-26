@@ -44,6 +44,7 @@ import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.atomic.AtomicLong
 import java.util.concurrent.atomic.AtomicReference
 import kotlin.time.Duration.Companion.milliseconds
+import kotlin.time.TimeSource
 
 private const val SHELL_COMMAND_LINE_CONTEXT_LONGS = 3
 private const val SHELL_COMMAND_LINE_CONTEXT_LINE_ID_INDEX = 0
@@ -72,7 +73,7 @@ private const val SHELL_COMMAND_LINE_CONTEXT_ACTIVE_INDEX = 2
  * @property renderPublisher the render publisher responsible for frame updates.
  * @property shellIntegrationState shared host-side prompt and command marker state.
  * @property workerDispatcher non-owned dispatcher used for session background work.
- * @property ioDispatcher non-owned dispatcher used for blocking connector writes and metadata queries.
+ * @property ioDispatcher non-owned dispatcher for connector writes, metadata queries, and clipboard providers.
  */
 class TerminalSession(
     val terminal: TerminalBuffer,
@@ -130,22 +131,26 @@ class TerminalSession(
 
     // Only the outbound worker uses this mode word, encoder, and its scratch.
     private var bulkInputModeBits = 0L
+    private val streamingOutput by lazy(LazyThreadSafetyMode.NONE) {
+        object : SessionTerminalHostOutput() {
+            override fun writeBytes(
+                bytes: ByteArray,
+                offset: Int,
+                length: Int,
+            ) {
+                if (isSessionClosed()) throw CancellationException("Terminal session closed")
+                sessionJob.ensureActive()
+                connector.write(bytes, offset, length)
+            }
+        }
+    }
+    private var clipboardReads: ClipboardReadHandler? = null
     private val bulkInputEncoder by lazy(LazyThreadSafetyMode.NONE) {
         TerminalInputEncoders.create(
             object : TerminalInputState {
                 override fun getInputModeBits(): Long = bulkInputModeBits
             },
-            object : SessionTerminalHostOutput() {
-                override fun writeBytes(
-                    bytes: ByteArray,
-                    offset: Int,
-                    length: Int,
-                ) {
-                    if (isSessionClosed()) throw CancellationException("Terminal session closed")
-                    sessionJob.ensureActive()
-                    connector.write(bytes, offset, length)
-                }
-            },
+            streamingOutput,
         )
     }
     private val mutableState = MutableStateFlow<TerminalSessionState>(TerminalSessionState.Created)
@@ -418,7 +423,10 @@ class TerminalSession(
      */
     fun setHostPolicy(policy: HostPolicy) {
         synchronized(mutationLock) {
-            hostCommandAdapter?.setHostPolicy(policy)
+            synchronized(outboundWriteLock) {
+                hostCommandAdapter?.setHostPolicy(policy)
+                clipboardReads?.policyChanged()
+            }
         }
     }
 
@@ -997,6 +1005,7 @@ class TerminalSession(
     }
 
     private fun cleanupParser() {
+        clipboardReads?.close()
         outboundWriter.close()
         synchronized(outboundWriteLock) {
             startupSubmission?.cancel(TerminalStartupCommandStatus.CLOSED)
@@ -1048,7 +1057,9 @@ class TerminalSession(
          * @param workerDispatcher non-owned dispatcher used for render publication and timeouts.
          * @param startupCommand optional command submitted once after a complete OSC 133 prompt.
          * User input before readiness cancels submission; hosts must install supported shell hooks.
-         * @param ioDispatcher non-owned dispatcher used for blocking connector metadata queries.
+         * @param ioDispatcher non-owned dispatcher for connector writes, metadata queries, and clipboard providers.
+         * @param clipboardReader session-bound clipboard/consent operation, or null for unavailable reads.
+         * @param clipboardReadTimeSource monotonic clock for the end-to-end read deadline.
          * @return standard production terminal session.
          */
         @JvmStatic
@@ -1064,6 +1075,8 @@ class TerminalSession(
             startupCommand: TerminalStartupCommand? = null,
             ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
             modeReportCapabilities: Int = 0,
+            clipboardReader: TerminalClipboardReader? = null,
+            clipboardReadTimeSource: TimeSource = TimeSource.Monotonic,
         ): TerminalSession {
             val outboundWriteLock = Any()
             val renderReader =
@@ -1106,6 +1119,24 @@ class TerminalSession(
                     workerDispatcher = workerDispatcher,
                     ioDispatcher = ioDispatcher,
                 )
+            val clipboardReads =
+                ClipboardReadHandler(
+                    scope = session.sessionScope,
+                    ioDispatcher = ioDispatcher,
+                    lock = outboundWriteLock,
+                    writer = session.outboundWriter,
+                    output = { session.streamingOutput },
+                    reader = clipboardReader,
+                    policy = { sink.currentPolicy },
+                    isClosed = session::isSessionClosed,
+                    audit = hostEvents::terminalClipboardReadCompleted,
+                    timeSource = clipboardReadTimeSource,
+                )
+            session.clipboardReads = clipboardReads
+            recordingHostEvents.clipboardReadRequest = { request ->
+                session.drainResponses()
+                clipboardReads.request(request)
+            }
             session.activeShellCommandLineProvider = recordingHostEvents::activeCommandLine
             val submission = startupCommand?.let(::StartupCommandSubmission)
             session.startupSubmission = submission
@@ -1128,6 +1159,12 @@ private class SessionHostEventSink(
     private val state: TerminalShellIntegrationState,
     private val connector: TerminalConnector,
 ) : HostEventSink {
+    var clipboardReadRequest: ((TerminalClipboardReadRequest) -> Unit)? = null
+
+    override fun terminalClipboardReadRequested(request: TerminalClipboardReadRequest) {
+        checkNotNull(clipboardReadRequest).invoke(request)
+    }
+
     override fun paletteChanged(palette: TerminalColorPalette) = delegate.paletteChanged(palette)
 
     override fun hyperlinkRegistered(

@@ -27,6 +27,43 @@ import org.junit.jupiter.api.Test
 @OptIn(ExperimentalCoroutinesApi::class)
 class OutboundWriterTest {
     @Test
+    fun `owned reply reservation is bounded ordered and released exactly once`() =
+        runTest {
+            val connector = MockConnector()
+            val writer = OutboundWriter(connector, Any())
+            var releases = 0
+            writer.submit { writer.append(byteArrayOf(1), 0, 1) }
+            assertFalse(writer.submitReply(1, onlyIfIdle = true, write = { fail("writer is busy") }, release = { releases++ }))
+            writer.submitBulk(1) {
+                assertFalse(writer.submitReply(1, onlyIfIdle = true, write = { fail("writer is active") }, release = { releases++ }))
+                connector.write(byteArrayOf(2))
+            }
+            assertTrue(
+                writer.submitReply(
+                    OutboundWriter.MAX_REPLY_BYTES,
+                    write = { connector.write(byteArrayOf(3)) },
+                    release = { releases++ },
+                ),
+            )
+            assertFalse(writer.submitReply(1, write = { fail("reply slot is occupied") }, release = { releases++ }))
+            assertThrows(IllegalArgumentException::class.java) {
+                writer.submitReply(OutboundWriter.MAX_REPLY_BYTES + 1, write = {}, release = {})
+            }
+            writer.submitBulk(1) { connector.write(byteArrayOf(4)) }
+            writer.submit { writer.append(byteArrayOf(5), 0, 1) }
+            backgroundScope.launch(StandardTestDispatcher(testScheduler)) { writer.run() }
+            runCurrent()
+            assertArrayEquals(byteArrayOf(1, 2, 3, 4, 5), connector.writtenBytes)
+            assertEquals(1, releases)
+            assertTrue(writer.submitReply(1, write = { fail("closed before write") }, release = { releases++ }))
+            writer.close()
+            runCurrent()
+            assertEquals(2, releases)
+            writer.close()
+            assertEquals(2, releases)
+        }
+
+    @Test
     fun `wrap growth and rollback retain exactly the committed bytes`() =
         runTest {
             val connector = MockConnector()

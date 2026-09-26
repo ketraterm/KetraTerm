@@ -112,7 +112,7 @@ OSC 5522 status codes do not apply to OSC 52.
 | No available text target, unsupported host, platform failure, oversized/invalid text | No fallback to an unrelated selection and no truncated data | Empty response |
 | Session/tab/project closed, request superseded by lifecycle invalidation | Cancel/retire request and discard late completion | Silence |
 | Valid request arrives while this session already has an active read | No additional coroutine, native read, or prompt | Silence; content-free busy audit |
-| Read deadline expires while session/replies remain eligible | Dismiss prompt and retire native result | Empty response if it can be committed immediately; discard later success |
+| Read deadline expires while session/replies remain eligible | Dismiss prompt and retire native result | Empty response only through an idle writer that commits within the bounded timeout window; discard later success |
 
 Silencing excess concurrent requests avoids replying to a later query ahead of
 the pending one. OSC 52 has no request ID. Do not coalesce several reads into one
@@ -138,10 +138,13 @@ XTGETTCAP advertisement for this capability.
   to block repeated requests. A terminal cannot create a stack of dialogs.
   Share lifecycle mechanics where both products use the same Swing behavior;
   keep product wording, settings, and IDE modality ownership in the products.
-- Proposed initial end-to-end deadline: **eight seconds from query admission**,
+- End-to-end deadline: **eight seconds from query admission**,
   leaving margin under Neovim's observed ten-second wait. Use a monotonic clock
   and an injectable scheduler. Show expiry in the prompt. This is an internal
-  policy constant, not another user setting.
+  policy constant, not another user setting. An empty timeout reply has a
+  100 ms scheduling window after that deadline and must commit before 8.1 seconds
+  from admission. Check this at writer commitment; delayed timer execution or
+  queue admission cannot restart the window.
 - Recheck current permissions before native access and at the outbound commit
   point. Revoking permission, lowering the byte limit, disposing the owner, or
   closing/replacing the session invalidates pending work. A later Allow must
@@ -304,6 +307,12 @@ Gate: a blocked connector cannot block the EDT/parser or interleave bytes;
 memory is bounded and ordinary input does not gain avoidable allocation.
 
 ### Part 3 — Headless read execution
+
+Checkpoint 3 implements the provider contract, session lifetime, strict reply
+preparation, and a single owned reply reservation (at most 8 MiB on the wire).
+The existing raw UTF-8 policy limit defaults to 1 MiB for both reads and writes.
+Provider access is optional; shipped products currently receive empty responses
+for denied/unavailable reads, without native read access or read consent.
 
 - Wire host admission into one active read per session, current-policy checks,
   a suspending host operation, deadline/cancellation, and the input reply encoder.

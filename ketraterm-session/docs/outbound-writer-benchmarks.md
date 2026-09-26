@@ -76,6 +76,39 @@ Raw JSON/logs are local build artifacts named
 For the longer run, select `TerminalSessionOutputBenchmark.keys` and use
 `-wi 3 -i 5 -w 1s -r 1s -f 2 -prof gc` with the command below.
 
+## Checkpoint 3: headless clipboard reads
+
+Compared committed checkpoint `c21362c1` with the headless read lifecycle on
+Java 25. Both used two forks, three 1-second warmups and five 1-second
+measurements per fork, with the GC profiler and the same completed-output
+workloads. No clipboard requests are issued by these workloads: the comparison
+checks whether the added lifecycle/reservation changes ordinary input or render
+consumption when clipboard reads are idle.
+
+| Workload | Baseline ops/ms | Read-capable ops/ms | Baseline B/op | Read-capable B/op |
+| --- | ---: | ---: | ---: | ---: |
+| Published render-cache consumption, one session | 609 | 603 | 0.056 | 0.045 |
+| Session ASCII keys, bursts of 64, per key | 5,691 | 6,608 | 5.432 | 4.679 |
+| Session paste, 64 KiB | 6.932 | 7.083 | 123.619 | 126.043 |
+
+The confidence intervals overlap for throughput and allocation. These runs show
+no measurable regression and do not establish a speedup. The render workload
+remains near the allocation measurement floor. Normal byte draining adds no
+payload objects or boxed counters; clipboard requests allocate only when
+admitted. Clipboard preparation deliberately allocates bounded UTF-8/Base64
+storage outside parser/input locks and is covered by correctness/resource tests,
+not a claim of allocation-free clipboard execution.
+
+Validation used an ignored Gradle initialization script that redirected build
+outputs, because a running standalone instance held the normal JARs open on
+Windows. The isolated baseline checkout was removed after measurement. Raw
+JSON/logs remain local build artifacts named
+`osc52-read-{baseline,current}-jmh`.
+
+Reproduce with the command below, selecting
+`TerminalSessionOutputBenchmark|TerminalCoroutineSessionBenchmark.consumePublishedCaches`
+and using `-wi 3 -i 5 -w 1s -r 1s -f 2`.
+
 ## Reproduction
 
 Build `:ketraterm-benchmarks:jmhJar` in both checkouts. Run the Java 25 executable

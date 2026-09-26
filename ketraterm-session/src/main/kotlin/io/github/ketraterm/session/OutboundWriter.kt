@@ -39,9 +39,11 @@ internal class OutboundWriter(
     private var closed = false
     private var producedBytes = 0L
     private var consumedBytes = 0L
-    private val bulkWrites = ArrayDeque<BulkWrite>()
+    private val pendingWrites = ArrayDeque<PendingWrite>()
     private var pendingBulkUnits = 0L
     private var pendingBulkOperations = 0
+    private var pendingReply = false
+    private var writing = false
 
     /** Returns after copying a complete operation, never after waiting for transport I/O. */
     inline fun submit(crossinline block: () -> Unit) {
@@ -78,11 +80,33 @@ internal class OutboundWriter(
             if (workUnits > MAX_BULK_UNITS - pendingBulkUnits || pendingBulkOperations == MAX_BULK_OPERATIONS) {
                 throw OutboundCapacityException("Terminal output exceeds the bulk input budget")
             }
-            bulkWrites.addLast(BulkWrite(producedBytes, workUnits, write))
+            pendingWrites.addLast(BulkWrite(producedBytes, workUnits, write))
             pendingBulkUnits += workUnits
             pendingBulkOperations++
         }
         ready.trySend(Unit)
+    }
+
+    /**
+     * Reserves the sole owned reply slot, separately from ordinary/bulk input.
+     * [release] runs exactly once, after writing or discard, under [lock].
+     * [write] owns eligibility checks and runs outside the monitor.
+     */
+    fun submitReply(
+        byteCount: Int,
+        onlyIfIdle: Boolean = false,
+        write: () -> Unit,
+        release: () -> Unit,
+    ): Boolean {
+        require(byteCount in 0..MAX_REPLY_BYTES)
+        synchronized(lock) {
+            if (closed || pendingReply) return false
+            if (onlyIfIdle && (writing || size != 0 || pendingWrites.isNotEmpty())) return false
+            pendingWrites.addLast(ReplyWrite(producedBytes, write, release))
+            pendingReply = true
+        }
+        ready.trySend(Unit)
+        return true
     }
 
     /** Called only inside [submit], while holding the session's outbound lock. */
@@ -128,13 +152,14 @@ internal class OutboundWriter(
     ) {
         while (true) {
             context.ensureActive()
-            var bulk: BulkWrite? = null
+            var pending: PendingWrite? = null
             val count =
                 synchronized(lock) {
                     if (closed) return
-                    val next = bulkWrites.firstOrNull()
+                    val next = pendingWrites.firstOrNull()
                     if (next != null && next.position == consumedBytes) {
-                        bulk = bulkWrites.removeFirst()
+                        pending = pendingWrites.removeFirst()
+                        writing = true
                         0
                     } else {
                         // Differences stay within the byte budget even when these sequence counters wrap.
@@ -145,25 +170,34 @@ internal class OutboundWriter(
                         head = (head + count) % bytes.size
                         size -= count
                         consumedBytes += count
+                        writing = count != 0
                         count
                     }
                 }
-            val operation = bulk
-            if (operation != null) {
-                try {
-                    operation.write()
-                } finally {
-                    synchronized(lock) {
-                        if (!closed) {
-                            pendingBulkUnits -= operation.workUnits
-                            pendingBulkOperations--
-                        }
-                    }
-                }
-            } else {
+            val operation = pending
+            if (operation == null) {
                 if (count == 0) return
                 connector.write(scratch, 0, count)
                 scratch.fill(0, 0, count)
+                continue
+            }
+            try {
+                operation.write()
+            } finally {
+                synchronized(lock) {
+                    writing = false
+                    when (operation) {
+                        is BulkWrite ->
+                            if (!closed) {
+                                pendingBulkUnits -= operation.workUnits
+                                pendingBulkOperations--
+                            }
+                        is ReplyWrite -> {
+                            pendingReply = false
+                            operation.release()
+                        }
+                    }
+                }
             }
         }
     }
@@ -175,18 +209,33 @@ internal class OutboundWriter(
             bytes = EMPTY_BYTES
             size = 0
             head = 0
-            bulkWrites.clear()
+            for (pending in pendingWrites) {
+                if (pending is ReplyWrite) pending.release()
+            }
+            pendingWrites.clear()
+            pendingReply = false
             pendingBulkUnits = 0
             pendingBulkOperations = 0
         }
         ready.close()
     }
 
-    private class BulkWrite(
+    private sealed class PendingWrite(
         val position: Long,
-        val workUnits: Long,
         val write: () -> Unit,
     )
+
+    private class BulkWrite(
+        position: Long,
+        val workUnits: Long,
+        write: () -> Unit,
+    ) : PendingWrite(position, write)
+
+    private class ReplyWrite(
+        position: Long,
+        write: () -> Unit,
+        val release: () -> Unit,
+    ) : PendingWrite(position, write)
 
     private fun copyTo(
         destination: ByteArray,
@@ -209,6 +258,7 @@ internal class OutboundWriter(
 
     companion object {
         const val MAX_QUEUED_BYTES = 8 * 1024 * 1024
+        const val MAX_REPLY_BYTES = 8 * 1024 * 1024
         const val MAX_BULK_UNITS = 16 * 1024 * 1024
         const val MAX_BULK_OPERATIONS = 16
         private val EMPTY_BYTES = ByteArray(0)
