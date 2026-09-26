@@ -17,6 +17,7 @@ package io.github.ketraterm.session
 
 import io.github.ketraterm.core.api.TerminalBuffer
 import io.github.ketraterm.core.api.TerminalHostResponseReader
+import io.github.ketraterm.core.api.TerminalInputState
 import io.github.ketraterm.host.*
 import io.github.ketraterm.input.TerminalInputEncoders
 import io.github.ketraterm.input.api.TerminalInputEncoder
@@ -43,6 +44,7 @@ import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.atomic.AtomicLong
 import java.util.concurrent.atomic.AtomicReference
 import kotlin.time.Duration.Companion.milliseconds
+import kotlin.time.TimeSource
 
 private const val SHELL_COMMAND_LINE_CONTEXT_LONGS = 3
 private const val SHELL_COMMAND_LINE_CONTEXT_LINE_ID_INDEX = 0
@@ -56,6 +58,14 @@ private const val SHELL_COMMAND_LINE_CONTEXT_ACTIVE_INDEX = 2
  * The connector owns transport threads. This session owns parser/core mutation
  * serialization and all host-bound write ordering.
  *
+ * Ordinary input and core replies share a bounded 8 MiB byte queue. Paste and
+ * text replacement retain their source and admission-time modes/policy for
+ * background encoding, bounded to 16 operations and 16 * 1024 * 1024 combined
+ * UTF-16/deletion units, including active work. One writer preserves order.
+ * Returning from input methods means acceptance, not transport completion. Queue
+ * exhaustion or transport failure closes the session with [failure]; closing a
+ * session discards pending output. A supplied [inputEncoder] owns its output sink.
+ *
  * A session publishes one active render viewport. Two independently scrolling
  * renderers must use separate sessions so their viewport requests do not race.
  *
@@ -63,7 +73,7 @@ private const val SHELL_COMMAND_LINE_CONTEXT_ACTIVE_INDEX = 2
  * @property renderPublisher the render publisher responsible for frame updates.
  * @property shellIntegrationState shared host-side prompt and command marker state.
  * @property workerDispatcher non-owned dispatcher used for session background work.
- * @property ioDispatcher non-owned dispatcher used for blocking connector metadata queries.
+ * @property ioDispatcher non-owned dispatcher for connector writes, metadata queries, and clipboard providers.
  */
 class TerminalSession(
     val terminal: TerminalBuffer,
@@ -72,7 +82,7 @@ class TerminalSession(
     private val responseReader: TerminalHostResponseReader,
     private val connector: TerminalConnector,
     private val parser: TerminalOutputParser,
-    private val inputEncoder: TerminalInputEncoder,
+    inputEncoder: TerminalInputEncoder? = null,
     private val hyperlinkResolver: TerminalHyperlinkResolver = TerminalHyperlinkResolver.NONE,
     private val outboundWriteLock: Any = Any(),
     val shellIntegrationState: TerminalShellIntegrationState = TerminalShellIntegrationState(),
@@ -104,6 +114,45 @@ class TerminalSession(
                 workerDispatcher +
                 CoroutineName("terminal-session-${SESSION_COUNTER.getAndIncrement()}"),
         )
+    private val outboundWriter = OutboundWriter(connector, outboundWriteLock)
+    private val ownsInputEncoder = inputEncoder == null
+    private val inputEncoder =
+        inputEncoder ?: TerminalInputEncoders.create(
+            terminal,
+            object : SessionTerminalHostOutput() {
+                override fun writeBytes(
+                    bytes: ByteArray,
+                    offset: Int,
+                    length: Int,
+                ) = outboundWriter.append(bytes, offset, length)
+            },
+            inputPolicy,
+        )
+
+    // Only the outbound worker uses this mode word, encoder, and its scratch.
+    private var bulkInputModeBits = 0L
+    private val streamingOutput by lazy(LazyThreadSafetyMode.NONE) {
+        object : SessionTerminalHostOutput() {
+            override fun writeBytes(
+                bytes: ByteArray,
+                offset: Int,
+                length: Int,
+            ) {
+                if (isSessionClosed()) throw CancellationException("Terminal session closed")
+                sessionJob.ensureActive()
+                connector.write(bytes, offset, length)
+            }
+        }
+    }
+    private var clipboardReads: ClipboardReadHandler? = null
+    private val bulkInputEncoder by lazy(LazyThreadSafetyMode.NONE) {
+        TerminalInputEncoders.create(
+            object : TerminalInputState {
+                override fun getInputModeBits(): Long = bulkInputModeBits
+            },
+            streamingOutput,
+        )
+    }
     private val mutableState = MutableStateFlow<TerminalSessionState>(TerminalSessionState.Created)
     private val mutableRenderGeneration = MutableStateFlow(NO_RENDER_GENERATION)
 
@@ -167,6 +216,15 @@ class TerminalSession(
         get() = sessionJob.isActive
 
     init {
+        sessionScope.launch(ioDispatcher) {
+            try {
+                outboundWriter.run()
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (failure: Exception) {
+                failWrite(failure)
+            }
+        }
         sessionScope.launch {
             for (signal in renderRequests) {
                 drainRenderRequests()
@@ -365,7 +423,10 @@ class TerminalSession(
      */
     fun setHostPolicy(policy: HostPolicy) {
         synchronized(mutationLock) {
-            hostCommandAdapter?.setHostPolicy(policy)
+            synchronized(outboundWriteLock) {
+                hostCommandAdapter?.setHostPolicy(policy)
+                clipboardReads?.policyChanged()
+            }
         }
     }
 
@@ -373,8 +434,8 @@ class TerminalSession(
      * Updates the active terminal input policy dynamically.
      *
      * Serializes with outbound encoding and publishes the Backarrow default for
-     * mode queries. Must not hold [mutationLock] while waiting for the writer:
-     * ingress may need to drain child output before a blocked write can finish.
+     * mode queries. This monitor protects encoding and admission only; a blocked
+     * connector never holds it.
      *
      * @param policy new input policy.
      */
@@ -406,16 +467,17 @@ class TerminalSession(
     }
 
     /**
-     * Encodes a key event and writes it to the connector unless closed.
+     * Accepts a complete input operation for ordered background writing unless closed.
      *
      * Input before [start] is ignored.
      */
-    @Suppress("UNUSED_PARAMETER")
-    private inline fun withInputLock(block: TerminalInputEncoder.() -> Unit) {
-        synchronized(outboundWriteLock) {
-            if (isAcceptingInput()) {
-                inputEncoder.block()
+    private inline fun withInputLock(crossinline block: TerminalInputEncoder.() -> Unit) {
+        try {
+            outboundWriter.submit {
+                if (isAcceptingInput()) inputEncoder.block()
             }
+        } catch (failure: OutboundCapacityException) {
+            failWrite(failure)
         }
     }
 
@@ -427,19 +489,21 @@ class TerminalSession(
     }
 
     /**
-     * Encodes a paste event and writes it to the connector unless closed.
+     * Accepts a paste for background encoding and writing unless closed.
+     * Captures modes and policy at admission; retains the immutable source text
+     * within the session bulk budget. A supplied encoder remains synchronous.
      *
      * Input before [start] is ignored.
      */
     override fun encodePaste(event: TerminalPasteEvent) {
-        withInputLock {
-            if (event.text.isNotEmpty()) startupSubmission?.cancel(TerminalStartupCommandStatus.CANCELLED_BY_INPUT)
+        withTextInput(event.text.length.toLong(), cancelStartup = event.text.isNotEmpty()) {
             encodePaste(event)
         }
     }
 
     /**
-     * Encodes a complete text replacement under one outbound lock acquisition.
+     * Accepts a complete text replacement with admission-time modes and policy.
+     * The standard encoder streams it on the I/O worker within the bulk budget.
      *
      * Delete, Backspace, and paste bytes cannot interleave with keyboard input
      * or parser/core responses from this session.
@@ -447,14 +511,44 @@ class TerminalSession(
      * @param event deletion counts and replacement text.
      */
     override fun encodeTextReplacement(event: TerminalTextReplacementEvent) {
-        withInputLock {
-            startupSubmission?.cancel(TerminalStartupCommandStatus.CANCELLED_BY_INPUT)
+        val workUnits = event.replacementText.length.toLong() + event.deleteAfterCursorCount + event.deleteBeforeCursorCount
+        withTextInput(workUnits, cancelStartup = true) {
             encodeTextReplacement(event)
         }
     }
 
+    private inline fun withTextInput(
+        workUnits: Long,
+        cancelStartup: Boolean,
+        crossinline encode: TerminalInputEncoder.() -> Unit,
+    ) {
+        if (!ownsInputEncoder) {
+            withInputLock {
+                if (cancelStartup) startupSubmission?.cancel(TerminalStartupCommandStatus.CANCELLED_BY_INPUT)
+                encode()
+            }
+            return
+        }
+        try {
+            synchronized(outboundWriteLock) {
+                if (!isAcceptingInput()) return
+                if (cancelStartup) startupSubmission?.cancel(TerminalStartupCommandStatus.CANCELLED_BY_INPUT)
+                if (workUnits == 0L) return
+                val modeBits = terminal.getInputModeBits()
+                val policy = inputPolicy
+                outboundWriter.submitBulk(workUnits) {
+                    bulkInputModeBits = modeBits
+                    bulkInputEncoder.setInputPolicy(policy)
+                    bulkInputEncoder.encode()
+                }
+            }
+        } catch (failure: OutboundCapacityException) {
+            failWrite(failure)
+        }
+    }
+
     /**
-     * Encodes a focus event and writes it to the connector unless closed.
+     * Encodes a focus event and queues it for background writing unless closed.
      *
      * Input before [start] is ignored.
      */
@@ -463,7 +557,7 @@ class TerminalSession(
     }
 
     /**
-     * Encodes a mouse event and writes it to the connector unless closed.
+     * Encodes a mouse event and queues it for background writing unless closed.
      *
      * Input before [start] is ignored.
      */
@@ -487,11 +581,20 @@ class TerminalSession(
             parser.accept(bytes, offset, length)
         }
 
-        drainResponses()
+        try {
+            drainResponses()
+            submitStartupCommand()
+        } catch (failure: OutboundCapacityException) {
+            failWrite(failure)
+        }
+        invalidateRender(immediate = false)
+    }
+
+    private fun submitStartupCommand() {
         val submission = startupSubmission
         if (submission?.status?.value == TerminalStartupCommandStatus.WAITING) {
             synchronized(mutationLock) {
-                synchronized(outboundWriteLock) {
+                outboundWriter.submit {
                     if (isAcceptingInput()) {
                         renderReader.readRenderFrame { frame ->
                             if (frame.activeBuffer == TerminalRenderBufferKind.PRIMARY) {
@@ -504,7 +607,6 @@ class TerminalSession(
                 }
             }
         }
-        invalidateRender(immediate = false)
     }
 
     /**
@@ -867,20 +969,22 @@ class TerminalSession(
     }
 
     private fun drainResponses() {
-        while (!isSessionClosed()) {
-            val count =
-                synchronized(mutationLock) {
-                    responseReader.readResponseBytes(responseScratch, 0, responseScratch.size)
-                }
-
-            if (count <= 0) return
-
-            synchronized(outboundWriteLock) {
-                if (!isSessionClosed()) {
-                    connector.write(responseScratch, 0, count)
+        synchronized(mutationLock) {
+            outboundWriter.submit {
+                while (!isSessionClosed()) {
+                    val count = responseReader.readResponseBytes(responseScratch, 0, responseScratch.size)
+                    if (count <= 0) break
+                    outboundWriter.append(responseScratch, 0, count)
                 }
             }
         }
+    }
+
+    private fun failWrite(failure: Exception) {
+        transitionToClosed(
+            TerminalSessionCloseEvent(exitCode = null, failure = failure, locallyRequested = false),
+            closeConnector = true,
+        )
     }
 
     private fun transitionToClosed(
@@ -901,6 +1005,8 @@ class TerminalSession(
     }
 
     private fun cleanupParser() {
+        clipboardReads?.close()
+        outboundWriter.close()
         synchronized(outboundWriteLock) {
             startupSubmission?.cancel(TerminalStartupCommandStatus.CLOSED)
         }
@@ -951,7 +1057,9 @@ class TerminalSession(
          * @param workerDispatcher non-owned dispatcher used for render publication and timeouts.
          * @param startupCommand optional command submitted once after a complete OSC 133 prompt.
          * User input before readiness cancels submission; hosts must install supported shell hooks.
-         * @param ioDispatcher non-owned dispatcher used for blocking connector metadata queries.
+         * @param ioDispatcher non-owned dispatcher for connector writes, metadata queries, and clipboard providers.
+         * @param clipboardReader session-bound clipboard/consent operation, or null for unavailable reads.
+         * @param clipboardReadTimeSource monotonic clock for the end-to-end read deadline.
          * @return standard production terminal session.
          */
         @JvmStatic
@@ -967,9 +1075,10 @@ class TerminalSession(
             startupCommand: TerminalStartupCommand? = null,
             ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
             modeReportCapabilities: Int = 0,
+            clipboardReader: TerminalClipboardReader? = null,
+            clipboardReadTimeSource: TimeSource = TimeSource.Monotonic,
         ): TerminalSession {
             val outboundWriteLock = Any()
-            val hostOutput = ConnectorTerminalHostOutput(connector, outboundWriteLock)
             val renderReader =
                 terminal as? TerminalRenderFrameReader
                     ?: error("terminal must implement TerminalRenderFrameReader")
@@ -991,7 +1100,6 @@ class TerminalSession(
                     defaultBackarrowSendsBackspace = inputPolicy.backspacePolicy == BackspacePolicy.BACKSPACE,
                 )
             val parser = TerminalParsers.create(sink, clipboardWriteLimitBytes = sink::clipboardWriteLimitBytes)
-            val inputEncoder = TerminalInputEncoders.create(terminal, hostOutput, inputPolicy)
 
             val renderPublisher = TerminalRenderPublisher(terminal.width, terminal.height)
 
@@ -1003,7 +1111,6 @@ class TerminalSession(
                     responseReader = terminal,
                     connector = connector,
                     parser = parser,
-                    inputEncoder = inputEncoder,
                     hyperlinkResolver = TerminalHyperlinkResolver(sink::hyperlinkUri),
                     outboundWriteLock = outboundWriteLock,
                     shellIntegrationState = shellIntegrationState,
@@ -1012,6 +1119,24 @@ class TerminalSession(
                     workerDispatcher = workerDispatcher,
                     ioDispatcher = ioDispatcher,
                 )
+            val clipboardReads =
+                ClipboardReadHandler(
+                    scope = session.sessionScope,
+                    ioDispatcher = ioDispatcher,
+                    lock = outboundWriteLock,
+                    writer = session.outboundWriter,
+                    output = { session.streamingOutput },
+                    reader = clipboardReader,
+                    policy = { sink.currentPolicy },
+                    isClosed = session::isSessionClosed,
+                    audit = hostEvents::terminalClipboardReadCompleted,
+                    timeSource = clipboardReadTimeSource,
+                )
+            session.clipboardReads = clipboardReads
+            recordingHostEvents.clipboardReadRequest = { request ->
+                session.drainResponses()
+                clipboardReads.request(request)
+            }
             session.activeShellCommandLineProvider = recordingHostEvents::activeCommandLine
             val submission = startupCommand?.let(::StartupCommandSubmission)
             session.startupSubmission = submission
@@ -1034,6 +1159,12 @@ private class SessionHostEventSink(
     private val state: TerminalShellIntegrationState,
     private val connector: TerminalConnector,
 ) : HostEventSink {
+    var clipboardReadRequest: ((TerminalClipboardReadRequest) -> Unit)? = null
+
+    override fun terminalClipboardReadRequested(request: TerminalClipboardReadRequest) {
+        checkNotNull(clipboardReadRequest).invoke(request)
+    }
+
     override fun paletteChanged(palette: TerminalColorPalette) = delegate.paletteChanged(palette)
 
     override fun hyperlinkRegistered(

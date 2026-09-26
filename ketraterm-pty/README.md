@@ -21,7 +21,7 @@ Using JetBrains [Pty4J](https://github.com/JetBrains/pty4j) as the underlying na
 The PTY transport orchestrates three asynchronous boundaries:
 1. **The Reader Thread** (`terminal-pty-reader`): Blocks on the native PTY process `InputStream`, pumping raw byte packets to the parser.
 2. **The Watcher Thread** (`terminal-pty-watcher`): Blocks on process termination (`Process.waitFor()`) to capture the native exit code.
-3. **The Outbound Writer**: Processes writes synchronously from the terminal event loop or core replies, protected by an internal serialization write lock.
+3. **The Outbound Writer**: Serializes input and terminal replies on the session I/O dispatcher; native writes run outside parser/input locks.
 
 ```mermaid
 flowchart TD
@@ -52,6 +52,12 @@ For deep-dive details on daemon threading and ConPTY integration:
 * [pty4j-process-lifecycle.md](docs/pty4j-process-lifecycle.md) - PTY reader and watcher loops, exit-code capture, and Windows sizing adjustments.
 
 ---
+
+## Clipboard reads
+
+Implement the suspending `PtyEventListener.readClipboard(session, request)` operation to supply clipboard data. The existing host bridge binds it to the requesting session before PTY startup. Follow the `TerminalClipboardReader` contract for consent, target selection, cancellation, and earlier posted writes. The default returns unavailable data. Provider exceptions go through the content-free session read audit, rather than the generic listener error callback.
+
+For hosts that must register a session before handling startup output, use `TerminalSessions.createLocalPty(options)`, publish the returned session, then call `session.start(options.columns, options.rows)`. The PTY process already exists, but output delivery has not started. Close the session if publication fails or startup is abandoned. `TerminalSessions.localPty(options)` remains the immediate-start convenience API.
 
 ## How to Use
 

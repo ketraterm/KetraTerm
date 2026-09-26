@@ -16,6 +16,7 @@
 package io.github.ketraterm.ui.swing.settings
 
 import java.awt.Toolkit
+import java.awt.datatransfer.Clipboard
 import java.awt.datatransfer.DataFlavor
 import java.awt.datatransfer.StringSelection
 
@@ -42,6 +43,13 @@ interface TerminalClipboardHandler {
      */
     fun readText(): String?
 
+    /**
+     * Reads the native primary selection, or returns `null` when unsupported or
+     * without text. An empty string is available text. Never substitutes the
+     * ordinary clipboard. Like [readText], this operation may block in native code.
+     */
+    fun readPrimarySelectionText(): String? = null
+
     companion object {
         /**
          * Clipboard handler backed by AWT's system clipboard.
@@ -59,9 +67,13 @@ private object SystemTerminalClipboardHandler : TerminalClipboardHandler {
             .setContents(StringSelection(text), null)
     }
 
-    override fun readText(): String? {
-        val clipboard = Toolkit.getDefaultToolkit().systemClipboard
-        if (!clipboard.isDataFlavorAvailable(DataFlavor.stringFlavor)) return null
-        return clipboard.getData(DataFlavor.stringFlavor) as? String
+    override fun readText(): String? = Toolkit.getDefaultToolkit().systemClipboard.readPlainText()
+
+    override fun readPrimarySelectionText(): String? = Toolkit.getDefaultToolkit().systemSelection?.readPlainText()
+
+    private fun Clipboard.readPlainText(): String? {
+        val contents = getContents(null) ?: return null
+        if (!contents.isDataFlavorSupported(DataFlavor.stringFlavor)) return null
+        return contents.getTransferData(DataFlavor.stringFlavor) as? String
     }
 }

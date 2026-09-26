@@ -15,6 +15,7 @@ Input owns:
 - host-bound byte encoding for keyboard, keypad, mouse, paste, and focus reports
 - policy decisions for ambiguous or unsupported input encodings
 - allocation-conscious scratch buffers for generated terminal input sequences
+- validation, owned payload preparation, and wire encoding for clipboard read replies
 - input-facing reads from core's packed mode snapshot
 
 Input does not own:
@@ -23,7 +24,7 @@ Input does not own:
 - grid, cursor, scrollback, pen, or title state
 - pixel-to-cell mouse coordinate conversion
 - renderer state or UI toolkit event types
-- parser/core response generation such as DSR, CPR, DA, OSC, or DCS replies
+- parser/core state-query response generation such as DSR, CPR, DA, palette OSC, or DCS replies
 - raw terminal mode bit layout
 
 ## Public API Surfaces
@@ -36,6 +37,7 @@ The public input surface is:
 - `TerminalInputPolicy`, the compatibility and safety policy for ambiguous
   encodings
 - `TerminalHostOutput`, the host-bound byte sink shared with terminal responses
+- `TerminalClipboardReply`, owned OSC 52 payload preparation, output, and cleanup
 
 External UI code should construct normalized events and call the encoder from
 the serialized terminal event loop. It should not reach into specialized
@@ -496,3 +498,25 @@ Likely to evolve before 1.0:
 The runtime semantics described in this document are the current intended
 contract for integrating UI adapters, `:ketraterm-core`, and host-bound terminal
 input.
+
+## Clipboard read replies
+
+`TerminalClipboardReply.prepare` accepts a validated protocol selection, exact
+clipboard text, a raw UTF-8 byte limit, and a complete wire-byte budget. It returns
+null for malformed UTF-16 or exceeded bounds, before emitting any bytes. Negative
+budgets are API errors. The wire budget bounds validation work and allocation
+even when the host configures a very large decoded limit. Padded Base64 sizing
+uses division before multiplication to avoid overflow.
+
+Preparation uses JDK UTF-8 and Base64 encoding after scalar/count validation.
+Only the Base64 byte array is retained; the temporary UTF-8 array is cleared.
+`writeTo` emits OSC 52, the validated selectors, Base64, and seven-bit ST through
+`TerminalHostOutput`, with payload ranges no larger than 16 KiB. It does not
+apply bracketed-paste framing, control filtering, newline conversion, or modes.
+The caller owns whole-frame ordering and must close the reply after writing or
+discard. Close clears the owned payload and prevents another write. It must not
+race a writer using the buffer. JVM Strings and platform data cannot be erased
+by this contract.
+
+Session owns permission, deadline, and transport commitment; input never reads
+a platform clipboard or chooses whether a reply is authorized.

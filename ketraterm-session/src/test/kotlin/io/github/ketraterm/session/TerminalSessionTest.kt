@@ -27,13 +27,9 @@ import io.github.ketraterm.render.cache.TerminalRenderCache
 import io.github.ketraterm.render.cache.TerminalRenderPublisher
 import io.github.ketraterm.testkit.MockConnector
 import io.github.ketraterm.transport.TerminalConnector
-import io.github.ketraterm.transport.TerminalConnectorListener
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.test.StandardTestDispatcher
-import kotlinx.coroutines.test.advanceTimeBy
-import kotlinx.coroutines.test.runCurrent
-import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.test.*
 import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.params.ParameterizedTest
@@ -91,6 +87,7 @@ class TerminalSessionTest {
                         events,
                         HostPolicy(clipboardPolicy = policy),
                         workerDispatcher = StandardTestDispatcher(testScheduler),
+                        ioDispatcher = UnconfinedTestDispatcher(),
                     ).use { session ->
                         session.start(10, 3)
                         for (offset in bytes.indices step 511) {
@@ -144,6 +141,7 @@ class TerminalSessionTest {
                     events,
                     policy,
                     workerDispatcher = StandardTestDispatcher(testScheduler),
+                    ioDispatcher = UnconfinedTestDispatcher(),
                 ).use { session ->
                     session.start(10, 3)
                     for (count in intArrayOf(8191, 8192, 8193, 8194)) {
@@ -201,6 +199,7 @@ class TerminalSessionTest {
                         events,
                         original,
                         workerDispatcher = StandardTestDispatcher(testScheduler),
+                        ioDispatcher = UnconfinedTestDispatcher(),
                     ).use { session ->
                         session.start(10, 3)
                         connector.feedFromHost(("\u001B]52;c;" + "YWFh".repeat(2048)).ascii())
@@ -231,6 +230,7 @@ class TerminalSessionTest {
                         events,
                         HostPolicy(clipboardPolicy = TerminalClipboardPolicy(writePermission = TerminalClipboardPermission.ALLOW)),
                         workerDispatcher = StandardTestDispatcher(testScheduler),
+                        ioDispatcher = UnconfinedTestDispatcher(),
                     ).use { session ->
                         session.start(10, 3)
                         for (offset in bytes.indices step 8191) {
@@ -259,6 +259,7 @@ class TerminalSessionTest {
                     terminal = TerminalBuffers.create(10, 3),
                     connector = connector,
                     workerDispatcher = StandardTestDispatcher(testScheduler),
+                    ioDispatcher = UnconfinedTestDispatcher(),
                 ).use { session ->
                     session.setCursorShape(TerminalRenderCursorShape.BAR)
                     session.start(10, 3)
@@ -359,7 +360,7 @@ class TerminalSessionTest {
                     columns: Int,
                 ): Boolean = true
             }
-        val session = TerminalSession.create(terminal, connector, hostEvents = events)
+        val session = TerminalSession.create(terminal, connector, hostEvents = events, ioDispatcher = UnconfinedTestDispatcher())
         try {
             session.start(80, 3)
             delegate.feedFromHost("keep".ascii())
@@ -415,6 +416,7 @@ class TerminalSessionTest {
                 terminal = terminal,
                 connector = connector,
                 kittyKeyboardSupportedFlags = KittyKeyboardProgressiveFlag.ENCODER_SUPPORTED_MASK,
+                ioDispatcher = UnconfinedTestDispatcher(),
             )
         session.start(columns = 10, rows = 3)
 
@@ -456,6 +458,7 @@ class TerminalSessionTest {
                     terminal = terminal,
                     connector = connector,
                     workerDispatcher = StandardTestDispatcher(testScheduler),
+                    ioDispatcher = UnconfinedTestDispatcher(),
                 )
 
             assertSame(TerminalSessionState.Created, session.state.value)
@@ -593,30 +596,6 @@ class TerminalSessionTest {
     }
 
     @Test
-    fun `text replacement does not interleave with concurrent input`() {
-        lateinit var session: TerminalSession
-        val connector =
-            ReplacementInterleavingConnector {
-                SessionTestThread("terminal-session-replacement-ordering-test") {
-                    session.encodeKey(TerminalKeyEvent.codepoint('a'.code))
-                }
-            }
-        session = createStartedSession(connector)
-        session.use {
-            session.encodeTextReplacement(
-                TerminalTextReplacementEvent(
-                    deleteAfterCursorCount = 1,
-                    deleteBeforeCursorCount = 1,
-                    replacementText = "status",
-                ),
-            )
-
-            connector.awaitWrites()
-            assertArrayEquals("\u001B[3~\u007Fstatusa".ascii(), connector.writtenBytes)
-        }
-    }
-
-    @Test
     fun `local close emits local lifecycle event once`() {
         val connector = MockConnector()
         val session = createStartedSession(connector)
@@ -631,28 +610,6 @@ class TerminalSessionTest {
             ),
             session.state.value,
         )
-    }
-
-    @ParameterizedTest
-    @CsvSource("5n,0n", "?2004\$p,?2004;2\$y")
-    fun `response write and key write do not interleave`(
-        query: String,
-        expected: String,
-    ) {
-        lateinit var session: TerminalSession
-        val connector =
-            SlowFirstWriteConnector {
-                SessionTestThread("terminal-session-ordering-test") {
-                    session.encodeKey(TerminalKeyEvent.codepoint('a'.code))
-                }
-            }
-        session = createStartedSession(connector)
-        session.use {
-            connector.feedFromHost(("\u001B[" + query).ascii())
-
-            connector.awaitWrites()
-            assertEquals("\u001B[" + expected + "a", connector.writtenBytes.asciiText())
-        }
     }
 
     @Test
@@ -674,7 +631,7 @@ class TerminalSessionTest {
     fun `input before start is ignored`() {
         val connector = MockConnector()
         val terminal = TerminalBuffers.create(width = 10, height = 3)
-        val session = TerminalSession.create(terminal, connector)
+        val session = TerminalSession.create(terminal, connector, ioDispatcher = UnconfinedTestDispatcher())
 
         session.encodeKey(TerminalKeyEvent.codepoint('a'.code))
         session.encodeTextReplacement(TerminalTextReplacementEvent(1, 1, "text"))
@@ -738,6 +695,7 @@ class TerminalSessionTest {
                 terminal,
                 connector,
                 workerDispatcher = StandardTestDispatcher(testScheduler),
+                ioDispatcher = UnconfinedTestDispatcher(),
             )
         session.start(columns = 8, rows = 3)
         try {
@@ -780,7 +738,7 @@ class TerminalSessionTest {
     fun `viewport resize captures the new discarded baseline after bounded history reflow`() {
         val connector = MockConnector()
         val terminal = TerminalBuffers.create(width = 8, height = 3, maxHistory = 4)
-        val session = TerminalSession.create(terminal, connector)
+        val session = TerminalSession.create(terminal, connector, ioDispatcher = UnconfinedTestDispatcher())
         session.start(columns = 8, rows = 3)
         try {
             connector.feedFromHost((0..6).joinToString("\r\n") { "row${it.toString().repeat(5)}" }.ascii())
@@ -820,7 +778,7 @@ class TerminalSessionTest {
                 }
             }
         val terminal = TerminalBuffers.create(width = 8, height = 3, maxHistory = 4)
-        val session = TerminalSession.create(terminal, connector)
+        val session = TerminalSession.create(terminal, connector, ioDispatcher = UnconfinedTestDispatcher())
         session.start(columns = 8, rows = 3)
         try {
             backingConnector.feedFromHost((0..6).joinToString("\r\n") { "row${it.toString().repeat(5)}" }.ascii())
@@ -1518,6 +1476,7 @@ class TerminalSessionTest {
                 connector = connector,
                 parser = parser,
                 inputEncoder = NoOpInputEncoder,
+                ioDispatcher = UnconfinedTestDispatcher(),
             )
 
         session.start(columns = 10, rows = 3)
@@ -1560,6 +1519,7 @@ class TerminalSessionTest {
                     { id ->
                         if (id == 42) "https://example.com" else null
                     },
+                ioDispatcher = UnconfinedTestDispatcher(),
             )
 
         assertAll(
@@ -1583,6 +1543,7 @@ class TerminalSessionTest {
                 connector = connector,
                 parser = RecordingParser(),
                 inputEncoder = NoOpInputEncoder,
+                ioDispatcher = UnconfinedTestDispatcher(),
             )
 
         session.readRenderFrame(scrollbackOffset = 4) { frame ->
@@ -1609,6 +1570,7 @@ class TerminalSessionTest {
                     parser = RecordingParser(),
                     inputEncoder = NoOpInputEncoder,
                     workerDispatcher = StandardTestDispatcher(testScheduler),
+                    ioDispatcher = UnconfinedTestDispatcher(),
                 )
             session.use {
                 val previousGeneration = session.renderGeneration.value
@@ -1629,7 +1591,13 @@ class TerminalSessionTest {
             val connector = MockConnector()
             val dispatcher = StandardTestDispatcher(testScheduler)
             val terminal = TerminalBuffers.create(width = 10, height = 3)
-            val session = TerminalSession.create(terminal, connector, workerDispatcher = dispatcher)
+            val session =
+                TerminalSession.create(
+                    terminal,
+                    connector,
+                    workerDispatcher = dispatcher,
+                    ioDispatcher = UnconfinedTestDispatcher(),
+                )
             session.start(columns = 10, rows = 3)
 
             // Enable synchronized output mode: CSI ? 2026 h
@@ -1656,7 +1624,13 @@ class TerminalSessionTest {
             val connector = MockConnector()
             val dispatcher = StandardTestDispatcher(testScheduler)
             val terminal = TerminalBuffers.create(width = 10, height = 3)
-            val session = TerminalSession.create(terminal, connector, workerDispatcher = dispatcher)
+            val session =
+                TerminalSession.create(
+                    terminal,
+                    connector,
+                    workerDispatcher = dispatcher,
+                    ioDispatcher = UnconfinedTestDispatcher(),
+                )
             session.start(columns = 10, rows = 3)
 
             // Enable synchronized output mode and write some text
@@ -1691,6 +1665,7 @@ class TerminalSessionTest {
                     parser = RecordingParser(),
                     inputEncoder = NoOpInputEncoder,
                     workerDispatcher = StandardTestDispatcher(testScheduler),
+                    ioDispatcher = UnconfinedTestDispatcher(),
                 )
             session.use {
                 renderReader.beforeRead = { call ->
@@ -1721,6 +1696,7 @@ class TerminalSessionTest {
                     parser = RecordingParser(),
                     inputEncoder = NoOpInputEncoder,
                     workerDispatcher = dispatcher,
+                    ioDispatcher = UnconfinedTestDispatcher(),
                 )
 
             session.requestRender(scrollbackOffset = 0)
@@ -1762,6 +1738,7 @@ class TerminalSessionTest {
                     parser = RecordingParser(),
                     inputEncoder = NoOpInputEncoder,
                     workerDispatcher = dispatcher,
+                    ioDispatcher = UnconfinedTestDispatcher(),
                 )
 
             session.requestRender(scrollbackOffset = 0)
@@ -1794,6 +1771,7 @@ class TerminalSessionTest {
                     parser = RecordingParser(),
                     inputEncoder = NoOpInputEncoder,
                     workerDispatcher = StandardTestDispatcher(testScheduler),
+                    ioDispatcher = UnconfinedTestDispatcher(),
                 )
             session.use {
                 renderReader.beforeRead = { call ->
@@ -1830,6 +1808,7 @@ class TerminalSessionTest {
                     parser = RecordingParser(),
                     inputEncoder = NoOpInputEncoder,
                     workerDispatcher = StandardTestDispatcher(testScheduler),
+                    ioDispatcher = UnconfinedTestDispatcher(),
                 )
             session.use {
                 session.requestRender(scrollbackOffset = 1)
@@ -1867,6 +1846,7 @@ class TerminalSessionTest {
                     parser = RecordingParser(),
                     inputEncoder = NoOpInputEncoder,
                     workerDispatcher = StandardTestDispatcher(testScheduler),
+                    ioDispatcher = UnconfinedTestDispatcher(),
                 )
             session.use {
                 val subscriberFailure = IllegalStateException("subscriber failed")
@@ -1922,6 +1902,7 @@ class TerminalSessionTest {
                 parser = parser,
                 inputEncoder = NoOpInputEncoder,
                 workerDispatcher = StandardTestDispatcher(),
+                ioDispatcher = UnconfinedTestDispatcher(),
             )
         val callbackEntered = CountDownLatch(1)
         val releaseCallback = CountDownLatch(1)
@@ -2021,6 +2002,7 @@ class TerminalSessionTest {
                 parser = parser,
                 inputEncoder = NoOpInputEncoder,
                 workerDispatcher = StandardTestDispatcher(),
+                ioDispatcher = UnconfinedTestDispatcher(),
             )
         session.start(columns = 10, rows = 3)
 
@@ -2078,6 +2060,7 @@ class TerminalSessionTest {
                 parser = parser,
                 inputEncoder = NoOpInputEncoder,
                 workerDispatcher = StandardTestDispatcher(),
+                ioDispatcher = UnconfinedTestDispatcher(),
             )
         session.start(columns = 10, rows = 3)
 
@@ -2135,6 +2118,7 @@ class TerminalSessionTest {
                 hostEvents = hostEvents,
                 hostPolicy = hostPolicy,
                 workerDispatcher = StandardTestDispatcher(),
+                ioDispatcher = UnconfinedTestDispatcher(),
             )
         session.start(columns, rows)
         return session
@@ -2408,115 +2392,5 @@ class TerminalSessionTest {
         override fun encodeFocus(event: TerminalFocusEvent) = Unit
 
         override fun encodeMouse(event: TerminalMouseEvent) = Unit
-    }
-
-    private class SlowFirstWriteConnector(
-        private val startSecondWriter: () -> SessionTestThread,
-    ) : TerminalConnector {
-        private val bytes = ArrayList<Byte>()
-        private var listener: TerminalConnectorListener? = null
-        private var writes: Int = 0
-        private var writerThread: SessionTestThread? = null
-
-        val writtenBytes: ByteArray
-            get() =
-                synchronized(bytes) {
-                    ByteArray(bytes.size) { index -> bytes[index] }
-                }
-
-        override fun start(listener: TerminalConnectorListener) {
-            this.listener = listener
-        }
-
-        override fun write(
-            bytes: ByteArray,
-            offset: Int,
-            length: Int,
-        ) {
-            val currentWrite =
-                synchronized(this) {
-                    writes++
-                    writes
-                }
-
-            if (currentWrite == 1) {
-                val writer = startSecondWriter()
-                writerThread = writer
-                writer.awaitBlockedBy(Thread.currentThread())
-            }
-
-            synchronized(this.bytes) {
-                var index = 0
-                while (index < length) {
-                    this.bytes += bytes[offset + index]
-                    index++
-                }
-            }
-        }
-
-        override fun resize(
-            columns: Int,
-            rows: Int,
-        ) = Unit
-
-        override fun close() {
-            writerThread?.close()
-        }
-
-        fun feedFromHost(bytes: ByteArray) {
-            listener?.onBytes(bytes, 0, bytes.size)
-        }
-
-        fun awaitWrites() {
-            checkNotNull(writerThread).awaitCompletion()
-            assertEquals(2, writes)
-        }
-    }
-
-    private class ReplacementInterleavingConnector(
-        private val startConcurrentWriter: () -> SessionTestThread,
-    ) : TerminalConnector {
-        private val bytes = ArrayList<Byte>()
-        private var writes = 0
-        private var writerThread: SessionTestThread? = null
-
-        val writtenBytes: ByteArray
-            get() = synchronized(bytes) { ByteArray(bytes.size) { index -> bytes[index] } }
-
-        override fun start(listener: TerminalConnectorListener) = Unit
-
-        override fun write(
-            bytes: ByteArray,
-            offset: Int,
-            length: Int,
-        ) {
-            val currentWrite = synchronized(this) { ++writes }
-            if (currentWrite == 1) {
-                val writer = startConcurrentWriter()
-                writerThread = writer
-                writer.awaitBlockedBy(Thread.currentThread())
-            }
-            synchronized(this.bytes) {
-                var index = 0
-                while (index < length) {
-                    this.bytes += bytes[offset + index]
-                    index++
-                }
-            }
-        }
-
-        override fun resize(
-            columns: Int,
-            rows: Int,
-        ) = Unit
-
-        override fun close() {
-            writerThread?.close()
-        }
-
-        fun awaitWrites() {
-            checkNotNull(writerThread).awaitCompletion()
-            assertEquals(3, writes)
-        }
     }
 }

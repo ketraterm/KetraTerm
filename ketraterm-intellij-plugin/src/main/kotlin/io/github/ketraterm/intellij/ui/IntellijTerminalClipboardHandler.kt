@@ -16,6 +16,7 @@
 package io.github.ketraterm.intellij.ui
 
 import com.intellij.openapi.ide.CopyPasteManager
+import io.github.ketraterm.intellij.services.IntellijClipboardClient
 import io.github.ketraterm.ui.swing.settings.TerminalClipboardHandler
 import java.awt.datatransfer.DataFlavor
 import java.awt.datatransfer.StringSelection
@@ -26,15 +27,33 @@ import java.awt.datatransfer.StringSelection
  * This adapter keeps IDE clipboard ownership inside the plugin host. Reusable
  * terminal modules continue to depend only on [TerminalClipboardHandler].
  */
-internal object IntellijTerminalClipboardHandler : TerminalClipboardHandler {
+internal class IntellijTerminalClipboardHandler(
+    private val client: IntellijClipboardClient,
+) : TerminalClipboardHandler {
+    // The nullable Java getter and non-null setter do not form a writable Kotlin property.
+    @Suppress("UsePropertyAccessSyntax")
     override fun copyText(text: String) {
+        client.checkCurrent()
         CopyPasteManager.getInstance().setContents(StringSelection(text))
     }
 
-    override fun readText(): String? =
-        try {
-            CopyPasteManager.getInstance().getContents(DataFlavor.stringFlavor) as? String
-        } catch (_: Exception) {
-            null
-        }
+    override fun readText(): String? {
+        client.checkCurrent()
+        val text = CopyPasteManager.getInstance().getContents<String>(DataFlavor.stringFlavor)
+        client.checkCurrent()
+        return text
+    }
+
+    override fun readPrimarySelectionText(): String? {
+        client.checkCurrent()
+        val contents = CopyPasteManager.getInstance().systemSelectionContents
+        val text =
+            if (contents?.isDataFlavorSupported(DataFlavor.stringFlavor) == true) {
+                contents.getTransferData(DataFlavor.stringFlavor) as? String
+            } else {
+                null
+            }
+        client.checkCurrent()
+        return text
+    }
 }

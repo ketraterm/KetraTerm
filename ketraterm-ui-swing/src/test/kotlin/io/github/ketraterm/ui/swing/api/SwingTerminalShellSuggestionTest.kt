@@ -35,6 +35,7 @@ import org.junit.jupiter.api.Test
 import java.awt.event.KeyEvent
 import java.io.ByteArrayOutputStream
 import java.nio.charset.StandardCharsets
+import java.util.concurrent.CountDownLatch
 import java.util.concurrent.LinkedBlockingQueue
 import java.util.concurrent.TimeUnit
 import javax.swing.JPanel
@@ -463,7 +464,8 @@ class SwingTerminalShellSuggestionTest {
 
         assertTrue(enterEvent.isConsumed)
         assertTrue(accepted.isEmpty())
-        assertTrue(connector.writtenBytes.size() > 0)
+        assertTrue(connector.firstWrite.await(5, TimeUnit.SECONDS))
+        assertEquals("\r", connector.writtenBytes.toString(Charsets.US_ASCII))
         SwingUtilities.invokeAndWait {
             assertFalse(component.currentShellSuggestionState().visible)
             component.dispose()
@@ -1011,6 +1013,7 @@ class SwingTerminalShellSuggestionTest {
     private class RecordingConnector : TerminalConnector {
         private var listener: TerminalConnectorListener? = null
         val writtenBytes = ByteArrayOutputStream()
+        val firstWrite = CountDownLatch(1)
 
         override fun start(listener: TerminalConnectorListener) {
             this.listener = listener
@@ -1022,6 +1025,7 @@ class SwingTerminalShellSuggestionTest {
             length: Int,
         ) {
             writtenBytes.write(bytes, offset, length)
+            firstWrite.countDown()
         }
 
         override fun resize(

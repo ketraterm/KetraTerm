@@ -344,7 +344,7 @@ class KetraTermSettingsConfigurable internal constructor(
                     ?: TerminalConfig.DEFAULT_CLIPBOARD_WRITE.name.lowercase(Locale.ROOT),
             clipboardRead =
                 (clipboardReadCombo.selectedItem as? PermissionOption)?.id
-                    ?: TerminalConfig.DEFAULT_CLIPBOARD_READ.name.lowercase(Locale.ROOT),
+                    ?: settings.state.clipboardRead,
             clipboardMaxDecodedBytes = spinnerValue(clipboardMaxDecodedBytesSpinner),
             titlePermission = if (titlePermissionCheckBox.isSelected) "allow" else "deny",
             scrollOnOutput = scrollOnOutputCheckBox.isSelected,

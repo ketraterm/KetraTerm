@@ -31,6 +31,11 @@
     <resource-bundle>messages.MyMessageBundle</resource-bundle>
 
     <extensions defaultExtensionNs="com.intellij">
+        <applicationService serviceImplementation="io.github.ketraterm.intellij.services.IntellijClipboardClient"
+                            client="all"/>
+        <projectService serviceImplementation="io.github.ketraterm.intellij.services.IntellijClipboardClient"
+                        client="all"/>
+
         <applicationConfigurable parentId="tools"
                                  instance="io.github.ketraterm.intellij.settings.KetraTermSettingsConfigurable"
                                  id="io.github.ketraterm.terminal.settings"

@@ -17,6 +17,7 @@ package io.github.ketraterm.workspace
 
 import io.github.ketraterm.host.HostPolicy
 import io.github.ketraterm.host.TerminalClipboardPromptEvent
+import io.github.ketraterm.host.TerminalClipboardReadRequest
 import io.github.ketraterm.host.TerminalClipboardWriteEvent
 import io.github.ketraterm.input.policy.PasteControlPolicy
 import io.github.ketraterm.protocol.NotificationLevel
@@ -25,9 +26,7 @@ import io.github.ketraterm.pty.PtyEventListener
 import io.github.ketraterm.pty.PtyOptions
 import io.github.ketraterm.pty.TerminalSessions
 import io.github.ketraterm.render.api.TerminalColorPalette
-import io.github.ketraterm.session.TerminalSession
-import io.github.ketraterm.session.TerminalSessionState
-import io.github.ketraterm.session.TerminalStartupCommandStatus
+import io.github.ketraterm.session.*
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.*
 import java.net.URI
@@ -88,7 +87,9 @@ class TerminalWorkspace internal constructor(
     fun selectedTab(): TerminalWorkspaceTab? = synchronized(stateLock) { selectedTabId?.let(::tabByIdLocked) }
 
     /**
-     * Opens a new local PTY-backed tab.
+     * Opens a new local PTY-backed tab. Publishes it through
+     * [TerminalWorkspaceListener.tabOpened] before starting output delivery.
+     * Publication or startup failure closes the session and removes the tab.
      *
      * @param profile launch profile for the new process.
      * @param options initial session dimensions and terminal policy.
@@ -99,58 +100,73 @@ class TerminalWorkspace internal constructor(
         options: TerminalWorkspaceOpenOptions,
     ): TerminalWorkspaceTab {
         val id = "terminal-${nextTabNumber.getAndIncrement()}"
-        val tabEventListener = tabEventListener(id)
-        val session = sessionFactory.open(profile, options, tabEventListener)
-        val tab =
-            TerminalWorkspaceTab(
-                id = id,
-                profile = profile,
-                title = profile.displayName,
-                session = session,
-                onColorChanged = { t, color -> listener.colorChanged(t, color) },
-                onTitleChanged = { t, titleText -> listener.titleChanged(t, titleText) },
-                onCurrentWorkingDirectoryChanged = { t, uri -> listener.currentWorkingDirectoryChanged(t, uri) },
-                showForegroundProcessName = options.showForegroundProcessName,
-            )
-        synchronized(stateLock) {
-            tabs += tab
-        }
-        session.currentWorkingDirectoryUri()?.let(tab::updateCurrentWorkingDirectoryUri)
-        selectTab(id)
-        listener.tabOpened(tab)
+        val session = sessionFactory.create(profile, options, tabEventListener(id))
+        try {
+            check(session.state.value === TerminalSessionState.Created) { "Workspace factory must return an unstarted session" }
+            val tab =
+                TerminalWorkspaceTab(
+                    id = id,
+                    profile = profile,
+                    title = profile.displayName,
+                    session = session,
+                    onColorChanged = { t, color -> listener.colorChanged(t, color) },
+                    onTitleChanged = { t, titleText -> listener.titleChanged(t, titleText) },
+                    onCurrentWorkingDirectoryChanged = { t, uri -> listener.currentWorkingDirectoryChanged(t, uri) },
+                    showForegroundProcessName = options.showForegroundProcessName,
+                )
+            synchronized(stateLock) {
+                tabs += tab
+            }
+            selectTab(id)
+            listener.tabOpened(tab)
+            session.start(options.columns, options.rows)
 
-        val stateJob =
-            workspaceScope.launch {
-                val processTitleJob =
-                    launch {
-                        tab.processTitleEnabled.collectLatest { enabled ->
-                            if (enabled) session.foregroundProcessName.collect(tab::updateForegroundProcessName)
-                        }
-                    }
-                val startupJob =
-                    session.startupCommandStatus?.let { status ->
+            val stateJob =
+                workspaceScope.launch {
+                    val processTitleJob =
                         launch {
-                            if (status.first { it != TerminalStartupCommandStatus.WAITING } ==
-                                TerminalStartupCommandStatus.CANCELLED_BY_INPUT
-                            ) {
-                                listener.startupCommandCancelled(tab)
+                            tab.processTitleEnabled.collectLatest { enabled ->
+                                if (enabled) session.foregroundProcessName.collect(tab::updateForegroundProcessName)
                             }
                         }
-                    }
-                val closed = session.state.filterIsInstance<TerminalSessionState.Closed>().first()
-                startupJob?.cancel()
-                processTitleJob.cancelAndJoin()
-                tab.updateForegroundProcessName(null)
-                if (!closed.event.locallyRequested) {
-                    tabBySession(session)?.let {
-                        listener.sessionClosed(it, closed.event.exitCode, closed.event.failure)
+                    val startupJob =
+                        session.startupCommandStatus?.let { status ->
+                            launch {
+                                if (status.first { it != TerminalStartupCommandStatus.WAITING } ==
+                                    TerminalStartupCommandStatus.CANCELLED_BY_INPUT
+                                ) {
+                                    listener.startupCommandCancelled(tab)
+                                }
+                            }
+                        }
+                    val closed = session.state.filterIsInstance<TerminalSessionState.Closed>().first()
+                    startupJob?.cancel()
+                    processTitleJob.cancelAndJoin()
+                    tab.updateForegroundProcessName(null)
+                    if (!closed.event.locallyRequested) {
+                        tabBySession(session)?.let {
+                            listener.sessionClosed(it, closed.event.exitCode, closed.event.failure)
+                        }
                     }
                 }
+            synchronized(stateLock) {
+                sessionStateJobs[id] = stateJob
             }
-        synchronized(stateLock) {
-            sessionStateJobs[id] = stateJob
+            return tab
+        } catch (failure: Throwable) {
+            try {
+                closeTab(id)
+            } catch (cleanup: Throwable) {
+                failure.addSuppressed(cleanup)
+            }
+            // Also covers failure before the tab entered the workspace registry.
+            try {
+                session.close()
+            } catch (cleanup: Throwable) {
+                failure.addSuppressed(cleanup)
+            }
+            throw failure
         }
-        return tab
     }
 
     /**
@@ -329,6 +345,16 @@ class TerminalWorkspace internal constructor(
                 tabBySession(session)?.let { listener.hyperlinksCleared(it) }
             }
 
+            override suspend fun readClipboard(
+                session: TerminalSession,
+                request: TerminalClipboardReadRequest,
+            ): TerminalClipboardReadResult {
+                currentCoroutineContext().ensureActive()
+                val tab = tabById(tabId) ?: return TerminalClipboardReadResult.Unavailable
+                if (tab.session !== session) return TerminalClipboardReadResult.Unavailable
+                return listener.readClipboard(tab, request)
+            }
+
             override fun terminalClipboardWrite(
                 session: TerminalSession,
                 event: TerminalClipboardWriteEvent,
@@ -364,7 +390,8 @@ class TerminalWorkspace internal constructor(
 }
 
 internal fun interface TerminalWorkspaceSessionFactory {
-    fun open(
+    /** Returns a created session; the workspace publishes its tab before starting output delivery. */
+    fun create(
         profile: TerminalProfile,
         options: TerminalWorkspaceOpenOptions,
         eventListener: PtyEventListener,
@@ -372,7 +399,7 @@ internal fun interface TerminalWorkspaceSessionFactory {
 }
 
 private object LocalPtyWorkspaceSessionFactory : TerminalWorkspaceSessionFactory {
-    override fun open(
+    override fun create(
         profile: TerminalProfile,
         options: TerminalWorkspaceOpenOptions,
         eventListener: PtyEventListener,
@@ -382,7 +409,7 @@ private object LocalPtyWorkspaceSessionFactory : TerminalWorkspaceSessionFactory
                 profile = profile,
                 enabled = options.shellIntegrationEnabled,
             )
-        return TerminalSessions.localPty(
+        return TerminalSessions.createLocalPty(
             PtyOptions(
                 command = launchProfile.command,
                 environment = PtyOptions.defaultEnvironment() + launchProfile.environment,
@@ -651,7 +678,9 @@ interface TerminalWorkspaceListener {
     fun startupCommandCancelled(tab: TerminalWorkspaceTab) = Unit
 
     /**
-     * Called after a tab is opened and selected.
+     * Called after a tab is registered and selected, before its session starts.
+     * Establish host routing here; output delivery starts after this callback
+     * returns. Throwing aborts the open and closes the prepared session.
      *
      * @param tab opened tab.
      */
@@ -878,6 +907,22 @@ interface TerminalWorkspaceListener {
         tab: TerminalWorkspaceTab,
         event: TerminalClipboardPromptEvent,
     ) = Unit
+
+    /**
+     * Resolves a read for its owning [tab], independently of the selected tab.
+     *
+     * Invoked after [tabOpened] returns, on the session I/O dispatcher without
+     * workspace or parser/input locks. Asynchronously posted pane creation may
+     * still be pending: await that pane and earlier posted writes as required
+     * by [TerminalClipboardReader]. Session cancellation covers the host
+     * operation within the original deadline. Provider failures
+     * are audited without details; they are not delivered to [listenerFailed].
+     * The default reports unavailable data without accessing a clipboard.
+     */
+    suspend fun readClipboard(
+        tab: TerminalWorkspaceTab,
+        request: TerminalClipboardReadRequest,
+    ): TerminalClipboardReadResult = TerminalClipboardReadResult.Unavailable
 
     companion object {
         /**

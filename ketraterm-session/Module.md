@@ -4,7 +4,9 @@
 
 `ketraterm-session` is the runtime synchronization boundary between transport, parser, core, input encoding, and render publication.
 
-It uses coroutines for lifecycle orchestration, synchronized-output timeout handling, and conflated render publication. Transport byte consumption, parser/core mutation, input encoding, response writes, and borrowed frame reads remain synchronous.
+It uses coroutines for lifecycle orchestration, synchronized-output timeout handling, and conflated render publication. Transport byte consumption, parser/core mutation, ordinary input encoding and borrowed frame reads remain synchronous. Ordinary input and core-response batches use a bounded byte queue. Paste and text replacement retain bounded source data with admission-time modes and policy; one I/O coroutine streams their encoding and performs all ordered connector writes outside parser/input locks.
+
+OSC 52 reads use an optional session-bound suspending provider. Session owns the deadline, permission revalidation, one active request, and a bounded owned reply; product hosts supply consent and native access. Missing providers return an empty reply when terminal responses are permitted.
 
 ## Runtime model
 
@@ -13,7 +15,7 @@ It uses coroutines for lifecycle orchestration, synchronized-output timeout hand
 - `TerminalSession.renderPublisher` owns the leased primitive cache consumed by renderers.
 - A session has one active render viewport. Use separate sessions for independently scrolling views.
 - `mutationLock` protects parser/core mutation and borrowed frame reads.
-- Reentrant `outboundWriteLock` preserves exact input and core-response ordering.
+- Reentrant `outboundWriteLock` protects encoding and atomic queue admission. Native writes occur outside it.
 - The transport contract already guarantees serial, ordered inbound byte delivery, so no additional inbound lock is used.
 
 See [session-concurrency-locks.md](docs/session-concurrency-locks.md) and [asynchronous-render-coalescing.md](docs/asynchronous-render-coalescing.md).

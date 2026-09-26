@@ -17,6 +17,8 @@ package io.github.ketraterm.intellij.settings
 
 import com.intellij.openapi.components.*
 import com.intellij.util.ui.JBFont
+import com.intellij.util.xmlb.annotations.OptionTag
+import com.intellij.util.xmlb.annotations.Property
 import io.github.ketraterm.host.*
 import io.github.ketraterm.input.policy.PasteControlPolicy
 import io.github.ketraterm.render.api.TerminalRenderCursorShape
@@ -43,7 +45,10 @@ import java.util.concurrent.CopyOnWriteArrayList
     storages = [Storage(value = "ketraterm.xml", roamingType = RoamingType.DEFAULT)],
     category = SettingsCategory.TOOLS,
 )
-class KetraTermIntellijSettings : SerializablePersistentStateComponent<KetraTermIntellijSettings.State>(State()) {
+class KetraTermIntellijSettings :
+    SerializablePersistentStateComponent<KetraTermIntellijSettings.State>(
+        State(clipboardRead = TerminalConfig.DEFAULT_CLIPBOARD_READ.name.lowercase(Locale.ROOT)),
+    ) {
     private val stateLock = Any()
     private val changeListeners = CopyOnWriteArrayList<() -> Unit>()
 
@@ -171,6 +176,7 @@ class KetraTermIntellijSettings : SerializablePersistentStateComponent<KetraTerm
 
     /**
      * Persistent XML state for IntelliJ-hosted terminal preferences.
+     * Explicit XML annotations include immutable fields in the platform serializer.
      *
      * @property themeId `intellij` for IDE-derived colors, or a built-in theme id.
      * @property fontFamily terminal font family.
@@ -200,38 +206,72 @@ class KetraTermIntellijSettings : SerializablePersistentStateComponent<KetraTerm
      * already-selected terminal suggestion and otherwise reaches the shell.
      * @property completionLearningPersistenceEnabled whether sanitized learned
      * completion statistics may be read from and written to local disk.
+     * @property clipboardRead persisted read permission. Its deserialization default
+     * stays Deny for legacy XML; fresh services explicitly start with the product default.
      */
     data class State(
+        @OptionTag
         @JvmField val themeId: String = DEFAULT_THEME_ID,
+        @OptionTag
         @JvmField val fontFamily: String = DEFAULT_FONT_FAMILY,
+        @OptionTag
         @JvmField val fallbackFontFamily: String = DEFAULT_FONT_FAMILY,
+        @OptionTag
         @JvmField val fontSize: Int = DEFAULT_FONT_SIZE,
+        @OptionTag
         @JvmField val columns: Int = TerminalConfig.DEFAULT_COLUMNS,
+        @OptionTag
         @JvmField val rows: Int = TerminalConfig.DEFAULT_ROWS,
+        @OptionTag
         @JvmField val treatAmbiguousAsWide: Boolean = TerminalConfig.DEFAULT_TREAT_AMBIGUOUS_AS_WIDE,
+        @OptionTag
         @JvmField val cursorBlinkMillis: Int = TerminalConfig.DEFAULT_CURSOR_BLINK_MILLIS,
+        @OptionTag
         @JvmField val useSystemFallbackFonts: Boolean = TerminalConfig.DEFAULT_USE_SYSTEM_FALLBACK_FONTS,
+        @OptionTag
         @JvmField val cursorShape: String = TerminalConfig.DEFAULT_CURSOR_SHAPE,
+        @OptionTag
         @JvmField val visualBell: Boolean = TerminalConfig.DEFAULT_VISUAL_BELL,
+        @OptionTag
         @JvmField val pasteOnMiddleClick: Boolean = TerminalConfig.DEFAULT_PASTE_ON_MIDDLE_CLICK,
+        @OptionTag
         @JvmField val overrideIdeShortcuts: Boolean = true,
+        @OptionTag
         @JvmField val scrollbackLines: Int = TerminalConfig.DEFAULT_SCROLLBACK_LINES,
+        @OptionTag
         @JvmField val lineHeight: Float = TerminalConfig.DEFAULT_LINE_HEIGHT,
+        @OptionTag
         @JvmField val shellPath: String = TerminalConfig.DEFAULT_SHELL_PATH,
+        @OptionTag
         @JvmField val startDirectory: String = "",
+        @OptionTag
         @JvmField val environmentVariables: String = "",
+        @OptionTag
         @JvmField val addProjectJdkToPath: Boolean = true,
+        @OptionTag
         @JvmField val defaultTabName: String = "Local",
+        @OptionTag
         @JvmField val smartSuggestionsEnabled: Boolean = TerminalConfig.DEFAULT_SMART_SUGGESTIONS_ENABLED,
+        @OptionTag
         @JvmField val shellSuggestionsEnabled: Boolean = TerminalConfig.DEFAULT_SHELL_SUGGESTIONS_ENABLED,
+        @OptionTag
         @JvmField val acceptSelectedSuggestionWithEnter: Boolean = TerminalConfig.DEFAULT_ACCEPT_SELECTED_SUGGESTION_WITH_ENTER,
+        @OptionTag
         @JvmField val completionLearningPersistenceEnabled: Boolean = false,
+        @OptionTag
         @JvmField val pasteSanitization: String = "preserve",
+        @OptionTag
         @JvmField val clipboardWrite: String = TerminalConfig.DEFAULT_CLIPBOARD_WRITE.name.lowercase(Locale.ROOT),
-        @JvmField val clipboardRead: String = TerminalConfig.DEFAULT_CLIPBOARD_READ.name.lowercase(Locale.ROOT),
+        // Keep Deny in XML even when every preference equals its serialization default.
+        @Property(alwaysWrite = true)
+        @JvmField val clipboardRead: String = "deny",
+        @OptionTag
         @JvmField val clipboardMaxDecodedBytes: Int = TerminalConfig.DEFAULT_CLIPBOARD_MAX_DECODED_BYTES,
+        @OptionTag
         @JvmField val titlePermission: String = TerminalConfig.DEFAULT_TITLE_PERMISSION.name.lowercase(Locale.ROOT),
+        @OptionTag
         @JvmField val scrollOnOutput: Boolean = true,
+        @OptionTag
         @JvmField val showForegroundProcessName: Boolean = TerminalConfig.DEFAULT_SHOW_FOREGROUND_PROCESS_NAME,
     )
 
@@ -317,7 +357,7 @@ internal object KetraTermIntellijSettingsNormalizer {
             clipboardRead =
                 normalizeClipboardPermission(
                     state.clipboardRead,
-                    TerminalConfig.DEFAULT_CLIPBOARD_READ,
+                    TerminalClipboardPermission.DENY,
                 ),
             clipboardMaxDecodedBytes = state.clipboardMaxDecodedBytes.coerceAtLeast(0),
             titlePermission =

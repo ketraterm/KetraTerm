@@ -25,6 +25,7 @@ Parser/Core Replies  -----------------------------------------------------------
 ### What the Module Owns
 - **Platform-Neutral Models**: Normalized representation of [TerminalKeyEvent](src/main/kotlin/io/github/ketraterm/input/event/TerminalKeyEvent.kt), [TerminalPasteEvent](src/main/kotlin/io/github/ketraterm/input/event/TerminalPasteEvent.kt), [TerminalFocusEvent](src/main/kotlin/io/github/ketraterm/input/event/TerminalFocusEvent.kt), and [TerminalMouseEvent](src/main/kotlin/io/github/ketraterm/input/event/TerminalMouseEvent.kt).
 - **ANSI/DEC Encoding**: Translating events into byte sequences based on the terminal's active modes.
+- **Clipboard Reply Encoding**: Validating and preparing owned OSC 52 replies, independently of paste policy; session owns authorization and lifetime.
 - **Input Policy**: Decision-making policies ([TerminalInputPolicy](src/main/kotlin/io/github/ketraterm/input/policy/TerminalInputPolicy.kt)) for handling backspace bytes, meta keys, and paste sanitization.
 
 ### What the Module Does NOT Own

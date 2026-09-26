@@ -20,7 +20,7 @@ enum class TerminalStartupCommandStatus {
     /** Awaiting a complete primary-screen prompt; no timer submits the command. */
     WAITING,
 
-    /** Command and Enter were written; this does not imply command execution succeeded. */
+    /** Command and Enter were queued; transport completion and command success are not implied. */
     SUBMITTED,
 
     /** User input took precedence before submission. The command will not be retried. */
@@ -29,6 +29,6 @@ enum class TerminalStartupCommandStatus {
     /** The session closed before submission. */
     CLOSED,
 
-    /** A write failed. The command will not be retried because it may have been partially written. */
+    /** Encoding or queue admission failed. The command will not be retried. */
     FAILED,
 }

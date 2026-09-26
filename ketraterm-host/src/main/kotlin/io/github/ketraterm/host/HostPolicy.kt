@@ -42,8 +42,10 @@ package io.github.ketraterm.host
  * responses may affect core palette state or enqueue terminal-to-host bytes.
  * @property terminalResponsePolicy whether DA, DSR/CPR (including light/dark
  * scheme queries), DECRQM mode reports, window reports, DECRQCRA,
- * DECRQSS, and XTGETTCAP requests may enqueue terminal-to-host response bytes.
+ * DECRQSS, XTGETTCAP, and OSC 52 reads may enqueue terminal-to-host response bytes.
  * DENY also suppresses unsupported-mode replies; no response bytes are permitted.
+ * OSC 52 reads also require clipboard read permission; denying responses suppresses
+ * their empty failure replies too. Clipboard writes are unaffected.
  * @property clipboardPolicy deny-by-default permission and audit policy for
  * terminal-triggered clipboard protocols such as OSC 52.
  * @property maxHyperlinkEntries maximum distinct OSC 8 hyperlink keys retained

@@ -20,15 +20,18 @@ import io.github.ketraterm.input.event.*
 import io.github.ketraterm.testkit.MockConnector
 import io.github.ketraterm.transport.TerminalConnector
 import io.github.ketraterm.transport.TerminalConnectorListener
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.test.StandardTestDispatcher
+import kotlinx.coroutines.test.UnconfinedTestDispatcher
+import kotlinx.coroutines.test.runCurrent
+import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.params.ParameterizedTest
 import org.junit.jupiter.params.provider.ValueSource
 import java.io.IOException
-import java.util.concurrent.CountDownLatch
-import java.util.concurrent.TimeUnit
 
+@OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
 class TerminalStartupCommandTest {
     @Test
     fun `prompt delivered synchronously during connector start executes once`() {
@@ -49,7 +52,7 @@ class TerminalStartupCommandTest {
     @Test
     fun `unconfigured sessions do not submit commands on prompt markers`() {
         val connector = MockConnector()
-        TerminalSession.create(TerminalBuffers.create(40, 4), connector).use { session ->
+        TerminalSession.create(TerminalBuffers.create(40, 4), connector, ioDispatcher = UnconfinedTestDispatcher()).use { session ->
             session.start(40, 4)
             connector.feedFromHost(PROMPT.toByteArray())
             assertNull(session.startupCommandStatus)
@@ -168,52 +171,28 @@ class TerminalStartupCommandTest {
                 ): Unit = throw IOException("write failed")
             }
         session(connector).use { session ->
-            assertThrows(IOException::class.java) { delegate.feedFromHost(PROMPT.toByteArray()) }
-            assertEquals(TerminalStartupCommandStatus.FAILED, session.startupCommandStatus?.value)
-            assertDoesNotThrow { delegate.feedFromHost(PROMPT.toByteArray()) }
+            delegate.feedFromHost(PROMPT.toByteArray())
+            assertInstanceOf(IOException::class.java, session.failure)
+            assertTrue(session.isClosed)
+            assertEquals(1, delegate.closeCount)
+            session.onBytes(PROMPT.toByteArray(), 0, PROMPT.length)
+            assertEquals("", delegate.writtenBytes.decodeToString())
         }
     }
 
     @Test
-    fun `command and Enter cannot interleave with concurrent typing`() {
-        val enteredWrite = CountDownLatch(1)
-        val continueWrite = CountDownLatch(1)
-        val delegate = MockConnector()
-        val connector =
-            object : TerminalConnector by delegate {
-                override fun write(
-                    bytes: ByteArray,
-                    offset: Int,
-                    length: Int,
-                ) {
-                    enteredWrite.countDown()
-                    continueWrite.await()
-                    delegate.write(bytes, offset, length)
-                }
+    fun queuedCommandAndEnterPrecedeLaterTyping() =
+        runTest {
+            val connector = MockConnector()
+            session(connector, ioDispatcher = StandardTestDispatcher(testScheduler)).use { session ->
+                connector.feedFromHost(PROMPT.toByteArray())
+                session.encodeKey(TerminalKeyEvent(codepoint = 'x'.code))
+                assertEquals("", connector.writtenBytes.decodeToString())
+                assertEquals(TerminalStartupCommandStatus.SUBMITTED, session.startupCommandStatus?.value)
+                runCurrent()
+                assertEquals("echo ready\rx", connector.writtenBytes.decodeToString())
             }
-        session(connector).use { session ->
-            SessionTestThread("startup-prompt") { delegate.feedFromHost(PROMPT.toByteArray()) }.use { prompt ->
-                try {
-                    assertTrue(enteredWrite.await(SESSION_THREAD_TIMEOUT_SECONDS, TimeUnit.SECONDS))
-                    SessionTestThread("startup-concurrent-input") {
-                        session.encodeKey(TerminalKeyEvent(codepoint = 'x'.code))
-                    }.use { typing ->
-                        try {
-                            typing.awaitBlockedBy(prompt)
-                            assertEquals("", delegate.writtenBytes.decodeToString())
-                        } finally {
-                            continueWrite.countDown()
-                        }
-                        prompt.awaitCompletion()
-                        typing.awaitCompletion()
-                    }
-                } finally {
-                    continueWrite.countDown()
-                }
-            }
-            assertEquals("echo ready\rx", delegate.writtenBytes.decodeToString())
         }
-    }
 
     @ParameterizedTest
     @ValueSource(strings = ["", " ", "echo x\nexit", "echo x\r", "echo\tx", "\u001B[200~x", "x\u0000"])
@@ -231,6 +210,7 @@ class TerminalStartupCommandTest {
     private fun session(
         connector: TerminalConnector,
         command: String = "echo ready",
+        ioDispatcher: CoroutineDispatcher = UnconfinedTestDispatcher(),
     ): TerminalSession =
         TerminalSession
             .create(
@@ -238,6 +218,7 @@ class TerminalStartupCommandTest {
                 connector = connector,
                 startupCommand = TerminalStartupCommand(command),
                 workerDispatcher = StandardTestDispatcher(),
+                ioDispatcher = ioDispatcher,
             ).also { it.start(40, 4) }
 
     private companion object {

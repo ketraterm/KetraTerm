@@ -186,7 +186,9 @@ data class TerminalConfig(
         const val DEFAULT_SCROLL_ON_OUTPUT: Boolean = true
 
         val DEFAULT_CLIPBOARD_WRITE: TerminalClipboardPermission = TerminalClipboardPermission.ALLOW
-        val DEFAULT_CLIPBOARD_READ: TerminalClipboardPermission = TerminalClipboardPermission.DENY
+
+        /** Product default for new settings and explicit resets; persisted omissions remain denied. */
+        val DEFAULT_CLIPBOARD_READ: TerminalClipboardPermission = TerminalClipboardPermission.PROMPT
         const val DEFAULT_CLIPBOARD_MAX_DECODED_BYTES: Int = TerminalClipboardPolicy.DEFAULT_MAX_DECODED_BYTES
         val DEFAULT_TITLE_PERMISSION: TerminalTitlePermission = TerminalTitlePermission.ALLOW
 

@@ -34,6 +34,7 @@ import io.github.ketraterm.session.TerminalSession
 import io.github.ketraterm.transport.TerminalConnector
 import io.github.ketraterm.transport.TerminalConnectorListener
 import io.github.ketraterm.ui.swing.settings.SwingSettings
+import io.github.ketraterm.ui.swing.settings.TerminalClipboardHandler
 import io.github.ketraterm.ui.swing.settings.TerminalTheme
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.StandardTestDispatcher
@@ -57,6 +58,59 @@ class SwingTerminalThreadingTest {
     private val dispatcher = StandardTestDispatcher()
 
     @Test
+    fun `clipboard paste larger than byte queue is accepted on EDT and streamed on IO dispatcher`() {
+        val text = "x".repeat(9 * 1024 * 1024)
+        var written = 0
+        val connector =
+            object : TerminalConnector by NoOpConnector {
+                override fun write(
+                    bytes: ByteArray,
+                    offset: Int,
+                    length: Int,
+                ) {
+                    assertFalse(SwingUtilities.isEventDispatchThread())
+                    assertTrue(length <= 16 * 1024)
+                    written += length
+                }
+            }
+        val session =
+            TerminalSession.create(
+                terminal = TerminalBuffers.create(width = 3, height = 1),
+                connector = connector,
+                workerDispatcher = dispatcher,
+                ioDispatcher = dispatcher,
+            )
+        val component =
+            SwingTerminal(
+                hostServices =
+                    SwingHostServices(
+                        clipboardHandler =
+                            object : TerminalClipboardHandler {
+                                override fun copyText(text: String) = error("Unexpected clipboard write")
+
+                                override fun readText(): String = text
+                            },
+                    ),
+            )
+        try {
+            session.start(columns = 3, rows = 1)
+            edtCall {
+                component.bind(session)
+                assertTrue(component.pasteClipboardText())
+                assertEquals(0, written)
+                assertFalse(session.isClosed)
+            }
+            dispatcher.scheduler.runCurrent()
+            assertNull(session.failure)
+            assertEquals(text.length, written)
+        } finally {
+            edtCall { component.dispose() }
+            session.close()
+            dispatcher.scheduler.runCurrent()
+        }
+    }
+
+    @Test
     fun `paste policy applies on binding and reload while preserving transport line endings`() {
         val output = java.io.ByteArrayOutputStream()
         val connector =
@@ -74,6 +128,7 @@ class SwingTerminalThreadingTest {
                 terminal = TerminalBuffers.create(width = 3, height = 1),
                 connector = connector,
                 inputPolicy = TerminalInputPolicy(pasteLineEndingPolicy = PasteLineEndingPolicy.CARRIAGE_RETURN),
+                ioDispatcher = dispatcher,
             )
         var settings = SwingSettings(pasteControlPolicy = PasteControlPolicy.STRIP_C0_EXCEPT_TAB_CR_LF)
         val component = SwingTerminal(settingsProvider = { settings })
@@ -83,21 +138,25 @@ class SwingTerminalThreadingTest {
             edtCall {
                 component.bind(session)
                 session.encodePaste(paste)
+                dispatcher.scheduler.runCurrent()
                 assertEquals("A\tB\rC\rD\rE", output.toString(Charsets.UTF_8))
                 output.reset()
                 val enableBracketed = "\u001B[?2004h".toByteArray(Charsets.US_ASCII)
                 session.onBytes(enableBracketed, 0, enableBracketed.size)
                 session.encodePaste(paste)
+                dispatcher.scheduler.runCurrent()
                 assertEquals("\u001B[200~A\tB\r\nC\nD\rE\u001B[201~", output.toString(Charsets.UTF_8))
                 settings = settings.copy(pasteControlPolicy = PasteControlPolicy.PRESERVE)
                 component.reloadSettings()
                 output.reset()
                 session.encodePaste(paste)
+                dispatcher.scheduler.runCurrent()
                 assertEquals("\u001B[200~A\u0001\tB\r\nC\nD\rE\u001B[201~", output.toString(Charsets.UTF_8))
                 val disableBracketed = "\u001B[?2004l".toByteArray(Charsets.US_ASCII)
                 session.onBytes(disableBracketed, 0, disableBracketed.size)
                 output.reset()
                 session.encodePaste(paste)
+                dispatcher.scheduler.runCurrent()
                 assertEquals("A\u0001\tB\rC\rD\rE", output.toString(Charsets.UTF_8))
             }
         } finally {
@@ -119,7 +178,12 @@ class SwingTerminalThreadingTest {
                     replies.write(bytes, offset, length)
                 }
             }
-        val session = TerminalSession.create(terminal = TerminalBuffers.create(width = 3, height = 1), connector = connector)
+        val session =
+            TerminalSession.create(
+                terminal = TerminalBuffers.create(width = 3, height = 1),
+                connector = connector,
+                ioDispatcher = dispatcher,
+            )
         var settings =
             SwingSettings(
                 palette =
@@ -135,11 +199,13 @@ class SwingTerminalThreadingTest {
             edtCall {
                 component.bind(session)
                 session.onBytes(query, 0, query.size)
+                dispatcher.scheduler.runCurrent()
                 assertEquals("\u001B[?997;2n", replies.toString(Charsets.US_ASCII))
                 settings = settings.copy(palette = TerminalTheme.NORD.createPalette())
                 component.reloadSettings()
                 assertEquals("\u001B[?997;2n", replies.toString(Charsets.US_ASCII))
                 session.onBytes(query, 0, query.size)
+                dispatcher.scheduler.runCurrent()
                 assertEquals("\u001B[?997;2n\u001B[?997;1n", replies.toString(Charsets.US_ASCII))
             }
         } finally {

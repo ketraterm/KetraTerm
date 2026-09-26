@@ -2943,6 +2943,185 @@ class HostCommandAdapterTest {
             )
         }
 
+        @ParameterizedTest
+        @CsvSource(
+            "ALLOW, DENY, DENIED_READ_DISABLED",
+            "ALLOW, PROMPT, PROMPT_REQUIRED",
+            "ALLOW, ALLOW, ALLOWED_BY_POLICY",
+            "DENY, DENY, DENIED_BY_POLICY",
+            "DENY, PROMPT, DENIED_BY_POLICY",
+            "DENY, ALLOW, DENIED_BY_POLICY",
+        )
+        fun `OSC 52 read queries require both read and response permissions`(
+            responsePermission: HostControlPolicy,
+            readPermission: TerminalClipboardPermission,
+            expected: TerminalClipboardDecision,
+        ) {
+            val f =
+                Fixture(
+                    hostPolicy =
+                        HostPolicy(
+                            terminalResponsePolicy = responsePermission,
+                            clipboardPolicy =
+                                TerminalClipboardPolicy(
+                                    writePermission = TerminalClipboardPermission.ALLOW,
+                                    readPermission = readPermission,
+                                    maxDecodedBytes = 0,
+                                ),
+                        ),
+                )
+            for (terminator in listOf("\u0007", "\u001B\\")) {
+                f.acceptAscii("\u001B]52;c;?$terminator")
+            }
+
+            assertEquals(
+                List(2) {
+                    TerminalClipboardAuditEvent(
+                        operation = TerminalClipboardOperation.READ_QUERY,
+                        selection = "c",
+                        encodedLength = 1,
+                        decodedBytes = 0,
+                        maxDecodedBytes = 0,
+                        decision = expected,
+                    )
+                },
+                f.events.clipboardAudits,
+            )
+            val readRequests = f.events.clipboardReads
+            assertEquals(if (responsePermission == HostControlPolicy.ALLOW) 2 else 0, readRequests.size)
+            for (request in readRequests) {
+                assertEquals("c", request.selection.value)
+                assertEquals(readPermission, request.permission)
+                assertEquals(0, request.maxDecodedBytes)
+            }
+            assertTrue(f.events.clipboardWrites.isEmpty())
+            assertTrue(f.events.clipboardPrompts.isEmpty())
+            assertEquals(0, f.terminal.pendingResponseBytes)
+        }
+
+        @ParameterizedTest
+        @ValueSource(strings = ["", "c", "p", "q", "s", "0", "1", "2", "3", "4", "5", "6", "7", "pc", "cp", "ccpsp", "s0"])
+        fun `OSC 52 query audit preserves valid selection lists without implying platform support`(selection: String) {
+            val f =
+                Fixture(
+                    hostPolicy = HostPolicy(clipboardPolicy = TerminalClipboardPolicy(readPermission = TerminalClipboardPermission.ALLOW)),
+                )
+            f.acceptAscii("\u001B]52;$selection;?\u0007")
+
+            assertEquals(
+                TerminalClipboardAuditEvent(
+                    operation = TerminalClipboardOperation.READ_QUERY,
+                    selection = selection,
+                    encodedLength = 1,
+                    decodedBytes = 0,
+                    maxDecodedBytes = TerminalClipboardPolicy.DEFAULT_MAX_DECODED_BYTES,
+                    decision = TerminalClipboardDecision.ALLOWED_BY_POLICY,
+                ),
+                f.events.clipboardAudits.single(),
+            )
+            val normalized = if (selection.isEmpty()) "c" else selection.toList().distinct().joinToString("")
+            assertEquals(
+                normalized,
+                f.events.clipboardReads
+                    .single()
+                    .selection.value,
+            )
+            assertTrue(f.events.clipboardWrites.isEmpty())
+            assertTrue(f.events.clipboardPrompts.isEmpty())
+        }
+
+        @ParameterizedTest
+        @ValueSource(strings = ["x", "C", "c ", " p", "c,p", "c:p", "c?", "8"])
+        fun `OSC 52 query selection validation precedes permission decisions`(selection: String) {
+            for (responsePermission in HostControlPolicy.entries) {
+                for (readPermission in TerminalClipboardPermission.entries) {
+                    val f =
+                        Fixture(
+                            hostPolicy =
+                                HostPolicy(
+                                    terminalResponsePolicy = responsePermission,
+                                    clipboardPolicy = TerminalClipboardPolicy(readPermission = readPermission),
+                                ),
+                        )
+                    f.acceptAscii("\u001B]52;$selection;?\u0007X")
+                    val audit = f.events.clipboardAudits.single()
+                    assertEquals(
+                        TerminalClipboardDecision.DENIED_MALFORMED_PAYLOAD,
+                        audit.decision,
+                        "response=$responsePermission read=$readPermission",
+                    )
+                    assertEquals(selection, audit.selection)
+                    assertEquals(TerminalClipboardOperation.READ_QUERY, audit.operation)
+                    assertTrue(f.events.clipboardReads.isEmpty())
+                    assertEquals('X'.code, f.terminal.getCodepointAt(0, 0))
+                    assertTrue(f.events.clipboardWrites.isEmpty())
+                    assertTrue(f.events.clipboardPrompts.isEmpty())
+                    assertEquals(0, f.terminal.pendingResponseBytes)
+                }
+            }
+        }
+
+        @Test
+        fun `OSC 52 queries sample current permissions when a chunked command completes`() {
+            val allowed = HostPolicy(clipboardPolicy = TerminalClipboardPolicy(readPermission = TerminalClipboardPermission.ALLOW))
+            for (terminator in listOf("\u0007", "\u001B\\")) {
+                val bytes = "\u001B]52;pc;?$terminator".encodeToByteArray()
+                for (split in 1 until bytes.size) {
+                    val f = Fixture(hostPolicy = allowed)
+                    f.parser.accept(bytes, 0, split)
+                    assertTrue(f.events.clipboardAudits.isEmpty())
+                    f.sink.setHostPolicy(allowed.copy(terminalResponsePolicy = HostControlPolicy.DENY))
+                    f.parser.accept(bytes, split, bytes.size - split)
+                    f.sink.setHostPolicy(
+                        allowed.copy(clipboardPolicy = allowed.clipboardPolicy.copy(readPermission = TerminalClipboardPermission.DENY)),
+                    )
+                    f.acceptAscii("\u001B]52;c;?\u0007")
+                    f.sink.setHostPolicy(allowed)
+                    f.acceptAscii("\u001B]52;c;?\u0007")
+
+                    assertEquals(
+                        listOf(
+                            TerminalClipboardDecision.DENIED_BY_POLICY,
+                            TerminalClipboardDecision.DENIED_READ_DISABLED,
+                            TerminalClipboardDecision.ALLOWED_BY_POLICY,
+                        ),
+                        f.events.clipboardAudits.map { it.decision },
+                    )
+                    assertEquals(listOf("pc", "c", "c"), f.events.clipboardAudits.map { it.selection })
+                    assertTrue(f.events.clipboardWrites.isEmpty())
+                    assertTrue(f.events.clipboardPrompts.isEmpty())
+                    assertEquals(0, f.terminal.pendingResponseBytes)
+                }
+            }
+        }
+
+        @Test
+        fun `OSC 52 response denial leaves allowed writes and write prompts available`() {
+            val f =
+                Fixture(
+                    hostPolicy =
+                        HostPolicy(
+                            terminalResponsePolicy = HostControlPolicy.DENY,
+                            clipboardPolicy = TerminalClipboardPolicy(writePermission = TerminalClipboardPermission.ALLOW),
+                        ),
+                )
+            f.acceptAscii("\u001B]52;c;SGVsbG8=\u0007")
+            f.sink.setHostPolicy(
+                f.hostPolicy.copy(
+                    clipboardPolicy = f.hostPolicy.clipboardPolicy.copy(writePermission = TerminalClipboardPermission.PROMPT),
+                ),
+            )
+            f.acceptAscii("\u001B]52;c;V29ybGQ=\u0007")
+
+            assertEquals(listOf("Hello"), f.events.clipboardWrites.map { it.text })
+            assertEquals(listOf("World"), f.events.clipboardPrompts.map { it.text })
+            assertEquals(
+                listOf(TerminalClipboardDecision.ALLOWED_BY_POLICY, TerminalClipboardDecision.PROMPT_REQUIRED),
+                f.events.clipboardAudits.map { it.decision },
+            )
+            assertEquals(0, f.terminal.pendingResponseBytes)
+        }
+
         @Test
         fun `OSC 52 prompt policy requests host prompt without writing clipboard`() {
             val f =
@@ -3329,6 +3508,12 @@ class HostCommandAdapterTest {
 
         val notifications = mutableListOf<Triple<String, String, NotificationLevel>>()
         val clipboardAudits = mutableListOf<TerminalClipboardAuditEvent>()
+        val clipboardReads = mutableListOf<TerminalClipboardReadRequest>()
+
+        override fun terminalClipboardReadRequested(request: TerminalClipboardReadRequest) {
+            clipboardReads += request
+        }
+
         val clipboardWrites = mutableListOf<TerminalClipboardWriteEvent>()
         val clipboardPrompts = mutableListOf<TerminalClipboardPromptEvent>()
 

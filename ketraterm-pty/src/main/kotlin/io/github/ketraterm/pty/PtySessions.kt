@@ -42,27 +42,54 @@ internal object PtySessions {
         options: PtyOptions,
         processFactory: PtyProcessFactory,
     ): TerminalSession {
+        val session = create(options, processFactory)
+        try {
+            session.start(options.columns, options.rows)
+            return session
+        } catch (failure: Throwable) {
+            try {
+                session.close()
+            } catch (cleanup: Throwable) {
+                failure.addSuppressed(cleanup)
+            }
+            throw failure
+        }
+    }
+
+    internal fun create(
+        options: PtyOptions,
+        processFactory: PtyProcessFactory = Pty4jProcessFactory,
+    ): TerminalSession {
         val connector = PtyConnectors.create(options, processFactory)
-        val terminal =
-            TerminalBuffers.create(
-                width = options.columns,
-                height = options.rows,
-                maxHistory = options.maxHistory,
-            )
-        terminal.setTreatAmbiguousAsWide(options.treatAmbiguousAsWide)
-        val hostEventBridge = SessionHostEventBridge(options.eventListener)
-        val session =
-            TerminalSession.create(
-                terminal = terminal,
-                connector = connector,
-                hostEvents = hostEventBridge,
-                hostPolicy = options.hostPolicy,
-                inputPolicy = options.inputPolicy,
-                startupCommand = options.startupCommand,
-                modeReportCapabilities = options.modeReportCapabilities,
-            )
-        hostEventBridge.attach(session)
-        session.start(options.columns, options.rows)
-        return session
+        try {
+            val terminal =
+                TerminalBuffers.create(
+                    width = options.columns,
+                    height = options.rows,
+                    maxHistory = options.maxHistory,
+                )
+            terminal.setTreatAmbiguousAsWide(options.treatAmbiguousAsWide)
+            val hostEventBridge = SessionHostEventBridge(options.eventListener)
+            val session =
+                TerminalSession.create(
+                    terminal = terminal,
+                    connector = connector,
+                    hostEvents = hostEventBridge,
+                    clipboardReader = hostEventBridge,
+                    hostPolicy = options.hostPolicy,
+                    inputPolicy = options.inputPolicy,
+                    startupCommand = options.startupCommand,
+                    modeReportCapabilities = options.modeReportCapabilities,
+                )
+            hostEventBridge.attach(session)
+            return session
+        } catch (failure: Throwable) {
+            try {
+                connector.close()
+            } catch (cleanup: Throwable) {
+                failure.addSuppressed(cleanup)
+            }
+            throw failure
+        }
     }
 }

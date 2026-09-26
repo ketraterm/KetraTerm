@@ -141,7 +141,6 @@ class TerminalWorkspaceTest {
             val titles = mutableListOf<String>()
             val connector = RecordingConnector(foregroundName = "vim")
             val session = testSession(connector, dispatcher)
-            session.start(80, 24)
             TerminalWorkspace(
                 listener =
                     object : TerminalWorkspaceListener {
@@ -198,7 +197,6 @@ class TerminalWorkspaceTest {
             val dispatcher = StandardTestDispatcher(testScheduler)
             val connector = RecordingConnector(foregroundName = "vim")
             val session = testSession(connector, dispatcher)
-            session.start(80, 24)
             TerminalWorkspace(
                 listener = TerminalWorkspaceListener.NONE,
                 sessionFactory = { _, _, _ -> session },
@@ -347,7 +345,6 @@ class TerminalWorkspaceTest {
                     startupCommand = TerminalStartupCommand("echo ready"),
                     workerDispatcher = StandardTestDispatcher(testScheduler),
                 )
-            session.start(80, 24)
             val cancellations = mutableListOf<String>()
             TerminalWorkspace(
                 listener =
@@ -623,7 +620,6 @@ class TerminalWorkspaceTest {
         runTest {
             val connector = RecordingConnector()
             val session = testSession(connector, StandardTestDispatcher(testScheduler))
-            session.start(columns = 80, rows = 24)
             val closeEvents = mutableListOf<Triple<String, Int?, Throwable?>>()
             val workspace =
                 TerminalWorkspace(
@@ -656,7 +652,6 @@ class TerminalWorkspaceTest {
     @Test
     fun `local workspace close is not forwarded as remote session close`() {
         val session = testSession(RecordingConnector())
-        session.start(columns = 80, rows = 24)
         val closeEvents = mutableListOf<String>()
         val workspace =
             TerminalWorkspace(

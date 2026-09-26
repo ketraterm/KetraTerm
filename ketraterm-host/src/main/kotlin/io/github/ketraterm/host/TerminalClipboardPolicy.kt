@@ -21,9 +21,9 @@ package io.github.ketraterm.host
  * This policy describes what would be permitted by an embedding host. The host
  * adapter never writes to a platform clipboard directly; it audits every
  * request and emits decoded write payloads only when the configured policy
- * permits the operation or requires a product-host write prompt. Read responses
- * and platform clipboard access remain product-host
- * responsibilities.
+ * permits the operation or requires a product-host write prompt. Valid read
+ * requests pass to session execution; the product supplies consent and platform
+ * clipboard access, while the session owns response ordering and lifetime.
  *
  * Permissions apply to all output in the session, including nested SSH and
  * multiplexer output. Process names and reported host metadata do not establish
@@ -32,8 +32,9 @@ package io.github.ketraterm.host
  * @property writePermission write policy for the entire terminal session.
  * @property readPermission policy for clipboard read/query requests. This
  * defaults to deny because read responses can exfiltrate user clipboard data.
- * @property maxDecodedBytes maximum decoded clipboard payload size accepted for
- * write requests before the adapter reports a size denial.
+ * Queries must also pass the selection allowlist and [HostPolicy.terminalResponsePolicy].
+ * @property maxDecodedBytes maximum raw UTF-8 clipboard payload size for reads
+ * and writes. Session output storage also bounds the complete encoded reply.
  */
 data class TerminalClipboardPolicy(
     val writePermission: TerminalClipboardPermission = TerminalClipboardPermission.DENY,
@@ -48,7 +49,7 @@ data class TerminalClipboardPolicy(
 
     companion object {
         /**
-         * Default maximum decoded OSC 52 write payload size. Production sessions derive
+         * Default maximum raw UTF-8 OSC 52 payload size. Production sessions derive
          * their temporary encoded collection budget from this policy for eligible writes.
          */
         const val DEFAULT_MAX_DECODED_BYTES: Int = 1 * 1024 * 1024
@@ -96,7 +97,7 @@ enum class TerminalClipboardDecision {
     /** Clipboard reads are disabled by configured policy. */
     DENIED_READ_DISABLED,
 
-    /** Base64 syntax or decoded UTF-8 text is malformed; no write or prompt is emitted. */
+    /** Query selection, Base64 syntax, or decoded UTF-8 text is malformed; no clipboard action is permitted. */
     DENIED_MALFORMED_PAYLOAD,
 
     /** Decoded payload would exceed the configured size limit. */

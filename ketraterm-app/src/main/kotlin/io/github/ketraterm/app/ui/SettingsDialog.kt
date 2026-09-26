@@ -19,6 +19,8 @@ import io.github.ketraterm.app.config.KetraTermSettings
 import io.github.ketraterm.host.TerminalClipboardPermission
 import io.github.ketraterm.host.TerminalTitlePermission
 import io.github.ketraterm.session.TerminalStartupCommand
+import io.github.ketraterm.ui.swing.host.SwingDialogRequest
+import io.github.ketraterm.ui.swing.host.SwingMessageDialogs
 import io.github.ketraterm.ui.swing.settings.SwingSettings
 import io.github.ketraterm.ui.swing.settings.TerminalTheme
 import io.github.ketraterm.workspace.TerminalProfile
@@ -780,7 +782,10 @@ internal class SettingsDialog(
         try {
             TerminalStartupCommand.fromText(uiState.startupCommand)
         } catch (exception: IllegalArgumentException) {
-            JOptionPane.showMessageDialog(this, exception.message, "Invalid Startup Command", JOptionPane.ERROR_MESSAGE)
+            SwingMessageDialogs.show(
+                this,
+                SwingDialogRequest("Invalid Startup Command", exception.message.orEmpty(), SwingDialogRequest.Severity.ERROR),
+            )
             return
         }
         if (!model.hasChanges(uiState)) {
@@ -803,11 +808,13 @@ internal class SettingsDialog(
                 } catch (failure: ExecutionException) {
                     val cause = failure.cause ?: failure
                     if (cause !is IOException) throw cause
-                    JOptionPane.showMessageDialog(
+                    SwingMessageDialogs.show(
                         this@SettingsDialog,
-                        "Your changes could not be saved.\n${cause.message ?: cause.javaClass.simpleName}",
-                        "Unable to Save Settings",
-                        JOptionPane.ERROR_MESSAGE,
+                        SwingDialogRequest(
+                            "Unable to Save Settings",
+                            "Your changes could not be saved.\n${cause.message ?: cause.javaClass.simpleName}",
+                            SwingDialogRequest.Severity.ERROR,
+                        ),
                     )
                 }
             }

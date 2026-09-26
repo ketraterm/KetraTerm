@@ -23,6 +23,22 @@ import java.io.IOException
  */
 object TerminalSessions {
     /**
+     * Creates a local PTY process and an attached session without consuming output.
+     *
+     * Publish the session to its host before calling [TerminalSession.start]
+     * with the initial dimensions from [options]. This ensures startup output
+     * cannot overtake host registration. The caller owns the returned session
+     * and must close it even if publication fails or it is never started.
+     * Use [localPty] when no host registration is needed before output delivery.
+     *
+     * @throws IOException if the process cannot be started.
+     */
+    @JvmStatic
+    @JvmOverloads
+    @Throws(IOException::class)
+    fun createLocalPty(options: PtyOptions = PtyOptions()): TerminalSession = PtySessions.create(options)
+
+    /**
      * Starts a local PTY and returns the shared transport-neutral session type.
      *
      * @param options options configuration for the PTY session.
