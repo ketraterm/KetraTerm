@@ -311,8 +311,8 @@ memory is bounded and ordinary input does not gain avoidable allocation.
 Checkpoint 3 implements the provider contract, session lifetime, strict reply
 preparation, and a single owned reply reservation (at most 8 MiB on the wire).
 The existing raw UTF-8 policy limit defaults to 1 MiB for both reads and writes.
-Provider access is optional; shipped products currently receive empty responses
-for denied/unavailable reads, without native read access or read consent.
+Provider access is optional; denied/unavailable reads receive empty responses.
+Standalone native access and consent are connected in checkpoint 4c below.
 
 - Wire host admission into one active read per session, current-policy checks,
   a suspending host operation, deadline/cancellation, and the input reply encoder.
@@ -338,9 +338,22 @@ session, and revocation cannot release an uncommitted successful response.
   following read. Publication/startup failure closes the prepared session and
   removes the tab. Tests cover exact startup bytes, unstarted-session disposal,
   startup failure, and workspace rollback.
-- Native access and product consent remain next. Asynchronous pane readiness
-  and earlier posted writes must still be awaited by those product providers.
-  In particular, IntelliJ creates the workspace tab on a pooled thread and
+- Checkpoint 4c connects standalone native access and consent. The existing
+  clipboard abstraction gains optional native primary-selection access. A
+  shared Swing reader resolves requested selections in order, treats empty text
+  as success, and retains one process-wide native-read slot until actual return,
+  even after cancellation. Consent is nonmodal and pane-owned, with Allow once,
+  Deny, Escape, and Block for this terminal; one prompt may be pending per window.
+  The original session deadline dismisses consent, and no clipboard preview is
+  shown. Closing a pane cancels its session before disposing the UI. Standalone
+  enters the EDT after pane publication and earlier posted allowed writes, then
+  reads off the EDT. Deterministic tests cover selector order, consent, blocking
+  native access, expiry, revocation, close, and exact byte-stream write/read
+  ordering. The read default remains Deny. Native platform smoke checks remain
+  release validation, separate from these fake-provider tests.
+- IntelliJ native access and consent remain next. Asynchronous pane readiness
+  and earlier posted writes must still be awaited by its provider.
+  IntelliJ creates the workspace tab on a pooled thread and
   publishes its pane later on the EDT. Its existing clipboard-write callback
   drops writes when that pane lookup is still null; product wiring must retain
   write/read ordering across this remaining attachment boundary.
@@ -423,7 +436,38 @@ output. For tmux, record the tested version and configuration: multiplexer
 filtering/passthrough can prevent the request reaching KetraTerm and is not a
 reason to weaken permission or framing checks.
 
-## 7. Known limits to keep honest
+## 7. Standalone checkpoint 4c manual verification
+
+Run the rebuilt standalone app with a harmless clipboard marker such as
+`KetraTerm clipboard test`. In its settings, set clipboard reads to Ask. Start
+`nvim --clean` directly in that terminal, outside tmux for the first check, then:
+
+```vim
+:lua print(vim.inspect(require('vim.ui.clipboard.osc52').paste('+')()))
+```
+
+This calls Neovim's OSC 52 provider explicitly instead of its ordinary platform
+clipboard provider. Its [implementation](https://github.com/neovim/neovim/blob/master/runtime/lua/vim/ui/clipboard/osc52.lua)
+maps `+` to clipboard `c` and `*` to primary selection `p`.
+
+- Allow once returns the marker; repeating the command asks again.
+- Deny, Escape, or leaving consent unanswered returns empty text. Expiry hides
+  consent after the original eight-second session deadline.
+- Block for this terminal prevents subsequent reads and prompts in that pane,
+  including after changing the global read setting to Allow. A new pane follows
+  the configured permission again.
+- Allow reads without prompting; Deny never reads or prompts.
+- Switch tabs while consent is visible: it stays in the requesting pane. Close
+  that pane: the prompt disappears without a later reply to another terminal.
+- Repeat with `paste('*')` where the runtime exposes a primary selection. An
+  unavailable primary selection returns empty text; it must not return `c`.
+
+Repeat with UTF-8, multiline, and empty clipboard text, and with Neovim over SSH.
+Record app/runtime/OS and Neovim versions with the result. These checks have not
+been performed by the automated fake-provider tests and do not establish
+IntelliJ or cross-platform native acceptance.
+
+## 8. Known limits to keep honest
 
 OSC 52 has no request identity, cancellation message, or standardized NACK.
 The eight-second deadline reduces late-reply risk but cannot match every

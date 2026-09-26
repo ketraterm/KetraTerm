@@ -19,13 +19,18 @@ import io.github.ketraterm.app.completion.StandaloneCompletionRegistry
 import io.github.ketraterm.app.completion.completionShellCapabilities
 import io.github.ketraterm.app.config.KetraTermSettings
 import io.github.ketraterm.host.TerminalClipboardPromptEvent
+import io.github.ketraterm.host.TerminalClipboardReadRequest
 import io.github.ketraterm.host.TerminalClipboardWriteEvent
 import io.github.ketraterm.protocol.TerminalHostModeCapability
+import io.github.ketraterm.session.TerminalClipboardReadResult
 import io.github.ketraterm.session.TerminalShellIntegrationCommandLifecycle
 import io.github.ketraterm.session.TerminalStartupCommand
 import io.github.ketraterm.ui.swing.api.SwingTerminalContextMenuRequest
+import io.github.ketraterm.ui.swing.host.SwingClipboardReader
+import io.github.ketraterm.ui.swing.settings.TerminalClipboardHandler
 import io.github.ketraterm.workspace.*
 import kotlinx.coroutines.*
+import kotlinx.coroutines.swing.Swing
 import java.awt.*
 import java.awt.event.InputEvent
 import java.awt.event.KeyEvent
@@ -59,6 +64,7 @@ internal class TabManager(
 ) {
     private val panes = ArrayList<TerminalPane>(INITIAL_TAB_CAPACITY)
     private val workspace = TerminalWorkspace(StandaloneWorkspaceListener())
+    private val clipboardReader = SwingClipboardReader(TerminalClipboardHandler.SYSTEM)
     private val attentionTaskbar: Taskbar? =
         try {
             if (Taskbar.isTaskbarSupported()) {
@@ -303,8 +309,8 @@ internal class TabManager(
         var failure: Throwable? = null
         for (pane in tabPanes) {
             panes.remove(pane)
-            failure = captureCleanupFailure(failure, pane::close)
             failure = captureCleanupFailure(failure) { workspace.closeTab(pane.tab.id) }
+            failure = captureCleanupFailure(failure, pane::close)
         }
         tabRoots.remove(id)
         val container = tabContainers.remove(id)
@@ -590,8 +596,8 @@ internal class TabManager(
         }
 
         panes.remove(pane)
-        failure = captureCleanupFailure(failure, pane::close)
         failure = captureCleanupFailure(failure) { workspace.closeTab(pane.tab.id) }
+        failure = captureCleanupFailure(failure, pane::close)
 
         val newActive = getActivePane(tabId)
         refreshWindowResizeTarget()
@@ -983,6 +989,17 @@ internal class TabManager(
                 DesktopNotificationManager.showNotification(title, body, level)
             }
         }
+
+        override suspend fun readClipboard(
+            tab: TerminalWorkspaceTab,
+            request: TerminalClipboardReadRequest,
+        ): TerminalClipboardReadResult =
+            withContext(Dispatchers.Swing) {
+                // Pane publication and earlier allowed writes complete on the EDT before this lookup.
+                if (shutdownStarted.get()) return@withContext TerminalClipboardReadResult.Unavailable
+                val pane = panes.firstOrNull { it.tab === tab } ?: return@withContext TerminalClipboardReadResult.Unavailable
+                clipboardReader.read(request, pane.clipboardReadPrompt, Osc52ClipboardPromptText.readQuestion(tab.profile.displayName))
+            }
 
         override fun terminalClipboardWrite(
             tab: TerminalWorkspaceTab,

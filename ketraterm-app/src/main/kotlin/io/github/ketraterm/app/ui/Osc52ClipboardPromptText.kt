@@ -20,6 +20,11 @@ import io.github.ketraterm.host.TerminalClipboardPromptEvent
 internal object Osc52ClipboardPromptText {
     fun title(): String = "Clipboard Access"
 
+    fun readQuestion(profileName: String): String {
+        val terminalName = profileName.trim().ifBlank { "this terminal" }
+        return "Allow an application in $terminalName to read your clipboard? Only allow applications you trust."
+    }
+
     fun question(
         profileName: String,
         event: TerminalClipboardPromptEvent,

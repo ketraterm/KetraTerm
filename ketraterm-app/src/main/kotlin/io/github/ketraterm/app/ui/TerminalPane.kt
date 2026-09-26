@@ -20,14 +20,12 @@ import io.github.ketraterm.ui.swing.api.SwingHostServices
 import io.github.ketraterm.ui.swing.api.SwingTerminal
 import io.github.ketraterm.ui.swing.api.SwingTerminalContextMenuHandler
 import io.github.ketraterm.ui.swing.api.SwingTerminalContextMenuRequest
-import io.github.ketraterm.ui.swing.host.SwingCompletionBinding
-import io.github.ketraterm.ui.swing.host.SwingCompletionResources
-import io.github.ketraterm.ui.swing.host.SwingTerminalOverlayPane
-import io.github.ketraterm.ui.swing.host.SwingTerminalSearchBar
+import io.github.ketraterm.ui.swing.host.*
 import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionHandler
 import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionKeymap
 import io.github.ketraterm.workspace.TerminalWorkspaceTab
 import java.util.concurrent.atomic.AtomicBoolean
+import javax.swing.BoxLayout
 import javax.swing.JPanel
 
 /**
@@ -44,6 +42,7 @@ internal class TerminalPane private constructor(
     private var completionResources: SwingCompletionResources?,
     private val completionBinding: SwingCompletionBinding,
     private val searchBar: SwingTerminalSearchBar,
+    val clipboardReadPrompt: SwingClipboardReadPrompt,
 ) : TerminalPaneActionTarget {
     private val closed = AtomicBoolean()
     private var shortcutController: TerminalPaneShortcutController? = null
@@ -114,6 +113,7 @@ internal class TerminalPane private constructor(
         val shortcut = shortcutController
         shortcutController = null
         var failure: Throwable? = null
+        failure = captureCleanupFailure(failure, clipboardReadPrompt::close)
         failure = captureCleanupFailure(failure, completionBinding::close)
         completionResources = null
         failure = captureCleanupFailure(failure, searchBar::close)
@@ -134,6 +134,7 @@ internal class TerminalPane private constructor(
             val completionBinding = SwingCompletionBinding(tab.session) { tab.currentWorkingDirectoryUri }
             var ownedTerminal: SwingTerminal? = null
             var ownedSearchBar: SwingTerminalSearchBar? = null
+            var ownedClipboardReadPrompt: SwingClipboardReadPrompt? = null
             var ownedPane: TerminalPane? = null
             return try {
                 val terminal =
@@ -160,7 +161,9 @@ internal class TerminalPane private constructor(
 
                 val searchBar = SwingTerminalSearchBar(terminal)
                 ownedSearchBar = searchBar
-                val component = terminalPanel(terminal, searchBar)
+                val clipboardReadPrompt = SwingClipboardReadPrompt(terminal)
+                ownedClipboardReadPrompt = clipboardReadPrompt
+                val component = terminalPanel(terminal, searchBar, clipboardReadPrompt)
                 val pane =
                     TerminalPane(
                         tab = tab,
@@ -170,6 +173,7 @@ internal class TerminalPane private constructor(
                         completionResources = completionResources,
                         completionBinding = completionBinding,
                         searchBar = searchBar,
+                        clipboardReadPrompt = clipboardReadPrompt,
                     )
                 ownedPane = pane
                 pane.shortcutController = TerminalPaneShortcutController(pane, settings)
@@ -186,6 +190,7 @@ internal class TerminalPane private constructor(
                     cleanupFailure = captureCleanupFailure(cleanupFailure, pane::close)
                 } else {
                     cleanupFailure = captureCleanupFailure(cleanupFailure, completionBinding::close)
+                    cleanupFailure = captureCleanupFailure(cleanupFailure) { ownedClipboardReadPrompt?.close() }
                     cleanupFailure = captureCleanupFailure(cleanupFailure) { ownedSearchBar?.close() }
                     cleanupFailure = captureCleanupFailure(cleanupFailure) { ownedTerminal?.dispose() }
                 }
@@ -196,12 +201,21 @@ internal class TerminalPane private constructor(
         private fun terminalPanel(
             terminal: SwingTerminal,
             searchBar: SwingTerminalSearchBar,
-        ): JPanel =
-            SwingTerminalOverlayPane(terminal, searchBar.component).apply {
+            clipboardReadPrompt: SwingClipboardReadPrompt,
+        ): JPanel {
+            val chrome =
+                JPanel().apply {
+                    layout = BoxLayout(this, BoxLayout.Y_AXIS)
+                    isOpaque = false
+                    add(clipboardReadPrompt.component)
+                    add(searchBar.component)
+                }
+            return SwingTerminalOverlayPane(terminal, chrome).apply {
                 background = terminal.background
                 border = null
                 terminal.border = null
             }
+        }
     }
 }
 

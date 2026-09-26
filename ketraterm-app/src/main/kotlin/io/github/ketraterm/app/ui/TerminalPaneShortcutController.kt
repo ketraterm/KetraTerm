@@ -91,6 +91,7 @@ internal class TerminalPaneShortcutController(
      * the shell.
      */
     fun handleKeyPressed(event: KeyEvent): Boolean {
+        if (event.keyCode == KeyEvent.VK_ESCAPE && pane.clipboardReadPrompt.dismiss()) return true
         val action = shortcutMap.actionFor(event.keyCode, event.modifiersEx) ?: return false
         if (!actionRegistry.isEnabled(action, pane)) return false
         actionRegistry.perform(action, pane)

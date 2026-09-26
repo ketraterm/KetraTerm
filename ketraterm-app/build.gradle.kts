@@ -35,6 +35,7 @@ dependencies {
     implementation(project(":ketraterm-ui-swing-host"))
     implementation(project(":ketraterm-workspace"))
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:$kotlinxCoroutinesVersion")
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-swing:$kotlinxCoroutinesVersion")
 
     runtimeOnly("org.slf4j:slf4j-nop:2.0.19")
 
