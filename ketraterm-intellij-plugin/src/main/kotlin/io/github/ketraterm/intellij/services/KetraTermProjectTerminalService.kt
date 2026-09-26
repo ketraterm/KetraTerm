@@ -15,10 +15,13 @@
  */
 package io.github.ketraterm.intellij.services
 
+import com.intellij.codeWithMe.ClientId
 import com.intellij.ide.trustedProjects.TrustedProjects
 import com.intellij.ide.trustedProjects.TrustedProjectsListener
 import com.intellij.openapi.Disposable
 import com.intellij.openapi.application.ApplicationManager
+import com.intellij.openapi.client.ClientProjectSession
+import com.intellij.openapi.client.ClientSessionsManager
 import com.intellij.openapi.components.Service
 import com.intellij.openapi.components.service
 import com.intellij.openapi.editor.colors.EditorColorsListener
@@ -27,11 +30,13 @@ import com.intellij.openapi.progress.ProcessCanceledException
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.project.ProjectCloseListener
 import com.intellij.openapi.ui.Messages
+import com.intellij.openapi.util.Disposer
 import com.intellij.openapi.util.Key
 import com.intellij.openapi.wm.ToolWindow
 import com.intellij.ui.content.*
 import com.intellij.util.ui.update.UiNotifyConnector
 import io.github.ketraterm.host.TerminalClipboardPromptEvent
+import io.github.ketraterm.host.TerminalClipboardReadRequest
 import io.github.ketraterm.host.TerminalClipboardWriteEvent
 import io.github.ketraterm.intellij.settings.KetraTermIntellijSettings
 import io.github.ketraterm.intellij.settings.KetraTermProjectSettings
@@ -41,14 +46,17 @@ import io.github.ketraterm.intellij.ui.KetraTermTerminalStartupView
 import io.github.ketraterm.protocol.NotificationLevel
 import io.github.ketraterm.protocol.ShellIntegrationEvent
 import io.github.ketraterm.protocol.ShellIntegrationMarker
+import io.github.ketraterm.session.TerminalClipboardReadResult
 import io.github.ketraterm.session.TerminalSessionState
 import io.github.ketraterm.session.TerminalStartupCommand
+import io.github.ketraterm.ui.swing.host.SwingClipboardReader
 import io.github.ketraterm.ui.swing.settings.SwingSettings
 import io.github.ketraterm.workspace.*
 import java.awt.BorderLayout
 import java.awt.Component
 import java.nio.file.Path
 import java.util.concurrent.CancellationException
+import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicInteger
 import javax.swing.JPanel
 import javax.swing.SwingUtilities
@@ -75,6 +83,11 @@ class KetraTermProjectTerminalService internal constructor(
     private val contentsByTabId = LinkedHashMap<String, Content>()
     private val pendingTabsById = LinkedHashMap<String, PendingTerminalTab>()
     private val panesByTabId = LinkedHashMap<String, KetraTermTerminalPane>()
+    private val clipboardSessions = ConcurrentHashMap<String, IntellijClipboardSession>()
+    private val clipboardReader = SwingClipboardReader()
+
+    // Only accessed during serialized workspace creation and its synchronous tabOpened callback.
+    private var startingTab: PendingTerminalTab? = null
     private val closeListenersByTabId = LinkedHashMap<String, ContentCloseQueryRegistration>()
     private val workspace = TerminalWorkspace(IntellijWorkspaceListener())
     private val workspaceLock = Any()
@@ -112,6 +125,7 @@ class KetraTermProjectTerminalService internal constructor(
                     if (project !== this@KetraTermProjectTerminalService.project) return
                     closing = true
                     persistence?.dispose()
+                    for (binding in clipboardSessions.values) Disposer.dispose(binding)
                 }
             },
         )
@@ -261,7 +275,8 @@ class KetraTermProjectTerminalService internal constructor(
         @Suppress("UsePropertyAccessSyntax")
         content.setDisposer(PendingTerminalTabDisposable(pendingId))
 
-        val pending = PendingTerminalTab(content, container, profile, restoredState)
+        val client = ClientSessionsManager.getProjectSessionOrThrow(project, ClientId.current)
+        val pending = PendingTerminalTab(content, container, profile, restoredState, client)
         pendingTabsById[pendingId] = pending
         content.putUserData(TAB_STATE) {
             restoredState ?: TerminalTabRestore.snapshot(requireNotNull(profile), null, null)
@@ -303,7 +318,12 @@ class KetraTermProjectTerminalService internal constructor(
                     val tab =
                         synchronized(workspaceLock) {
                             if (disposed || closing || pending.closed) return@executeOnPooledThread
-                            startWorkspaceTab(workspace, launchProfile, openOptions(settings, profile))
+                            startingTab = pending
+                            try {
+                                startWorkspaceTab(workspace, launchProfile, openOptions(settings))
+                            } finally {
+                                startingTab = null
+                            }
                         }
                     TerminalStartupResult.Started(tab, profile)
                 } catch (cancelled: ProcessCanceledException) {
@@ -337,12 +357,12 @@ class KetraTermProjectTerminalService internal constructor(
         pendingTabsById.clear()
         closeListenersByTabId.clear()
 
-        for (pane in panes) {
-            pane.close()
-        }
         KetraTermIntellijSettings.getInstance().removeChangeListener(settingsChangedListener)
         synchronized(workspaceLock) {
             workspace.close()
+        }
+        for (pane in panes) {
+            pane.close()
         }
     }
 
@@ -354,10 +374,10 @@ class KetraTermProjectTerminalService internal constructor(
         removeCloseQueryListener(tabId)
         if (pane == null && content == null) return
 
-        pane?.close()
         synchronized(workspaceLock) {
             workspace.closeTab(tabId)
         }
+        pane?.close()
     }
 
     private fun closeTabAfterRemoteSessionExit(tab: TerminalWorkspaceTab) {
@@ -367,10 +387,10 @@ class KetraTermProjectTerminalService internal constructor(
         val content = contentsByTabId.remove(tab.id)
         removeCloseQueryListener(tab.id)
 
-        pane.close()
         synchronized(workspaceLock) {
             workspace.closeTab(tab.id)
         }
+        pane.close()
 
         content?.manager?.removeContent(content, true)
 
@@ -380,7 +400,10 @@ class KetraTermProjectTerminalService internal constructor(
     }
 
     private fun closePendingTab(pendingId: String) {
-        pendingTabsById.remove(pendingId)?.closed = true
+        pendingTabsById.remove(pendingId)?.let { pending ->
+            pending.closed = true
+            pending.startedTab?.session?.close()
+        }
     }
 
     private fun publishTerminalStartupResult(
@@ -400,7 +423,18 @@ class KetraTermProjectTerminalService internal constructor(
         when (result) {
             is TerminalStartupResult.Started -> {
                 pendingTabsById.remove(pendingId)
-                bindStartedTab(pendingTab, result.tab, result.sourceProfile)
+                try {
+                    bindStartedTab(pendingTab, result.tab, result.sourceProfile)
+                } catch (failure: Exception) {
+                    val pane = panesByTabId.remove(result.tab.id)
+                    try {
+                        synchronized(workspaceLock) { workspace.closeTab(result.tab.id) }
+                    } finally {
+                        pane?.close()
+                    }
+                    if (failure is ProcessCanceledException || failure is CancellationException) throw failure
+                    showStartupFailure(pendingTab, failure)
+                }
             }
             is TerminalStartupResult.Failed -> showStartupFailure(pendingTab, result.error)
         }
@@ -412,10 +446,12 @@ class KetraTermProjectTerminalService internal constructor(
         sourceProfile: TerminalProfile,
     ) {
         workspaceTab.customTitle = pendingTab.restoredState?.customTitle
+        val clipboardSession = checkNotNull(clipboardSessions[workspaceTab.id])
         val pane =
             KetraTermTerminalPane.create(
                 project = project,
                 tab = workspaceTab,
+                clipboard = clipboardSession.clipboard,
                 hostActions =
                     KetraTermTerminalPaneHostActions(
                         openNewTabAction = ::openDefaultTabFromContextMenu,
@@ -424,6 +460,7 @@ class KetraTermProjectTerminalService internal constructor(
                         closePaneAction = ::closePaneFromContextMenu,
                     ),
             )
+        panesByTabId[workspaceTab.id] = pane
         replaceContent(pendingTab.container, pane.component)
         pendingTab.content.displayName = workspaceTab.title
         pendingTab.content.preferredFocusableComponent = pane.terminal
@@ -431,7 +468,7 @@ class KetraTermProjectTerminalService internal constructor(
         pendingTab.content.setDisposer(TerminalTabDisposable(workspaceTab.id))
         installCloseQueryListener(pendingTab.content, workspaceTab)
         contentsByTabId[workspaceTab.id] = pendingTab.content
-        panesByTabId[workspaceTab.id] = pane
+        clipboardSession.attach(pane.clipboardReadPrompt)
         pendingTab.content.putUserData(TAB_STATE) {
             TerminalTabRestore.snapshot(sourceProfile, workspaceTab.customTitle, workspaceTab.currentWorkingDirectoryUri)
         }
@@ -503,10 +540,7 @@ class KetraTermProjectTerminalService internal constructor(
         }
     }
 
-    private fun openOptions(
-        settings: SwingSettings,
-        profile: TerminalProfile,
-    ): TerminalWorkspaceOpenOptions =
+    private fun openOptions(settings: SwingSettings): TerminalWorkspaceOpenOptions =
         TerminalWorkspaceOpenOptions(
             columns = settings.columns,
             rows = settings.rows,
@@ -576,6 +610,26 @@ class KetraTermProjectTerminalService internal constructor(
     }
 
     private inner class IntellijWorkspaceListener : TerminalWorkspaceListener {
+        override fun tabOpened(tab: TerminalWorkspaceTab) {
+            val pending = checkNotNull(startingTab)
+            if (disposed || closing || pending.closed) throw CancellationException("Terminal startup cancelled")
+            val binding = IntellijClipboardSession(pending.client, tab.session, clipboardReader)
+            clipboardSessions[tab.id] = binding
+            pending.startedTab = tab
+            if (disposed || closing || pending.closed) {
+                Disposer.dispose(binding)
+                throw CancellationException("Terminal startup cancelled")
+            }
+        }
+
+        override suspend fun readClipboard(
+            tab: TerminalWorkspaceTab,
+            request: TerminalClipboardReadRequest,
+        ): TerminalClipboardReadResult {
+            val binding = clipboardSessions[tab.id] ?: return TerminalClipboardReadResult.Unavailable
+            return binding.read(request, IntellijOsc52ClipboardPromptText.readMessage(tab.profile.displayName))
+        }
+
         override fun shellIntegrationMarker(
             tab: TerminalWorkspaceTab,
             event: ShellIntegrationEvent,
@@ -640,9 +694,7 @@ class KetraTermProjectTerminalService internal constructor(
             event: TerminalClipboardWriteEvent,
         ) {
             if (!IntellijOsc52ClipboardSelections.targetsIdeClipboard(event.selection)) return
-            invokeLaterIfAlive {
-                panesByTabId[tab.id]?.terminal?.copyTextToClipboard(event.text)
-            }
+            clipboardSessions[tab.id]?.write(event.text)
         }
 
         override fun terminalClipboardPrompt(
@@ -650,8 +702,8 @@ class KetraTermProjectTerminalService internal constructor(
             event: TerminalClipboardPromptEvent,
         ) {
             if (!IntellijOsc52ClipboardSelections.targetsIdeClipboard(event.selection)) return
-            invokeLaterIfAlive {
-                val pane = panesByTabId[tab.id] ?: return@invokeLaterIfAlive
+            val binding = clipboardSessions[tab.id] ?: return
+            binding.postIfAlive {
                 val answer =
                     Messages.showYesNoDialog(
                         project,
@@ -659,13 +711,14 @@ class KetraTermProjectTerminalService internal constructor(
                         IntellijOsc52ClipboardPromptText.title(),
                         Messages.getWarningIcon(),
                     )
-                if (answer == Messages.YES) {
-                    pane.terminal.copyTextToClipboard(event.text)
+                if (answer == Messages.YES && binding.isAlive) {
+                    binding.clipboard.copyText(event.text)
                 }
             }
         }
 
         override fun tabClosed(tabId: String) {
+            clipboardSessions.remove(tabId)?.let(Disposer::dispose)
             invokeLaterIfAlive {
                 contentsByTabId.remove(tabId)
                 panesByTabId.remove(tabId)
@@ -709,7 +762,10 @@ class KetraTermProjectTerminalService internal constructor(
         val container: JPanel,
         val sourceProfile: TerminalProfile?,
         val restoredState: TerminalTabState?,
+        val client: ClientProjectSession,
     ) {
+        @Volatile
+        var startedTab: TerminalWorkspaceTab? = null
         var startRequested = false
 
         @Volatile
@@ -739,6 +795,11 @@ internal object IntellijOsc52ClipboardSelections {
 
 internal object IntellijOsc52ClipboardPromptText {
     fun title(): String = "Clipboard Access"
+
+    fun readMessage(profileName: String): String {
+        val terminalName = profileName.trim().ifBlank { "this terminal" }
+        return "Allow an application in $terminalName to read your IDE clipboard? Only allow applications you trust."
+    }
 
     fun message(
         profileName: String,

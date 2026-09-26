@@ -32,11 +32,9 @@ import javax.swing.SwingUtilities
  * from the requesting session's pane. The session owns the request deadline and
  * cancellation. A blocked native call retains its slot until it actually returns.
  *
- * @param clipboard host clipboard implementation; called off the EDT.
  * @param ioDispatcher dispatcher for potentially blocking native clipboard access.
  */
 class SwingClipboardReader(
-    private val clipboard: TerminalClipboardHandler,
     private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
 ) {
     private var prompting = false
@@ -45,11 +43,13 @@ class SwingClipboardReader(
      * Reads with the admitted permission and the pane's persistent block choice.
      * Call on the EDT with this request's product-owned [message]; no clipboard
      * access occurs before consent. Cancellation and provider failures propagate.
+     * [clipboard] belongs to the requesting host/client and is called off the EDT.
      */
     suspend fun read(
         request: TerminalClipboardReadRequest,
         prompt: SwingClipboardReadPrompt,
         message: String,
+        clipboard: TerminalClipboardHandler,
     ): TerminalClipboardReadResult {
         check(SwingUtilities.isEventDispatchThread())
         currentCoroutineContext().ensureActive()
@@ -64,10 +64,13 @@ class SwingClipboardReader(
             }
         }
         if (prompt.isBlocked) return TerminalClipboardReadResult.Denied
-        return withContext(ioDispatcher) { readSelection(request.selection) }
+        return withContext(ioDispatcher) { readSelection(request.selection, clipboard) }
     }
 
-    private suspend fun readSelection(selection: TerminalClipboardSelection): TerminalClipboardReadResult {
+    private suspend fun readSelection(
+        selection: TerminalClipboardSelection,
+        clipboard: TerminalClipboardHandler,
+    ): TerminalClipboardReadResult {
         check(!SwingUtilities.isEventDispatchThread())
         currentCoroutineContext().ensureActive()
         if (!nativeReadActive.compareAndSet(false, true)) return TerminalClipboardReadResult.Unavailable

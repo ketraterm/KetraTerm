@@ -312,7 +312,8 @@ Checkpoint 3 implements the provider contract, session lifetime, strict reply
 preparation, and a single owned reply reservation (at most 8 MiB on the wire).
 The existing raw UTF-8 policy limit defaults to 1 MiB for both reads and writes.
 Provider access is optional; denied/unavailable reads receive empty responses.
-Standalone native access and consent are connected in checkpoint 4c below.
+Standalone and IntelliJ native access and consent are connected in checkpoints
+4c and 4d below.
 
 - Wire host admission into one active read per session, current-policy checks,
   a suspending host operation, deadline/cancellation, and the input reply encoder.
@@ -351,19 +352,27 @@ session, and revocation cannot release an uncommitted successful response.
   native access, expiry, revocation, close, and exact byte-stream write/read
   ordering. The read default remains Deny. Native platform smoke checks remain
   release validation, separate from these fake-provider tests.
-- IntelliJ native access and consent remain next. Asynchronous pane readiness
-  and earlier posted writes must still be awaited by its provider.
-  IntelliJ creates the workspace tab on a pooled thread and
-  publishes its pane later on the EDT. Its existing clipboard-write callback
-  drops writes when that pane lookup is still null; product wiring must retain
-  write/read ordering across this remaining attachment boundary.
-- Implement selection-aware AWT and IntelliJ adapters using the existing
-  clipboard boundary and the bounded native-I/O lifecycle.
-- Add cancellable consent with bounded presentation and tab/session identity.
-- Wire both product providers and their existing settings choices into the
-  completed PTY/workspace bridge.
-- Preserve write behavior and prove write-then-read ordering; share actual
-  repeated behavior rather than adding forwarding helper classes.
+- Checkpoint 4d connects IntelliJ reads and consent. Workspace publication binds
+  a clipboard session to the client captured when its pending tab was created.
+  Allowed writes use that binding before the Swing pane exists; reads await the
+  pane inside the original session deadline. Both posted writes and consent run
+  under the captured IDE client, with nonmodal IDE dispatch. The shared reader
+  receives the request's clipboard explicitly, retaining one prompt per window
+  and the shared native-read bound. Client disposal and project closing close
+  the actual terminal session, also revoking already queued replies.
+  Tests use real IntelliJ dispatch and parser/session byte streams with fake
+  per-client clipboard services; they cover startup and attached-pane ordering,
+  consent competition, cancellation before attachment, client isolation,
+  disposal, and native calls that return after client departure.
+- Checkpoint 4d is not ready for acceptance: IDE inspections identified private
+  and experimental API dependencies in its client binding. In SDK 262.8665.258,
+  the public `CopyPasteManager` facade resolves its per-client service on each
+  call; the currently captured `ClientCopyPasteManager`, `ClientAppSession`,
+  and `ClientProjectSession` APIs are platform-internal. Keeping them inside
+  the plugin does not make their use supported. Replace this dependency before
+  accepting the checkpoint; do not suppress the inspections. The remaining
+  scope decision is whether to restrict this checkpoint to local desktop IDE
+  clipboard access or design a frontend-owned remote-client integration.
 
 Gate: Allow, Ask, Deny, close, disposal, expiry, and policy changes work in both
 products. A pending request never reads another session's or IDE client's
@@ -436,9 +445,9 @@ output. For tmux, record the tested version and configuration: multiplexer
 filtering/passthrough can prevent the request reaching KetraTerm and is not a
 reason to weaken permission or framing checks.
 
-## 7. Standalone checkpoint 4c manual verification
+## 7. Product clipboard manual verification
 
-Run the rebuilt standalone app with a harmless clipboard marker such as
+Run the rebuilt standalone app or IntelliJ plugin with a harmless clipboard marker such as
 `KetraTerm clipboard test`. In its settings, set clipboard reads to Ask. Start
 `nvim --clean` directly in that terminal, outside tmux for the first check, then:
 
@@ -465,7 +474,11 @@ maps `+` to clipboard `c` and `*` to primary selection `p`.
 Repeat with UTF-8, multiline, and empty clipboard text, and with Neovim over SSH.
 Record app/runtime/OS and Neovim versions with the result. These checks have not
 been performed by the automated fake-provider tests and do not establish
-IntelliJ or cross-platform native acceptance.
+cross-platform native acceptance. For IntelliJ, also close the project while
+consent is pending and confirm it disappears. Where multiple IDE clients are
+available, use distinct harmless markers and verify that a terminal always
+reads its owning client's clipboard, including across tab changes and client
+disconnection.
 
 ## 8. Known limits to keep honest
 

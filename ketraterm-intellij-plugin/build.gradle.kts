@@ -91,6 +91,10 @@ dependencies {
     runtimeOnly("org.slf4j:slf4j-nop:2.0.18")
 
     testImplementation(libs.junit)
+    testImplementation("io.github.ketraterm:ketraterm-testkit:$ketratermVersion") {
+        exclude(group = "org.jetbrains.kotlinx", module = "kotlinx-coroutines-core")
+        exclude(group = "org.jetbrains.kotlinx", module = "kotlinx-coroutines-core-jvm")
+    }
 
     // IntelliJ Platform Gradle Plugin Dependencies Extension - read more: https://plugins.jetbrains.com/docs/intellij/tools-intellij-platform-gradle-plugin-dependencies-extension.html
     intellijPlatform {

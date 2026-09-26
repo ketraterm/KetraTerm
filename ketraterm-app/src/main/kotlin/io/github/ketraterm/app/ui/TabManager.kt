@@ -64,7 +64,7 @@ internal class TabManager(
 ) {
     private val panes = ArrayList<TerminalPane>(INITIAL_TAB_CAPACITY)
     private val workspace = TerminalWorkspace(StandaloneWorkspaceListener())
-    private val clipboardReader = SwingClipboardReader(TerminalClipboardHandler.SYSTEM)
+    private val clipboardReader = SwingClipboardReader()
     private val attentionTaskbar: Taskbar? =
         try {
             if (Taskbar.isTaskbarSupported()) {
@@ -998,7 +998,12 @@ internal class TabManager(
                 // Pane publication and earlier allowed writes complete on the EDT before this lookup.
                 if (shutdownStarted.get()) return@withContext TerminalClipboardReadResult.Unavailable
                 val pane = panes.firstOrNull { it.tab === tab } ?: return@withContext TerminalClipboardReadResult.Unavailable
-                clipboardReader.read(request, pane.clipboardReadPrompt, Osc52ClipboardPromptText.readQuestion(tab.profile.displayName))
+                clipboardReader.read(
+                    request,
+                    pane.clipboardReadPrompt,
+                    Osc52ClipboardPromptText.readQuestion(tab.profile.displayName),
+                    TerminalClipboardHandler.SYSTEM,
+                )
             }
 
         override fun terminalClipboardWrite(

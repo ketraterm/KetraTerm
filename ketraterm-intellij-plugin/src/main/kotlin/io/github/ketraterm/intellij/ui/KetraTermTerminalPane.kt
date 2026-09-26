@@ -27,14 +27,13 @@ import com.intellij.ui.components.JBScrollBar
 import io.github.ketraterm.intellij.services.KetraTermCompletionService
 import io.github.ketraterm.intellij.settings.KetraTermIntellijSettings
 import io.github.ketraterm.ui.swing.api.*
-import io.github.ketraterm.ui.swing.host.SwingCompletionBinding
-import io.github.ketraterm.ui.swing.host.SwingTerminalHostAction
-import io.github.ketraterm.ui.swing.host.SwingTerminalOverlayPane
-import io.github.ketraterm.ui.swing.host.SwingTerminalSearchBar
+import io.github.ketraterm.ui.swing.host.*
+import io.github.ketraterm.ui.swing.settings.TerminalClipboardHandler
 import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionHandler
 import io.github.ketraterm.workspace.TerminalWorkspaceTab
 import java.awt.Adjustable
 import java.awt.BorderLayout
+import javax.swing.BoxLayout
 import javax.swing.JPanel
 
 /**
@@ -52,6 +51,7 @@ internal class KetraTermTerminalPane private constructor(
     private val hostActions: KetraTermTerminalPaneHostActions,
     private val project: Project,
     private val completionBinding: SwingCompletionBinding,
+    val clipboardReadPrompt: SwingClipboardReadPrompt,
 ) {
     private var closed = false
     private var completionService: KetraTermCompletionService? = null
@@ -272,6 +272,7 @@ internal class KetraTermTerminalPane private constructor(
     fun close() {
         if (closed) return
         closed = true
+        clipboardReadPrompt.close()
         completionService?.releaseResources(tab)
         completionService?.removeResourceListener(completionChanged)
         completionService = null
@@ -292,6 +293,7 @@ internal class KetraTermTerminalPane private constructor(
         fun create(
             project: Project,
             tab: TerminalWorkspaceTab,
+            clipboard: TerminalClipboardHandler,
             hostActions: KetraTermTerminalPaneHostActions = KetraTermTerminalPaneHostActions.NONE,
         ): KetraTermTerminalPane {
             val completionBinding = SwingCompletionBinding(tab.session) { tab.currentWorkingDirectoryUri }
@@ -304,7 +306,7 @@ internal class KetraTermTerminalPane private constructor(
                     settingsProvider = { KetraTermIntellijSettings.current() },
                     hostServices =
                         SwingHostServices(
-                            clipboardHandler = IntellijTerminalClipboardHandler,
+                            clipboardHandler = clipboard,
                             hyperlinkDetector = IntellijTerminalHyperlinkDetector(project),
                             viewportListener = scrollbarAdapter,
                             scrollbarOverlayEnabled = false,
@@ -329,7 +331,15 @@ internal class KetraTermTerminalPane private constructor(
             terminal.bind(tab.session)
 
             val searchBar = SwingTerminalSearchBar(terminal)
-            val terminalArea = SwingTerminalOverlayPane(terminal, searchBar.component)
+            val clipboardReadPrompt = SwingClipboardReadPrompt(terminal)
+            val chrome =
+                JPanel().apply {
+                    layout = BoxLayout(this, BoxLayout.Y_AXIS)
+                    isOpaque = false
+                    add(clipboardReadPrompt.component)
+                    add(searchBar.component)
+                }
+            val terminalArea = SwingTerminalOverlayPane(terminal, chrome)
             val component =
                 JPanel(BorderLayout()).apply {
                     border = null
@@ -348,6 +358,7 @@ internal class KetraTermTerminalPane private constructor(
                 hostActions = hostActions,
                 project = project,
                 completionBinding = completionBinding,
+                clipboardReadPrompt = clipboardReadPrompt,
             ).also { pane ->
                 pane.shortcutController = KetraTermTerminalShortcutController(pane)
                 shortcutControllerRef[0] = pane.shortcutController

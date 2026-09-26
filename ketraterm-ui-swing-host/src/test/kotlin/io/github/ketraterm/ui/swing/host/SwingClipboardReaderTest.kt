@@ -36,12 +36,12 @@ class SwingClipboardReaderTest {
         runBlocking {
             withContext(Dispatchers.Swing) {
                 val clipboard = Clipboard()
-                val reader = SwingClipboardReader(clipboard)
+                val reader = SwingClipboardReader()
                 val prompt = SwingClipboardReadPrompt(JPanel())
 
                 suspend fun read(selectors: String): TerminalClipboardReadResult {
                     clipboard.calls.clear()
-                    return reader.read(request(selectors), prompt, "Read?")
+                    return reader.read(request(selectors), prompt, "Read?", clipboard)
                 }
                 assertEquals("clipboard", assertIs<TerminalClipboardReadResult.Text>(read("c")).text)
                 assertEquals("clipboard", assertIs<TerminalClipboardReadResult.Text>(read("s")).text)
@@ -70,13 +70,13 @@ class SwingClipboardReaderTest {
         runBlocking {
             withContext(Dispatchers.Swing) {
                 val clipboard = Clipboard()
-                val reader = SwingClipboardReader(clipboard)
+                val reader = SwingClipboardReader()
                 val prompt = SwingClipboardReadPrompt(JPanel())
                 val ask = request(permission = TerminalClipboardPermission.PROMPT)
 
                 suspend fun decide(button: String): TerminalClipboardReadResult =
                     coroutineScope {
-                        val result = async(start = CoroutineStart.UNDISPATCHED) { reader.read(ask, prompt, "Read?") }
+                        val result = async(start = CoroutineStart.UNDISPATCHED) { reader.read(ask, prompt, "Read?", clipboard) }
                         assertTrue(prompt.component.isVisible)
                         assertTrue(clipboard.calls.isEmpty())
                         prompt.click(button)
@@ -84,14 +84,14 @@ class SwingClipboardReaderTest {
                     }
                 assertSame(
                     TerminalClipboardReadResult.Denied,
-                    reader.read(request(permission = TerminalClipboardPermission.DENY), prompt, "Read?"),
+                    reader.read(request(permission = TerminalClipboardPermission.DENY), prompt, "Read?", clipboard),
                 )
                 assertFalse(prompt.component.isVisible)
                 assertSame(TerminalClipboardReadResult.Denied, decide("Deny"))
                 assertEquals("clipboard", assertIs<TerminalClipboardReadResult.Text>(decide("Allow once")).text)
                 clipboard.calls.clear()
                 assertSame(TerminalClipboardReadResult.Denied, decide("Block for this terminal"))
-                assertSame(TerminalClipboardReadResult.Denied, reader.read(request(), prompt, "Read?"))
+                assertSame(TerminalClipboardReadResult.Denied, reader.read(request(), prompt, "Read?", clipboard))
                 assertTrue(clipboard.calls.isEmpty())
                 assertFalse(prompt.component.isVisible)
                 prompt.close()
@@ -103,19 +103,19 @@ class SwingClipboardReaderTest {
         runBlocking {
             withContext(Dispatchers.Swing) {
                 val clipboard = Clipboard()
-                val reader = SwingClipboardReader(clipboard)
+                val reader = SwingClipboardReader()
                 val first = SwingClipboardReadPrompt(JPanel())
                 val second = SwingClipboardReadPrompt(JPanel())
                 val ask = request(permission = TerminalClipboardPermission.PROMPT)
-                val pending = async(start = CoroutineStart.UNDISPATCHED) { reader.read(ask, first, "First terminal") }
-                assertSame(TerminalClipboardReadResult.Denied, reader.read(ask, second, "Second terminal"))
+                val pending = async(start = CoroutineStart.UNDISPATCHED) { reader.read(ask, first, "First terminal", clipboard) }
+                assertSame(TerminalClipboardReadResult.Denied, reader.read(ask, second, "Second terminal", clipboard))
                 assertFalse(second.component.isVisible)
                 assertTrue(first.component.isVisible)
                 pending.cancelAndJoin()
                 assertFalse(first.component.isVisible)
                 first.click("Allow once")
                 assertTrue(clipboard.calls.isEmpty())
-                val replacement = async(start = CoroutineStart.UNDISPATCHED) { reader.read(ask, second, "Second terminal") }
+                val replacement = async(start = CoroutineStart.UNDISPATCHED) { reader.read(ask, second, "Second terminal", clipboard) }
                 assertTrue(second.component.isVisible)
                 assertTrue(second.dismiss())
                 assertSame(TerminalClipboardReadResult.Denied, replacement.await())
@@ -145,16 +145,16 @@ class SwingClipboardReaderTest {
                 val clipboard = Clipboard()
                 val firstPrompt = withContext(Dispatchers.Swing) { SwingClipboardReadPrompt(JPanel()) }
                 val secondPrompt = withContext(Dispatchers.Swing) { SwingClipboardReadPrompt(JPanel()) }
-                val secondReader = SwingClipboardReader(clipboard)
+                val secondReader = SwingClipboardReader()
                 val pending =
                     async {
-                        withContext(Dispatchers.Swing) { SwingClipboardReader(blocking).read(request(), firstPrompt, "First") }
+                        withContext(Dispatchers.Swing) { SwingClipboardReader().read(request(), firstPrompt, "First", blocking) }
                     }
                 try {
                     entered.await()
                     pending.cancel()
                     // The contender actually reaches admission while the cancelled native call is held.
-                    val busy = withContext(Dispatchers.Swing) { secondReader.read(request(), secondPrompt, "Second") }
+                    val busy = withContext(Dispatchers.Swing) { secondReader.read(request(), secondPrompt, "Second", clipboard) }
                     assertSame(TerminalClipboardReadResult.Unavailable, busy)
                     assertTrue(clipboard.calls.isEmpty())
                 } finally {
@@ -163,7 +163,7 @@ class SwingClipboardReaderTest {
                     withContext(Dispatchers.Swing) { firstPrompt.close() }
                 }
                 assertFailsWith<CancellationException> { pending.await() }
-                val result = withContext(Dispatchers.Swing) { secondReader.read(request(), secondPrompt, "Second") }
+                val result = withContext(Dispatchers.Swing) { secondReader.read(request(), secondPrompt, "Second", clipboard) }
                 assertEquals("clipboard", assertIs<TerminalClipboardReadResult.Text>(result).text)
                 withContext(Dispatchers.Swing) { secondPrompt.close() }
             }
@@ -183,10 +183,10 @@ class SwingClipboardReaderTest {
                 val prompt = SwingClipboardReadPrompt(JPanel())
                 val caught =
                     assertFailsWith<IllegalStateException> {
-                        SwingClipboardReader(clipboard).read(request(), prompt, "Read?")
+                        SwingClipboardReader().read(request(), prompt, "Read?", clipboard)
                     }
                 assertEquals(failure.message, caught.message)
-                val result = SwingClipboardReader(Clipboard()).read(request(), prompt, "Read?")
+                val result = SwingClipboardReader().read(request(), prompt, "Read?", Clipboard())
                 assertIs<TerminalClipboardReadResult.Text>(result)
                 prompt.close()
             }

@@ -15,10 +15,12 @@
  */
 package io.github.ketraterm.intellij.ui
 
-import com.intellij.openapi.ide.CopyPasteManager
+import com.intellij.ide.ClientCopyPasteManager
+import com.intellij.openapi.client.ClientAppSession
 import io.github.ketraterm.ui.swing.settings.TerminalClipboardHandler
 import java.awt.datatransfer.DataFlavor
 import java.awt.datatransfer.StringSelection
+import java.util.concurrent.CancellationException
 
 /**
  * IntelliJ-backed clipboard service for the reusable Swing terminal.
@@ -26,15 +28,34 @@ import java.awt.datatransfer.StringSelection
  * This adapter keeps IDE clipboard ownership inside the plugin host. Reusable
  * terminal modules continue to depend only on [TerminalClipboardHandler].
  */
-internal object IntellijTerminalClipboardHandler : TerminalClipboardHandler {
+internal class IntellijTerminalClipboardHandler(
+    private val client: ClientAppSession,
+) : TerminalClipboardHandler {
+    // Resolve once: CopyPasteManager's facade looks up the ambient client on each call.
+    private val clipboard = ClientCopyPasteManager.getInstance(client)
+
     override fun copyText(text: String) {
-        CopyPasteManager.getInstance().setContents(StringSelection(text))
+        checkClient()
+        clipboard.contents = StringSelection(text)
     }
 
-    override fun readText(): String? =
-        try {
-            CopyPasteManager.getInstance().getContents(DataFlavor.stringFlavor) as? String
-        } catch (_: Exception) {
-            null
-        }
+    override fun readText(): String? {
+        checkClient()
+        val text = clipboard.getContents<String>(DataFlavor.stringFlavor)
+        checkClient()
+        return text
+    }
+
+    override fun readPrimarySelectionText(): String? {
+        checkClient()
+        val contents = clipboard.systemSelectionContents ?: return null
+        if (!contents.isDataFlavorSupported(DataFlavor.stringFlavor)) return null
+        val text = contents.getTransferData(DataFlavor.stringFlavor) as? String
+        checkClient()
+        return text
+    }
+
+    private fun checkClient() {
+        if (client.isDisposed) throw CancellationException("Terminal clipboard client closed")
+    }
 }

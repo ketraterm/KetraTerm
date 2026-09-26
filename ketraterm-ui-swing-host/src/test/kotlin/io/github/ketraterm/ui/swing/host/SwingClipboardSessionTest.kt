@@ -158,7 +158,7 @@ class SwingClipboardSessionTest {
                     return text
                 }
             }
-        private val reader = SwingClipboardReader(clipboard, StandardTestDispatcher(scope.testScheduler))
+        private val reader = SwingClipboardReader(StandardTestDispatcher(scope.testScheduler))
         val policy =
             HostPolicy(
                 clipboardPolicy =
@@ -184,7 +184,7 @@ class SwingClipboardSessionTest {
                     clipboardReadTimeSource = scope.testScheduler.timeSource,
                     clipboardReader =
                         TerminalClipboardReader { request ->
-                            withContext(Dispatchers.Swing) { reader.read(request, prompt, "Read from this terminal?") }
+                            withContext(Dispatchers.Swing) { reader.read(request, prompt, "Read from this terminal?", clipboard) }
                         },
                 ).also { it.start(10, 3) }
 
