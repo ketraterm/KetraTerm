@@ -117,13 +117,48 @@ interface TerminalModeController {
      *
      * @param mode The modify-other-keys mode level, where `-1` is xterm's
      * explicit disabled state and `0` is the reset/default state.
+     * @throws IllegalArgumentException if [mode] is outside -1..3.
      */
     fun setModifyOtherKeysMode(mode: Int)
 
     /**
+     * Sets one xterm modifier resource. Resource 0 retains the legacy-profile admission
+     * mask; the current PC profile always permits modifiers. Values are -1 (disable),
+     * 0..3 for ordinary keys, 0..15 for resource 0, and 0..4 for other key classes.
+     * @throws IllegalArgumentException for an unsupported resource or value.
+     */
+    fun setKeyModifierOption(
+        resource: Int,
+        value: Int,
+    )
+
+    /** Restores one modifier resource's initial value; unknown resources are ignored. */
+    fun resetKeyModifierOption(resource: Int)
+
+    /** Restores all xterm modifier resources atomically, preserving format resources. */
+    fun resetKeyModifierOptions()
+
+    /**
+     * Selects format 0 (CSI 27) or 1 (CSI u) for one xterm resource. Resource 0 is
+     * independent storage, as in xterm; it does not override per-class formats.
+     * @throws IllegalArgumentException for an unsupported resource or value.
+     */
+    fun setKeyFormatOption(
+        resource: Int,
+        value: Int,
+    )
+
+    /** Restores one format resource to 0; unknown resources are ignored. */
+    fun resetKeyFormatOption(resource: Int)
+
+    /** Restores all xterm format resources atomically, preserving modifier resources. */
+    fun resetKeyFormatOptions()
+
+    /**
      * Sets the format-other-keys wire format used when modify-other-keys applies.
      *
-     * @param mode The format-other-keys mode (typically 4 or 5).
+     * @param mode 0 for the original xterm report or 1 for CSI-u.
+     * @throws IllegalArgumentException if [mode] is outside 0..1.
      */
     fun setFormatOtherKeysMode(mode: Int)
 

@@ -49,6 +49,28 @@ import kotlin.time.Duration.Companion.milliseconds
 @OptIn(ExperimentalCoroutinesApi::class)
 class TerminalSessionTest {
     @Test
+    fun `xterm resource queries and negotiated key bytes share the session output`() {
+        val connector = MockConnector()
+        createStartedSession(connector).use { session ->
+            connector.feedFromHost("\u001B[>1;3m\u001B[?1m".ascii())
+            session.encodeKey(TerminalKeyEvent.key(TerminalKey.UP, TerminalModifiers.CTRL))
+            connector.feedFromHost("\u001B[>1;4m\u001B[>1;1f\u001B[?1g".ascii())
+            session.encodeKey(TerminalKeyEvent.key(TerminalKey.UP))
+            connector.feedFromHost("\u001B[>1u".ascii())
+            session.encodeKey(TerminalKeyEvent.key(TerminalKey.UP, TerminalModifiers.CTRL))
+            connector.feedFromHost("\u001B[<u\u001B[>m\u001B[>f\u001B[?1m\u001B[?1g".ascii())
+            session.encodeKey(TerminalKeyEvent.key(TerminalKey.UP, TerminalModifiers.CTRL))
+            assertArrayEquals(
+                (
+                    "\u001B[>1;3m\u001B[>1;5A\u001B[>1;1f\u001B[57938;1u\u001B[1;5A" +
+                        "\u001B[>1;2m\u001B[>1;0f\u001B[1;5A"
+                ).ascii(),
+                connector.writtenBytes,
+            )
+        }
+    }
+
+    @Test
     fun `large clipboard writes follow session permissions through real session parsing`() =
         runTest {
             val text = "é🙂".repeat(1024)

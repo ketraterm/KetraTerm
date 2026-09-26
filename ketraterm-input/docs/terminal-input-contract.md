@@ -111,7 +111,7 @@ including:
 - focus reporting
 - mouse tracking mode
 - mouse encoding mode
-- modify-other-keys mode
+- independent xterm key modifier and format resources
 
 Input must not decode raw mode bit positions. If a new input-facing mode is
 needed, add protocol vocabulary and a core `TerminalInputState` helper first.
@@ -192,7 +192,9 @@ Guaranteed behavior:
 - application cursor and application keypad modes are read from the per-event
   mode snapshot
 - PF1-PF4 are explicit terminal keys and are not permanently conflated with
-  physical F1-F4 at the event vocabulary boundary
+  physical F1-F4 at the event vocabulary boundary. Function resource 2 does not
+  alter their legacy modified CSI reports; keypad resource 3 selects their
+  extended reports.
 
 Supported modified-key protocol:
 
@@ -207,7 +209,7 @@ Supported modified-key protocol:
   supplied unshifted key scalar when the input source provides one.
 - Kitty modifier encoding uses all eight protocol-defined bits. Legacy xterm
   encodings retain their four-modifier representation; modifier-only key events
-  are emitted only when Kitty report-all-keys mode (`8`) is active.
+  are emitted in Kitty report-all-keys mode (`8`) or xterm modifier-key level 4.
 - Kitty event-type formatting (`modifier:event-type`) is implemented in the
   encoder for rich host events, but flag `2` is not advertised until a host can
   truthfully provide the complete required lifecycle metadata.
@@ -225,9 +227,93 @@ Supported modified-key protocol:
 
 Not guaranteed yet:
 
-- modifyCursorKeys, modifyFunctionKeys, or modifyKeypadKeys resource variants
 - complete Kitty Keyboard Protocol support, including event types, alternate
   key values, associated text, and complete host lifecycle/layout metadata
+
+### Xterm key resources
+
+Resource controls use decimal IDs with independent modifier and format state:
+
+| ID | Modifier resource | Accepted values | Modifier default | Format default |
+| --- | --- | --- | --- | --- |
+| 0 | modifyKeyboard | 0..15 | 0 | 0 |
+| 1 | modifyCursorKeys | 0..4 | 2 | 0 |
+| 2 | modifyFunctionKeys | 0..4 | 2 | 0 |
+| 3 | modifyKeypadKeys | 0..4 | 0 | 0 |
+| 4 | modifyOtherKeys | 0..3 | 0 | 0 |
+| 6 | modifyModifierKeys | 0..4 | 0 | 0 |
+| 7 | modifySpecialKeys | 0..4 | 0 | 0 |
+
+Every format accepts 0 (original xterm report) or 1 (CSI-u). Format selection
+changes the layout of extended reports; it does not enable reporting.
+Resource 0 stores its own value: it does not overwrite the individual resources.
+Its modifier mask belongs to xterm's legacy/VT220 keyboard profiles and does not
+change KetraTerm's PC keyboard encoding.
+
+- `CSI > id ; value m` sets modifier state; final `f` sets format state.
+- Omitting the value, including an empty second field, restores that resource's
+  default. Omitting both parameters restores the entire corresponding family.
+- `CSI > id n` explicitly disables one modifier resource. Omitting the ID
+  selects function keys (2). This is distinct from setting level 0.
+- `CSI ? id m` queries modifier state; `CSI ? id g` queries format state.
+  Replies are `CSI > id ; value m` and `CSI > id ; value f`.
+- Queries accept a list of IDs and reply in request order, including duplicates.
+  Missing IDs, empty fields, colon subparameters, numeric overflow, and excess
+  parser capacity reject the whole query before any reply. Reserved ID 5 and
+  unknown IDs are outside the response allowlist and remain silent; these
+  protocols define no failure reply. Denying terminal responses suppresses both
+  query families without suppressing state changes.
+- Set/reset accepts at most two fields and disable at most one. Invalid syntax
+  or out-of-range values preserve state. Colon modifier masks are not interpreted
+  as ordinary resource setters.
+- Explicit disable is stored as -1 in typed state. The reply uses 65535, matching
+  xterm's unsigned serialization of its signed-short sentinel. Restore this state
+  with `CSI > id n`; 65535 is not an accepted set level.
+- Hard and soft reset restore both resource families. Family reset preserves
+  other input modes, including Kitty flags.
+
+Cursor/function levels control modified key formatting: 0 retains the old
+first-parameter/SS3 form, 1 forces CSI, 2 puts the modifier in the second
+parameter, and 3 adds the private `>` prefix. Unmodified keys retain their
+normal/application forms. Explicit cursor disable omits the modifier; explicit
+function disable uses Shift/Ctrl to select higher function numbers (+12/+24).
+Editing keys (Insert, Delete, Page Up/Down) retain their traditional numbered
+CSI reports at levels -1..3.
+
+Level 4 selects extended reports for cursor/editing, function, keypad, modifier,
+and special-key families. Both modified and unmodified presses/repeats report;
+release is suppressed. Format 0 writes `CSI 27 ; modifier ; code ~`; format 1
+writes `CSI code ; modifier u`. Codes follow xterm's standard X11-to-Unicode
+mapping, including control aliases and private-use values; Kitty's functional
+key numbers must never be substituted. Other-key levels retain the existing
+modifyOtherKeys rules.
+
+A nonzero active Kitty mode takes precedence over xterm encoding. Committed
+text-only events retain the literal UTF-8 contract above. Input reads all
+resources from one primitive mode snapshot and writes into reusable byte
+scratch; no map, snapshot object, or formatted string is created per key.
+
+#### Compatibility evidence
+
+The contract was checked against the [xterm control reference](https://invisible-island.net/xterm/ctlseqs/ctlseqs.html),
+[xterm resource manual](https://invisible-island.net/xterm/manpage/xterm.html),
+and upstream [input handling](https://github.com/ThomasDickey/xterm-snapshots/blob/master/input.c),
+[control handling](https://github.com/ThomasDickey/xterm-snapshots/blob/master/charproc.c),
+and [key mapping](https://github.com/ThomasDickey/xterm-snapshots/blob/master/keysym2ucs.c)
+on 2026-09-26. The documented reset-all semantics are used for all seven
+resources; upstream's control loop currently resets only IDs 1..5.
+
+Peer implementations are narrower:
+[Ghostty's stream handler](https://github.com/ghostty-org/ghostty/blob/main/src/terminal/stream.zig)
+handles a subset of modifier settings and documents approximate disable behavior;
+[xterm.js's input handler](https://github.com/xtermjs/xterm.js/blob/master/src/common/InputHandler.ts)
+does not register these xterm modifier/format query controls. Their subsets are
+not a reliable definition of the full resource protocol.
+
+Capability boundaries and deferred host metadata remain in the
+[feature map](../../docs/terminal-feature-map.md#6-input-encoding--event-reporting) and
+[gap map](../../docs/terminal-feature-gap-map.md#input-module-gaps).
+
 
 ## Mouse Contract
 
@@ -353,6 +439,16 @@ Avoid in encoder hot paths:
 - regex
 - `StringBuilder` for generated terminal sequences
 - ad hoc string assembly for CSI/SS3 bytes
+
+Allocation verification for `TerminalKeyResourceBenchmark` (2026-09-26):
+JMH 1.37 on JBR 25.0.4.1, one fork, two 1-second warmups, three 1-second
+measurements, and the GC profiler. Across IDs 1/2/3/6/7 in formats 0/1,
+encoding measured at most 0.000195 B/op and paired modifier/format queries
+at most 0.000230 B/op, with no collections. Events and output storage were
+reused. These figures are consistent with no steady-state per-operation
+allocation; they do not measure event construction, transport writes, or
+whole-frame rendering. Rerun the benchmark with longer iterations for
+throughput comparisons.
 
 ## Testing Contract
 

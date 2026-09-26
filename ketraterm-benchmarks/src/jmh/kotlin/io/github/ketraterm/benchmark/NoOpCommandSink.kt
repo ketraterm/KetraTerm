@@ -214,6 +214,8 @@ internal class NoOpCommandSink : TerminalCommandSink {
 
     override fun disableKeyModifierOption(resource: Int) {}
 
+    override fun requestKeyFormatOption(resource: Int) {}
+
     override fun requestKeyModifierOption(resource: Int) {}
 
     override fun setKeyFormatOption(

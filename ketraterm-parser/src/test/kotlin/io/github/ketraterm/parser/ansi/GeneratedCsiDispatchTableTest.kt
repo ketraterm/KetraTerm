@@ -83,6 +83,7 @@ class GeneratedCsiDispatchTableTest {
             assertEquals(CsiCommand.XTMODKEYS, lookup('m', privateMarker = '>'.code))
             assertEquals(CsiCommand.XTDISMODKEYS, lookup('n', privateMarker = '>'.code))
             assertEquals(CsiCommand.XTQMODKEYS, lookup('m', privateMarker = '?'.code))
+            assertEquals(CsiCommand.XTQFMTKEYS, lookup('g', privateMarker = '?'.code))
         }
 
         @Test

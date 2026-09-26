@@ -104,7 +104,10 @@ interface TerminalModeReader : TerminalInputState {
     /**
      * Returns an immutable snapshot of the current durable mode flags.
      *
-     * @return A detached [TerminalModeSnapshot] instance containing all active mode state.
+     * Additional xterm key resources are read through [TerminalInputState.keyModifierOption]
+     * and [TerminalInputState.keyFormatOption] from [getInputModeBits].
+     *
+     * @return A detached [TerminalModeSnapshot] of the commonly used mode fields.
      */
     fun getModeSnapshot(): TerminalModeSnapshot
 }

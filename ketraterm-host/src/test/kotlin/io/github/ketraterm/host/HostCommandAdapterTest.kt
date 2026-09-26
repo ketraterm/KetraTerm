@@ -810,7 +810,7 @@ class HostCommandAdapterTest {
             f.acceptAscii("\u001B[>4n\u001B[?4m")
             assertAll(
                 { assertEquals(-1, f.terminal.getModeSnapshot().modifyOtherKeysMode) },
-                { assertEquals("\u001B[>4;-1m", f.drainResponses()) },
+                { assertEquals("\u001B[>4;65535m", f.drainResponses()) },
             )
         }
 
@@ -828,9 +828,9 @@ class HostCommandAdapterTest {
             val f = Fixture()
 
             val before = f.terminal.getModeSnapshot()
-            f.acceptAscii("\u001B[>1;2m")
+            f.acceptAscii("\u001B[>5;2m")
             f.acceptAscii("\u001B[>4;9m")
-            f.acceptAscii("\u001B[>1;1f")
+            f.acceptAscii("\u001B[>5;1f")
             f.acceptAscii("\u001B[>4;2f")
 
             assertEquals(before, f.terminal.getModeSnapshot())

@@ -24,6 +24,8 @@ package io.github.ketraterm.core.api
  * core internals.
  */
 object TerminalModeBits {
+    // Bits 37..62 are reserved for XtermKeyResourceBits. Keep new fields disjoint.
+
     /** Insert/replace mode flag (IRM). */
     const val INSERT_MODE: Long = 1L shl 0
 

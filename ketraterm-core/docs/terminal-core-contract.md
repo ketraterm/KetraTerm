@@ -189,7 +189,9 @@ Guaranteed behavior:
 
 `TerminalModeController` is the public write surface for durable mode state.
 
-`TerminalModeReader.getModeSnapshot()` is the public read surface.
+`TerminalModeReader.getModeSnapshot()` provides the common typed mode view.
+Xterm resource reads use `TerminalInputState.getInputModeBits()` with
+`keyModifierOption` and `keyFormatOption` to decode one coherent primitive snapshot.
 
 Durable mode state currently exposed by core:
 
@@ -208,13 +210,17 @@ Durable mode state currently exposed by core:
 - East Asian ambiguous-width policy
 - mouse tracking mode
 - mouse encoding mode
-- modify-other-keys mode
+- independent xterm key modifier and format resources
 
 Guaranteed behavior:
 
 - mode setters that home or otherwise alter cursor physics cancel `pendingWrap`;
   input, reporting, presentation, palette, and other non-cursor modes preserve it
 - public mode reads are immutable snapshots
+- input reads all xterm resources from the same atomic primitive mode word;
+  resource helpers decode that word directly without additional snapshot fields
+- resource setters reject invalid IDs/values before mutation; family resets
+  restore defaults atomically while preserving unrelated mode bits
 - input/UI code cannot mutate internal mode storage directly
 - `resetCursorStyle()` restores the configured default shape and enables the
   cursor blink flag without changing visibility, position, or pending wrap;
@@ -315,7 +321,7 @@ Guaranteed behavior:
 - visible content and scrollback are preserved
 - dimensions, tab stops, and active screen selection are preserved
 - insert, origin, application cursor/keypad, cursor presentation, left/right
-  margin mode, and modify-other-keys state reset to defaults
+  margin mode, and both xterm key-resource families reset to defaults
 - bracketed paste, focus reporting, and mouse reporting modes are preserved
 - top/bottom and left/right margins reset to the full viewport on both buffers
 - current cursor position is preserved, but pending wrap is cleared

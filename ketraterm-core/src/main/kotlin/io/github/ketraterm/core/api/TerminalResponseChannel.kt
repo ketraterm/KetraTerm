@@ -96,11 +96,20 @@ interface TerminalResponseChannel : TerminalHostResponseReader {
     /**
      * Enqueues an allowlisted xterm key-modifier option response.
      *
-     * Unsupported resources produce no response.
+     * Unsupported resources produce no response; the protocol defines no failure reply.
+     * Explicit disable is reported as 65535, matching xterm's unsigned parameter.
+     * Host adapters must enforce terminal-response policy before calling this API.
      *
      * @param resource The queried xterm key-modifier resource identifier.
      */
     fun requestKeyModifierOption(resource: Int)
+
+    /**
+     * Enqueues an allowlisted XTQFMTKEYS reply using the active format resource.
+     * Unknown and reserved resources stay silent; this protocol defines no failure reply.
+     * Host adapters must enforce terminal-response policy before calling this API.
+     */
+    fun requestKeyFormatOption(resource: Int)
 
     /**
      * Enqueues a VT420 DECRQCRA response for an active-page rectangular area.

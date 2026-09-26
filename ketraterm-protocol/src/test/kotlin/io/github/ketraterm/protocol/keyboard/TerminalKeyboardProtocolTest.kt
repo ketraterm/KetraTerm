@@ -40,10 +40,7 @@ class TerminalKeyboardProtocolTest {
 
     @Test
     fun `xterm key option resource ids match control sequence values`() {
-        assertAll(
-            { assertEquals(4, XtermKeyModifierResource.MODIFY_OTHER_KEYS) },
-            { assertEquals(4, XtermKeyFormatResource.FORMAT_OTHER_KEYS) },
-        )
+        assertEquals(4, XtermKeyResource.OTHER_KEYS)
     }
 
     @Test

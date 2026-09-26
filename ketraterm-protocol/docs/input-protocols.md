@@ -1,6 +1,6 @@
 # Keyboard Input Protocol Vocabulary
 
-This document outlines the low-level constants and structures defined in `ketraterm-protocol` to support advanced keyboard input encoding standards, specifically **xterm modifyOtherKeys** and the **Kitty Keyboard Protocol**. KetraTerm supports the modifyOtherKeys resource's set/reset, explicit-disable, and query controls; only the implemented resource is allowed to produce a query response.
+This document outlines the low-level constants and structures defined in `ketraterm-protocol` to support advanced keyboard input encoding standards, specifically **xterm modifyOtherKeys** and the **Kitty Keyboard Protocol**. `XtermKeyResource` defines the shared modifier/format IDs 0, 1, 2, 3, 4, 6, and 7; ID 5 is reserved. Modifier and format validation belong to the shared vocabulary. The [input contract](../../ketraterm-input/docs/terminal-input-contract.md#xterm-key-resources) specifies resource defaults, set/reset/disable and query semantics, and encoding rules.
 
 ---
 
