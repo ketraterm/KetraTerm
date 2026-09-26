@@ -71,8 +71,8 @@ short runs; its allocation remains near the measurement floor. No render-path
 speedup or regression is established by this comparison. Real PTY throughput
 and native latency are outside this counting-connector benchmark.
 
-Raw JSON/logs are local build artifacts named
-`osc52-bulk-{baseline,current}-jmh` and `osc52-bulk-{baseline,current}-keys`.
+Temporary JSON/logs were removed after validation; the measurements and
+reproduction settings are retained here.
 For the longer run, select `TerminalSessionOutputBenchmark.keys` and use
 `-wi 3 -i 5 -w 1s -r 1s -f 2 -prof gc` with the command below.
 
@@ -101,9 +101,8 @@ not a claim of allocation-free clipboard execution.
 
 Validation used an ignored Gradle initialization script that redirected build
 outputs, because a running standalone instance held the normal JARs open on
-Windows. The isolated baseline checkout was removed after measurement. Raw
-JSON/logs remain local build artifacts named
-`osc52-read-{baseline,current}-jmh`.
+Windows. The isolated baseline checkout, redirected build outputs, and raw
+JSON/logs were removed after validation; the measurements are retained above.
 
 Reproduce with the command below, selecting
 `TerminalSessionOutputBenchmark|TerminalCoroutineSessionBenchmark.consumePublishedCaches`
@@ -119,5 +118,5 @@ java -jar <jmh-jar> "TerminalSessionOutputBenchmark|TerminalInputBenchmark.encod
 ```
 
 Use longer measurements and more forks before drawing throughput conclusions
-for a release. The raw JSON/logs for this comparison are local build artifacts
-named `osc52-output-{baseline,current}-jmh`; they are not checked in.
+for a release. Temporary raw JSON/logs were removed after validation; they were
+not checked in.
