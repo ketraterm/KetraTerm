@@ -640,22 +640,73 @@ class SwingTerminalScrollbackTest {
         session.close()
     }
 
+    @ParameterizedTest
+    @ValueSource(ints = [80, 132])
+    fun `logical column switches survive frame publication until the pane grid changes`(columns: Int) {
+        val connector = RecordingConnector()
+        val terminal = TerminalBuffers.create(90, 3)
+        val session =
+            TerminalSession
+                .create(
+                    terminal,
+                    connector,
+                    workerDispatcher = dispatcher,
+                    ioDispatcher = dispatcher,
+                ).also(sessions::add)
+        val component = createComponent()
+        SwingUtilities.invokeAndWait {
+            component.size = component.preferredGridSize(90, 3)
+            component.bind(session)
+            dispatcher.scheduler.runCurrent()
+        }
+        drainEdt()
+        SwingUtilities.invokeAndWait {
+            val originalSize = component.size
+            val mode = if (columns == 132) 'h' else 'l'
+            val bytes = ("\u001B[?1049h\u001B[?3$mode" + "x".repeat(columns) + "Y").encodeToByteArray()
+            session.onBytes(bytes, 0, bytes.size)
+            session.requestRender(scrollbackOffset = 0)
+            dispatcher.scheduler.runCurrent()
+            assertEquals(columns, terminal.width)
+            assertEquals(originalSize, component.size)
+        }
+        drainEdt()
+        SwingUtilities.invokeAndWait {
+            dispatcher.scheduler.runCurrent()
+            assertEquals(columns, terminal.width)
+            assertEquals(columns, connector.lastColumns.get())
+            assertEquals("x".repeat(columns), terminal.getLineAsString(0))
+            assertEquals("Y", terminal.getLineAsString(1))
+            session.renderPublisher.readCurrent { assertEquals(columns, it.columns) }
+            val image = BufferedImage(component.width, component.height, BufferedImage.TYPE_INT_ARGB)
+            val graphics = image.createGraphics()
+            try {
+                component.paint(graphics)
+            } finally {
+                graphics.dispose()
+            }
+            assertEquals(columns, terminal.width)
+            component.size = component.preferredGridSize(100, 4, TerminalRenderBufferKind.ALTERNATE)
+            component.dispatchEvent(ComponentEvent(component, ComponentEvent.COMPONENT_RESIZED))
+            assertEquals(100, terminal.width)
+            assertEquals(4, terminal.height)
+            assertEquals(100, connector.lastColumns.get())
+            assertEquals(4, connector.lastRows.get())
+        }
+    }
+
     @Test
     fun `alternate screen chrome resizes terminal grid to explicit alternate padding`() {
         val connector = RecordingConnector()
-        val reader = ActiveBufferFrameReader()
         val terminal = TerminalBuffers.create(width = 3, height = 3, maxHistory = 0)
         val session =
-            TerminalSession(
-                terminal = terminal,
-                renderPublisher = TerminalRenderPublisher(3, 3),
-                renderReader = reader,
-                responseReader = terminal,
-                connector = connector,
-                parser = NoOpParser,
-                inputEncoder = NoOpInputEncoder,
-                workerDispatcher = dispatcher,
-            ).also(sessions::add)
+            TerminalSession
+                .create(
+                    terminal = terminal,
+                    connector = connector,
+                    workerDispatcher = dispatcher,
+                    ioDispatcher = dispatcher,
+                ).also(sessions::add)
         val settings =
             SwingSettings(
                 padding = SwingPadding(0, 40, 8, 8),
@@ -675,7 +726,7 @@ class SwingTerminalScrollbackTest {
             val primaryColumns = terminal.width
             assertEquals(10, primaryColumns)
 
-            reader.activeBuffer = TerminalRenderBufferKind.ALTERNATE
+            terminal.enterAltBuffer()
             session.requestRender(scrollbackOffset = 0)
             publishVisibleGridColumnsGreaterThan(component, primaryColumns)
 

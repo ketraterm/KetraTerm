@@ -99,6 +99,21 @@ class TerminalWindowResizeControllerTest {
     }
 
     @Test
+    fun `cancelled window resize preserves a logical column switch`() {
+        withWindow { window, _, session, controller, updates ->
+            onEdt {
+                assertTrue(controller.request(session, 10, 132, preserveGrid = true))
+                session.resize(132, 10)
+                controller.clearTarget()
+                updates.removeFirst().invoke()
+                assertTrue(window.sizes.isEmpty())
+                assertEquals(132, session.terminal.width)
+                assertEquals(10, session.terminal.height)
+            }
+        }
+    }
+
+    @Test
     fun `geometry refresh keeps the previous complete snapshot available to requests`() {
         withWindow { window, _, session, controller, updates ->
             onEdt {

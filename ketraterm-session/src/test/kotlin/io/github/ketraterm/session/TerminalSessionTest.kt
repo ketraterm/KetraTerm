@@ -291,22 +291,26 @@ class TerminalSessionTest {
         }
 
     @Test
-    fun `accepted DECCOLM synchronizes connector and core before following output and queries`() {
+    fun `DECCOLM synchronizes connector and core before notifying hosts and following output`() {
         val stream = "old\u001B[?3hwide\u001B[18t\u001B[?3lnarrow\u001B[18t"
         for (split in 0..stream.length) {
             val connector = MockConnector()
+            val terminal = TerminalBuffers.create(80, 3)
             val requests = mutableListOf<Pair<Int, Int>>()
             val events =
                 object : HostEventSink by HostEventSink.NONE {
-                    override fun requestColumnMode(
+                    override fun columnModeChanged(
                         rows: Int,
                         columns: Int,
-                    ): Boolean {
+                    ) {
+                        assertEquals(columns to rows, connector.resizeCalls.last())
+                        assertEquals(columns, terminal.width)
+                        assertEquals("", terminal.getLineAsString(0))
                         requests += columns to rows
-                        return true
                     }
                 }
-            val session = createStartedSession(connector, columns = 80, rows = 3, hostEvents = events)
+            val session = TerminalSession.create(terminal, connector, hostEvents = events, ioDispatcher = UnconfinedTestDispatcher())
+            session.start(80, 3)
             try {
                 connector.feedFromHost(stream.take(split).ascii())
                 connector.feedFromHost(stream.drop(split).ascii())
@@ -322,18 +326,29 @@ class TerminalSessionTest {
     }
 
     @Test
-    fun `denied and unhandled DECCOLM never resize the connector`() {
+    fun `DECCOLM without a host resizes and wraps independently of window policy`() {
+        val stream = "\u001B[?3h\u001B[18t\u001B[?3l" + "x".repeat(80) + "Y\u001B[6n\u001B[18t"
         for (policy in HostControlPolicy.entries) {
-            val connector = MockConnector()
-            val session =
-                createStartedSession(connector, columns = 90, rows = 3, hostPolicy = HostPolicy(windowManipulationPolicy = policy))
-            try {
-                connector.feedFromHost("keep\u001B[?3h\u001B[?3l".ascii())
-                assertEquals(listOf(90 to 3), connector.resizeCalls)
-                assertEquals(90, session.terminal.width)
-                assertEquals("keep", session.terminal.getLineAsString(0))
-            } finally {
-                session.close()
+            for (split in 0..stream.length) {
+                val connector = MockConnector()
+                val session =
+                    createStartedSession(
+                        connector,
+                        columns = 90,
+                        rows = 3,
+                        hostPolicy = HostPolicy(windowManipulationPolicy = policy),
+                    )
+                try {
+                    connector.feedFromHost(stream.take(split).ascii())
+                    connector.feedFromHost(stream.drop(split).ascii())
+                    assertEquals(listOf(90 to 3, 132 to 3, 80 to 3), connector.resizeCalls)
+                    assertEquals(80, session.terminal.width)
+                    assertEquals("x".repeat(80), session.terminal.getLineAsString(0))
+                    assertEquals("Y", session.terminal.getLineAsString(1))
+                    assertEquals("\u001B[8;3;132t\u001B[2;2R\u001B[8;3;80t", connector.writtenBytes.asciiText())
+                } finally {
+                    session.close()
+                }
             }
         }
     }
@@ -355,10 +370,10 @@ class TerminalSessionTest {
         val terminal = TerminalBuffers.create(width = 80, height = 3)
         val events =
             object : HostEventSink by HostEventSink.NONE {
-                override fun requestColumnMode(
+                override fun columnModeChanged(
                     rows: Int,
                     columns: Int,
-                ): Boolean = true
+                ) = error("failed connector resize must not notify the host")
             }
         val session = TerminalSession.create(terminal, connector, hostEvents = events, ioDispatcher = UnconfinedTestDispatcher())
         try {

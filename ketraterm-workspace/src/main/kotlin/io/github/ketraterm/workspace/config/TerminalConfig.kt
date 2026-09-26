@@ -71,7 +71,7 @@ private fun defaultFontFamily(): String {
  * terminal-host emission.
  * @property scrollbackLines maximum retained scrollback lines.
  * @property lineHeight font metric line-height multiplier.
- * @property shellRequestResizeWindow whether shell application window/grid resize requests are honored.
+ * @property shellRequestResizeWindow whether shell requests may resize the application window.
  * @property desktopNotificationsEnabled whether desktop notifications are enabled.
  * @property smartSuggestionsEnabled whether completion, learning, and completion persistence are available.
  * @property shellSuggestionsEnabled whether host-provided shell suggestions may

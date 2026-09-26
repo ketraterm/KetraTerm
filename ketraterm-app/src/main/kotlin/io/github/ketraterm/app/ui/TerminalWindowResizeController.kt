@@ -77,11 +77,15 @@ internal class TerminalWindowResizeController(
         snapshot = window.readGeometry(terminal)?.let { Snapshot(session, terminal, it) }
     }
 
-    /** Called under the session mutation lock; no Swing access on this path. */
+    /**
+     * Schedules an eligible window resize without Swing access on the calling thread.
+     * [preserveGrid] keeps a logical column switch intact if the queued window update is cancelled.
+     */
     fun request(
         session: TerminalSession,
         rows: Int,
         columns: Int,
+        preserveGrid: Boolean = false,
     ): Boolean {
         val current = snapshot ?: return false
         if (current.session !== session) return false
@@ -96,7 +100,7 @@ internal class TerminalWindowResizeController(
             val target = latest?.takeIf { it.session === session }?.geometry?.targetSize(columns, rows, alternate)
             if (target != null) {
                 window.resize(target)
-            } else if (!session.isClosed) {
+            } else if (!preserveGrid && !session.isClosed) {
                 val visible = current.terminal.visibleGridSize()
                 session.resize(visible.width, visible.height)
             }

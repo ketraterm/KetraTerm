@@ -1213,13 +1213,18 @@ private class SessionHostEventSink(
         delegate.resizeWindow(rows, columns)
     }
 
-    override fun requestColumnMode(
+    override fun resizeForColumnMode(
         rows: Int,
         columns: Int,
-    ): Boolean {
-        if (!delegate.requestColumnMode(rows, columns)) return false
+    ) {
         connector.resize(columns, rows)
-        return true
+    }
+
+    override fun columnModeChanged(
+        rows: Int,
+        columns: Int,
+    ) {
+        delegate.columnModeChanged(rows, columns)
     }
 
     override fun moveWindow(
