@@ -22,6 +22,7 @@ import io.github.ketraterm.input.event.TerminalPasteEvent
 import io.github.ketraterm.input.event.TerminalTextReplacementEvent
 import io.github.ketraterm.input.policy.BackspacePolicy
 import io.github.ketraterm.input.policy.PasteControlPolicy
+import io.github.ketraterm.input.policy.PasteLineEndingPolicy
 import io.github.ketraterm.input.policy.TerminalInputPolicy
 import io.github.ketraterm.testkit.MockConnector
 import io.github.ketraterm.transport.TerminalConnector
@@ -42,6 +43,86 @@ import java.util.concurrent.TimeUnit
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class TerminalSessionOutboundTest {
+    @Test
+    fun `queued replacements retain modes policy and Unicode transformations at admission`() =
+        runTest {
+            val connector = MockConnector()
+            val dispatcher = StandardTestDispatcher(testScheduler)
+            val policy = TerminalInputPolicy(backspacePolicy = BackspacePolicy.BACKSPACE)
+            TerminalSession
+                .create(
+                    TerminalBuffers.create(10, 3),
+                    connector,
+                    inputPolicy = policy,
+                    workerDispatcher = dispatcher,
+                    ioDispatcher = dispatcher,
+                ).use { session ->
+                    session.start(10, 3)
+                    connector.feedFromHost("\u001b[?2004h".toByteArray())
+                    val prefix = "a".repeat(8191)
+                    session.encodeTextReplacement(TerminalTextReplacementEvent(1, 2, prefix + "é🙂\u001b\u0003\u009b\ud800\u0001\r\n"))
+                    session.setInputPolicy(
+                        policy.copy(
+                            backspacePolicy = BackspacePolicy.DELETE,
+                            pasteControlPolicy = PasteControlPolicy.STRIP_C0_EXCEPT_TAB_CR_LF,
+                            pasteLineEndingPolicy = PasteLineEndingPolicy.LINE_FEED,
+                        ),
+                    )
+                    connector.feedFromHost("\u001b[?2004l\u001b[?67l".toByteArray())
+                    session.encodeTextReplacement(TerminalTextReplacementEvent(0, 1, "\u0001Q\r\n"))
+                    session.encodeKey(TerminalKeyEvent.key(TerminalKey.BACKSPACE))
+                    assertArrayEquals(byteArrayOf(), connector.writtenBytes)
+                    runCurrent()
+                    assertEquals(
+                        "\u001b[3~\u0008\u0008\u001b[200~" + prefix + "é🙂␛␃\\u009b�\u0001\r\n\u001b[201~\u007fQ\n\u007f",
+                        connector.writtenBytes.toString(Charsets.UTF_8),
+                    )
+                }
+        }
+
+    @Test
+    fun `paste larger than the byte queue streams before later input and replies`() =
+        runTest {
+            val text = "x".repeat(OutboundWriter.MAX_QUEUED_BYTES + 1)
+            val expected = ("\u001b[200~" + text + "\u001b[201~z\u001b[0n").toByteArray()
+            val delegate = MockConnector()
+            var received = 0
+            var largestWrite = 0
+            val connector =
+                object : TerminalConnector by delegate {
+                    override fun write(
+                        bytes: ByteArray,
+                        offset: Int,
+                        length: Int,
+                    ) {
+                        assertTrue(received + length <= expected.size)
+                        assertEquals(-1, java.util.Arrays.mismatch(expected, received, received + length, bytes, offset, offset + length))
+                        received += length
+                        largestWrite = maxOf(largestWrite, length)
+                    }
+                }
+            val dispatcher = StandardTestDispatcher(testScheduler)
+            TerminalSession
+                .create(
+                    TerminalBuffers.create(10, 3),
+                    connector,
+                    workerDispatcher = dispatcher,
+                    ioDispatcher = dispatcher,
+                ).use { session ->
+                    session.start(10, 3)
+                    delegate.feedFromHost("\u001b[?2004h".toByteArray())
+                    session.encodePaste(TerminalPasteEvent(text))
+                    assertNull(session.failure)
+                    session.encodeKey(TerminalKeyEvent.codepoint('z'.code))
+                    delegate.feedFromHost("\u001b[5n".toByteArray())
+                    assertEquals(0, received)
+                    runCurrent()
+                    assertEquals(expected.size, received)
+                    assertTrue(largestWrite <= 16384)
+                    assertFalse(session.isClosed)
+                }
+        }
+
     @Test
     fun `input acceptance copies scratch and captures modes before background writing`() =
         runTest {
@@ -92,8 +173,9 @@ class TerminalSessionOutboundTest {
                 }
         }
 
-    @Test
-    fun `queue overflow closes the session without publishing a partial bracketed paste`() =
+    @ParameterizedTest
+    @ValueSource(strings = ["paste", "key", "deletions", "operations"])
+    fun `admission bounds close the session without publishing partial input`(kind: String) =
         runTest {
             val connector = MockConnector()
             val dispatcher = StandardTestDispatcher(testScheduler)
@@ -106,7 +188,12 @@ class TerminalSessionOutboundTest {
                 ).use { session ->
                     session.start(10, 3)
                     connector.feedFromHost("\u001b[?2004h".toByteArray())
-                    session.encodePaste(TerminalPasteEvent("x".repeat(OutboundWriter.MAX_QUEUED_BYTES)))
+                    when (kind) {
+                        "paste" -> session.encodePaste(TerminalPasteEvent("x".repeat(OutboundWriter.MAX_BULK_UNITS + 1)))
+                        "key" -> session.encodeKey(TerminalKeyEvent.text("x".repeat(OutboundWriter.MAX_QUEUED_BYTES + 1)))
+                        "deletions" -> session.encodeTextReplacement(TerminalTextReplacementEvent(Int.MAX_VALUE, Int.MAX_VALUE, ""))
+                        "operations" -> repeat(OutboundWriter.MAX_BULK_OPERATIONS + 1) { session.encodePaste(TerminalPasteEvent("x")) }
+                    }
                     assertInstanceOf(OutboundCapacityException::class.java, session.failure)
                     assertTrue(session.isClosed)
                     assertEquals(1, connector.closeCount)
@@ -116,6 +203,29 @@ class TerminalSessionOutboundTest {
                     assertArrayEquals(byteArrayOf(), connector.writtenBytes)
                 }
             assertEquals(1, connector.closeCount)
+        }
+
+    @Test
+    fun `empty text operations do not exhaust admission or emit bytes`() =
+        runTest {
+            val connector = MockConnector()
+            val dispatcher = StandardTestDispatcher(testScheduler)
+            TerminalSession
+                .create(
+                    TerminalBuffers.create(10, 3),
+                    connector,
+                    workerDispatcher = dispatcher,
+                    ioDispatcher = dispatcher,
+                ).use { session ->
+                    session.start(10, 3)
+                    repeat(OutboundWriter.MAX_BULK_OPERATIONS + 1) {
+                        session.encodePaste(TerminalPasteEvent(""))
+                        session.encodeTextReplacement(TerminalTextReplacementEvent(0, 0, ""))
+                    }
+                    runCurrent()
+                    assertFalse(session.isClosed)
+                    assertArrayEquals(byteArrayOf(), connector.writtenBytes)
+                }
         }
 
     @Test
@@ -234,7 +344,7 @@ class TerminalSessionOutboundTest {
                 connector.entered.awaitEvent()
                 SessionTestThread("output-close") {
                     if (overflow) {
-                        session.encodePaste(TerminalPasteEvent("x".repeat(OutboundWriter.MAX_QUEUED_BYTES + 1)))
+                        session.encodePaste(TerminalPasteEvent("x".repeat(OutboundWriter.MAX_BULK_UNITS + 1)))
                     } else {
                         session.close()
                     }
@@ -251,6 +361,76 @@ class TerminalSessionOutboundTest {
         }
     }
 
+    @Test
+    fun `active bulk write permits producers and preserves its captured framing`() {
+        val text = "x".repeat(40000)
+        val expected = "\u001b[200~" + text + "\u001b[201~\u001b[0ntailz"
+        val connector = BlockingConnector(expected.length)
+        Executors.newSingleThreadExecutor().asCoroutineDispatcher().use { io ->
+            val session =
+                TerminalSession.create(
+                    TerminalBuffers.create(10, 3),
+                    connector,
+                    workerDispatcher = StandardTestDispatcher(),
+                    ioDispatcher = io,
+                )
+            session.use {
+                try {
+                    session.start(10, 3)
+                    connector.delegate.feedFromHost("\u001b[?2004h".toByteArray())
+                    session.encodePaste(TerminalPasteEvent(text))
+                    connector.entered.awaitEvent()
+                    SessionTestThread("bulk-producer") {
+                        connector.delegate.feedFromHost("hello\u001b[?2004l\u001b[5n".toByteArray())
+                        session.setPasteControlPolicy(PasteControlPolicy.STRIP_C0_EXCEPT_TAB_CR_LF)
+                        session.encodePaste(TerminalPasteEvent("\u0001tail"))
+                        session.encodeKey(TerminalKeyEvent.codepoint('z'.code))
+                    }.use { it.awaitCompletion() }
+                    assertEquals("hello", session.terminal.getLineAsString(0))
+                    assertEquals(1L, connector.release.count)
+                    connector.release.countDown()
+                    connector.completed.awaitEvent()
+                    assertEquals(expected, connector.writtenText())
+                    assertNull(session.failure)
+                } finally {
+                    connector.release.countDown()
+                }
+            }
+        }
+    }
+
+    @Test
+    fun `close stops active bulk encoding and discards following operations`() {
+        val connector = BlockingConnector(1)
+        val executor = Executors.newSingleThreadExecutor()
+        executor.asCoroutineDispatcher().use { io ->
+            val session =
+                TerminalSession.create(
+                    TerminalBuffers.create(10, 3),
+                    connector,
+                    workerDispatcher = StandardTestDispatcher(),
+                    ioDispatcher = io,
+                )
+            try {
+                session.start(10, 3)
+                session.encodePaste(TerminalPasteEvent("x".repeat(40000)))
+                connector.entered.awaitEvent()
+                session.encodePaste(TerminalPasteEvent("later"))
+                session.encodeKey(TerminalKeyEvent.codepoint('z'.code))
+                SessionTestThread("bulk-close") { session.close() }.use { it.awaitCompletion() }
+                connector.completed.awaitEvent()
+                executor.submit {}.get(SESSION_THREAD_TIMEOUT_SECONDS, TimeUnit.SECONDS)
+                assertEquals(1, connector.writeCount)
+                assertEquals("", connector.writtenText())
+                assertEquals(1, connector.delegate.closeCount)
+                assertFalse(session.isCoroutineScopeActive)
+            } finally {
+                connector.release.countDown()
+                session.close()
+            }
+        }
+    }
+
     private class BlockingConnector(
         private val expectedBytes: Int,
         val delegate: MockConnector = MockConnector(),
@@ -259,6 +439,8 @@ class TerminalSessionOutboundTest {
         val release = CountDownLatch(1)
         val completed = CountDownLatch(1)
         private val output = ByteArrayOutputStream()
+        var writeCount = 0
+            private set
 
         @Volatile private var closed = false
 
@@ -267,6 +449,7 @@ class TerminalSessionOutboundTest {
             offset: Int,
             length: Int,
         ) {
+            writeCount++
             entered.countDown()
             release.awaitEvent()
             synchronized(output) {

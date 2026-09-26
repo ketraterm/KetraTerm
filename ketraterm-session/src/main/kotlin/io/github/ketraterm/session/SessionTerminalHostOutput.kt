@@ -17,10 +17,8 @@ package io.github.ketraterm.session
 
 import io.github.ketraterm.protocol.host.TerminalHostOutput
 
-/** Encodes text into reusable scratch, consumed inside one outbound writer transaction. */
-internal class SessionTerminalHostOutput(
-    private val writer: OutboundWriter,
-) : TerminalHostOutput {
+/** Reusable text encoding for session byte sinks. Each instance is serialized by its owner. */
+internal abstract class SessionTerminalHostOutput : TerminalHostOutput {
     private val one = ByteArray(1)
     private val asciiBuffer = ByteArray(ASCII_BUFFER_SIZE)
     private val utf8Buffer = ByteArray(UTF8_BUFFER_SIZE)
@@ -29,15 +27,7 @@ internal class SessionTerminalHostOutput(
         require(byte in 0..255) { "Host byte must be in 0..255, got $byte" }
 
         one[0] = byte.toByte()
-        writer.append(one, 0, 1)
-    }
-
-    override fun writeBytes(
-        bytes: ByteArray,
-        offset: Int,
-        length: Int,
-    ) {
-        writer.append(bytes, offset, length)
+        writeBytes(one, 0, 1)
     }
 
     override fun writeAscii(text: String) {
@@ -52,7 +42,7 @@ internal class SessionTerminalHostOutput(
                 index++
             }
 
-            writer.append(asciiBuffer, 0, count)
+            writeBytes(asciiBuffer, 0, count)
             offset += count
         }
     }
@@ -93,7 +83,7 @@ internal class SessionTerminalHostOutput(
                 }
 
             if (bufferOffset + bytesNeeded > utf8Buffer.size) {
-                writer.append(utf8Buffer, 0, bufferOffset)
+                writeBytes(utf8Buffer, 0, bufferOffset)
                 bufferOffset = 0
             }
 
@@ -118,7 +108,7 @@ internal class SessionTerminalHostOutput(
         }
 
         if (bufferOffset > 0) {
-            writer.append(utf8Buffer, 0, bufferOffset)
+            writeBytes(utf8Buffer, 0, bufferOffset)
         }
     }
 

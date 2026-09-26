@@ -1,11 +1,11 @@
 # Session concurrency and locking invariants
 
-The session consumes borrowed inbound bytes and performs parser/core mutation synchronously. Input encoding also remains synchronous, but standard input and core responses are copied into an owned queue before returning. One session child coroutine performs connector writes on the injected I/O dispatcher.
+The session consumes borrowed inbound bytes and performs parser/core mutation synchronously. Ordinary input encoding and core-response copying also run on the producer. Paste and text replacement retain their source and admission-time modes/policy for background encoding. One session child coroutine performs all connector writes on the injected I/O dispatcher.
 
 ## Retained monitors
 
 - `mutationLock` serializes parser/core mutation, resize and render extraction. A borrowed `TerminalRenderFrame` is valid only while its callback holds this monitor. Consumers must copy promptly and must not call a mutating session API from the callback.
-- `outboundWriteLock` protects encoder scratch, input policy, startup state, and queue admission/draining. It never covers a connector write. A complete input operation or response batch is admitted under one acquisition.
+- `outboundWriteLock` protects the ordinary encoder's scratch, input policy, startup state, and queue admission/draining. It never covers a connector write or bulk encoding. A complete input operation or response batch is admitted under one acquisition.
 - `TerminalRenderPublisher` owns its lease lock so the worker can promote a back cache only when no reader still leases the front cache.
 
 When both session monitors are needed, acquire mutation before outbound. The writer copies queued bytes into its own scratch under outbound serialization, releases the monitor, and only then calls the connector. Producers cannot modify that scratch until the synchronous connector call returns.
@@ -17,20 +17,28 @@ There is no inbound monitor. `TerminalConnector` guarantees serial, ordered deli
 1. The connector invokes `onBytes` in stream order; parsing runs under mutation serialization.
 2. The session drains all available core-response bytes under mutation and outbound serialization into one queue transaction. The 1 KiB core-response scratch is copied before reuse.
 3. Ready startup input is encoded and queued as one operation, including its final Enter, after replies.
-4. UI input uses the same queue transaction. Bracketed paste and text replacement cannot interleave with other operations, even when the writer divides their bytes into several native calls.
-5. Queue transitions from empty to nonempty wake the conflated writer. Empty operations do not wake it. Render invalidation remains independent.
+4. Ordinary UI input uses the same byte transaction. A transaction that throws rolls back its staged bytes, preserving earlier committed operations.
+5. Paste and text replacement reserve a position between committed byte transactions. Admission captures the packed input mode word and immutable input policy under outbound serialization. Later mode or policy changes affect later input only.
+6. The worker writes preceding bytes, then streams each bulk operation to completion before consuming later bytes or bulk operations. One worker-owned encoder reuses the existing input implementation with the captured snapshot. Its mutable state and scratch are independent of the producer encoder. Delete, Backspace and bracketed-paste phases stay contiguous even across multiple native calls.
+7. Byte transitions from empty to nonempty and bulk admissions wake the conflated writer. Empty byte transactions do not wake it. Render invalidation remains independent.
 
-A transaction that throws rolls back all its staged bytes. Existing committed bytes retain their order. The ring starts at 16 KiB and grows on demand to an 8 MiB hard limit. The writer has one additional 16 KiB scratch buffer. Growth temporarily retains the old ring while copying; less than 16 MiB of ring storage is live during growth. No per-key payload objects or request list are retained. Coroutine wake-ups can allocate; rendering does not enqueue output merely because a frame is painted.
+Produced and consumed byte counters locate bulk operations without per-key markers. They count committed ring bytes, excluding bulk bytes; their difference is bounded by the ring budget. A non-suspending drain keeps active bulk references out of the coroutine continuation while it waits for new work.
 
-The current non-suspending input APIs fail the session if a complete operation cannot fit. They never wait for the transport, silently drop input, or publish a partial paste delimiter. Encoding work still runs on the producer thread. Capability status and the remaining bulk-input work are tracked in the canonical feature/gap maps.
+## Bounds and backpressure
+
+The ring starts at 16 KiB and grows on demand to an 8 MiB hard limit. The writer has one additional 16 KiB scratch buffer. Growth temporarily retains the old ring while copying; less than 16 MiB of ring storage is live during growth. No per-key payload objects or request list are retained. Coroutine wake-ups can allocate; rendering does not enqueue output merely because a frame is painted.
+
+Bulk input has two shared limits: 16 outstanding operations and 16,777,216 work units, including active work. One unit is one retained UTF-16 code unit or one requested deletion action. Accounting uses Long arithmetic before summing replacement/deletion counts. Text contributes at most 32 MiB of source character storage; encoded expansion is streamed through fixed encoder scratch, not materialized into a full byte array. The operation limit also bounds per-request overhead. Empty paste and replacement events without text or deletions need no reservation. These limits accommodate pastes larger than the ordinary byte queue while bounding retained data and pending encoding work.
+
+A slow connector backpressures bulk encoding on the I/O worker. Producers can continue accepting input under their remaining budgets. Non-suspending input APIs fail the session if a reservation or complete byte transaction cannot fit; they never wait for queue capacity or silently drop an accepted operation. Rejected admission publishes none of that operation. A later transport failure or close can interrupt an already writing operation.
 
 ## Acceptance and lifecycle
 
-Input methods return after encoding and copying, not after transport completion. Startup `SUBMITTED` also means queue acceptance. The connector contract is unchanged: each `write` synchronously consumes or copies the supplied bytes. Embedders supplying a custom input encoder own that encoder's output sink; `TerminalSession.create` wires the standard shared writer.
+Input methods return after admission, not transport completion. For ordinary input this includes encoding/copying; for paste and replacement it includes source retention and mode/policy capture. Startup `SUBMITTED` also means queue acceptance. The connector contract is unchanged: each `write` synchronously consumes or copies the supplied bytes. Embedders supplying a custom input encoder retain synchronous invocation and own its output sink; `TerminalSession.create` wires the standard shared writer.
 
-`state` retains `Created`, `Running`, or `Closed`. Queue exhaustion and native write failure use `Closed.event.failure`, close the connector, discard pending bytes, and cancel session children. A failed transport write may already have sent a prefix; no bytes are retried.
+`state` retains `Created`, `Running`, or `Closed`. Budget exhaustion and native write failure use `Closed.event.failure`, close the connector, discard pending output, and cancel session children. A failed transport write may already have sent a prefix; no bytes are retried.
 
-Local close publishes the closed state and calls `connector.close` before taking cleanup locks. It does not join the writer while a native call is blocked. Remote close cancels pending writes too. A connector must tolerate concurrent close; session cancellation alone cannot interrupt an arbitrary native call. The ring is cleared/released on cleanup, and writer scratch is cleared when its call returns and the coroutine unwinds.
+Local close publishes the closed state and calls `connector.close` before taking cleanup locks. It does not join the writer while a native call is blocked. Remote close cancels pending writes too. A connector must tolerate concurrent close; session cancellation alone cannot interrupt an arbitrary native call. The ring is cleared/released and pending bulk references are dropped on cleanup. While open, active bulk work remains charged to the budgets until its callback returns. The bulk sink checks closure/cancellation before every chunk; a racing native call already entered can finish, and pure encoding between writes is bounded by admitted work. Writer scratch is cleared when its call returns and the coroutine unwinds.
 
 ## Tests
 

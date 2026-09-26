@@ -21,6 +21,7 @@ import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
 import java.io.IOException
+import kotlin.coroutines.CoroutineContext
 
 /**
  * Bounded byte storage shared by input and replies. A transaction publishes all
@@ -36,6 +37,11 @@ internal class OutboundWriter(
     private var head = 0
     private var size = 0
     private var closed = false
+    private var producedBytes = 0L
+    private var consumedBytes = 0L
+    private val bulkWrites = ArrayDeque<BulkWrite>()
+    private var pendingBulkUnits = 0L
+    private var pendingBulkOperations = 0
 
     /** Returns after copying a complete operation, never after waiting for transport I/O. */
     inline fun submit(crossinline block: () -> Unit) {
@@ -50,9 +56,33 @@ internal class OutboundWriter(
                     size = previousSize
                     throw failure
                 }
+                producedBytes += size - previousSize
                 previousSize == 0 && size != 0
             }
         if (wake) ready.trySend(Unit)
+    }
+
+    /**
+     * Reserves a position between byte transactions. The worker streams this
+     * operation directly to the connector before consuming later queued bytes.
+     * [workUnits] counts retained UTF-16 units and requested editor deletions;
+     * reservations include the active operation until its write returns.
+     */
+    fun submitBulk(
+        workUnits: Long,
+        write: () -> Unit,
+    ) {
+        require(workUnits >= 0)
+        synchronized(lock) {
+            if (closed) return
+            if (workUnits > MAX_BULK_UNITS - pendingBulkUnits || pendingBulkOperations == MAX_BULK_OPERATIONS) {
+                throw OutboundCapacityException("Terminal output exceeds the bulk input budget")
+            }
+            bulkWrites.addLast(BulkWrite(producedBytes, workUnits, write))
+            pendingBulkUnits += workUnits
+            pendingBulkOperations++
+        }
+        ready.trySend(Unit)
     }
 
     /** Called only inside [submit], while holding the session's outbound lock. */
@@ -81,27 +111,60 @@ internal class OutboundWriter(
     /** Runs once, on the session I/O dispatcher. Cancellation never waits for a native write. */
     suspend fun run() {
         val scratch = ByteArray(WRITE_BUFFER_SIZE)
+        val context = currentCoroutineContext()
         try {
             for (signal in ready) {
-                while (true) {
-                    currentCoroutineContext().ensureActive()
-                    val count =
-                        synchronized(lock) {
-                            if (closed) return
-                            val count = minOf(size, scratch.size)
-                            copyTo(scratch, count)
-                            clear(0, count)
-                            head = (head + count) % bytes.size
-                            size -= count
-                            count
-                        }
-                    if (count == 0) break
-                    connector.write(scratch, 0, count)
-                    scratch.fill(0, 0, count)
-                }
+                drain(scratch, context)
             }
         } finally {
             scratch.fill(0)
+        }
+    }
+
+    // Keep payload references on this stack, rather than in a suspended continuation.
+    private fun drain(
+        scratch: ByteArray,
+        context: CoroutineContext,
+    ) {
+        while (true) {
+            context.ensureActive()
+            var bulk: BulkWrite? = null
+            val count =
+                synchronized(lock) {
+                    if (closed) return
+                    val next = bulkWrites.firstOrNull()
+                    if (next != null && next.position == consumedBytes) {
+                        bulk = bulkWrites.removeFirst()
+                        0
+                    } else {
+                        // Differences stay within the byte budget even when these sequence counters wrap.
+                        val beforeBulk = if (next == null) size else (next.position - consumedBytes).toInt()
+                        val count = minOf(size, scratch.size, beforeBulk)
+                        copyTo(scratch, count)
+                        clear(0, count)
+                        head = (head + count) % bytes.size
+                        size -= count
+                        consumedBytes += count
+                        count
+                    }
+                }
+            val operation = bulk
+            if (operation != null) {
+                try {
+                    operation.write()
+                } finally {
+                    synchronized(lock) {
+                        if (!closed) {
+                            pendingBulkUnits -= operation.workUnits
+                            pendingBulkOperations--
+                        }
+                    }
+                }
+            } else {
+                if (count == 0) return
+                connector.write(scratch, 0, count)
+                scratch.fill(0, 0, count)
+            }
         }
     }
 
@@ -112,9 +175,18 @@ internal class OutboundWriter(
             bytes = EMPTY_BYTES
             size = 0
             head = 0
+            bulkWrites.clear()
+            pendingBulkUnits = 0
+            pendingBulkOperations = 0
         }
         ready.close()
     }
+
+    private class BulkWrite(
+        val position: Long,
+        val workUnits: Long,
+        val write: () -> Unit,
+    )
 
     private fun copyTo(
         destination: ByteArray,
@@ -136,12 +208,15 @@ internal class OutboundWriter(
     }
 
     companion object {
-        // Includes a complete large paste; the consumer additionally retains at most 16 KiB.
         const val MAX_QUEUED_BYTES = 8 * 1024 * 1024
+        const val MAX_BULK_UNITS = 16 * 1024 * 1024
+        const val MAX_BULK_OPERATIONS = 16
         private val EMPTY_BYTES = ByteArray(0)
         private const val INITIAL_CAPACITY = 16 * 1024
         private const val WRITE_BUFFER_SIZE = 16 * 1024
     }
 }
 
-internal class OutboundCapacityException : IOException("Terminal output exceeds the 8 MiB queue limit")
+internal class OutboundCapacityException(
+    message: String = "Terminal output exceeds the 8 MiB queue limit",
+) : IOException(message)

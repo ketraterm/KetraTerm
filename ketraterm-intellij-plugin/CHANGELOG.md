@@ -2,6 +2,7 @@
 
 ## [Unreleased]
 
+- Improved responsiveness and reliability when pasting large text into busy terminals.
 - Improved validation of terminal clipboard access requests.
 - Improved keyboard compatibility with terminal apps that configure and query modifier handling.
 - Improved compatibility with terminal apps that query active terminal settings and supported features. Input settings can be changed safely during large pastes.

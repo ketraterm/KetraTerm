@@ -281,9 +281,12 @@ public API exists solely for a possible later protocol.
   input APIs, one I/O writer, coherent core-response draining, and failure/close
   handling. Admission replaces synchronous write completion. This is a review
   boundary within Part 2; it does not complete the outbound prerequisite.
-- Checkpoint 2b must add background backpressure for bulk producers while keeping
-  ordinary input bounded and whole operations ordered. Do not treat the current
-  hard-limit failure behavior as the final large-paste path.
+- Checkpoint 2b implements background encoding and native-write backpressure for
+  paste and text replacement. Admission captures modes/policy and retains source
+  text under a shared 16-operation / 16,777,216 UTF-16-and-deletion-unit budget,
+  including active work. The existing encoder streams through reusable scratch;
+  byte transactions remain ordered around each complete bulk operation. Exceeding
+  either budget still fails the session without admitting that operation.
 - Clipboard-owned payload reservation and cancellation/revalidation at write
   start belong with their first consuming read implementation in Part 3.
 - Implementation details and acceptance semantics are in the
@@ -293,7 +296,7 @@ public API exists solely for a possible later protocol.
 - Cover input, paste, core replies, large logical frames, scratch reuse,
   saturation, write failure, and close while output is blocked.
 - Compare existing input/session allocation and throughput benchmarks with the
-  baseline. Checkpoint 2a measurements, including dispatch overhead and their
+  baseline. Checkpoint measurements, including dispatch overhead and their
   limitations, are recorded in the [benchmark notes](../ketraterm-session/docs/outbound-writer-benchmarks.md).
   Settle byte budgets and acceptance/completion semantics here.
 

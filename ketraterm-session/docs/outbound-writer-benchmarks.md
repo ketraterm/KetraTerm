@@ -31,6 +31,51 @@ short run; no speedup is claimed. The output measurements show a substantial
 throughput cost for thread handoff against a no-op synchronous sink. The benefit
 is that slow real writes no longer occupy parser/input monitors or the UI thread.
 
+## Checkpoint 2b: background bulk encoding
+
+Compared committed checkpoint `5e9eb30b` with background paste/replacement
+encoding using the same Java 25 runtime and completed-output benchmarks. The
+first comparison used the short one-fork settings above:
+
+| Workload | Checkpoint 2a ops/ms | Checkpoint 2b ops/ms | Checkpoint 2a B/op | Checkpoint 2b B/op |
+| --- | ---: | ---: | ---: | ---: |
+| Published render-cache consumption, one session | 743 | 333 | 0.054 | 0.123 |
+| Legacy ASCII input encoder | 35,380 | 37,289 | < 0.001 | < 0.001 |
+| Session ASCII keys, bursts of 64, per key | 5,239 | 5,314 | 5.535 | 7.172 |
+| Session paste, 64 KiB | 4.639 | 8.247 | 50.400 | 128.346 |
+
+The initial key allocation difference prompted a longer comparison: two forks,
+three 1-second warmups and five 1-second measurements per fork.
+
+| Session keys, per key | Checkpoint 2a | Checkpoint 2b |
+| --- | ---: | ---: |
+| Throughput, ops/ms | 5,498 ? 653 | 7,187 ? 1,972 |
+| Allocation, B/op | 5.988 ? 1.328 | 5.656 ? 3.023 |
+
+The intervals overlap; this repeat did not reproduce the initial allocation
+increase. Bytecode inspection also found no allocation instructions or boxed
+counters in the new writer drain. Ordinary keys still use reusable byte storage,
+with allocation from coroutine/channel scheduling. These measurements do not
+justify a general throughput improvement claim.
+
+Bulk requests now allocate a captured operation and queue record once per
+paste/replacement. They retain the immutable source and stream encoding through
+fixed scratch rather than growing the byte ring to fit the entire payload.
+The higher paste B/op reflects this fixed request cost; it is neither a
+per-byte cost nor a render-frame cost. The deterministic tests additionally
+verify output beyond 8 MiB, the shared 16-operation / 16,777,216-work-unit budget,
+and queued/active reservations under blocked writes and close.
+
+The unchanged render-cache workload varied substantially in throughput in these
+short runs; its allocation remains near the measurement floor. No render-path
+speedup or regression is established by this comparison. Real PTY throughput
+and native latency are outside this counting-connector benchmark.
+
+Raw JSON/logs are local build artifacts named
+`osc52-bulk-{baseline,current}-jmh` and `osc52-bulk-{baseline,current}-keys`.
+For the longer run, select `TerminalSessionOutputBenchmark.keys` and use
+`-wi 3 -i 5 -w 1s -r 1s -f 2 -prof gc` with the command below.
+
 ## Reproduction
 
 Build `:ketraterm-benchmarks:jmhJar` in both checkouts. Run the Java 25 executable

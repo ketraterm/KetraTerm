@@ -17,6 +17,7 @@ package io.github.ketraterm.session
 
 import io.github.ketraterm.core.api.TerminalBuffer
 import io.github.ketraterm.core.api.TerminalHostResponseReader
+import io.github.ketraterm.core.api.TerminalInputState
 import io.github.ketraterm.host.*
 import io.github.ketraterm.input.TerminalInputEncoders
 import io.github.ketraterm.input.api.TerminalInputEncoder
@@ -56,7 +57,10 @@ private const val SHELL_COMMAND_LINE_CONTEXT_ACTIVE_INDEX = 2
  * The connector owns transport threads. This session owns parser/core mutation
  * serialization and all host-bound write ordering.
  *
- * Default input encoding copies complete operations into a bounded 8 MiB queue.
+ * Ordinary input and core replies share a bounded 8 MiB byte queue. Paste and
+ * text replacement retain their source and admission-time modes/policy for
+ * background encoding, bounded to 16 operations and 16 * 1024 * 1024 combined
+ * UTF-16/deletion units, including active work. One writer preserves order.
  * Returning from input methods means acceptance, not transport completion. Queue
  * exhaustion or transport failure closes the session with [failure]; closing a
  * session discards pending output. A supplied [inputEncoder] owns its output sink.
@@ -110,12 +114,40 @@ class TerminalSession(
                 CoroutineName("terminal-session-${SESSION_COUNTER.getAndIncrement()}"),
         )
     private val outboundWriter = OutboundWriter(connector, outboundWriteLock)
+    private val ownsInputEncoder = inputEncoder == null
     private val inputEncoder =
         inputEncoder ?: TerminalInputEncoders.create(
             terminal,
-            SessionTerminalHostOutput(outboundWriter),
+            object : SessionTerminalHostOutput() {
+                override fun writeBytes(
+                    bytes: ByteArray,
+                    offset: Int,
+                    length: Int,
+                ) = outboundWriter.append(bytes, offset, length)
+            },
             inputPolicy,
         )
+
+    // Only the outbound worker uses this mode word, encoder, and its scratch.
+    private var bulkInputModeBits = 0L
+    private val bulkInputEncoder by lazy(LazyThreadSafetyMode.NONE) {
+        TerminalInputEncoders.create(
+            object : TerminalInputState {
+                override fun getInputModeBits(): Long = bulkInputModeBits
+            },
+            object : SessionTerminalHostOutput() {
+                override fun writeBytes(
+                    bytes: ByteArray,
+                    offset: Int,
+                    length: Int,
+                ) {
+                    if (isSessionClosed()) throw CancellationException("Terminal session closed")
+                    sessionJob.ensureActive()
+                    connector.write(bytes, offset, length)
+                }
+            },
+        )
+    }
     private val mutableState = MutableStateFlow<TerminalSessionState>(TerminalSessionState.Created)
     private val mutableRenderGeneration = MutableStateFlow(NO_RENDER_GENERATION)
 
@@ -449,19 +481,21 @@ class TerminalSession(
     }
 
     /**
-     * Encodes a paste event and queues it for background writing unless closed.
+     * Accepts a paste for background encoding and writing unless closed.
+     * Captures modes and policy at admission; retains the immutable source text
+     * within the session bulk budget. A supplied encoder remains synchronous.
      *
      * Input before [start] is ignored.
      */
     override fun encodePaste(event: TerminalPasteEvent) {
-        withInputLock {
-            if (event.text.isNotEmpty()) startupSubmission?.cancel(TerminalStartupCommandStatus.CANCELLED_BY_INPUT)
+        withTextInput(event.text.length.toLong(), cancelStartup = event.text.isNotEmpty()) {
             encodePaste(event)
         }
     }
 
     /**
-     * Encodes a complete text replacement under one outbound lock acquisition.
+     * Accepts a complete text replacement with admission-time modes and policy.
+     * The standard encoder streams it on the I/O worker within the bulk budget.
      *
      * Delete, Backspace, and paste bytes cannot interleave with keyboard input
      * or parser/core responses from this session.
@@ -469,9 +503,39 @@ class TerminalSession(
      * @param event deletion counts and replacement text.
      */
     override fun encodeTextReplacement(event: TerminalTextReplacementEvent) {
-        withInputLock {
-            startupSubmission?.cancel(TerminalStartupCommandStatus.CANCELLED_BY_INPUT)
+        val workUnits = event.replacementText.length.toLong() + event.deleteAfterCursorCount + event.deleteBeforeCursorCount
+        withTextInput(workUnits, cancelStartup = true) {
             encodeTextReplacement(event)
+        }
+    }
+
+    private inline fun withTextInput(
+        workUnits: Long,
+        cancelStartup: Boolean,
+        crossinline encode: TerminalInputEncoder.() -> Unit,
+    ) {
+        if (!ownsInputEncoder) {
+            withInputLock {
+                if (cancelStartup) startupSubmission?.cancel(TerminalStartupCommandStatus.CANCELLED_BY_INPUT)
+                encode()
+            }
+            return
+        }
+        try {
+            synchronized(outboundWriteLock) {
+                if (!isAcceptingInput()) return
+                if (cancelStartup) startupSubmission?.cancel(TerminalStartupCommandStatus.CANCELLED_BY_INPUT)
+                if (workUnits == 0L) return
+                val modeBits = terminal.getInputModeBits()
+                val policy = inputPolicy
+                outboundWriter.submitBulk(workUnits) {
+                    bulkInputModeBits = modeBits
+                    bulkInputEncoder.setInputPolicy(policy)
+                    bulkInputEncoder.encode()
+                }
+            }
+        } catch (failure: OutboundCapacityException) {
+            failWrite(failure)
         }
     }
 

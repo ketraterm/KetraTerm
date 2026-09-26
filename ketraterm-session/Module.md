@@ -4,7 +4,7 @@
 
 `ketraterm-session` is the runtime synchronization boundary between transport, parser, core, input encoding, and render publication.
 
-It uses coroutines for lifecycle orchestration, synchronized-output timeout handling, and conflated render publication. Transport byte consumption, parser/core mutation, input encoding and borrowed frame reads remain synchronous. Complete input operations and core-response batches are copied into a bounded queue and written by one I/O coroutine outside parser/input locks.
+It uses coroutines for lifecycle orchestration, synchronized-output timeout handling, and conflated render publication. Transport byte consumption, parser/core mutation, ordinary input encoding and borrowed frame reads remain synchronous. Ordinary input and core-response batches use a bounded byte queue. Paste and text replacement retain bounded source data with admission-time modes and policy; one I/O coroutine streams their encoding and performs all ordered connector writes outside parser/input locks.
 
 ## Runtime model
 

@@ -34,6 +34,7 @@ import io.github.ketraterm.session.TerminalSession
 import io.github.ketraterm.transport.TerminalConnector
 import io.github.ketraterm.transport.TerminalConnectorListener
 import io.github.ketraterm.ui.swing.settings.SwingSettings
+import io.github.ketraterm.ui.swing.settings.TerminalClipboardHandler
 import io.github.ketraterm.ui.swing.settings.TerminalTheme
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.StandardTestDispatcher
@@ -55,6 +56,59 @@ import kotlin.concurrent.thread
 @OptIn(ExperimentalCoroutinesApi::class)
 class SwingTerminalThreadingTest {
     private val dispatcher = StandardTestDispatcher()
+
+    @Test
+    fun `clipboard paste larger than byte queue is accepted on EDT and streamed on IO dispatcher`() {
+        val text = "x".repeat(9 * 1024 * 1024)
+        var written = 0
+        val connector =
+            object : TerminalConnector by NoOpConnector {
+                override fun write(
+                    bytes: ByteArray,
+                    offset: Int,
+                    length: Int,
+                ) {
+                    assertFalse(SwingUtilities.isEventDispatchThread())
+                    assertTrue(length <= 16 * 1024)
+                    written += length
+                }
+            }
+        val session =
+            TerminalSession.create(
+                terminal = TerminalBuffers.create(width = 3, height = 1),
+                connector = connector,
+                workerDispatcher = dispatcher,
+                ioDispatcher = dispatcher,
+            )
+        val component =
+            SwingTerminal(
+                hostServices =
+                    SwingHostServices(
+                        clipboardHandler =
+                            object : TerminalClipboardHandler {
+                                override fun copyText(text: String) = error("Unexpected clipboard write")
+
+                                override fun readText(): String = text
+                            },
+                    ),
+            )
+        try {
+            session.start(columns = 3, rows = 1)
+            edtCall {
+                component.bind(session)
+                assertTrue(component.pasteClipboardText())
+                assertEquals(0, written)
+                assertFalse(session.isClosed)
+            }
+            dispatcher.scheduler.runCurrent()
+            assertNull(session.failure)
+            assertEquals(text.length, written)
+        } finally {
+            edtCall { component.dispose() }
+            session.close()
+            dispatcher.scheduler.runCurrent()
+        }
+    }
 
     @Test
     fun `paste policy applies on binding and reload while preserving transport line endings`() {
