@@ -38,6 +38,10 @@ graph TD
     Workspace -.->|updates themes/modes from| Config
 ```
 
+### Clipboard read routing
+
+`TerminalWorkspaceListener.readClipboard(tab, request)` runs asynchronously for the owning tab, independently of selection. Queries arriving during launch await completion of `tabOpened` within the original session deadline. Failed launch/publication and cancellation retire that wait; removed tabs cannot receive reads. Product providers must still await asynchronously posted pane creation and earlier clipboard writes before native access. No clipboard implementation means an explicit unavailable result.
+
 ### Key Components
 * [TerminalWorkspace](src/main/kotlin/io/github/ketraterm/workspace/TerminalWorkspace.kt): The main lifecycle manager. Handles opening, selecting, closing, and applying settings updates to all open terminal tabs.
 * [TerminalProfile](src/main/kotlin/io/github/ketraterm/workspace/TerminalProfile.kt): Describes a launch configuration (command, display name, working directory, environment variables).

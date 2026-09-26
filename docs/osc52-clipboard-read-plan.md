@@ -327,10 +327,19 @@ session, and revocation cannot release an uncommitted successful response.
 
 ### Part 4 — Shared platform mechanics and both products
 
+- Checkpoint 4a connects the existing PTY/workspace listeners to the session's
+  suspending provider. Reads retain their requesting session/tab identity and
+  wait for workspace tab publication without restarting the deadline. Launch
+  or publication failure cancels that wait; removed tabs cannot receive reads.
+  Tests cover actual fake-PTY streams, early queries, selected-tab changes,
+  expiry/revocation/close, and provider failure isolation. Native access and
+  product consent are the next checkpoint; asynchronous pane readiness and
+  earlier posted writes must still be awaited by those product providers.
 - Implement selection-aware AWT and IntelliJ adapters using the existing
   clipboard boundary and the bounded native-I/O lifecycle.
 - Add cancellable consent with bounded presentation and tab/session identity.
-- Wire the existing PTY/workspace bridges and both product settings choices.
+- Wire both product providers and their existing settings choices into the
+  completed PTY/workspace bridge.
 - Preserve write behavior and prove write-then-read ordering; share actual
   repeated behavior rather than adding forwarding helper classes.
 
@@ -366,6 +375,9 @@ weaken a previous denial.
   tracked in their separate entry.
 - Update all three changelogs: root technical details; standalone and plugin
   concise user-facing clipboard-read behavior, permissions, and defaults.
+  Maintain one evolving entry for the feature in each changelog. Checkpoint
+  progress belongs in this plan and the feature/gap maps, not separate release
+  notes. Product entries must describe only behavior already available.
 - Update input/host/session contracts affected by encoding or asynchronous
   acceptance. Remove stale read no-op comments and obsolete test expectations.
 - Audit new APIs/helpers for unused members and duplicate policy state. Run

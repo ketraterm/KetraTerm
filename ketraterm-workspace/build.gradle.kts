@@ -27,6 +27,7 @@ dependencies {
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:$kotlinxCoroutinesVersion")
 
     testImplementation(kotlin("test"))
+    testImplementation(project(":ketraterm-testkit"))
     testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:$kotlinxCoroutinesVersion")
 }
 

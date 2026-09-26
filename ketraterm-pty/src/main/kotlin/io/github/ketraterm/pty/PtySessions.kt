@@ -56,6 +56,7 @@ internal object PtySessions {
                 terminal = terminal,
                 connector = connector,
                 hostEvents = hostEventBridge,
+                clipboardReader = hostEventBridge,
                 hostPolicy = options.hostPolicy,
                 inputPolicy = options.inputPolicy,
                 startupCommand = options.startupCommand,

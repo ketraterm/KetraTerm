@@ -15,10 +15,15 @@
  */
 package io.github.ketraterm.pty
 
+import io.github.ketraterm.host.HostPolicy
+import io.github.ketraterm.host.TerminalClipboardPermission
+import io.github.ketraterm.host.TerminalClipboardPolicy
+import io.github.ketraterm.host.TerminalClipboardReadRequest
 import io.github.ketraterm.input.event.TerminalKey
 import io.github.ketraterm.input.event.TerminalKeyEvent
 import io.github.ketraterm.input.event.TerminalPasteEvent
 import io.github.ketraterm.protocol.TerminalCapabilityIdentity
+import io.github.ketraterm.session.TerminalClipboardReadResult
 import io.github.ketraterm.session.TerminalSession
 import io.github.ketraterm.session.TerminalSessionState
 import kotlinx.coroutines.flow.first
@@ -27,6 +32,8 @@ import kotlinx.coroutines.withTimeout
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.Test
+import org.junit.jupiter.params.ParameterizedTest
+import org.junit.jupiter.params.provider.ValueSource
 import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
 import java.io.InputStream
@@ -34,10 +41,67 @@ import java.io.OutputStream
 import java.nio.charset.StandardCharsets
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicReference
 import kotlin.time.Duration.Companion.seconds
 
 class PtySessionTest {
     private val sessions = mutableListOf<TerminalSession>()
+
+    @ParameterizedTest
+    @ValueSource(strings = ["text", "denied", "unavailable", "failed"])
+    fun clipboardReadUsesTheAttachedSessionAndReturnsACompleteFrame(result: String) {
+        val expected = "\u001b]52;pc;" + (if (result == "text") "cHR5" else "") + "\u001b\\"
+        val process =
+            FakePtyProcess.running(
+                inputBytes = "\u001b]52;ppcc;?\u0007".ascii(),
+                expectedOutputBytes = expected.length,
+            )
+        val requestedSession = AtomicReference<TerminalSession>()
+        val requestedRead = AtomicReference<TerminalClipboardReadRequest>()
+        val reportedFailure = AtomicReference<Exception>()
+        val listener =
+            object : PtyEventListener by PtyEventListener.NONE {
+                override suspend fun readClipboard(
+                    session: TerminalSession,
+                    request: TerminalClipboardReadRequest,
+                ): TerminalClipboardReadResult {
+                    requestedSession.set(session)
+                    requestedRead.set(request)
+                    return when (result) {
+                        "text" -> TerminalClipboardReadResult.Text("pty")
+                        "denied" -> TerminalClipboardReadResult.Denied
+                        "unavailable" -> TerminalClipboardReadResult.Unavailable
+                        else -> error("private provider detail")
+                    }
+                }
+
+                override fun listenerFailed(
+                    session: TerminalSession,
+                    exception: Exception,
+                ) {
+                    reportedFailure.set(exception)
+                }
+            }
+        val session =
+            startSession(
+                options =
+                    PtyOptions(
+                        command = listOf("fake"),
+                        eventListener = listener,
+                        hostPolicy =
+                            HostPolicy(
+                                clipboardPolicy = TerminalClipboardPolicy(readPermission = TerminalClipboardPermission.ALLOW),
+                            ),
+                    ),
+                processFactory = FixedProcessFactory(process),
+            )
+        process.awaitWrite()
+        assertSame(session, requestedSession.get())
+        assertEquals("pc", requestedRead.get().selection.value)
+        assertEquals(TerminalClipboardPermission.ALLOW, requestedRead.get().permission)
+        assertEquals(expected, process.outputText())
+        assertNull(reportedFailure.get(), "Provider details must not reach generic listener logging")
+    }
 
     @AfterEach
     fun closeSessions() {
@@ -111,11 +175,11 @@ class PtySessionTest {
     fun modeReportCapabilitiesReachPtyResponses() {
         for (capabilities in listOf(0, io.github.ketraterm.protocol.TerminalHostModeCapability.POP_ON_BELL)) {
             val process = FakePtyProcess.running(inputBytes = "\u001B[?1043h\u001B[?1043\$p".ascii())
-            val session =
-                startSession(
-                    options = PtyOptions(command = listOf("fake"), columns = 10, rows = 3, modeReportCapabilities = capabilities),
-                    processFactory = FixedProcessFactory(process),
-                )
+
+            startSession(
+                options = PtyOptions(command = listOf("fake"), columns = 10, rows = 3, modeReportCapabilities = capabilities),
+                processFactory = FixedProcessFactory(process),
+            )
             process.awaitWrite()
             assertEquals(if (capabilities == 0) "\u001B[?1043;0\$y" else "\u001B[?1043;1\$y", process.outputText())
         }
@@ -320,6 +384,7 @@ class PtySessionTest {
         override val input: InputStream,
         private val inputDrained: CountDownLatch?,
         private val exitCode: Int,
+        private val expectedOutputBytes: Int = 1,
     ) : PtyProcess {
         constructor(
             inputBytes: ByteArray,
@@ -332,7 +397,7 @@ class PtySessionTest {
             object : OutputStream() {
                 override fun write(byte: Int) {
                     capturedOutput.write(byte)
-                    firstWrite.countDown()
+                    if (capturedOutput.size() >= expectedOutputBytes) firstWrite.countDown()
                 }
 
                 override fun write(
@@ -341,7 +406,7 @@ class PtySessionTest {
                     length: Int,
                 ) {
                     capturedOutput.write(bytes, offset, length)
-                    firstWrite.countDown()
+                    if (capturedOutput.size() >= expectedOutputBytes) firstWrite.countDown()
                 }
             }
 
@@ -385,9 +450,10 @@ class PtySessionTest {
             fun running(
                 exitCode: Int = 0,
                 inputBytes: ByteArray = byteArrayOf(),
+                expectedOutputBytes: Int = 1,
             ): FakePtyProcess {
                 val input = BlockingInputStream(inputBytes)
-                return FakePtyProcess(input, input.released, exitCode)
+                return FakePtyProcess(input, input.released, exitCode, expectedOutputBytes)
             }
         }
     }

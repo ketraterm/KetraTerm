@@ -17,15 +17,19 @@ package io.github.ketraterm.pty
 
 import io.github.ketraterm.host.HostEventSink
 import io.github.ketraterm.host.TerminalClipboardPromptEvent
+import io.github.ketraterm.host.TerminalClipboardReadRequest
 import io.github.ketraterm.host.TerminalClipboardWriteEvent
 import io.github.ketraterm.protocol.NotificationLevel
 import io.github.ketraterm.protocol.ShellIntegrationEvent
 import io.github.ketraterm.render.api.TerminalColorPalette
+import io.github.ketraterm.session.TerminalClipboardReadResult
+import io.github.ketraterm.session.TerminalClipboardReader
 import io.github.ketraterm.session.TerminalSession
 
 internal class SessionHostEventBridge(
     private val listener: PtyEventListener,
-) : HostEventSink {
+) : HostEventSink,
+    TerminalClipboardReader {
     private var attachedSession: TerminalSession? = null
 
     fun attach(session: TerminalSession) {
@@ -133,6 +137,9 @@ internal class SessionHostEventBridge(
     override fun terminalClipboardPrompt(event: TerminalClipboardPromptEvent) {
         safeDispatch { session -> listener.terminalClipboardPrompt(session, event) }
     }
+
+    override suspend fun read(request: TerminalClipboardReadRequest): TerminalClipboardReadResult =
+        listener.readClipboard(checkNotNull(attachedSession) { "SessionHostEventBridge not attached" }, request)
 
     private inline fun safeDispatch(block: (TerminalSession) -> Unit) {
         val session =

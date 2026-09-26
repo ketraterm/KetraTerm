@@ -17,6 +17,7 @@ package io.github.ketraterm.workspace
 
 import io.github.ketraterm.host.HostPolicy
 import io.github.ketraterm.host.TerminalClipboardPromptEvent
+import io.github.ketraterm.host.TerminalClipboardReadRequest
 import io.github.ketraterm.host.TerminalClipboardWriteEvent
 import io.github.ketraterm.input.policy.PasteControlPolicy
 import io.github.ketraterm.protocol.NotificationLevel
@@ -25,9 +26,7 @@ import io.github.ketraterm.pty.PtyEventListener
 import io.github.ketraterm.pty.PtyOptions
 import io.github.ketraterm.pty.TerminalSessions
 import io.github.ketraterm.render.api.TerminalColorPalette
-import io.github.ketraterm.session.TerminalSession
-import io.github.ketraterm.session.TerminalSessionState
-import io.github.ketraterm.session.TerminalStartupCommandStatus
+import io.github.ketraterm.session.*
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.*
 import java.net.URI
@@ -99,25 +98,34 @@ class TerminalWorkspace internal constructor(
         options: TerminalWorkspaceOpenOptions,
     ): TerminalWorkspaceTab {
         val id = "terminal-${nextTabNumber.getAndIncrement()}"
-        val tabEventListener = tabEventListener(id)
-        val session = sessionFactory.open(profile, options, tabEventListener)
+        val tabReady = CompletableDeferred<Unit>(workspaceJob)
         val tab =
-            TerminalWorkspaceTab(
-                id = id,
-                profile = profile,
-                title = profile.displayName,
-                session = session,
-                onColorChanged = { t, color -> listener.colorChanged(t, color) },
-                onTitleChanged = { t, titleText -> listener.titleChanged(t, titleText) },
-                onCurrentWorkingDirectoryChanged = { t, uri -> listener.currentWorkingDirectoryChanged(t, uri) },
-                showForegroundProcessName = options.showForegroundProcessName,
-            )
-        synchronized(stateLock) {
-            tabs += tab
-        }
-        session.currentWorkingDirectoryUri()?.let(tab::updateCurrentWorkingDirectoryUri)
-        selectTab(id)
-        listener.tabOpened(tab)
+            try {
+                val session = sessionFactory.open(profile, options, tabEventListener(id, tabReady))
+                val tab =
+                    TerminalWorkspaceTab(
+                        id = id,
+                        profile = profile,
+                        title = profile.displayName,
+                        session = session,
+                        onColorChanged = { t, color -> listener.colorChanged(t, color) },
+                        onTitleChanged = { t, titleText -> listener.titleChanged(t, titleText) },
+                        onCurrentWorkingDirectoryChanged = { t, uri -> listener.currentWorkingDirectoryChanged(t, uri) },
+                        showForegroundProcessName = options.showForegroundProcessName,
+                    )
+                synchronized(stateLock) {
+                    tabs += tab
+                }
+                session.currentWorkingDirectoryUri()?.let(tab::updateCurrentWorkingDirectoryUri)
+                selectTab(id)
+                listener.tabOpened(tab)
+                tabReady.complete(Unit)
+                tab
+            } finally {
+                // A failed launch or publication must not leave an early read waiting.
+                if (!tabReady.isCompleted) tabReady.cancel(CancellationException("Terminal workspace tab publication failed"))
+            }
+        val session = tab.session
 
         val stateJob =
             workspaceScope.launch {
@@ -214,7 +222,10 @@ class TerminalWorkspace internal constructor(
         workspaceScope.cancel(CancellationException("Terminal workspace closed"))
     }
 
-    private fun tabEventListener(tabId: String): PtyEventListener =
+    private fun tabEventListener(
+        tabId: String,
+        tabReady: Deferred<Unit>,
+    ): PtyEventListener =
         object : PtyEventListener {
             override fun bell(session: TerminalSession) {
                 tabBySession(session)?.let { listener.bell(it) }
@@ -327,6 +338,17 @@ class TerminalWorkspace internal constructor(
 
             override fun hyperlinksCleared(session: TerminalSession) {
                 tabBySession(session)?.let { listener.hyperlinksCleared(it) }
+            }
+
+            override suspend fun readClipboard(
+                session: TerminalSession,
+                request: TerminalClipboardReadRequest,
+            ): TerminalClipboardReadResult {
+                tabReady.await()
+                currentCoroutineContext().ensureActive()
+                val tab = tabById(tabId) ?: return TerminalClipboardReadResult.Unavailable
+                if (tab.session !== session) return TerminalClipboardReadResult.Unavailable
+                return listener.readClipboard(tab, request)
             }
 
             override fun terminalClipboardWrite(
@@ -878,6 +900,22 @@ interface TerminalWorkspaceListener {
         tab: TerminalWorkspaceTab,
         event: TerminalClipboardPromptEvent,
     ) = Unit
+
+    /**
+     * Resolves a read for its owning [tab], independently of the selected tab.
+     *
+     * Invoked after [tabOpened] returns, on the session I/O dispatcher without
+     * workspace or parser/input locks. Asynchronously posted pane creation may
+     * still be pending: await that pane and earlier posted writes as required
+     * by [TerminalClipboardReader]. Cancellation covers startup waiting and the
+     * host operation within the original session deadline. Provider failures
+     * are audited without details; they are not delivered to [listenerFailed].
+     * The default reports unavailable data without accessing a clipboard.
+     */
+    suspend fun readClipboard(
+        tab: TerminalWorkspaceTab,
+        request: TerminalClipboardReadRequest,
+    ): TerminalClipboardReadResult = TerminalClipboardReadResult.Unavailable
 
     companion object {
         /**

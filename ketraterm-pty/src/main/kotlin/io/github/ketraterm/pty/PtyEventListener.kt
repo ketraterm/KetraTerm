@@ -16,10 +16,13 @@
 package io.github.ketraterm.pty
 
 import io.github.ketraterm.host.TerminalClipboardPromptEvent
+import io.github.ketraterm.host.TerminalClipboardReadRequest
 import io.github.ketraterm.host.TerminalClipboardWriteEvent
 import io.github.ketraterm.protocol.NotificationLevel
 import io.github.ketraterm.protocol.ShellIntegrationEvent
 import io.github.ketraterm.render.api.TerminalColorPalette
+import io.github.ketraterm.session.TerminalClipboardReadResult
+import io.github.ketraterm.session.TerminalClipboardReader
 import io.github.ketraterm.session.TerminalSession
 
 /**
@@ -29,7 +32,8 @@ import io.github.ketraterm.session.TerminalSession
  * the connector reader thread as parser output is handled, or the caller of a
  * host theme update. Delivery holds the session mutation lock; do not reenter
  * mutation or wait for a UI thread. There is no initial replay. Listener failures
- * are reported through [listenerFailed].
+ * are reported through [listenerFailed]. [readClipboard] is an asynchronous
+ * operation with the separate threading and failure contract documented below.
  */
 @Suppress("UNUSED_PARAMETER")
 interface PtyEventListener {
@@ -240,6 +244,21 @@ interface PtyEventListener {
         session: TerminalSession,
         event: TerminalClipboardPromptEvent,
     ) = Unit
+
+    /**
+     * Resolves a clipboard read for the requesting [session].
+     *
+     * Runs on the session I/O dispatcher without parser/input locks. Follow
+     * [TerminalClipboardReader]'s consent, selection, and cancellation contract;
+     * await host readiness and previously posted writes before native access.
+     * Cancellation must propagate. Provider exceptions reach the session's
+     * content-free read audit, never [listenerFailed], which may log details.
+     * Hosts without a read provider explicitly report unavailable data.
+     */
+    suspend fun readClipboard(
+        session: TerminalSession,
+        request: TerminalClipboardReadRequest,
+    ): TerminalClipboardReadResult = TerminalClipboardReadResult.Unavailable
 
     companion object {
         /**
