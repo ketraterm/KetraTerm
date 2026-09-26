@@ -31,13 +31,22 @@ import kotlin.test.*
 
 class SwingMessageDialogsTest {
     @Test
-    fun `arrow keys cycle dialog choices skip disabled buttons and preserve Tab without accepting`() =
+    fun `arrow keys cycle dialog choices skip disabled buttons and preserve Tab without accepting`() = assertChoiceNavigation(false)
+
+    @Test
+    fun `keyboard navigation follows displayed order with reversed choices`() = assertChoiceNavigation(true)
+
+    private fun assertChoiceNavigation(reverseOptions: Boolean) =
         withOwner { owner ->
             val decisions = mutableListOf<Int?>()
-            SwingMessageDialogs.showModeless(owner, request(), decisions::add).use {
+            SwingMessageDialogs.showModeless(owner, request(reverseOptions), decisions::add).use {
                 val dialog = owner.ownedWindows.filterIsInstance<JDialog>().single { it.isVisible }
                 val pane = optionPane(dialog)
                 val buttons = components(pane).filterIsInstance<JButton>().associateBy { it.text }
+                // Native look and feels may place choices in a different order
+                // from the request. Expected traversal follows their displayed row.
+                val displayedButtons = buttons.values.sortedBy { SwingUtilities.convertPoint(it, 0, 0, dialog).x }
+                assertEquals(Decision.entries.size, displayedButtons.size)
                 var focused: Component = buttons.getValue("Deny")
                 // Use AWT's key processing and the real dialog's traversal policy;
                 // replace only native focus transfer so desktop focus cannot race the test.
@@ -52,31 +61,39 @@ class SwingMessageDialogsTest {
                         }
                     }
 
-                fun move(
+                fun cycle(
                     key: Int,
-                    expected: String,
+                    direction: Int,
                     modifiers: Int = 0,
                 ) {
-                    val source = focused
-                    for (id in listOf(KeyEvent.KEY_PRESSED, KeyEvent.KEY_RELEASED)) {
-                        val event = KeyEvent(source, id, 0, modifiers, key, KeyEvent.CHAR_UNDEFINED)
-                        keyboard.processKeyEvent(source, event)
-                        assertTrue(event.isConsumed)
+                    val enabledButtons = displayedButtons.filter { it.isEnabled }
+                    val initialFocus = focused
+                    var index = enabledButtons.indexOf(focused)
+                    assertTrue(index >= 0)
+                    repeat(enabledButtons.size) {
+                        index = Math.floorMod(index + direction, enabledButtons.size)
+                        val expected = enabledButtons[index]
+                        val source = focused
+                        for (id in listOf(KeyEvent.KEY_PRESSED, KeyEvent.KEY_RELEASED)) {
+                            val event = KeyEvent(source, id, 0, modifiers, key, KeyEvent.CHAR_UNDEFINED)
+                            keyboard.processKeyEvent(source, event)
+                            assertTrue(event.isConsumed)
+                        }
+                        assertSame(expected, focused, "${KeyEvent.getKeyText(key)} should focus ${expected.text}")
+                        assertEquals(JOptionPane.UNINITIALIZED_VALUE, pane.value)
+                        assertTrue(decisions.isEmpty())
                     }
-                    assertSame(buttons.getValue(expected), focused)
-                    assertEquals(JOptionPane.UNINITIALIZED_VALUE, pane.value)
-                    assertTrue(decisions.isEmpty())
+                    assertSame(initialFocus, focused, "Traversal should wrap around")
                 }
-                move(KeyEvent.VK_RIGHT, "Block for this terminal")
-                move(KeyEvent.VK_RIGHT, "Allow once")
-                move(KeyEvent.VK_LEFT, "Block for this terminal")
-                move(KeyEvent.VK_DOWN, "Allow once")
-                move(KeyEvent.VK_UP, "Block for this terminal")
-                buttons.getValue("Deny").isEnabled = false
-                move(KeyEvent.VK_RIGHT, "Allow once")
-                move(KeyEvent.VK_RIGHT, "Block for this terminal")
-                move(KeyEvent.VK_TAB, "Allow once")
-                move(KeyEvent.VK_TAB, "Block for this terminal", InputEvent.SHIFT_DOWN_MASK)
+                for (allowEnabled in listOf(true, false)) {
+                    buttons.getValue("Allow once").isEnabled = allowEnabled
+                    cycle(KeyEvent.VK_RIGHT, 1)
+                    cycle(KeyEvent.VK_DOWN, 1)
+                    cycle(KeyEvent.VK_LEFT, -1)
+                    cycle(KeyEvent.VK_UP, -1)
+                    cycle(KeyEvent.VK_TAB, 1)
+                    cycle(KeyEvent.VK_TAB, -1, InputEvent.SHIFT_DOWN_MASK)
+                }
             }
         }
 
@@ -172,12 +189,12 @@ class SwingMessageDialogsTest {
             }
         }
 
-    private fun request() =
+    private fun request(reverseOptions: Boolean = false) =
         SwingDialogRequest(
             "Confirmation",
             "A harmless request",
             SwingDialogRequest.Severity.WARNING,
-            Decision.entries.map { it.label },
+            Decision.entries.map { it.label }.let { if (reverseOptions) it.reversed() else it },
             defaultOption = Decision.DENY.ordinal,
         )
 
