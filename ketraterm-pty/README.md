@@ -57,6 +57,8 @@ For deep-dive details on daemon threading and ConPTY integration:
 
 Implement the suspending `PtyEventListener.readClipboard(session, request)` operation to supply clipboard data. The existing host bridge binds it to the requesting session before PTY startup. Follow the `TerminalClipboardReader` contract for consent, target selection, cancellation, and earlier posted writes. The default returns unavailable data. Provider exceptions go through the content-free session read audit, rather than the generic listener error callback.
 
+For hosts that must register a session before handling startup output, use `TerminalSessions.createLocalPty(options)`, publish the returned session, then call `session.start(options.columns, options.rows)`. The PTY process already exists, but output delivery has not started. Close the session if publication fails or startup is abandoned. `TerminalSessions.localPty(options)` remains the immediate-start convenience API.
+
 ## How to Use
 
 The following example shows how to launch a local shell session (e.g. `/bin/bash` or `cmd.exe`) using the `TerminalSessions` factory:

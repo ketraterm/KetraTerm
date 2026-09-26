@@ -22,15 +22,45 @@ import io.github.ketraterm.pty.PtyEventListener
 import io.github.ketraterm.session.TerminalClipboardReadResult
 import io.github.ketraterm.session.TerminalClipboardReader
 import io.github.ketraterm.session.TerminalSession
+import io.github.ketraterm.session.TerminalSessionState
 import io.github.ketraterm.testkit.MockConnector
+import io.github.ketraterm.transport.TerminalConnector
+import io.github.ketraterm.transport.TerminalConnectorListener
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.awaitCancellation
-import kotlinx.coroutines.test.*
+import kotlinx.coroutines.test.StandardTestDispatcher
+import kotlinx.coroutines.test.TestScope
+import kotlinx.coroutines.test.runCurrent
+import kotlinx.coroutines.test.runTest
 import kotlin.test.*
-import kotlin.time.Duration.Companion.milliseconds
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class TerminalWorkspaceClipboardReadTest {
+    @Test
+    fun startupWriteIsDeliveredBeforeTheFollowingRead() =
+        runTest {
+            var clipboard = "old"
+            val listener =
+                object : TerminalWorkspaceListener {
+                    override fun terminalClipboardWrite(
+                        tab: TerminalWorkspaceTab,
+                        event: TerminalClipboardWriteEvent,
+                    ) {
+                        clipboard = event.text
+                    }
+
+                    override suspend fun readClipboard(
+                        tab: TerminalWorkspaceTab,
+                        request: TerminalClipboardReadRequest,
+                    ): TerminalClipboardReadResult = TerminalClipboardReadResult.Text(clipboard)
+                }
+            Fixture(this, listener, startupOutput = "\u001b]52;c;bmV3\u0007\u001b]52;c;?\u0007").use { f ->
+                f.open("startup")
+                runCurrent()
+                assertEquals("\u001b]52;c;bmV3\u001b\\", f.entries.single().output())
+            }
+        }
+
     @Test
     fun startupReadWaitsUntilTabOpenedReturns() =
         runTest {
@@ -39,6 +69,7 @@ class TerminalWorkspaceClipboardReadTest {
             val listener =
                 object : TerminalWorkspaceListener {
                     override fun tabOpened(tab: TerminalWorkspaceTab) {
+                        assertSame(TerminalSessionState.Created, tab.session.state.value)
                         runCurrent()
                         assertEquals(emptyList(), reads)
                         published = true
@@ -54,12 +85,7 @@ class TerminalWorkspaceClipboardReadTest {
                         return TerminalClipboardReadResult.Text("ok")
                     }
                 }
-            Fixture(this, listener) { entry ->
-                entry.query()
-                runCurrent()
-                assertEquals(emptyList(), reads)
-                assertEquals("", entry.output())
-            }.use { f ->
+            Fixture(this, listener, startupOutput = "\u001b]52;ppcc;?\u0007").use { f ->
                 val tab = f.open("first")
                 runCurrent()
                 assertEquals(listOf(tab), reads)
@@ -106,43 +132,6 @@ class TerminalWorkspaceClipboardReadTest {
         }
 
     @Test
-    fun startupWaitingKeepsTheOriginalDeadlineAndCannotReviveAfterCancellation() =
-        runTest {
-            for (change in listOf("timeout", "close", "deny")) {
-                var reads = 0
-                val listener =
-                    object : TerminalWorkspaceListener {
-                        override suspend fun readClipboard(
-                            tab: TerminalWorkspaceTab,
-                            request: TerminalClipboardReadRequest,
-                        ): TerminalClipboardReadResult {
-                            reads++
-                            return TerminalClipboardReadResult.Text("must-not-escape")
-                        }
-                    }
-                Fixture(this, listener) { entry ->
-                    entry.query()
-                    runCurrent()
-                    assertEquals(0, reads)
-                    when (change) {
-                        "timeout" -> advanceTimeBy(8000.milliseconds)
-                        "close" -> entry.session.close()
-                        "deny" -> {
-                            entry.session.setHostPolicy(HostPolicy())
-                            entry.session.setHostPolicy(ALLOW_READS)
-                        }
-                    }
-                    runCurrent()
-                }.use { f ->
-                    f.open("early")
-                    runCurrent()
-                    assertEquals(0, reads, change)
-                    assertEquals(if (change == "timeout") "\u001b]52;pc;\u001b\\" else "", f.entries.single().output(), change)
-                }
-            }
-        }
-
-    @Test
     fun closingATabCancelsItsSuspendedHostRead() =
         runTest {
             var entered = false
@@ -176,39 +165,6 @@ class TerminalWorkspaceClipboardReadTest {
         }
 
     @Test
-    fun failedLaunchOrPublicationCancelsStartupWaiting() =
-        runTest {
-            for (stage in listOf("launch", "publication")) {
-                var reads = 0
-                val listener =
-                    object : TerminalWorkspaceListener {
-                        override fun tabOpened(tab: TerminalWorkspaceTab) {
-                            if (stage == "publication") error("publication failed")
-                        }
-
-                        override suspend fun readClipboard(
-                            tab: TerminalWorkspaceTab,
-                            request: TerminalClipboardReadRequest,
-                        ): TerminalClipboardReadResult {
-                            reads++
-                            return TerminalClipboardReadResult.Text("must-not-escape")
-                        }
-                    }
-                Fixture(this, listener) { entry ->
-                    entry.query()
-                    runCurrent()
-                    if (stage == "launch") error("launch failed")
-                }.use { f ->
-                    assertFailsWith<IllegalStateException> { f.open("failed") }
-                    runCurrent()
-                    assertEquals(0, reads)
-                    assertEquals("", f.entries.single().output())
-                    assertEquals(listOf(TerminalClipboardReadOutcome.CANCELLED), f.entries.single().outcomes)
-                }
-            }
-        }
-
-    @Test
     fun absentHostProviderReturnsAnEmptyReply() =
         runTest {
             Fixture(this, TerminalWorkspaceListener.NONE).use { f ->
@@ -220,10 +176,42 @@ class TerminalWorkspaceClipboardReadTest {
             }
         }
 
+    @Test
+    fun failedPublicationOrStartClosesTheSessionAndRemovesTheTab() =
+        runTest {
+            for (stage in listOf("publication", "start")) {
+                val failure = IllegalStateException(stage)
+                val closedTabs = mutableListOf<String>()
+                val listener =
+                    object : TerminalWorkspaceListener {
+                        override fun tabOpened(tab: TerminalWorkspaceTab) {
+                            if (stage == "publication") throw failure
+                        }
+
+                        override fun tabClosed(tabId: String) {
+                            closedTabs += tabId
+                        }
+                    }
+                Fixture(this, listener, startFailure = failure.takeIf { stage == "start" }).use { f ->
+                    assertSame(failure, assertFailsWith<IllegalStateException> { f.open("failed") })
+                    runCurrent()
+                    val entry = f.entries.single()
+                    assertTrue(entry.session.isClosed)
+                    assertEquals(1, entry.connector.closeCount)
+                    assertEquals(if (stage == "start") 1 else 0, entry.connector.startCount)
+                    assertEquals(listOf("terminal-1"), closedTabs)
+                    assertEquals(emptyList(), f.workspace.tabSnapshot())
+                    assertNull(f.workspace.selectedTab())
+                    assertEquals(0, f.workspace.sessionCollectionCount)
+                }
+            }
+        }
+
     private class Fixture(
         scope: TestScope,
         listener: TerminalWorkspaceListener,
-        beforePublication: (Entry) -> Unit = {},
+        startupOutput: String = "",
+        startFailure: Throwable? = null,
     ) : AutoCloseable {
         val entries = mutableListOf<Entry>()
         private val dispatcher = StandardTestDispatcher(scope.testScheduler)
@@ -237,10 +225,20 @@ class TerminalWorkspaceClipboardReadTest {
                     val session =
                         TerminalSession.create(
                             TerminalBuffers.create(10, 3),
-                            connector,
+                            object : TerminalConnector by connector {
+                                override fun start(listener: TerminalConnectorListener) {
+                                    connector.start(listener)
+                                    startFailure?.let { throw it }
+                                    if (startupOutput.isNotEmpty()) connector.feedFromHost(startupOutput.toByteArray())
+                                }
+                            },
                             hostPolicy = options.hostPolicy,
                             hostEvents =
                                 object : HostEventSink by HostEventSink.NONE {
+                                    override fun terminalClipboardWrite(event: TerminalClipboardWriteEvent) {
+                                        events.terminalClipboardWrite(checkNotNull(attached), event)
+                                    }
+
                                     override fun terminalClipboardReadCompleted(event: TerminalClipboardReadAuditEvent) {
                                         outcomes += event.outcome
                                     }
@@ -253,8 +251,6 @@ class TerminalWorkspaceClipboardReadTest {
                     attached = session
                     val entry = Entry(session, connector, events, outcomes)
                     entries += entry
-                    session.start(10, 3)
-                    beforePublication(entry)
                     session
                 },
                 workerDispatcher = dispatcher,
@@ -284,6 +280,13 @@ class TerminalWorkspaceClipboardReadTest {
     }
 
     private companion object {
-        val ALLOW_READS = HostPolicy(clipboardPolicy = TerminalClipboardPolicy(readPermission = TerminalClipboardPermission.ALLOW))
+        val ALLOW_READS =
+            HostPolicy(
+                clipboardPolicy =
+                    TerminalClipboardPolicy(
+                        writePermission = TerminalClipboardPermission.ALLOW,
+                        readPermission = TerminalClipboardPermission.ALLOW,
+                    ),
+            )
     }
 }

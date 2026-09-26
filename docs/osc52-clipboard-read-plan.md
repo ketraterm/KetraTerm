@@ -328,13 +328,22 @@ session, and revocation cannot release an uncommitted successful response.
 ### Part 4 — Shared platform mechanics and both products
 
 - Checkpoint 4a connects the existing PTY/workspace listeners to the session's
-  suspending provider. Reads retain their requesting session/tab identity and
-  wait for workspace tab publication without restarting the deadline. Launch
-  or publication failure cancels that wait; removed tabs cannot receive reads.
-  Tests cover actual fake-PTY streams, early queries, selected-tab changes,
-  expiry/revocation/close, and provider failure isolation. Native access and
-  product consent are the next checkpoint; asynchronous pane readiness and
-  earlier posted writes must still be awaited by those product providers.
+  suspending provider. Reads retain their requesting session/tab identity;
+  removed tabs cannot receive reads. Tests cover fake-PTY streams, selected-tab
+  changes, cancellation, and provider failure isolation.
+- Checkpoint 4b fixes startup write/read ordering. PTY creation can return an
+  unstarted session; the workspace registers the tab and completes `tabOpened`
+  before starting output delivery. This replaces the read-only publication
+  wait from 4a and prevents an early allowed write from being dropped before a
+  following read. Publication/startup failure closes the prepared session and
+  removes the tab. Tests cover exact startup bytes, unstarted-session disposal,
+  startup failure, and workspace rollback.
+- Native access and product consent remain next. Asynchronous pane readiness
+  and earlier posted writes must still be awaited by those product providers.
+  In particular, IntelliJ creates the workspace tab on a pooled thread and
+  publishes its pane later on the EDT. Its existing clipboard-write callback
+  drops writes when that pane lookup is still null; product wiring must retain
+  write/read ordering across this remaining attachment boundary.
 - Implement selection-aware AWT and IntelliJ adapters using the existing
   clipboard boundary and the bounded native-I/O lifecycle.
 - Add cancellable consent with bounded presentation and tab/session identity.

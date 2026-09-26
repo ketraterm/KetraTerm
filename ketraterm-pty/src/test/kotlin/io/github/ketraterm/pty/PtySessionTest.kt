@@ -34,10 +34,7 @@ import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.params.ParameterizedTest
 import org.junit.jupiter.params.provider.ValueSource
-import java.io.ByteArrayInputStream
-import java.io.ByteArrayOutputStream
-import java.io.InputStream
-import java.io.OutputStream
+import java.io.*
 import java.nio.charset.StandardCharsets
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
@@ -46,6 +43,45 @@ import kotlin.time.Duration.Companion.seconds
 
 class PtySessionTest {
     private val sessions = mutableListOf<TerminalSession>()
+
+    @Test
+    fun createdSessionDefersOutputUntilExplicitStart() {
+        val process = FakePtyProcess.running(inputBytes = "\u001b[6n".ascii())
+        val session =
+            PtySessions.create(
+                PtyOptions(command = listOf("fake"), columns = 10, rows = 3),
+                FixedProcessFactory(process),
+            )
+        sessions += session
+        assertSame(TerminalSessionState.Created, session.state.value)
+        session.start(10, 3)
+        process.awaitWrite()
+        assertEquals("\u001b[1;1R", process.outputText())
+    }
+
+    @Test
+    fun closingAnUnstartedSessionDestroysItsProcess() {
+        val process = FakePtyProcess.running()
+        val session = PtySessions.create(PtyOptions(command = listOf("fake")), FixedProcessFactory(process))
+        sessions += session
+        assertSame(TerminalSessionState.Created, session.state.value)
+        session.close()
+        assertTrue(process.destroyed)
+        assertTrue(session.isClosed)
+    }
+
+    @Test
+    fun immediateStartupFailureDestroysTheCreatedProcess() {
+        val failure = IOException("resize failed")
+        val process = FakePtyProcess.running().apply { resizeFailure = failure }
+        assertSame(
+            failure,
+            assertThrows(IOException::class.java) {
+                PtySessions.start(PtyOptions(command = listOf("fake")), FixedProcessFactory(process))
+            },
+        )
+        assertTrue(process.destroyed)
+    }
 
     @ParameterizedTest
     @ValueSource(strings = ["text", "denied", "unavailable", "failed"])
@@ -418,6 +454,7 @@ class PtySessionTest {
         var destroyed: Boolean = false
             private set
         val sizes = mutableListOf<Pair<Int, Int>>()
+        var resizeFailure: IOException? = null
 
         override fun isAlive(): Boolean = !destroyed
 
@@ -441,6 +478,7 @@ class PtySessionTest {
             columns: Int,
             rows: Int,
         ) {
+            resizeFailure?.let { throw it }
             sizes += columns to rows
         }
 
