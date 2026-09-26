@@ -15,12 +15,11 @@
  */
 package io.github.ketraterm.intellij.ui
 
-import com.intellij.ide.ClientCopyPasteManager
-import com.intellij.openapi.client.ClientAppSession
+import com.intellij.openapi.ide.CopyPasteManager
+import io.github.ketraterm.intellij.services.IntellijClipboardClient
 import io.github.ketraterm.ui.swing.settings.TerminalClipboardHandler
 import java.awt.datatransfer.DataFlavor
 import java.awt.datatransfer.StringSelection
-import java.util.concurrent.CancellationException
 
 /**
  * IntelliJ-backed clipboard service for the reusable Swing terminal.
@@ -29,33 +28,32 @@ import java.util.concurrent.CancellationException
  * terminal modules continue to depend only on [TerminalClipboardHandler].
  */
 internal class IntellijTerminalClipboardHandler(
-    private val client: ClientAppSession,
+    private val client: IntellijClipboardClient,
 ) : TerminalClipboardHandler {
-    // Resolve once: CopyPasteManager's facade looks up the ambient client on each call.
-    private val clipboard = ClientCopyPasteManager.getInstance(client)
-
+    // The nullable Java getter and non-null setter do not form a writable Kotlin property.
+    @Suppress("UsePropertyAccessSyntax")
     override fun copyText(text: String) {
-        checkClient()
-        clipboard.contents = StringSelection(text)
+        client.checkCurrent()
+        CopyPasteManager.getInstance().setContents(StringSelection(text))
     }
 
     override fun readText(): String? {
-        checkClient()
-        val text = clipboard.getContents<String>(DataFlavor.stringFlavor)
-        checkClient()
+        client.checkCurrent()
+        val text = CopyPasteManager.getInstance().getContents<String>(DataFlavor.stringFlavor)
+        client.checkCurrent()
         return text
     }
 
     override fun readPrimarySelectionText(): String? {
-        checkClient()
-        val contents = clipboard.systemSelectionContents ?: return null
-        if (!contents.isDataFlavorSupported(DataFlavor.stringFlavor)) return null
-        val text = contents.getTransferData(DataFlavor.stringFlavor) as? String
-        checkClient()
+        client.checkCurrent()
+        val contents = CopyPasteManager.getInstance().systemSelectionContents
+        val text =
+            if (contents?.isDataFlavorSupported(DataFlavor.stringFlavor) == true) {
+                contents.getTransferData(DataFlavor.stringFlavor) as? String
+            } else {
+                null
+            }
+        client.checkCurrent()
         return text
-    }
-
-    private fun checkClient() {
-        if (client.isDisposed) throw CancellationException("Terminal clipboard client closed")
     }
 }

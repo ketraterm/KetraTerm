@@ -360,22 +360,30 @@ session, and revocation cannot release an uncommitted successful response.
   receives the request's clipboard explicitly, retaining one prompt per window
   and the shared native-read bound. Client disposal and project closing close
   the actual terminal session, also revoking already queued replies.
-  Tests use real IntelliJ dispatch and parser/session byte streams with fake
-  per-client clipboard services; they cover startup and attached-pane ordering,
+  Tests use real IntelliJ dispatch and parser/session byte streams with a fake
+  native clipboard boundary; they cover startup and attached-pane ordering,
   consent competition, cancellation before attachment, client isolation,
-  disposal, and native calls that return after client departure.
-- Checkpoint 4d is not ready for acceptance: IDE inspections identified private
-  and experimental API dependencies in its client binding. In SDK 262.8665.258,
-  the public `CopyPasteManager` facade resolves its per-client service on each
-  call; the currently captured `ClientCopyPasteManager`, `ClientAppSession`,
-  and `ClientProjectSession` APIs are platform-internal. Keeping them inside
-  the plugin does not make their use supported. Replace this dependency before
-  accepting the checkpoint; do not suppress the inspections. The remaining
-  scope decision is whether to restrict this checkpoint to local desktop IDE
-  clipboard access or design a frontend-owned remote-client integration.
+  disposal, and native calls that return after client departure. Additional
+  tests exercise the public IDE clipboard facade and service registration.
+- The private client-session API dependency has been replaced. A plugin-owned
+  `IntellijClipboardClient` is registered with `client="all"` at application and
+  project level. Application service identity guards clipboard operations;
+  disposal of either owner closes the terminal session, including when the
+  application client disappears before project-client cleanup. Public
+  `ClientId.asContextElement()` propagates the captured identity through UI and
+  I/O coroutines, and public `CopyPasteManager` supplies clipboard access. Reads
+  validate the owning service instances before and after access: replacement of
+  either service under the same client ID cancels the result even before the old
+  service is disposed. Identity checks use `getServiceIfCreated`, so they neither
+  create replacement owners nor select a local fallback. The clipboard binding
+  uses no private API or reflective access. SDK 262.8665.258's service metadata
+  and disposal behavior were checked alongside the
+  [public service lifecycle contract](https://plugins.jetbrains.com/docs/intellij/plugin-services.html).
+  Deterministic fixtures cover client-context propagation and replacement;
+  actual multi-client UI and native-platform acceptance remain release checks.
 
 Gate: Allow, Ask, Deny, close, disposal, expiry, and policy changes work in both
-products. A pending request never reads another session's or IDE client's
+products. A pending request never delivers another session's or IDE client's
 clipboard by falling back to whichever context happens to be current.
 
 ### Part 5 — Defaults and migration

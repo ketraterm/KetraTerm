@@ -15,14 +15,11 @@
  */
 package io.github.ketraterm.intellij.services
 
-import com.intellij.codeWithMe.ClientId
 import com.intellij.codeWithMe.asContextElement
 import com.intellij.openapi.Disposable
-import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.application.ModalityState
 import com.intellij.openapi.application.UI
 import com.intellij.openapi.application.asContextElement
-import com.intellij.openapi.client.ClientProjectSession
 import com.intellij.openapi.util.Disposer
 import io.github.ketraterm.host.TerminalClipboardReadRequest
 import io.github.ketraterm.intellij.ui.IntellijTerminalClipboardHandler
@@ -30,27 +27,30 @@ import io.github.ketraterm.session.TerminalClipboardReadResult
 import io.github.ketraterm.session.TerminalSession
 import io.github.ketraterm.ui.swing.host.SwingClipboardReadPrompt
 import io.github.ketraterm.ui.swing.host.SwingClipboardReader
-import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.CompletableDeferred
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
+import io.github.ketraterm.ui.swing.settings.TerminalClipboardHandler
+import kotlinx.coroutines.*
 import java.util.concurrent.atomic.AtomicBoolean
 import javax.swing.SwingUtilities
 
 /** Clipboard identity and pane readiness for one terminal, retired with its IDE client. */
 internal class IntellijClipboardSession(
-    private val client: ClientProjectSession,
+    private val projectClient: IntellijClipboardClient,
+    private val applicationClient: IntellijClipboardClient,
     private val session: TerminalSession,
     private val reader: SwingClipboardReader,
+    val clipboard: TerminalClipboardHandler = IntellijTerminalClipboardHandler(applicationClient),
 ) : Disposable {
-    val clipboard = IntellijTerminalClipboardHandler(client.appSession)
+    private val uiContext = Dispatchers.UI + ModalityState.nonModal().asContextElement() + projectClient.clientId.asContextElement()
     private val paneReady = CompletableDeferred<SwingClipboardReadPrompt>()
     private val disposed = AtomicBoolean()
+    private val applicationLifetime = Disposable { session.close() }
 
-    val isAlive: Boolean get() = !disposed.get() && !client.isDisposed && !client.appSession.isDisposed
+    val isAlive: Boolean get() = !disposed.get() && projectClient.isAlive && applicationClient.isAlive
 
     init {
-        Disposer.register(client, this)
+        require(projectClient.clientId == applicationClient.clientId) { "Clipboard owners must belong to the same IDE client" }
+        Disposer.register(projectClient, this)
+        Disposer.register(applicationClient, applicationLifetime)
     }
 
     /** Publishes consent UI only after the owning pane has been registered. */
@@ -67,10 +67,11 @@ internal class IntellijClipboardSession(
 
     /** Posts clipboard UI under the owning client rather than the parser thread's ambient client. */
     fun postIfAlive(action: () -> Unit) {
-        ClientId.withExplicitClientId(client.clientId) {
-            ApplicationManager.getApplication().invokeLater({
-                if (isAlive) action()
-            }, ModalityState.nonModal())
+        projectClient.coroutineScope.launch(uiContext) {
+            if (isAlive) {
+                projectClient.checkCurrent()
+                action()
+            }
         }
     }
 
@@ -79,16 +80,20 @@ internal class IntellijClipboardSession(
         request: TerminalClipboardReadRequest,
         message: String,
     ): TerminalClipboardReadResult =
-        withContext(Dispatchers.UI + ModalityState.nonModal().asContextElement() + client.clientId.asContextElement()) {
+        withContext(uiContext) {
             val prompt = paneReady.await()
             if (!isAlive) throw CancellationException("Terminal clipboard client closed")
-            reader.read(request, prompt, message, clipboard)
+            projectClient.checkCurrent()
+            val result = reader.read(request, prompt, message, clipboard)
+            projectClient.checkCurrent()
+            result
         }
 
     override fun dispose() {
         if (!disposed.compareAndSet(false, true)) return
         paneReady.cancel(CancellationException("Terminal clipboard session closed"))
-        // Closing the actual session also revokes replies already queued for output.
-        session.close()
+        // Either owner closes the actual session, also revoking replies queued for output.
+        // Disposing the registration here removes the application's reference to this tab.
+        Disposer.dispose(applicationLifetime)
     }
 }

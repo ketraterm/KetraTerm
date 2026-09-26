@@ -15,13 +15,10 @@
  */
 package io.github.ketraterm.intellij.services
 
-import com.intellij.codeWithMe.ClientId
 import com.intellij.ide.trustedProjects.TrustedProjects
 import com.intellij.ide.trustedProjects.TrustedProjectsListener
 import com.intellij.openapi.Disposable
 import com.intellij.openapi.application.ApplicationManager
-import com.intellij.openapi.client.ClientProjectSession
-import com.intellij.openapi.client.ClientSessionsManager
 import com.intellij.openapi.components.Service
 import com.intellij.openapi.components.service
 import com.intellij.openapi.editor.colors.EditorColorsListener
@@ -275,8 +272,9 @@ class KetraTermProjectTerminalService internal constructor(
         @Suppress("UsePropertyAccessSyntax")
         content.setDisposer(PendingTerminalTabDisposable(pendingId))
 
-        val client = ClientSessionsManager.getProjectSessionOrThrow(project, ClientId.current)
-        val pending = PendingTerminalTab(content, container, profile, restoredState, client)
+        val client = project.service<IntellijClipboardClient>()
+        val applicationClient = service<IntellijClipboardClient>()
+        val pending = PendingTerminalTab(content, container, profile, restoredState, client, applicationClient)
         pendingTabsById[pendingId] = pending
         content.putUserData(TAB_STATE) {
             restoredState ?: TerminalTabRestore.snapshot(requireNotNull(profile), null, null)
@@ -613,7 +611,7 @@ class KetraTermProjectTerminalService internal constructor(
         override fun tabOpened(tab: TerminalWorkspaceTab) {
             val pending = checkNotNull(startingTab)
             if (disposed || closing || pending.closed) throw CancellationException("Terminal startup cancelled")
-            val binding = IntellijClipboardSession(pending.client, tab.session, clipboardReader)
+            val binding = IntellijClipboardSession(pending.client, pending.applicationClient, tab.session, clipboardReader)
             clipboardSessions[tab.id] = binding
             pending.startedTab = tab
             if (disposed || closing || pending.closed) {
@@ -762,7 +760,8 @@ class KetraTermProjectTerminalService internal constructor(
         val container: JPanel,
         val sourceProfile: TerminalProfile?,
         val restoredState: TerminalTabState?,
-        val client: ClientProjectSession,
+        val client: IntellijClipboardClient,
+        val applicationClient: IntellijClipboardClient,
     ) {
         @Volatile
         var startedTab: TerminalWorkspaceTab? = null

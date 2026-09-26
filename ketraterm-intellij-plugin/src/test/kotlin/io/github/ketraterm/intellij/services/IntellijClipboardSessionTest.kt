@@ -16,10 +16,10 @@
 package io.github.ketraterm.intellij.services
 
 import com.intellij.codeWithMe.ClientId
-import com.intellij.ide.ClientCopyPasteManager
+import com.intellij.codeWithMe.asContextElement
 import com.intellij.openapi.Disposable
-import com.intellij.openapi.client.ClientAppSession
-import com.intellij.openapi.client.ClientProjectSession
+import com.intellij.openapi.components.service
+import com.intellij.openapi.ide.CopyPasteManager
 import com.intellij.openapi.util.Disposer
 import com.intellij.testFramework.PlatformTestUtil
 import com.intellij.testFramework.fixtures.BasePlatformTestCase
@@ -32,14 +32,13 @@ import io.github.ketraterm.session.TerminalSessionState
 import io.github.ketraterm.testkit.MockConnector
 import io.github.ketraterm.ui.swing.host.SwingClipboardReadPrompt
 import io.github.ketraterm.ui.swing.host.SwingClipboardReader
-import kotlinx.coroutines.CompletableDeferred
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.runBlocking
+import io.github.ketraterm.ui.swing.settings.TerminalClipboardHandler
+import kotlinx.coroutines.*
 import java.awt.Container
 import java.awt.datatransfer.DataFlavor
 import java.awt.datatransfer.StringSelection
 import java.awt.datatransfer.Transferable
-import java.lang.reflect.Proxy
+import java.awt.datatransfer.UnsupportedFlavorException
 import java.util.concurrent.CancellationException
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.atomic.AtomicBoolean
@@ -48,7 +47,7 @@ import javax.swing.JButton
 import javax.swing.JPanel
 import javax.swing.SwingUtilities
 
-/** Real IDE dispatch and session byte streams, with per-client clipboard services replaced by fakes. */
+/** Real IDE dispatch and session byte streams, with a fake native clipboard boundary. */
 class IntellijClipboardSessionTest : BasePlatformTestCase() {
     private lateinit var lifetime: Disposable
 
@@ -116,7 +115,7 @@ class IntellijClipboardSessionTest : BasePlatformTestCase() {
         assertEquals("\u001b]52;c;\u001b\\", second.output())
         assertFalse(second.prompt.component.isVisible)
         assertTrue(first.prompt.component.isVisible)
-        click(first.prompt, "Allow once")
+        allowOnce(first.prompt)
         await("first query approval", first.completed)
         assertEquals("\u001b]52;c;Zmlyc3QtY2xpZW50\u001b\\", first.output())
         assertEquals(1, first.client.reads.get())
@@ -129,10 +128,10 @@ class IntellijClipboardSessionTest : BasePlatformTestCase() {
         f.attach()
         f.query()
         waitFor("consent") { f.prompt.component.isVisible }
-        Disposer.dispose(client.projectSession)
+        Disposer.dispose(client.owner)
         waitFor("consent cancellation") { !f.prompt.component.isVisible }
         await("request retirement", f.completed)
-        click(f.prompt, "Allow once")
+        allowOnce(f.prompt)
         assertTrue(f.session.state.value is TerminalSessionState.Closed)
         assertFalse(f.binding.isAlive)
         assertEquals(0, client.reads.get())
@@ -143,12 +142,29 @@ class IntellijClipboardSessionTest : BasePlatformTestCase() {
         val client = Client("closed-write", "old")
         val f = Fixture(client)
         f.binding.write("must-not-be-written")
-        Disposer.dispose(client.projectSession)
+        Disposer.dispose(client.owner)
         val barrier = CompletableDeferred<Unit>()
         SwingUtilities.invokeLater { barrier.complete(Unit) }
         await("EDT write barrier", barrier)
         assertEquals("old", client.text)
         assertFalse(client.written.isCompleted)
+    }
+
+    fun testApplicationClientDisposalCancelsConsentWhileProjectClientIsStillAlive() {
+        val projectClient = Client("project", "secret")
+        val applicationClient = Client("application", "secret", projectClient.id)
+        val f = Fixture(projectClient, TerminalClipboardPermission.PROMPT, applicationClient = applicationClient)
+        f.attach()
+        f.query()
+        waitFor("consent") { f.prompt.component.isVisible }
+        Disposer.dispose(applicationClient.owner)
+        await("application client retirement", f.completed)
+        waitFor("consent cancellation") { !f.prompt.component.isVisible }
+        assertTrue(projectClient.owner.isAlive)
+        assertFalse(f.binding.isAlive)
+        assertTrue(f.session.state.value is TerminalSessionState.Closed)
+        assertEquals(0, applicationClient.reads.get())
+        assertEquals("", f.output())
     }
 
     fun testClientDisposalRetiresANativeReadThatReturnsLater() {
@@ -165,7 +181,7 @@ class IntellijClipboardSessionTest : BasePlatformTestCase() {
         f.query()
         try {
             await("native read entered", entered)
-            Disposer.dispose(client.projectSession)
+            Disposer.dispose(client.owner)
             assertTrue(f.session.state.value is TerminalSessionState.Closed)
         } finally {
             release.countDown()
@@ -174,34 +190,137 @@ class IntellijClipboardSessionTest : BasePlatformTestCase() {
         assertEquals("", f.output())
     }
 
-    fun testCapturedClientDoesNotFollowAmbientClientAndPrimaryDoesNotAliasClipboard() {
-        val owner = Client("owner", "owner-clipboard")
-        val other = Client("other", "other-clipboard")
-        val clipboard = IntellijTerminalClipboardHandler(owner.appSession)
-        ClientId.withExplicitClientId(other.id) { clipboard.copyText("owner-update") }
-        assertEquals("owner-update", owner.text)
-        assertEquals("other-clipboard", other.text)
-        runBlocking(Dispatchers.IO) {
-            assertEquals("owner-update", clipboard.readText())
-            assertNull(clipboard.readPrimarySelectionText())
-            owner.primary = ""
-            assertEquals("", clipboard.readPrimarySelectionText())
-            owner.appDisposed.set(true)
-            try {
-                clipboard.readText()
-                fail("Disposed client must not read a replacement or local clipboard")
-            } catch (_: CancellationException) {
-                // Required provider cancellation, not an unavailable result.
-            }
+    fun testRegisteredApplicationAndProjectOwnersHaveDistinctLifetimes() {
+        val applicationClient = service<IntellijClipboardClient>()
+        val projectClient = project.service<IntellijClipboardClient>()
+        assertNotSame(applicationClient, projectClient)
+        assertEquals(ClientId.current, applicationClient.clientId)
+        assertEquals(ClientId.current, projectClient.clientId)
+        applicationClient.checkCurrent()
+        projectClient.checkCurrent()
+    }
+
+    fun testSameClientIdCannotImpersonateRegisteredService() {
+        val scope = CoroutineScope(SupervisorJob())
+        try {
+            val applicationClient = IntellijClipboardClient(scope)
+            val projectClient = IntellijClipboardClient(project, scope)
+            assertEquals(ClientId.current, applicationClient.clientId)
+            assertEquals(ClientId.current, projectClient.clientId)
+            assertCancelled { applicationClient.checkCurrent() }
+            assertCancelled { projectClient.checkCurrent() }
+        } finally {
+            scope.cancel()
         }
-        assertEquals(1, owner.reads.get())
-        assertEquals(0, other.reads.get())
+    }
+
+    fun testPublicClipboardAdapterRejectsForeignContextBeforeReadingOrWriting() {
+        val owner = Client("foreign-owner", "")
+        val clipboard = IntellijTerminalClipboardHandler(owner.owner)
+        val manager = CopyPasteManager.getInstance()
+        @Suppress("UsePropertyAccessSyntax")
+        manager.setContents(StringSelection("local-clipboard"))
+        assertCancelled { clipboard.copyText("must-not-replace-local") }
+        assertCancelled { clipboard.readText() }
+        assertCancelled { clipboard.readPrimarySelectionText() }
+        assertEquals("local-clipboard", manager.getContents(DataFlavor.stringFlavor))
+    }
+
+    fun testPublicClipboardAdapterUsesTheIdeFacadeAndRejectsDisposedOwner() {
+        val owner = Client("local", "", ClientId.current)
+        val clipboard = IntellijTerminalClipboardHandler(owner.owner)
+        clipboard.copyText("public-api-text")
+        assertEquals("public-api-text", CopyPasteManager.getInstance().getContents(DataFlavor.stringFlavor))
+        runBlocking(Dispatchers.IO + owner.id.asContextElement()) {
+            assertEquals("public-api-text", clipboard.readText())
+            assertNull(clipboard.readPrimarySelectionText())
+        }
+        Disposer.dispose(owner.owner)
+        assertCancelled { clipboard.readText() }
+        assertCancelled { clipboard.copyText("must-not-write") }
+        assertCancelled { clipboard.readPrimarySelectionText() }
+    }
+
+    fun testReplacementProjectClientDiscardsANativeResultBeforeOldClientDisposal() {
+        val client = Client("reconnecting", "old-clipboard")
+        val replacement = Client("replacement", "new-clipboard", client.id)
+        val f = Fixture(client)
+        client.onRead = {
+            client.current = replacement.owner
+            "must-not-be-delivered"
+        }
+        f.attach()
+        f.query()
+        await("replacement rejection", f.completed)
+        assertTrue(client.owner.isAlive)
+        assertEquals(TerminalClipboardReadOutcome.CANCELLED, runBlocking { f.completed.await() })
+        assertEquals("", f.output())
+    }
+
+    fun testReplacementApplicationClientDiscardsDataReadThroughPublicFacade() {
+        val projectClient = Client("project", "", ClientId.current)
+        val applicationClient = Client("application", "", projectClient.id)
+        val replacement = Client("replacement", "", projectClient.id)
+        val armed = AtomicBoolean()
+        val accessed = CompletableDeferred<Unit>()
+        @Suppress("UsePropertyAccessSyntax")
+        CopyPasteManager.getInstance().setContents(
+            object : Transferable {
+                override fun getTransferDataFlavors(): Array<DataFlavor> = arrayOf(DataFlavor.stringFlavor)
+
+                override fun isDataFlavorSupported(flavor: DataFlavor): Boolean = flavor == DataFlavor.stringFlavor
+
+                override fun getTransferData(flavor: DataFlavor): String {
+                    if (!isDataFlavorSupported(flavor)) throw UnsupportedFlavorException(flavor)
+                    if (armed.get()) {
+                        assertFalse(SwingUtilities.isEventDispatchThread())
+                        applicationClient.current = replacement.owner
+                        accessed.complete(Unit)
+                    }
+                    return "replacement-client-secret"
+                }
+            },
+        )
+        val f =
+            Fixture(
+                projectClient,
+                applicationClient = applicationClient,
+                clipboard = IntellijTerminalClipboardHandler(applicationClient.owner),
+            )
+        f.attach()
+        armed.set(true)
+        try {
+            f.query()
+            await("replacement rejection", f.completed)
+            assertTrue(accessed.isCompleted)
+            assertTrue(applicationClient.owner.isAlive)
+            assertEquals(TerminalClipboardReadOutcome.CANCELLED, runBlocking { f.completed.await() })
+            assertEquals("", f.output())
+        } finally {
+            armed.set(false)
+            @Suppress("UsePropertyAccessSyntax")
+            CopyPasteManager.getInstance().setContents(StringSelection(""))
+        }
+    }
+
+    fun testMissingClientRejectsQueuedWritesInsteadOfUsingLocalClipboard() {
+        val client = Client("missing", "old")
+        val f = Fixture(client)
+        f.binding.write("must-not-be-written")
+        client.current = null
+        val barrier = CompletableDeferred<Unit>()
+        SwingUtilities.invokeLater { barrier.complete(Unit) }
+        await("EDT write barrier", barrier)
+        assertEquals("old", client.text)
+        assertFalse(client.written.isCompleted)
     }
 
     private inner class Fixture(
         val client: Client,
         permission: TerminalClipboardPermission = TerminalClipboardPermission.ALLOW,
         reader: SwingClipboardReader = SwingClipboardReader(),
+        applicationClient: Client = client,
+        clipboard: TerminalClipboardHandler = applicationClient.clipboard,
     ) {
         val connector = MockConnector()
         val entered = CompletableDeferred<Unit>()
@@ -240,7 +359,7 @@ class IntellijClipboardSessionTest : BasePlatformTestCase() {
                         }
                     },
             )
-        val binding: IntellijClipboardSession = IntellijClipboardSession(client.projectSession, session, reader)
+        val binding: IntellijClipboardSession = IntellijClipboardSession(client.owner, applicationClient.owner, session, reader, clipboard)
 
         init {
             Disposer.register(lifetime) {
@@ -264,10 +383,12 @@ class IntellijClipboardSessionTest : BasePlatformTestCase() {
     private inner class Client(
         name: String,
         initialText: String,
+        val id: ClientId = ClientId("clipboard-test-$name"),
     ) {
-        val id = ClientId("clipboard-test-$name")
-        val appDisposed = AtomicBoolean()
-        private val projectDisposed = AtomicBoolean()
+        private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+
+        @Volatile var current: IntellijClipboardClient? = null
+        val owner = IntellijClipboardClient(scope, id) { current }.also { current = it }
         val reads = AtomicInteger()
         val written = CompletableDeferred<Unit>()
         var onRead: (() -> String)? = null
@@ -275,72 +396,38 @@ class IntellijClipboardSessionTest : BasePlatformTestCase() {
 
         @Volatile var text = initialText
 
-        @Volatile var primary: String? = null
-        private val manager =
-            proxy(ClientCopyPasteManager::class.java) { method, arguments ->
-                when (method) {
-                    "setContents" -> {
-                        assertTrue(SwingUtilities.isEventDispatchThread())
-                        writeClient = ClientId.current
-                        text = (arguments!![0] as Transferable).getTransferData(DataFlavor.stringFlavor) as String
-                        written.complete(Unit)
-                        null
-                    }
-                    "getContents" -> {
-                        assertFalse(SwingUtilities.isEventDispatchThread())
-                        reads.incrementAndGet()
-                        onRead?.invoke() ?: text
-                    }
-                    "getSystemSelectionContents" -> primary?.let(::StringSelection)
-                    else -> error("Unexpected clipboard call: $method")
+        val clipboard =
+            object : TerminalClipboardHandler {
+                override fun copyText(text: String) {
+                    assertTrue(SwingUtilities.isEventDispatchThread())
+                    assertEquals(id, ClientId.current)
+                    writeClient = ClientId.current
+                    this@Client.text = text
+                    written.complete(Unit)
                 }
-            }
-        val appSession: ClientAppSession =
-            proxy(ClientAppSession::class.java) { method, _ ->
-                when (method) {
-                    "getClientId" -> id
-                    "isDisposed" -> appDisposed.get()
-                    "dispose" -> {
-                        appDisposed.set(true)
-                        null
-                    }
-                    "getService" -> manager
-                    else -> error("Unexpected app client call: $method")
-                }
-            }
-        val projectSession: ClientProjectSession =
-            proxy(ClientProjectSession::class.java) { method, _ ->
-                when (method) {
-                    "getClientId" -> id
-                    "getAppSession" -> appSession
-                    "isDisposed" -> projectDisposed.get()
-                    "dispose" -> {
-                        projectDisposed.set(true)
-                        null
-                    }
-                    else -> error("Unexpected project client call: $method")
+
+                override fun readText(): String {
+                    assertFalse(SwingUtilities.isEventDispatchThread())
+                    assertEquals(id, ClientId.current)
+                    reads.incrementAndGet()
+                    return onRead?.invoke() ?: text
                 }
             }
 
         init {
-            Disposer.register(lifetime, projectSession)
+            Disposer.register(lifetime, owner)
+            Disposer.register(owner) { scope.cancel() }
         }
     }
 
-    private fun <T> proxy(
-        type: Class<T>,
-        call: (String, Array<out Any?>?) -> Any?,
-    ): T =
-        type.cast(
-            Proxy.newProxyInstance(type.classLoader, arrayOf(type)) { instance, method, arguments ->
-                when (method.name) {
-                    "hashCode" -> System.identityHashCode(instance)
-                    "equals" -> instance === arguments?.get(0)
-                    "toString" -> "Clipboard fixture ${type.simpleName}"
-                    else -> call(method.name, arguments)
-                }
-            },
-        )
+    private fun assertCancelled(action: () -> Unit) {
+        try {
+            action()
+            fail("Expected client cancellation")
+        } catch (_: CancellationException) {
+            // Client identity/lifetime rejection must propagate as cancellation.
+        }
+    }
 
     private fun await(
         description: String,
@@ -354,13 +441,10 @@ class IntellijClipboardSessionTest : BasePlatformTestCase() {
         PlatformTestUtil.waitWithEventsDispatching(description, condition, 10)
     }
 
-    private fun click(
-        prompt: SwingClipboardReadPrompt,
-        text: String,
-    ) {
+    private fun allowOnce(prompt: SwingClipboardReadPrompt) {
         fun find(container: Container): JButton? {
             for (child in container.components) {
-                if (child is JButton && child.text == text) return child
+                if (child is JButton && child.text == "Allow once") return child
                 if (child is Container) find(child)?.let { return it }
             }
             return null
