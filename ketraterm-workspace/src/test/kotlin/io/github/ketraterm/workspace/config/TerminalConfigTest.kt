@@ -26,6 +26,33 @@ import kotlin.test.*
 
 class TerminalConfigTest {
     @Test
+    fun `existing clipboard choices and omissions survive unrelated save and restart`() {
+        val directory = Files.createTempDirectory("ketraterm-clipboard-migration")
+        val file = directory.resolve("config.toml")
+        try {
+            val manager = TerminalWorkspaceConfigManager(file)
+            for ((raw, permission) in listOf(
+                "" to TerminalClipboardPermission.DENY,
+                "[security]\n" to TerminalClipboardPermission.DENY,
+                "[security]\nclipboard_read = \"deny\"\n" to TerminalClipboardPermission.DENY,
+                "[security]\nclipboard_read = \"prompt\"\n" to TerminalClipboardPermission.PROMPT,
+                "[security]\nclipboard_read = \"allow\"\n" to TerminalClipboardPermission.ALLOW,
+            )) {
+                Files.writeString(file, raw)
+                val loaded = manager.load()
+                assertEquals(permission, loaded.clipboardRead, raw)
+                val edited = loaded.copy(fontSize = 20)
+                manager.save(edited)
+                assertEquals(edited, manager.load(), raw)
+                assertContains(Files.readString(file), "clipboard_read = \"${permission.name.lowercase(Locale.ROOT)}\"")
+            }
+        } finally {
+            Files.deleteIfExists(file)
+            Files.deleteIfExists(directory)
+        }
+    }
+
+    @Test
     fun `removed origin settings use session defaults and save only the new keys`() {
         val directory = Files.createTempDirectory("ketraterm-session-permissions")
         val file = directory.resolve("config.toml")
@@ -123,7 +150,7 @@ class TerminalConfigTest {
         val directory = Files.createTempDirectory("ketraterm-config-unreadable")
         val existing = Files.writeString(directory.resolve("existing"), "preserve me")
         try {
-            assertEquals(TerminalConfig(), TerminalWorkspaceConfigManager(directory).load())
+            assertEquals(TerminalConfig(clipboardRead = TerminalClipboardPermission.DENY), TerminalWorkspaceConfigManager(directory).load())
             assertEquals("preserve me", Files.readString(existing))
             assertFalse(Files.exists(directory.resolveSibling("${directory.fileName}.broken")))
         } finally {
@@ -272,7 +299,9 @@ class TerminalConfigTest {
         assertTrue(config.acceptSelectedSuggestionWithEnter)
         assertFalse(config.persistentSuggestionLearningEnabled)
         assertEquals(TerminalClipboardPermission.ALLOW, config.clipboardWrite)
-        assertEquals(TerminalClipboardPermission.DENY, config.clipboardRead)
+        assertEquals(TerminalClipboardPermission.PROMPT, config.clipboardRead)
+        assertContains(Files.readString(configFile), "clipboard_read = \"prompt\"")
+        assertEquals(config, manager.load())
         assertEquals(1024 * 1024, config.clipboardMaxDecodedBytes)
         assertEquals(TerminalTitlePermission.ALLOW, config.titlePermission)
 
@@ -486,6 +515,8 @@ class TerminalConfigTest {
         // Should return default config instead of crashing
         assertEquals("one-dark", loaded.theme)
         assertEquals(100, loaded.columns)
+        assertEquals(TerminalClipboardPermission.DENY, loaded.clipboardRead)
+        assertEquals(loaded, manager.load())
 
         // Verify it backed up the broken file and generated a new valid file
         assertTrue(Files.exists(brokenFile))

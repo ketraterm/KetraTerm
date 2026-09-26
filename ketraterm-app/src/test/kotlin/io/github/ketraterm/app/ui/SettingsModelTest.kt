@@ -53,6 +53,15 @@ class SettingsModelTest {
     }
 
     @Test
+    fun `fresh settings publish Ask and preserve it after restart`() {
+        Files.delete(tempFile)
+        val manager = TerminalWorkspaceConfigManager(tempFile)
+        val fresh = KetraTermSettings(manager)
+        assertEquals(TerminalClipboardPermission.PROMPT, fresh.createHostPolicy().clipboardPolicy.readPermission)
+        assertEquals(fresh.createHostPolicy(), KetraTermSettings(manager).createHostPolicy())
+    }
+
+    @Test
     fun `unrelated settings changes preserve hidden suggestion preferences`() {
         settings.update(
             settings.config.copy(

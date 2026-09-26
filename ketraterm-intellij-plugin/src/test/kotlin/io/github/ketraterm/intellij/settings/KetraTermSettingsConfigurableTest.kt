@@ -33,6 +33,43 @@ import javax.swing.JComboBox
 import javax.swing.JLabel
 
 class KetraTermSettingsConfigurableTest : BasePlatformTestCase() {
+    fun testFreshAndLegacyClipboardReadChoicesSurviveUnrelatedApplyAndFormReset() {
+        val settings = KetraTermIntellijSettings.getInstance()
+        val original = settings.state
+        try {
+            for ((state, expectedLabel) in listOf(
+                KetraTermIntellijSettings().state to "Ask",
+                KetraTermIntellijSettings.State() to "Deny",
+            )) {
+                settings.loadState(state)
+                val configurable = KetraTermSettingsConfigurable(emptyList())
+                try {
+                    val component = configurable.createComponent()
+                    val readPermission =
+                        descendants(component)
+                            .filterIsInstance<JComboBox<*>>()
+                            .last { it.selectedItem?.toString() in listOf("Deny", "Ask", "Allow") }
+                    assertEquals(expectedLabel, readPermission.selectedItem?.toString())
+                    descendants(component)
+                        .filterIsInstance<AbstractButton>()
+                        .first { it.text == KetraTermBundle.message("settings.ketraterm.visualBell") }
+                        .apply { isSelected = !isSelected }
+                    configurable.apply()
+                    assertEquals(state.clipboardRead, settings.state.clipboardRead)
+                    readPermission.selectedIndex = 2
+                    assertTrue(configurable.isModified())
+                    configurable.reset()
+                    assertEquals(expectedLabel, readPermission.selectedItem?.toString())
+                    assertFalse(configurable.isModified())
+                } finally {
+                    configurable.disposeUIResources()
+                }
+            }
+        } finally {
+            settings.replaceState(original)
+        }
+    }
+
     fun testProcessTitleCheckboxAppliesAndResetsWithoutChangingOtherSettings() {
         val settings = KetraTermIntellijSettings.getInstance()
         val original = settings.state

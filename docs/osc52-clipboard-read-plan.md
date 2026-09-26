@@ -350,8 +350,9 @@ session, and revocation cannot release an uncommitted successful response.
   enters the EDT after pane publication and earlier posted allowed writes, then
   reads off the EDT. Deterministic tests cover selector order, consent, blocking
   native access, expiry, revocation, close, and exact byte-stream write/read
-  ordering. The read default remains Deny. Native platform smoke checks remain
-  release validation, separate from these fake-provider tests.
+  ordering. Read defaults and migration are covered in Part 5 below. Native
+  platform smoke checks remain release validation, separate from these
+  fake-provider tests.
 - Checkpoint 4d connects IntelliJ reads and consent. Workspace publication binds
   a clipboard session to the client captured when its pending tab was created.
   Allowed writes use that binding before the Swing pane exists; reads await the
@@ -388,20 +389,34 @@ clipboard by falling back to whichever context happens to be current.
 
 ### Part 5 — Defaults and migration
 
-- New installations and explicit Reset to Defaults use Ask for reads. Keep
-  library defaults Deny and product write defaults unchanged.
-- Preserve existing explicit Allow/Ask/Deny values. Treat invalid values
-  conservatively, with explicit migration tests.
-- Preserve legacy Deny when an existing config omits the read field. IntelliJ
-  may omit fields equal to old defaults: changing the state initializer alone
-  is insufficient. Distinguish a fresh service from loading legacy state; add
-  a persisted migration marker only if that distinction cannot be preserved
-  reliably by the current serializer/lifecycle.
-- Verify live settings changes on existing sessions and cancellation of
-  pending reads; unrelated Apply must preserve the user's permission.
+- Fresh product settings and standalone Reset to Defaults now use Ask for
+  reads. Library defaults remain Deny; product write defaults remain Allow.
+- Standalone distinguishes a positively absent TOML file from an existing or
+  unreadable file. Existing omissions, invalid values, and malformed/unreadable
+  configurations retain Deny. Explicit Deny/Ask/Allow values survive save and
+  restart; the generated TOML always includes the read permission.
+- IntelliJ starts a fresh service with Ask but deserializes a missing read field
+  as Deny. Its supported `@Property(alwaysWrite = true)` annotation retains an
+  explicit read permission even when every preference equals its XML default.
+  No migration marker or separate settings model is needed. Invalid values
+  normalize to Deny through the existing publication boundary.
+- XML round trips exposed unannotated immutable fields being skipped by SDK
+  262.8665.258. Explicit `@OptionTag` bindings retain the existing immutable state
+  and XML names. Regression tests use the platform configuration serializer
+  with its default filtering, and verify legacy font settings and unrelated
+  visual-bell edits survive alongside the read permission.
+- Standalone Reset to Defaults selects Ask. IntelliJ's ordinary settings Reset
+  restores the applied permission; it is not a factory-reset action. Both forms
+  preserve read choices through unrelated Apply. Existing live-publication and
+  session revocation tests continue to cover pending requests.
+- Boundary: an older IDE installation with no stored settings component is
+  indistinguishable from fresh settings and therefore uses Ask. An existing
+  component with an omitted read field retains Deny. A newly added marker cannot
+  reconstruct state that was never persisted.
 
-Gate: old saved settings and absent/default-valued fields cannot silently
-weaken a previous denial.
+Gate: existing persisted components/files preserve explicit choices and legacy
+read omissions through normalization, unrelated edits, serialization, and reload.
+The no-component IntelliJ boundary is recorded in both canonical maps.
 
 ### Part 6 — Integration, documentation, and final cleanup
 

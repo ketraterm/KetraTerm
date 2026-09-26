@@ -15,15 +15,19 @@
  */
 package io.github.ketraterm.intellij.settings
 
+import com.intellij.configurationStore.deserialize
+import com.intellij.configurationStore.serialize
 import com.intellij.openapi.progress.ProcessCanceledException
 import io.github.ketraterm.host.HostControlPolicy
 import io.github.ketraterm.host.TerminalClipboardPermission
+import io.github.ketraterm.host.TerminalClipboardPolicy
 import io.github.ketraterm.host.TerminalTitlePermission
 import io.github.ketraterm.input.policy.PasteControlPolicy
 import io.github.ketraterm.render.api.TerminalRenderCursorShape
 import io.github.ketraterm.ui.swing.settings.SwingPadding
 import io.github.ketraterm.ui.swing.settings.TerminalTheme
 import io.github.ketraterm.workspace.config.TerminalConfig
+import org.jdom.Element
 import org.junit.Assert.*
 import org.junit.Test
 import java.util.concurrent.CancellationException
@@ -32,6 +36,81 @@ import java.util.concurrent.CancellationException
  * Tests IntelliJ settings persistence mapping without opening an IDE window.
  */
 class KetraTermIntellijSettingsTest {
+    @Test
+    fun `fresh clipboard Ask survives XML round trip while library reads stay denied`() {
+        val settings = KetraTermIntellijSettings()
+        assertEquals(TerminalClipboardPermission.PROMPT, settings.createHostPolicy().clipboardPolicy.readPermission)
+        assertEquals(TerminalClipboardPermission.DENY, TerminalClipboardPolicy().readPermission)
+        val xml = requireNotNull(serialize(settings.state))
+        assertEquals(
+            "prompt",
+            xml.getChildren("option").single { it.getAttributeValue("name") == "clipboardRead" }.getAttributeValue("value"),
+        )
+        val restored = KetraTermIntellijSettings()
+        restored.loadState(xml.deserialize(KetraTermIntellijSettings.State::class.java))
+        assertEquals(settings.state, restored.state)
+    }
+
+    @Test
+    fun `legacy XML omission retains Deny through unrelated changes and restart`() {
+        val legacyStates =
+            listOf(
+                Element("State") to KetraTermIntellijSettings.DEFAULT_FONT_SIZE,
+                Element("State").addContent(Element("option").setAttribute("name", "fontSize").setAttribute("value", "18")) to 18,
+            )
+        for ((xml, fontSize) in legacyStates) {
+            val settings = KetraTermIntellijSettings()
+            val observed = mutableListOf<TerminalClipboardPermission>()
+            settings.addChangeListener { observed += settings.createHostPolicy().clipboardPolicy.readPermission }
+            settings.loadState(xml.deserialize(KetraTermIntellijSettings.State::class.java))
+            assertEquals(fontSize, settings.state.fontSize)
+            assertEquals(TerminalClipboardPermission.DENY, settings.createHostPolicy().clipboardPolicy.readPermission)
+            assertEquals(listOf(TerminalClipboardPermission.DENY), observed)
+            settings.replaceState(settings.state.copy(visualBell = !settings.state.visualBell))
+            val saved = requireNotNull(serialize(settings.state))
+            assertEquals(
+                "deny",
+                saved.getChildren("option").single { it.getAttributeValue("name") == "clipboardRead" }.getAttributeValue("value"),
+            )
+            val restored = KetraTermIntellijSettings()
+            restored.loadState(saved.deserialize(KetraTermIntellijSettings.State::class.java))
+            assertEquals(settings.state, restored.state)
+        }
+    }
+
+    @Test
+    fun `invalid XML read choices normalize to persisted Deny`() {
+        for (invalid in listOf("", "unknown", "allowlist")) {
+            val xml =
+                Element("State").addContent(
+                    Element("option").setAttribute("name", "clipboardRead").setAttribute("value", invalid),
+                )
+            val settings = KetraTermIntellijSettings()
+            settings.loadState(xml.deserialize(KetraTermIntellijSettings.State::class.java))
+            assertEquals(TerminalClipboardPermission.DENY, settings.createHostPolicy().clipboardPolicy.readPermission)
+            val restored = KetraTermIntellijSettings()
+            restored.loadState(requireNotNull(serialize(settings.state)).deserialize(KetraTermIntellijSettings.State::class.java))
+            assertEquals(settings.state, restored.state)
+        }
+    }
+
+    @Test
+    fun `every explicit read choice remains in XML even when all other preferences are default`() {
+        for (permission in TerminalClipboardPermission.entries) {
+            val id = permission.name.lowercase(java.util.Locale.ROOT)
+            val settings = KetraTermIntellijSettings()
+            settings.replaceState(KetraTermIntellijSettings.State(clipboardRead = id))
+            val saved = requireNotNull(serialize(settings.state))
+            assertEquals(
+                id,
+                saved.getChildren("option").single { it.getAttributeValue("name") == "clipboardRead" }.getAttributeValue("value"),
+            )
+            val restored = KetraTermIntellijSettings()
+            restored.loadState(saved.deserialize(KetraTermIntellijSettings.State::class.java))
+            assertEquals(permission, restored.createHostPolicy().clipboardPolicy.readPermission)
+        }
+    }
+
     @Test
     fun `IDE host denies application window and column mode requests`() {
         val settings = KetraTermIntellijSettings()
@@ -371,7 +450,7 @@ class KetraTermIntellijSettingsTest {
         val settings = KetraTermIntellijSettings()
         val defaults = settings.createHostPolicy()
         assertEquals(TerminalClipboardPermission.ALLOW, defaults.clipboardPolicy.writePermission)
-        assertEquals(TerminalClipboardPermission.DENY, defaults.clipboardPolicy.readPermission)
+        assertEquals(TerminalClipboardPermission.PROMPT, defaults.clipboardPolicy.readPermission)
         assertEquals(TerminalTitlePermission.ALLOW, defaults.titlePolicy.permission)
 
         settings.loadState(settings.state.copy(clipboardWrite = "deny", titlePermission = "deny"))

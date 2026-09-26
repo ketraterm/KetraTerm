@@ -42,17 +42,19 @@ class TerminalWorkspaceConfigManager(
      *
      * If the file does not exist, it creates a default configuration file with comments
      * and returns the default settings. If the file is invalid or unreadable, it falls back
-     * gracefully to default settings.
+     * gracefully to default settings with clipboard reads denied. Existing files
+     * with a missing or invalid read permission retain the legacy Deny behavior.
      *
      * @return the loaded [TerminalConfig] instance.
      */
     fun load(): TerminalConfig {
-        if (!Files.exists(configPath)) {
+        if (Files.notExists(configPath)) {
             val defaultConfig = TerminalConfig()
             saveDefaults(defaultConfig)
             return defaultConfig
         }
 
+        val default = TerminalConfig(clipboardRead = TerminalClipboardPermission.DENY)
         return try {
             val content = Files.readString(configPath)
             val parsed = TomlParser.parse(content)
@@ -63,8 +65,6 @@ class TerminalWorkspaceConfigManager(
             val behavior = parsed["behavior"] ?: emptyMap()
             val shell = parsed["shell"] ?: emptyMap()
             val security = parsed["security"] ?: emptyMap()
-
-            val default = TerminalConfig()
 
             val theme = themeSection["name"] ?: default.theme
             val shellPath = shell["path"] ?: default.shellPath
@@ -208,7 +208,7 @@ class TerminalWorkspaceConfigManager(
             )
         } catch (failure: IOException) {
             System.err.println("Using default configuration; could not read $configPath: ${failure.message}")
-            TerminalConfig()
+            default
         } catch (_: IllegalArgumentException) {
             try {
                 val backupPath = configPath.resolveSibling("${configPath.fileName}.broken")
@@ -216,11 +216,10 @@ class TerminalWorkspaceConfigManager(
                 System.err.println("Configuration file was malformed and has been backed up to $backupPath")
             } catch (ioe: IOException) {
                 System.err.println("Failed to back up malformed configuration file: ${ioe.message}")
-                return TerminalConfig()
+                return default
             }
-            val defaultConfig = TerminalConfig()
-            saveDefaults(defaultConfig)
-            defaultConfig
+            saveDefaults(default)
+            default
         }
     }
 

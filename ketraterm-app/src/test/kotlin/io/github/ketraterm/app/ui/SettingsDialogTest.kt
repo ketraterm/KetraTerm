@@ -215,6 +215,9 @@ class SettingsDialogTest {
             }
             assertTrue(closed.await(5, TimeUnit.SECONDS))
             assertEquals(TerminalConfig.DEFAULT_THEME, settings.config.theme)
+            assertEquals(TerminalClipboardPermission.PROMPT, settings.config.clipboardRead)
+            assertEquals(TerminalClipboardPermission.PROMPT, settings.createHostPolicy().clipboardPolicy.readPermission)
+            assertEquals(TerminalClipboardPermission.ALLOW, settings.config.clipboardWrite)
             assertTrue(settings.config.smartSuggestionsEnabled)
             assertFalse(settings.config.shellSuggestionsEnabled)
             assertFalse(settings.config.acceptSelectedSuggestionWithEnter)
