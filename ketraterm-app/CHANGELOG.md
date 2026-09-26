@@ -2,6 +2,7 @@
 
 ## [Unreleased]
 
+- Fixed terminal windows failing to grow near screen edges; resizing now keeps the window within the available desktop.
 - Fixed terminal column switching when shell window resizing is disabled or the window layout cannot resize.
 - Improved responsiveness and reliability when pasting large text into busy terminals.
 - Compatible terminal apps can now read clipboard text with your permission. Keyboard-accessible dialogs let you approve once, deny, or block reads for that terminal. New settings ask before reading; saved permissions are preserved.

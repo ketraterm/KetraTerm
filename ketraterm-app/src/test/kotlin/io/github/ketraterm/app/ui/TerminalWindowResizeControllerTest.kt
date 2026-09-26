@@ -22,8 +22,8 @@ import io.github.ketraterm.transport.TerminalConnectorListener
 import io.github.ketraterm.ui.swing.api.SwingTerminal
 import io.github.ketraterm.ui.swing.settings.SwingSettings
 import org.junit.jupiter.api.Test
-import java.awt.Dimension
 import java.awt.Font
+import java.awt.Rectangle
 import java.util.concurrent.FutureTask
 import java.util.concurrent.TimeUnit
 import javax.swing.SwingUtilities
@@ -47,7 +47,7 @@ class TerminalWindowResizeControllerTest {
                 assertEquals(1, updates.size)
                 onEdt {
                     updates.removeFirst().invoke()
-                    assertEquals(Dimension(columns * 8 + 20, 200), window.sizes.last())
+                    assertEquals(Rectangle(0, 0, columns * 8 + 20, 200), window.bounds.last())
                 }
             }
             onEdt {
@@ -57,6 +57,43 @@ class TerminalWindowResizeControllerTest {
             assertFalse(controller.request(session, 10, 132))
             assertEquals(1, window.observationClosed)
             assertTrue(updates.isEmpty())
+        }
+    }
+
+    @Test
+    fun `column round trip grows back by moving within the work area`() {
+        withWindow { window, _, session, controller, updates ->
+            onEdt {
+                window.geometry = checkNotNull(window.geometry).copy(windowX = 800, windowY = 100)
+                window.refresh()
+                assertTrue(controller.request(session, 10, 80, preserveGrid = true))
+                updates.removeFirst().invoke()
+                assertEquals(Rectangle(800, 100, 660, 200), window.bounds.last())
+                assertTrue(controller.request(session, 10, 132, preserveGrid = true))
+                updates.removeFirst().invoke()
+                assertEquals(Rectangle(524, 100, 1076, 200), window.bounds.last())
+                assertTrue(controller.request(session, 10, 80, preserveGrid = true))
+                updates.removeFirst().invoke()
+                assertEquals(Rectangle(524, 100, 660, 200), window.bounds.last())
+            }
+        }
+    }
+
+    @Test
+    fun `queued resize uses the current monitor work area and position`() {
+        withWindow { window, _, session, controller, updates ->
+            onEdt {
+                assertTrue(controller.request(session, 10, 132, preserveGrid = true))
+                window.geometry =
+                    checkNotNull(window.geometry).copy(
+                        windowX = -700,
+                        windowY = 10,
+                        availableX = -1600,
+                        availableY = 30,
+                    )
+                updates.removeFirst().invoke()
+                assertEquals(listOf(Rectangle(-1076, 30, 1076, 200)), window.bounds)
+            }
         }
     }
 
@@ -77,7 +114,7 @@ class TerminalWindowResizeControllerTest {
                 // A split or tab selection changes eligibility before the queued update.
                 controller.clearTarget()
                 updates.removeFirst().invoke()
-                assertTrue(window.sizes.isEmpty())
+                assertTrue(window.bounds.isEmpty())
             }
         }
     }
@@ -91,7 +128,7 @@ class TerminalWindowResizeControllerTest {
                 session.resize(132, 10)
                 window.geometry = null
                 updates.removeFirst().invoke()
-                assertTrue(window.sizes.isEmpty())
+                assertTrue(window.bounds.isEmpty())
                 assertEquals(visible.width, session.terminal.width)
                 assertEquals(visible.height, session.terminal.height)
             }
@@ -106,7 +143,7 @@ class TerminalWindowResizeControllerTest {
                 session.resize(132, 10)
                 controller.clearTarget()
                 updates.removeFirst().invoke()
-                assertTrue(window.sizes.isEmpty())
+                assertTrue(window.bounds.isEmpty())
                 assertEquals(132, session.terminal.width)
                 assertEquals(10, session.terminal.height)
             }
@@ -122,7 +159,7 @@ class TerminalWindowResizeControllerTest {
                 window.beforeRead = {}
                 assertEquals(1, updates.size)
                 updates.removeFirst().invoke()
-                assertEquals(listOf(Dimension(1076, 200)), window.sizes)
+                assertEquals(listOf(Rectangle(0, 0, 1076, 200)), window.bounds)
             }
         }
     }
@@ -134,7 +171,7 @@ class TerminalWindowResizeControllerTest {
             onEdt {
                 controller.close()
                 updates.removeFirst().invoke()
-                assertTrue(window.sizes.isEmpty())
+                assertTrue(window.bounds.isEmpty())
             }
         }
         withWindow { window, _, session, controller, updates ->
@@ -142,7 +179,7 @@ class TerminalWindowResizeControllerTest {
             session.close()
             onEdt {
                 updates.removeFirst().invoke()
-                assertTrue(window.sizes.isEmpty())
+                assertTrue(window.bounds.isEmpty())
             }
         }
     }
@@ -190,9 +227,12 @@ class TerminalWindowResizeControllerTest {
                 minimumHeight = 100,
                 availableWidth = 1600,
                 availableHeight = 1000,
-                windowOriginFits = true,
+                windowX = 0,
+                windowY = 0,
+                availableX = 0,
+                availableY = 0,
             )
-        val sizes = mutableListOf<Dimension>()
+        val bounds = mutableListOf<Rectangle>()
         var beforeRead: () -> Unit = {}
         var refresh: () -> Unit = {}
         var observationClosed = 0
@@ -203,9 +243,11 @@ class TerminalWindowResizeControllerTest {
             return geometry
         }
 
-        override fun resize(size: Dimension) {
+        override fun resize(bounds: Rectangle) {
             check(SwingUtilities.isEventDispatchThread())
-            sizes.add(size)
+            this.bounds.add(bounds)
+            geometry = geometry?.copy(windowX = bounds.x, windowY = bounds.y)
+            refresh()
         }
 
         override fun observeGeometryChanges(refresh: () -> Unit): AutoCloseable {

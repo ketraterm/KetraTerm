@@ -18,7 +18,7 @@ package io.github.ketraterm.app.ui
 import io.github.ketraterm.render.api.TerminalRenderBufferKind
 import io.github.ketraterm.session.TerminalSession
 import io.github.ketraterm.ui.swing.api.SwingTerminal
-import java.awt.Dimension
+import java.awt.Rectangle
 import java.awt.event.ComponentAdapter
 import java.awt.event.ComponentEvent
 import javax.swing.JFrame
@@ -91,13 +91,13 @@ internal class TerminalWindowResizeController(
         if (current.session !== session) return false
         var alternate = false
         session.readRenderFrame { alternate = it.activeBuffer == TerminalRenderBufferKind.ALTERNATE }
-        if (current.geometry.targetSize(columns, rows, alternate) == null) return false
+        if (current.geometry.targetBounds(columns, rows, alternate) == null) return false
         dispatch {
             if (closed || session.isClosed) return@dispatch
             // A user layout change after acceptance takes precedence over the queued request.
             refresh()
             val latest = snapshot
-            val target = latest?.takeIf { it.session === session }?.geometry?.targetSize(columns, rows, alternate)
+            val target = latest?.takeIf { it.session === session }?.geometry?.targetBounds(columns, rows, alternate)
             if (target != null) {
                 window.resize(target)
             } else if (!preserveGrid && !session.isClosed) {
@@ -123,7 +123,7 @@ internal class TerminalWindowResizeController(
     )
 }
 
-/** Immutable geometry only; rejects overflow and requests outside available desktop space. */
+/** Fits an exact grid into the monitor work area, preserving window position where possible. */
 internal data class WindowResizeGeometry(
     val cellWidth: Int,
     val cellHeight: Int,
@@ -137,21 +137,26 @@ internal data class WindowResizeGeometry(
     val minimumHeight: Int,
     val availableWidth: Int,
     val availableHeight: Int,
-    val windowOriginFits: Boolean,
+    val windowX: Int,
+    val windowY: Int,
+    val availableX: Int,
+    val availableY: Int,
 ) {
-    fun targetSize(
+    fun targetBounds(
         columns: Int,
         rows: Int,
         alternate: Boolean,
-    ): Dimension? {
-        if (!windowOriginFits || columns <= 0 || rows <= 0 || cellWidth <= 0 || cellHeight <= 0) return null
+    ): Rectangle? {
+        if (columns <= 0 || rows <= 0 || cellWidth <= 0 || cellHeight <= 0) return null
         val width = columns.toLong() * cellWidth + windowExtraWidth + if (alternate) alternateInsetWidth else primaryInsetWidth
         val height = rows.toLong() * cellHeight + windowExtraHeight + if (alternate) alternateInsetHeight else primaryInsetHeight
-        if (width !in minimumWidth.toLong()..availableWidth.toLong() ||
-            height !in minimumHeight.toLong()..availableHeight.toLong()
+        if (width !in minimumWidth.coerceAtLeast(1).toLong()..availableWidth.toLong() ||
+            height !in minimumHeight.coerceAtLeast(1).toLong()..availableHeight.toLong()
         ) {
             return null
         }
-        return Dimension(width.toInt(), height.toInt())
+        val x = windowX.toLong().coerceIn(availableX.toLong(), availableX.toLong() + availableWidth - width)
+        val y = windowY.toLong().coerceIn(availableY.toLong(), availableY.toLong() + availableHeight - height)
+        return Rectangle(x.toInt(), y.toInt(), width.toInt(), height.toInt())
     }
 }
