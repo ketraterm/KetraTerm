@@ -170,9 +170,9 @@ class TerminalResponseChannelTest {
         buffer.setModifyOtherKeysMode(-1)
 
         buffer.requestKeyModifierOption(4)
-        buffer.requestKeyModifierOption(1)
+        buffer.requestKeyModifierOption(5)
 
-        assertEquals("\u001B[>4;-1m", drain(buffer))
+        assertEquals("\u001B[>4;65535m", drain(buffer))
     }
 
     @Test

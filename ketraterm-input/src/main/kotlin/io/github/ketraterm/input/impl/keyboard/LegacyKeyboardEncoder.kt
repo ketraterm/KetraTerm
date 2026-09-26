@@ -26,6 +26,7 @@ import io.github.ketraterm.protocol.ControlCode
 import io.github.ketraterm.protocol.host.TerminalHostOutput
 import io.github.ketraterm.protocol.keyboard.FormatOtherKeysMode
 import io.github.ketraterm.protocol.keyboard.ModifyOtherKeysMode
+import io.github.ketraterm.protocol.keyboard.XtermKeyResource
 
 /**
  * Encoder for legacy xterm-style keyboard sequences, keypad modes, and modifyOtherKeys modes.
@@ -76,7 +77,7 @@ internal class LegacyKeyboardEncoder(
         modeBits: Long,
     ) {
         if (shouldEncodeModifyOtherKey(codepoint, modifiers, modeBits)) {
-            encodeModifyOtherKey(codepoint, modifiers, modeBits)
+            encodeXtermKey(codepoint, modifiers, modeBits)
             return
         }
 
@@ -117,6 +118,12 @@ internal class LegacyKeyboardEncoder(
         modifiers: Int,
         modeBits: Long,
     ) {
+        val resource = XtermKeyMappingTable.RESOURCES[key.ordinal]
+        val code = XtermKeyMappingTable.CODES[key.ordinal]
+        if (code >= 0 && TerminalInputState.keyModifierOption(modeBits, resource) >= 4) {
+            encodeXtermKey(code, modifiers, modeBits, resource)
+            return
+        }
         when (key) {
             TerminalKey.ENTER -> encodeEnter(modifiers, modeBits)
             TerminalKey.NUMPAD_ENTER -> encodeKeypad(key, modifiers, modeBits)
@@ -132,6 +139,18 @@ internal class LegacyKeyboardEncoder(
         modifiers: Int,
         modeBits: Long,
     ) {
+        val functionLevel = TerminalInputState.keyModifierOption(modeBits, XtermKeyResource.FUNCTION_KEYS)
+        if (functionLevel == -1 && key.ordinal in TerminalKey.F1.ordinal..TerminalKey.F35.ordinal) {
+            var number = key.ordinal - TerminalKey.F1.ordinal + 1
+            if (TerminalModifiers.hasShift(modifiers)) number += 12
+            if (TerminalModifiers.hasCtrl(modifiers)) number += 24
+            if (number <= 4) {
+                CsiWriter.writeSs3(scratch, output, 'P'.code + number - 1)
+            } else {
+                CsiWriter.writeCsiTilde(scratch, output, XtermKeyMappingTable.functionNumber(number), TerminalModifiers.NONE)
+            }
+            return
+        }
         if (key.ordinal in TerminalKey.F13.ordinal..TerminalKey.F24.ordinal) {
             val baseKey = TERMINAL_KEYS[TerminalKey.F1.ordinal + key.ordinal - TerminalKey.F13.ordinal]
             encodeMappedKey(baseKey, modifiers or TerminalModifiers.SHIFT, modeBits)
@@ -169,21 +188,45 @@ internal class LegacyKeyboardEncoder(
                 key == TerminalKey.END
         if (isCursorKey) {
             val csiLetter = KeyMappingTable.LEGACY_CSI_LETTERS[keyOrdinal]
-            CsiWriter.writeCsiModifierLetter(scratch, output, 1, modifiers, csiLetter)
+            CsiWriter.writeXtermKey(
+                scratch,
+                output,
+                csiLetter,
+                -1,
+                modifiers,
+                TerminalInputState.keyModifierOption(modeBits, XtermKeyResource.CURSOR_KEYS),
+                TerminalInputState.isApplicationCursorKeys(modeBits),
+            )
             return
         }
 
-        // 2. Function F1-F4
+        // 2. Function F1-F4 and keypad PF1-PF4
         val csiLetter = KeyMappingTable.LEGACY_CSI_LETTERS[keyOrdinal]
         if (csiLetter >= 0) {
-            CsiWriter.writeCsiModifierLetter(scratch, output, 1, modifiers, csiLetter)
+            if (keyOrdinal in TerminalKey.F1.ordinal..TerminalKey.F4.ordinal) {
+                CsiWriter.writeXtermKey(scratch, output, csiLetter, -1, modifiers, functionLevel, application = true)
+            } else {
+                CsiWriter.writeCsiModifierLetter(scratch, output, 1, modifiers, csiLetter)
+            }
             return
         }
 
         // 3. Tilde Keys (Insert, Delete, PgUp, PgDn, F5-F12, F3)
         val tildeNumber = KeyMappingTable.TILDE_NUMBERS[keyOrdinal]
         if (tildeNumber >= 0) {
-            CsiWriter.writeCsiTilde(scratch, output, tildeNumber, modifiers)
+            val resource = XtermKeyMappingTable.RESOURCES[keyOrdinal]
+            // xterm applies legacy formatting levels only to function keys here.
+            // Editing keys share the cursor resource only for extended reports.
+            val level = if (resource == XtermKeyResource.FUNCTION_KEYS) functionLevel else 2
+            CsiWriter.writeXtermKey(
+                scratch,
+                output,
+                '~'.code,
+                tildeNumber,
+                modifiers,
+                level,
+                application = false,
+            )
             return
         }
 
@@ -201,7 +244,7 @@ internal class LegacyKeyboardEncoder(
         modeBits: Long,
     ) {
         if (shouldEncodeModifyOtherSpecial(BACKSPACE_CODEPOINT, modifiers, modeBits)) {
-            encodeModifyOtherKey(BACKSPACE_CODEPOINT, modifiers, modeBits)
+            encodeXtermKey(BACKSPACE_CODEPOINT, modifiers, modeBits)
             return
         }
 
@@ -226,7 +269,7 @@ internal class LegacyKeyboardEncoder(
         modeBits: Long,
     ) {
         if (shouldEncodeModifyOtherSpecial(ENTER_CODEPOINT, modifiers, modeBits)) {
-            encodeModifyOtherKey(ENTER_CODEPOINT, modifiers, modeBits)
+            encodeXtermKey(ENTER_CODEPOINT, modifiers, modeBits)
             return
         }
 
@@ -248,7 +291,7 @@ internal class LegacyKeyboardEncoder(
         modeBits: Long,
     ) {
         if (shouldEncodeModifyOtherSpecial(ESCAPE_CODEPOINT, modifiers, modeBits)) {
-            encodeModifyOtherKey(ESCAPE_CODEPOINT, modifiers, modeBits)
+            encodeXtermKey(ESCAPE_CODEPOINT, modifiers, modeBits)
             return
         }
 
@@ -262,7 +305,7 @@ internal class LegacyKeyboardEncoder(
         modeBits: Long,
     ) {
         if (shouldEncodeModifyOtherSpecial(TAB_CODEPOINT, modifiers, modeBits)) {
-            encodeModifyOtherKey(TAB_CODEPOINT, modifiers, modeBits)
+            encodeXtermKey(TAB_CODEPOINT, modifiers, modeBits)
             return
         }
 
@@ -373,17 +416,18 @@ internal class LegacyKeyboardEncoder(
     }
 
     /**
-     * Encodes a key using the modifyOtherKeys protocol format.
+     * Encodes an ordinary or extended key using its resource's selected format.
      *
-     * Depending on formatOtherKeys mode, this outputs either the modern `CSI u` sequence
+     * Depending on the format resource, this outputs either the `CSI u` sequence
      * or the legacy xterm format: `ESC [ 27 ; <modifier> ; <codepoint> ~`.
      */
-    private fun encodeModifyOtherKey(
+    private fun encodeXtermKey(
         codepoint: Int,
         modifiers: Int,
         modeBits: Long,
+        resource: Int = XtermKeyResource.OTHER_KEYS,
     ) {
-        if (TerminalInputState.formatOtherKeysMode(modeBits) == FormatOtherKeysMode.CSI_U) {
+        if (TerminalInputState.keyFormatOption(modeBits, resource) == FormatOtherKeysMode.CSI_U) {
             CsiWriter.writeCsiU(scratch, output, codepoint, modifiers, forceModifier = true)
         } else {
             // Legacy ESC [ 27 ; mod ; codepoint ~

@@ -22,8 +22,7 @@ import io.github.ketraterm.parser.runtime.ParserState
 import io.github.ketraterm.protocol.AnsiMode
 import io.github.ketraterm.protocol.DecPrivateMode
 import io.github.ketraterm.protocol.keyboard.KittyKeyboardFlagApplicationMode
-import io.github.ketraterm.protocol.keyboard.XtermKeyFormatResource
-import io.github.ketraterm.protocol.keyboard.XtermKeyModifierResource
+import io.github.ketraterm.protocol.keyboard.XtermKeyResource
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.DisplayName
@@ -284,12 +283,26 @@ class ModeDispatchTest {
     @DisplayName("xterm key option controls")
     inner class XtermKeyOptions {
         @Test
+        fun `format query dispatches every requested resource in order`() {
+            assertEquals(
+                listOf("requestKeyFormatOption:1", "requestKeyFormatOption:4", "requestKeyFormatOption:7"),
+                dispatchMode('g'.code, 1, 4, 7, privateMarker = '?'.code).events,
+            )
+        }
+
+        @Test
+        fun `omitted disable selects function keys while empty value resets one resource`() {
+            assertEquals(listOf("disableKeyModifierOption:2"), dispatchMode('n'.code, privateMarker = '>'.code).events)
+            assertEquals(listOf("resetKeyModifierOption:1"), dispatchMode('m'.code, 1, -1, privateMarker = '>'.code).events)
+        }
+
+        @Test
         fun `CSI greater-than Pp Pv m dispatches key modifier option set`() {
             assertEquals(
-                listOf(keyModifierEvent(XtermKeyModifierResource.MODIFY_OTHER_KEYS, 3)),
+                listOf(keyModifierEvent(XtermKeyResource.OTHER_KEYS, 3)),
                 dispatchMode(
                     'm'.code,
-                    XtermKeyModifierResource.MODIFY_OTHER_KEYS,
+                    XtermKeyResource.OTHER_KEYS,
                     3,
                     privateMarker = '>'.code,
                 ).events,
@@ -299,10 +312,10 @@ class ModeDispatchTest {
         @Test
         fun `CSI greater-than Pp Pv f dispatches key format option set`() {
             assertEquals(
-                listOf(keyFormatEvent(XtermKeyFormatResource.FORMAT_OTHER_KEYS, 1)),
+                listOf(keyFormatEvent(XtermKeyResource.OTHER_KEYS, 1)),
                 dispatchMode(
                     'f'.code,
-                    XtermKeyFormatResource.FORMAT_OTHER_KEYS,
+                    XtermKeyResource.OTHER_KEYS,
                     1,
                     privateMarker = '>'.code,
                 ).events,
@@ -312,18 +325,18 @@ class ModeDispatchTest {
         @Test
         fun `CSI greater-than Pp m and f reset one key option resource`() {
             assertEquals(
-                listOf("resetKeyModifierOption:${XtermKeyModifierResource.MODIFY_OTHER_KEYS}"),
+                listOf("resetKeyModifierOption:${XtermKeyResource.OTHER_KEYS}"),
                 dispatchMode(
                     'm'.code,
-                    XtermKeyModifierResource.MODIFY_OTHER_KEYS,
+                    XtermKeyResource.OTHER_KEYS,
                     privateMarker = '>'.code,
                 ).events,
             )
             assertEquals(
-                listOf("resetKeyFormatOption:${XtermKeyFormatResource.FORMAT_OTHER_KEYS}"),
+                listOf("resetKeyFormatOption:${XtermKeyResource.OTHER_KEYS}"),
                 dispatchMode(
                     'f'.code,
-                    XtermKeyFormatResource.FORMAT_OTHER_KEYS,
+                    XtermKeyResource.OTHER_KEYS,
                     privateMarker = '>'.code,
                 ).events,
             )
@@ -338,10 +351,10 @@ class ModeDispatchTest {
         @Test
         fun `CSI greater-than Pp n dispatches explicit key modifier option disable`() {
             assertEquals(
-                listOf("disableKeyModifierOption:${XtermKeyModifierResource.MODIFY_OTHER_KEYS}"),
+                listOf("disableKeyModifierOption:${XtermKeyResource.OTHER_KEYS}"),
                 dispatchMode(
                     'n'.code,
-                    XtermKeyModifierResource.MODIFY_OTHER_KEYS,
+                    XtermKeyResource.OTHER_KEYS,
                     privateMarker = '>'.code,
                 ).events,
             )
@@ -350,10 +363,10 @@ class ModeDispatchTest {
         @Test
         fun `CSI question Pp m dispatches key modifier option query`() {
             assertEquals(
-                listOf("requestKeyModifierOption:${XtermKeyModifierResource.MODIFY_OTHER_KEYS}"),
+                listOf("requestKeyModifierOption:${XtermKeyResource.OTHER_KEYS}"),
                 dispatchMode(
                     'm'.code,
-                    XtermKeyModifierResource.MODIFY_OTHER_KEYS,
+                    XtermKeyResource.OTHER_KEYS,
                     privateMarker = '?'.code,
                 ).events,
             )
@@ -364,7 +377,7 @@ class ModeDispatchTest {
             val state = ParserState(maxParams = 32)
             val sink = RecordingTerminalCommandSink()
             state.privateMarker = '>'.code
-            state.params[0] = XtermKeyModifierResource.MODIFY_OTHER_KEYS
+            state.params[0] = XtermKeyResource.OTHER_KEYS
             state.params[1] = 1
             state.paramCount = 2
             state.subParameterMask = 0b10
@@ -533,10 +546,10 @@ class ModeDispatchTest {
 
             assertEquals(
                 listOf(
-                    keyModifierEvent(XtermKeyModifierResource.MODIFY_OTHER_KEYS, 3),
-                    keyFormatEvent(XtermKeyFormatResource.FORMAT_OTHER_KEYS, 1),
-                    "resetKeyModifierOption:${XtermKeyModifierResource.MODIFY_OTHER_KEYS}",
-                    "resetKeyFormatOption:${XtermKeyFormatResource.FORMAT_OTHER_KEYS}",
+                    keyModifierEvent(XtermKeyResource.OTHER_KEYS, 3),
+                    keyFormatEvent(XtermKeyResource.OTHER_KEYS, 1),
+                    "resetKeyModifierOption:${XtermKeyResource.OTHER_KEYS}",
+                    "resetKeyFormatOption:${XtermKeyResource.OTHER_KEYS}",
                 ),
                 fixture.sink.events,
             )

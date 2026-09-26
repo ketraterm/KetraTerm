@@ -25,7 +25,7 @@ import io.github.ketraterm.core.model.TerminalConstants
 import io.github.ketraterm.core.model.UnderlineStyle
 import io.github.ketraterm.core.state.TerminalState
 import io.github.ketraterm.protocol.*
-import io.github.ketraterm.protocol.keyboard.XtermKeyModifierResource
+import io.github.ketraterm.protocol.keyboard.XtermKeyResource
 
 internal class BufferResponseChannel(
     private val state: TerminalState,
@@ -186,16 +186,28 @@ internal class BufferResponseChannel(
     }
 
     override fun requestKeyModifierOption(resource: Int) {
-        if (resource != XtermKeyModifierResource.MODIFY_OTHER_KEYS) return
+        if (!XtermKeyResource.isSupported(resource)) return
+        val value = TerminalInputState.keyModifierOption(state.modes.getInputModeBits(), resource)
+        // xterm serializes its signed-short disabled value as an unsigned parameter.
+        enqueueKeyOption(resource, if (value < 0) 65535 else value, 'm')
+    }
 
+    override fun requestKeyFormatOption(resource: Int) {
+        if (!XtermKeyResource.isSupported(resource)) return
+        enqueueKeyOption(resource, TerminalInputState.keyFormatOption(state.modes.getInputModeBits(), resource), 'f')
+    }
+
+    private fun enqueueKeyOption(
+        resource: Int,
+        value: Int,
+        final: Char,
+    ) {
         enqueueCsiPrefix()
         state.hostResponses.enqueueByte('>'.code)
         state.hostResponses.enqueuePositiveDecimal(resource)
         state.hostResponses.enqueueByte(';'.code)
-        val mode = state.modes.modifyOtherKeysMode
-        if (mode < 0) state.hostResponses.enqueueByte('-'.code)
-        state.hostResponses.enqueuePositiveDecimal(if (mode < 0) -mode else mode)
-        state.hostResponses.enqueueByte('m'.code)
+        state.hostResponses.enqueuePositiveDecimal(value)
+        state.hostResponses.enqueueByte(final.code)
     }
 
     override fun requestRectangleChecksum(

@@ -501,6 +501,10 @@ class ActionEngineTest {
             sinkCalls += "disableKeyModifierOption:$resource"
         }
 
+        override fun requestKeyFormatOption(resource: Int) {
+            sinkCalls += "requestKeyFormatOption:$resource"
+        }
+
         override fun requestKeyModifierOption(resource: Int) {
             sinkCalls += "requestKeyModifierOption:$resource"
         }

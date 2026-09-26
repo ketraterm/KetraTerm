@@ -18,6 +18,8 @@ package io.github.ketraterm.core.model
 import io.github.ketraterm.core.api.TerminalInputState
 import io.github.ketraterm.core.api.TerminalModeBits
 import io.github.ketraterm.core.api.TerminalModeSnapshot
+import io.github.ketraterm.core.api.XtermKeyResourceBits
+import io.github.ketraterm.protocol.keyboard.XtermKeyResource
 import java.util.concurrent.atomic.AtomicLong
 
 /**
@@ -131,41 +133,46 @@ internal class TerminalModes : TerminalInputState {
         get() = decodeMouseEncoding(currentBits)
         set(value) = setPacked(TerminalModeBits.MOUSE_ENCODING_MASK, TerminalModeBits.MOUSE_ENCODING_SHIFT, value.ordinal)
 
-    /**
-     * Modify-other-keys level.
-     *
-     * `-1` means explicitly disabled by XTDISMODKEYS; `0` means the xterm
-     * default/reset state. The all-ones packed value is reserved for `-1`,
-     * preserving the zero-initialized reset state.
-     */
+    /** Ordinary-key level; shares validation and storage with the generic resource API. */
     var modifyOtherKeysMode: Int
         get() = TerminalInputState.modifyOtherKeysMode(currentBits)
-        set(value) =
-            setPacked(
-                TerminalModeBits.MODIFY_OTHER_KEYS_MASK,
-                TerminalModeBits.MODIFY_OTHER_KEYS_SHIFT,
-                if (value < 0) {
-                    TerminalModeBits.MODIFY_OTHER_KEYS_EXPLICITLY_DISABLED
-                } else {
-                    value.coerceIn(0, TerminalModeBits.MODIFY_OTHER_KEYS_EXPLICITLY_DISABLED - 1)
-                },
-            )
+        set(value) = setKeyModifierOption(XtermKeyResource.OTHER_KEYS, value)
 
-    /**
-     * Format-other-keys wire format.
-     *
-     * `0` means xterm's original modifyOtherKeys format. Values are clamped to
-     * the packed 2-bit range until the protocol contract grows additional
-     * supported formats.
-     */
+    /** Ordinary-key format; shares validation and storage with the generic resource API. */
     var formatOtherKeysMode: Int
         get() = TerminalInputState.formatOtherKeysMode(currentBits)
-        set(value) =
-            setPacked(
-                TerminalModeBits.FORMAT_OTHER_KEYS_MASK,
-                TerminalModeBits.FORMAT_OTHER_KEYS_SHIFT,
-                value.coerceIn(0, 3),
-            )
+        set(value) = setKeyFormatOption(XtermKeyResource.OTHER_KEYS, value)
+
+    /** Updates one resource without publishing an intermediate input snapshot. */
+    fun setKeyModifierOption(
+        resource: Int,
+        value: Int,
+    ) {
+        updateBits { XtermKeyResourceBits.withModifier(it, resource, value) }
+    }
+
+    fun setKeyFormatOption(
+        resource: Int,
+        value: Int,
+    ) {
+        updateBits { XtermKeyResourceBits.withFormat(it, resource, value) }
+    }
+
+    fun resetKeyModifierOptions() {
+        updateBits { it and XtermKeyResourceBits.MODIFIER_MASK.inv() }
+    }
+
+    fun resetKeyFormatOptions() {
+        updateBits { it and XtermKeyResourceBits.FORMAT_MASK.inv() }
+    }
+
+    private inline fun updateBits(transform: (Long) -> Long) {
+        while (true) {
+            val old = modeBits.get()
+            val new = transform(old)
+            if (old == new || modeBits.compareAndSet(old, new)) return
+        }
+    }
 
     /**
      * Active Kitty keyboard progressive-enhancement flags.
@@ -260,11 +267,7 @@ internal class TerminalModes : TerminalInputState {
         flag: Long,
         enabled: Boolean,
     ) {
-        while (true) {
-            val old = modeBits.get()
-            val new = if (enabled) old or flag else old and flag.inv()
-            if (old == new || modeBits.compareAndSet(old, new)) return
-        }
+        updateBits { if (enabled) it or flag else it and flag.inv() }
     }
 
     private fun setPacked(
@@ -272,11 +275,7 @@ internal class TerminalModes : TerminalInputState {
         shift: Int,
         value: Int,
     ) {
-        while (true) {
-            val old = modeBits.get()
-            val new = TerminalModeBits.withPackedValue(old, mask, shift, value)
-            if (old == new || modeBits.compareAndSet(old, new)) return
-        }
+        updateBits { TerminalModeBits.withPackedValue(it, mask, shift, value) }
     }
 
     private companion object {

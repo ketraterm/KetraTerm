@@ -31,6 +31,24 @@ interface TerminalInputState {
      */
     companion object {
         /**
+         * Reads an XTMODKEYS resource from the same snapshot as all other input modes.
+         * Returns -1 for explicit disable and -2 for an unsupported resource identifier.
+         * Cursor/function resources default to 2; all other resources default to 0.
+         */
+        @JvmStatic
+        fun keyModifierOption(
+            bits: Long,
+            resource: Int,
+        ): Int = XtermKeyResourceBits.modifier(bits, resource)
+
+        /** Reads an XTFMTKEYS format (0 or 1), or -2 for an unsupported resource. */
+        @JvmStatic
+        fun keyFormatOption(
+            bits: Long,
+            resource: Int,
+        ): Int = XtermKeyResourceBits.format(bits, resource)
+
+        /**
          * Resolves the unmodified legacy Backspace selection. An explicit DECBKM
          * override takes precedence over the host's current configured default.
          */

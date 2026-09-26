@@ -22,6 +22,7 @@ import io.github.ketraterm.parser.spi.TerminalCommandSink
 import io.github.ketraterm.protocol.ControlCode
 import io.github.ketraterm.protocol.DecRectangleAttribute
 import io.github.ketraterm.protocol.keyboard.KittyKeyboardFlagApplicationMode
+import io.github.ketraterm.protocol.keyboard.XtermKeyResource
 
 /**
  * Semantic dispatcher boundary used by ActionEngine.
@@ -202,10 +203,11 @@ internal object AnsiCommandDispatcher : CommandDispatcher {
             CsiCommand.DSR_DEC -> dispatchPrivateDeviceStatusReport(sink, state)
             CsiCommand.TBC -> dispatchTabClear(sink, state)
             CsiCommand.WINDOW_OP -> dispatchWindowOperation(sink, state)
-            CsiCommand.XTFMTKEYS -> dispatchKeyFormatOption(sink, state)
-            CsiCommand.XTMODKEYS -> dispatchKeyModifierOption(sink, state)
+            CsiCommand.XTFMTKEYS -> dispatchKeyOption(sink, state, format = true)
+            CsiCommand.XTMODKEYS -> dispatchKeyOption(sink, state, format = false)
             CsiCommand.XTDISMODKEYS -> dispatchDisableKeyModifierOption(sink, state)
-            CsiCommand.XTQMODKEYS -> dispatchQueryKeyModifierOption(sink, state)
+            CsiCommand.XTQMODKEYS -> dispatchQueryKeyOption(state) { sink.requestKeyModifierOption(it) }
+            CsiCommand.XTQFMTKEYS -> dispatchQueryKeyOption(state) { sink.requestKeyFormatOption(it) }
             CsiCommand.KITTY_KEYBOARD_FLAGS -> dispatchKittyKeyboardFlags(sink, state)
             CsiCommand.KITTY_KEYBOARD_PUSH -> dispatchKittyKeyboardPush(sink, state)
             CsiCommand.KITTY_KEYBOARD_POP -> dispatchKittyKeyboardPop(sink, state)
@@ -517,30 +519,6 @@ internal object AnsiCommandDispatcher : CommandDispatcher {
         }
     }
 
-    private fun dispatchKeyModifierOption(
-        sink: TerminalCommandSink,
-        state: ParserState,
-    ) {
-        dispatchKeyOption(
-            state = state,
-            resetAll = { sink.resetKeyModifierOptions() },
-            resetOne = { resource -> sink.resetKeyModifierOption(resource) },
-            set = { resource, value -> sink.setKeyModifierOption(resource, value) },
-        )
-    }
-
-    private fun dispatchKeyFormatOption(
-        sink: TerminalCommandSink,
-        state: ParserState,
-    ) {
-        dispatchKeyOption(
-            state = state,
-            resetAll = { sink.resetKeyFormatOptions() },
-            resetOne = { resource -> sink.resetKeyFormatOption(resource) },
-            set = { resource, value -> sink.setKeyFormatOption(resource, value) },
-        )
-    }
-
     private fun dispatchPrivateDeviceStatusReport(
         sink: TerminalCommandSink,
         state: ParserState,
@@ -554,18 +532,20 @@ internal object AnsiCommandDispatcher : CommandDispatcher {
         sink: TerminalCommandSink,
         state: ParserState,
     ) {
-        if (state.paramCount != 1 || isSubParameter(state, 0)) return
+        if (state.paramCount > 1 || state.subParameterMask != 0 || state.parameterValueSaturated) return
         val resource = paramOrMissing(state, 0)
-        if (resource >= 0) sink.disableKeyModifierOption(resource)
+        sink.disableKeyModifierOption(if (resource < 0) XtermKeyResource.FUNCTION_KEYS else resource)
     }
 
-    private fun dispatchQueryKeyModifierOption(
-        sink: TerminalCommandSink,
+    private inline fun dispatchQueryKeyOption(
         state: ParserState,
+        request: (Int) -> Unit,
     ) {
-        if (state.paramCount != 1 || isSubParameter(state, 0)) return
-        val resource = paramOrMissing(state, 0)
-        if (resource >= 0) sink.requestKeyModifierOption(resource)
+        if (state.subParameterMask != 0 || state.parameterValueSaturated) return
+        for (index in 0 until state.paramCount) {
+            if (paramOrMissing(state, index) < 0) return
+        }
+        for (index in 0 until state.paramCount) request(state.params[index])
     }
 
     private fun dispatchKittyKeyboardFlags(
@@ -608,25 +588,23 @@ internal object AnsiCommandDispatcher : CommandDispatcher {
         sink.popKittyKeyboardFlags(countParam(state, 0))
     }
 
-    private inline fun dispatchKeyOption(
+    private fun dispatchKeyOption(
+        sink: TerminalCommandSink,
         state: ParserState,
-        resetAll: () -> Unit,
-        resetOne: (Int) -> Unit,
-        set: (Int, Int) -> Unit,
+        format: Boolean,
     ) {
-        when (state.paramCount) {
-            0 -> resetAll()
-            1 -> {
-                val resource = paramOrMissing(state, 0)
-                if (resource >= 0) resetOne(resource)
-            }
-            else -> {
-                val resource = paramOrMissing(state, 0)
-                val value = paramOrMissing(state, 1)
-                if (resource >= 0 && value >= 0 && !isSubParameter(state, 1)) {
-                    set(resource, value)
-                }
-            }
+        if (state.paramCount > 2 || state.subParameterMask != 0 || state.parameterValueSaturated) return
+        if (state.paramCount == 0) {
+            if (format) sink.resetKeyFormatOptions() else sink.resetKeyModifierOptions()
+            return
+        }
+        val resource = paramOrMissing(state, 0)
+        if (resource < 0) return
+        val value = paramOrMissing(state, 1)
+        if (format) {
+            if (value < 0) sink.resetKeyFormatOption(resource) else sink.setKeyFormatOption(resource, value)
+        } else {
+            if (value < 0) sink.resetKeyModifierOption(resource) else sink.setKeyModifierOption(resource, value)
         }
     }
 

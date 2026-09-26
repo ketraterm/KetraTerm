@@ -581,6 +581,9 @@ interface TerminalCommandSink {
      */
     fun requestKeyModifierOption(resource: Int)
 
+    /** Requests an xterm key-format resource (XTQFMTKEYS); the host owns response permission. */
+    fun requestKeyFormatOption(resource: Int)
+
     /**
      * Xterm key format option set, `CSI > Pp ; Pv f`.
      *

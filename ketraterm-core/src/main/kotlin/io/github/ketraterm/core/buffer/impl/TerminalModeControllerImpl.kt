@@ -16,8 +16,10 @@
 package io.github.ketraterm.core.buffer.impl
 
 import io.github.ketraterm.core.api.TerminalModeController
+import io.github.ketraterm.core.api.XtermKeyResourceBits
 import io.github.ketraterm.core.engine.CursorEngine
 import io.github.ketraterm.core.state.TerminalState
+import io.github.ketraterm.protocol.keyboard.XtermKeyResource
 import io.github.ketraterm.render.api.TerminalColorPalette
 import io.github.ketraterm.render.api.TerminalRenderCursorShape
 
@@ -92,6 +94,30 @@ internal class TerminalModeControllerImpl(
     override fun setFormatOtherKeysMode(mode: Int) {
         mutateMode { state.modes.formatOtherKeysMode = mode }
     }
+
+    override fun setKeyModifierOption(
+        resource: Int,
+        value: Int,
+    ) = state.modes.setKeyModifierOption(resource, value)
+
+    override fun resetKeyModifierOption(resource: Int) {
+        if (XtermKeyResource.isSupported(resource)) {
+            state.modes.setKeyModifierOption(resource, XtermKeyResourceBits.defaultModifier(resource))
+        }
+    }
+
+    override fun resetKeyModifierOptions() = state.modes.resetKeyModifierOptions()
+
+    override fun setKeyFormatOption(
+        resource: Int,
+        value: Int,
+    ) = state.modes.setKeyFormatOption(resource, value)
+
+    override fun resetKeyFormatOption(resource: Int) {
+        if (XtermKeyResource.isSupported(resource)) state.modes.setKeyFormatOption(resource, 0)
+    }
+
+    override fun resetKeyFormatOptions() = state.modes.resetKeyFormatOptions()
 
     override fun setKittyKeyboardFlags(flags: Int) {
         mutateMode {

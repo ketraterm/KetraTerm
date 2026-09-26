@@ -70,6 +70,7 @@ internal object GeneratedCsiDispatchTable {
             15989L, // CSI > u  Kitty keyboard push flags
             16202L, // CSI ? J  DECSED
             16203L, // CSI ? K  DECSEL
+            16231L, // CSI ? g  XTQFMTKEYS
             16232L, // CSI ? h  DECSET
             16236L, // CSI ? l  DECRST
             16237L, // CSI ? m  XTQMODKEYS
@@ -135,6 +136,7 @@ internal object GeneratedCsiDispatchTable {
             CsiCommand.KITTY_KEYBOARD_PUSH,
             CsiCommand.DECSED,
             CsiCommand.DECSEL,
+            CsiCommand.XTQFMTKEYS,
             CsiCommand.SM_DEC,
             CsiCommand.RM_DEC,
             CsiCommand.XTQMODKEYS,

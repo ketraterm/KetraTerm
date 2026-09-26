@@ -29,6 +29,37 @@ import io.github.ketraterm.protocol.host.TerminalHostOutput
  */
 internal object CsiWriter {
     /**
+     * Formats xterm cursor/function levels -1..3. A negative number denotes a
+     * letter key; numbered keys retain their first parameter. SS3 is retained
+     * only for an unmodified key or the explicitly selected old level 0.
+     */
+    fun writeXtermKey(
+        scratch: InputScratchBuffer,
+        output: TerminalHostOutput,
+        finalByte: Int,
+        number: Int,
+        modifiers: Int,
+        level: Int,
+        application: Boolean,
+    ) {
+        val modified = modifiers != TerminalModifiers.NONE && level >= 0
+        scratch.clear()
+        scratch.appendByte(ControlCode.ESC)
+        scratch.appendByte(if (application && (!modified || level == 0)) 'O'.code else '['.code)
+        if (modified && level >= 3) scratch.appendByte('>'.code)
+        if (number >= 0) {
+            scratch.appendDecimal(number)
+            if (modified) scratch.appendByte(';'.code)
+        } else if (modified && level >= 2) {
+            scratch.appendByte('1'.code)
+            scratch.appendByte(';'.code)
+        }
+        if (modified) scratch.appendDecimal(TerminalModifiers.toCsiModifierParam(modifiers))
+        scratch.appendByte(finalByte)
+        scratch.writeTo(output)
+    }
+
+    /**
      * Writes a simple unmodified CSI sequence of the format: `ESC [ <finalByte>`.
      *
      * Example sequence generated: `\u001b[A` for Cursor Up.

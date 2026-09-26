@@ -17,8 +17,7 @@ package io.github.ketraterm.parser.ansi
 
 import io.github.ketraterm.protocol.keyboard.FormatOtherKeysMode
 import io.github.ketraterm.protocol.keyboard.ModifyOtherKeysMode
-import io.github.ketraterm.protocol.keyboard.XtermKeyFormatResource
-import io.github.ketraterm.protocol.keyboard.XtermKeyModifierResource
+import io.github.ketraterm.protocol.keyboard.XtermKeyResource
 import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Nested
@@ -75,16 +74,16 @@ class RecordingTerminalCommandSinkTest {
             sink.setAnsiMode(4, enable = true)
             sink.setDecMode(25, enable = false)
             sink.setKeyModifierOption(
-                XtermKeyModifierResource.MODIFY_OTHER_KEYS,
+                XtermKeyResource.OTHER_KEYS,
                 ModifyOtherKeysMode.MODE_3,
             )
-            sink.resetKeyModifierOption(XtermKeyModifierResource.MODIFY_OTHER_KEYS)
+            sink.resetKeyModifierOption(XtermKeyResource.OTHER_KEYS)
             sink.resetKeyModifierOptions()
             sink.setKeyFormatOption(
-                XtermKeyFormatResource.FORMAT_OTHER_KEYS,
+                XtermKeyResource.OTHER_KEYS,
                 FormatOtherKeysMode.CSI_U,
             )
-            sink.resetKeyFormatOption(XtermKeyFormatResource.FORMAT_OTHER_KEYS)
+            sink.resetKeyFormatOption(XtermKeyResource.OTHER_KEYS)
             sink.resetKeyFormatOptions()
             sink.requestDeviceStatusReport(6, decPrivate = true)
             sink.requestDeviceAttributes(kind = 1, parameter = 0)
@@ -157,11 +156,11 @@ class RecordingTerminalCommandSinkTest {
                     "clearAllTabStops",
                     "setAnsiMode:4:true",
                     "setDecMode:25:false",
-                    "setKeyModifierOption:${XtermKeyModifierResource.MODIFY_OTHER_KEYS}:${ModifyOtherKeysMode.MODE_3}",
-                    "resetKeyModifierOption:${XtermKeyModifierResource.MODIFY_OTHER_KEYS}",
+                    "setKeyModifierOption:${XtermKeyResource.OTHER_KEYS}:${ModifyOtherKeysMode.MODE_3}",
+                    "resetKeyModifierOption:${XtermKeyResource.OTHER_KEYS}",
                     "resetKeyModifierOptions",
-                    "setKeyFormatOption:${XtermKeyFormatResource.FORMAT_OTHER_KEYS}:${FormatOtherKeysMode.CSI_U}",
-                    "resetKeyFormatOption:${XtermKeyFormatResource.FORMAT_OTHER_KEYS}",
+                    "setKeyFormatOption:${XtermKeyResource.OTHER_KEYS}:${FormatOtherKeysMode.CSI_U}",
+                    "resetKeyFormatOption:${XtermKeyResource.OTHER_KEYS}",
                     "resetKeyFormatOptions",
                     "requestDeviceStatusReport:6:true",
                     "requestDeviceAttributes:1:0",

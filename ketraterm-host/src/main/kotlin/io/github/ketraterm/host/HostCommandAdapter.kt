@@ -21,7 +21,9 @@ import io.github.ketraterm.core.model.CellColor
 import io.github.ketraterm.core.model.UnderlineStyle
 import io.github.ketraterm.parser.spi.TerminalCommandSink
 import io.github.ketraterm.protocol.*
-import io.github.ketraterm.protocol.keyboard.*
+import io.github.ketraterm.protocol.keyboard.KittyKeyboardFlagApplicationMode
+import io.github.ketraterm.protocol.keyboard.KittyKeyboardProgressiveFlag
+import io.github.ketraterm.protocol.keyboard.XtermKeyResource
 import io.github.ketraterm.render.api.TerminalColorPalette
 import io.github.ketraterm.render.api.TerminalRenderCursorShape
 import java.net.URI
@@ -570,72 +572,37 @@ class HostCommandAdapter(
         resource: Int,
         value: Int,
     ) {
-        when (resource) {
-            XtermKeyModifierResource.MODIFY_OTHER_KEYS -> {
-                if (value in ModifyOtherKeysMode.DISABLED..ModifyOtherKeysMode.MODE_3) {
-                    terminal.setModifyOtherKeysMode(value)
-                }
-            }
-            else -> {
-                // TODO(input): modifyKeyboard/cursor/function/keypad/special resources need separate mode state.
-            }
+        if (value >= 0 && XtermKeyResource.isValidModifierValue(resource, value)) {
+            terminal.setKeyModifierOption(resource, value)
         }
     }
 
-    override fun resetKeyModifierOption(resource: Int) {
-        when (resource) {
-            XtermKeyModifierResource.MODIFY_OTHER_KEYS ->
-                terminal.setModifyOtherKeysMode(ModifyOtherKeysMode.DISABLED)
-            else -> {
-                // TODO(input): reset supported xterm key modifier resources when their mode state exists.
-            }
-        }
-    }
+    override fun resetKeyModifierOption(resource: Int) = terminal.resetKeyModifierOption(resource)
 
-    override fun resetKeyModifierOptions() {
-        terminal.setModifyOtherKeysMode(ModifyOtherKeysMode.DISABLED)
-    }
+    override fun resetKeyModifierOptions() = terminal.resetKeyModifierOptions()
 
     override fun disableKeyModifierOption(resource: Int) {
-        if (resource == XtermKeyModifierResource.MODIFY_OTHER_KEYS) {
-            terminal.setModifyOtherKeysMode(-1)
-        }
+        if (XtermKeyResource.isSupported(resource)) terminal.setKeyModifierOption(resource, -1)
     }
 
     override fun requestKeyModifierOption(resource: Int) {
-        if (!hostPolicy.terminalResponsePolicy.isAllowed) return
-        terminal.requestKeyModifierOption(resource)
+        if (hostPolicy.terminalResponsePolicy.isAllowed) terminal.requestKeyModifierOption(resource)
+    }
+
+    override fun requestKeyFormatOption(resource: Int) {
+        if (hostPolicy.terminalResponsePolicy.isAllowed) terminal.requestKeyFormatOption(resource)
     }
 
     override fun setKeyFormatOption(
         resource: Int,
         value: Int,
     ) {
-        when (resource) {
-            XtermKeyFormatResource.FORMAT_OTHER_KEYS -> {
-                if (value == FormatOtherKeysMode.DEFAULT || value == FormatOtherKeysMode.CSI_U) {
-                    terminal.setFormatOtherKeysMode(value)
-                }
-            }
-            else -> {
-                // TODO(input): formatCursor/function/keypad/special resources need separate mode state.
-            }
-        }
+        if (XtermKeyResource.isValidFormatValue(resource, value)) terminal.setKeyFormatOption(resource, value)
     }
 
-    override fun resetKeyFormatOption(resource: Int) {
-        when (resource) {
-            XtermKeyFormatResource.FORMAT_OTHER_KEYS ->
-                terminal.setFormatOtherKeysMode(FormatOtherKeysMode.DEFAULT)
-            else -> {
-                // TODO(input): reset supported xterm key format resources when their mode state exists.
-            }
-        }
-    }
+    override fun resetKeyFormatOption(resource: Int) = terminal.resetKeyFormatOption(resource)
 
-    override fun resetKeyFormatOptions() {
-        terminal.setFormatOtherKeysMode(FormatOtherKeysMode.DEFAULT)
-    }
+    override fun resetKeyFormatOptions() = terminal.resetKeyFormatOptions()
 
     override fun applyKittyKeyboardFlags(
         flags: Int,
