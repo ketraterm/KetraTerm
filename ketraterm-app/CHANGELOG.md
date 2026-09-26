@@ -2,6 +2,7 @@
 
 ## [Unreleased]
 
+- Improved validation of terminal clipboard access requests.
 - Improved keyboard compatibility with terminal apps that configure and query modifier handling.
 - Improved compatibility with terminal apps that query active terminal settings and supported features. Input settings can be changed safely during large pastes.
 - Simplified clipboard and title permissions so they apply consistently throughout a terminal, including SSH sessions. Clipboard choices are now Deny, Ask, and Allow, with writes allowed and reads blocked by default. Previous separate local/remote settings reset to the new defaults.

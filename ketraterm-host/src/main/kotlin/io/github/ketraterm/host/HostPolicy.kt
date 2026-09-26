@@ -44,6 +44,8 @@ package io.github.ketraterm.host
  * scheme queries), DECRQM mode reports, window reports, DECRQCRA,
  * DECRQSS, and XTGETTCAP requests may enqueue terminal-to-host response bytes.
  * DENY also suppresses unsupported-mode replies; no response bytes are permitted.
+ * OSC 52 read/query admission also requires ALLOW, independently of clipboard
+ * read permission; clipboard writes are unaffected by this response policy.
  * @property clipboardPolicy deny-by-default permission and audit policy for
  * terminal-triggered clipboard protocols such as OSC 52.
  * @property maxHyperlinkEntries maximum distinct OSC 8 hyperlink keys retained

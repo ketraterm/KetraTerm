@@ -32,6 +32,7 @@ package io.github.ketraterm.host
  * @property writePermission write policy for the entire terminal session.
  * @property readPermission policy for clipboard read/query requests. This
  * defaults to deny because read responses can exfiltrate user clipboard data.
+ * Queries must also pass the selection allowlist and [HostPolicy.terminalResponsePolicy].
  * @property maxDecodedBytes maximum decoded clipboard payload size accepted for
  * write requests before the adapter reports a size denial.
  */
@@ -96,7 +97,7 @@ enum class TerminalClipboardDecision {
     /** Clipboard reads are disabled by configured policy. */
     DENIED_READ_DISABLED,
 
-    /** Base64 syntax or decoded UTF-8 text is malformed; no write or prompt is emitted. */
+    /** Query selection, Base64 syntax, or decoded UTF-8 text is malformed; no clipboard action is permitted. */
     DENIED_MALFORMED_PAYLOAD,
 
     /** Decoded payload would exceed the configured size limit. */

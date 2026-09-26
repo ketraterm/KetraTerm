@@ -933,7 +933,8 @@ class HostCommandAdapter(
         selection: String,
         encodedData: String,
     ) {
-        val policy = hostPolicy.clipboardPolicy
+        val requestPolicy = hostPolicy
+        val policy = requestPolicy.clipboardPolicy
         val operation =
             if (encodedData == CLIPBOARD_QUERY_MARKER) {
                 TerminalClipboardOperation.READ_QUERY
@@ -951,13 +952,21 @@ class HostCommandAdapter(
             }
         val decision =
             when {
-                operation == TerminalClipboardOperation.READ_QUERY -> clipboardDecisionForRead(policy)
+                operation == TerminalClipboardOperation.READ_QUERY -> clipboardDecisionForRead(selection, requestPolicy)
                 decodedBytes < 0 -> TerminalClipboardDecision.DENIED_MALFORMED_PAYLOAD
                 decodedBytes > policy.maxDecodedBytes -> TerminalClipboardDecision.DENIED_PAYLOAD_TOO_LARGE
                 decodedText == null -> TerminalClipboardDecision.DENIED_MALFORMED_PAYLOAD
                 else -> clipboardDecisionForWrite(policy)
             }
-        val audit = clipboardAudit(selection, operation, encodedData, decodedBytes.coerceAtLeast(0), decision)
+        val audit =
+            TerminalClipboardAuditEvent(
+                operation = operation,
+                selection = selection,
+                encodedLength = encodedData.length,
+                decodedBytes = decodedBytes.coerceAtLeast(0),
+                maxDecodedBytes = policy.maxDecodedBytes,
+                decision = decision,
+            )
         hostEvents.terminalClipboardRequest(audit)
         if (decodedText == null) return
         when (audit.decision) {
@@ -1113,24 +1122,6 @@ class HostCommandAdapter(
         terminal.setHyperlinkId(NO_HYPERLINK_ID)
     }
 
-    private fun clipboardAudit(
-        selection: String,
-        operation: TerminalClipboardOperation,
-        encodedData: String,
-        decodedBytes: Int,
-        decision: TerminalClipboardDecision,
-    ): TerminalClipboardAuditEvent {
-        val policy = hostPolicy.clipboardPolicy
-        return TerminalClipboardAuditEvent(
-            operation = operation,
-            selection = selection,
-            encodedLength = encodedData.length,
-            decodedBytes = decodedBytes,
-            maxDecodedBytes = policy.maxDecodedBytes,
-            decision = decision,
-        )
-    }
-
     private fun clipboardDecisionForWrite(policy: TerminalClipboardPolicy): TerminalClipboardDecision =
         when (policy.writePermission) {
             TerminalClipboardPermission.DENY -> TerminalClipboardDecision.DENIED_BY_POLICY
@@ -1138,12 +1129,19 @@ class HostCommandAdapter(
             TerminalClipboardPermission.ALLOW -> TerminalClipboardDecision.ALLOWED_BY_POLICY
         }
 
-    private fun clipboardDecisionForRead(policy: TerminalClipboardPolicy): TerminalClipboardDecision =
-        when (policy.readPermission) {
+    private fun clipboardDecisionForRead(
+        selection: String,
+        policy: HostPolicy,
+    ): TerminalClipboardDecision {
+        // This is the protocol allowlist, independent of the host's available clipboards.
+        if (!selection.all { it in "cpqs01234567" }) return TerminalClipboardDecision.DENIED_MALFORMED_PAYLOAD
+        if (!policy.terminalResponsePolicy.isAllowed) return TerminalClipboardDecision.DENIED_BY_POLICY
+        return when (policy.clipboardPolicy.readPermission) {
             TerminalClipboardPermission.DENY -> TerminalClipboardDecision.DENIED_READ_DISABLED
             TerminalClipboardPermission.PROMPT -> TerminalClipboardDecision.PROMPT_REQUIRED
             TerminalClipboardPermission.ALLOW -> TerminalClipboardDecision.ALLOWED_BY_POLICY
         }
+    }
 
     private fun hyperlinkIdFor(
         uri: String,
