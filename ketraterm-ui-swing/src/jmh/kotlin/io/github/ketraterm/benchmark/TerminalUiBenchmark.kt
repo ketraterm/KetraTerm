@@ -154,6 +154,9 @@ open class SwingPaintBenchmark {
     @Param("ascii", "styled", "clusters")
     lateinit var workload: String
 
+    @Param("false", "true")
+    var selected: Boolean = false
+
     private lateinit var terminal: TerminalBuffer
     private lateinit var session: TerminalSession
     private lateinit var component: SwingTerminal
@@ -201,6 +204,7 @@ open class SwingPaintBenchmark {
             component.paint(graphics)
             val emptyPixels = image.getRGB(0, 0, image.width, image.height / 2, null, 0, image.width)
             component.bind(session)
+            if (selected) check(component.selectAll())
             component.paint(graphics)
             val contentPixels = image.getRGB(0, 0, image.width, image.height / 2, null, 0, image.width)
             check(!emptyPixels.contentEquals(contentPixels)) { "Benchmark frame was not painted" }

@@ -1401,7 +1401,7 @@ class HostCommandAdapterTest {
                         f.acceptAscii("\u001B[$style q\u001B[?${entry}h\u001B[2 q\u001B[?12l")
                         // Repeated entry must not overwrite the saved primary presentation.
                         f.acceptAscii("\u001B[?${entry}h\u001B[?${exit}l\u001B[?${exit}l")
-                        f.acceptAscii("\u001BP\$qq\u001B\\")
+                        f.acceptAscii("\u001BP\$q q\u001B\\")
                         assertEquals("\u001BP1\$r$style q\u001B\\", f.drainResponses(), "entry=$entry exit=$exit style=$style")
                         assertEquals(style % 2 == 1, f.terminal.getModeSnapshot().isCursorBlinking)
                     }
@@ -2692,7 +2692,7 @@ class HostCommandAdapterTest {
         @Test
         fun `DECRQSS cursor style query returns current shape`() {
             val f = Fixture()
-            f.acceptAscii("\u001BP\$qq\u001B\\")
+            f.acceptAscii("\u001BP\$q q\u001B\\")
             f.end()
             // Default: blinking block = 1
             assertEquals("\u001BP1\$r1 q\u001B\\", f.drainResponses())
@@ -2703,7 +2703,7 @@ class HostCommandAdapterTest {
             val f = Fixture()
             f.acceptAscii("\u001BP\$qx\u001B\\")
             f.end()
-            assertEquals("\u001BP0\$rx\u001B\\", f.drainResponses())
+            assertEquals("\u001BP0\$r\u001B\\", f.drainResponses())
         }
 
         @Test

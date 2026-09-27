@@ -29,6 +29,8 @@ import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
+import org.junit.jupiter.params.ParameterizedTest
+import org.junit.jupiter.params.provider.CsvSource
 
 @DisplayName("TerminalParser")
 class TerminalParserTest {
@@ -123,6 +125,27 @@ class TerminalParserTest {
     @Nested
     @DisplayName("API validation")
     inner class ApiValidation {
+        @ParameterizedTest
+        @CsvSource("1,2147483647", "2147483647,1", "2147483647,2147483647")
+        fun `overflowing slices are rejected without consuming or flushing pending input`(
+            offset: Int,
+            length: Int,
+        ) {
+            val f = TerminalParserFixture()
+            f.acceptAscii("\u001B[3")
+            val bytes = "1mX!".encodeToByteArray()
+
+            assertThrows(IllegalArgumentException::class.java) {
+                f.parser.accept(bytes, offset = offset, length = length)
+            }
+            assertTrue(f.sink.events.isEmpty())
+
+            f.parser.accept(bytes, offset = bytes.size, length = 0)
+            f.parser.accept(bytes, offset = 0, length = 3)
+            f.endOfInput()
+            assertEquals(listOf("setForegroundIndexed:1", "writeCodepoint:88"), f.sink.events)
+        }
+
         @Test
         fun `accept rejects invalid offset and length ranges`() {
             val f = TerminalParserFixture()

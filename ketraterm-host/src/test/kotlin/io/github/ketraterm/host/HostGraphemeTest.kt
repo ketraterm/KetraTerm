@@ -23,9 +23,73 @@ import org.junit.jupiter.api.Assertions.assertArrayEquals
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.params.ParameterizedTest
+import org.junit.jupiter.params.provider.CsvSource
 import org.junit.jupiter.params.provider.ValueSource
 
 class HostGraphemeTest {
+    @ParameterizedTest
+    @CsvSource(
+        "false,false,false",
+        "false,false,true",
+        "false,true,false",
+        "false,true,true",
+        "true,false,false",
+        "true,false,true",
+        "true,true,false",
+        "true,true,true",
+    )
+    fun `variation selectors preserve right margin placement across every byte split`(
+        shrink: Boolean,
+        alternate: Boolean,
+        bottomRow: Boolean,
+    ) {
+        val cluster = if (shrink) "\uD83D\uDE00\uFE0E" else "\u2764\uFE0F"
+        val column = if (shrink) 3 else 2
+        val bytes = (cluster + "X").encodeToByteArray()
+
+        fun terminal(): TerminalBuffer =
+            TerminalBuffers.create(4, 3, maxHistory = 3).apply {
+                if (alternate) enterAltBuffer()
+                writeText("KEEP")
+                positionCursor(0, 1)
+                writeText("MID")
+                positionCursor(column, if (bottomRow) 2 else 0)
+            }
+
+        val whole = terminal()
+        TerminalParsers.create(HostCommandAdapter(whole)).apply {
+            accept(bytes)
+            endOfInput()
+        }
+        val clusterRow = if (bottomRow) 1 else 0
+        val followingRow = if (bottomRow) 2 else 1
+        assertCluster(whole, column, clusterRow, cluster.codePoints().toArray(), "whole shrink=$shrink bottom=$bottomRow")
+        assertEquals('X'.code, whole.getCodepointAt(0, followingRow))
+        assertEquals(if (bottomRow && !alternate) 1 else 0, whole.historySize)
+        assertEquals(followingRow, whole.cursorRow)
+        assertEquals(1, whole.cursorCol)
+
+        assertAllByteSplits(bytes) { split ->
+            val splitTerminal = terminal()
+            val parser = TerminalParsers.create(HostCommandAdapter(splitTerminal))
+            parser.accept(bytes, 0, split)
+            parser.accept(bytes, split, bytes.size - split)
+            parser.endOfInput()
+            val context = "shrink=$shrink alternate=$alternate bottom=$bottomRow split=$split"
+
+            assertEquals(whole.getAllAsString(), splitTerminal.getAllAsString(), context)
+            assertEquals(whole.historySize, splitTerminal.historySize, context)
+            assertEquals(whole.cursorRow, splitTerminal.cursorRow, context)
+            assertEquals(whole.cursorCol, splitTerminal.cursorCol, context)
+            assertCluster(splitTerminal, column, clusterRow, cluster.codePoints().toArray(), context)
+            for (row in 0 until whole.height) {
+                for (col in 0 until whole.width) {
+                    assertEquals(whole.getCodepointAt(col, row), splitTerminal.getCodepointAt(col, row), "$context cell=($col,$row)")
+                }
+            }
+        }
+    }
+
     @Test
     fun `full updates preserve original styling and precede structural commands`() {
         for (suffix in listOf("X", "\u001B[32mX", "\r\nX")) {

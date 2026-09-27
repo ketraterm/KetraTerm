@@ -19,8 +19,11 @@ import io.github.ketraterm.transport.TerminalConnectorListener
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.Test
+import org.junit.jupiter.params.ParameterizedTest
+import org.junit.jupiter.params.provider.ValueSource
 import java.io.*
 import java.nio.charset.StandardCharsets
+import java.util.concurrent.CopyOnWriteArrayList
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 
@@ -158,22 +161,153 @@ class PtyConnectorTest {
     }
 
     @Test
-    fun `reader failure emits error and closes once`() {
+    fun `reader failure emits the original error and disposes the live process once`() {
         val failure = IOException("read failed")
-        val connector = createConnector(TestProcess(input = FailingInputStream(failure), blockWaitFor = true))
+        val output = RecordingOutputStream()
+        val process = TestProcess(input = FailingInputStream(failure), output = output, blockWaitFor = true)
+        val connector = createConnector(process)
         val listener = RecordingListener()
 
-        connector.start(listener)
+        try {
+            connector.start(listener)
+            assertTrue(connector.joinReader(10_000), "reader did not stop")
+            assertAll(
+                { assertEquals(listOf(failure), listener.errors) },
+                { assertEquals(listOf<Int?>(null), listener.closed) },
+                { assertSame(failure, connector.failure) },
+                { assertTrue(process.destroyed, "fatal read failure must dispose the live process") },
+                { assertEquals(1, output.closeCount) },
+            )
+            connector.close()
+            connector.close()
+            assertEquals(1, output.closeCount)
+            assertSame(failure, connector.failure)
+            assertEquals(listOf<Int?>(null), listener.closed)
+        } finally {
+            connector.close()
+        }
+    }
 
-        assertTrue(connector.joinReader(10_000), "reader did not stop")
-        assertEquals(listOf(failure), listener.errors)
-        assertEquals(listOf<Int?>(null), listener.closed)
-        assertEquals(failure, connector.failure)
+    @Test
+    fun `read failure preserves delivered output and the original cause through later process exit`() {
+        val failure = IOException("read failed after output")
+        val prefix = ByteArrayInputStream("before failure".ascii())
+        val input =
+            object : InputStream() {
+                override fun read(): Int = prefix.read().takeIf { it >= 0 } ?: throw failure
+            }
+        val process = TestProcess(input = input, blockWaitFor = true)
+        val connector = createConnector(process, readBufferSize = 3)
+        val listener = RecordingListener()
+        try {
+            connector.start(listener)
+            assertTrue(connector.joinReader(10_000), "reader did not stop after failure")
+            connector.close()
+            assertTrue(connector.joinWatcher(10_000), "watcher did not stop after disposal")
+            assertAll(
+                { assertEquals("before failure", listener.byteEvents.joinToString("") { it.asciiText() }) },
+                { assertEquals(listOf(failure), listener.errors) },
+                { assertEquals(listOf<Int?>(null), listener.closed) },
+                { assertSame(failure, connector.failure) },
+                { assertTrue(process.destroyed) },
+            )
+        } finally {
+            connector.close()
+        }
+    }
+
+    @Test
+    fun `local close during a pending read suppresses teardown errors and remote closure`() {
+        val readEntered = CountDownLatch(1)
+        val releaseFailure = CountDownLatch(1)
+        val input =
+            object : InputStream() {
+                override fun read(): Int {
+                    readEntered.countDown()
+                    releaseFailure.await()
+                    throw IOException("stream closed during local shutdown")
+                }
+            }
+        var outputCloses = 0
+        val output =
+            object : ByteArrayOutputStream() {
+                override fun close() {
+                    outputCloses++
+                    releaseFailure.countDown()
+                    super.close()
+                }
+            }
+        val process = TestProcess(input = input, output = output, blockWaitFor = true)
+        val connector = createConnector(process)
+        val listener = RecordingListener()
+        try {
+            connector.start(listener)
+            assertTrue(readEntered.await(10, TimeUnit.SECONDS), "reader did not enter its pending read")
+            connector.close()
+            assertTrue(connector.joinReader(10_000), "reader did not stop after local shutdown")
+            assertTrue(connector.joinWatcher(10_000), "watcher did not stop after local shutdown")
+            connector.close()
+            assertAll(
+                { assertTrue(listener.errors.isEmpty()) },
+                { assertTrue(listener.closed.isEmpty()) },
+                { assertNull(connector.failure) },
+                { assertNull(connector.exitCode) },
+                { assertTrue(process.destroyed) },
+                { assertEquals(1, outputCloses) },
+            )
+        } finally {
+            releaseFailure.countDown()
+            connector.close()
+        }
+    }
+
+    @ParameterizedTest
+    @ValueSource(ints = [1, 4, 8192])
+    fun `process exit before the final read still delivers every byte before closure`(readBufferSize: Int) {
+        val input = GatedInputStream("LAST LINE\r\n".ascii())
+        val processExited = CountDownLatch(1)
+        val process =
+            TestProcess(
+                input = input,
+                exitCode = 7,
+                waitForRelease = CountDownLatch(1),
+                waitForCompleted = processExited,
+            )
+        val connector = createConnector(process, readBufferSize)
+        val events = CopyOnWriteArrayList<String>()
+        val listener =
+            object : RecordingListener() {
+                override fun onBytes(
+                    bytes: ByteArray,
+                    offset: Int,
+                    length: Int,
+                ) {
+                    events += "bytes:" + bytes.copyOfRange(offset, offset + length).asciiText()
+                }
+
+                override fun onClosed(exitCode: Int?) {
+                    events += "closed:$exitCode"
+                }
+            }
+        try {
+            connector.start(listener)
+            assertTrue(input.readEntered.await(10, TimeUnit.SECONDS), "reader did not enter its final read")
+            process.releaseWaitFor()
+            assertTrue(processExited.await(10, TimeUnit.SECONDS), "process exit was not observed")
+            input.release()
+            assertTrue(connector.joinReader(10_000), "reader did not finish")
+            assertTrue(connector.joinWatcher(10_000), "watcher did not finish")
+            assertEquals("LAST LINE\r\n".chunked(readBufferSize).map { "bytes:$it" } + "closed:7", events.toList())
+        } finally {
+            input.release()
+            process.releaseWaitFor()
+            connector.close()
+        }
     }
 
     @Test
     fun `process exit emits exit code once`() {
-        val connector = createConnector(TestProcess(input = BlockingInputStream(), exitCode = 7))
+        val connector = createConnector(TestProcess(input = ByteArrayInputStream(ByteArray(0)), exitCode = 7))
         val listener = RecordingListener()
 
         connector.start(listener)
@@ -271,6 +405,7 @@ class PtyConnectorTest {
         private val exitCode: Int = 0,
         private val blockWaitFor: Boolean = false,
         private val waitForRelease: CountDownLatch? = null,
+        private val waitForCompleted: CountDownLatch? = null,
         private val readForegroundName: () -> String? = { null },
     ) : PtyProcess {
         private val destroyedSignal = CountDownLatch(1)
@@ -289,6 +424,7 @@ class PtyConnectorTest {
                 destroyedSignal.await()
             }
             waitForRelease?.await()
+            waitForCompleted?.countDown()
             return exitCode
         }
 
@@ -346,6 +482,34 @@ class PtyConnectorTest {
         ): Int {
             released.await()
             return -1
+        }
+
+        fun release() {
+            released.countDown()
+        }
+    }
+
+    private class GatedInputStream(
+        bytes: ByteArray,
+    ) : InputStream() {
+        val readEntered = CountDownLatch(1)
+        private val released = CountDownLatch(1)
+        private val content = ByteArrayInputStream(bytes)
+
+        override fun read(): Int {
+            readEntered.countDown()
+            released.await()
+            return content.read()
+        }
+
+        override fun read(
+            buffer: ByteArray,
+            offset: Int,
+            length: Int,
+        ): Int {
+            readEntered.countDown()
+            released.await()
+            return content.read(buffer, offset, length)
         }
 
         fun release() {

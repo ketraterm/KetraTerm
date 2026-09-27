@@ -42,6 +42,7 @@ import org.junit.jupiter.api.Test
 import org.junit.jupiter.params.ParameterizedTest
 import org.junit.jupiter.params.provider.CsvSource
 import org.junit.jupiter.params.provider.ValueSource
+import java.awt.event.ComponentEvent
 import java.awt.event.InputEvent
 import java.awt.event.MouseEvent
 import java.awt.image.BufferedImage
@@ -52,6 +53,85 @@ import java.util.concurrent.atomic.AtomicReference
 import javax.swing.SwingUtilities
 
 class SwingTerminalSelectionTest {
+    @ParameterizedTest
+    @CsvSource("4,false", "4,true", "12,false", "12,true")
+    fun `ordinary column resize clears selection or preserves its copied text`(
+        resizedColumns: Int,
+        block: Boolean,
+    ) {
+        val terminal = TerminalBuffers.create(width = 8, height = 2, maxHistory = 8)
+        terminal.writeText("abcdefgh")
+        val dispatcher = StandardTestDispatcher()
+        val session =
+            TerminalSession(
+                terminal = terminal,
+                renderPublisher = TerminalRenderPublisher(8, 2),
+                renderReader = terminal as TerminalRenderFrameReader,
+                responseReader = terminal,
+                connector = NoOpConnector,
+                parser = NoOpParser,
+                inputEncoder = NoOpInputEncoder,
+                workerDispatcher = dispatcher,
+                ioDispatcher = dispatcher,
+            ).also(sessions::add)
+
+        SwingUtilities.invokeAndWait {
+            val clipboard = RecordingClipboard()
+            val component =
+                createComponent(
+                    settingsProvider = {
+                        SwingSettings(
+                            columns = 8,
+                            rows = 2,
+                            padding = SwingPadding(),
+                            shellIntegrationDecorationGutterWidth = 0,
+                            cursorBlinkMillis = 0,
+                        )
+                    },
+                    hostServices = SwingHostServices(clipboardHandler = clipboard),
+                )
+            component.size = component.preferredGridSize(8, 2)
+            component.bind(session)
+            dispatcher.scheduler.runCurrent()
+            val pressed = if (block) mousePressedWithAlt(component, x = 1, y = 1) else mousePressed(component, x = 1, y = 1, clickCount = 3)
+            component.mouseListeners.forEach { it.mousePressed(pressed) }
+            if (block) {
+                val cellWidth = component.width / 8
+                val dragged =
+                    MouseEvent(
+                        component,
+                        MouseEvent.MOUSE_DRAGGED,
+                        0L,
+                        InputEvent.BUTTON1_DOWN_MASK or InputEvent.ALT_DOWN_MASK,
+                        cellWidth * 7 + cellWidth / 2,
+                        1,
+                        0,
+                        false,
+                        MouseEvent.BUTTON1,
+                    )
+                component.mouseMotionListeners.forEach { it.mouseDragged(dragged) }
+            }
+            val released = mouseReleased(component, x = 1, y = 1)
+            component.mouseListeners.forEach { it.mouseReleased(released) }
+            assertEquals(block, component.currentSelection()?.isBlock)
+            assertTrue(component.copySelectionToClipboard())
+            assertEquals("abcdefgh", clipboard.copied.get())
+
+            component.size = component.preferredGridSize(resizedColumns, 2)
+            val resize = ComponentEvent(component, ComponentEvent.COMPONENT_RESIZED)
+            component.componentListeners.forEach { it.componentResized(resize) }
+            dispatcher.scheduler.runCurrent()
+            assertEquals(resizedColumns, terminal.width)
+
+            if (component.currentSelection() == null) {
+                assertFalse(component.copySelectionToClipboard(), "A cleared selection must not copy stale coordinates")
+            } else {
+                assertTrue(component.copySelectionToClipboard())
+                assertEquals("abcdefgh", clipboard.copied.get(), "Reflow must not silently select only part of the original text")
+            }
+        }
+    }
+
     @Test
     fun `published frames reconcile hover at a stationary pointer`() {
         fun frame(

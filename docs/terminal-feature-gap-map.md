@@ -29,7 +29,17 @@ These tiers rank terminal behavior across standalone and embedded hosts. Reprodu
 
 ### Tier 1: Current correctness and security defects
 
-No remaining prioritized items in this tier.
+The [2026-09-27 terminal quality audit](reviews/terminal-quality-audit-2026-09-27.md)
+reproduced unsafe DECRQSS replies, cursor-count overflow, output-loss and cleanup
+failures, saved-state corruption, and logical-text defects. Bounded tab work is
+also required. The owner entries below track these corrections; they take
+precedence over optional protocol extensions. The existing late-width-change
+Unicode gap is a release correctness issue, not a deferred feature.
+
+Correct-behavior regressions and their validation limits are indexed in the
+audit's [regression coverage](reviews/terminal-quality-audit-2026-09-27.md#regression-coverage).
+Tests may fail until their owning defects are fixed; adding coverage does not
+close these entries.
 
 ### Tier 2: Regression coverage and modern compatibility
 
@@ -63,6 +73,8 @@ These are not badges of compatibility for this project. They expand attack surfa
 ## Parser Gaps
 
 ### CSI Protocols
+- `TODO(parser)`: make public parser slice validation overflow-safe; an invalid `offset=1, length=Int.MAX_VALUE` currently bypasses bounds checks. See audit [R17](reviews/terminal-quality-audit-2026-09-27.md#r17--p3-parser-slice-validation-accepts-an-overflowing-range).
+- `TODO(parser/host)`: align saved charset slots with effective primary/alternate screen transitions. Core cursor slots are isolated, but parser charset saves currently overwrite one global slot. See audit R12.
 - `DONE(parser/host)`: parameterless ANSI/SCO `CSI s` / `CSI u` compatibility, including mode-aware DECSLRM disambiguation and shared DEC/SCO cursor and charset save/restore. The [feature map](terminal-feature-map.md#1-terminal-protocols--control-sequences) defines the supported forms; byte-stream tests cover mixed forms, chunk boundaries, margin changes, resets, screen-local cursor slots, resize, and malformed input.
 - `DONE(parser/host)`: bounded CSI collection rejects the entire command on field overflow before excess input can overwrite retained parameters or dispatch a truncated request. The [CSI parameter resource contract](terminal-feature-map.md#csi-parameter-resource-contract) defines the 32-field limit, shared subparameter budget, and recovery policy. Parser and host byte-stream tests cover exact capacity, empty fields, colon boundaries, chunking, cancellation, and suppression of pen, mode, cursor, and query effects.
 - `DONE(parser/core/host/input/session/host/profile/policy)`: ANSI and DEC private mode status requests/reports (`DECRQM` / `DECRPM`) use an explicit core allowlist, effective mode state, and conservative host capability declarations. Unsupported status queries return `0` when replies are allowed; terminal-response denial is silent. The [mode status contract](terminal-feature-map.md#mode-status-reports) defines the supported modes, host-dependent cases, and malformed-input rules. Tests cover byte splits, reset/resize behavior, live Backarrow defaults, synchronized-output timeout, query purity, outbound ordering, and ingress progress during a blocked paste with a concurrent input-policy update.
@@ -86,7 +98,7 @@ These are not badges of compatibility for this project. They expand attack surfa
 - `TODO(parser/core/render/ui)`: Kitty graphics use APC (`ESC _ G ... ESC \`), not DCS. The parser currently consumes APC without dispatch; image storage and rendering are also absent. Transfer and retained-image policy is tracked [below](#session-transport-rendering-and-host-integration-gaps).
 
 ### Text and Unicode
-- `TODO(core)`: a retained variation selector arriving after prefix publication can change width without correctly updating right-margin wrapping. Reproduction: in a four-column terminal, position at zero-based column 2, publish U+2764, then parse U+FE0F followed by `X`; the streamed path can overwrite the cluster, while an unsplit cluster wraps `X`. A width-two prefix published at the last column can already wrap or scroll before a later U+FE0E narrows it. This predates the grapheme-length limit and also affects two-codepoint clusters; resolving placement requires an explicit policy for provisional width and already performed wrapping/scrolling.
+- `TODO(core)`: a retained variation selector arriving after prefix publication can change width without correctly updating right-margin wrapping. Reproduction: in a four-column terminal, position at zero-based column 2, publish U+2764, then parse U+FE0F followed by `X`; the streamed path can overwrite the cluster, while an unsplit cluster wraps `X`. A width-two prefix published at the last column can already wrap or scroll before a later U+FE0E narrows it. This predates the grapheme-length limit and also affects two-codepoint clusters; resolving placement requires an explicit policy for provisional width and already performed wrapping/scrolling. See audit R06 and its primary/alternate, widening/narrowing regression matrix.
 - `DONE(parser)`: malformed UTF-8 recovery is exercised immediately before and inside ESC, CSI,
   OSC (BEL/ST/CAN/SUB), DCS ST, and end-of-input, with every split boundary proving that malformed
   bytes do not print or complete stale structural commands.
@@ -97,6 +109,7 @@ These are not badges of compatibility for this project. They expand attack surfa
 ## Core Gaps
 
 ### Grid Operations
+- `TODO(core/host)`: bound cursor/tab/scroll work and use overflow-safe coordinate arithmetic for saturated counts. Large down/right counts can produce negative coordinates; tab counts loop after reaching the edge, and the host repeats every supplied scroll step. See audit R02.
 - `DONE(core)`: deterministic randomized left/right-margin properties cover ICH/DCH, selective erase, IL/DL, and partial-region scroll up/down. They preserve guard columns and rows outside the scroll rectangle and verify protected wide spans plus wide/cluster storage invariants.
 - `DONE(core/host)`: alternate-screen byte-stream coverage verifies exact primary history retention and zero alternate history across every `47`/`1047`/`1049` entry/exit pairing, repeated commands and re-entry, screen-local `1048` saves, and ordered private-mode lists. `ED2`, repeated `ED3`, and repeated `DECSTR` tests verify active-buffer clearing or text preservation, including combining/wide text and saved-cursor behavior. `DECCOLM` tests cover both 80/132-column directions and current-width requests, preserving primary history while alternate is active and clearing primary history when primary is active.
 - `DONE(core)`: resize/capacity tests verify exact retained rows with zero, bounded, and spare history capacity, oldest-row eviction during narrowing and height shrink, and repeated `47`/`1047`/`1049` resize cycles without alternate text leaking or evicted rows returning. Cursor and scrollback anchors account for reflow eviction, including empty rows, wide characters, and grapheme clusters; evicted viewport anchors clamp to the oldest retained row.
@@ -106,6 +119,8 @@ These are not badges of compatibility for this project. They expand attack surfa
 - `DONE(core/host/ui)`: invalid/unassigned codepoint width policy is explicit in the [core contract](../ketraterm-core/docs/terminal-core-contract.md#unicode-scalar-and-width-policy). Typed scalar/cluster writes reject non-scalars atomically; string writes repair unpaired surrogates. Pinned Unicode tables preserve reserved wide ranges and ambiguous-width behavior, with byte-split integration coverage for replacement, wrapping, and cursor alignment, plus real-buffer selection extraction through resize/reflow.
 
 ### Query and Response Channel
+- `TODO(core/policy)`: unsupported DECRQSS replies must use the fixed empty failure response; reflecting the query currently injects control bytes into host input, including through Unicode truncation. Preserve complete response suppression when denied. See audit R01.
+- `TODO(core)`: recognize the standard DECRQSS cursor-style selector `SP q`, and report CPR relative to active origin-mode margins. Correct-behavior regressions cover both; the implementation still accepts bare `q` and reports absolute coordinates. See audit R10/R11.
 - `DONE(core/host/policy)`: terminal-to-host response channel exists for DA, DSR/CPR, safe window reports, palette queries, `DECRQSS`, and allowlisted `XTGETTCAP`; host policy can deny terminal responses before they enqueue bytes.
 - `DONE(core/host/policy)`: light/dark color-scheme query (`CSI ?996n`) returns `CSI ?997;1n` (dark) or `CSI ?997;2n` (light) from the active host theme palette under terminal-response policy. Standalone and IDE theme updates use the existing synchronized palette publication path; application color overrides do not affect the reply. Denied requests stay silent because this protocol has no failure response. The implemented slice is the one-shot query, without mode 2031 unsolicited notifications.
 
@@ -113,6 +128,7 @@ These are not badges of compatibility for this project. They expand attack surfa
 
 ## Integration Gaps
 
+- `TODO(host/core)`: eliminate stale adapter pen state after core cursor restoration. A subsequent partial SGR currently replaces restored colors/styles with the adapter's previous values. See audit R07.
 - `DONE(host/policy)`: host-adapter allow/deny policy surface for title updates, OSC 8 hyperlinks, OSC 7 current-working-directory reports, desktop notifications, window manipulation requests, palette controls, terminal response channels, and OSC 52 clipboard request auditing.
 - `DONE(host/session/ui)`: DECCOLM switches logical columns independently of window-resize permission, with ordered connector synchronization and optional host window resizing. Standalone fits requested window bounds within the monitor work area, moving only as needed. Fixed-pane behavior is described under [Column Toggles](terminal-feature-map.md#1-terminal-protocols--control-sequences).
 - `DONE(core/host/session/pty/workspace)`: targeted metadata callbacks publish effective palette changes and OSC 8 registry registration, eviction, and clearing through the existing host/PTY/workspace boundaries. Existing notification callbacks preserve individual requests, including identical repetitions. Callbacks are synchronous, policy-filtered for application controls, and independent of render publication; they do not replay initial state. Workspace forwarding applies to attached tabs. Active OSC 8 writing-attribute observation and application-facing color-scheme notifications are outside this slice. See [Targeted Host Metadata Events](terminal-feature-map.md#targeted-host-metadata-events) for delivery and reset semantics.
@@ -151,6 +167,12 @@ These are not badges of compatibility for this project. They expand attack surfa
 
 ## Session, Transport, Rendering, and Host Integration Gaps
 
+- `TODO(ui)`: forward Swing focus gain/loss through the current session's mode-gated focus encoder. Applications enabling DEC 1004 currently receive no focus reports; regressions cover mode changes, unbinding, disposal, and rebinding. See embedding audit [E01](reviews/intellij-embedding-audit-2026-09-27.md#e01--p2-swing-focus-reporting-is-disconnected).
+- `TODO(transport/session)`: order PTY closure after final output delivery, and make fatal read failures plus later explicit close release the process exactly once. The current watcher can overtake buffered output, and a closed session can retain a live child. See audit R03/R04.
+- `TODO(session)`: flush parser EOF and publish the final coherent render frame before stopping publication; queued final output currently remains absent from the retained UI frame. See audit R05.
+- `TODO(host/profile)`: finish all workspace and pane cleanup when one connector or listener throws; remaining tabs and the workspace scope currently survive the first failure. See audit R15.
+- `TODO(ui)`: omit `WRAP_PADDING` from search/hyperlink logical text, and explicitly clear or remap selection during ordinary column reflow. Current behavior introduces false spaces and silently changes selected text. See audit R13/R14.
+- `TODO(ui/render)`: amortize growing-history search storage and bound copying/search work off the EDT frame path; reuse unchanged internal selection projections during painting. Whole-frame zero allocation is not established. See audit R09/R16 and its scoped measurements.
 - `DONE(session)`: ordinary input, startup commands, and core-response batches use bounded atomic admission and one background writer outside parser/input locks. Paste and text replacement use bounded source retention and background encoding with native-write backpressure, preserving admission-time modes/policy and whole-operation ordering. Overflow and transport errors fail the session; local close can unblock native writes. Acceptance, byte/source-work/operation budgets, and shutdown semantics are defined in the [feature map](terminal-feature-map.md#7-embedding--swing-ui).
 
 - `TODO(transport)`: the shipped workspace factory creates local PTY sessions only. A generic `TerminalConnector` contract exists, but there is no SSH connector, remote-session lifecycle, or product SSH session surface. Launching `ssh` inside a local shell is not equivalent. An SSH implementation also needs explicit session permissions and transport-appropriate paste defaults. [IntelliJ IDEA still routes SSH sessions through its Classic engine](https://www.jetbrains.com/help/idea/terminal-emulator.html), so this is a replacement-readiness gap.
@@ -169,3 +191,18 @@ These are not badges of compatibility for this project. They expand attack surfa
 - `TODO(parser/policy)`: graphics require separate bounded storage/transfer designs, APC where applicable, decoded/decompressed image bounds, and retained-image budgets; current clipboard/family ceilings alone do not enable graphics.
 - `DONE(host/policy)`: title/icon updates are host-gated through `HostPolicy.titlePolicy`, which models session-wide allow/deny decisions and configurable oversized-title handling (`clamp` by default for standalone compatibility, or `reject` for stricter profiles).
 - `DONE(policy)`: terminal capability identity policy is explicit in `TerminalCapabilityIdentity` and consumed by PTY launch defaults plus core terminal-to-host query responses.
+
+### Embedding Contracts
+
+The [IntelliJ embedding audit](reviews/intellij-embedding-audit-2026-09-27.md) distinguishes supported host customization from these composition decisions. They do not require replacing the existing module structure.
+
+- `TODO(host/profile)`: remove implicit standalone CLI/config augmentation from neutral workspace shell integration. It currently installs `ketra` helpers, prepends their bin directory, and advertises the standalone TOML path even for IDE-owned settings. Preserve shell markers and caller environment; standalone wiring should explicitly own the product helper. See E05.
+- `TODO(session/ui)`: allow a host-owned shell integration to supply authoritative active-command context and updates while retaining standard session assembly. OSC 133-compatible host scripts work today; writing the public command timeline does not replace the session's private active-edit providers. Reuse existing semantic models and preserve parser/host ownership rather than requiring synthetic terminal bytes. See E02.
+- `TODO(ui)`: expose an explicit suggestion request using host-provided command context while automatic popup is disabled. The current custom-text request is deliberately automatic; manual `showShellSuggestions` works but makes the host own collection/cancellation. This is an integration capability gap, not a violation of the current request contract. See E03.
+- `TODO(ui/session)`: decide and document renderer reuse without the concrete session, configuration authority during binding, and whether multiple independently scrolling views of one process are in v1 scope. Public render contracts support custom renderers, but KetraTerm's painter is internal and `SwingTerminal` binds one concrete session viewport. Expose only the rendering/input contracts an actual host needs if independent reuse is required. See E04.
+
+## API and Product Verification
+
+- `TODO(policy)`: establish the v1 compatibility contract and reviewed ABI baseline; correct missing public dependency exports in parser, host, and completion, then compile isolated Kotlin/Java consumers against published artifacts. Freeze intended APIs only after reviewing mutation ownership, lifetimes, coordinate conventions, and evolving configuration types. See audit R08/G01.
+- `TODO(host/profile)`: gate binary and plugin delivery on verification of the exact release revision, including native PTY coverage, package checks, Plugin Verifier for supported IDEs, and installed-product smoke tests. Current binary publishing is independent of the test workflow; ordinary CI omits native PTY opt-in and plugin package checks. Include the IDE 2026.3 bundled-JNA module visibility change identified in the embedding review; the plugin currently relies on IDE-native dependencies while testing only 2026.2. See audit G02.
+- `TODO(policy)`: define measured allocation/latency budgets for warm terminal paths, changing content, history growth, and platform painting; keep examples executable and performance claims scoped to evidence. The audit's short Windows paint smoke is not a release baseline. See audit G03.

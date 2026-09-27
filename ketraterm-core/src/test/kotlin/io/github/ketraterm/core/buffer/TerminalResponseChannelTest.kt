@@ -311,24 +311,28 @@ class TerminalResponseChannelTest {
     fun `queryStatusString returns valid or invalid status string responses`() {
         val buffer = TerminalBuffers.create(width = 80, height = 24)
 
-        // Valid SGR (default pen)
-        buffer.queryStatusString("m")
-        assertEquals("\u001BP1\$r0m\u001B\\", drain(buffer))
-
-        // Valid margins
-        buffer.queryStatusString("r")
-        assertEquals("\u001BP1\$r1;24r\u001B\\", drain(buffer))
-
-        buffer.queryStatusString("s")
-        assertEquals("\u001BP1\$r1;80s\u001B\\", drain(buffer))
-
-        // Valid cursor style (default is blinking block -> 1)
-        buffer.queryStatusString("q")
-        assertEquals("\u001BP1\$r1 q\u001B\\", drain(buffer))
-
-        // Invalid query
-        buffer.queryStatusString("invalid")
-        assertEquals("\u001BP0\$rinvalid\u001B\\", drain(buffer))
+        assertAll(
+            {
+                buffer.queryStatusString("m")
+                assertEquals("\u001BP1\$r0m\u001B\\", drain(buffer))
+            },
+            {
+                buffer.queryStatusString("r")
+                assertEquals("\u001BP1\$r1;24r\u001B\\", drain(buffer))
+            },
+            {
+                buffer.queryStatusString("s")
+                assertEquals("\u001BP1\$r1;80s\u001B\\", drain(buffer))
+            },
+            {
+                buffer.queryStatusString(" q")
+                assertEquals("\u001BP1\$r1 q\u001B\\", drain(buffer))
+            },
+            {
+                buffer.queryStatusString("invalid")
+                assertEquals("\u001BP0\$r\u001B\\", drain(buffer))
+            },
+        )
     }
 
     @Test

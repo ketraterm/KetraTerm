@@ -29,8 +29,72 @@ import org.junit.jupiter.params.provider.ValueSource
 import java.awt.event.InputEvent
 import java.awt.event.MouseEvent
 import javax.swing.JButton
+import javax.swing.SwingUtilities
 
 class TerminalSelectionControllerTest {
+    @ParameterizedTest
+    @ValueSource(booleans = [false, true])
+    fun `projection reuse follows viewport clipping and selection mode changes`(block: Boolean) {
+        SwingUtilities.invokeAndWait {
+            val lines = listOf("abcdefgh", "ijklmnop", "qrstuvwx")
+            val cache = TerminalRenderCache(8, 3)
+            cache.accept(AbsoluteLinesFrame(lines, historySize = 0))
+            val controller = TerminalSelectionController(FakeSelectionHost(cache))
+            val button = JButton()
+            controller.handleSelectionMousePressed(selectionMouseEvent(button, MouseEvent.MOUSE_PRESSED, 15, 5, alt = block))
+            controller.handleSelectionMouseDragged(selectionMouseEvent(button, MouseEvent.MOUSE_DRAGGED, 25, 45, alt = block))
+            val initial = controller.getViewportSelection(cache)
+            val repeatedInitial = controller.getViewportSelection(cache)
+
+            cache.accept(AbsoluteLinesFrame(lines.drop(1), historySize = 1))
+            val clipped = controller.getViewportSelection(cache)
+            val repeatedClipped = controller.getViewportSelection(cache)
+
+            controller.handleSelectionMouseDragged(selectionMouseEvent(button, MouseEvent.MOUSE_DRAGGED, 25, 25, alt = !block))
+            val changedMode = controller.getViewportSelection(cache)
+            val repeatedChangedMode = controller.getViewportSelection(cache)
+            controller.clearSelection()
+
+            assertAll(
+                { assertEquals(CellSelection(1, 0, 3, 2, isBlock = block), initial) },
+                { assertSame(initial, repeatedInitial) },
+                { assertEquals(CellSelection(if (block) 1 else 0, 0, 3, 1, isBlock = block), clipped) },
+                { assertSame(clipped, repeatedClipped) },
+                { assertEquals(CellSelection(if (block) 0 else 1, 0, 3, 1, isBlock = !block), changedMode) },
+                { assertSame(changedMode, repeatedChangedMode) },
+                { assertNull(controller.getViewportSelection(cache)) },
+            )
+        }
+    }
+
+    @Test
+    fun `unchanged internal viewport selection reuses its immutable projection`() {
+        SwingUtilities.invokeAndWait {
+            val cache = TerminalRenderCache(10, 2)
+            val controller = TerminalSelectionController(FakeSelectionHost(cache))
+            controller.selectAbsoluteRows(0L, 0L, 10)
+            val first = controller.getViewportSelection(cache)
+            assertEquals(CellSelection(0, 0, 10, 0), first)
+
+            assertSame(first, controller.getViewportSelection(cache), "The per-paint projection must reuse unchanged storage")
+        }
+    }
+
+    @Test
+    fun `selection projection changes preserve previous immutable snapshots and clearing removes it`() {
+        SwingUtilities.invokeAndWait {
+            val cache = TerminalRenderCache(10, 2)
+            val controller = TerminalSelectionController(FakeSelectionHost(cache))
+            controller.selectAbsoluteRows(0L, 0L, 10)
+            val first = controller.getViewportSelection(cache)
+            controller.selectAbsoluteRows(1L, 1L, 10)
+            assertEquals(CellSelection(0, 1, 10, 1), controller.getViewportSelection(cache))
+            assertEquals(CellSelection(0, 0, 10, 0), first, "An earlier immutable snapshot must not be mutated")
+            controller.clearSelection()
+            assertNull(controller.getViewportSelection(cache))
+        }
+    }
+
     private class FakeSelectionHost(
         override val renderCache: TerminalRenderCache,
     ) : TerminalSelectionHost {

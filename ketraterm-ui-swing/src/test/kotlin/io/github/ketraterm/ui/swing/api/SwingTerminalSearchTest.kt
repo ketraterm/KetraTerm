@@ -30,13 +30,160 @@ import io.github.ketraterm.transport.TerminalConnectorListener
 import io.github.ketraterm.ui.swing.settings.SwingPadding
 import io.github.ketraterm.ui.swing.settings.SwingSettings
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.test.StandardTestDispatcher
 import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.params.ParameterizedTest
 import org.junit.jupiter.params.provider.ValueSource
+import java.util.*
 import javax.swing.SwingUtilities
 
 class SwingTerminalSearchTest {
+    @ParameterizedTest
+    @ValueSource(ints = [32, 128])
+    fun `active search amortizes destination storage as retained history grows`(initialHistoryRows: Int) {
+        val columns = 80
+        val terminal = TerminalBuffers.create(width = columns, height = 2, maxHistory = initialHistoryRows * 2)
+        repeat(initialHistoryRows + 1) {
+            terminal.writeText("needle")
+            terminal.carriageReturn()
+            terminal.newLine()
+        }
+        assertEquals(initialHistoryRows, terminal.historySize)
+        val reader = RecordingHistoryReader(terminal as TerminalRenderFrameReader)
+        val dispatcher = StandardTestDispatcher()
+        val session =
+            TerminalSession(
+                terminal = terminal,
+                renderPublisher = TerminalRenderPublisher(columns, 2),
+                renderReader = reader,
+                responseReader = terminal,
+                connector = NoOpConnector,
+                parser = NoOpParser,
+                inputEncoder = NoOpInputEncoder,
+                workerDispatcher = dispatcher,
+                ioDispatcher = dispatcher,
+            )
+        try {
+            SwingUtilities.invokeAndWait {
+                val component =
+                    SwingTerminal(settingsProvider = {
+                        SwingSettings(
+                            columns = columns,
+                            rows = 2,
+                            padding = SwingPadding(),
+                            shellIntegrationDecorationGutterWidth = 0,
+                            cursorBlinkMillis = 0,
+                        )
+                    })
+                try {
+                    component.size = component.preferredGridSize(columns, 2)
+                    component.bind(session)
+                    dispatcher.scheduler.runCurrent()
+                    component.search("needle")
+                    dispatcher.scheduler.runCurrent()
+                    assertEquals(initialHistoryRows + 1, component.currentSearchState().resultCount)
+                    reader.beginReplacementAccounting()
+
+                    repeat(initialHistoryRows) { appended ->
+                        terminal.writeText("needle")
+                        terminal.carriageReturn()
+                        terminal.newLine()
+                        session.requestRender(scrollbackOffset = component.viewportState().renderOffset)
+                        dispatcher.scheduler.runCurrent()
+                        assertEquals(initialHistoryRows + appended + 2, component.currentSearchState().resultCount)
+                    }
+
+                    // A linear replacement budget permits different reserves/growth policies, not a full history allocation per append.
+                    val finalRetainedCells = (terminal.historySize + terminal.height).toLong() * columns
+                    val replacementBudget = 8L * finalRetainedCells * RecordingHistoryReader.BYTES_PER_COPIED_CELL
+                    assertTrue(
+                        reader.replacementBytes <= replacementBudget,
+                        "Search replaced ${reader.replacementBytes} bytes of cell planes; budget=$replacementBudget while doubling retained history",
+                    )
+                } finally {
+                    component.dispose()
+                }
+            }
+        } finally {
+            session.close()
+        }
+    }
+
+    private class RecordingHistoryReader(
+        private val source: TerminalRenderFrameReader,
+    ) : TerminalRenderFrameReader by source {
+        private val destinations = IdentityHashMap<Any, Boolean>()
+        var replacementBytes = 0L
+            private set
+
+        fun beginReplacementAccounting() {
+            replacementBytes = 0L
+        }
+
+        override fun readRenderFrameForAbsoluteRange(
+            startAbsoluteRow: Long,
+            endAbsoluteRow: Long,
+            consumer: TerminalRenderFrameConsumer,
+        ) {
+            source.readRenderFrameForAbsoluteRange(startAbsoluteRow, endAbsoluteRow) { frame ->
+                consumer.accept(
+                    object : TerminalRenderFrame by frame {
+                        override fun copyLine(
+                            row: Int,
+                            codeWords: IntArray,
+                            codeOffset: Int,
+                            attrWords: LongArray,
+                            attrOffset: Int,
+                            flags: IntArray,
+                            flagOffset: Int,
+                            extraAttrWords: LongArray?,
+                            extraAttrOffset: Int,
+                            hyperlinkIds: IntArray?,
+                            hyperlinkOffset: Int,
+                            clusterSink: TerminalRenderClusterSink?,
+                            clusterDataSink: TerminalRenderClusterDataSink?,
+                        ) {
+                            record(codeWords, codeWords.size, Int.SIZE_BYTES)
+                            record(attrWords, attrWords.size, Long.SIZE_BYTES)
+                            record(flags, flags.size, Int.SIZE_BYTES)
+                            extraAttrWords?.let { record(it, it.size, Long.SIZE_BYTES) }
+                            hyperlinkIds?.let { record(it, it.size, Int.SIZE_BYTES) }
+                            frame.copyLine(
+                                row,
+                                codeWords,
+                                codeOffset,
+                                attrWords,
+                                attrOffset,
+                                flags,
+                                flagOffset,
+                                extraAttrWords,
+                                extraAttrOffset,
+                                hyperlinkIds,
+                                hyperlinkOffset,
+                                clusterSink,
+                                clusterDataSink,
+                            )
+                        }
+                    },
+                )
+            }
+        }
+
+        private fun record(
+            destination: Any,
+            entries: Int,
+            entryBytes: Int,
+        ) {
+            if (destinations.put(destination, true) == null) replacementBytes += entries.toLong() * entryBytes
+        }
+
+        companion object {
+            const val BYTES_PER_COPIED_CELL = 3 * Int.SIZE_BYTES + 2 * Long.SIZE_BYTES
+        }
+    }
+
     @ParameterizedTest
     @ValueSource(booleans = [false, true])
     fun `replacement session cannot reuse searched text from equal row metadata`(unbindFirst: Boolean) {

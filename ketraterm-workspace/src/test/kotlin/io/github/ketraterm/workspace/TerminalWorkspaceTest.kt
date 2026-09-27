@@ -761,6 +761,87 @@ class TerminalWorkspaceTest {
         assertEquals(listOf(tab.id to event), clipboardEvents)
     }
 
+    @Test
+    fun `workspace shutdown attempts every cleanup despite connector failure`() = assertWorkspaceShutdown("connector")
+
+    @Test
+    fun `workspace shutdown attempts every cleanup despite listener failure`() = assertWorkspaceShutdown("listener")
+
+    @Test
+    fun `workspace shutdown attempts every cleanup and preserves connector and listener failures`() = assertWorkspaceShutdown("both")
+
+    private fun assertWorkspaceShutdown(failureSource: String) =
+        runTest {
+            val dispatcher = StandardTestDispatcher(testScheduler)
+            val connectorFailure = IllegalStateException("connector close failed")
+            val listenerFailure = IllegalStateException("tab closed listener failed")
+            val closeCalls = IntArray(2)
+            val closedTabIds = mutableListOf<String>()
+            var failingTabId: String? = null
+            val sessions =
+                List(2) { index ->
+                    testSession(
+                        connector =
+                            object : TerminalConnector by NoOpConnector {
+                                override fun close() {
+                                    closeCalls[index]++
+                                    if (index == 1 && failureSource != "listener") throw connectorFailure
+                                }
+                            },
+                        dispatcher = dispatcher,
+                    )
+                }
+            var nextSession = 0
+            val workspace =
+                TerminalWorkspace(
+                    listener =
+                        object : TerminalWorkspaceListener {
+                            override fun tabClosed(tabId: String) {
+                                closedTabIds += tabId
+                                if (tabId == failingTabId && failureSource != "connector") throw listenerFailure
+                            }
+                        },
+                    sessionFactory = { _, _, _ -> sessions[nextSession++] },
+                    workerDispatcher = dispatcher,
+                )
+            try {
+                val tabs =
+                    List(2) { index ->
+                        workspace.openTab(
+                            TerminalProfile("p$index", "Profile $index", listOf("mock-shell")),
+                            TerminalWorkspaceOpenOptions(80, 24, false, 100, showForegroundProcessName = false),
+                        )
+                    }
+                failingTabId = tabs.last().id
+                runCurrent()
+                val reported = assertFailsWith<IllegalStateException> { workspace.close() }
+                runCurrent()
+                assertTrue(workspace.tabSnapshot().isEmpty(), "all tabs must be removed despite failed cleanup")
+                assertTrue(sessions.all { it.isClosed }, "all sessions must receive shutdown")
+                assertContentEquals(intArrayOf(1, 1), closeCalls)
+                assertEquals(tabs.map { it.id }.toSet(), closedTabIds.toSet())
+                assertEquals(tabs.size, closedTabIds.size, "each tab must receive one close notification")
+                assertFalse(workspace.isCoroutineScopeActive)
+                assertEquals(0, workspace.sessionCollectionCount)
+                if (failureSource == "listener") {
+                    assertSame(listenerFailure, reported)
+                } else {
+                    assertSame(connectorFailure, reported)
+                    if (failureSource == "both") assertTrue(listenerFailure in reported.suppressed)
+                }
+                workspace.close()
+                assertContentEquals(intArrayOf(1, 1), closeCalls)
+                assertEquals(tabs.size, closedTabIds.size)
+            } finally {
+                try {
+                    workspace.close()
+                } finally {
+                    sessions.forEach { session -> runCatching { session.close() } }
+                    runCurrent()
+                }
+            }
+        }
+
     private fun testClipboardWriteEvent(text: String): TerminalClipboardWriteEvent =
         TerminalClipboardWriteEvent(
             selection = "c",

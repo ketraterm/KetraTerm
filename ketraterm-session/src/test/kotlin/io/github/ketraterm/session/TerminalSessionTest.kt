@@ -488,67 +488,210 @@ class TerminalSessionTest {
             assertFalse(session.isCoroutineScopeActive)
         }
 
+    @ParameterizedTest
+    @ValueSource(strings = ["local", "remote", "error"])
+    fun `cleanup disposes transport once and preserves the first termination event`(termination: String) =
+        runTest {
+            val dispatcher = StandardTestDispatcher(testScheduler)
+            val connector = MockConnector()
+            val failure = IllegalStateException("transport failed")
+            TerminalSession
+                .create(
+                    terminal = TerminalBuffers.create(10, 3),
+                    connector = connector,
+                    workerDispatcher = dispatcher,
+                    ioDispatcher = dispatcher,
+                ).use { session ->
+                    session.start(10, 3)
+                    when (termination) {
+                        "local" -> session.close()
+                        "remote" -> connector.simulateClosed(7)
+                        "error" -> connector.simulateCrash(failure)
+                        else -> error("unknown termination: $termination")
+                    }
+                    val expected =
+                        TerminalSessionState.Closed(
+                            TerminalSessionCloseEvent(
+                                exitCode = if (termination == "remote") 7 else null,
+                                failure = if (termination == "error") failure else null,
+                                locallyRequested = termination == "local",
+                            ),
+                        )
+                    assertEquals(expected, session.state.value)
+
+                    session.close()
+                    session.close()
+                    connector.simulateClosed(19)
+                    connector.simulateCrash(IllegalStateException("later failure"))
+                    runCurrent()
+
+                    assertAll(
+                        { assertEquals(1, connector.closeCount) },
+                        { assertTrue(connector.isClosed) },
+                        { assertEquals(expected, session.state.value) },
+                        { assertFalse(session.isCoroutineScopeActive) },
+                    )
+                }
+        }
+
     @Test
-    fun `remote close records exit code`() {
+    fun `connector closure callback cannot recursively dispose transport or replace the first event`() =
+        runTest {
+            val dispatcher = StandardTestDispatcher(testScheduler)
+            val recorded = MockConnector()
+            lateinit var session: TerminalSession
+            val connector =
+                object : TerminalConnector by recorded {
+                    override fun close() {
+                        recorded.close()
+                        session.onClosed(19)
+                    }
+                }
+            session =
+                TerminalSession.create(
+                    terminal = TerminalBuffers.create(10, 3),
+                    connector = connector,
+                    workerDispatcher = dispatcher,
+                    ioDispatcher = dispatcher,
+                )
+            session.use {
+                session.start(10, 3)
+                recorded.simulateClosed(7)
+                session.close()
+                session.close()
+                runCurrent()
+                assertAll(
+                    { assertEquals(1, recorded.closeCount) },
+                    {
+                        assertEquals(
+                            TerminalSessionState.Closed(
+                                TerminalSessionCloseEvent(exitCode = 7, failure = null, locallyRequested = false),
+                            ),
+                            session.state.value,
+                        )
+                    },
+                )
+            }
+        }
+
+    @ParameterizedTest
+    @CsvSource("local,false", "remote,false", "error,false", "local,true", "remote,true", "error,true")
+    fun `termination publishes final UTF8 cells when publication is pending`(
+        termination: String,
+        synchronizedOutput: Boolean,
+    ) = runTest {
+        val dispatcher = StandardTestDispatcher(testScheduler)
         val connector = MockConnector()
-        val session = createStartedSession(connector)
+        val terminal = TerminalBuffers.create(10, 3)
+        TerminalSession
+            .create(
+                terminal = terminal,
+                connector = connector,
+                workerDispatcher = dispatcher,
+                ioDispatcher = dispatcher,
+            ).use { session ->
+                session.start(10, 3)
+                session.requestRender(0)
+                runCurrent()
+                val before = session.renderGeneration.value
+                assertEquals(0, session.renderPublisher.current()!!.codeWords[0])
+                if (synchronizedOutput) connector.feedFromHost("\u001B[?2026h".ascii())
+                connector.feedFromHost("LAST \u20AC\r\n".encodeToByteArray())
+                when (termination) {
+                    "local" -> session.close()
+                    "remote" -> connector.simulateClosed(0)
+                    "error" -> connector.simulateCrash(IllegalStateException("read failed"))
+                    else -> error("unknown termination: $termination")
+                }
+                runCurrent()
 
-        connector.simulateClosed(7)
-
-        assertEquals(7, session.exitCode)
-        assertEquals(0, connector.closeCount)
-        assertEquals(
-            TerminalSessionState.Closed(
-                TerminalSessionCloseEvent(exitCode = 7, failure = null, locallyRequested = false),
-            ),
-            session.state.value,
-        )
+                assertEquals("LAST \u20AC", terminal.getLineAsString(0))
+                val expected = "LAST \u20AC".map(Char::code).toIntArray()
+                assertAll(
+                    {
+                        assertArrayEquals(
+                            expected,
+                            session.renderPublisher
+                                .current()!!
+                                .codeWords
+                                .copyOf(expected.size),
+                        )
+                    },
+                    { assertNotEquals(before, session.renderGeneration.value) },
+                    { assertTrue(session.isClosed) },
+                )
+            }
     }
 
+    @ParameterizedTest
+    @ValueSource(strings = ["local", "remote", "error"])
+    fun `termination publishes EOF replacement for incomplete UTF8 exactly once`(termination: String) =
+        runTest {
+            val dispatcher = StandardTestDispatcher(testScheduler)
+            val connector = MockConnector()
+            val terminal = TerminalBuffers.create(10, 3)
+            TerminalSession
+                .create(
+                    terminal = terminal,
+                    connector = connector,
+                    workerDispatcher = dispatcher,
+                    ioDispatcher = dispatcher,
+                ).use { session ->
+                    session.start(10, 3)
+                    session.requestRender(0)
+                    runCurrent()
+                    connector.feedFromHost(byteArrayOf(0xE2.toByte(), 0x82.toByte()))
+                    when (termination) {
+                        "local" -> session.close()
+                        "remote" -> connector.simulateClosed(0)
+                        "error" -> connector.simulateCrash(IllegalStateException("read failed"))
+                        else -> error("unknown termination: $termination")
+                    }
+                    session.close()
+                    connector.simulateClosed(19)
+                    runCurrent()
+                    assertEquals(0xFFFD, terminal.getCodepointAt(0, 0))
+                    assertEquals(0, terminal.getCodepointAt(1, 0))
+                    assertArrayEquals(
+                        intArrayOf(0xFFFD, 0),
+                        session.renderPublisher
+                            .current()!!
+                            .codeWords
+                            .copyOf(2),
+                    )
+                    assertTrue(session.isClosed)
+                }
+        }
+
     @Test
-    fun `remote error records failure and does not fake exit code`() {
-        val connector = MockConnector()
-        val session = createStartedSession(connector)
-        val failure = IllegalStateException("transport failed")
-
-        connector.simulateCrash(failure)
-
-        assertEquals(failure, session.failure)
-        assertNull(session.exitCode)
-        assertEquals(0, connector.closeCount)
-        assertEquals(
-            TerminalSessionState.Closed(
-                TerminalSessionCloseEvent(exitCode = null, failure = failure, locallyRequested = false),
-            ),
-            session.state.value,
-        )
-    }
-
-    @Test
-    fun `onClosed does not recursively close connector`() {
-        val connector = MockConnector()
-        createStartedSession(connector)
-
-        connector.simulateClosed(7)
-
-        assertEquals(0, connector.closeCount)
-    }
-
-    @Test
-    fun `local cleanup after remote close does not emit duplicate close event`() {
-        val connector = MockConnector()
-        val session = createStartedSession(connector)
-
-        connector.simulateClosed(1)
-        session.close()
-
-        assertEquals(
-            TerminalSessionState.Closed(
-                TerminalSessionCloseEvent(exitCode = 1, failure = null, locallyRequested = false),
-            ),
-            session.state.value,
-        )
-    }
+    fun `remote EOF preserves a final frame that was already published`() =
+        runTest {
+            val dispatcher = StandardTestDispatcher(testScheduler)
+            val connector = MockConnector()
+            TerminalSession
+                .create(
+                    terminal = TerminalBuffers.create(10, 3),
+                    connector = connector,
+                    workerDispatcher = dispatcher,
+                    ioDispatcher = dispatcher,
+                ).use { session ->
+                    session.start(10, 3)
+                    connector.feedFromHost("LAST LINE\r\n".ascii())
+                    session.requestRender(0)
+                    runCurrent()
+                    connector.simulateClosed(0)
+                    runCurrent()
+                    val expected = "LAST LINE".map(Char::code).toIntArray()
+                    assertArrayEquals(
+                        expected,
+                        session.renderPublisher
+                            .current()!!
+                            .codeWords
+                            .copyOf(expected.size),
+                    )
+                    assertEquals(0, session.exitCode)
+                }
+        }
 
     @Test
     fun `input key writes through connector`() {

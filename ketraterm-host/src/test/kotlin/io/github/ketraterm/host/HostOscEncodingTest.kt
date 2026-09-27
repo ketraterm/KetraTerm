@@ -100,7 +100,7 @@ class HostOscEncodingTest {
             val count = f.terminal.readResponseBytes(output)
             val expected =
                 if (permission == HostControlPolicy.ALLOW) {
-                    "\u001BP0\$rz\u001B\\\u001BP1+r436f=323536\u001B\\\u001BP0+r\u001B\\"
+                    "\u001BP0\$r\u001B\\\u001BP1+r436f=323536\u001B\\\u001BP0+r\u001B\\"
                 } else {
                     ""
                 }

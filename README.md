@@ -10,14 +10,14 @@ Designed for embedding into IDEs, developer tools, and standalone desktop applic
 ## Features
 
 * **Native Pseudo-Terminal (PTY) Integration**: Seamless cross-platform native execution using JetBrains [Pty4J](https://github.com/traff/pty4j) with full Windows ConPTY support, built to handle modern shells (Zsh, Fish, PowerShell) and prompt size propagation.
-* **Modern TUI & vt100/xterm Compliance**: Passes most tests of the rigorous `vttest` suite, ensuring flawless rendering for heavy interactive TUI applications like Neovim, Tmux, Htop, Fzf, and lazygit.
+* **Modern Shell & TUI Support**: Implements the protocols documented in the feature map, with deterministic byte-stream, differential, and grid-model tests. Known compatibility and correctness limitations are recorded in the gap map.
 * **Richer Styling & 24-Bit TrueColor**: Bypasses the limits of standard 256-color palettes with full 24-bit TrueColor RGB mapping. Renders overline decorations and modern underline styles (Single, Double, Curly, Dotted, Dashed) with custom underline colors.
 * **Advanced Keyboard Shortcuts**: Supports DEC Backarrow mode, conventional Ctrl-number controls, xterm modified and extended function keys, `modifyOtherKeys`, compact CSI-u, and Kitty keyboard progressive flags `1` (escape-code disambiguation) and `8` (report all keys as CSI-u). Swing preserves press/repeat/release for AWT-visible non-text physical keys without per-event allocation. Rich native layout, IME, alternate-key, and associated-text reporting (`2`, `4`, `16`) is explicitly deferred and never advertised by portable hosts.
 * **Unbounded Mouse Tracking**: Supports legacy mouse tracking alongside modern Standard SGR Mouse (`1006`), SGR-Pixels (`1016`), and URXVT (`1015`) decimal-packed coordinates, allowing precise clicks, drags, and scroll-wheel interactions beyond the legacy 223-cell limit.
-* **Tear-Free Triple-Buffered Rendering**: Decouples active parsing from the UI drawing loops using an asynchronous dirty-coalescing rendering worker and a triple-buffered publisher. Delivers a clean **60+ FPS** paint cycle with zero visual tearing or stuttering under massive log outputs.
-* **Security-Hardened Design**: Hardened against malicious escape sequence exploits. Utilizes a bounded, double-indexed LRU cache for OSC 8 hyperlinks, strict xterm title stack limits, and pre-allocated OSC/DCS payload buffers to block memory exhaustion.
+* **Triple-Buffered Rendering**: Decouples parsing from Swing painting through a background frame-publication worker and leased copied frames. Java2D painting runs on the EDT; frame rate and allocation depend on workload, runtime, and platform.
+* **Bounded Protocol Handling**: Uses a bounded, double-indexed LRU cache for OSC 8 hyperlinks, title stack limits, and bounded OSC/DCS payload collection. Host policies gate terminal-initiated actions; open security corrections are tracked in the release review and gap map.
 * **Pixel-Perfect Typography & Color Emojis**: Integrates UAX #29 grapheme cluster segmentation, East Asian width policies, custom fallback font chains, and prioritized OS color emojis (Apple, Segoe, Noto). Programmatically paints box-drawing and block characters to eliminate anti-aliased line gaps.
-* **Zero-Allocation Memory Profile**: Core grid storage is built on flat parallel primitive arrays (no object-per-cell overhead) and a circular arena allocator (`ClusterStore`), ensuring near-zero garbage collector pressure and pauses during active shell throughput.
+* **Allocation-Conscious Storage**: Core grid storage uses flat parallel primitive arrays and a `ClusterStore` arena, avoiding object-per-cell storage. Reusable hot-path buffers reduce allocation; this does not imply zero allocation across complete Swing frames or changing workloads.
 * **Independent Buffer & Margin Physics**: Employs vertical and horizontal scroll margins (`DECSLRM`/`DECSTBM`) with instant switching between primary and alt buffers (`?1049`) carrying independent margins and cursor state save slots.
 * **VT420 Rectangular Operations**: Supports protected, wide-glyph-safe rectangular erase, fill, copy, attribute updates, column edits, and active-page checksum responses for demanding text TUIs.
 * **Native Desktop Notifications**: Fully supports native desktop notifications triggered directly via iTerm2-style `OSC 9` and urxvt-style `OSC 777` sequences, featuring a KetraTerm-specific severity extension (`info`, `warning`, `error`, `none`), ConEmu subcommand conflict filtering, and self-cleaning tray icon management.
@@ -27,6 +27,8 @@ Designed for embedding into IDEs, developer tools, and standalone desktop applic
 > For a complete specification of all supported capabilities, see the [Terminal Feature Map](docs/terminal-feature-map.md). A detailed list of current backlog items and compatibility decisions is maintained in the [Terminal Feature Gap Map](docs/terminal-feature-gap-map.md)
 
 > Deterministic differential, resize/reflow, and independent grid-model verification are documented in [Terminal Conformance Testing](docs/terminal-conformance-testing.md).
+
+> The [terminal quality audit](docs/reviews/terminal-quality-audit-2026-09-27.md) records correctness, performance and API findings, reproduction evidence, and verification requirements.
 
 ---
 
@@ -114,7 +116,7 @@ KetraTerm is composed of strict, decoupled Gradle modules:
 
 ### Prerequisites
 * **JDK 25 or higher**
-* **Gradle 7.4+**
+* **Gradle**: use the included wrapper (`gradlew` / `gradlew.bat`).
 
 ### Command Reference
 * **Run All Tests**:

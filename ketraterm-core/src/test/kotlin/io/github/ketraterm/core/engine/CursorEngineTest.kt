@@ -24,6 +24,34 @@ import org.junit.jupiter.api.Test
 
 @DisplayName("CursorEngine")
 class CursorEngineTest {
+    @Test
+    fun `maximum downward movement clamps before integer addition`() {
+        val s = state()
+        val e = engine(s)
+        e.setCursorAbsolute(1, 1)
+        val before = snapshot(s)
+
+        e.cursorDown(Int.MAX_VALUE)
+
+        assertEquals(3, s.cursor.row)
+        assertEquals(1, s.cursor.col)
+        assertGridUnchanged(before, s)
+    }
+
+    @Test
+    fun `maximum rightward movement clamps before integer addition`() {
+        val s = state()
+        val e = engine(s)
+        e.setCursorAbsolute(1, 1)
+        val before = snapshot(s)
+
+        e.cursorRight(Int.MAX_VALUE)
+
+        assertEquals(5, s.cursor.col)
+        assertEquals(1, s.cursor.row)
+        assertGridUnchanged(before, s)
+    }
+
     // ── Fixtures ──────────────────────────────────────────────────────────
 
     private fun state(

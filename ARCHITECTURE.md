@@ -25,7 +25,7 @@ KetraTerm separates terminal operations into a strict, unidirectional data pipel
   └─────────────┘             └─────────────────┘            └──────────────────────┘             └───────────────┘
 ```
 
-The pipeline coordination is managed by `TerminalSession` using a thread-safe, actor-like model. Concurrency is tightly controlled, preventing race conditions or visual tearing while sustaining a rendering speed of **60+ FPS** under heavy stdout throughput.
+`TerminalSession` serializes parser/core mutation and outbound admission. A background worker publishes copied frames, while Swing paints its own cache on the EDT. These boundaries reduce shared-state exposure; workload-specific performance and remaining lifecycle defects are documented in the [terminal quality audit](docs/reviews/terminal-quality-audit-2026-09-27.md).
 
 ---
 
@@ -55,7 +55,7 @@ The KetraTerm codebase is partitioned into highly specialized modules with stric
 Operating a multithreaded terminal on the JVM introduces concurrent events from the host PTY (background reads), the OS (resizing and focus shifts), and the UI (user keystrokes and paint ticks). The transport contract already guarantees ordered, serial byte delivery, so `TerminalSession` needs two locks and one coroutine publication worker:
 
 1. **`mutationLock`**: The core-critical lock. It blocks parser execution, grid resizing, borrowed frame reads, and render-frame extraction. This ensures copied frames never contain half-written rows or mismatched widths.
-2. **`outboundWriteLock`**: A reentrant monitor that synchronizes writes to host stdin and protects encoder scratch buffers. It guarantees that user input and synchronous query responses are written in exact order without interleaved bytes.
+2. **`outboundWriteLock`**: A reentrant monitor protecting ordinary encoder scratch, policy state and bounded queue admission. One I/O coroutine writes admitted input and responses in order; native writes and bulk encoding run outside this monitor. Input return means acceptance, not completed transport output.
 3. **Render publication worker**: A conflated coroutine channel wakes one session worker. The worker extracts a frame under `mutationLock`, promotes it through `TerminalRenderPublisher`, and updates a `StateFlow` generation consumed by UI renderers.
 
 ---
@@ -87,5 +87,5 @@ During terminal resizes, KetraTerm uses a 3-phase reflow strategy in `TerminalRe
 
 We treat terminal testing as a critical engineering discipline:
 1. **Assert Real Semantics**: Tests assert standard-aligned ANSI/DEC protocol states and real screen results, rather than current parser implementation quirks.
-2. **Deterministic Multi-threading**: The host and session test suites employ synchronized latches to stress-test high-volume updates, proving that resizes, writes, and renders are race-free.
+2. **Deterministic Concurrency Tests**: Host and session suites use controlled schedulers and explicit event handshakes to test resize, write, render and shutdown ordering. Passing cases establish those tested contracts, not the absence of all races.
 3. **In-Memory Fakes**: By leveraging `:ketraterm-testkit`'s `MockConnector`, developers can run complete, bidirectional I/O host tests with exact byte assertions, completely independent of local OS PTY subsystems.

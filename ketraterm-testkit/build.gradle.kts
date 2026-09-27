@@ -254,3 +254,31 @@ registerCursorWrapModelProfile(
 tasks.test {
     useJUnitPlatform()
 }
+
+// Compile consumer fixtures against each module's exported API variant, not testkit's classpath.
+val consumerClasspathsDirectory = layout.buildDirectory.dir("consumer-classpaths")
+val prepareConsumerClasspaths =
+    listOf("host", "parser", "completion").map { module ->
+        val consumerClasspath =
+            configurations.create("${module}ConsumerCompileClasspath") {
+                isCanBeConsumed = false
+                isCanBeResolved = true
+                attributes {
+                    attribute(Usage.USAGE_ATTRIBUTE, objects.named(Usage.JAVA_API))
+                    attribute(Category.CATEGORY_ATTRIBUTE, objects.named(Category.LIBRARY))
+                    attribute(LibraryElements.LIBRARY_ELEMENTS_ATTRIBUTE, objects.named(LibraryElements.JAR))
+                    attribute(TargetJvmVersion.TARGET_JVM_VERSION_ATTRIBUTE, 25)
+                }
+            }
+        dependencies.add(consumerClasspath.name, project(":ketraterm-$module"))
+        tasks.register<Sync>("prepare${module.replaceFirstChar(Char::uppercaseChar)}ConsumerClasspath") {
+            from(consumerClasspath)
+            into(consumerClasspathsDirectory.map { it.dir(module) })
+        }
+    }
+
+tasks.test {
+    dependsOn(prepareConsumerClasspaths)
+    inputs.dir(consumerClasspathsDirectory)
+    systemProperty("ketraterm.consumerClasspaths", consumerClasspathsDirectory.get().asFile.absolutePath)
+}

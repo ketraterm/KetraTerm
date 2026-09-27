@@ -15,13 +15,68 @@
  */
 package io.github.ketraterm.ui.swing.search
 
+import io.github.ketraterm.core.TerminalBuffers
 import io.github.ketraterm.render.api.*
 import io.github.ketraterm.render.cache.TerminalRenderCache
-import org.junit.jupiter.api.Assertions.assertEquals
-import org.junit.jupiter.api.Assertions.assertTrue
+import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.Test
+import org.junit.jupiter.api.function.Executable
+import org.junit.jupiter.params.ParameterizedTest
+import org.junit.jupiter.params.provider.CsvSource
 
 class TerminalSearchModelTest {
+    @ParameterizedTest
+    @CsvSource("false,abc", "false,'ab '", "true,abc", "true,'ab '")
+    fun `search excludes wide wrap padding and retains written separators`(
+        cluster: Boolean,
+        prefix: String,
+    ) {
+        val terminal = TerminalBuffers.create(width = 4, height = 3, maxHistory = 8)
+        terminal.writeText(prefix)
+        val wideText = if (cluster) "界\u0301" else "界"
+        if (cluster) terminal.writeCluster(intArrayOf(0x754C, 0x0301)) else terminal.writeCodepoint(0x754C)
+        terminal.writeText("x")
+        val cache = TerminalRenderCache(4, 3)
+        val reader = terminal as TerminalRenderFrameReader
+        val model = TerminalSearchModel()
+
+        assertAll(
+            intArrayOf(4, 8, 4).map { width ->
+                Executable {
+                    terminal.resize(newWidth = width, newHeight = 3)
+                    cache.updateFromAbsoluteRange(reader, 0L, Long.MAX_VALUE)
+                    val matches = model.search(cache, "$prefix${wideText}x", ignoreCase = false)
+                    assertEquals(1, matches.resultCount, "width=$width prefix='$prefix'")
+                    val viewport = TerminalSearchViewportHighlights()
+                    matches.buildViewportHighlights(cache, viewport)
+                    if (width == 4) {
+                        assertEquals(2, viewport.segmentCount)
+                        assertEquals(0, viewport.startColumn(0))
+                        assertEquals(3, viewport.endColumn(0), "The first highlight must end before wrap padding")
+                        assertEquals(0, viewport.startColumn(1))
+                        assertEquals(3, viewport.endColumn(1), "The continuation must include the wide cell and following text")
+                    } else {
+                        assertEquals(1, viewport.segmentCount)
+                        assertEquals(0, viewport.startColumn(0))
+                        assertEquals(6, viewport.endColumn(0))
+                    }
+                    assertEquals(
+                        0,
+                        model.search(cache, "$prefix $wideText", ignoreCase = false).resultCount,
+                        "Wrap padding is not a separator",
+                    )
+                    if (prefix.endsWith(' ')) {
+                        assertEquals(
+                            0,
+                            model.search(cache, "ab$wideText", ignoreCase = false).resultCount,
+                            "Written separators must remain",
+                        )
+                    }
+                }
+            },
+        )
+    }
+
     @Test
     fun `viewport projection includes all boundary matches and clips a wrapped active result`() {
         val cache = renderCache(WrappedTextFrame(Array(1000) { "aa" }, wrapped = BooleanArray(1000) { it < 999 }))
