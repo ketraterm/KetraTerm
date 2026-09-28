@@ -88,7 +88,10 @@ Render frames distinguish stored content from its global presentation:
   to the most recently written printable cell. The caller owns segmentation and
   includes the previously published prefix; core preserves the original attributes
   and applies width, occupied-span, and following-cursor changes. No new printable
-  cell is inserted. Valid updates without a remembered target are ignored.
+  cell is inserted. In-row width changes recompute the following cursor and its
+  pending-wrap flag using the active right margin and autowrap mode. Completed
+  wrapping, scrolling, overwrites and insert shifts are not reversed. Valid updates
+  without a remembered target are ignored.
 - Both cluster APIs consume the borrowed array synchronously, copying its used prefix
   into core storage. Callers may reuse it immediately. Core neither compares prefixes
   nor validates grapheme boundaries, and imposes no parser retention limit.
@@ -103,8 +106,8 @@ Guaranteed behavior:
 - deferred wrap follows terminal semantics
 - clusters are stored in the active buffer arena and survive reflow by
   deep-copy into the new arena
-- parser-identified grapheme continuations preserve the cursor position and
-  wide spacer invariants
+- same-width grapheme continuations preserve cursor position; in-row width changes
+  update the following cursor while preserving wide spacer invariants
 
 Not guaranteed:
 

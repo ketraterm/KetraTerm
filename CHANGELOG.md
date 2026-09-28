@@ -4,6 +4,7 @@ Release notes for library consumers and embedders. Product-specific changes are 
 
 ## [Unreleased]
 
+- Partially addressed R06: recompute the following cursor and pending wrap when a retained variation selector changes width within the row. This prevents subsequent text from overwriting a newly widened cluster and cancels stale pending wrap after narrowing. Remaining chunk-dependent placement cases stay open; width policy and public signatures are unchanged.
 - Fixed R03/R04: PTY closure now waits for output delivery through EOF, while read failures and session startup/termination paths release owned transport resources once. Explicit local close cancels reads; cleanup preserves the first termination cause.
 - Fixed R05: session shutdown flushes parser EOF and publishes the final viewport before emitting Closed, including synchronized output and concurrent render publication. Public signatures are unchanged; remote completion now also disposes the connector, and close can wait for active render leases.
 - Fixed R15: workspace and product disposal attempt remaining sessions, panes, listeners, and resources after failures, preserving suppressed exceptions and cancelling the workspace scope. Closed workspaces reject new tabs. Added deterministic lifecycle/failure tests and native Windows ConPTY verification.

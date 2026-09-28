@@ -19,6 +19,7 @@ import io.github.ketraterm.core.TerminalBuffers
 import io.github.ketraterm.core.api.TerminalBuffer
 import io.github.ketraterm.core.model.CellColor
 import io.github.ketraterm.parser.api.TerminalParsers
+import io.github.ketraterm.render.api.TerminalRenderFrameReader
 import org.junit.jupiter.api.Assertions.assertArrayEquals
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Test
@@ -27,6 +28,175 @@ import org.junit.jupiter.params.provider.CsvSource
 import org.junit.jupiter.params.provider.ValueSource
 
 class HostGraphemeTest {
+    @Test
+    fun `narrowing restores text overwritten by the provisional wide prefix`() {
+        for (insert in listOf(false, true)) {
+            val terminal = TerminalBuffers.create(6, 2)
+            terminal.writeText("abcdef")
+            terminal.positionCursor(1, 0)
+            terminal.setInsertMode(insert)
+            val parser = TerminalParsers.create(HostCommandAdapter(terminal))
+            parser.accept("\uD83D\uDE00".encodeToByteArray())
+            assertEquals(0x1f600, terminal.getCodepointAt(1, 0), "prefix is immediately visible")
+            assertEquals(-1, terminal.getCodepointAt(2, 0))
+            parser.accept("\uFE0E".encodeToByteArray())
+            assertEquals(if (insert) "a\uD83D\uDE00\uFE0Ebcde" else "a\uD83D\uDE00\uFE0Ecdef", terminal.getLineAsString(0))
+            assertEquals(2, terminal.cursorCol)
+        }
+    }
+
+    @ParameterizedTest
+    @CsvSource("false,full", "true,full", "false,vertical", "true,vertical", "false,top", "true,top", "false,horizontal", "true,horizontal")
+    fun `provisional width changes are independent of chunks with occupied cells and scrolling`(
+        alternate: Boolean,
+        margins: String,
+    ) {
+        for (history in listOf(0, 1, 4)) {
+            for (insert in listOf(false, true)) {
+                for (wrap in listOf(false, true)) {
+                    for (cluster in listOf("\u2764\uFE0F", "\uD83D\uDE00\uFE0E", "\u2764\uFE0F\uFE0E")) {
+                        for (suffix in listOf("", "X", "\r\nY")) {
+                            val bytes = (cluster + suffix).encodeToByteArray()
+
+                            fun terminal(): TerminalBuffer =
+                                TerminalBuffers.create(6, 4, maxHistory = history).apply {
+                                    if (alternate) enterAltBuffer()
+                                    repeat(8) {
+                                        writeCluster(intArrayOf('a'.code + it, 0x0301))
+                                        writeText("BCDEF")
+                                        newLine()
+                                        carriageReturn()
+                                    }
+                                    for (row in 0..3) {
+                                        positionCursor(0, row)
+                                        writeText("abcdef")
+                                    }
+                                    if (margins == "vertical") setScrollRegion(2, 3)
+                                    if (margins == "top") setScrollRegion(1, 3)
+                                    if (margins == "horizontal") {
+                                        setLeftRightMarginMode(true)
+                                        setLeftRightMargins(2, 5)
+                                    }
+                                    setInsertMode(insert)
+                                    setAutoWrap(wrap)
+                                    positionCursor(
+                                        if (margins ==
+                                            "horizontal"
+                                        ) {
+                                            4
+                                        } else {
+                                            5
+                                        },
+                                        if (margins == "vertical" || margins == "top") 2 else 3,
+                                    )
+                                }
+                            val whole = terminal()
+                            TerminalParsers.create(HostCommandAdapter(whole)).apply {
+                                accept(bytes)
+                                endOfInput()
+                            }
+                            for (split in -1..bytes.size) {
+                                val streamed = terminal()
+                                val parser = TerminalParsers.create(HostCommandAdapter(streamed))
+                                if (split < 0) {
+                                    for (byte in bytes) parser.acceptByte(byte.toInt() and 0xff)
+                                } else {
+                                    parser.accept(bytes, 0, split)
+                                    parser.accept(bytes, split, bytes.size - split)
+                                }
+                                parser.endOfInput()
+                                assertSameGrid(
+                                    whole,
+                                    streamed,
+                                    "alt=$alternate history=$history margins=$margins insert=$insert wrap=$wrap cluster=$cluster suffix=$suffix split=$split",
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    private fun assertSameGrid(
+        expected: TerminalBuffer,
+        actual: TerminalBuffer,
+        context: String,
+    ) {
+        assertEquals(expected.getAllAsString(), actual.getAllAsString(), context)
+        assertEquals(expected.historySize, actual.historySize, context)
+        assertEquals(expected.cursorCol, actual.cursorCol, context)
+        assertEquals(expected.cursorRow, actual.cursorRow, context)
+        (expected as TerminalRenderFrameReader).readRenderFrame(
+            expected.historySize,
+            expected.historySize + expected.height,
+        ) { expectedFrame ->
+            (actual as TerminalRenderFrameReader).readRenderFrame(actual.historySize, actual.historySize + actual.height) { actualFrame ->
+                assertEquals(expectedFrame.discardedCount, actualFrame.discardedCount, context)
+                for (row in 0 until expectedFrame.rows) {
+                    assertEquals(expectedFrame.lineWrapped(row), actualFrame.lineWrapped(row), "$context wrapped row=$row")
+                    val expectedCodes = IntArray(expected.width)
+                    val actualCodes = IntArray(actual.width)
+                    val expectedAttrs = LongArray(expected.width)
+                    val actualAttrs = LongArray(actual.width)
+                    val expectedFlags = IntArray(expected.width)
+                    val actualFlags = IntArray(actual.width)
+                    expectedFrame.copyLine(row, expectedCodes, attrWords = expectedAttrs, flags = expectedFlags)
+                    actualFrame.copyLine(row, actualCodes, attrWords = actualAttrs, flags = actualFlags)
+                    assertArrayEquals(expectedCodes, actualCodes, context)
+                    assertArrayEquals(expectedAttrs, actualAttrs, context)
+                    assertArrayEquals(expectedFlags, actualFlags, context)
+                }
+            }
+        }
+        val expectedCluster = IntArray(32)
+        val actualCluster = IntArray(32)
+        for (row in 0 until expected.height) {
+            for (col in 0 until expected.width) {
+                assertEquals(expected.getCodepointAt(col, row), actual.getCodepointAt(col, row), "$context ($col,$row)")
+                assertEquals(expected.getAttrAt(col, row), actual.getAttrAt(col, row), "$context ($col,$row)")
+                val length = expected.getLine(row).readCluster(col, expectedCluster)
+                assertEquals(length, actual.getLine(row).readCluster(col, actualCluster), context)
+                assertArrayEquals(expectedCluster.copyOf(length), actualCluster.copyOf(length), context)
+            }
+        }
+    }
+
+    @Test
+    fun `tiny grids and already pending wraps retain chunk equivalence`() {
+        for (width in 1..3) {
+            for (height in 1..2) {
+                for (history in 0..1) {
+                    for (prefix in listOf("", "A".repeat(width))) {
+                        for (text in listOf("\uD83D\uDE00\uFE0E", "\u2764\uFE0F\uFE0E", "\u4E00\uFE0E")) {
+                            for (suffix in listOf("", "X", "\u001B[32mY", "\u0018X")) {
+                                val bytes = (prefix + text + suffix).encodeToByteArray()
+                                val whole = TerminalBuffers.create(width, height, maxHistory = history)
+                                TerminalParsers.create(HostCommandAdapter(whole)).apply {
+                                    accept(bytes)
+                                    endOfInput()
+                                }
+                                for (split in 0..bytes.size) {
+                                    val actual = TerminalBuffers.create(width, height, maxHistory = history)
+                                    TerminalParsers.create(HostCommandAdapter(actual)).apply {
+                                        accept(bytes, 0, split)
+                                        accept(bytes, split, bytes.size - split)
+                                        endOfInput()
+                                    }
+                                    assertSameGrid(
+                                        whole,
+                                        actual,
+                                        "size=$width,$height history=$history prefix=$prefix text=$text suffix=$suffix split=$split",
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     @ParameterizedTest
     @CsvSource(
         "false,false,false",

@@ -41,7 +41,7 @@ are an ownership reference, not a stable extension contract to copy.
 |---|---|---|
 | Windows, tabs, process/remote connector and product services | `TerminalSession.create` + `SwingTerminal` + `SwingHostServices` | Best-supported path. No KetraTerm workspace, PTY launcher or completion engine required. |
 | Its renderer and frontend models | Core/parser/host/input, optionally session; consume public render frames/cache | Existing contracts support this. Independent artifact consumption still needs R08/G01 verification. |
-| Its session/runtime, while reusing our complete Swing renderer | Public render contracts plus an independently bound Swing surface | Incomplete: `SwingTerminal.bind` requires the final concrete `TerminalSession`; the painter is internal. E04. |
+| Its session/runtime, while reusing our complete Swing renderer | Not a supported composition: `SwingTerminal.bind` requires `TerminalSession` | E04 scope decision: independent Swing renderer reuse is not required; no extraction is planned. |
 
 The existing IDE pane is a useful example, not the library integration API. It
 supplies native clipboard, fonts, dispatch, shortcuts, context menus, scrollbar
@@ -111,11 +111,13 @@ is internal. Binding applies width policy, palette, cursor/paste settings and gr
 geometry. The bind documentation's observation-only wording is therefore
 incomplete: this view also configures the session.
 
-If retaining the IDE's runtime while using our painter is a v1 requirement,
-expose a narrow rendering boundary based on existing frame/cache and input
-contracts, retaining convenient standard session binding. Do not export the
-whole internal painter graph or mirror every session method in another facade.
-Otherwise state the concrete-session requirement clearly before freezing APIs.
+**Scope decision recorded 2026-09-28:** Independent reuse of KetraTerm's Swing
+renderer is not required. Keep its `TerminalSession` dependency; the proposed
+independent rendering boundary is no longer planned. Hosts using their own
+renderer retain the existing core/render contracts, with optional session reuse.
+Replacing shell integration or suggestion providers remains separate E02/E03
+work. The canonical decision and remaining public binding-documentation work
+are recorded under [embedding contracts](../terminal-feature-gap-map.md#embedding-contracts).
 
 One session currently publishes one viewport. Two independently scrolling views
 of one process are not supported by binding two components; separate sessions
@@ -183,5 +185,7 @@ The failures assert correct focus reporting and host-neutral bootstrap behavior
 and remain enabled. No tests were skipped and there were no fixture errors.
 `spotlessApply` succeeded; the unrelated existing production line-wrap change
 was restored. No production fix, changelog entry, native GUI focus test or new
-full-root run accompanies this follow-up. E02–E04 are capability/contract
-decisions; tests for unchosen APIs would not prove their correct design.
+full-root run accompanies this follow-up. E02/E03 are capability/contract
+decisions; tests for unchosen APIs would not prove their correct design. E04's
+later scope decision requires no new renderer API or behavioral tests; its
+remaining work is public contract documentation.

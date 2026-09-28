@@ -89,7 +89,9 @@ interface TerminalWriter {
      * The caller owns segmentation and supplies the entire retained sequence, including
      * the previously published prefix. Core preserves the target's attributes, recalculates
      * width, and adjusts its occupied span and following cursor. This does not insert a new
-     * cell or advance past a second grapheme. If no remembered printable target remains,
+     * cell or advance past a second grapheme. In-row width changes recompute the following
+     * cursor and pending wrap; completed wraps, scrolls, overwrites and insert shifts are
+     * not reversed. If no remembered printable target remains,
      * valid input is ignored. This operation does not validate grapheme boundaries or
      * compare the supplied prefix with stored text.
      *

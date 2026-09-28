@@ -640,16 +640,15 @@ internal class MutationEngine(
         oldWidth: Int,
         newWidth: Int,
     ) {
-        if (oldWidth == newWidth || state.cursor.row != row || state.cursor.pendingWrap) return
+        if (oldWidth == newWidth || state.cursor.row != row) return
 
         val oldEnd = col + oldWidth
-        if (state.cursor.col != oldEnd) return
+        if (state.cursor.col != oldEnd.coerceAtMost(rightMargin)) return
 
         val newEnd = col + newWidth
-        if (newEnd <= rightMargin) {
-            state.cursor.col = newEnd
-            state.markCursorChanged()
-        }
+        state.cursor.col = newEnd.coerceAtMost(rightMargin)
+        state.cursor.pendingWrap = newEnd > rightMargin && state.modes.isAutoWrap
+        state.markCursorChanged()
     }
 
     /**
