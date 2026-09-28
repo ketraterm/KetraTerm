@@ -59,7 +59,35 @@ class SwingTerminalSelectionTest {
         resizedColumns: Int,
         block: Boolean,
     ) {
-        val terminal = TerminalBuffers.create(width = 8, height = 2, maxHistory = 8)
+        assertSelectionAfterResize(resizedColumns, 2, block)
+    }
+
+    @ParameterizedTest
+    @CsvSource("8,1,false", "8,1,true", "8,3,false", "8,3,true", "4,1,false", "4,1,true", "8,2,false", "8,2,true")
+    fun `grid resize clears physical selection including eviction but unchanged geometry preserves it`(
+        columns: Int,
+        rows: Int,
+        block: Boolean,
+    ) {
+        assertSelectionAfterResize(columns, rows, block)
+    }
+
+    @ParameterizedTest
+    @CsvSource("8,false", "8,true", "28,false", "28,true")
+    fun `font resize clears physical selection`(
+        fontSize: Float,
+        block: Boolean,
+    ) {
+        assertSelectionAfterResize(8, 2, block, fontSize)
+    }
+
+    private fun assertSelectionAfterResize(
+        resizedColumns: Int,
+        resizedRows: Int,
+        block: Boolean,
+        fontSize: Float? = null,
+    ) {
+        val terminal = TerminalBuffers.create(width = 8, height = 2, maxHistory = 0)
         terminal.writeText("abcdefgh")
         val dispatcher = StandardTestDispatcher()
         val session =
@@ -77,17 +105,17 @@ class SwingTerminalSelectionTest {
 
         SwingUtilities.invokeAndWait {
             val clipboard = RecordingClipboard()
+            var settings =
+                SwingSettings(
+                    columns = 8,
+                    rows = 2,
+                    padding = SwingPadding(),
+                    shellIntegrationDecorationGutterWidth = 0,
+                    cursorBlinkMillis = 0,
+                )
             val component =
                 createComponent(
-                    settingsProvider = {
-                        SwingSettings(
-                            columns = 8,
-                            rows = 2,
-                            padding = SwingPadding(),
-                            shellIntegrationDecorationGutterWidth = 0,
-                            cursorBlinkMillis = 0,
-                        )
-                    },
+                    settingsProvider = { settings },
                     hostServices = SwingHostServices(clipboardHandler = clipboard),
                 )
             component.size = component.preferredGridSize(8, 2)
@@ -112,23 +140,43 @@ class SwingTerminalSelectionTest {
                 component.mouseMotionListeners.forEach { it.mouseDragged(dragged) }
             }
             val released = mouseReleased(component, x = 1, y = 1)
-            component.mouseListeners.forEach { it.mouseReleased(released) }
+            if (!block) component.mouseListeners.forEach { it.mouseReleased(released) }
             assertEquals(block, component.currentSelection()?.isBlock)
             assertTrue(component.copySelectionToClipboard())
             assertEquals("abcdefgh", clipboard.copied.get())
 
-            component.size = component.preferredGridSize(resizedColumns, 2)
-            val resize = ComponentEvent(component, ComponentEvent.COMPONENT_RESIZED)
-            component.componentListeners.forEach { it.componentResized(resize) }
-            dispatcher.scheduler.runCurrent()
-            assertEquals(resizedColumns, terminal.width)
-
-            if (component.currentSelection() == null) {
-                assertFalse(component.copySelectionToClipboard(), "A cleared selection must not copy stale coordinates")
+            if (fontSize != null) {
+                settings = settings.copy(font = settings.font.deriveFont(fontSize))
+                component.reloadSettings()
             } else {
-                assertTrue(component.copySelectionToClipboard())
-                assertEquals("abcdefgh", clipboard.copied.get(), "Reflow must not silently select only part of the original text")
+                component.size = component.preferredGridSize(resizedColumns, resizedRows)
+                val resize = ComponentEvent(component, ComponentEvent.COMPONENT_RESIZED)
+                component.componentListeners.forEach { it.componentResized(resize) }
             }
+            dispatcher.scheduler.runCurrent()
+            if (fontSize == null) {
+                assertEquals(resizedColumns, terminal.width)
+                assertEquals(resizedRows, terminal.height)
+                if (resizedColumns == 4 && resizedRows == 1) {
+                    (terminal as TerminalRenderFrameReader).readRenderFrame { frame ->
+                        assertTrue(frame.discardedCount > 0L, "Narrowing into one row must exercise eviction")
+                    }
+                }
+            } else {
+                assertNotEquals(8, terminal.width, "Font metrics must change the grid for this regression")
+            }
+
+            if (fontSize != null || resizedColumns != 8 || resizedRows != 2) {
+                assertNull(component.currentSelection(), "Physical selection must be cleared when the grid changes")
+                assertFalse(component.copySelectionToClipboard(), "A cleared selection must not copy stale coordinates")
+                component.mouseMotionListeners.forEach { it.mouseDragged(mouseDragged(component, x = 1, y = 1)) }
+                assertNull(component.currentSelection(), "A resize must stop an active selection drag")
+            } else {
+                assertNotNull(component.currentSelection(), "A no-op resize must preserve selection")
+                assertTrue(component.copySelectionToClipboard())
+                assertEquals("abcdefgh", clipboard.copied.get())
+            }
+            component.mouseListeners.forEach { it.mouseReleased(released) }
         }
     }
 

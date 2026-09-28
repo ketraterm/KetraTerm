@@ -66,6 +66,10 @@ import kotlin.math.floor
  * on the EDT unless a method explicitly documents another threading contract.
  * Snapshot access and dispatch to the EDT are specified by each public method.
  *
+ * Component or font/settings changes that resize the bound session's grid clear
+ * selection and stop selection dragging. Selection uses physical cell coordinates;
+ * unchanged grid dimensions preserve it.
+ *
  * @param settingsProvider provider for immutable settings snapshots.
  * @param hostServices host-provided non-render services.
  */
@@ -1142,7 +1146,7 @@ class SwingTerminal
             }
             session?.let { applySettingsToSession(it, next, previous) }
             if (geometryChanged) {
-                if (resizeSessionToVisibleGridOnEdt()) selectionController.clearSelection()
+                resizeSessionToVisibleGridOnEdt()
                 searchController.updateViewportHighlights()
                 hyperlinkController.clearHyperlinkHover()
                 hyperlinkDiscoveryController.reset()
@@ -1911,6 +1915,7 @@ class SwingTerminal
             publishViewportState(renderCache.historySize)
             lastResizedColumns = columns
             lastResizedRows = rows
+            selectionController.clearSelection()
 
             // Animation is finished above, so resize anchoring is always row-exact.
             val oldOffset = viewportController.requestedOffset

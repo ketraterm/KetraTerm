@@ -140,7 +140,7 @@ internal class TerminalSearchModel {
     ): Int {
         val index = cache.rowOffset(row) + column
         val flags = cache.flags[index]
-        if (flags and TerminalRenderCellFlags.WIDE_TRAILING != 0) {
+        if (flags and (TerminalRenderCellFlags.WIDE_TRAILING or TerminalRenderCellFlags.WRAP_PADDING) != 0) {
             return column + 1
         }
 

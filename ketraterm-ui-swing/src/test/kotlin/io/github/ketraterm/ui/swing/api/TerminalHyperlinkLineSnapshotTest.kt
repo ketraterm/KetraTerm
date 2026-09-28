@@ -16,15 +16,45 @@
 package io.github.ketraterm.ui.swing.api
 
 import io.github.ketraterm.core.TerminalBuffers
+import io.github.ketraterm.render.api.TerminalRenderCellFlags
 import io.github.ketraterm.render.api.TerminalRenderFrameReader
 import io.github.ketraterm.render.cache.TerminalRenderCache
-import org.junit.jupiter.api.Assertions.assertAll
-import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.function.Executable
 import org.junit.jupiter.params.ParameterizedTest
 import org.junit.jupiter.params.provider.CsvSource
+import org.junit.jupiter.params.provider.ValueSource
 
 class TerminalHyperlinkLineSnapshotTest {
+    @ParameterizedTest
+    @ValueSource(longs = [0L, 1L])
+    fun `changing padding into a blank invalidates logical line identity`(lineId: Long) {
+        val cache = TerminalRenderCache(3, 2)
+        cache.flags.fill(TerminalRenderCellFlags.EMPTY)
+        for ((index, codepoint) in intArrayOf(0, 1, 3).zip("abc".map(Char::code))) {
+            cache.flags[index] = TerminalRenderCellFlags.CODEPOINT
+            cache.codeWords[index] = codepoint
+        }
+        cache.flags[2] = TerminalRenderCellFlags.EMPTY or TerminalRenderCellFlags.WRAP_PADDING
+        cache.lineWrapped[0] = true
+        cache.lineIds[0] = lineId
+        val builder = TerminalHyperlinkLineSnapshotBuilder()
+        val padded = builder.snapshot(cache, 0, 2)
+        assertEquals("abc\n", padded.text)
+        assertTrue(padded.matchesRows(cache, 0, 2))
+        assertTrue(padded.sameIdentity(builder.snapshot(cache, 0, 2)))
+
+        cache.flags[2] = TerminalRenderCellFlags.EMPTY
+        cache.lineGenerations[0]++
+        val blank = builder.snapshot(cache, 0, 2)
+        assertEquals("ab c\n", blank.text)
+        assertFalse(padded.matchesRows(cache, 0, 2))
+        assertFalse(padded.sameIdentity(blank))
+        assertEquals(2, blank.cellStarts[2])
+        assertEquals(3, blank.cellEnds[2])
+        assertEquals(3, blank.cellStarts[3])
+    }
+
     @ParameterizedTest
     @CsvSource("false,abc", "false,'ab '", "true,abc", "true,'ab '")
     fun `logical detector text omits wrap padding while retaining real spaces and cell ownership`(
@@ -53,6 +83,22 @@ class TerminalHyperlinkLineSnapshotTest {
                     for (offset in prefix.length until prefix.length + wideText.length) {
                         assertEquals(expectedStart, snapshot.cellStarts[offset], "All cluster code units own the wide leading cell")
                         assertEquals(expectedStart + 2, snapshot.cellEnds[offset], "The mapping must cover the entire wide cell")
+                    }
+                    val viewport = TerminalHyperlinkViewport()
+                    viewport.update(cache)
+                    val pending = viewport.pendingLines()
+                    viewport.accept(
+                        pending,
+                        pending.map { line ->
+                            listOf(TerminalDetectedHyperlink(0, line.text.length - 1, SwingHyperlinkAction.NONE, 0, line.text.length))
+                        },
+                    )
+                    viewport.writeOverlay(cache) { _, _, _, _ -> }
+                    val ids = viewport.idsFor(cache)
+                    for (cell in 0 until 3) assertTrue(ids[cell] < 0)
+                    if (width == 4) assertEquals(0, ids[3], "Wrap padding must not acquire a detector action")
+                    for (cell in expectedStart until expectedStart + 3) {
+                        assertEquals(ids[0], ids[cell], "The wide cell and following text must share the detected span")
                     }
                 }
             },

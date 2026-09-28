@@ -77,7 +77,7 @@ internal class TerminalHyperlinkLineSnapshotBuilder {
             while (column < cache.columns) {
                 val index = rowOffset + column
                 val flags = cache.flags[index]
-                if (flags and TerminalRenderCellFlags.WIDE_TRAILING != 0) {
+                if (flags and (TerminalRenderCellFlags.WIDE_TRAILING or TerminalRenderCellFlags.WRAP_PADDING) != 0) {
                     column++
                     continue
                 }
@@ -149,7 +149,7 @@ private fun rowFingerprint(
         val textFlags =
             flags and (
                 TerminalRenderCellFlags.CODEPOINT or TerminalRenderCellFlags.CLUSTER or
-                    TerminalRenderCellFlags.WIDE_LEADING or TerminalRenderCellFlags.WIDE_TRAILING
+                    TerminalRenderCellFlags.WIDE_LEADING or TerminalRenderCellFlags.WIDE_TRAILING or TerminalRenderCellFlags.WRAP_PADDING
             )
         hash = (hash xor textFlags.toLong()) * 1099511628211L
         if (flags and TerminalRenderCellFlags.CLUSTER != 0) {
