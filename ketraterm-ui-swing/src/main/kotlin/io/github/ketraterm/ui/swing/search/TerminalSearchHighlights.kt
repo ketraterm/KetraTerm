@@ -36,6 +36,9 @@ internal class TerminalSearchHighlights {
     private var resultSegmentCounts = IntArray(INITIAL_RESULT_CAPACITY)
     private var segmentRows = LongArray(INITIAL_SEGMENT_CAPACITY)
     private var segmentRanges = LongArray(INITIAL_SEGMENT_CAPACITY)
+    private var segmentIds = LongArray(INITIAL_SEGMENT_CAPACITY)
+    private var segmentGenerations = LongArray(INITIAL_SEGMENT_CAPACITY)
+    var validatesRows: Boolean = false
 
     val hasActiveResult: Boolean
         get() = activeResultIndex in 0 until resultCount
@@ -57,12 +60,16 @@ internal class TerminalSearchHighlights {
         absoluteRow: Long,
         startColumn: Int,
         endColumn: Int,
+        lineId: Long = 0L,
+        generation: Long = 0L,
     ) {
         if (startColumn >= endColumn) return
         check(resultCount > 0) { "beginResult must be called before addSegment" }
         ensureSegmentCapacity(segmentCount + 1)
         segmentRows[segmentCount] = absoluteRow
         segmentRanges[segmentCount] = packRange(startColumn, endColumn)
+        segmentIds[segmentCount] = lineId
+        segmentGenerations[segmentCount] = generation
         segmentCount++
         resultSegmentCounts[resultCount - 1]++
     }
@@ -87,6 +94,23 @@ internal class TerminalSearchHighlights {
         return segmentRows[segmentIndex]
     }
 
+    fun activeStartColumn(): Int = if (hasActiveResult) rangeStart(segmentRanges[resultSegmentStarts[activeResultIndex]]) else -1
+
+    fun activateNearest(
+        absoluteRow: Long,
+        column: Int,
+    ) {
+        var low = 0
+        var high = resultCount
+        while (low < high) {
+            val middle = low + (high - low) / 2
+            val segment = resultSegmentStarts[middle]
+            val row = segmentRows[segment]
+            if (row < absoluteRow || row == absoluteRow && rangeStart(segmentRanges[segment]) < column) low = middle + 1 else high = middle
+        }
+        activate(minOf(low, resultCount - 1))
+    }
+
     fun buildViewportHighlights(
         cache: TerminalRenderCache,
         destination: TerminalSearchViewportHighlights,
@@ -96,20 +120,6 @@ internal class TerminalSearchHighlights {
 
         val firstAbsoluteRow = firstAbsoluteRow(cache)
         val lastAbsoluteRow = firstAbsoluteRow + cache.rows - 1L
-        val activeStart =
-            if (hasActiveResult) {
-                resultSegmentStarts[activeResultIndex]
-            } else {
-                -1
-            }
-        val activeEnd =
-            if (hasActiveResult) {
-                activeStart + resultSegmentCounts[activeResultIndex]
-            } else {
-                -1
-            }
-
-        // Scanning emits segments in row order. Skip retained matches above the viewport.
         var low = 0
         var high = segmentCount
         while (low < high) {
@@ -117,22 +127,75 @@ internal class TerminalSearchHighlights {
             if (segmentRows[middle] < firstAbsoluteRow) low = middle + 1 else high = middle
         }
         var segmentIndex = low
-        while (segmentIndex < segmentCount) {
-            val absoluteRow = segmentRows[segmentIndex]
-            if (absoluteRow > lastAbsoluteRow) break
-            if (absoluteRow in firstAbsoluteRow..lastAbsoluteRow) {
-                val row = (absoluteRow - firstAbsoluteRow).toInt()
-                val range = segmentRanges[segmentIndex]
-                destination.add(
-                    row = row,
-                    startColumn = rangeStart(range).coerceIn(0, cache.columns),
-                    endColumn = rangeEnd(range).coerceIn(0, cache.columns),
-                    active = segmentIndex in activeStart until activeEnd,
-                )
+        low = 0
+        high = resultCount
+        while (low < high) {
+            val middle = low + (high - low) / 2
+            if (resultSegmentStarts[middle] + resultSegmentCounts[middle] <= segmentIndex) low = middle + 1 else high = middle
+        }
+        var resultIndex = low
+        while (resultIndex < resultCount && segmentIndex < segmentCount && segmentRows[segmentIndex] <= lastAbsoluteRow) {
+            val end = resultSegmentStarts[resultIndex] + resultSegmentCounts[resultIndex]
+            var visibleEnd = segmentIndex
+            var valid = true
+            while (visibleEnd < end && segmentRows[visibleEnd] <= lastAbsoluteRow) {
+                val row = (segmentRows[visibleEnd] - firstAbsoluteRow).toInt()
+                if (validatesRows && (
+                        segmentIds[visibleEnd] != cache.lineIds[row] ||
+                            segmentGenerations[visibleEnd] != cache.lineGenerations[row]
+                    )
+                ) {
+                    valid = false
+                }
+                visibleEnd++
             }
-            segmentIndex++
+            if (valid) {
+                while (segmentIndex < visibleEnd) {
+                    val range = segmentRanges[segmentIndex]
+                    destination.add(
+                        row = (segmentRows[segmentIndex] - firstAbsoluteRow).toInt(),
+                        startColumn = rangeStart(range).coerceIn(0, cache.columns),
+                        endColumn = rangeEnd(range).coerceIn(0, cache.columns),
+                        active = resultIndex == activeResultIndex,
+                    )
+                    segmentIndex++
+                }
+            }
+            segmentIndex = end
+            resultIndex++
         }
         destination.finish()
+    }
+
+    /** Removes whole matches whose start has been evicted; called only by the worker before publication. */
+    fun discardBefore(
+        firstRetainedRow: Long,
+        checkCancelled: () -> Unit,
+    ) {
+        var discardedResults = 0
+        while (discardedResults < resultCount && segmentRows[resultSegmentStarts[discardedResults]] < firstRetainedRow) {
+            checkCancelled()
+            discardedResults++
+        }
+        if (discardedResults == 0) return
+        if (discardedResults == resultCount) {
+            clear()
+            return
+        }
+        val discardedSegments = resultSegmentStarts[discardedResults]
+        val remaining = segmentCount - discardedSegments
+        segmentRows.copyInto(segmentRows, 0, discardedSegments, segmentCount)
+        segmentRanges.copyInto(segmentRanges, 0, discardedSegments, segmentCount)
+        segmentIds.copyInto(segmentIds, 0, discardedSegments, segmentCount)
+        segmentGenerations.copyInto(segmentGenerations, 0, discardedSegments, segmentCount)
+        for (index in discardedResults until resultCount) {
+            checkCancelled()
+            resultSegmentStarts[index - discardedResults] = resultSegmentStarts[index] - discardedSegments
+            resultSegmentCounts[index - discardedResults] = resultSegmentCounts[index]
+        }
+        resultCount -= discardedResults
+        segmentCount = remaining
+        activate(0)
     }
 
     private fun ensureResultCapacity(required: Int) {
@@ -147,6 +210,8 @@ internal class TerminalSearchHighlights {
         val nextCapacity = nextCapacity(segmentRows.size, required)
         segmentRows = segmentRows.copyOf(nextCapacity)
         segmentRanges = segmentRanges.copyOf(nextCapacity)
+        segmentIds = segmentIds.copyOf(nextCapacity)
+        segmentGenerations = segmentGenerations.copyOf(nextCapacity)
     }
 
     private companion object {

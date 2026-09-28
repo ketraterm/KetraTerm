@@ -74,13 +74,18 @@ import kotlin.math.floor
  * @param hostServices host-provided non-render services.
  */
 class SwingTerminal
-    @JvmOverloads
-    constructor(
-        private val settingsProvider: SwingSettingsProvider =
-            SwingSettingsProvider { SwingSettings() },
-        private val hostServices: SwingHostServices = SwingHostServices(),
+    internal constructor(
+        private val settingsProvider: SwingSettingsProvider,
+        private val hostServices: SwingHostServices,
+        searchDispatcher: CoroutineDispatcher,
     ) : JComponent(),
         SwingScrollbarScroller {
+        @JvmOverloads
+        constructor(
+            settingsProvider: SwingSettingsProvider = SwingSettingsProvider { SwingSettings() },
+            hostServices: SwingHostServices = SwingHostServices(),
+        ) : this(settingsProvider, hostServices, Dispatchers.Default)
+
         private var session: TerminalSession? = null
         private var disposed: Boolean = false
         private var settings: SwingSettings = settingsProvider.currentSettings()
@@ -315,7 +320,6 @@ class SwingTerminal
                 object : TerminalSearchHost {
                     override val session: TerminalSession? get() = this@SwingTerminal.session
                     override val renderCache: TerminalRenderCache get() = this@SwingTerminal.renderCache
-                    override val searchCache: TerminalRenderCache get() = this@SwingTerminal.searchCache
 
                     override fun visibleGridRows(): Int = this@SwingTerminal.visibleGridRows()
 
@@ -327,6 +331,8 @@ class SwingTerminal
 
                     override fun repaint() = this@SwingTerminal.renderFrameController.repaintFrame()
                 },
+                scope = componentScope,
+                analysisDispatcher = searchDispatcher,
             )
         private var shellSuggestionController: SwingShellSuggestionController? = null
         private val inputController =
@@ -1205,11 +1211,13 @@ class SwingTerminal
         }
 
         /**
-         * Applies a literal terminal-buffer search query.
+         * Schedules a cancellable background literal search. This does not wait for results.
          *
          * The search covers retained scrollback plus the live grid snapshot exposed
          * through the bound session's render-frame reader. Hosts own any visible
          * search UI and call this method when their query changes.
+         * Observe [searchState] for completion or failure. Results are refreshed in
+         * completed passes while output continues, not an atomic snapshot of all history.
          *
          * @param query literal text to find.
          */
@@ -1230,6 +1238,7 @@ class SwingTerminal
 
         /**
          * Selects the next search result when a search query is active.
+         * While searching, navigates the last completed pass; does nothing when no results are available.
          */
         fun selectNextSearchResult() {
             runOnEdt {
@@ -1239,6 +1248,7 @@ class SwingTerminal
 
         /**
          * Selects the previous search result when a search query is active.
+         * While searching, navigates the last completed pass; does nothing when no results are available.
          */
         fun selectPreviousSearchResult() {
             runOnEdt {
@@ -1268,6 +1278,14 @@ class SwingTerminal
          * @return current terminal search state.
          */
         fun currentSearchState(): TerminalSearchState = searchController.state()
+
+        /**
+         * Immutable search state, safe to observe from any thread. UI collectors must
+         * use the EDT and cancel collection when their view closes. Counts describe
+         * the last completed pass; [TerminalSearchState.isSearching] marks pending work.
+         * Clearing or unbinding cancels obsolete work; disposing cancels the worker.
+         */
+        val searchState: StateFlow<TerminalSearchState> get() = searchController.states
 
         /**
          * Shows host-provided shell suggestions for a known command-line request.

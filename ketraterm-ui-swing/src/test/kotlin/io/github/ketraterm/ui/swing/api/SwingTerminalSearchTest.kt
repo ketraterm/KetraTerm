@@ -40,6 +40,8 @@ import java.util.*
 import javax.swing.SwingUtilities
 
 class SwingTerminalSearchTest {
+    private val searchDispatcher = StandardTestDispatcher()
+
     @ParameterizedTest
     @ValueSource(ints = [32, 128])
     fun `active search amortizes destination storage as retained history grows`(initialHistoryRows: Int) {
@@ -76,7 +78,7 @@ class SwingTerminalSearchTest {
                             shellIntegrationDecorationGutterWidth = 0,
                             cursorBlinkMillis = 0,
                         )
-                    })
+                    }, hostServices = SwingHostServices(), searchDispatcher = dispatcher)
                 try {
                     component.size = component.preferredGridSize(columns, 2)
                     component.bind(session)
@@ -217,18 +219,22 @@ class SwingTerminalSearchTest {
                         shellIntegrationDecorationGutterWidth = 0,
                         cursorBlinkMillis = 0,
                     )
-                val component = SwingTerminal(settingsProvider = { settings })
+                val component =
+                    SwingTerminal(settingsProvider = { settings }, hostServices = SwingHostServices(), searchDispatcher = searchDispatcher)
                 try {
                     component.size = component.preferredGridSize(12, 1)
                     component.bind(first)
                     component.search("alpha")
+                    searchDispatcher.scheduler.runCurrent()
                     assertEquals(1, component.currentSearchState().resultCount)
 
                     if (unbindFirst) component.unbind()
                     component.bind(second)
                     component.search("bravo")
+                    searchDispatcher.scheduler.runCurrent()
                     assertEquals(1, component.currentSearchState().resultCount)
                     component.search("alpha")
+                    searchDispatcher.scheduler.runCurrent()
                     assertEquals(0, component.currentSearchState().resultCount)
                 } finally {
                     component.dispose()
@@ -244,12 +250,16 @@ class SwingTerminalSearchTest {
     fun `clearSearch clears query and result highlights`() {
         val reader = SearchFrameReader()
         val session = testSession(reader)
-        val component = SwingTerminal(settingsProvider = { SwingSettings(padding = SwingPadding(0, 0, 0, 0)) })
+        val component =
+            SwingTerminal(settingsProvider = {
+                SwingSettings(padding = SwingPadding(0, 0, 0, 0))
+            }, hostServices = SwingHostServices(), searchDispatcher = searchDispatcher)
 
         SwingUtilities.invokeAndWait {
             component.size = component.preferredGridSize(12, 1)
             component.bind(session)
             component.search("needle")
+            searchDispatcher.scheduler.runCurrent()
             component.clearSearch()
 
             val state = component.currentSearchState()
@@ -265,12 +275,16 @@ class SwingTerminalSearchTest {
     fun `search scrolls active scrollback result into viewport`() {
         val reader = SearchFrameReader()
         val session = testSession(reader)
-        val component = SwingTerminal(settingsProvider = { SwingSettings(padding = SwingPadding(0, 0, 0, 0)) })
+        val component =
+            SwingTerminal(settingsProvider = {
+                SwingSettings(padding = SwingPadding(0, 0, 0, 0))
+            }, hostServices = SwingHostServices(), searchDispatcher = searchDispatcher)
 
         SwingUtilities.invokeAndWait {
             component.size = component.preferredGridSize(12, 1)
             component.bind(session)
             component.search("needle")
+            searchDispatcher.scheduler.runCurrent()
 
             val state = component.currentSearchState()
             assertEquals(1, state.resultCount)

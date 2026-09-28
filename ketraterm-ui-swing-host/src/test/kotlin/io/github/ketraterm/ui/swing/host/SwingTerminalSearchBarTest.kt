@@ -15,7 +15,17 @@
  */
 package io.github.ketraterm.ui.swing.host
 
+import io.github.ketraterm.core.TerminalBuffers
+import io.github.ketraterm.session.TerminalSession
+import io.github.ketraterm.testkit.MockConnector
 import io.github.ketraterm.ui.swing.api.SwingTerminal
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withTimeout
+import java.awt.Component
+import java.awt.Container
+import javax.swing.JLabel
+import javax.swing.JTextField
 import javax.swing.SwingUtilities
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -23,6 +33,43 @@ import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 class SwingTerminalSearchBarTest {
+    @Test
+    fun counterObservesBackgroundCompletionWithoutAnotherKeyPress() {
+        val buffer = TerminalBuffers.create(80, 24)
+        buffer.writeText("needle")
+        val session = TerminalSession.create(buffer, MockConnector())
+        val terminal = SwingTerminal()
+        val bar = SwingTerminalSearchBar(terminal)
+
+        fun descendants(component: Component): List<Component> =
+            listOf(component) + if (component is Container) component.components.flatMap(::descendants) else emptyList()
+        try {
+            SwingUtilities.invokeAndWait {
+                terminal.size = terminal.preferredSize
+                terminal.bind(session)
+                bar.open()
+                descendants(bar.component).filterIsInstance<JTextField>().single().text = "needle"
+                assertTrue(descendants(bar.component).filterIsInstance<JLabel>().any { it.text == "Searching…" })
+            }
+            val result =
+                runBlocking {
+                    withTimeout(10_000) { terminal.searchState.first { it.query == "needle" && !it.isSearching } }
+                }
+            assertEquals(1, result.resultCount)
+            SwingUtilities.invokeAndWait {
+                assertTrue(descendants(bar.component).filterIsInstance<JLabel>().any { it.text == "1/1" })
+                bar.close()
+                assertEquals("", terminal.currentSearchState().query)
+            }
+        } finally {
+            SwingUtilities.invokeAndWait {
+                bar.close()
+                terminal.dispose()
+            }
+            session.close()
+        }
+    }
+
     @Test
     fun openAndCloseToggleHostSearchChrome() {
         val terminal = SwingTerminal()
