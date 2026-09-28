@@ -26,6 +26,7 @@ import java.nio.charset.StandardCharsets
 import java.util.concurrent.CopyOnWriteArrayList
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicInteger
 
 class PtyConnectorTest {
     private val connectors = mutableListOf<PtyConnector>()
@@ -164,11 +165,12 @@ class PtyConnectorTest {
     fun `reader failure emits the original error and disposes the live process once`() {
         val failure = IOException("read failed")
         val output = RecordingOutputStream()
-        val process = TestProcess(input = FailingInputStream(failure), output = output, blockWaitFor = true)
+        val input = FailingInputStream(failure)
+        val process = TestProcess(input = input, output = output, blockWaitFor = true)
         val connector = createConnector(process)
         val listener = RecordingListener()
 
-        try {
+        connector.use { connector ->
             connector.start(listener)
             assertTrue(connector.joinReader(10_000), "reader did not stop")
             assertAll(
@@ -181,10 +183,10 @@ class PtyConnectorTest {
             connector.close()
             connector.close()
             assertEquals(1, output.closeCount)
+            assertEquals(1, input.closeCount)
+            assertEquals(1, process.destroyCount)
             assertSame(failure, connector.failure)
             assertEquals(listOf<Int?>(null), listener.closed)
-        } finally {
-            connector.close()
         }
     }
 
@@ -199,7 +201,7 @@ class PtyConnectorTest {
         val process = TestProcess(input = input, blockWaitFor = true)
         val connector = createConnector(process, readBufferSize = 3)
         val listener = RecordingListener()
-        try {
+        connector.use { connector ->
             connector.start(listener)
             assertTrue(connector.joinReader(10_000), "reader did not stop after failure")
             connector.close()
@@ -211,8 +213,6 @@ class PtyConnectorTest {
                 { assertSame(failure, connector.failure) },
                 { assertTrue(process.destroyed) },
             )
-        } finally {
-            connector.close()
         }
     }
 
@@ -257,6 +257,44 @@ class PtyConnectorTest {
             )
         } finally {
             releaseFailure.countDown()
+            connector.close()
+        }
+    }
+
+    @Test
+    fun `local shutdown closes the input stream to release a blocked reader`() {
+        val entered = CountDownLatch(1)
+        val released = CountDownLatch(1)
+        val inputCloses = AtomicInteger()
+        val input =
+            object : InputStream() {
+                override fun read(): Int {
+                    entered.countDown()
+                    released.await()
+                    throw IOException("input closed")
+                }
+
+                override fun close() {
+                    inputCloses.incrementAndGet()
+                    released.countDown()
+                }
+            }
+        val process = TestProcess(input = input, blockWaitFor = true)
+        val connector = createConnector(process)
+        val listener = RecordingListener()
+        try {
+            connector.start(listener)
+            assertTrue(entered.await(10, TimeUnit.SECONDS))
+            connector.close()
+            assertTrue(connector.joinReader(10_000))
+            assertTrue(connector.joinWatcher(10_000))
+            connector.close()
+            assertEquals(1, inputCloses.get())
+            assertEquals(1, process.destroyCount)
+            assertTrue(listener.errors.isEmpty())
+            assertTrue(listener.closed.isEmpty())
+        } finally {
+            released.countDown()
             connector.close()
         }
     }
@@ -413,6 +451,8 @@ class PtyConnectorTest {
         @Volatile
         var destroyed: Boolean = false
             private set
+        var destroyCount: Int = 0
+            private set
         val sizes = mutableListOf<Pair<Int, Int>>()
 
         override fun isAlive(): Boolean = !destroyed
@@ -429,6 +469,7 @@ class PtyConnectorTest {
         }
 
         override fun destroy() {
+            destroyCount++
             destroyed = true
             destroyedSignal.countDown()
             releaseWaitFor()
@@ -520,6 +561,13 @@ class PtyConnectorTest {
     private class FailingInputStream(
         private val failure: IOException,
     ) : InputStream() {
+        var closeCount = 0
+            private set
+
+        override fun close() {
+            closeCount++
+        }
+
         override fun read(): Int = throw failure
 
         override fun read(

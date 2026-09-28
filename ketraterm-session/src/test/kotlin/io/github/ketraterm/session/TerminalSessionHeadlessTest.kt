@@ -23,8 +23,7 @@ import io.github.ketraterm.input.policy.PasteLineEndingPolicy
 import io.github.ketraterm.input.policy.TerminalInputPolicy
 import io.github.ketraterm.testkit.MockConnector
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
-import org.junit.jupiter.api.Assertions.assertEquals
-import org.junit.jupiter.api.Assertions.assertThrows
+import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.Test
 import java.nio.charset.StandardCharsets
 
@@ -161,7 +160,7 @@ class TerminalSessionHeadlessTest {
     }
 
     @Test
-    fun `remote close stops host bytes and UI input without local connector close`() {
+    fun `remote close stops input and disposes transport without changing the remote result`() {
         val connector = MockConnector()
         val session = createStartedSession(connector)
 
@@ -171,7 +170,9 @@ class TerminalSessionHeadlessTest {
 
         assertEquals("", session.terminal.getLineAsString(0))
         assertEquals("", connector.writtenBytes.asciiText())
-        assertEquals(0, connector.closeCount)
+        assertEquals(1, connector.closeCount)
+        assertEquals(0, session.exitCode)
+        assertFalse((session.state.value as TerminalSessionState.Closed).event.locallyRequested)
     }
 
     @Test

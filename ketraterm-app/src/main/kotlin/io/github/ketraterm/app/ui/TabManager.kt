@@ -341,9 +341,9 @@ internal class TabManager(
     /** Closes every open tab and starts bounded completion persistence without blocking the Swing EDT. */
     fun closeAllTabsWithoutConfirmation() {
         if (!shutdownStarted.compareAndSet(false, true)) return
-        windowResizeController.close()
-        settings.removeChangeListener(settingsListener)
         var failure: Throwable? = null
+        failure = captureCleanupFailure(failure, windowResizeController::close)
+        failure = captureCleanupFailure(failure) { settings.removeChangeListener(settingsListener) }
         failure =
             captureCleanupFailure(failure) {
                 KeyboardFocusManager.getCurrentKeyboardFocusManager().removeKeyEventDispatcher(keyEventDispatcher)

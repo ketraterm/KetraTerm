@@ -21,6 +21,7 @@ import io.github.ketraterm.host.*
 import io.github.ketraterm.input.api.TerminalInputEncoder
 import io.github.ketraterm.input.event.*
 import io.github.ketraterm.parser.api.TerminalOutputParser
+import io.github.ketraterm.parser.api.TerminalParsers
 import io.github.ketraterm.protocol.keyboard.KittyKeyboardProgressiveFlag
 import io.github.ketraterm.render.api.*
 import io.github.ketraterm.render.cache.TerminalRenderCache
@@ -37,13 +38,295 @@ import org.junit.jupiter.params.provider.CsvSource
 import org.junit.jupiter.params.provider.ValueSource
 import java.nio.charset.StandardCharsets
 import java.util.*
+import java.util.concurrent.CompletableFuture
 import java.util.concurrent.CountDownLatch
+import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicInteger
 import kotlin.time.Duration.Companion.milliseconds
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class TerminalSessionTest {
+    @ParameterizedTest
+    @ValueSource(strings = ["running", "resize"])
+    fun `reentrant shutdown during startup cannot start a disposed connector`(stage: String) =
+        runTest {
+            val recorded = MockConnector()
+            var starts = 0
+            lateinit var session: TerminalSession
+            val connector =
+                object : TerminalConnector by recorded {
+                    override fun resize(
+                        columns: Int,
+                        rows: Int,
+                    ) {
+                        recorded.resize(columns, rows)
+                        if (stage == "resize") session.close()
+                    }
+
+                    override fun start(listener: io.github.ketraterm.transport.TerminalConnectorListener) {
+                        starts++
+                        recorded.start(listener)
+                    }
+                }
+            session =
+                TerminalSession.create(
+                    terminal = TerminalBuffers.create(10, 3),
+                    connector = connector,
+                    workerDispatcher = StandardTestDispatcher(testScheduler),
+                    ioDispatcher = StandardTestDispatcher(testScheduler),
+                )
+            if (stage == "running") {
+                backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) {
+                    session.state.first { it === TerminalSessionState.Running }
+                    session.close()
+                }
+            }
+            session.use {
+                session.start(10, 3)
+                assertEquals(0, starts)
+                assertEquals(1, recorded.closeCount)
+                assertTrue((session.state.value as TerminalSessionState.Closed).event.locallyRequested)
+                assertFalse(session.isCoroutineScopeActive)
+            }
+        }
+
+    @Test
+    fun `close waits for an in flight publication then retains the EOF frame`() {
+        val copied = CountDownLatch(1)
+        val release = CountDownLatch(1)
+        val transportClosed = CountDownLatch(1)
+        val terminal = TerminalBuffers.create(10, 3)
+        val source = terminal as TerminalRenderFrameReader
+        val reads = AtomicInteger()
+        val renderReader =
+            object : TerminalRenderFrameReader by source {
+                override fun readRenderFrame(
+                    scrollbackOffset: Int,
+                    consumer: TerminalRenderFrameConsumer,
+                ) {
+                    readRenderFrame(scrollbackOffset, terminal.height, consumer)
+                }
+
+                override fun readRenderFrame(
+                    scrollbackOffset: Int,
+                    viewportRows: Int,
+                    consumer: TerminalRenderFrameConsumer,
+                ) {
+                    source.readRenderFrame(scrollbackOffset, viewportRows, consumer)
+                    if (reads.incrementAndGet() == 1) {
+                        copied.countDown()
+                        release.await()
+                    }
+                }
+            }
+        val recorded = MockConnector()
+        val worker = Executors.newSingleThreadExecutor().asCoroutineDispatcher()
+        val session =
+            TerminalSession(
+                terminal = terminal,
+                renderPublisher = TerminalRenderPublisher(10, 3),
+                renderReader = renderReader,
+                responseReader = terminal,
+                connector =
+                    object : TerminalConnector by recorded {
+                        override fun close() {
+                            recorded.close()
+                            transportClosed.countDown()
+                        }
+                    },
+                parser = TerminalParsers.create(HostCommandAdapter(terminal)),
+                workerDispatcher = worker,
+                ioDispatcher = worker,
+            )
+        try {
+            session.start(10, 3)
+            recorded.feedFromHost(byteArrayOf('A'.code.toByte(), 0xE2.toByte(), 0x82.toByte()))
+            assertTrue(copied.await(10, TimeUnit.SECONDS), "publication did not copy the pre-EOF frame")
+            val closing = CompletableFuture.runAsync(session::close)
+            try {
+                assertTrue(transportClosed.await(10, TimeUnit.SECONDS), "close did not reach transport disposal")
+                assertFalse(session.state.value is TerminalSessionState.Closed)
+            } finally {
+                release.countDown()
+                closing.get(10, TimeUnit.SECONDS)
+            }
+            assertArrayEquals(
+                intArrayOf('A'.code, 0xFFFD),
+                session.renderPublisher
+                    .current()!!
+                    .codeWords
+                    .copyOf(2),
+            )
+            assertTrue(session.state.value is TerminalSessionState.Closed)
+            assertFalse(session.isCoroutineScopeActive)
+        } finally {
+            release.countDown()
+            session.close()
+            worker.close()
+        }
+    }
+
+    @Test
+    fun `final publication preserves an active reader lease`() =
+        runTest {
+            val connector = MockConnector()
+            val session =
+                TerminalSession.create(
+                    terminal = TerminalBuffers.create(10, 3),
+                    connector = connector,
+                    workerDispatcher = StandardTestDispatcher(testScheduler),
+                    ioDispatcher = StandardTestDispatcher(testScheduler),
+                )
+            val leased = CountDownLatch(1)
+            val release = CountDownLatch(1)
+            session.use {
+                session.start(10, 3)
+                connector.feedFromHost("OLD".ascii())
+                runCurrent()
+                val reader =
+                    CompletableFuture.runAsync {
+                        session.renderPublisher.readCurrent { frame ->
+                            assertEquals('O'.code, frame.codeWords[0])
+                            leased.countDown()
+                            release.await()
+                            assertEquals('O'.code, frame.codeWords[0])
+                        }
+                    }
+                try {
+                    assertTrue(leased.await(10, TimeUnit.SECONDS))
+                    connector.feedFromHost("\rFINAL".ascii())
+                    session.close()
+                    assertEquals(
+                        'F'.code,
+                        session.renderPublisher
+                            .current()
+                            ?.codeWords
+                            ?.get(0),
+                    )
+                    assertTrue(session.state.value is TerminalSessionState.Closed)
+                } finally {
+                    release.countDown()
+                    reader.get(10, TimeUnit.SECONDS)
+                }
+            }
+        }
+
+    @Test
+    fun `cleanup failures cannot skip EOF publication or scope cancellation`() =
+        runTest {
+            val connectorFailure = IllegalStateException("connector close failed")
+            val eofFailure = IllegalStateException("EOF failed")
+            val recorded = MockConnector()
+            val terminal = TerminalBuffers.create(10, 3)
+            terminal.writeText("FINAL")
+            val session =
+                TerminalSession(
+                    terminal = terminal,
+                    renderPublisher = TerminalRenderPublisher(10, 3),
+                    renderReader = terminal as TerminalRenderFrameReader,
+                    responseReader = terminal,
+                    connector =
+                        object : TerminalConnector by recorded {
+                            override fun close() {
+                                recorded.close()
+                                throw connectorFailure
+                            }
+                        },
+                    parser =
+                        object : TerminalOutputParser by RecordingParser() {
+                            override fun endOfInput(): Unit = throw eofFailure
+                        },
+                    workerDispatcher = StandardTestDispatcher(testScheduler),
+                    ioDispatcher = StandardTestDispatcher(testScheduler),
+                )
+            assertSame(connectorFailure, assertThrows(IllegalStateException::class.java) { session.close() })
+            assertTrue(eofFailure in connectorFailure.suppressed)
+            assertEquals(
+                'F'.code,
+                session.renderPublisher
+                    .current()
+                    ?.codeWords
+                    ?.get(0),
+            )
+            assertTrue(session.isClosed)
+            assertFalse(session.isCoroutineScopeActive)
+            session.close()
+            assertEquals(1, recorded.closeCount)
+        }
+
+    @ParameterizedTest
+    @ValueSource(strings = ["resize", "start"])
+    fun `startup failure closes the connector and retains its cause`(stage: String) =
+        runTest {
+            val failure = IllegalStateException("startup $stage failed")
+            val recorded = MockConnector()
+            val connector =
+                object : TerminalConnector by recorded {
+                    override fun resize(
+                        columns: Int,
+                        rows: Int,
+                    ) {
+                        if (stage == "resize") throw failure
+                        recorded.resize(columns, rows)
+                    }
+
+                    override fun start(listener: io.github.ketraterm.transport.TerminalConnectorListener): Unit = throw failure
+                }
+            val session =
+                TerminalSession.create(
+                    terminal = TerminalBuffers.create(10, 3),
+                    connector = connector,
+                    workerDispatcher = StandardTestDispatcher(testScheduler),
+                    ioDispatcher = StandardTestDispatcher(testScheduler),
+                )
+            session.use {
+                assertSame(failure, assertThrows(IllegalStateException::class.java) { session.start(10, 3) })
+                assertTrue(session.isClosed)
+                assertSame(failure, session.failure)
+                assertEquals(1, recorded.closeCount)
+                assertFalse(session.isCoroutineScopeActive)
+            }
+            assertEquals(1, recorded.closeCount)
+        }
+
+    @Test
+    fun `closed observers see the final frame and released transport immediately`() =
+        runTest {
+            val connector = MockConnector()
+            val session =
+                TerminalSession.create(
+                    terminal = TerminalBuffers.create(10, 3),
+                    connector = connector,
+                    workerDispatcher = StandardTestDispatcher(testScheduler),
+                    ioDispatcher = StandardTestDispatcher(testScheduler),
+                )
+            session.use {
+                session.start(10, 3)
+                session.requestRender(0)
+                runCurrent()
+                val observed = mutableListOf<Pair<Int?, Int>>()
+                backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) {
+                    session.state.first { it is TerminalSessionState.Closed }
+                    observed += session.renderPublisher
+                        .current()
+                        ?.codeWords
+                        ?.get(0) to connector.closeCount
+                }
+                connector.feedFromHost("LAST".ascii())
+                connector.simulateClosed(7)
+                assertEquals(listOf('L'.code to 1), observed)
+                assertEquals(session.state.value, session.state.first())
+                assertEquals(
+                    'L'.code,
+                    session.renderPublisher
+                        .current()
+                        ?.codeWords
+                        ?.get(0),
+                )
+            }
+        }
+
     @Test
     fun `xterm resource queries and negotiated key bytes share the session output`() {
         val connector = MockConnector()

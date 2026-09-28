@@ -98,6 +98,8 @@ class TerminalSession(
     private val pendingRenderGeneration = AtomicLong(0)
 
     private val mutationLock = Any()
+    private val connectorLifecycleLock = Any()
+    private val closingEvent = AtomicReference<TerminalSessionCloseEvent?>(null)
     private var startupSubmission: StartupCommandSubmission? = null
 
     /** Retained startup submission outcome, or null when no command was configured. */
@@ -159,7 +161,11 @@ class TerminalSession(
     private var activeShellCommandLineProvider: (() -> TerminalShellCommandLineSnapshot?)? = null
     private var activeShellCommandLineContextProvider: ((LongArray) -> Long)? = null
 
-    /** Lifecycle state retained for current and future collectors. */
+    /**
+     * Lifecycle state retained for current and future collectors. Closed is
+     * published after cleanup and the final frame publication attempt, so a
+     * successful final frame is available to both early and late observers.
+     */
     val state: StateFlow<TerminalSessionState> = mutableState.asStateFlow()
 
     /**
@@ -235,6 +241,7 @@ class TerminalSession(
     /**
      * Returns true after either local shutdown, remote closure, or transport
      * failure has made the session unable to accept more input.
+     * This becomes true when shutdown starts; [state] reaches Closed after cleanup.
      */
     val isClosed: Boolean
         get() = isSessionClosed()
@@ -298,6 +305,9 @@ class TerminalSession(
      * Starts the connector after resizing core and transport to [columns] x
      * [rows].
      *
+     * Startup failure closes owned resources, retains the failure in [state],
+     * and rethrows it with any cleanup failures suppressed.
+     *
      * @param columns initial terminal width count.
      * @param rows initial terminal height count.
      */
@@ -307,15 +317,24 @@ class TerminalSession(
     ) {
         require(columns > 0) { "columns must be positive, got $columns" }
         require(rows > 0) { "rows must be positive, got $rows" }
-        check(mutableState.compareAndSet(TerminalSessionState.Created, TerminalSessionState.Running)) {
-            "session already started or closed"
-        }
+        synchronized(connectorLifecycleLock) {
+            check(!isSessionClosed() && mutableState.compareAndSet(TerminalSessionState.Created, TerminalSessionState.Running)) {
+                "session already started or closed"
+            }
 
-        synchronized(mutationLock) {
-            terminal.resize(columns, rows)
+            try {
+                if (isSessionClosed()) return
+                synchronized(mutationLock) {
+                    terminal.resize(columns, rows)
+                }
+                if (isSessionClosed()) return
+                connector.resize(columns, rows)
+                if (!isSessionClosed()) connector.start(this)
+            } catch (failure: Throwable) {
+                transitionToClosed(TerminalSessionCloseEvent(exitCode = null, failure = failure, locallyRequested = false))
+                throw failure
+            }
         }
-        connector.resize(columns, rows)
-        connector.start(this)
     }
 
     /**
@@ -713,11 +732,15 @@ class TerminalSession(
 
             cancelSynchronizedOutputTimeout()
 
+            val context = currentCoroutineContext()
             try {
-                renderPublisher.updateAndPublish(this, offset, rows)
-                publishedGeneration = generation
-                currentCoroutineContext().ensureActive()
-                mutableRenderGeneration.value = generation
+                synchronized(mutationLock) {
+                    if (isSessionClosed()) return
+                    renderPublisher.updateAndPublish(this, offset, rows)
+                    publishedGeneration = generation
+                    context.ensureActive()
+                    mutableRenderGeneration.value = generation
+                }
             } catch (e: CancellationException) {
                 throw e
             } catch (_: Exception) {
@@ -942,7 +965,8 @@ class TerminalSession(
     }
 
     /**
-     * Records remote closure and closes the parser exactly once.
+     * Records remote closure, releases the connector, and finalizes parser/render
+     * state exactly once. The connector must deliver its final bytes first.
      */
     override fun onClosed(exitCode: Int?) {
         transitionToClosed(TerminalSessionCloseEvent(exitCode = exitCode, failure = null, locallyRequested = false))
@@ -959,12 +983,19 @@ class TerminalSession(
     }
 
     /**
-     * Requests local connector shutdown and closes parser input exactly once.
+     * Stops accepting input, releases the connector, flushes parser EOF, and
+     * synchronously publishes the last requested viewport, including synchronized
+     * output. Publication waits for active frame-copy callbacks and available
+     * render buffers; do not call from a render-reader or leased-cache callback.
+     *
+     * The first termination owns cleanup and its event is retained. Concurrent or
+     * reentrant calls return without waiting; observe [state] for completed cleanup.
+     * Every cleanup is attempted. Local cleanup failures are rethrown with later
+     * failures suppressed; failure-triggered cleanup adds them to the original cause.
      */
     override fun close() {
         transitionToClosed(
             event = TerminalSessionCloseEvent(exitCode = null, failure = null, locallyRequested = true),
-            closeConnector = true,
         )
     }
 
@@ -983,45 +1014,58 @@ class TerminalSession(
     private fun failWrite(failure: Exception) {
         transitionToClosed(
             TerminalSessionCloseEvent(exitCode = null, failure = failure, locallyRequested = false),
-            closeConnector = true,
         )
     }
 
-    private fun transitionToClosed(
-        event: TerminalSessionCloseEvent,
-        closeConnector: Boolean = false,
-    ) {
-        while (true) {
-            val current = mutableState.value
-            if (current is TerminalSessionState.Closed) return
-            if (mutableState.compareAndSet(current, TerminalSessionState.Closed(event))) break
+    private fun transitionToClosed(event: TerminalSessionCloseEvent) {
+        if (!closingEvent.compareAndSet(null, event)) return
+        var failure: Throwable? = event.failure
+
+        fun cleanup(action: () -> Unit) {
+            try {
+                action()
+            } catch (error: Throwable) {
+                val previous = failure
+                if (previous == null) {
+                    failure = error
+                } else if (previous !== error) {
+                    previous.addSuppressed(error)
+                }
+            }
         }
 
         try {
-            if (closeConnector) connector.close()
+            cleanup { synchronized(connectorLifecycleLock) { connector.close() } }
+            cleanup { clipboardReads?.close() }
+            cleanup { outboundWriter.close() }
+            cleanup {
+                synchronized(outboundWriteLock) {
+                    startupSubmission?.cancel(TerminalStartupCommandStatus.CLOSED)
+                }
+            }
+            cancelSynchronizedOutputTimeout()
+            renderRequests.close()
+            immediateRenderRequests.close()
+            sessionScope.cancel(CancellationException("Terminal session closed"))
+            // Serialize against an in-flight publication so it cannot replace
+            // this final frame after EOF has been flushed.
+            synchronized(mutationLock) {
+                cleanup { parser.endOfInput() }
+                cleanup {
+                    val request = pendingRenderRequest.get()
+                    renderPublisher.updateAndPublish(this, unpackScrollbackOffset(request), unpackViewportRows(request))
+                    mutableRenderGeneration.value = pendingRenderGeneration.incrementAndGet()
+                }
+            }
         } finally {
-            cleanupParser()
+            mutableState.value = TerminalSessionState.Closed(event)
         }
+        if (event.failure == null) failure?.let { throw it }
     }
 
-    private fun cleanupParser() {
-        clipboardReads?.close()
-        outboundWriter.close()
-        synchronized(outboundWriteLock) {
-            startupSubmission?.cancel(TerminalStartupCommandStatus.CLOSED)
-        }
-        cancelSynchronizedOutputTimeout()
-        renderRequests.close()
-        immediateRenderRequests.close()
-        sessionScope.cancel(CancellationException("Terminal session closed"))
-        synchronized(mutationLock) {
-            parser.endOfInput()
-        }
-    }
+    private fun isSessionClosed(): Boolean = closingEvent.get() != null
 
-    private fun isSessionClosed(): Boolean = state.value is TerminalSessionState.Closed
-
-    private fun isAcceptingInput(): Boolean = state.value === TerminalSessionState.Running
+    private fun isAcceptingInput(): Boolean = !isSessionClosed() && state.value === TerminalSessionState.Running
 
     companion object {
         private val SESSION_COUNTER =

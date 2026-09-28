@@ -65,6 +65,7 @@ class TerminalWorkspace internal constructor(
         CoroutineScope(workspaceJob + workerDispatcher + CoroutineName("terminal-workspace"))
     private val nextTabNumber = AtomicInteger(1)
     private var selectedTabId: String? = null
+    private var closed = false
 
     internal val isCoroutineScopeActive: Boolean
         get() = workspaceJob.isActive
@@ -90,6 +91,7 @@ class TerminalWorkspace internal constructor(
      * Opens a new local PTY-backed tab. Publishes it through
      * [TerminalWorkspaceListener.tabOpened] before starting output delivery.
      * Publication or startup failure closes the session and removes the tab.
+     * A closed workspace rejects new tabs before creating a session.
      *
      * @param profile launch profile for the new process.
      * @param options initial session dimensions and terminal policy.
@@ -99,6 +101,7 @@ class TerminalWorkspace internal constructor(
         profile: TerminalProfile,
         options: TerminalWorkspaceOpenOptions,
     ): TerminalWorkspaceTab {
+        synchronized(stateLock) { check(!closed) { "workspace is closed" } }
         val id = "terminal-${nextTabNumber.getAndIncrement()}"
         val session = sessionFactory.create(profile, options, tabEventListener(id))
         try {
@@ -115,6 +118,7 @@ class TerminalWorkspace internal constructor(
                     showForegroundProcessName = options.showForegroundProcessName,
                 )
             synchronized(stateLock) {
+                check(!closed) { "workspace is closed" }
                 tabs += tab
             }
             selectTab(id)
@@ -150,20 +154,24 @@ class TerminalWorkspace internal constructor(
                     }
                 }
             synchronized(stateLock) {
-                sessionStateJobs[id] = stateJob
+                if (!closed && tabByIdLocked(id) === tab) {
+                    sessionStateJobs[id] = stateJob
+                } else {
+                    stateJob.cancel(CancellationException("Terminal workspace tab closed during startup"))
+                }
             }
             return tab
         } catch (failure: Throwable) {
             try {
                 closeTab(id)
             } catch (cleanup: Throwable) {
-                failure.addSuppressed(cleanup)
+                if (failure !== cleanup) failure.addSuppressed(cleanup)
             }
             // Also covers failure before the tab entered the workspace registry.
             try {
                 session.close()
             } catch (cleanup: Throwable) {
-                failure.addSuppressed(cleanup)
+                if (failure !== cleanup) failure.addSuppressed(cleanup)
             }
             throw failure
         }
@@ -184,6 +192,8 @@ class TerminalWorkspace internal constructor(
 
     /**
      * Closes an existing tab and its session.
+     * Attempts session cleanup and every close/selection notification even when
+     * a callback throws. Rethrows the first failure with later failures suppressed.
      *
      * @param id tab id.
      */
@@ -200,10 +210,12 @@ class TerminalWorkspace internal constructor(
                 tab to selectedTabId
             }
         val (tab, nextSelectedTabId) = result
-        tab.showForegroundProcessName = false
-        tab.session.close()
-        listener.tabClosed(id)
-        nextSelectedTabId?.let(listener::tabSelected)
+        var failure: Throwable? = null
+        failure = captureCleanupFailure(failure) { tab.showForegroundProcessName = false }
+        failure = captureCleanupFailure(failure) { tab.session.close() }
+        failure = captureCleanupFailure(failure) { listener.tabClosed(id) }
+        failure = captureCleanupFailure(failure) { nextSelectedTabId?.let(listener::tabSelected) }
+        failure?.let { throw it }
     }
 
     /**
@@ -222,13 +234,38 @@ class TerminalWorkspace internal constructor(
         }
     }
 
+    /**
+     * Rejects new tabs, attempts every tab cleanup, and cancels the workspace scope.
+     * Rethrows the first failure with later failures suppressed. Repeated or
+     * reentrant calls are no-ops; they do not wait for an active close to finish.
+     */
     override fun close() {
-        while (true) {
-            val id = synchronized(stateLock) { tabs.lastOrNull()?.id } ?: break
-            closeTab(id)
+        synchronized(stateLock) {
+            if (closed) return
+            closed = true
         }
-        workspaceScope.cancel(CancellationException("Terminal workspace closed"))
+        var failure: Throwable? = null
+        try {
+            while (true) {
+                val id = synchronized(stateLock) { tabs.lastOrNull()?.id } ?: break
+                failure = captureCleanupFailure(failure) { closeTab(id) }
+            }
+        } finally {
+            workspaceScope.cancel(CancellationException("Terminal workspace closed"))
+        }
+        failure?.let { throw it }
     }
+
+    private inline fun captureCleanupFailure(
+        previous: Throwable?,
+        action: () -> Unit,
+    ): Throwable? =
+        try {
+            action()
+            previous
+        } catch (failure: Throwable) {
+            previous?.apply { if (this !== failure) addSuppressed(failure) } ?: failure
+        }
 
     private fun tabEventListener(tabId: String): PtyEventListener =
         object : PtyEventListener {

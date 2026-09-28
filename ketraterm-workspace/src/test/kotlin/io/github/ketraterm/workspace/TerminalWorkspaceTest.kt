@@ -47,6 +47,32 @@ import kotlin.time.Duration.Companion.milliseconds
 @OptIn(ExperimentalCoroutinesApi::class)
 class TerminalWorkspaceTest {
     @Test
+    fun `closed workspace rejects new tabs before creating a session`() =
+        runTest {
+            var created = 0
+            val workspace =
+                TerminalWorkspace(
+                    listener = TerminalWorkspaceListener.NONE,
+                    sessionFactory = { _, _, _ ->
+                        created++
+                        testSession(dispatcher = StandardTestDispatcher(testScheduler))
+                    },
+                    workerDispatcher = StandardTestDispatcher(testScheduler),
+                )
+            workspace.close()
+            assertFailsWith<IllegalStateException> {
+                workspace.openTab(
+                    TerminalProfile("test", "Test", listOf("unused")),
+                    TerminalWorkspaceOpenOptions(80, 24, false, 100),
+                )
+            }
+            assertEquals(0, created)
+            assertTrue(workspace.tabSnapshot().isEmpty())
+            assertFalse(workspace.isCoroutineScopeActive)
+            workspace.close()
+        }
+
+    @Test
     fun `metadata callbacks target the attached tab and stop after removal`() =
         runTest {
             val dispatcher = StandardTestDispatcher(testScheduler)

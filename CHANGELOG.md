@@ -4,6 +4,9 @@ Release notes for library consumers and embedders. Product-specific changes are 
 
 ## [Unreleased]
 
+- Fixed R03/R04: PTY closure now waits for output delivery through EOF, while read failures and session startup/termination paths release owned transport resources once. Explicit local close cancels reads; cleanup preserves the first termination cause.
+- Fixed R05: session shutdown flushes parser EOF and publishes the final viewport before emitting Closed, including synchronized output and concurrent render publication. Public signatures are unchanged; remote completion now also disposes the connector, and close can wait for active render leases.
+- Fixed R15: workspace and product disposal attempt remaining sessions, panes, listeners, and resources after failures, preserving suppressed exceptions and cancelling the workspace scope. Closed workspaces reject new tabs. Added deterministic lifecycle/failure tests and native Windows ConPTY verification.
 - Fixed R02: clamp cursor arithmetic before addition, stop tab traversal at margins, and route counted scrolling to core's region-height limit. Added required `TerminalWriter.scrollUp(count)` / `scrollDown(count)` overloads; existing no-argument calls remain valid, while custom implementations must implement the bounded operations. Tests cover saturated counts, split input, history, margins, and wide/cluster cells.
 - Fixed R17: reject overflowing parser and response-reader byte slices atomically, preserving pending input and queued output.
 - Fixed R10: normal/private cursor-position reports now respect DECOM and active margins, with exact-byte coverage for mode combinations, resets, chunking, and response-policy denial.

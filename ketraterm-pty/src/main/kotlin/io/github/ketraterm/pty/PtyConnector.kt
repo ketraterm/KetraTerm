@@ -19,6 +19,7 @@ import io.github.ketraterm.transport.TerminalConnector
 import io.github.ketraterm.transport.TerminalConnectorListener
 import io.github.ketraterm.transport.checkBounds
 import java.io.IOException
+import java.util.concurrent.CountDownLatch
 import java.util.concurrent.atomic.AtomicBoolean
 import com.pty4j.PtyProcess as Pty4jNativeProcess
 
@@ -29,6 +30,10 @@ import com.pty4j.PtyProcess as Pty4jNativeProcess
  * lifecycle events between the PTY process and a connector listener; parser,
  * core, cursor, attribute, and input-encoder behavior are owned by
  * `terminal-session` and lower layers.
+ * Normal closure follows both process exit and delivery of stdout through EOF.
+ * Local close cancels pending reads instead of draining; fatal read failure
+ * reports the original error and releases the process and both streams once.
+ * Listener callbacks may close this connector reentrantly.
  *
  * @param process the underlying PTY process.
  * @param readBufferSize size of the read buffer in bytes.
@@ -47,6 +52,8 @@ class PtyConnector internal constructor(
     private val started = AtomicBoolean(false)
     private val localCloseRequested = AtomicBoolean(false)
     private val closedNotified = AtomicBoolean(false)
+    private val outputDrained = CountDownLatch(1)
+    private val lifecycleLock = Any()
     private val writeLock = Any()
 
     @Volatile
@@ -112,22 +119,25 @@ class PtyConnector internal constructor(
     }
 
     override fun start(listener: TerminalConnectorListener) {
-        check(started.compareAndSet(false, true)) { "connector already started" }
-        this.listener = listener
+        synchronized(lifecycleLock) {
+            check(!localCloseRequested.get()) { "connector is closed" }
+            check(started.compareAndSet(false, true)) { "connector already started" }
+            this.listener = listener
 
-        val watcher =
-            Thread(this::watchProcessExit, watcherThreadName).apply {
-                isDaemon = true
-            }
-        watcherThread = watcher
-        watcher.start()
+            val watcher =
+                Thread(this::watchProcessExit, watcherThreadName).apply {
+                    isDaemon = true
+                }
+            watcherThread = watcher
 
-        val reader =
-            Thread(this::pumpOutput, readerThreadName).apply {
-                isDaemon = true
-            }
-        readerThread = reader
-        reader.start()
+            val reader =
+                Thread(this::pumpOutput, readerThreadName).apply {
+                    isDaemon = true
+                }
+            readerThread = reader
+            reader.start()
+            watcher.start()
+        }
     }
 
     override fun write(
@@ -159,28 +169,39 @@ class PtyConnector internal constructor(
     }
 
     override fun close() {
-        if (!localCloseRequested.compareAndSet(false, true)) return
+        synchronized(lifecycleLock) {
+            if (!localCloseRequested.compareAndSet(false, true)) return
+        }
 
         try {
             process.destroy()
         } finally {
-            synchronized(writeLock) {
-                try {
-                    process.output.close()
-                } catch (_: IOException) {
-                    // Local close should remain best-effort and idempotent.
+            try {
+                process.input.close()
+            } catch (_: IOException) {
+                // Destruction can already have closed the native stream.
+            } finally {
+                synchronized(writeLock) {
+                    try {
+                        process.output.close()
+                    } catch (_: IOException) {
+                        // Local close should remain best-effort and idempotent.
+                    }
                 }
+                joinThreads()
             }
-            joinThreads()
         }
     }
 
     /**
      * Waits for the child process to exit and returns its exit code.
+     * This does not wait for output delivery; [TerminalConnectorListener.onClosed]
+     * is the completion boundary for drained output.
      *
      * @return exit code of the process.
      * @throws InterruptedException if thread waiting is interrupted.
      */
+    @Suppress("unused") // Public API for embedders waiting for process exit.
     @Throws(InterruptedException::class)
     fun waitFor(): Int = process.waitFor()
 
@@ -197,23 +218,40 @@ class PtyConnector internal constructor(
                 if (read < 0) break
                 if (read == 0) continue
 
-                listenerOrThrow().onBytes(buffer, 0, read)
+                if (!localCloseRequested.get()) listenerOrThrow().onBytes(buffer, 0, read)
             }
         } catch (exception: IOException) {
-            if (!localCloseRequested.get()) {
+            val report =
+                synchronized(lifecycleLock) {
+                    !localCloseRequested.get() && closedNotified.compareAndSet(false, true)
+                }
+            if (report) {
                 failure = exception
-                listenerOrThrow().onError(exception)
-                notifyClosed(null)
+                try {
+                    listenerOrThrow().onError(exception)
+                } finally {
+                    try {
+                        close()
+                    } finally {
+                        listenerOrThrow().onClosed(null)
+                    }
+                }
             }
+        } finally {
+            outputDrained.countDown()
         }
     }
 
     private fun watchProcessExit() {
         try {
             val code = process.waitFor()
+            outputDrained.await()
             if (!localCloseRequested.get()) {
-                exitCode = code
-                notifyClosed(code)
+                try {
+                    notifyClosed(code)
+                } finally {
+                    close()
+                }
             }
         } catch (_: InterruptedException) {
             Thread.currentThread().interrupt()
@@ -221,12 +259,17 @@ class PtyConnector internal constructor(
     }
 
     private fun notifyClosed(code: Int?) {
-        if (closedNotified.compareAndSet(false, true)) {
-            listenerOrThrow().onClosed(code)
+        synchronized(lifecycleLock) {
+            if (localCloseRequested.get() || !closedNotified.compareAndSet(false, true)) return
+            exitCode = code
         }
+        listenerOrThrow().onClosed(code)
     }
 
     private fun joinThreads() {
+        // A callback may close on either worker; joining its peer can make
+        // the watcher wait for the reader that is currently performing close.
+        if (Thread.currentThread() === readerThread || Thread.currentThread() === watcherThread) return
         joinThread(readerThread, CLOSE_JOIN_MILLIS)
         joinThread(watcherThread, CLOSE_JOIN_MILLIS)
     }
