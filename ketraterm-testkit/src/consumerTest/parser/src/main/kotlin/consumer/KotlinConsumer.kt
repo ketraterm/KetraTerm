@@ -13,24 +13,18 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+package consumer
 
-plugins {
-    kotlin("jvm")
-}
+import io.github.ketraterm.parser.api.TerminalParsers
+import io.github.ketraterm.protocol.NotificationLevel
 
-repositories {
-    mavenCentral()
-}
-
-dependencies {
-    api(project(":ketraterm-protocol"))
-    api(project(":ketraterm-core"))
-    api(project(":ketraterm-parser"))
-
-    testImplementation(kotlin("test"))
-    testImplementation("org.junit.jupiter:junit-jupiter:6.1.3")
-}
-
-tasks.test {
-    useJUnitPlatform()
+fun main() {
+    JavaConsumer.verify()
+    val output = StringBuilder()
+    val sink = JavaConsumer.sink(output)
+    val parser = TerminalParsers.create(sink)
+    parser.accept("Kotlin".encodeToByteArray())
+    parser.endOfInput()
+    sink.showNotification("title", "!", NotificationLevel.INFO)
+    check(output.toString() == "Kotlin!")
 }

@@ -23,6 +23,12 @@ plugins {
 
 extra["kotlinxCoroutinesVersion"] = "1.10.2"
 
+// Stage the real publication's runtime jar and generated metadata, without invoking
+// release signing or remote publishing. Consumer fixtures resolve only this repository.
+val consumerRepository = layout.buildDirectory.dir("library-consumer-repository")
+val prepareLibraryConsumerRepository = tasks.register("prepareLibraryConsumerRepository")
+val consumerModules = setOf("protocol", "render-api", "core", "parser", "host", "completion")
+
 repositories {
     mavenCentral()
 }
@@ -98,6 +104,27 @@ subprojects {
                         connection.set("scm:git:git://github.com/ketraterm/ketraterm.git")
                         developerConnection.set("scm:git:ssh://github.com/ketraterm/ketraterm.git")
                         url.set("https://github.com/ketraterm/ketraterm")
+                    }
+                }
+            }
+
+            if (name.removePrefix("ketraterm-") in consumerModules) {
+                extensions.configure<PublishingExtension> {
+                    publications.withType<MavenPublication>().configureEach {
+                        val publication = this
+                        val publicationName = name.replaceFirstChar(Char::uppercaseChar)
+                        val stage = tasks.register<Sync>("stage${publicationName}ConsumerPublication") {
+                            val pom = tasks.named<GenerateMavenPom>("generatePomFileFor${publicationName}Publication")
+                            val metadata = tasks.named<GenerateModuleMetadata>("generateMetadataFileFor${publicationName}Publication")
+                            dependsOn(pom, metadata)
+                            from(tasks.named("jar"))
+                            from(pom.map { it.destination }) { rename { "${publication.artifactId}-${publication.version}.pom" } }
+                            from(metadata.flatMap { it.outputFile }) { rename { "${publication.artifactId}-${publication.version}.module" } }
+                            into(consumerRepository.map {
+                                it.dir("${publication.groupId.replace('.', '/')}/${publication.artifactId}/${publication.version}")
+                            })
+                        }
+                        prepareLibraryConsumerRepository.configure { dependsOn(stage) }
                     }
                 }
             }

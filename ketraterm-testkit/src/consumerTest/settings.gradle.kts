@@ -13,24 +13,9 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
-plugins {
-    kotlin("jvm")
+pluginManagement {
+    repositories { gradlePluginPortal() }
+    plugins { kotlin("jvm") version providers.gradleProperty("kotlinVersion").get() }
 }
-
-repositories {
-    mavenCentral()
-}
-
-dependencies {
-    api(project(":ketraterm-protocol"))
-    api(project(":ketraterm-core"))
-    api(project(":ketraterm-parser"))
-
-    testImplementation(kotlin("test"))
-    testImplementation("org.junit.jupiter:junit-jupiter:6.1.3")
-}
-
-tasks.test {
-    useJUnitPlatform()
-}
+rootProject.name = "published-library-consumers"
+include("parser", "host", "completion")

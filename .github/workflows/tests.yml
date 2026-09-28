@@ -37,12 +37,12 @@ jobs:
       - name: Run Tests (Linux with Xvfb)
         if: runner.os == 'Linux'
         run: |
-          xvfb-run ./gradlew test "-Djava.awt.headless=true"
+          xvfb-run ./gradlew test :ketraterm-testkit:publishedConsumerTest --continue "-Djava.awt.headless=true"
 
       - name: Run Tests (Windows & macOS)
         if: runner.os != 'Linux'
         run: |
-          ./gradlew test "-Djava.awt.headless=true"
+          ./gradlew test :ketraterm-testkit:publishedConsumerTest --continue "-Djava.awt.headless=true"
 
       - name: Run IntelliJ Plugin Tests (Linux)
         if: runner.os == 'Linux'

@@ -13,24 +13,17 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+package consumer
 
-plugins {
-    kotlin("jvm")
-}
+import io.github.ketraterm.core.TerminalBuffers
+import io.github.ketraterm.host.HostCommandAdapter
+import io.github.ketraterm.parser.api.TerminalParsers
 
-repositories {
-    mavenCentral()
-}
-
-dependencies {
-    api(project(":ketraterm-protocol"))
-    api(project(":ketraterm-core"))
-    api(project(":ketraterm-parser"))
-
-    testImplementation(kotlin("test"))
-    testImplementation("org.junit.jupiter:junit-jupiter:6.1.3")
-}
-
-tasks.test {
-    useJUnitPlatform()
+fun main() {
+    JavaConsumer.verify()
+    val buffer = TerminalBuffers.create(12, 2, 0)
+    val parser = TerminalParsers.create(HostCommandAdapter(buffer))
+    parser.accept("Kotlin".encodeToByteArray())
+    parser.endOfInput()
+    check(buffer.getLineAsString(0).trimEnd() == "Kotlin")
 }

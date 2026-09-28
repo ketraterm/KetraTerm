@@ -270,7 +270,7 @@ val prepareConsumerClasspaths =
                     attribute(TargetJvmVersion.TARGET_JVM_VERSION_ATTRIBUTE, 25)
                 }
             }
-        dependencies.add(consumerClasspath.name, project(":ketraterm-$module"))
+        dependencies.add(consumerClasspath.name, dependencies.project(mapOf("path" to ":ketraterm-$module")))
         tasks.register<Sync>("prepare${module.replaceFirstChar(Char::uppercaseChar)}ConsumerClasspath") {
             from(consumerClasspath)
             into(consumerClasspathsDirectory.map { it.dir(module) })
@@ -282,3 +282,47 @@ tasks.test {
     inputs.dir(consumerClasspathsDirectory)
     systemProperty("ketraterm.consumerClasspaths", consumerClasspathsDirectory.get().asFile.absolutePath)
 }
+
+val consumerFixtureDirectory = layout.buildDirectory.dir("published-consumers")
+configure<com.diffplug.gradle.spotless.SpotlessExtension> {
+    kotlinGradle { target("*.gradle.kts", "src/consumerTest/*.gradle.kts") }
+}
+val preparePublishedConsumers =
+    tasks.register<Sync>("preparePublishedConsumers") {
+        from("src/consumerTest")
+        into(consumerFixtureDirectory)
+        preserve { include("**/build/**", ".gradle/**") }
+    }
+
+val verifyPublishedConsumers =
+    listOf("gradle", "pom").map { metadata ->
+        tasks.register<JavaExec>("verify${metadata.replaceFirstChar(Char::uppercaseChar)}PublishedConsumers") {
+            group = "verification"
+            description = "Compiles and runs isolated Kotlin/Java consumers using $metadata publication metadata."
+            dependsOn(preparePublishedConsumers, rootProject.tasks.named("prepareLibraryConsumerRepository"))
+            javaLauncher.set(javaToolchains.launcherFor { languageVersion.set(JavaLanguageVersion.of(25)) })
+            classpath = files(rootProject.file("gradle/wrapper/gradle-wrapper.jar"))
+            mainClass.set("org.gradle.wrapper.GradleWrapperMain")
+            jvmArgs("--enable-native-access=ALL-UNNAMED")
+            args(
+                "--project-dir",
+                consumerFixtureDirectory.get().asFile.absolutePath,
+                "--console=plain",
+                "--no-daemon",
+                "--max-workers=2",
+                "-PkotlinVersion=${org.jetbrains.kotlin.gradle.plugin.getKotlinPluginVersion(logger)}",
+                "-PlibraryVersion=${project.version}",
+                "-PlibraryRepository=${rootProject.layout.buildDirectory.dir("library-consumer-repository").get().asFile.toURI()}",
+                "-PmetadataMode=$metadata",
+                "check",
+            )
+        }
+    }
+verifyPublishedConsumers[1].configure { mustRunAfter(verifyPublishedConsumers[0]) }
+
+tasks.register("publishedConsumerTest") {
+    group = "verification"
+    description = "Verifies published parser, host and completion libraries without project dependencies."
+    dependsOn(verifyPublishedConsumers)
+}
+tasks.named("check") { dependsOn("publishedConsumerTest") }
