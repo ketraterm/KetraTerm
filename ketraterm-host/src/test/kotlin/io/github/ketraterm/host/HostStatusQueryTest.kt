@@ -27,6 +27,29 @@ import org.junit.jupiter.params.provider.ValueSource
 
 class HostStatusQueryTest {
     @ParameterizedTest
+    @ValueSource(booleans = [false, true])
+    fun `origin relative cursor reports follow resets and response denial`(deny: Boolean) {
+        val bytes =
+            (
+                "\u001B[2;4r\u001B[?69h\u001B[3;8s\u001B[?6h\u001B[2;3H\u001B[6n\u001B[?6n" +
+                    "\u001B[!p\u001B[6n\u001B[?6n\u001Bc\u001B[6n\u001B[?6nX"
+            ).encodeToByteArray()
+        assertAllByteSplits(bytes) { split ->
+            val terminal = TerminalBuffers.create(10, 5)
+            val policy = if (deny) HostControlPolicy.DENY else HostControlPolicy.ALLOW
+            val parser = TerminalParsers.create(HostCommandAdapter(terminal, hostPolicy = HostPolicy(terminalResponsePolicy = policy)))
+            parser.accept(bytes, 0, split)
+            parser.accept(bytes, split, bytes.size - split)
+            val response = ByteArray(128)
+            val count = terminal.readResponseBytes(response)
+            val expected = if (deny) "" else "\u001B[2;3R\u001B[?2;3R\u001B[3;5R\u001B[?3;5R\u001B[1;1R\u001B[?1;1R"
+            assertEquals(expected, response.decodeToString(0, count), "split=$split")
+            assertEquals(0, terminal.pendingResponseBytes)
+            assertEquals("X", terminal.getLineAsString(0))
+        }
+    }
+
+    @ParameterizedTest
     @ValueSource(
         strings = [
             "", "unsupported", "\nAUDIT_MARKER\n", "\u010AAUDIT_MARKER\u010A", "\u011B[31m",

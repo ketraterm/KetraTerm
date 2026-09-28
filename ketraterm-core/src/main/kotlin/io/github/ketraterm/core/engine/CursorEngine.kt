@@ -107,7 +107,7 @@ internal class CursorEngine(
         state.cancelPendingWrap()
         val targetCol =
             if (state.modes.isOriginMode && state.modes.isLeftRightMarginMode) {
-                leftMargin + col
+                leftMargin + col.coerceIn(0, rightMargin - leftMargin)
             } else {
                 col
             }
@@ -115,7 +115,7 @@ internal class CursorEngine(
 
         state.cursor.row =
             if (state.modes.isOriginMode) {
-                (state.scrollTop + row).coerceIn(state.scrollTop, state.scrollBottom)
+                state.scrollTop + row.coerceIn(0, state.scrollBottom - state.scrollTop)
             } else {
                 state.dimensions.clampRow(row)
             }
@@ -150,7 +150,7 @@ internal class CursorEngine(
             if (n <= 0) return
             state.cancelPendingWrap()
             val bottom = if (state.cursor.row in state.scrollTop..state.scrollBottom) state.scrollBottom else height - 1
-            state.cursor.row = (state.cursor.row + n).coerceAtMost(bottom)
+            state.cursor.row += minOf(n, bottom - state.cursor.row)
         }
 
     /**
@@ -170,7 +170,7 @@ internal class CursorEngine(
         cursorMutation {
             if (n <= 0) return
             state.cancelPendingWrap()
-            state.cursor.col = (state.cursor.col + n).coerceAtMost(rightMargin)
+            state.cursor.col += minOf(n, rightMargin - state.cursor.col)
         }
 
     /**
@@ -194,10 +194,11 @@ internal class CursorEngine(
     fun cursorForwardTab(count: Int = 1) =
         cursorMutation {
             state.cancelPendingWrap()
-            val steps = if (count <= 0) 1 else count
-            repeat(steps) {
+            var steps = count.coerceAtLeast(1)
+            do {
                 advanceToNextTabStop()
-            }
+                steps--
+            } while (steps > 0 && state.cursor.col < rightMargin)
         }
 
     /**
@@ -210,10 +211,11 @@ internal class CursorEngine(
     fun cursorBackwardTab(count: Int = 1) =
         cursorMutation {
             state.cancelPendingWrap()
-            val steps = if (count <= 0) 1 else count
-            repeat(steps) {
+            var steps = count.coerceAtLeast(1)
+            do {
                 retreatToPreviousTabStop()
-            }
+                steps--
+            } while (steps > 0 && state.cursor.col > leftMargin)
         }
 
     // --- Save / Restore ----------------------------------------------

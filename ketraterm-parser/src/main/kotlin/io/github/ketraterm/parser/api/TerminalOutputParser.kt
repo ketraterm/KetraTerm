@@ -33,6 +33,8 @@ interface TerminalOutputParser {
      * @param bytes The byte array containing raw terminal output.
      * @param offset The index of the first byte to process in [bytes].
      * @param length The number of bytes to process.
+     * @throws IllegalArgumentException if the slice is outside [bytes], including
+     * integer-overflow ranges. Rejection leaves pending input and sink state unchanged.
      */
     fun accept(
         bytes: ByteArray,

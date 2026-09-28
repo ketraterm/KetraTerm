@@ -22,14 +22,68 @@ import io.github.ketraterm.protocol.TerminalCapabilityIdentity
 import io.github.ketraterm.protocol.keyboard.KittyKeyboardProgressiveFlag
 import io.github.ketraterm.render.api.TerminalColorPalette
 import io.github.ketraterm.render.api.TerminalRenderCursorShape
-import org.junit.jupiter.api.Assertions.assertAll
-import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.params.ParameterizedTest
 import org.junit.jupiter.params.provider.CsvSource
 import org.junit.jupiter.params.provider.ValueSource
 
 class TerminalResponseChannelTest {
+    @ParameterizedTest
+    @CsvSource("false,false", "false,true", "true,false", "true,true")
+    fun `cursor reports use the same origin as cursor positioning`(
+        origin: Boolean,
+        horizontalMargins: Boolean,
+    ) {
+        val buffer = TerminalBuffers.create(10, 6)
+        buffer.setScrollRegion(2, 5)
+        buffer.setLeftRightMarginMode(horizontalMargins)
+        buffer.setLeftRightMargins(3, 8)
+        buffer.setOriginMode(origin)
+        buffer.positionCursor(4, 2)
+
+        buffer.requestDeviceStatusReport(6, false)
+        buffer.requestDeviceStatusReport(6, true)
+
+        assertEquals("\u001B[3;5R\u001B[?3;5R", drain(buffer))
+        assertEquals(if (origin) 3 else 2, buffer.cursorRow)
+        assertEquals(if (origin && horizontalMargins) 6 else 4, buffer.cursorCol)
+    }
+
+    @Test
+    fun `cursor restored before a moved origin reports positive coordinates`() {
+        val buffer = TerminalBuffers.create(10, 6)
+        buffer.setOriginMode(true)
+        buffer.saveCursor()
+        buffer.setScrollRegion(3, 5)
+        buffer.restoreCursor()
+
+        buffer.requestDeviceStatusReport(6, false)
+        buffer.requestDeviceStatusReport(6, true)
+
+        assertEquals("\u001B[1;1R\u001B[?1;1R", drain(buffer))
+        assertEquals(0, buffer.cursorRow)
+    }
+
+    @ParameterizedTest
+    @CsvSource("1,2147483647", "2147483647,1", "-1,1", "0,-1", "4,1", "5,0")
+    fun `invalid response slices preserve queued bytes and destination`(
+        offset: Int,
+        length: Int,
+    ) {
+        val buffer = TerminalBuffers.create(10, 5)
+        buffer.requestDeviceStatusReport(5, false)
+        val destination = ByteArray(4) { 42 }
+
+        assertThrows(IllegalArgumentException::class.java) {
+            buffer.readResponseBytes(destination, offset, length)
+        }
+        assertArrayEquals(ByteArray(4) { 42 }, destination)
+        assertEquals(4, buffer.pendingResponseBytes)
+        assertEquals(0, buffer.readResponseBytes(destination, destination.size, 0))
+        assertEquals("\u001B[0n", drain(buffer))
+    }
+
     @Test
     fun `private color scheme query follows host palette independently of application colors and resets`() {
         val buffer = TerminalBuffers.create(width = 10, height = 5)

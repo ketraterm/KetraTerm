@@ -174,6 +174,14 @@ interface TerminalWriter {
     fun scrollUp()
 
     /**
+     * Scrolls the active region up by [count] lines, capped at its height.
+     * Non-positive counts are ignored. Preserves the cursor position and uses
+     * the same horizontal-margin and history-admission rules as [scrollUp].
+     * Work is bounded by the grid dimensions, not the supplied count.
+     */
+    fun scrollUp(count: Int)
+
+    /**
      * Scrolls the active scroll region down by one line (SD, `CSI 1 T`).
      *
      * Only cells within the active horizontal margins move, exposing blank
@@ -181,6 +189,14 @@ interface TerminalWriter {
      * position is preserved.
      */
     fun scrollDown()
+
+    /**
+     * Scrolls the active region down by [count] lines, capped at its height.
+     * Non-positive counts are ignored. Preserves the cursor position and uses
+     * the same horizontal-margin rules as [scrollDown], without consuming history.
+     * Work is bounded by the grid dimensions, not the supplied count.
+     */
+    fun scrollDown(count: Int)
 
     /**
      * Inserts [count] blank lines at the cursor row within the active scroll

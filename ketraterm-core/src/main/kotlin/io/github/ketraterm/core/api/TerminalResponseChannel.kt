@@ -63,6 +63,10 @@ interface TerminalResponseChannel : TerminalHostResponseReader {
      * palette, independently of application color overrides. Unsupported
      * requests stay silent; the color-scheme protocol defines no failure reply.
      * Host adapters must enforce terminal-response policy before calling this API.
+     * Both cursor-position forms use one-based coordinates relative to the active
+     * origin: top margin under DECOM, and left margin under DECOM plus DECLRMM.
+     * With DECOM off they report absolute viewport coordinates. Positions restored
+     * before the origin report row/column 1 rather than a non-positive coordinate.
      *
      * @param mode The DSR mode parameter.
      * @param decPrivate `true` if this is a DEC private DSR (? prefix), `false` for standard ANSI.

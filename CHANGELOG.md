@@ -4,6 +4,9 @@ Release notes for library consumers and embedders. Product-specific changes are 
 
 ## [Unreleased]
 
+- Fixed R02: clamp cursor arithmetic before addition, stop tab traversal at margins, and route counted scrolling to core's region-height limit. Added required `TerminalWriter.scrollUp(count)` / `scrollDown(count)` overloads; existing no-argument calls remain valid, while custom implementations must implement the bounded operations. Tests cover saturated counts, split input, history, margins, and wide/cluster cells.
+- Fixed R17: reject overflowing parser and response-reader byte slices atomically, preserving pending input and queued output.
+- Fixed R10: normal/private cursor-position reports now respect DECOM and active margins, with exact-byte coverage for mode combinations, resets, chunking, and response-policy denial.
 - Fixed R11: DECRQSS cursor-style queries now match the exact `SP q` selector and return the effective shape/blink code; bare `q` receives the empty failure response. Added all-style, configured-default, malformed-selector, and byte-split coverage while preserving response-policy denial and public API signatures.
 - Fixed R01: unsupported DECRQSS selectors now enqueue only the empty protocol failure, preventing request controls and truncated Unicode from reaching application input. Preserved exact selector admission, supported replies, and response-policy denial; added core and byte-stream coverage for malformed UTF-8, chunking, bounds, and recovery. Public API signatures are unchanged.
 - Fixed position-dependent rejection of standalone window growth. Resize geometry uses the monitor work area and adjusts position only as needed, with coverage for column round trips, desktop insets, and negative monitor coordinates.

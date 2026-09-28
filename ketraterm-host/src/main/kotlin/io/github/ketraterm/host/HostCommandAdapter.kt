@@ -471,15 +471,11 @@ class HostCommandAdapter(
     }
 
     override fun scrollUp(n: Int) {
-        repeat(n.coerceAtLeast(0)) {
-            terminal.scrollUp()
-        }
+        terminal.scrollUp(n)
     }
 
     override fun scrollDown(n: Int) {
-        repeat(n.coerceAtLeast(0)) {
-            terminal.scrollDown()
-        }
+        terminal.scrollDown(n)
     }
 
     override fun setTabStop() {

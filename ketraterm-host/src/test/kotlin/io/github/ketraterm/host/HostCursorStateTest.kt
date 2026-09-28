@@ -29,6 +29,21 @@ import org.junit.jupiter.params.provider.ValueSource
 
 class HostCursorStateTest {
     @ParameterizedTest
+    @ValueSource(strings = ["2147483647", "999999999999999999999999999999"])
+    fun `origin relative absolute positioning saturates before adding margins`(count: String) {
+        val bytes = "\u001B[2;4r\u001B[?69h\u001B[3;8s\u001B[?6h\u001B[$count;${count}HX".encodeToByteArray()
+        assertAllByteSplits(bytes) { split ->
+            val terminal = TerminalBuffers.create(10, 5)
+            val parser = TerminalParsers.create(HostCommandAdapter(terminal))
+            parser.accept(bytes, 0, split)
+            parser.accept(bytes, split, bytes.size - split)
+            assertEquals('X'.code, terminal.getCodepointAt(7, 3), "split=$split")
+            assertEquals(7, terminal.cursorCol)
+            assertEquals(3, terminal.cursorRow)
+        }
+    }
+
+    @ParameterizedTest
     @CsvSource(
         "B,2147483647,false",
         "B,2147483647,true",

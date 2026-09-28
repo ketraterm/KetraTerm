@@ -63,7 +63,7 @@ internal class HostResponseQueue(
         require(offset >= 0) { "offset must be non-negative: $offset" }
         require(length >= 0) { "length must be non-negative: $length" }
         require(offset <= destination.size) { "offset out of range: $offset" }
-        require(offset + length <= destination.size) {
+        require(length <= destination.size - offset) {
             "offset + length out of range: offset=$offset length=$length size=${destination.size}"
         }
 

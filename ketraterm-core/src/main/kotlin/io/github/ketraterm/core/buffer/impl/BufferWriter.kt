@@ -109,7 +109,15 @@ internal class BufferWriter(
 
     override fun scrollUp() = mutationEngine.scrollUp()
 
+    override fun scrollUp(count: Int) {
+        if (count > 0) mutationEngine.scrollUp(count)
+    }
+
     override fun scrollDown() = mutationEngine.scrollDown()
+
+    override fun scrollDown(count: Int) {
+        if (count > 0) mutationEngine.scrollDown(count)
+    }
 
     override fun insertLines(count: Int) = mutationEngine.insertLines(count)
 

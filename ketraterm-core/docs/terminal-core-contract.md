@@ -133,6 +133,9 @@ The writer surface owns:
 Guaranteed behavior:
 
 - structural edits cancel `pendingWrap`
+- counted `scrollUp` / `scrollDown` cap positive counts at the active region
+  height; non-positive counts are no-ops. Cursor position is preserved, and
+  one request can admit at most that many rows under the existing history rules
 - `ECH` erases without shifting
 - `ICH` / `DCH` are constrained by active horizontal margins
 - `IL` / `DL` are constrained by the active vertical region and are no-op when
@@ -151,6 +154,10 @@ The cursor surface owns:
 - absolute and relative cursor motion
 - `DECSC` / `DECRC`
 - tab stop commands
+
+Cursor counts and origin-relative coordinates clamp without integer overflow.
+Tab traversal stops at the applicable margin, so work is bounded by the viewport
+width rather than the supplied count.
 
 ### `DECSC` / `DECRC`
 

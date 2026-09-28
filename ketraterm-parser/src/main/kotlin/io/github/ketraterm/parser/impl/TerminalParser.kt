@@ -75,7 +75,7 @@ internal class TerminalParser(
         require(offset >= 0) { "offset must be non-negative: $offset" }
         require(length >= 0) { "length must be non-negative: $length" }
         require(offset <= bytes.size) { "offset out of range: $offset" }
-        require(offset + length <= bytes.size) {
+        require(length <= bytes.size - offset) {
             "offset + length out of range: offset=$offset length=$length size=${bytes.size}"
         }
 

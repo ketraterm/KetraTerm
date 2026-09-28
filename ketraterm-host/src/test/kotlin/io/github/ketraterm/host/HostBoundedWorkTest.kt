@@ -24,6 +24,7 @@ import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.io.TempDir
 import org.junit.jupiter.params.ParameterizedTest
+import org.junit.jupiter.params.provider.CsvSource
 import org.junit.jupiter.params.provider.ValueSource
 import java.io.File
 import java.nio.file.Files
@@ -31,6 +32,32 @@ import java.nio.file.Path
 import java.util.concurrent.TimeUnit
 
 class HostBoundedWorkTest {
+    @ParameterizedTest
+    @CsvSource("S,0", "S,2", "S,8", "T,0", "T,2", "T,8")
+    fun `scroll counts stop at the region height without adding surplus blank history`(
+        command: String,
+        historyCapacity: Int,
+    ) {
+        val bytes = "\u001B[1;3r\u001B[2;2H\u001B[6$command".encodeToByteArray()
+        assertAllByteSplits(bytes) { split ->
+            val terminal = TerminalBuffers.create(6, 5, maxHistory = historyCapacity)
+            for (row in 0 until terminal.height) {
+                terminal.positionCursor(0, row)
+                terminal.writeText("row$row")
+            }
+            val parser = TerminalParsers.create(HostCommandAdapter(terminal))
+            parser.accept(bytes, 0, split)
+            parser.accept(bytes, split, bytes.size - split)
+
+            val retained = if (command == "S") minOf(3, historyCapacity) else 0
+            assertEquals(retained, terminal.historySize, "split=$split")
+            assertEquals((3 - retained until 3).map { "row$it" }, terminal.getAllAsString().lines().take(retained))
+            assertEquals(listOf("", "", "", "row3", "row4"), (0 until 5).map(terminal::getLineAsString))
+            assertEquals(1, terminal.cursorRow)
+            assertEquals(1, terminal.cursorCol)
+        }
+    }
+
     @ParameterizedTest
     @ValueSource(strings = ["S", "T"])
     fun `saturated scrolling finishes within retained grid work and preserves guard rows`(command: String) {
@@ -148,6 +175,29 @@ internal object HostTabWorkProcess {
         check(terminal.cursorRow == 1)
         check(terminal.cursorCol == if (command == "I") 9 else 1)
         check(terminal.historySize == 0)
+        for (margins in listOf(false, true)) {
+            for (clearStops in listOf(false, true)) {
+                val setup = if (margins) "\u001B[?69h\u001B[3;8s" else ""
+                val tabs = if (clearStops) "\u001B[3g" else "\u001B[1;6H\u001BH"
+                val bytes = "$setup$tabs\u001B[2;5H\u001B[2147483647${command}X".encodeToByteArray()
+                for (split in 0..bytes.size) {
+                    val bounded = TerminalBuffers.create(10, 5, maxHistory = 0)
+                    val chunked = TerminalParsers.create(HostCommandAdapter(bounded))
+                    chunked.accept(bytes, 0, split)
+                    chunked.accept(bytes, split, bytes.size - split)
+                    val edge =
+                        if (command == "I") {
+                            if (margins) 7 else 9
+                        } else {
+                            if (margins) 2 else 0
+                        }
+                    check(bounded.getCodepointAt(edge, 1) == 'X'.code) { "margins=$margins clear=$clearStops split=$split" }
+                    check(bounded.cursorRow == 1)
+                    check(bounded.cursorCol == if (command == "I") edge else edge + 1)
+                    check(bounded.historySize == 0)
+                }
+            }
+        }
         println("completed $command")
     }
 }

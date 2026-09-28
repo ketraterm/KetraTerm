@@ -125,6 +125,22 @@ class TerminalParserTest {
     @Nested
     @DisplayName("API validation")
     inner class ApiValidation {
+        @Test
+        fun `rejected slice preserves an incomplete UTF8 scalar at every byte boundary`() {
+            val bytes = "😀".encodeToByteArray()
+            for (split in 1 until bytes.size) {
+                val f = TerminalParserFixture()
+                f.parser.accept(bytes, 0, split)
+                assertThrows(IllegalArgumentException::class.java) {
+                    f.parser.accept(bytes, 1, Int.MAX_VALUE)
+                }
+                assertTrue(f.sink.events.isEmpty())
+                f.parser.accept(bytes, split, bytes.size - split)
+                f.endOfInput()
+                assertEquals(listOf("writeCodepoint:128512"), f.sink.events, "split=$split")
+            }
+        }
+
         @ParameterizedTest
         @CsvSource("1,2147483647", "2147483647,1", "2147483647,2147483647")
         fun `overflowing slices are rejected without consuming or flushing pending input`(

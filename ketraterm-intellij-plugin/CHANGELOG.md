@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+- Fixed freezes and misplaced text from unusually large cursor or scroll commands.
+- Improved cursor-position reporting in terminal apps using margins.
 - Fixed terminal apps failing to query the current cursor shape and blinking style.
 - Fixed unsupported terminal status queries reflecting supplied text and control characters into shell or application input.
 - Fixed terminal column switching inside fixed-size IDE panes.

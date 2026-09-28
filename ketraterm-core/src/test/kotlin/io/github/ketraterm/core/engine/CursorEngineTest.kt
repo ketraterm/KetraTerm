@@ -25,6 +25,23 @@ import org.junit.jupiter.api.Test
 @DisplayName("CursorEngine")
 class CursorEngineTest {
     @Test
+    fun `origin relative positioning clamps before adding margins`() {
+        val s = state(width = 10, height = 6)
+        val e = engine(s)
+        s.activeBuffer.setScrollRegion(2, 5, false, 6)
+        s.activeBuffer.setLeftRightMargins(3, 8, 10)
+        s.modes.isLeftRightMarginMode = true
+        s.modes.isOriginMode = true
+
+        e.setCursor(Int.MAX_VALUE, Int.MAX_VALUE)
+        assertEquals(7, s.cursor.col)
+        assertEquals(4, s.cursor.row)
+        e.setCursor(Int.MIN_VALUE, Int.MIN_VALUE)
+        assertEquals(2, s.cursor.col)
+        assertEquals(1, s.cursor.row)
+    }
+
+    @Test
     fun `maximum downward movement clamps before integer addition`() {
         val s = state()
         val e = engine(s)

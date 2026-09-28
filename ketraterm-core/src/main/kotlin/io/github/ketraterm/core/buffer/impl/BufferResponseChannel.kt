@@ -376,13 +376,15 @@ internal class BufferResponseChannel(
     }
 
     private fun enqueueCursorPositionReport(decPrivate: Boolean) {
+        val rowOrigin = if (state.modes.isOriginMode) state.scrollTop else 0
+        val colOrigin = if (state.modes.isOriginMode) state.effectiveLeftMargin else 0
         enqueueCsiPrefix()
         if (decPrivate) {
             state.hostResponses.enqueueByte('?'.code)
         }
-        state.hostResponses.enqueuePositiveDecimal(state.cursor.row + 1)
+        state.hostResponses.enqueuePositiveDecimal((state.cursor.row - rowOrigin).coerceAtLeast(0) + 1)
         state.hostResponses.enqueueByte(';'.code)
-        state.hostResponses.enqueuePositiveDecimal(state.cursor.col + 1)
+        state.hostResponses.enqueuePositiveDecimal((state.cursor.col - colOrigin).coerceAtLeast(0) + 1)
         state.hostResponses.enqueueByte('R'.code)
     }
 
