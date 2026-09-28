@@ -1165,6 +1165,9 @@ class SwingTerminal
          * selected. Linear selection columns are logical; block selection columns
          * are visual, as defined by [CellSelection].
          *
+         * The returned snapshot is immutable and may be retained. Unchanged values
+         * may share an instance; object identity is not part of this API's contract.
+         *
          * This method may be called from any thread. Off-EDT callers wait for the
          * EDT to read the binding, selection, and viewport together. EDT callers
          * read directly.

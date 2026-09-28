@@ -15,6 +15,7 @@
  */
 package io.github.ketraterm.ui.swing.api
 
+import io.github.ketraterm.core.TerminalBuffers
 import io.github.ketraterm.render.api.*
 import io.github.ketraterm.render.cache.TerminalRenderCache
 import io.github.ketraterm.ui.swing.render.TerminalBidiLayout
@@ -32,6 +33,83 @@ import javax.swing.JButton
 import javax.swing.SwingUtilities
 
 class TerminalSelectionControllerTest {
+    @ParameterizedTest
+    @ValueSource(booleans = [false, true])
+    fun `backward projection reuse preserves direction across clipping and invisible viewports`(block: Boolean) {
+        SwingUtilities.invokeAndWait {
+            val lines = listOf("abcdefgh", "ijklmnop", "qrstuvwx")
+            val cache = TerminalRenderCache(8, 3)
+            cache.accept(AbsoluteLinesFrame(lines, historySize = 0))
+            val controller = TerminalSelectionController(FakeSelectionHost(cache))
+            val button = JButton()
+            controller.handleSelectionMousePressed(selectionMouseEvent(button, MouseEvent.MOUSE_PRESSED, 55, 45, alt = block))
+            controller.handleSelectionMouseDragged(selectionMouseEvent(button, MouseEvent.MOUSE_DRAGGED, 15, 5, alt = block))
+            controller.stopSelectionDrag()
+            val initial = controller.getViewportSelection(cache)
+            val expected = CellSelection(if (block) 6 else 5, 2, 1, 0, isBlock = block)
+            assertEquals(expected, initial)
+            assertSame(initial, controller.getViewportSelection(cache))
+
+            cache.accept(AbsoluteLinesFrame(lines.drop(1), historySize = 1))
+            val clipped = controller.getViewportSelection(cache)
+            assertEquals(CellSelection(if (block) 6 else 5, 1, if (block) 1 else 0, 0, isBlock = block), clipped)
+            assertSame(clipped, controller.getViewportSelection(cache))
+            assertEquals(expected, initial)
+
+            cache.accept(AbsoluteLinesFrame(listOf("new text"), historySize = 0, discardedCount = 3))
+            assertNull(controller.getViewportSelection(cache))
+            assertNull(controller.getViewportSelection(null))
+            cache.accept(AbsoluteLinesFrame(lines, historySize = 0))
+            assertEquals(expected, controller.getViewportSelection(cache))
+            controller.clearSelection()
+            assertNull(controller.getViewportSelection(cache))
+        }
+    }
+
+    @Test
+    fun `projection reuse depends on clipped values rather than cache identity`() {
+        SwingUtilities.invokeAndWait {
+            val wide = TerminalRenderCache(10, 2)
+            val narrow = TerminalRenderCache(4, 1)
+            val controller = TerminalSelectionController(FakeSelectionHost(wide))
+            controller.selectAbsoluteRows(0, 1, 10)
+            val original = controller.getViewportSelection(wide)
+            assertEquals(CellSelection(0, 0, 10, 1), original)
+
+            val clipped = controller.getViewportSelection(narrow)
+            assertEquals(CellSelection(0, 0, 4, 0), clipped)
+            assertSame(clipped, controller.getViewportSelection(TerminalRenderCache(4, 1)))
+            assertEquals(CellSelection(0, 0, 10, 1), original)
+            assertEquals(original, controller.getViewportSelection(wide))
+        }
+    }
+
+    @Test
+    fun `reused selection resolves wide cells from current content`() {
+        SwingUtilities.invokeAndWait {
+            val terminal = TerminalBuffers.create(8, 1, maxHistory = 0)
+            terminal.writeText("abcdefgh")
+            val cache = TerminalRenderCache(8, 1)
+            val reader = terminal as TerminalRenderFrameReader
+            cache.updateFrom(reader)
+            val controller = TerminalSelectionController(FakeSelectionHost(cache))
+            val button = JButton()
+            controller.handleSelectionMousePressed(selectionMouseEvent(button, MouseEvent.MOUSE_PRESSED, 35, 5, alt = false))
+            controller.handleSelectionMouseDragged(selectionMouseEvent(button, MouseEvent.MOUSE_DRAGGED, 45, 5, alt = false))
+            controller.stopSelectionDrag()
+            val initial = requireNotNull(controller.getViewportSelection(cache))
+            assertEquals(CellSelection(3, 0, 5, 0), initial)
+            assertEquals(CellSelection.packRange(3, 5), initial.packedColumnRange(0, 8, cache))
+
+            terminal.positionCursor(2, 0)
+            terminal.writeCodepoint(0x754C)
+            cache.updateFrom(reader)
+            val updated = requireNotNull(controller.getViewportSelection(cache))
+            assertSame(initial, updated, "Content edits do not change the selection coordinates")
+            assertEquals(CellSelection.packRange(2, 5), updated.packedColumnRange(0, 8, cache))
+        }
+    }
+
     @ParameterizedTest
     @ValueSource(booleans = [false, true])
     fun `projection reuse follows viewport clipping and selection mode changes`(block: Boolean) {
@@ -634,6 +712,7 @@ class TerminalSelectionControllerTest {
 
         controller.handleSelectionMouseDragged(selectionMouseEvent(button, MouseEvent.MOUSE_DRAGGED, 25, 5, alt = false))
         assertEquals(CellSelection(0, 0, 3, 0), controller.getViewportSelection(cache))
+        assertSame(controller.getViewportSelection(cache), controller.getViewportSelection(cache))
         assertEquals("ח\nABC", controller.getSelectedText(reader))
         controller.stopSelectionDrag()
     }

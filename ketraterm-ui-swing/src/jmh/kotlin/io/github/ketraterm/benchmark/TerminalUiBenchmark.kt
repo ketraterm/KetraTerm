@@ -23,6 +23,7 @@ import io.github.ketraterm.render.cache.TerminalRenderPublisher
 import io.github.ketraterm.session.TerminalSession
 import io.github.ketraterm.transport.TerminalConnector
 import io.github.ketraterm.transport.TerminalConnectorListener
+import io.github.ketraterm.ui.swing.api.CellSelection
 import io.github.ketraterm.ui.swing.api.SwingTerminal
 import io.github.ketraterm.ui.swing.settings.SwingSettings
 import io.github.ketraterm.ui.swing.settings.SwingSettingsProvider
@@ -163,6 +164,11 @@ open class SwingPaintBenchmark {
     private lateinit var image: BufferedImage
     private lateinit var graphics: Graphics2D
     private var paintedPixel = 0
+    private val selectionSnapshots = arrayOfNulls<CellSelection>(SELECTION_BATCH_SIZE)
+    private val selectionBatch =
+        Runnable {
+            for (index in selectionSnapshots.indices) selectionSnapshots[index] = component.currentSelection()
+        }
     private val paintBatch =
         Runnable {
             repeat(PAINT_BATCH_SIZE) {
@@ -229,8 +235,17 @@ open class SwingPaintBenchmark {
         SwingUtilities.invokeAndWait(paintBatch)
         return paintedPixel
     }
+
+    /** Retains public snapshots to measure projection allocation, including amortized EDT dispatch but excluding painting. */
+    @Benchmark
+    @OperationsPerInvocation(SELECTION_BATCH_SIZE)
+    open fun readSelectionSnapshots(): Array<CellSelection?> {
+        SwingUtilities.invokeAndWait(selectionBatch)
+        return selectionSnapshots
+    }
 }
 
+private const val SELECTION_BATCH_SIZE = 1024
 private const val PAINT_BATCH_SIZE = 64
 private const val LARGE_INPUT_COLUMNS = 160
 private const val LARGE_INPUT_ROWS = 48
