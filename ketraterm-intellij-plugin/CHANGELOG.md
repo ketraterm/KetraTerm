@@ -2,6 +2,7 @@
 
 ## [Unreleased]
 
+- Fixed terminal apps failing to query the current cursor shape and blinking style.
 - Fixed unsupported terminal status queries reflecting supplied text and control characters into shell or application input.
 - Fixed terminal column switching inside fixed-size IDE panes.
 - Improved responsiveness and reliability when pasting large text into busy terminals.

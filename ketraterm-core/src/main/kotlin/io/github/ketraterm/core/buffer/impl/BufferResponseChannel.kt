@@ -462,7 +462,7 @@ internal class BufferResponseChannel(
                 val right = state.activeBuffer.rightMargin + 1
                 enqueueDecrqssResponse(status = 1, "$left;${right}s")
             }
-            "q" -> {
+            " q" -> {
                 val shapeCode =
                     when (state.cursorShape) {
                         io.github.ketraterm.render.api.TerminalRenderCursorShape.BLOCK -> if (state.modes.isCursorBlinking) 1 else 2

@@ -21,10 +21,12 @@ import io.github.ketraterm.core.api.TerminalResponseChannel
 import io.github.ketraterm.protocol.TerminalCapabilityIdentity
 import io.github.ketraterm.protocol.keyboard.KittyKeyboardProgressiveFlag
 import io.github.ketraterm.render.api.TerminalColorPalette
+import io.github.ketraterm.render.api.TerminalRenderCursorShape
 import org.junit.jupiter.api.Assertions.assertAll
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.params.ParameterizedTest
+import org.junit.jupiter.params.provider.CsvSource
 import org.junit.jupiter.params.provider.ValueSource
 
 class TerminalResponseChannelTest {
@@ -338,7 +340,29 @@ class TerminalResponseChannelTest {
     }
 
     @ParameterizedTest
-    @ValueSource(strings = ["", "invalid", "\nAUDIT_MARKER\n", "\u010A", "\u011B[31m", "\u016D", "m\u0000", " m", "m ", "\uD800"])
+    @CsvSource("BLOCK,true,1", "BLOCK,false,2", "UNDERLINE,true,3", "UNDERLINE,false,4", "BAR,true,5", "BAR,false,6")
+    fun `cursor status reports the effective shape and blink state`(
+        shape: TerminalRenderCursorShape,
+        blinking: Boolean,
+        expectedStyle: Int,
+    ) {
+        val buffer = TerminalBuffers.create(width = 10, height = 5)
+        buffer.setCursorShape(shape)
+        buffer.setCursorBlinking(blinking)
+
+        buffer.queryStatusString(" q")
+
+        assertEquals("\u001BP1\$r$expectedStyle q\u001B\\", drain(buffer))
+        assertEquals(0, buffer.pendingResponseBytes)
+    }
+
+    @ParameterizedTest
+    @ValueSource(
+        strings = [
+            "", "invalid", "\nAUDIT_MARKER\n", "\u010A", "\u011B[31m", "\u016D", "m\u0000", " m", "m ", "\uD800",
+            "q", "q ", "  q", " q ", "\tq", "\u00A0q", "\u0120q", " \u0171", " q\n",
+        ],
+    )
     fun `unsupported status selectors enqueue only the empty failure`(query: String) {
         val buffer = TerminalBuffers.create(width = 10, height = 5)
 

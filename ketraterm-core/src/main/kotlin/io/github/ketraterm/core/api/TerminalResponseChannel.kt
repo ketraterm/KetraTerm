@@ -179,6 +179,8 @@ interface TerminalResponseChannel : TerminalHostResponseReader {
      * Enqueues the response for a DCS DECRQSS request.
      *
      * Only exact selectors in the core allowlist produce success responses.
+     * Cursor style uses `SP q` and reports the effective shape and blink state
+     * as `DCS 1 $r Ps SP q ST`, with `Ps` in 1..6. Bare `q` is unsupported.
      * Unsupported selectors enqueue the empty failure `DCS 0 $r ST`, never
      * the supplied query text. Invoke under the same synchronization as core
      * mutation; callers must enforce terminal-response permission before invoking.

@@ -17,6 +17,7 @@ package io.github.ketraterm.host
 
 import io.github.ketraterm.core.TerminalBuffers
 import io.github.ketraterm.parser.api.TerminalParsers
+import io.github.ketraterm.render.api.TerminalRenderCursorShape
 import org.junit.jupiter.api.Assertions.assertAll
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Test
@@ -30,6 +31,7 @@ class HostStatusQueryTest {
         strings = [
             "", "unsupported", "\nAUDIT_MARKER\n", "\u010AAUDIT_MARKER\u010A", "\u011B[31m",
             "\r\t\u0000", "\u016D", "m\n", " m", "m ",
+            "q", "q ", "  q", " q ", "\tq", "\u00A0q", "\u0120q", " \u0171", " q\n",
         ],
     )
     fun `unsupported status queries return an empty failure without reflecting request text`(query: String) {
@@ -93,9 +95,13 @@ class HostStatusQueryTest {
         assertEquals(0, terminal.pendingResponseBytes)
     }
 
-    @Test
-    fun `cursor style status uses the space q selector and rejects bare q`() {
-        val bytes = "\u001B[5 q\u001BP\$q q\u001B\\\u001BP\$qq\u001B\\X".encodeToByteArray()
+    @ParameterizedTest
+    @CsvSource("0,1", "1,1", "2,2", "3,3", "4,4", "5,5", "6,6")
+    fun `cursor style status uses the space q selector and rejects bare q`(
+        style: Int,
+        expectedStyle: Int,
+    ) {
+        val bytes = "\u001B[$style q\u001BP\$q q\u001B\\\u001BP\$qq\u001B\\X".encodeToByteArray()
         assertAllByteSplits(bytes) { split ->
             val terminal = TerminalBuffers.create(10, 5)
             val parser = TerminalParsers.create(HostCommandAdapter(terminal))
@@ -105,11 +111,38 @@ class HostStatusQueryTest {
             val response = ByteArray(128)
             val count = terminal.readResponseBytes(response)
             assertEquals(
-                "\u001BP1\$r5 q\u001B\\\u001BP0\$r\u001B\\",
+                "\u001BP1\$r$expectedStyle q\u001B\\\u001BP0\$r\u001B\\",
                 response.decodeToString(0, count),
                 "split=$split",
             )
             assertEquals("X", terminal.getLineAsString(0))
+            assertEquals(0, terminal.pendingResponseBytes)
+        }
+    }
+
+    @ParameterizedTest
+    @CsvSource("BLOCK,1", "UNDERLINE,3", "BAR,5")
+    fun `cursor status reports configured shape after omitted and zero style resets`(
+        defaultShape: TerminalRenderCursorShape,
+        expectedStyle: Int,
+    ) {
+        val bytes =
+            ("\u001B[6 q\u001B[ q\u001BP\$q q\u001B\\" + "\u001B[6 q\u001B[0 q\u001BP\$q q\u001B\\").encodeToByteArray()
+        assertAllByteSplits(bytes) { split ->
+            val terminal = TerminalBuffers.create(10, 5)
+            terminal.setDefaultCursorShape(defaultShape)
+            val parser = TerminalParsers.create(HostCommandAdapter(terminal))
+            parser.accept(bytes, 0, split)
+            parser.accept(bytes, split, bytes.size - split)
+
+            val response = ByteArray(128)
+            val count = terminal.readResponseBytes(response)
+            assertEquals(
+                "\u001BP1\$r$expectedStyle q\u001B\\\u001BP1\$r$expectedStyle q\u001B\\",
+                response.decodeToString(0, count),
+                "split=$split",
+            )
+            assertEquals(0, terminal.pendingResponseBytes)
         }
     }
 
