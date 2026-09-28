@@ -90,8 +90,12 @@ Render frames distinguish stored content from its global presentation:
   and applies width, occupied-span, and following-cursor changes. No new printable
   cell is inserted. In-row width changes recompute the following cursor and its
   pending-wrap flag using the active right margin and autowrap mode. Completed
-  wrapping, scrolling, overwrites and insert shifts are not reversed. Valid updates
-  without a remembered target are ignored.
+  wrapping, scrolling, overwrites and insert shifts are not reversed. Narrowing
+  blanks the released spacer; widening overwrites the next cell only if it fits
+  inside the right margin, otherwise the cluster stays in one cell. Updates do
+  not insert or shift cells. A printable write rejected by geometry or disabled
+  autowrap clears the continuation target; validation failures leave it unchanged.
+  Valid updates without a remembered target are ignored.
 - Both cluster APIs consume the borrowed array synchronously, copying its used prefix
   into core storage. Callers may reuse it immediately. Core neither compares prefixes
   nor validates grapheme boundaries, and imposes no parser retention limit.

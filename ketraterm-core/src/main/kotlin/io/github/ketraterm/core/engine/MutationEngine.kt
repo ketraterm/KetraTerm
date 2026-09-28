@@ -454,10 +454,13 @@ internal class MutationEngine(
         var cRow = state.cursor.row
         val widthInCells = if (charWidth == 2) 2 else 1
 
-        if (cRow !in 0 until height || cCol !in 0 until width) return
-        if (cCol !in leftMargin..rightMargin) return
-
-        if (widthInCells == 2 && cCol >= rightMargin && !state.modes.isAutoWrap) {
+        if (cRow !in 0 until height ||
+            cCol !in 0 until width ||
+            cCol !in leftMargin..rightMargin ||
+            (widthInCells == 2 && cCol >= rightMargin && !state.modes.isAutoWrap)
+        ) {
+            // Extensions belong to this rejected write, never to an earlier printable cell.
+            state.clearLastPrintableCell()
             return
         }
 

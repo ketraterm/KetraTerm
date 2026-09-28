@@ -229,7 +229,38 @@ objects; initialization and queue growth can allocate.
 - **East Asian Width**: Dynamic width calculations supporting wide, narrow, and East Asian Ambiguous width modes.
 - **Invalid and Unassigned Scalars**: Core scalar/cluster ingress rejects non-scalars before mutation; literal string ingress replaces each unpaired UTF-16 surrogate with U+FFFD. Widths use pinned Unicode 17.0.0 tables, never JDK assignment status or font availability: unlisted valid scalars are narrow, reserved CJK wide ranges remain wide, noncharacters are narrow, and private-use characters plus U+FFFD follow ambiguous-width mode. Existing zero-width and cluster-presentation rules still apply. See the [core width contract](../ketraterm-core/docs/terminal-core-contract.md#unicode-scalar-and-width-policy).
 - **Live Grapheme Rendering**: Read boundaries publish printable prefixes while retaining segmentation context for combining marks and ZWJ extensions. The parser retains the first 32 codepoints of each grapheme; excess continuations update segmentation context but produce no additional cell writes. Only retained text contributes to width, rendering, and copying. Parser owns assembly for both initial writes and full-prefix updates; continuations within a read are batched until publication. Core consumes borrowed arrays synchronously, preserves original attributes, and applies width and grid changes without reconstructing text. This bounded fallback does not impose a new limit on direct core cluster writes. See the [grapheme retention contract](../ketraterm-parser/docs/grapheme-segmentation.md#bounded-retention).
-- **Late Width Changes**: In-row width changes update the following cursor and pending-wrap state, including active horizontal margins and disabled autowrap. Width changes requiring relocation, reversal of prior wrapping/scrolling, or restoration of overwritten/insert-shifted content remain a [documented placement gap](terminal-feature-gap-map.md#text-and-unicode).
+- **Late Width Changes**: In-place updates correct the following cursor and pending wrap. Published writes remain committed; exact placement may depend on input chunks when width changes interact with margins or occupied cells. See the [streaming placement policy](#streaming-grapheme-placement).
+
+### Streaming grapheme placement
+
+KetraTerm publishes decoded printable prefixes at the end of each `accept` or
+`acceptByte` call, without waiting for the next grapheme. Segmentation continues
+across calls; retained continuations update the same cell with its original
+attributes. Core determines width and corrects the following cursor and pending
+wrap using the active margins and autowrap mode.
+
+Publication commits its grid effects. Updates do not relocate a cluster, undo
+completed wrapping or scrolling, restore overwritten text, or reverse insert-mode
+shifts. Narrowing releases a spacer as a blank; widening consumes the neighboring
+cell if it fits. At the right margin a widening cluster retains its text in the
+single available cell, without adding a spacer outside the margin. Following text
+obeys normal wrap/overwrite rules. A rejected initial write has no continuation
+target; later extensions cannot replace an earlier character or revive that write.
+
+Consequently, whole-input and split-input placement can differ at margins,
+after wrapping/scrolling, over occupied cells, in insert mode, and on tiny grids.
+This includes different history eviction and rejection when autowrap is disabled.
+Those are accepted streaming limitations, not a promise of chunk-independent
+layout. In-row cursor correction, retained grapheme content, original attributes,
+cell integrity and bounded retention remain required; this policy does not excuse
+lost following text or updates to an unrelated character.
+
+[UAX #29](https://www.unicode.org/reports/tr29/) defines segmentation, not terminal
+rollback. The no-reverse-wrap choice also appears in
+[kitty's variation-selector convention](https://sw.kovidgoyal.net/kitty/text-sizing-protocol/#unicode-variation-selectors);
+the complete placement policy here is KetraTerm's own compatibility choice.
+Verification and retained audit oracles are recorded in the
+[gap map](terminal-feature-gap-map.md#r06-streaming-placement-policy).
 
 ---
 

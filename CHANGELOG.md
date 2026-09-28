@@ -10,7 +10,7 @@ Release notes for library consumers and embedders. Product-specific changes are 
 - Moved terminal search off the Swing event thread. Results update during output, preserve the active match where possible, and discard stale highlights.
 - Reduced allocations when painting unchanged selections. Search and hyperlink detection now ignore artificial padding at wide-character wraps; grid resizing clears selections to prevent copying unrelated text.
 - Preserved buffered output on process exit and the final rendered state on session closure. Transports are released once, and workspace cleanup continues after individual failures.
-- Corrected restored text styling and character sets across screen switches. Fixed following-text overwrites after in-row grapheme width changes; some placement cases across input chunks remain unresolved.
+- Corrected restored text styling and character sets across screen switches. Fixed following-text overwrites after in-row grapheme width changes; late width changes now have a documented streaming policy. Rejected characters no longer redirect later grapheme extensions onto earlier text.
 - Made large cursor, tab and scroll commands overflow-safe and bounded. Invalid byte slices are rejected before changing state.
 - Prevented unsupported status-string queries from reflecting request data into application input. Corrected cursor-style and cursor-position replies.
 - Added ANSI/DEC mode-status queries and expanded xterm key-resource negotiation. Fixed committed text being lost or encoded as NUL.

@@ -91,8 +91,12 @@ interface TerminalWriter {
      * width, and adjusts its occupied span and following cursor. This does not insert a new
      * cell or advance past a second grapheme. In-row width changes recompute the following
      * cursor and pending wrap; completed wraps, scrolls, overwrites and insert shifts are
-     * not reversed. If no remembered printable target remains,
-     * valid input is ignored. This operation does not validate grapheme boundaries or
+     * not reversed. Narrowing blanks the released spacer; widening overwrites the next
+     * cell only if it fits inside the right margin, otherwise the cluster stays in one
+     * cell. Updates never shift cells, including in insert mode. A write rejected by
+     * geometry or disabled autowrap clears the target; invalid input leaves it unchanged.
+     * If no remembered printable target remains, valid input is ignored.
+     * This operation does not validate grapheme boundaries or
      * compare the supplied prefix with stored text.
      *
      * The used prefix is copied into core-owned storage before returning; the caller may

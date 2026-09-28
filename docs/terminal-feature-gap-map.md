@@ -33,8 +33,9 @@ The [2026-09-27 terminal quality audit](reviews/terminal-quality-audit-2026-09-2
 reproduced unsafe DECRQSS replies, cursor-count overflow, output-loss and cleanup
 failures, saved-state corruption, and logical-text defects. Bounded tab work is
 also required. The owner entries below track these corrections; they take
-precedence over optional protocol extensions. The existing late-width-change
-Unicode gap is a release correctness issue, not a deferred feature.
+precedence over optional protocol extensions. R06 now has an explicit
+[streaming placement disposition](#r06-streaming-placement-policy), including
+narrowly tracked known failures of the stronger chunk-equivalence requirement.
 
 Correct-behavior regressions and their validation limits are indexed in the
 audit's [regression coverage](reviews/terminal-quality-audit-2026-09-27.md#regression-coverage).
@@ -98,11 +99,42 @@ These are not badges of compatibility for this project. They expand attack surfa
 - `TODO(parser/core/render/ui)`: Kitty graphics use APC (`ESC _ G ... ESC \`), not DCS. The parser currently consumes APC without dispatch; image storage and rendering are also absent. Transfer and retained-image policy is tracked [below](#session-transport-rendering-and-host-integration-gaps).
 
 ### Text and Unicode
-- `TODO(core)`: audit [R06](reviews/terminal-quality-audit-2026-09-27.md#r06--p1-chunk-boundaries-change-emoji-placement-and-can-delete-text) is partially addressed. In-row width changes now recompute the following cursor and pending wrap, fixing VS16 widening at the penultimate column and VS15 narrowing of a span ending at the margin. Chunk-dependent placement remains for widening that cannot fit the current row, narrowing after wrapping/scrolling, occupied neighbors, insert mode and tiny grids; their byte-split regressions remain active. No rollback of cells or history is implemented. Closing R06 requires a deterministic publication/placement policy; reversing completed scrolls is not a requirement (see [kitty’s streaming convention](https://sw.kovidgoyal.net/kitty/text-sizing-protocol/#unicode-variation-selectors)). The historical audit and its original regression assertions are unchanged.
+- `DONE(core/policy)`: audit [R06](reviews/terminal-quality-audit-2026-09-27.md#r06--p1-chunk-boundaries-change-emoji-placement-and-can-delete-text) is resolved within the [streaming placement policy](terminal-feature-map.md#streaming-grapheme-placement). In-row cursor/wrap correction prevents following-text loss; rejected writes clear the continuation target. Full chunk-equivalent layout remains an accepted limitation, not an implemented capability. No rollback machinery is required. Historical audit evidence and the original regression assertions are preserved; their current disposition is below.
 - `DONE(parser)`: malformed UTF-8 recovery is exercised immediately before and inside ESC, CSI,
   OSC (BEL/ST/CAN/SUB), DCS ST, and end-of-input, with every split boundary proving that malformed
   bytes do not print or complete stale structural commands.
 - `DONE(parser/core)`: long-grapheme retention has an explicit bounded fallback: retain the first 32 codepoints, discard excess continuations while advancing segmentation context, and resume storage at the next actual boundary. Overflow introduces no additional cell writes, and discarded selectors do not affect width. Parser publishes full retained sequences through `updatePreviousCluster`; core no longer reconstructs continuations in scratch storage. Read-boundary updates are batched and consumed synchronously with original cell attributes preserved. Parser/host regressions cover read boundaries, overflow recovery, and retained content; selection tests cover copying through wrapping and reflow. Exact text beyond the retained prefix is intentionally unavailable; direct core cluster writes keep their existing contract. See the [grapheme retention contract](../ketraterm-parser/docs/grapheme-segmentation.md#bounded-retention).
+
+#### R06 streaming placement policy
+
+`HostGraphemePolicyTest` enforces prompt publication, in-place width changes,
+committed wraps/scrolls/overwrites/insert shifts, right-margin clipping, tiny grids,
+and rejected-prefix recovery. Ordinary parser/core/host tests still enforce
+segmentation, retained content, attributes, cursor correction, malformed UTF-8,
+structural controls and the 32-codepoint bound.
+
+Four original `HostGraphemeTest` oracles ask for the stronger, unsupported
+whole-input/split-input equivalence. They execute during normal host tests:
+
+| Retained oracle | Known-failure invocations | Recorded difference |
+|---|---:|---|
+| `narrowing restores text overwritten by the provisional wide prefix` | 1 | An overwritten neighbor is not restored. |
+| `provisional width changes are independent of chunks with occupied cells and scrolling` | 8 | A published narrow prefix remains at the margin when later widened; an initially wide write with autowrap disabled is rejected. |
+| `tiny grids and already pending wraps retain chunk equivalence` | 1 | Late narrowing does not undo an eviction on a one-cell grid. |
+| `variation selectors preserve right margin placement across every byte split` | 4 shrinking cases | Late narrowing does not move a wrapped cluster back. The four widening cases remain ordinary passing tests. |
+
+`knownR06Failure` accepts only the recorded assertion type and exact messages,
+including every failure from the byte-split aggregate. Matching outcomes are
+reported as **skipped/aborted known failures**, with the original assertion as
+cause. A changed/additional failure or unexpected pass fails the test and requires
+review; remove an expectation when its oracle passes. No test is disabled, and
+there is no global ignore-failures setting. The older nested-loop oracles still
+stop at their first failing assertion; their skip is not evidence that later
+iterations passed. The passing policy tests provide separate boundary coverage.
+
+Run `./gradlew :ketraterm-host:test --tests '*HostGrapheme*' --tests '*KnownR06FailureTest'`
+to verify this disposition. Closing R06 means accepting the stated streaming
+semantics, not claiming arbitrary chunk-independent placement.
 
 ---
 

@@ -51,6 +51,11 @@ structural command. An unfinished UTF-8 scalar does not delay publication of an
 already decoded prefix. Unchanged prefixes are never published again. Normal flush
 publishes any pending update before clearing context; reset discards pending state.
 
+Both `accept` and `acceptByte` publish at their call boundary. Publication commits
+core grid effects; preserving segmentation across calls does not promise identical
+placement across calls. See the [streaming placement policy](../../docs/terminal-feature-map.md#streaming-grapheme-placement)
+for width changes after publication.
+
 Both array-based calls borrow the parser's reusable buffer only for the synchronous
 call. Sinks must consume or copy the used prefix before returning. Core stores its
 own copy and never retains the parser array. It does not assemble continuations from

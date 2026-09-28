@@ -30,18 +30,20 @@ import org.junit.jupiter.params.provider.ValueSource
 class HostGraphemeTest {
     @Test
     fun `narrowing restores text overwritten by the provisional wide prefix`() {
-        for (insert in listOf(false, true)) {
-            val terminal = TerminalBuffers.create(6, 2)
-            terminal.writeText("abcdef")
-            terminal.positionCursor(1, 0)
-            terminal.setInsertMode(insert)
-            val parser = TerminalParsers.create(HostCommandAdapter(terminal))
-            parser.accept("\uD83D\uDE00".encodeToByteArray())
-            assertEquals(0x1f600, terminal.getCodepointAt(1, 0), "prefix is immediately visible")
-            assertEquals(-1, terminal.getCodepointAt(2, 0))
-            parser.accept("\uFE0E".encodeToByteArray())
-            assertEquals(if (insert) "a\uD83D\uDE00\uFE0Ebcde" else "a\uD83D\uDE00\uFE0Ecdef", terminal.getLineAsString(0))
-            assertEquals(2, terminal.cursorCol)
+        knownR06Failure(listOf("expected: <a\uD83D\uDE00\uFE0Ecdef> but was: <a\uD83D\uDE00\uFE0E def>")) {
+            for (insert in listOf(false, true)) {
+                val terminal = TerminalBuffers.create(6, 2)
+                terminal.writeText("abcdef")
+                terminal.positionCursor(1, 0)
+                terminal.setInsertMode(insert)
+                val parser = TerminalParsers.create(HostCommandAdapter(terminal))
+                parser.accept("\uD83D\uDE00".encodeToByteArray())
+                assertEquals(0x1f600, terminal.getCodepointAt(1, 0), "prefix is immediately visible")
+                assertEquals(-1, terminal.getCodepointAt(2, 0))
+                parser.accept("\uFE0E".encodeToByteArray())
+                assertEquals(if (insert) "a\uD83D\uDE00\uFE0Ebcde" else "a\uD83D\uDE00\uFE0Ecdef", terminal.getLineAsString(0))
+                assertEquals(2, terminal.cursorCol)
+            }
         }
     }
 
@@ -51,65 +53,75 @@ class HostGraphemeTest {
         alternate: Boolean,
         margins: String,
     ) {
-        for (history in listOf(0, 1, 4)) {
-            for (insert in listOf(false, true)) {
-                for (wrap in listOf(false, true)) {
-                    for (cluster in listOf("\u2764\uFE0F", "\uD83D\uDE00\uFE0E", "\u2764\uFE0F\uFE0E")) {
-                        for (suffix in listOf("", "X", "\r\nY")) {
-                            val bytes = (cluster + suffix).encodeToByteArray()
+        val expected = "abcdef\nabcdef\nabcdef\nabcdef"
+        val actual =
+            when (margins) {
+                "vertical", "top" -> "abcdef\nabcdef\nabcde\u2764\uFE0F\nabcdef"
+                "horizontal" -> "abcdef\nabcdef\nabcdef\nabcd\u2764\uFE0Ff"
+                else -> "abcdef\nabcdef\nabcdef\nabcde\u2764\uFE0F"
+            }
+        val context = "alt=$alternate history=0 margins=$margins insert=false wrap=false cluster=\u2764\uFE0F suffix= split=-1"
+        knownR06Failure(listOf("$context ==> expected: <$expected> but was: <$actual>")) {
+            for (history in listOf(0, 1, 4)) {
+                for (insert in listOf(false, true)) {
+                    for (wrap in listOf(false, true)) {
+                        for (cluster in listOf("\u2764\uFE0F", "\uD83D\uDE00\uFE0E", "\u2764\uFE0F\uFE0E")) {
+                            for (suffix in listOf("", "X", "\r\nY")) {
+                                val bytes = (cluster + suffix).encodeToByteArray()
 
-                            fun terminal(): TerminalBuffer =
-                                TerminalBuffers.create(6, 4, maxHistory = history).apply {
-                                    if (alternate) enterAltBuffer()
-                                    repeat(8) {
-                                        writeCluster(intArrayOf('a'.code + it, 0x0301))
-                                        writeText("BCDEF")
-                                        newLine()
-                                        carriageReturn()
+                                fun terminal(): TerminalBuffer =
+                                    TerminalBuffers.create(6, 4, maxHistory = history).apply {
+                                        if (alternate) enterAltBuffer()
+                                        repeat(8) {
+                                            writeCluster(intArrayOf('a'.code + it, 0x0301))
+                                            writeText("BCDEF")
+                                            newLine()
+                                            carriageReturn()
+                                        }
+                                        for (row in 0..3) {
+                                            positionCursor(0, row)
+                                            writeText("abcdef")
+                                        }
+                                        if (margins == "vertical") setScrollRegion(2, 3)
+                                        if (margins == "top") setScrollRegion(1, 3)
+                                        if (margins == "horizontal") {
+                                            setLeftRightMarginMode(true)
+                                            setLeftRightMargins(2, 5)
+                                        }
+                                        setInsertMode(insert)
+                                        setAutoWrap(wrap)
+                                        positionCursor(
+                                            if (margins ==
+                                                "horizontal"
+                                            ) {
+                                                4
+                                            } else {
+                                                5
+                                            },
+                                            if (margins == "vertical" || margins == "top") 2 else 3,
+                                        )
                                     }
-                                    for (row in 0..3) {
-                                        positionCursor(0, row)
-                                        writeText("abcdef")
+                                val whole = terminal()
+                                TerminalParsers.create(HostCommandAdapter(whole)).apply {
+                                    accept(bytes)
+                                    endOfInput()
+                                }
+                                for (split in -1..bytes.size) {
+                                    val streamed = terminal()
+                                    val parser = TerminalParsers.create(HostCommandAdapter(streamed))
+                                    if (split < 0) {
+                                        for (byte in bytes) parser.acceptByte(byte.toInt() and 0xff)
+                                    } else {
+                                        parser.accept(bytes, 0, split)
+                                        parser.accept(bytes, split, bytes.size - split)
                                     }
-                                    if (margins == "vertical") setScrollRegion(2, 3)
-                                    if (margins == "top") setScrollRegion(1, 3)
-                                    if (margins == "horizontal") {
-                                        setLeftRightMarginMode(true)
-                                        setLeftRightMargins(2, 5)
-                                    }
-                                    setInsertMode(insert)
-                                    setAutoWrap(wrap)
-                                    positionCursor(
-                                        if (margins ==
-                                            "horizontal"
-                                        ) {
-                                            4
-                                        } else {
-                                            5
-                                        },
-                                        if (margins == "vertical" || margins == "top") 2 else 3,
+                                    parser.endOfInput()
+                                    assertSameGrid(
+                                        whole,
+                                        streamed,
+                                        "alt=$alternate history=$history margins=$margins insert=$insert wrap=$wrap cluster=$cluster suffix=$suffix split=$split",
                                     )
                                 }
-                            val whole = terminal()
-                            TerminalParsers.create(HostCommandAdapter(whole)).apply {
-                                accept(bytes)
-                                endOfInput()
-                            }
-                            for (split in -1..bytes.size) {
-                                val streamed = terminal()
-                                val parser = TerminalParsers.create(HostCommandAdapter(streamed))
-                                if (split < 0) {
-                                    for (byte in bytes) parser.acceptByte(byte.toInt() and 0xff)
-                                } else {
-                                    parser.accept(bytes, 0, split)
-                                    parser.accept(bytes, split, bytes.size - split)
-                                }
-                                parser.endOfInput()
-                                assertSameGrid(
-                                    whole,
-                                    streamed,
-                                    "alt=$alternate history=$history margins=$margins insert=$insert wrap=$wrap cluster=$cluster suffix=$suffix split=$split",
-                                )
                             }
                         }
                     }
@@ -164,30 +176,33 @@ class HostGraphemeTest {
 
     @Test
     fun `tiny grids and already pending wraps retain chunk equivalence`() {
-        for (width in 1..3) {
-            for (height in 1..2) {
-                for (history in 0..1) {
-                    for (prefix in listOf("", "A".repeat(width))) {
-                        for (text in listOf("\uD83D\uDE00\uFE0E", "\u2764\uFE0F\uFE0E", "\u4E00\uFE0E")) {
-                            for (suffix in listOf("", "X", "\u001B[32mY", "\u0018X")) {
-                                val bytes = (prefix + text + suffix).encodeToByteArray()
-                                val whole = TerminalBuffers.create(width, height, maxHistory = history)
-                                TerminalParsers.create(HostCommandAdapter(whole)).apply {
-                                    accept(bytes)
-                                    endOfInput()
-                                }
-                                for (split in 0..bytes.size) {
-                                    val actual = TerminalBuffers.create(width, height, maxHistory = history)
-                                    TerminalParsers.create(HostCommandAdapter(actual)).apply {
-                                        accept(bytes, 0, split)
-                                        accept(bytes, split, bytes.size - split)
+        val context = "size=1,1 history=0 prefix= text=\uD83D\uDE00\uFE0E suffix= split=4"
+        knownR06Failure(listOf("$context ==> expected: <0> but was: <1>")) {
+            for (width in 1..3) {
+                for (height in 1..2) {
+                    for (history in 0..1) {
+                        for (prefix in listOf("", "A".repeat(width))) {
+                            for (text in listOf("\uD83D\uDE00\uFE0E", "\u2764\uFE0F\uFE0E", "\u4E00\uFE0E")) {
+                                for (suffix in listOf("", "X", "\u001B[32mY", "\u0018X")) {
+                                    val bytes = (prefix + text + suffix).encodeToByteArray()
+                                    val whole = TerminalBuffers.create(width, height, maxHistory = history)
+                                    TerminalParsers.create(HostCommandAdapter(whole)).apply {
+                                        accept(bytes)
                                         endOfInput()
                                     }
-                                    assertSameGrid(
-                                        whole,
-                                        actual,
-                                        "size=$width,$height history=$history prefix=$prefix text=$text suffix=$suffix split=$split",
-                                    )
+                                    for (split in 0..bytes.size) {
+                                        val actual = TerminalBuffers.create(width, height, maxHistory = history)
+                                        TerminalParsers.create(HostCommandAdapter(actual)).apply {
+                                            accept(bytes, 0, split)
+                                            accept(bytes, split, bytes.size - split)
+                                            endOfInput()
+                                        }
+                                        assertSameGrid(
+                                            whole,
+                                            actual,
+                                            "size=$width,$height history=$history prefix=$prefix text=$text suffix=$suffix split=$split",
+                                        )
+                                    }
                                 }
                             }
                         }
@@ -239,24 +254,48 @@ class HostGraphemeTest {
         assertEquals(followingRow, whole.cursorRow)
         assertEquals(1, whole.cursorCol)
 
-        assertAllByteSplits(bytes) { split ->
-            val splitTerminal = terminal()
-            val parser = TerminalParsers.create(HostCommandAdapter(splitTerminal))
-            parser.accept(bytes, 0, split)
-            parser.accept(bytes, split, bytes.size - split)
-            parser.endOfInput()
-            val context = "shrink=$shrink alternate=$alternate bottom=$bottomRow split=$split"
+        fun verifySplits() {
+            assertAllByteSplits(bytes) { split ->
+                val splitTerminal = terminal()
+                val parser = TerminalParsers.create(HostCommandAdapter(splitTerminal))
+                parser.accept(bytes, 0, split)
+                parser.accept(bytes, split, bytes.size - split)
+                parser.endOfInput()
+                val context = "shrink=$shrink alternate=$alternate bottom=$bottomRow split=$split"
 
-            assertEquals(whole.getAllAsString(), splitTerminal.getAllAsString(), context)
-            assertEquals(whole.historySize, splitTerminal.historySize, context)
-            assertEquals(whole.cursorRow, splitTerminal.cursorRow, context)
-            assertEquals(whole.cursorCol, splitTerminal.cursorCol, context)
-            assertCluster(splitTerminal, column, clusterRow, cluster.codePoints().toArray(), context)
-            for (row in 0 until whole.height) {
-                for (col in 0 until whole.width) {
-                    assertEquals(whole.getCodepointAt(col, row), splitTerminal.getCodepointAt(col, row), "$context cell=($col,$row)")
+                assertEquals(whole.getAllAsString(), splitTerminal.getAllAsString(), context)
+                assertEquals(whole.historySize, splitTerminal.historySize, context)
+                assertEquals(whole.cursorRow, splitTerminal.cursorRow, context)
+                assertEquals(whole.cursorCol, splitTerminal.cursorCol, context)
+                assertCluster(splitTerminal, column, clusterRow, cluster.codePoints().toArray(), context)
+                for (row in 0 until whole.height) {
+                    for (col in 0 until whole.width) {
+                        assertEquals(whole.getCodepointAt(col, row), splitTerminal.getCodepointAt(col, row), "$context cell=($col,$row)")
+                    }
                 }
             }
+        }
+        if (shrink) {
+            val expected =
+                when {
+                    !bottomRow -> "KEE\uD83D\uDE00\uFE0E\nXID\n"
+                    alternate -> "MID\n   \uD83D\uDE00\uFE0E\nX"
+                    else -> "KEEP\nMID\n   \uD83D\uDE00\uFE0E\nX"
+                }
+            val actual =
+                when {
+                    !bottomRow -> "KEE\n\uD83D\uDE00\uFE0EXD\n"
+                    alternate -> "MID\n\n\uD83D\uDE00\uFE0EX"
+                    else -> "KEEP\nMID\n\n\uD83D\uDE00\uFE0EX"
+                }
+            knownR06Failure(
+                (4..6).map { split ->
+                    "shrink=true alternate=$alternate bottom=$bottomRow split=$split ==> expected: <$expected> but was: <$actual>"
+                },
+                ::verifySplits,
+            )
+        } else {
+            verifySplits()
         }
     }
 

@@ -24,6 +24,48 @@ import org.junit.jupiter.params.provider.CsvSource
 
 class TerminalWriterUnicodeTest {
     @ParameterizedTest
+    @CsvSource("1,false", "4,false", "6,true")
+    fun `rejected printable writes clear the continuation target`(
+        width: Int,
+        horizontalMargins: Boolean,
+    ) {
+        for (ingress in listOf("scalar", "text", "cluster")) {
+            for (alternate in listOf(false, true)) {
+                for (insert in listOf(false, true)) {
+                    val buffer = TerminalBuffers.create(width, 2)
+                    if (alternate) buffer.enterAltBuffer()
+                    val right = if (horizontalMargins) width - 2 else width - 1
+                    if (horizontalMargins) {
+                        buffer.setLeftRightMarginMode(true)
+                        buffer.setLeftRightMargins(2, right + 1)
+                    }
+                    buffer.setAutoWrap(false)
+                    buffer.setInsertMode(insert)
+                    val previous = maxOf(0, right - 1)
+                    buffer.positionCursor(previous, 0)
+                    buffer.writeCodepoint('A'.code)
+                    when (ingress) {
+                        "scalar" -> buffer.writeCodepoint(0x1F600)
+                        "text" -> buffer.writeText("\uD83D\uDE00")
+                        else -> buffer.writeCluster(intArrayOf(0x1F600, 0x0301))
+                    }
+                    val before = buffer.getAllAsString()
+                    buffer.updatePreviousCluster(intArrayOf(0x1F600, 0x0301, 0xFE0E))
+                    assertEquals(before, buffer.getAllAsString(), "$ingress alt=$alternate insert=$insert")
+                    assertEquals('A'.code, buffer.getCodepointAt(previous, 0))
+                    assertEquals(right, buffer.cursorCol)
+                    assertEquals(0, buffer.cursorRow)
+                    buffer.writeCodepoint('X'.code)
+                    buffer.updatePreviousCluster(intArrayOf('X'.code, 0x0301))
+                    val copied = IntArray(2)
+                    assertEquals(2, buffer.getLine(0).readCluster(right, copied))
+                    assertArrayEquals(intArrayOf('X'.code, 0x0301), copied)
+                }
+            }
+        }
+    }
+
+    @ParameterizedTest
     @CsvSource(
         "false,false,false",
         "false,false,true",
