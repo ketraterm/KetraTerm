@@ -472,7 +472,7 @@ internal class BufferResponseChannel(
                 enqueueDecrqssResponse(status = 1, "$shapeCode q")
             }
             else -> {
-                enqueueDecrqssResponse(status = 0, query)
+                enqueueDecrqssResponse(status = 0, "")
             }
         }
     }
@@ -481,8 +481,8 @@ internal class BufferResponseChannel(
      * Emits `DCS [status] $ r [responseData] ST`.
      *
      * Status 1 = valid, status 0 = invalid/unsupported. Response data is the
-     * setting value for valid queries or the original query string for failures.
-     * All response data characters are ASCII, so char-by-char enqueue is safe.
+     * core-generated ASCII setting value for valid queries and empty for failures.
+     * Never include request text in a failure response.
      */
     private fun enqueueDecrqssResponse(
         status: Int,

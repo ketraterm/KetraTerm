@@ -26,7 +26,12 @@ import org.junit.jupiter.params.provider.ValueSource
 
 class HostStatusQueryTest {
     @ParameterizedTest
-    @ValueSource(strings = ["unsupported", "\nAUDIT_MARKER\n", "\u010AAUDIT_MARKER\u010A", "\u011B[31m"])
+    @ValueSource(
+        strings = [
+            "", "unsupported", "\nAUDIT_MARKER\n", "\u010AAUDIT_MARKER\u010A", "\u011B[31m",
+            "\r\t\u0000", "\u016D", "m\n", " m", "m ",
+        ],
+    )
     fun `unsupported status queries return an empty failure without reflecting request text`(query: String) {
         val bytes = "\u001BP\$q$query\u001B\\X".encodeToByteArray()
         assertAllByteSplits(bytes) { split ->
@@ -67,6 +72,28 @@ class HostStatusQueryTest {
     }
 
     @Test
+    fun `supported status replies remain ordered after rejected queries with bytewise input`() {
+        val terminal = TerminalBuffers.create(10, 5)
+        val parser = TerminalParsers.create(HostCommandAdapter(terminal))
+        val bytes =
+            (
+                "\u001BP\$q${"x".repeat(62)}\u001B\\" +
+                    "\u001B[1;31m\u001B[2;4r\u001B[?69h\u001B[3;8s" +
+                    "\u001BP\$qm\u001B\\\u001BP\$qr\u001B\\\u001BP\$qs\u001B\\"
+            ).encodeToByteArray()
+        for (offset in bytes.indices) parser.accept(bytes, offset, 1)
+        parser.endOfInput()
+
+        val response = ByteArray(128)
+        val count = terminal.readResponseBytes(response)
+        assertEquals(
+            "\u001BP0\$r\u001B\\\u001BP1\$r1;31m\u001B\\\u001BP1\$r2;4r\u001B\\\u001BP1\$r3;8s\u001B\\",
+            response.decodeToString(0, count),
+        )
+        assertEquals(0, terminal.pendingResponseBytes)
+    }
+
+    @Test
     fun `cursor style status uses the space q selector and rejects bare q`() {
         val bytes = "\u001B[5 q\u001BP\$q q\u001B\\\u001BP\$qq\u001B\\X".encodeToByteArray()
         assertAllByteSplits(bytes) { split ->
@@ -92,7 +119,8 @@ class HostStatusQueryTest {
             (
                 "\u001BP\$qm\u001B\\\u001BP\$q q\u001B\\\u001BP\$qq\u001B\\" +
                     "\u001BP\$q\nAUDIT_MARKER\n\u001B\\\u001BP\$q\u010A\u001B\\\u001B[6n\u001B[?6nX"
-            ).encodeToByteArray()
+            ).encodeToByteArray() +
+                "\u001BP\$q".encodeToByteArray() + byteArrayOf(0xC3.toByte()) + "m\u001B\\".encodeToByteArray()
         assertAllByteSplits(bytes) { split ->
             val terminal = TerminalBuffers.create(10, 5)
             val parser =

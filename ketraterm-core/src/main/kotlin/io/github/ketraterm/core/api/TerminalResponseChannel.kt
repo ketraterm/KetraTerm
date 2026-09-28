@@ -178,7 +178,12 @@ interface TerminalResponseChannel : TerminalHostResponseReader {
     /**
      * Enqueues the response for a DCS DECRQSS request.
      *
-     * @param query the target query parameter.
+     * Only exact selectors in the core allowlist produce success responses.
+     * Unsupported selectors enqueue the empty failure `DCS 0 $r ST`, never
+     * the supplied query text. Invoke under the same synchronization as core
+     * mutation; callers must enforce terminal-response permission before invoking.
+     *
+     * @param query the decoded selector, matched without normalization.
      */
     fun queryStatusString(query: String)
 

@@ -43,7 +43,7 @@ package io.github.ketraterm.host
  * @property terminalResponsePolicy whether DA, DSR/CPR (including light/dark
  * scheme queries), DECRQM mode reports, window reports, DECRQCRA,
  * DECRQSS, XTGETTCAP, and OSC 52 reads may enqueue terminal-to-host response bytes.
- * DENY also suppresses unsupported-mode replies; no response bytes are permitted.
+ * DENY also suppresses unsupported-mode and DECRQSS failure replies; no response bytes are permitted.
  * OSC 52 reads also require clipboard read permission; denying responses suppresses
  * their empty failure replies too. Clipboard writes are unaffected.
  * @property clipboardPolicy deny-by-default permission and audit policy for

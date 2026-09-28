@@ -2,6 +2,7 @@
 
 ## [Unreleased]
 
+- Fixed unsupported terminal status queries reflecting supplied text and control characters into shell or application input.
 - Fixed terminal column switching inside fixed-size IDE panes.
 - Improved responsiveness and reliability when pasting large text into busy terminals.
 - Compatible terminal apps can now read IDE clipboard text with your permission. Keyboard-accessible dialogs let you approve once, deny, or block reads for that terminal. New settings ask before reading; saved permissions are preserved.

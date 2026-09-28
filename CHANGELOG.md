@@ -4,6 +4,7 @@ Release notes for library consumers and embedders. Product-specific changes are 
 
 ## [Unreleased]
 
+- Fixed R01: unsupported DECRQSS selectors now enqueue only the empty protocol failure, preventing request controls and truncated Unicode from reaching application input. Preserved exact selector admission, supported replies, and response-policy denial; added core and byte-stream coverage for malformed UTF-8, chunking, bounds, and recovery. Public API signatures are unchanged.
 - Fixed position-dependent rejection of standalone window growth. Resize geometry uses the monitor work area and adjusts position only as needed, with coverage for column round trips, desktop insets, and negative monitor coordinates.
 - Decoupled DECCOLM logical 80/132-column switching from window-resize permission while retaining ordered core/connector synchronization. Replaced host acceptance with transport preparation and completed-switch notifications; mode 3 reports core state without a host capability declaration. Fixed-pane rendering preserves logical width until viewport geometry changes.
 - Added bounded OSC 52 clipboard reads in standalone and IntelliJ, with shared consent dialogs, terminal/client isolation, cancellation, and ordered replies. Fresh settings use Ask; existing permissions are preserved. Added lifecycle regressions and an automated terminal harness.

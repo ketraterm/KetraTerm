@@ -24,6 +24,8 @@ import io.github.ketraterm.render.api.TerminalColorPalette
 import org.junit.jupiter.api.Assertions.assertAll
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Test
+import org.junit.jupiter.params.ParameterizedTest
+import org.junit.jupiter.params.provider.ValueSource
 
 class TerminalResponseChannelTest {
     @Test
@@ -333,6 +335,17 @@ class TerminalResponseChannelTest {
                 assertEquals("\u001BP0\$r\u001B\\", drain(buffer))
             },
         )
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = ["", "invalid", "\nAUDIT_MARKER\n", "\u010A", "\u011B[31m", "\u016D", "m\u0000", " m", "m ", "\uD800"])
+    fun `unsupported status selectors enqueue only the empty failure`(query: String) {
+        val buffer = TerminalBuffers.create(width = 10, height = 5)
+
+        buffer.queryStatusString(query)
+
+        assertEquals("\u001BP0\$r\u001B\\", drain(buffer))
+        assertEquals(0, buffer.pendingResponseBytes)
     }
 
     @Test

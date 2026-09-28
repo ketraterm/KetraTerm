@@ -2,6 +2,7 @@
 
 ## [Unreleased]
 
+- Fixed unsupported terminal status queries reflecting supplied text and control characters into shell or application input.
 - Fixed terminal windows failing to grow near screen edges; resizing now keeps the window within the available desktop.
 - Fixed terminal column switching when shell window resizing is disabled or the window layout cannot resize.
 - Improved responsiveness and reliability when pasting large text into busy terminals.
