@@ -78,3 +78,15 @@ The host adapter forwards these operations. Core owns cluster storage, width, cu
 and wrapping; its direct cluster-writing API has no new 32-codepoint restriction.
 The renderer consumes the retained text through its existing cache and shaping
 contracts. No grapheme policy is duplicated in those modules.
+
+## Charset save/restore ownership
+
+Live G0–G3 designations and GL/GR shifts remain parser-owned. DEC/SCO and 1048
+save/restore use separate primary/alternate charset slots, selected from the sink’s
+actual screen. An effective 1049 entry saves primary state; its exit restores it.
+Clearing alternate entry (1047/1049) resets that screen’s saved slot; repeated or
+rejected screen requests do not alter slots. Single shifts are transient and are
+cleared on restore. Unsaved slots, RIS and DECSTR use ASCII, GL=G0 and GR=G2.
+
+The sink must expose effective screen selection synchronously. Direct host resets
+of core should be paired with parser reset, as with other parser-owned state.

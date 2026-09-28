@@ -33,6 +33,9 @@ interface TerminalReader {
      */
     val palette: TerminalColorPalette
 
+    /** Actual active screen. Read synchronously under the same serialization as terminal mutations. */
+    val isAlternateScreenActive: Boolean
+
     /** Current viewport width in cells. */
     val width: Int
 

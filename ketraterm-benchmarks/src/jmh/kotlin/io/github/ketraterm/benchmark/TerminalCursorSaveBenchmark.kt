@@ -31,7 +31,7 @@ import java.util.concurrent.TimeUnit
 @Measurement(iterations = 5, time = 1)
 @Fork(1)
 open class TerminalCursorSaveBenchmark {
-    @Param("dec", "sco", "margins")
+    @Param("dec", "sco", "margins", "sgr", "screen")
     lateinit var workload: String
 
     private lateinit var terminal: TerminalBuffer
@@ -47,6 +47,8 @@ open class TerminalCursorSaveBenchmark {
             when (workload) {
                 "dec" -> "\u001B7\u001B[10;20H\u001B8"
                 "sco" -> "\u001B[s\u001B[10;20H\u001B[u"
+                "sgr" -> "\u001B[31;44;4:3m\u001B7\u001B[0m\u001B8\u001B[1;23;59m"
+                "screen" -> "\u001B[?1049h\u001B(B\u001B7\u001B[?1049l"
                 "margins" -> "\u001B[?69h\u001B[3;70s\u001B[s\u001B[u\u001B[?69l"
                 else -> error("Unknown workload: $workload")
             }.encodeToByteArray()

@@ -30,6 +30,40 @@ import org.junit.jupiter.params.ParameterizedTest
 import org.junit.jupiter.params.provider.CsvSource
 
 class BufferWriterTest {
+    @Test
+    fun `partial pen updates distinguish unchanged fields defaults and false flags`() {
+        val terminal = TerminalBuffers.create(4, 2)
+        terminal.setPenColors(CellColor.rgb(0x123456), CellColor.indexed(255), bold = true, faint = true)
+        terminal.setHyperlinkId(Int.MAX_VALUE)
+        terminal.setSelectiveEraseProtection(true)
+        terminal.writeCodepoint('A'.code)
+        val before = terminal.getAttrAt(0, 0)
+        terminal.updatePenColors()
+        terminal.writeCodepoint('B'.code)
+        assertEquals(before, terminal.getAttrAt(1, 0))
+        terminal.updatePenColors(foreground = CellColor.DEFAULT, bold = false, underlineStyle = UnderlineStyle.CURLY)
+        terminal.writeCodepoint('C'.code)
+        assertEquals(
+            before?.copy(foreground = CellColor.DEFAULT, bold = false, underlineStyle = UnderlineStyle.CURLY),
+            terminal.getAttrAt(2, 0),
+        )
+        assertEquals(before, terminal.getAttrAt(0, 0), "pen updates do not modify previously written cells")
+        terminal.saveCursor()
+        terminal.resetPen()
+        terminal.restoreCursor()
+        terminal.updatePenColors(background = CellColor.indexed(0), faint = false)
+        terminal.writeCodepoint('D'.code)
+        assertEquals(
+            CellAttributes(
+                background = CellColor.indexed(0),
+                underlineStyle = UnderlineStyle.CURLY,
+                hyperlinkId = Int.MAX_VALUE,
+                selectiveEraseProtected = true,
+            ),
+            terminal.getAttrAt(3, 0),
+        )
+    }
+
     @ParameterizedTest
     @CsvSource("true,false", "false,false", "true,true", "false,true")
     fun `counted scroll preserves bounded scalar semantics for cells attributes and history`(

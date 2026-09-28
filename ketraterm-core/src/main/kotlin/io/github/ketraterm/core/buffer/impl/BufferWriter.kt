@@ -16,6 +16,7 @@
 package io.github.ketraterm.core.buffer.impl
 
 import io.github.ketraterm.core.api.TerminalWriter
+import io.github.ketraterm.core.codec.AttributeCodec
 import io.github.ketraterm.core.engine.CursorEngine
 import io.github.ketraterm.core.engine.MutationEngine
 import io.github.ketraterm.core.model.CellColor
@@ -288,6 +289,26 @@ internal class BufferWriter(
             blink = blink,
             inverse = inverse,
             conceal = conceal,
+        )
+    }
+
+    override fun updatePenColors(
+        foreground: CellColor?,
+        background: CellColor?,
+        underlineColor: CellColor?,
+        bold: Boolean?,
+        faint: Boolean?,
+        italic: Boolean?,
+        underlineStyle: UnderlineStyle?,
+        strikethrough: Boolean?,
+        overline: Boolean?,
+        blink: Boolean?,
+        inverse: Boolean?,
+        conceal: Boolean?,
+    ) {
+        state.pen.restoreAttr(
+            AttributeCodec.updatePrimary(state.pen.currentAttr, foreground, background, bold, faint, italic, blink, inverse),
+            AttributeCodec.updateExtended(state.pen.currentExtendedAttr, underlineColor, underlineStyle, strikethrough, overline, conceal),
         )
     }
 

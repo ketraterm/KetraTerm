@@ -24,6 +24,44 @@ import org.junit.jupiter.api.Test
 
 @DisplayName("CommandDispatcher")
 class CommandDispatcherTest {
+    @Test
+    fun `rejected alternate requests do not save restore or clear charset slots`() {
+        val recorded = RecordingTerminalCommandSink()
+        val sink =
+            object : io.github.ketraterm.parser.spi.TerminalCommandSink by recorded {
+                override val isAlternateScreenActive: Boolean get() = false
+
+                override fun setDecMode(
+                    mode: Int,
+                    enable: Boolean,
+                ) = Unit
+            }
+        val state = ParserState()
+        state.charsets.fill(ParserState.CHARSET_DEC_SPECIAL_GRAPHICS)
+        state.glSlot = 1
+        state.grSlot = 3
+        state.saveCursor(false)
+        state.charsets.fill(ParserState.CHARSET_ASCII)
+        state.glSlot = 0
+        state.grSlot = 2
+        state.params[0] = 1049
+        state.paramCount = 1
+        state.privateMarker = '?'.code
+        AnsiCommandDispatcher.dispatchCsi(sink, state, 'h'.code)
+        AnsiCommandDispatcher.dispatchCsi(sink, state, 'l'.code)
+        assertArrayEquals(intArrayOf(0, 0, 0, 0), state.charsets)
+        state.singleShiftSlot = 2
+        state.restoreCursor(false)
+        assertArrayEquals(intArrayOf(1, 1, 1, 1), state.charsets)
+        assertEquals(1, state.glSlot)
+        assertEquals(3, state.grSlot)
+        assertEquals(-1, state.singleShiftSlot)
+        state.restoreCursor(true)
+        assertArrayEquals(intArrayOf(0, 0, 0, 0), state.charsets)
+        assertEquals(0, state.glSlot)
+        assertEquals(2, state.grSlot)
+    }
+
     private fun executeControl(byteValue: Int): RecordingTerminalCommandSink = executeControl(ParserState(), byteValue)
 
     private fun executeControl(

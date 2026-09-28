@@ -513,6 +513,27 @@ interface TerminalWriter {
     )
 
     /**
+     * Updates only the supplied SGR pen fields. A null field is unchanged;
+     * [CellColor.DEFAULT] explicitly selects the default color and `false` clears a flag.
+     * Hyperlink and selective-erase protection are preserved. With all fields null this is a no-op.
+     * Consumed synchronously; serialize with other terminal reads and writes. No cell is changed.
+     */
+    fun updatePenColors(
+        foreground: CellColor? = null,
+        background: CellColor? = null,
+        underlineColor: CellColor? = null,
+        bold: Boolean? = null,
+        faint: Boolean? = null,
+        italic: Boolean? = null,
+        underlineStyle: UnderlineStyle? = null,
+        strikethrough: Boolean? = null,
+        overline: Boolean? = null,
+        blink: Boolean? = null,
+        inverse: Boolean? = null,
+        conceal: Boolean? = null,
+    )
+
+    /**
      * Sets the active OSC 8 hyperlink id stamped onto future printed cells.
      *
      * Core stores only the numeric id. The host or host layer owns the

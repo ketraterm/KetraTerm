@@ -178,10 +178,18 @@ The core does not save or restore:
 - locking shifts
 - parser-owned shift state
 
-Those remain parser state and must be handled outside `:ketraterm-core`.
+Those remain parser state and must be handled outside `:ketraterm-core`. The parser
+selects its saved charset slot from `TerminalReader.isAlternateScreenActive` through
+the command sink; it does not maintain an independent active-screen flag.
 
 If no save slot exists, `restoreCursor()` falls back to the core's documented
 absolute home plus pen reset behavior.
+
+`TerminalWriter.updatePenColors` changes only non-null SGR fields of the current
+core pen. Null means unchanged, `CellColor.DEFAULT` selects a default color, and
+false clears a style flag. Hyperlink IDs and selective-erase protection survive.
+The adapter uses this operation instead of retaining another pen representation.
+Like other writes, updates are synchronous and require external serialization.
 
 ### Tabs
 

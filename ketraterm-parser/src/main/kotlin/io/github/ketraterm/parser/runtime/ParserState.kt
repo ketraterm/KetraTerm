@@ -118,24 +118,30 @@ internal class ParserState(
     var grSlot: Int = 2
     var singleShiftSlot: Int = -1
 
-    val savedCharsets: IntArray = IntArray(4) { CHARSET_ASCII }
-    var savedGlSlot: Int = 0
-    var savedGrSlot: Int = 2
-    var isCharsetSaved: Boolean = false
+    private val savedCharsets = IntArray(8) { CHARSET_ASCII }
+    private val savedGlSlots = IntArray(2)
+    private val savedGrSlots = IntArray(2) { 2 }
 
-    fun saveCursor() {
-        System.arraycopy(charsets, 0, savedCharsets, 0, 4)
-        savedGlSlot = glSlot
-        savedGrSlot = grSlot
-        isCharsetSaved = true
+    fun saveCursor(alternate: Boolean) {
+        val slot = if (alternate) 1 else 0
+        System.arraycopy(charsets, 0, savedCharsets, slot * 4, 4)
+        savedGlSlots[slot] = glSlot
+        savedGrSlots[slot] = grSlot
     }
 
-    fun restoreCursor() {
-        if (isCharsetSaved) {
-            System.arraycopy(savedCharsets, 0, charsets, 0, 4)
-            glSlot = savedGlSlot
-            grSlot = savedGrSlot
-        }
+    fun restoreCursor(alternate: Boolean) {
+        val slot = if (alternate) 1 else 0
+        System.arraycopy(savedCharsets, slot * 4, charsets, 0, 4)
+        glSlot = savedGlSlots[slot]
+        grSlot = savedGrSlots[slot]
+        singleShiftSlot = -1
+    }
+
+    fun clearSavedCharset(alternate: Boolean) {
+        val slot = if (alternate) 1 else 0
+        savedCharsets.fill(CHARSET_ASCII, slot * 4, slot * 4 + 4)
+        savedGlSlots[slot] = 0
+        savedGrSlots[slot] = 2
     }
 
     // -------------------------------------------------------------------------
@@ -216,13 +222,8 @@ internal class ParserState(
         glSlot = 0
         grSlot = 2
         singleShiftSlot = -1
-        savedCharsets[0] = CHARSET_ASCII
-        savedCharsets[1] = CHARSET_ASCII
-        savedCharsets[2] = CHARSET_ASCII
-        savedCharsets[3] = CHARSET_ASCII
-        savedGlSlot = 0
-        savedGrSlot = 2
-        isCharsetSaved = false
+        clearSavedCharset(false)
+        clearSavedCharset(true)
     }
 
     fun resetAll() {

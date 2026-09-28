@@ -99,14 +99,17 @@ internal object AnsiCommandDispatcher : CommandDispatcher {
 
         when (finalByte) {
             '7'.code -> {
-                state.saveCursor()
+                state.saveCursor(sink.isAlternateScreenActive)
                 sink.saveCursor()
             }
             '8'.code -> {
-                state.restoreCursor()
+                state.restoreCursor(sink.isAlternateScreenActive)
                 sink.restoreCursor()
             }
-            'c'.code -> sink.resetTerminal()
+            'c'.code -> {
+                sink.resetTerminal()
+                state.resetCharsetState()
+            }
             'D'.code -> sink.lineFeed()
             'E'.code -> sink.nextLine()
             'H'.code -> sink.setTabStop()
@@ -228,7 +231,10 @@ internal object AnsiCommandDispatcher : CommandDispatcher {
             CsiCommand.SM_DEC -> dispatchDecMode(sink, state, enable = true)
             CsiCommand.RM_DEC -> dispatchDecMode(sink, state, enable = false)
 
-            CsiCommand.DECSTR -> sink.softReset()
+            CsiCommand.DECSTR -> {
+                sink.softReset()
+                state.resetCharsetState()
+            }
             CsiCommand.DECSCUSR -> sink.setCursorStyle(modeParam(state, 0))
             CsiCommand.SGR -> SgrDispatcher.dispatch(sink, state)
         }
@@ -239,7 +245,7 @@ internal object AnsiCommandDispatcher : CommandDispatcher {
         state: ParserState,
     ) {
         if (state.paramCount == 0) {
-            if (sink.saveCursorOrResetMargins()) state.saveCursor()
+            if (sink.saveCursorOrResetMargins()) state.saveCursor(sink.isAlternateScreenActive)
         } else if (state.paramCount <= 2 && state.subParameterMask == 0) {
             sink.setLeftRightMargins(
                 left = leftRightMarginLeftParam(state, 0),
@@ -253,7 +259,7 @@ internal object AnsiCommandDispatcher : CommandDispatcher {
         state: ParserState,
     ) {
         if (state.paramCount == 0) {
-            state.restoreCursor()
+            state.restoreCursor(sink.isAlternateScreenActive)
             sink.restoreCursor()
         }
     }
@@ -447,12 +453,18 @@ internal object AnsiCommandDispatcher : CommandDispatcher {
         enable: Boolean,
     ) {
         forEachMaterializedMode(state) { mode ->
-            when (mode) {
-                1048, 1049 -> {
-                    if (enable) state.saveCursor() else state.restoreCursor()
+            val wasAlternate = sink.isAlternateScreenActive
+            sink.setDecMode(mode, enable)
+            val isAlternate = sink.isAlternateScreenActive
+            if (mode == 1048) {
+                if (enable) state.saveCursor(isAlternate) else state.restoreCursor(isAlternate)
+            } else if (wasAlternate != isAlternate) {
+                // Charset decoding stays global; only saved slots follow effective screen transitions.
+                if (enable && (mode == 1047 || mode == 1049)) state.clearSavedCharset(true)
+                if (mode == 1049) {
+                    if (enable) state.saveCursor(false) else state.restoreCursor(false)
                 }
             }
-            sink.setDecMode(mode, enable)
         }
     }
 
