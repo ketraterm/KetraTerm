@@ -23,9 +23,8 @@ import io.github.ketraterm.input.event.TerminalKey
 import io.github.ketraterm.input.event.TerminalKeyEvent
 import io.github.ketraterm.input.event.TerminalPasteEvent
 import io.github.ketraterm.protocol.TerminalCapabilityIdentity
-import io.github.ketraterm.session.TerminalClipboardReadResult
-import io.github.ketraterm.session.TerminalSession
-import io.github.ketraterm.session.TerminalSessionState
+import io.github.ketraterm.session.*
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
@@ -43,6 +42,42 @@ import kotlin.time.Duration.Companion.seconds
 
 class PtySessionTest {
     private val sessions = mutableListOf<TerminalSession>()
+
+    @ParameterizedTest
+    @ValueSource(booleans = [false, true])
+    fun `PTY assembly retains the host shell source through creation and start`(startImmediately: Boolean) {
+        val first = TerminalShellCommandLineSnapshot("git status", 4, 6, 1)
+        val source = MutableStateFlow<TerminalShellCommandLineSnapshot?>(first)
+        val process = FakePtyProcess.running()
+        val options = PtyOptions(command = listOf("fake"), shellCommandLineSource = source)
+        val factory = FixedProcessFactory(process)
+        val session = if (startImmediately) PtySessions.start(options, factory) else PtySessions.create(options, factory)
+        sessions += session
+
+        assertSame(first, session.activeShellCommandLine())
+        val changed = TerminalShellCommandLineSnapshot("git diff", 8, 10, 1)
+        source.value = changed
+        assertSame(changed, session.activeShellCommandLine())
+        source.value = null
+        assertNull(session.activeShellCommandLine())
+
+        session.close()
+        source.value = first
+        assertNull(session.activeShellCommandLine())
+        assertTrue(process.destroyed)
+        assertSame(first, source.value, "Closing the session must not mutate host-owned state")
+    }
+
+    @Test
+    fun `PTY options reject competing startup ownership before process creation`() {
+        assertThrows(IllegalArgumentException::class.java) {
+            PtyOptions(
+                command = listOf("fake"),
+                startupCommand = TerminalStartupCommand("echo ready"),
+                shellCommandLineSource = MutableStateFlow(null),
+            )
+        }
+    }
 
     @Test
     fun createdSessionDefersOutputUntilExplicitStart() {

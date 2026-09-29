@@ -40,6 +40,33 @@ Input methods return after admission, not transport completion. For ordinary inp
 
 Local close publishes the closed state and calls `connector.close` before taking cleanup locks. It does not join the writer while a native call is blocked. Remote close cancels pending writes too. A connector must tolerate concurrent close; session cancellation alone cannot interrupt an arbitrary native call. The ring is cleared/released and pending bulk references are dropped on cleanup. While open, active bulk work remains charged to the budgets until its callback returns. The bulk sink checks closure/cancellation before every chunk; a racing native call already entered can finish, and pure encoding between writes is bounded by admitted work. Writer scratch is cleared when its call returns and the coroutine unwinds.
 
+## Active shell editing context
+
+The default OSC 133 source reconstructs active command text under mutation
+serialization. Its revision tracker scans published live frames only while
+observed. An optional host-owned `shellCommandLineSource` replaces active editing
+context for the session's lifetime, including unavailable (`null`) values. It
+does not replace OSC command-history recording or directory metadata.
+
+The external source is a `StateFlow` of immutable snapshots. Snapshot reads use
+its current value without acquiring mutation serialization; one session child
+observes changes while revision collectors exist. Observation is independent of render publication and performs
+no grid scan. Equal values and intermediate updates may be conflated. Removing
+the final revision collector stops observation and clears the retained revision;
+a later collector samples the current source. Closure cancels observation and
+makes active snapshots unavailable without cancelling the host's producer.
+
+Hosts must publish source updates after the corresponding terminal output and
+geometry changes; the session cannot order an independently owned shell model.
+Hosts supplying a source also own startup readiness and command submission, so
+the factory rejects combining that source with `startupCommand`. Existing
+session input methods preserve outbound ordering for host-submitted commands.
+
+Current directory can stay in the host's completion context. To populate session
+metadata instead, hosts can call `shellIntegrationState.recordCurrentWorkingDirectory`
+with a validated file URI and deny OSC 7 through
+`HostPolicy.currentWorkingDirectoryPolicy`, preventing remote replacement.
+
 ## Clipboard read lifetime and output commitment
 
 The host validates selectors before admission. The session drains previously

@@ -15,7 +15,10 @@
  */
 package io.github.ketraterm.ui.swing.host
 
+import io.github.ketraterm.core.TerminalBuffers
+import io.github.ketraterm.session.TerminalSession
 import io.github.ketraterm.session.TerminalShellCommandLineSnapshot
+import io.github.ketraterm.testkit.MockConnector
 import io.github.ketraterm.ui.swing.suggestion.*
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -30,6 +33,72 @@ import kotlin.time.Duration.Companion.milliseconds
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class SwingLiveCompletionBindingTest {
+    @Test
+    fun `host shell state drives standard live completion without terminal output`() =
+        onEdtTest {
+            val source = MutableStateFlow<TerminalShellCommandLineSnapshot?>(null)
+            val dispatcher = StandardTestDispatcher(testScheduler)
+            val session =
+                TerminalSession.create(
+                    TerminalBuffers.create(30, 4),
+                    MockConnector(),
+                    workerDispatcher = dispatcher,
+                    ioDispatcher = dispatcher,
+                    shellCommandLineSource = source,
+                )
+            val target = RecordingTarget()
+            val binding =
+                SwingLiveCompletionBinding(
+                    activeCommandLine = session::activeShellCommandLine,
+                    shellCommandLineRevisions = session.activeShellCommandLineRevision,
+                    suggestionsEnabled = { true },
+                    rankingContextKey = { "host-project" },
+                    feedbackHandler = SwingShellSuggestionFeedbackHandler.NONE,
+                    observationScope = backgroundScope,
+                    edtDispatcher = dispatcher,
+                )
+            try {
+                binding.attach(target)
+                runCurrent()
+                assertEquals(1, source.subscriptionCount.value)
+                assertTrue(target.requests.isEmpty())
+
+                source.value = snapshot("git st")
+                runCurrent()
+                advanceTimeBy(75.milliseconds)
+                runCurrent()
+                assertEquals(listOf(snapshot("git st")), target.requests)
+
+                val middle = TerminalShellCommandLineSnapshot("git status", 4, 6, 1)
+                val previousHides = target.hideCount
+                source.value = middle
+                runCurrent()
+                assertEquals(previousHides + 1, target.hideCount)
+                advanceTimeBy(75.milliseconds)
+                runCurrent()
+                assertEquals(listOf(snapshot("git st"), middle), target.requests)
+
+                source.value = null
+                runCurrent()
+                advanceTimeBy(75.milliseconds)
+                runCurrent()
+                assertEquals(2, target.requests.size)
+                assertEquals(-1L, session.renderGeneration.value, "Host context must not require a published render frame")
+
+                binding.close()
+                runCurrent()
+                assertEquals(0, source.subscriptionCount.value)
+                source.value = snapshot("git diff")
+                runCurrent()
+                advanceTimeBy(75.milliseconds)
+                runCurrent()
+                assertEquals(2, target.requests.size)
+            } finally {
+                binding.close()
+                session.close()
+            }
+        }
+
     @Test
     fun `detach cancels debounce and removes observers without hiding an explicit popup`() =
         onEdtTest {

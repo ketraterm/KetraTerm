@@ -201,7 +201,7 @@ class TerminalShellIntegrationState(
     private var currentWorkingDirectory: String? = null
 
     /**
-     * Records the latest host-validated OSC 7 current-working-directory URI.
+     * Records the latest host-validated current-working-directory URI.
      *
      * The value is session metadata and remains available when command history
      * is cleared. Command starts snapshot it into their bounded record.
@@ -216,7 +216,7 @@ class TerminalShellIntegrationState(
     }
 
     /**
-     * Returns the latest accepted OSC 7 URI, or `null` before one is received.
+     * Returns the latest recorded directory URI, or `null` before one is recorded.
      *
      * @return current working directory URI for the live shell session.
      */
@@ -1043,8 +1043,7 @@ class TerminalShellIntegrationState(
         if (lifecycles[index] != TerminalShellIntegrationCommandLifecycle.FAILED) return false
         val start = commandStartLineIds[index]
         val end = commandEndLineIds[index]
-        if (start == NO_LINE_ID || end == NO_LINE_ID) return false
-        return isLineInCommandOutputRange(index, lineId, start, end)
+        return !(start == NO_LINE_ID || end == NO_LINE_ID) && isLineInCommandOutputRange(index, lineId, start, end)
     }
 
     private fun projectPromptStartLocked(
@@ -1174,8 +1173,7 @@ class TerminalShellIntegrationState(
     ): Boolean {
         if (start > end) return false
         val lastOutputLine = lastCommandOutputLineBeforePromptLocked(start, end)
-        if (lineId < start || lineId > lastOutputLine) return false
-        return hasFlag(index, FLAG_COMMAND_START_INCLUSIVE) || lineId != start
+        return !(lineId < start || lineId > lastOutputLine) && (hasFlag(index, FLAG_COMMAND_START_INCLUSIVE) || lineId != start)
     }
 
     /**

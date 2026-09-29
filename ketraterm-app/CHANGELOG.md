@@ -2,7 +2,6 @@
 
 ## [Unreleased]
 
-- Fixed `ketra config` to open the configuration file in use. Companion helpers are now included in the initial native shell environment even when shell integration is disabled.
 - Improved cursor-position reporting in terminal apps using margins.
 - Fixed terminal apps failing to query the current cursor shape and blinking style.
 - Fixed unsupported terminal status queries reflecting supplied text and control characters into shell or application input.

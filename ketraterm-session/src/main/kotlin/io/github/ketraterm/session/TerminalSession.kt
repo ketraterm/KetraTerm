@@ -66,14 +66,24 @@ private const val SHELL_COMMAND_LINE_CONTEXT_ACTIVE_INDEX = 2
  * exhaustion or transport failure closes the session with [failure]; closing a
  * session discards pending output. A supplied [inputEncoder] owns its output sink.
  *
- * A session publishes one active render viewport. Two independently scrolling
- * renderers must use separate sessions so their viewport requests do not race.
+ * A session publishes one active render viewport. Independently scrolling
+ * views of the same session are unsupported: each new viewport request replaces
+ * the previous request. Separate sessions are separate terminal pipelines.
+ *
+ * [shellCommandLineSource] optionally supplies host-owned active editing state.
+ * The source is selected at construction and its `null` values are authoritative;
+ * OSC 133 remains the default only when no source is supplied. The host owns
+ * the source and publishes immutable snapshots after corresponding terminal
+ * output and geometry changes. Session closure stops observing it and makes
+ * [activeShellCommandLine] unavailable; it does not cancel the host's producer.
+ * Command history and current-directory metadata retain their separate ownership.
  *
  * @property terminal public terminal buffer mutated by host output.
  * @property renderPublisher the render publisher responsible for frame updates.
  * @property shellIntegrationState shared host-side prompt and command marker state.
  * @property workerDispatcher non-owned dispatcher used for session background work.
  * @property ioDispatcher non-owned dispatcher for connector writes, metadata queries, and clipboard providers.
+ * @property shellCommandLineSource optional host-owned active-edit state; observation is shared only while collected.
  */
 class TerminalSession(
     val terminal: TerminalBuffer,
@@ -90,6 +100,7 @@ class TerminalSession(
     private var inputPolicy: TerminalInputPolicy = TerminalInputPolicy(),
     private val workerDispatcher: CoroutineDispatcher = Dispatchers.Default,
     private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
+    private val shellCommandLineSource: StateFlow<TerminalShellCommandLineSnapshot?>? = null,
 ) : TerminalConnectorListener,
     TerminalInputEncoder,
     TerminalRenderFrameReader,
@@ -194,22 +205,38 @@ class TerminalSession(
      * subscription and released when the last collector leaves. Merely reading
      * [StateFlow.value] does not start tracking.
      *
-     * The value is `-1` before an active OSC 133 command line is observed and
+     * The value is `-1` before an active command line is observed and
      * resets to `-1` when tracking stops. A new subscription samples the latest
-     * published live frame without waiting for more terminal output.
+     * available context without waiting for more terminal output.
      *
-     * Nonnegative values identify render generations where command text, cursor
-     * anchor, or snapshot availability changed. Treat them as opaque revisions;
+     * With the default OSC 133 source, changes are sampled from published live
+     * frames. An external [shellCommandLineSource] is observed directly without
+     * waiting for rendering or reading the grid.
+     *
+     * Nonnegative values identify changes in command text, cursor offset/anchor,
+     * or snapshot availability. Treat them as opaque revisions;
      * intermediate changes may be conflated. Consumers should debounce this
      * signal and call [activeShellCommandLine] when they need a command snapshot.
      * Session closure cancels tracking; collectors own their collection lifetime.
      */
     val activeShellCommandLineRevision: StateFlow<Long> by lazy {
+        var sourceRevision = 0L
         flow {
-            val contextProvider = activeShellCommandLineContextProvider ?: return@flow
-            val tracker = ShellCommandLineRevisionTracker(contextProvider)
-            renderGeneration.collect { generation ->
-                if (generation >= 0L && tracker.update()) emit(generation)
+            val source = shellCommandLineSource
+            if (source != null) {
+                var previous: TerminalShellCommandLineSnapshot? = null
+                source.collect { snapshot ->
+                    if (!isSessionClosed() && snapshot != previous) {
+                        previous = snapshot
+                        emit(sourceRevision++)
+                    }
+                }
+            } else {
+                val contextProvider = activeShellCommandLineContextProvider ?: return@flow
+                val tracker = ShellCommandLineRevisionTracker(contextProvider)
+                renderGeneration.collect { generation ->
+                    if (generation >= 0L && tracker.update()) emit(generation)
+                }
             }
         }.stateIn(
             scope = sessionScope,
@@ -276,18 +303,29 @@ class TerminalSession(
         get() = synchronized(mutationLock) { terminal.palette }
 
     /**
-     * Returns the latest valid OSC 7 current-working-directory URI.
+     * Returns the latest recorded current-working-directory URI.
      *
-     * @return absolute `file://` URI reported by the shell, or `null` before
-     *   the shell reports one.
+     * Hosts can instead write validated directory metadata through
+     * [TerminalShellIntegrationState.recordCurrentWorkingDirectory] and use
+     * [HostPolicy.currentWorkingDirectoryPolicy] to deny OSC 7 replacement.
+     * Active editing through [shellCommandLineSource] does not select a
+     * current-directory source.
+     *
+     * @return absolute `file://` URI reported by the shell or host, or `null`
+     *   before one is recorded.
      */
     fun currentWorkingDirectoryUri(): String? = shellIntegrationState.currentWorkingDirectoryUri()
 
     /**
-     * Returns the active shell command-line snapshot, when OSC 133 prompt
-     * markers provide a trustworthy visible range.
+     * Returns the active shell command-line snapshot, or `null` after closure
+     * or when no trustworthy editing context is available.
      *
-     * The read is serialized with parser/core mutation and reconstructs text
+     * A supplied [shellCommandLineSource] is authoritative, including `null`.
+     * Its current immutable value is returned without scanning the grid or
+     * acquiring the parser/core mutation lock.
+     * The host must keep its UTF-16 cursor offset and live-grid anchor current.
+     *
+     * Otherwise the read is serialized with parser/core mutation and reconstructs text
      * from the current render frame using the same prompt-end marker state used
      * for completed command capture. `null` means the shell has not reported a
      * prompt-end marker, the cursor is not at the visible command end, the
@@ -296,10 +334,18 @@ class TerminalSession(
      *
      * @return active command-line snapshot, or `null` when unavailable.
      */
-    fun activeShellCommandLine(): TerminalShellCommandLineSnapshot? =
-        synchronized(mutationLock) {
+    fun activeShellCommandLine(): TerminalShellCommandLineSnapshot? {
+        val source = shellCommandLineSource
+        if (source != null) {
+            if (isSessionClosed()) return null
+            val snapshot = source.value
+            return if (isSessionClosed()) null else snapshot
+        }
+        return synchronized(mutationLock) {
+            if (isSessionClosed()) return@synchronized null
             activeShellCommandLineProvider?.invoke()
         }
+    }
 
     /**
      * Starts the connector after resizing core and transport to [columns] x
@@ -1104,6 +1150,9 @@ class TerminalSession(
          * @param ioDispatcher non-owned dispatcher for connector writes, metadata queries, and clipboard providers.
          * @param clipboardReader session-bound clipboard/consent operation, or null for unavailable reads.
          * @param clipboardReadTimeSource monotonic clock for the end-to-end read deadline.
+         * @param shellCommandLineSource optional host-owned active-edit state, independent of OSC command-history recording.
+         * Cannot be combined with [startupCommand]: hosts supplying editing state own startup readiness and submission.
+         * @throws IllegalArgumentException when both [startupCommand] and [shellCommandLineSource] are supplied.
          * @return standard production terminal session.
          */
         @JvmStatic
@@ -1121,7 +1170,11 @@ class TerminalSession(
             modeReportCapabilities: Int = 0,
             clipboardReader: TerminalClipboardReader? = null,
             clipboardReadTimeSource: TimeSource = TimeSource.Monotonic,
+            shellCommandLineSource: StateFlow<TerminalShellCommandLineSnapshot?>? = null,
         ): TerminalSession {
+            require(startupCommand == null || shellCommandLineSource == null) {
+                "startupCommand requires OSC 133 readiness; hosts supplying shellCommandLineSource own startup submission"
+            }
             val outboundWriteLock = Any()
             val renderReader =
                 terminal as? TerminalRenderFrameReader
@@ -1162,6 +1215,7 @@ class TerminalSession(
                     inputPolicy = inputPolicy,
                     workerDispatcher = workerDispatcher,
                     ioDispatcher = ioDispatcher,
+                    shellCommandLineSource = shellCommandLineSource,
                 )
             val clipboardReads =
                 ClipboardReadHandler(

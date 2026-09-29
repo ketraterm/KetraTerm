@@ -16,19 +16,20 @@
 package io.github.ketraterm.session
 
 /**
- * Bounded snapshot of the shell command line currently known to the session.
+ * Immutable snapshot of the shell command line currently known to the session.
  *
- * The snapshot is derived from OSC 133 prompt markers and the synchronized
- * render-frame state owned by [TerminalSession]. It represents command text
- * that is safe for host suggestion providers to inspect without scanning
- * persistent history or maintaining their own shadow input buffer.
+ * The default session source extracts bounded text from OSC 133 prompt markers
+ * and synchronized render frames, only when the cursor is at the visible end.
+ * A host-owned shell editor can instead supply its complete logical command
+ * text and an offset anywhere in that text through `shellCommandLineSource`.
+ * Hosts own their source's text limits and publish updates when text, cursor,
+ * anchor, or availability changes. Snapshots are consumed outside paint loops.
  *
- * @property commandText visible command-line text captured from the end of the
- * active prompt.
+ * @property commandText complete known command-line text, without the prompt.
  * @property cursorOffset UTF-16 cursor offset within [commandText].
- * @property cursorColumn zero-based terminal-grid cursor column to use as a
+ * @property cursorColumn zero-based live terminal-grid cursor column to use as a
  * popup anchor.
- * @property cursorRow zero-based terminal-grid cursor row to use as a popup
+ * @property cursorRow zero-based live terminal-grid cursor row to use as a popup
  * anchor.
  */
 data class TerminalShellCommandLineSnapshot(

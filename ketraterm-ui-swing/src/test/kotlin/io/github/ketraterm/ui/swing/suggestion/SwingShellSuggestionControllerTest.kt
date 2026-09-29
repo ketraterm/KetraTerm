@@ -660,6 +660,8 @@ class SwingShellSuggestionControllerTest {
         override fun invalidateSuggestions() {
             invalidations++
         }
+
+        override fun isSuggestionContextCurrent(): Boolean = true
     }
 
     private class RecordingSuggestionView(
