@@ -15,21 +15,19 @@
  */
 package io.github.ketraterm.workspace
 
-import io.github.ketraterm.workspace.config.TerminalWorkspaceConfigManager
 import java.io.IOException
-import java.io.InputStream
 import java.nio.file.AtomicMoveNotSupportedException
 import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.StandardCopyOption
-import java.nio.file.attribute.PosixFilePermission
 import java.util.*
 
 /**
  * Applies host-neutral shell integration launch hooks to terminal profiles.
  *
- * The bootstrapper modifies only launch profiles. It does not parse terminal
- * output, mutate core state, or own PTY lifecycle.
+ * The bootstrapper modifies only launch profiles and shell startup hooks.
+ * Product commands, configuration paths, and metadata belong to the launching
+ * host. It does not parse terminal output, mutate core state, or own PTY lifecycle.
  */
 internal object TerminalShellIntegrationBootstrap {
     /**
@@ -73,34 +71,8 @@ internal object TerminalShellIntegrationBootstrap {
         }
         if (integrated === profile) return TerminalShellEnvironmentBootstrap.applyInitial(profile)
 
-        val configPath = TerminalWorkspaceConfigManager.getDefaultPath()
-        val binDir = scriptDirectory.resolve("bin")
-        writeWrapperScripts(binDir)
-
-        val baseEnv = integrated.environment.toMutableMap()
-        baseEnv["KetraTerm_VERSION"] = getAppVersion()
-        baseEnv["KetraTerm_CONFIG_PATH"] = configPath.toAbsolutePath().toString()
-        baseEnv["KetraTerm_OS"] = System.getProperty("os.name") + " (" + System.getProperty("os.arch") + ")"
-        baseEnv["KetraTerm_JVM"] = System.getProperty("java.version") + " (" + System.getProperty("java.vendor") + ")"
-
-        val systemPathKey = System.getenv().keys.firstOrNull { it.equals("PATH", ignoreCase = true) } ?: "PATH"
-        val pathKey = baseEnv.keys.firstOrNull { it.equals("PATH", ignoreCase = true) } ?: systemPathKey
-        val existingPath = baseEnv[pathKey] ?: System.getenv(pathKey) ?: ""
-        val separator = if (System.getProperty("os.name").lowercase(Locale.ROOT).contains("win")) ";" else ":"
-        val newPath =
-            if (existingPath.isNotEmpty()) {
-                "${binDir.toAbsolutePath()}$separator$existingPath"
-            } else {
-                binDir.toAbsolutePath().toString()
-            }
-        val keysToRemove = baseEnv.keys.filter { it.equals("PATH", ignoreCase = true) && it != pathKey }
-        for (k in keysToRemove) {
-            baseEnv.remove(k)
-        }
-        baseEnv[pathKey] = newPath
-
         return TerminalShellEnvironmentBootstrap.withMarkers(
-            TerminalShellEnvironmentBootstrap.applyInitial(integrated.copy(environment = baseEnv)),
+            TerminalShellEnvironmentBootstrap.applyInitial(integrated),
         )
     }
 
@@ -692,167 +664,6 @@ internal object TerminalShellIntegrationBootstrap {
         }
         """.trimIndent()
 
-    private fun getAppVersion(): String =
-        try {
-            val properties = Properties()
-            val inputStream: InputStream? =
-                TerminalShellIntegrationBootstrap::class.java.classLoader
-                    .getResourceAsStream("io/github/ketraterm/app/version.properties")
-            if (inputStream != null) {
-                properties.load(inputStream)
-                properties.getProperty("version") ?: "0.1.0"
-            } else {
-                "0.1.0"
-            }
-        } catch (_: Exception) {
-            "0.1.0"
-        }
-
     private const val OSC7_AUTHORITY_ENVIRONMENT_VARIABLE = "KetraTerm_OSC7_AUTHORITY"
     private const val LOCAL_OSC7_AUTHORITY = "localhost"
-
-    private fun writeWrapperScripts(directory: Path) {
-        try {
-            Files.createDirectories(directory)
-            val posixPath = directory.resolve("ketra")
-            writeIfChanged(posixPath, KETRA_POSIX_SCRIPT)
-            try {
-                val perms = Files.getPosixFilePermissions(posixPath)
-                val newPerms =
-                    perms + PosixFilePermission.OWNER_EXECUTE + PosixFilePermission.GROUP_EXECUTE + PosixFilePermission.OTHERS_EXECUTE
-                Files.setPosixFilePermissions(posixPath, newPerms)
-            } catch (_: UnsupportedOperationException) {
-                // Non-POSIX filesystem (e.g. Windows)
-            } catch (_: Exception) {
-                // Ignored
-            }
-
-            val batchPath = directory.resolve("ketra.bat")
-            writeIfChanged(batchPath, KETRA_BATCH_SCRIPT)
-        } catch (_: IOException) {
-            // Ignored
-        }
-    }
-
-    private val KETRA_POSIX_SCRIPT =
-        """
-        #!/bin/sh
-        case "${'$'}1" in
-            version)
-                echo "KetraTerm version ${'$'}{KetraTerm_VERSION:-unknown}"
-                ;;
-            config)
-                if [ -n "${'$'}KetraTerm_CONFIG_PATH" ]; then
-                    if [ -n "${'$'}EDITOR" ]; then
-                        "${'$'}EDITOR" "${'$'}KetraTerm_CONFIG_PATH"
-                    elif command -v nano >/dev/null 2>&1; then
-                        nano "${'$'}KetraTerm_CONFIG_PATH"
-                    elif command -v vim >/dev/null 2>&1; then
-                        vim "${'$'}KetraTerm_CONFIG_PATH"
-                    else
-                        cat "${'$'}KetraTerm_CONFIG_PATH"
-                    fi
-                else
-                    echo "KetraTerm_CONFIG_PATH is not set."
-                    exit 1
-                fi
-                ;;
-            info)
-                echo "KetraTerm System Information:"
-                echo "  Version:       ${'$'}{KetraTerm_VERSION:-unknown}"
-                echo "  Config Path:   ${'$'}{KetraTerm_CONFIG_PATH:-unknown}"
-                echo "  OS:            ${'$'}{KetraTerm_OS:-unknown}"
-                echo "  JVM:           ${'$'}{KetraTerm_JVM:-unknown}"
-                echo ""
-                echo "Environment Variables:"
-                echo "  KetraTerm_VERSION       Active version of the terminal application"
-                echo "  KetraTerm_CONFIG_PATH   Path to workspace settings file (config.toml)"
-                echo "  KetraTerm_OS            Current OS and architecture details"
-                echo "  KetraTerm_JVM           Java runtime version and vendor details"
-                echo ""
-                echo "Useful Commands:"
-                echo "  cat \"${'$'}{KetraTerm_CONFIG_PATH}\"       - Display the configuration file"
-                echo "  nano \"${'$'}{KetraTerm_CONFIG_PATH}\"      - Edit the configuration file in nano"
-                ;;
-            help|--help|-h|"")
-                echo "KetraTerm Companion CLI CLI Tool"
-                echo ""
-                echo "Usage:"
-                echo "  ketra <command> [options]"
-                echo ""
-                echo "Commands:"
-                echo "  version           Display active KetraTerm version"
-                echo "  config            Open config.toml in your default editor"
-                echo "  info              Print system diagnostic and path information"
-                echo "  help              Display this help instructions"
-                ;;
-            *)
-                echo "Usage: ketra [version | config | info | help]"
-                exit 1
-                ;;
-        esac
-        """.trimIndent()
-
-    private val KETRA_BATCH_SCRIPT =
-        """
-        @echo off
-        if "%1"=="version" goto run_version
-        if "%1"=="config" goto run_config
-        if "%1"=="info" goto run_info
-        if "%1"=="help" goto run_help
-        if "%1"=="--help" goto run_help
-        if "%1"=="-h" goto run_help
-        if "%1"=="" goto run_help
-
-        echo Usage: ketra [version ^| config ^| info ^| help]
-        exit /b 1
-
-        :run_version
-        echo KetraTerm version %KetraTerm_VERSION%
-        goto end
-
-        :run_config
-        if "%KetraTerm_CONFIG_PATH%"=="" (
-            echo KetraTerm_CONFIG_PATH is not set.
-            exit /b 1
-        )
-        if not "%EDITOR%"=="" (
-            %EDITOR% "%KetraTerm_CONFIG_PATH%"
-        ) else (
-            notepad "%KetraTerm_CONFIG_PATH%"
-        )
-        goto end
-
-        :run_info
-        echo KetraTerm System Information:
-        echo   Version:       %KetraTerm_VERSION%
-        echo   Config Path:   %KetraTerm_CONFIG_PATH%
-        echo   OS:            %KetraTerm_OS%
-        echo   JVM:           %KetraTerm_JVM%
-        echo.
-        echo Environment Variables:
-        echo   KetraTerm_VERSION       Active version of the terminal application
-        echo   KetraTerm_CONFIG_PATH   Path to workspace settings file (config.toml)
-        echo   KetraTerm_OS            Current OS and architecture details
-        echo   KetraTerm_JVM           Java runtime version and vendor details
-        echo.
-        echo Useful Commands:
-        echo   notepad "%%KetraTerm_CONFIG_PATH%%"      - Edit configuration in Notepad
-        goto end
-
-        :run_help
-        echo KetraTerm Companion CLI CLI Tool
-        echo.
-        echo Usage:
-        echo   ketra ^<command^> [options]
-        echo.
-        echo Commands:
-        echo   version           Display active KetraTerm version
-        echo   config            Open config.toml in your default editor
-        echo   info              Print system diagnostic and path information
-        echo   help              Display this help instructions
-        goto end
-
-        :end
-        """.trimIndent()
 }

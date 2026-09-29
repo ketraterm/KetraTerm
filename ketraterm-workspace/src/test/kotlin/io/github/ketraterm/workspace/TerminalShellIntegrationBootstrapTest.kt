@@ -122,6 +122,7 @@ class TerminalShellIntegrationBootstrapTest {
                 id = "powershell",
                 displayName = "PowerShell",
                 command = listOf("pwsh.exe", "-NoLogo"),
+                environment = mapOf("Path" to "host-bin", "KetraTerm_CONFIG_PATH" to "host-settings.xml"),
             )
 
         val integrated = TerminalShellIntegrationBootstrap.apply(profile, enabled = false)
@@ -268,6 +269,7 @@ class TerminalShellIntegrationBootstrapTest {
                 id = "custom",
                 displayName = "Custom",
                 command = listOf("custom-shell"),
+                environment = mapOf("PATH" to "host-bin", "KetraTerm_CONFIG_PATH" to "host-settings.toml"),
                 kind = TerminalProfileKind.DEFAULT,
             )
 
@@ -360,6 +362,9 @@ class TerminalShellIntegrationBootstrapTest {
         assertEquals("localhost", integrated.environment["KetraTerm_OSC7_AUTHORITY"])
         assertAll(
             { assertNull(integrated.environment["KetraTerm_CONFIG_PATH"], "The host chooses its settings location") },
+            { assertNull(integrated.environment["KetraTerm_VERSION"], "The host supplies its product version") },
+            { assertNull(integrated.environment["KetraTerm_OS"], "Shell hooks must not inject diagnostic metadata") },
+            { assertNull(integrated.environment["KetraTerm_JVM"], "Shell hooks must not inject diagnostic metadata") },
             {
                 assertTrue(
                     integrated.environment.keys.none {
@@ -426,6 +431,58 @@ class TerminalShellIntegrationBootstrapTest {
             { assertFalse(tempDir.resolve("bin/ketra").exists()) },
             { assertFalse(tempDir.resolve("bin/ketra.bat").exists()) },
         )
+    }
+
+    @Test
+    fun `shell families preserve host environment without introducing standalone policy`(
+        @TempDir tempDir: Path,
+    ) {
+        val profiles =
+            listOf(
+                TerminalProfile("powershell", "PowerShell", listOf("pwsh.exe")),
+                TerminalProfile("git-bash", "Git Bash", listOf("C:\\Program Files\\Git\\bin\\bash.exe", "-l")),
+                TerminalProfile("zsh", "Zsh", listOf("zsh", "-l")),
+                TerminalProfile("fish", "Fish", listOf("fish", "-l")),
+                TerminalProfile("wsl-bash", "WSL Bash", listOf("wsl.exe", "-e", "bash", "-l"), kind = TerminalProfileKind.WSL),
+                TerminalProfile("wsl-zsh", "WSL Zsh", listOf("wsl.exe", "-e", "zsh", "-l"), kind = TerminalProfileKind.WSL),
+                TerminalProfile("wsl-fish", "WSL Fish", listOf("wsl.exe", "-e", "fish", "-l"), kind = TerminalProfileKind.WSL),
+                TerminalProfile("ubuntu", "Ubuntu", listOf("ubuntu.exe", "run", "bash", "-l")),
+            )
+        val hostEnvironment =
+            mapOf(
+                "Path" to tempDir.resolve("host-bin").toString(),
+                "KetraTerm_CONFIG_PATH" to tempDir.resolve("host-settings.xml").toString(),
+                "KetraTerm_VERSION" to "host-version",
+                "KetraTerm_OS" to "host-os",
+                "KetraTerm_JVM" to "host-runtime",
+                "HOST_CUSTOM_VALUE" to "retained",
+            )
+
+        for (profile in profiles) {
+            val scriptDirectory = tempDir.resolve(profile.id)
+            val inherited = TerminalShellIntegrationBootstrap.apply(profile, enabled = true, scriptDirectory = scriptDirectory)
+            val explicit =
+                TerminalShellIntegrationBootstrap.apply(
+                    profile.copy(environment = hostEnvironment),
+                    enabled = true,
+                    scriptDirectory = scriptDirectory,
+                )
+
+            assertAll(
+                profile.displayName,
+                { assertNotEquals(profile, inherited, "The supported shell still receives integration hooks") },
+                { assertTrue(inherited.environment.keys.none { it.equals("PATH", ignoreCase = true) }) },
+                { assertTrue(inherited.environment.keys.none { it in hostEnvironment }, "The host owns product metadata") },
+                { assertEquals(hostEnvironment, explicit.environment.filterKeys { it in hostEnvironment }) },
+                {
+                    assertEquals(
+                        mapOf("Path" to hostEnvironment.getValue("Path")),
+                        explicit.environment.filterKeys { it.equals("PATH", true) },
+                    )
+                },
+                { assertFalse(scriptDirectory.resolve("bin").exists(), "Shell hooks must not install product commands") },
+            )
+        }
     }
 
     private fun decodePowerShellScript(encoded: String): String = String(Base64.getDecoder().decode(encoded), Charsets.UTF_16LE)

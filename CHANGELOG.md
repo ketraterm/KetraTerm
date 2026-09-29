@@ -6,6 +6,7 @@ Release notes for library consumers and embedders. Product-specific changes are 
 
 ### Improvements and fixes
 
+- Removed standalone CLI, configuration and PATH augmentation from workspace shell integration. Standalone product wiring now owns companion helpers and uses the active configuration path; embedded hosts retain their own environment.
 - Restored focus notifications for terminal applications that request them.
 - Fixed missing dependencies when using the parser, host or completion library independently from Kotlin or Java.
 - Moved terminal search off the Swing event thread. Results update during output, preserve the active match where possible, and discard stale highlights.

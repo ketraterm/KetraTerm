@@ -2,6 +2,7 @@
 
 ## [Unreleased]
 
+- Shell integration now preserves your command search path and no longer installs standalone application helpers or settings references.
 - Improved cursor-position reporting in terminal apps using margins.
 - Fixed terminal apps failing to query the current cursor shape and blinking style.
 - Fixed unsupported terminal status queries reflecting supplied text and control characters into shell or application input.

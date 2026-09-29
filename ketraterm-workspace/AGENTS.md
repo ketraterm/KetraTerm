@@ -23,6 +23,7 @@ This module must not:
 - encode keyboard, paste, focus, or mouse bytes directly.
 - own PTY stream threads or process implementation details.
 - own completion sources, completion learning, or completion-statistics persistence.
+- install product companion commands or inject product configuration paths and metadata.
 
 PTY process lifecycle stays in `ketraterm-pty`; session synchronization stays in
 `ketraterm-session`; UI modules adapt workspace state to visual containers.

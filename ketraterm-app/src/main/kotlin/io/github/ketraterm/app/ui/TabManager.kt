@@ -15,6 +15,7 @@
  */
 package io.github.ketraterm.app.ui
 
+import io.github.ketraterm.app.KetraTermCli
 import io.github.ketraterm.app.completion.StandaloneCompletionRegistry
 import io.github.ketraterm.app.completion.completionShellCapabilities
 import io.github.ketraterm.app.config.KetraTermSettings
@@ -67,6 +68,7 @@ internal class TabManager(
 ) {
     private val panes = ArrayList<TerminalPane>(INITIAL_TAB_CAPACITY)
     private val workspace = TerminalWorkspace(StandaloneWorkspaceListener())
+    private val cli = KetraTermCli(settings.configPath)
     private val clipboardReader = SwingClipboardReader()
     private val attentionTaskbar: Taskbar? =
         try {
@@ -236,7 +238,7 @@ internal class TabManager(
         val workspaceTab =
             try {
                 workspace.openTab(
-                    profile = profileWithStartupCommand(profile),
+                    profile = prepareLaunchProfile(profile),
                     options =
                         settings.current().let { snapshot ->
                             TerminalWorkspaceOpenOptions(
@@ -279,15 +281,17 @@ internal class TabManager(
         return true
     }
 
-    private fun profileWithStartupCommand(profile: TerminalProfile): TerminalProfile =
-        if (profile.startupCommand != null) {
-            profile
+    private fun prepareLaunchProfile(profile: TerminalProfile): TerminalProfile {
+        val prepared = cli.prepare(profile)
+        return if (prepared.startupCommand != null) {
+            prepared
         } else {
-            profile.copy(
+            prepared.copy(
                 startupCommand =
                     TerminalStartupCommand.fromText(settings.config.startupCommand),
             )
         }
+    }
 
     /**
      * Closes the tab identified by [id].
@@ -469,7 +473,7 @@ internal class TabManager(
         val workspaceTab =
             try {
                 workspace.openTab(
-                    profile = profileWithStartupCommand(profile),
+                    profile = prepareLaunchProfile(profile),
                     options =
                         settings.current().let { snapshot ->
                             TerminalWorkspaceOpenOptions(
