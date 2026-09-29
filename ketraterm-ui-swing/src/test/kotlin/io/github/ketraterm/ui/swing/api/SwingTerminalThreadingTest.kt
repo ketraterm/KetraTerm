@@ -60,6 +60,60 @@ class SwingTerminalThreadingTest {
     private val dispatcher = StandardTestDispatcher()
 
     @ParameterizedTest
+    @ValueSource(booleans = [false, true])
+    fun `focus reports use the mode at each transition before outbound writes run`(temporary: Boolean) {
+        val output = ByteArrayOutputStream()
+        val session = focusSession(output)
+        val component = edtCall { SwingTerminal() }
+        try {
+            edtCall {
+                component.bind(session)
+                val gained = FocusEvent(component, FocusEvent.FOCUS_GAINED, temporary)
+                val lost = FocusEvent(component, FocusEvent.FOCUS_LOST, temporary)
+                val enable = "\u001B[?1004h".toByteArray(Charsets.US_ASCII)
+                val disable = "\u001B[?1004l".toByteArray(Charsets.US_ASCII)
+
+                component.focusListeners.forEach { it.focusGained(gained) }
+                session.onBytes(enable, 0, enable.size)
+                component.focusListeners.forEach { it.focusGained(gained) }
+                session.onBytes(disable, 0, disable.size)
+                component.focusListeners.forEach { it.focusLost(lost) }
+                session.onBytes(enable, 0, enable.size)
+                component.focusListeners.forEach { it.focusLost(lost) }
+                session.onBytes(disable, 0, disable.size)
+            }
+            assertEquals(0, output.size(), "focus callbacks queue output without writing on the EDT")
+            dispatcher.scheduler.runCurrent()
+            assertEquals("\u001B[I\u001B[O", output.toString(Charsets.US_ASCII))
+        } finally {
+            edtCall { component.dispose() }
+            session.close()
+            dispatcher.scheduler.runCurrent()
+        }
+    }
+
+    @Test
+    fun `focus events after session closure produce no output`() {
+        val output = ByteArrayOutputStream()
+        val session = focusSession(output)
+        val component = edtCall { SwingTerminal() }
+        try {
+            val enable = "\u001B[?1004h".toByteArray(Charsets.US_ASCII)
+            session.onBytes(enable, 0, enable.size)
+            edtCall { component.bind(session) }
+            session.close()
+            edtCall { dispatchFocusCycle(component) }
+            dispatcher.scheduler.runCurrent()
+            assertTrue(session.isClosed)
+            assertEquals("", output.toString(Charsets.US_ASCII))
+        } finally {
+            edtCall { component.dispose() }
+            session.close()
+            dispatcher.scheduler.runCurrent()
+        }
+    }
+
+    @ParameterizedTest
     @ValueSource(strings = ["default", "enabled", "disabled"])
     fun `Swing focus transitions obey DEC1004 reporting mode`(mode: String) {
         val output = ByteArrayOutputStream()

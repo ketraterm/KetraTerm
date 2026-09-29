@@ -6,6 +6,7 @@ Release notes for library consumers and embedders. Product-specific changes are 
 
 ### Improvements and fixes
 
+- Restored focus notifications for terminal applications that request them.
 - Fixed missing dependencies when using the parser, host or completion library independently from Kotlin or Java.
 - Moved terminal search off the Swing event thread. Results update during output, preserve the active match where possible, and discard stale highlights.
 - Reduced allocations when painting unchanged selections. Search and hyperlink detection now ignore artificial padding at wide-character wraps; grid resizing clears selections to prevent copying unrelated text.

@@ -15,6 +15,7 @@
  */
 package io.github.ketraterm.ui.swing.input
 
+import io.github.ketraterm.input.event.TerminalFocusEvent
 import java.awt.event.FocusAdapter
 import java.awt.event.FocusEvent
 import java.awt.event.KeyAdapter
@@ -94,6 +95,7 @@ internal class SwingTerminalInputController(
         object : FocusAdapter() {
             override fun focusGained(event: FocusEvent) {
                 host.setTerminalFocused(true)
+                host.session?.encodeFocus(TerminalFocusEvent(focused = true))
                 host.resetCursorBlink()
                 host.repaintCursorState()
             }
@@ -101,6 +103,7 @@ internal class SwingTerminalInputController(
             override fun focusLost(event: FocusEvent) {
                 claimedKeyLifecycle.clear()
                 host.setTerminalFocused(false)
+                host.session?.encodeFocus(TerminalFocusEvent(focused = false))
                 host.repaintCursorState()
                 host.hideShellSuggestions()
             }
