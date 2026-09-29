@@ -486,12 +486,6 @@ class SwingTerminal
                         this@SwingTerminal.requestRenderFromSession(session)
                     }
 
-                    override fun syncTerminalGridToActiveChrome(): Boolean {
-                        // A parser-selected width must survive frame publication and chrome changes.
-                        return renderCache.columns == lastResizedColumns &&
-                            this@SwingTerminal.resizeSessionToVisibleGridOnEdt(publishWhenUnchanged = false)
-                    }
-
                     override fun clampViewport(
                         historySize: Int,
                         discardedCount: Long,

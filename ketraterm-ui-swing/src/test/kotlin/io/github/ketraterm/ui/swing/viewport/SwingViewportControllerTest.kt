@@ -41,6 +41,18 @@ class SwingViewportControllerTest {
             cursorStrokeWidth = 2,
         )
 
+    @Test
+    fun `default alternate padding balances an odd primary inset`() {
+        val settings = SwingSettings(padding = SwingPadding(3, 5, 7, 10))
+        assertEquals(SwingPadding(3, 15, 7, 16), settings.alternateScreenPadding)
+        val controller = SwingViewportController(TerminalViewportListener.NONE) { _, _ -> }
+        for (width in 1..250) {
+            val primary = controller.visibleGridSizeOnEdt(settings, metrics, width, 130, TerminalRenderBufferKind.PRIMARY)
+            val alternate = controller.visibleGridSizeOnEdt(settings, metrics, width, 130, TerminalRenderBufferKind.ALTERNATE)
+            assertEquals(primary, alternate, "component width $width")
+        }
+    }
+
     @Nested
     inner class GridSizing {
         @Test

@@ -697,7 +697,7 @@ class SwingTerminalScrollbackTest {
     }
 
     @Test
-    fun `alternate screen chrome resizes terminal grid to explicit alternate padding`() {
+    fun `buffer switches preserve terminal grid despite different chrome`() {
         val connector = RecordingConnector()
         val terminal = TerminalBuffers.create(width = 3, height = 3, maxHistory = 0)
         val session =
@@ -711,7 +711,6 @@ class SwingTerminalScrollbackTest {
         val settings =
             SwingSettings(
                 padding = SwingPadding(0, 40, 8, 8),
-                alternateScreenPadding = SwingPadding(0, 8, 8, 8),
                 shellIntegrationDecorationGutterWidth = 32,
             )
         val component = createComponent(settingsProvider = { settings })
@@ -729,17 +728,35 @@ class SwingTerminalScrollbackTest {
 
             terminal.enterAltBuffer()
             session.requestRender(scrollbackOffset = 0)
-            publishVisibleGridColumnsGreaterThan(component, primaryColumns)
+            SwingUtilities.invokeAndWait { dispatcher.scheduler.runCurrent() }
+            drainEdt()
 
             lateinit var alternateVisibleSize: java.awt.Dimension
             SwingUtilities.invokeAndWait {
                 alternateVisibleSize = component.visibleGridSize()
             }
 
-            assertTrue(alternateVisibleSize.width > primaryColumns)
-            assertEquals(alternateVisibleSize.width, terminal.width)
-            assertEquals(alternateVisibleSize.width, connector.lastColumns.get())
-            assertEquals(SwingPadding(0, 8, 8, 8), settings.alternateScreenPadding)
+            assertEquals(primaryColumns, alternateVisibleSize.width)
+            assertEquals(primaryColumns, terminal.width)
+            assertEquals(primaryColumns, connector.lastColumns.get())
+            assertEquals(3, terminal.height)
+
+            SwingUtilities.invokeAndWait {
+                component.size = component.preferredGridSize(20, 5)
+                component.dispatchEvent(ComponentEvent(component, ComponentEvent.COMPONENT_RESIZED))
+                dispatcher.scheduler.runCurrent()
+                assertEquals(20, terminal.width)
+                assertEquals(5, terminal.height)
+                assertEquals(component.preferredGridSize(20, 5), component.preferredGridSize(20, 5, TerminalRenderBufferKind.ALTERNATE))
+            }
+
+            terminal.exitAltBuffer()
+            session.requestRender(scrollbackOffset = 0)
+            SwingUtilities.invokeAndWait { dispatcher.scheduler.runCurrent() }
+            drainEdt()
+            assertEquals(20, terminal.width)
+            assertEquals(20, connector.lastColumns.get())
+            assertEquals(5, terminal.height)
         } finally {
             session.close()
         }
@@ -862,16 +879,6 @@ class SwingTerminalScrollbackTest {
         SwingUtilities.invokeAndWait {
             dispatcher.scheduler.runCurrent()
             assertEquals(expectedOffset, component.viewportState().scrollbackOffset)
-        }
-    }
-
-    private fun publishVisibleGridColumnsGreaterThan(
-        component: SwingTerminal,
-        columns: Int,
-    ) {
-        SwingUtilities.invokeAndWait {
-            dispatcher.scheduler.runCurrent()
-            assertTrue(component.visibleGridSize().width > columns, "visible grid was not resized")
         }
     }
 

@@ -42,6 +42,8 @@ audit's [regression coverage](reviews/terminal-quality-audit-2026-09-27.md#regre
 Tests may fail until their owning defects are fixed; adding coverage does not
 close these entries.
 
+- `TODO(ui)`: visually verify agy help-transition animation after removing frame-triggered resizing. Default alternate padding now redistributes the primary horizontal inset and preserves vertical insets; regressions cover physical resizing while alternate-screen content is active. The resize/clear defect is corrected, but animation parity is not established.
+
 ### Tier 2: Regression coverage and modern compatibility
 
 - Complete [host metadata for richer Kitty keyboard flags](#deferred-kitty-keyboard-protocol-scope).

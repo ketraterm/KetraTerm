@@ -22,8 +22,8 @@ import io.github.ketraterm.render.api.TerminalRenderBufferKind
  *
  * Primary screen chrome composes host/user margin plus terminal-owned gutters:
  * `left margin | prompt gutter | grid | scrollbar gutter`. Alternate screen
- * chrome uses its own explicit inset snapshot, so full-screen TUIs can receive
- * an edge-to-edge viewport without hidden coupling to primary-screen padding.
+ * chrome defaults to the same total inset, shared equally between both edges.
+ * Sizing, painting and interaction share these insets.
  */
 internal object SwingTerminalChrome {
     fun horizontalInset(

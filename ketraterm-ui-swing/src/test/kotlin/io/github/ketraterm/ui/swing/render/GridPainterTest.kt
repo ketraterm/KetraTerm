@@ -32,6 +32,38 @@ import java.awt.image.BufferedImage
 
 class GridPainterTest {
     @Test
+    fun `alternate grid paints at balanced default padding`() {
+        val image = BufferedImage(100, 40, BufferedImage.TYPE_INT_ARGB)
+        val g = image.createGraphics()
+        val settings =
+            SwingSettings(
+                palette = TerminalColorPalette(defaultForeground = WHITE, defaultBackground = BLACK),
+                selectionBackground = RED,
+            )
+        val metrics = SwingMetrics.from(g.getFontMetrics(settings.font))
+        val cache = TerminalRenderCache(columns = 2, rows = 1)
+        cache.updateFrom(TextFrame("  ", false, palette = settings.palette, activeBuffer = TerminalRenderBufferKind.ALTERNATE))
+        try {
+            GridPainter().paint(
+                g,
+                cache,
+                settings,
+                metrics,
+                image.width,
+                image.height,
+                true,
+                selection = CellSelection(0, 0, 2, 0),
+            )
+        } finally {
+            g.dispose()
+        }
+        val left = 13
+        for (x in 0 until image.width) {
+            assertEquals(if (x in left until left + 2 * metrics.cellWidth) RED else BLACK, image.getRGB(x, 1), "pixel $x")
+        }
+    }
+
+    @Test
     fun `ascii runs paint contiguous measured cells`() {
         val image = BufferedImage(80, 30, BufferedImage.TYPE_INT_ARGB)
         val g = image.createGraphics()
@@ -995,13 +1027,13 @@ class GridPainterTest {
         private val attrs: LongArray = LongArray(text.length) { TerminalRenderAttrs.DEFAULT },
         private val extraAttrs: LongArray = LongArray(text.length) { TerminalRenderExtraAttrs.DEFAULT },
         override val palette: TerminalColorPalette = TerminalColorPalette(),
+        override val activeBuffer: TerminalRenderBufferKind = TerminalRenderBufferKind.PRIMARY,
     ) : TerminalRenderFrameReader,
         TerminalRenderFrame {
         override val columns: Int = text.length
         override val rows: Int = 1
         override val frameGeneration: Long = 1
         override val structureGeneration: Long = 1
-        override val activeBuffer: TerminalRenderBufferKind = TerminalRenderBufferKind.PRIMARY
         override val cursor: TerminalRenderCursor =
             TerminalRenderCursor(
                 column = 0,

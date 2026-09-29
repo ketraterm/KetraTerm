@@ -6,6 +6,7 @@ Release notes for library consumers and embedders. Product-specific changes are 
 
 ### Improvements and fixes
 
+- Stopped frame-triggered terminal resizing on buffer switches. Default alternate-screen padding now shares the primary horizontal inset equally and preserves vertical insets, so physical resizing retains the same grid dimensions in either buffer. Explicit alternate-padding overrides remain supported.
 - Made shell metadata updates independent of transport output. Swing observes the selected model, and workspace/product command learning uses exact semantic completion snapshots; observer registrations end with their view/tab lifetime.
 - Discarded stale shell suggestions when editing context changes or the session closes, including pending results and acceptance. Dismissing suggestions cancels provider work, and ineligible automatic requests leave explicit requests untouched.
 - Clarified Swing binding ownership: binding applies session settings and geometry; unbinding leaves the host-owned session open. Each session publishes one viewport.

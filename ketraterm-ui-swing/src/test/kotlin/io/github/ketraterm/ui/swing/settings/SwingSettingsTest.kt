@@ -47,8 +47,8 @@ class SwingSettingsTest {
         assertSame(missingGlyphFont, cache.fontForCodePoint(0x10FFFF, Font.PLAIN))
         assertEquals(26, SwingTerminalChrome.horizontalInset(settings, TerminalRenderBufferKind.PRIMARY))
         assertEquals(4, SwingTerminalChrome.verticalInset(settings, TerminalRenderBufferKind.PRIMARY))
-        assertEquals(4, SwingTerminalChrome.horizontalInset(settings, TerminalRenderBufferKind.ALTERNATE))
-        assertEquals(2, SwingTerminalChrome.verticalInset(settings, TerminalRenderBufferKind.ALTERNATE))
+        assertEquals(26, SwingTerminalChrome.horizontalInset(settings, TerminalRenderBufferKind.ALTERNATE))
+        assertEquals(4, SwingTerminalChrome.verticalInset(settings, TerminalRenderBufferKind.ALTERNATE))
     }
 
     @Test
@@ -98,8 +98,8 @@ class SwingSettingsTest {
         assertEquals(listOf(replacementFont), copy.fallbackFonts)
         assertEquals(SwingPadding(0, 4, 4, 6), settings.padding)
         assertEquals(SwingPadding(0, 12, 4, 6), copy.padding)
-        assertEquals(SwingPadding(0, 2, 2, 2), settings.alternateScreenPadding)
-        assertEquals(SwingPadding(0, 2, 9, 2), copy.alternateScreenPadding)
+        assertEquals(SwingPadding(0, 13, 4, 13), settings.alternateScreenPadding)
+        assertEquals(SwingPadding(0, 13, 9, 13), copy.alternateScreenPadding)
         assertEquals(settings.font, copy.font)
         assertTrue(settings != copy)
     }
@@ -218,7 +218,7 @@ class SwingSettingsTest {
         assertEquals(0xFFE74856.toInt(), settings.shellIntegrationFailedCommandRailColor)
         assertEquals(3, settings.shellIntegrationFailedCommandRailWidth)
         assertEquals(SwingPadding(0, 4, 4, 6), settings.padding)
-        assertEquals(SwingPadding(0, 2, 2, 2), settings.alternateScreenPadding)
+        assertEquals(SwingPadding(0, 13, 4, 13), settings.alternateScreenPadding)
         assertEquals(0, settings.padding.top)
         assertEquals(4, settings.padding.left)
         assertEquals(4, settings.padding.bottom)
@@ -260,11 +260,11 @@ class SwingSettingsTest {
 
         assertEquals(20, SwingTerminalChrome.left(settings, TerminalRenderBufferKind.PRIMARY))
         assertEquals(6, SwingTerminalChrome.right(settings, TerminalRenderBufferKind.PRIMARY))
-        assertEquals(2, SwingTerminalChrome.left(settings, TerminalRenderBufferKind.ALTERNATE))
-        assertEquals(2, SwingTerminalChrome.right(settings, TerminalRenderBufferKind.ALTERNATE))
+        assertEquals(13, SwingTerminalChrome.left(settings, TerminalRenderBufferKind.ALTERNATE))
+        assertEquals(13, SwingTerminalChrome.right(settings, TerminalRenderBufferKind.ALTERNATE))
         assertEquals(26, SwingTerminalChrome.horizontalInset(settings, TerminalRenderBufferKind.PRIMARY))
-        assertEquals(4, SwingTerminalChrome.horizontalInset(settings, TerminalRenderBufferKind.ALTERNATE))
-        assertEquals(2, SwingTerminalChrome.verticalInset(settings, TerminalRenderBufferKind.ALTERNATE))
+        assertEquals(26, SwingTerminalChrome.horizontalInset(settings, TerminalRenderBufferKind.ALTERNATE))
+        assertEquals(4, SwingTerminalChrome.verticalInset(settings, TerminalRenderBufferKind.ALTERNATE))
         assertEquals(16, SwingTerminalChrome.promptDecorationGutterWidth(settings, TerminalRenderBufferKind.PRIMARY))
         assertEquals(0, SwingTerminalChrome.promptDecorationGutterWidth(settings, TerminalRenderBufferKind.ALTERNATE))
         assertEquals(true, settings.shellSuggestionsEnabled)

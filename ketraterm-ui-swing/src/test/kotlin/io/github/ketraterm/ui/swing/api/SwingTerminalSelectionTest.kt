@@ -298,8 +298,8 @@ class SwingTerminalSelectionTest {
                         hostServices =
                             SwingHostServices(
                                 hyperlinkHandler =
-                                    TerminalHyperlinkHandler {
-                                        openedLinks.add(it)
+                                    { link ->
+                                        openedLinks.add(link)
                                         true
                                     },
                             ),
@@ -421,7 +421,7 @@ class SwingTerminalSelectionTest {
                         hostServices =
                             SwingHostServices(
                                 hyperlinkHandler =
-                                    TerminalHyperlinkHandler {
+                                    {
                                         opened = it
                                         true
                                     },
@@ -480,8 +480,8 @@ class SwingTerminalSelectionTest {
                 hostServices =
                     SwingHostServices(
                         hyperlinkHandler =
-                            TerminalHyperlinkHandler {
-                                opened.set(it)
+                            { link ->
+                                opened.set(link)
                                 true
                             },
                     ),
@@ -494,6 +494,39 @@ class SwingTerminalSelectionTest {
                 component.mouseListeners.forEach { it.mousePressed(mousePressedWithCtrl(component, 1, 1)) }
             }
             assertEquals("https://example.com/3", opened.get())
+        } finally {
+            SwingUtilities.invokeAndWait { component.dispose() }
+            session.close()
+        }
+    }
+
+    @Test
+    fun `alternate screen mouse coordinates follow the centered grid`() {
+        val input = RecordingInputEncoder()
+        val frame =
+            object : TestRenderFrame(arrayOf(Array(3) { TestCell() })) {
+                override val activeBuffer = TerminalRenderBufferKind.ALTERNATE
+            }
+        val session = testSession(frame, inputEncoder = input)
+        val settings = SwingSettings(padding = SwingPadding(0, 4, 0, 6))
+        val component = createComponent(settingsProvider = { settings })
+        session.start(columns = 3, rows = 1)
+        session.terminal.setMouseTrackingMode(io.github.ketraterm.protocol.MouseTrackingMode.NORMAL)
+        try {
+            SwingUtilities.invokeAndWait {
+                component.setSize(200, 40)
+                component.bind(session)
+                session.renderPublisher.updateAndPublish(StaticFrameReader(frame))
+                val metrics = SwingMetrics.from(component.getFontMetrics(settings.font))
+                val left = 13
+                val x = left + metrics.cellWidth + 1
+                component.mouseListeners.forEach { it.mousePressed(mousePressed(component, x, 1, 1)) }
+                val event = requireNotNull(input.lastMouseEvent.get())
+                assertEquals(1, event.column)
+                assertEquals(metrics.cellWidth + 1, event.pixelX)
+                assertEquals(0, event.row)
+                assertEquals(1, event.pixelY)
+            }
         } finally {
             SwingUtilities.invokeAndWait { component.dispose() }
             session.close()
@@ -1107,7 +1140,7 @@ class SwingTerminalSelectionTest {
                 hostServices =
                     SwingHostServices(
                         hyperlinkHandler =
-                            TerminalHyperlinkHandler { uri ->
+                            { uri ->
                                 opened.set(uri)
                                 true
                             },
@@ -1154,7 +1187,7 @@ class SwingTerminalSelectionTest {
                 hostServices =
                     SwingHostServices(
                         hyperlinkHandler =
-                            TerminalHyperlinkHandler {
+                            {
                                 opened.incrementAndGet()
                                 true
                             },
