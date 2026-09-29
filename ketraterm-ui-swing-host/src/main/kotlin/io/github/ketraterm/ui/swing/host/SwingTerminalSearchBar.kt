@@ -16,37 +16,13 @@
 package io.github.ketraterm.ui.swing.host
 
 import io.github.ketraterm.ui.swing.api.SwingTerminal
-import java.awt.BasicStroke
-import java.awt.BorderLayout
-import java.awt.Color
-import java.awt.Cursor
-import java.awt.Dimension
-import java.awt.Font
-import java.awt.Graphics
-import java.awt.Graphics2D
-import java.awt.GridBagConstraints
-import java.awt.GridBagLayout
-import java.awt.Insets
-import java.awt.RenderingHints
-import java.awt.event.FocusEvent
-import java.awt.event.FocusListener
-import java.awt.event.InputEvent
-import java.awt.event.KeyEvent
-import java.awt.event.MouseAdapter
-import java.awt.event.MouseEvent
-import javax.swing.BorderFactory
-import javax.swing.ButtonModel
-import javax.swing.JButton
-import javax.swing.JComponent
-import javax.swing.JLabel
-import javax.swing.JPanel
-import javax.swing.JTextField
-import javax.swing.JToggleButton
-import javax.swing.KeyStroke
-import javax.swing.SwingConstants
-import javax.swing.SwingUtilities
+import kotlinx.coroutines.*
+import java.awt.*
+import java.awt.event.*
+import javax.swing.*
 import javax.swing.event.DocumentEvent
 import javax.swing.event.DocumentListener
+import kotlin.coroutines.CoroutineContext
 
 private val PANEL_SHADOW = Color(0x70000000, true)
 private val PANEL_BACKGROUND = Color(0xF01F2227.toInt(), true)
@@ -206,6 +182,18 @@ class SwingTerminalSearchBar
         private val searchInputPanel = SearchInputPanel(queryField, caseSensitiveToggle)
         private val closeButton = IconButton(ButtonIcon.CLOSE)
         private val searchPanel = SearchPanel()
+        private var searchObservation: Job? = null
+        private val searchScope =
+            CoroutineScope(
+                object : CoroutineDispatcher() {
+                    override fun isDispatchNeeded(context: CoroutineContext) = !SwingUtilities.isEventDispatchThread()
+
+                    override fun dispatch(
+                        context: CoroutineContext,
+                        block: Runnable,
+                    ) = SwingUtilities.invokeLater(block)
+                },
+            )
 
         /**
          * Swing component that hosts should mount as floating pane chrome.
@@ -219,6 +207,16 @@ class SwingTerminalSearchBar
             }
 
         init {
+            component.addHierarchyListener {
+                if (it.changeFlags and
+                    HierarchyEvent.DISPLAYABILITY_CHANGED
+                        .toLong() != 0L &&
+                    !component.isDisplayable
+                ) {
+                    searchObservation?.cancel()
+                    searchObservation = null
+                }
+            }
             queryField.toolTipText = "Search terminal output"
             counterLabel.toolTipText = "Active match and total matches"
             previousButton.toolTipText = "Previous match"
@@ -226,7 +224,11 @@ class SwingTerminalSearchBar
             closeButton.toolTipText = "Close search"
             caseSensitiveToggle.toolTipText = "Match case"
             counterLabel.horizontalAlignment = SwingConstants.CENTER
-            counterLabel.preferredSize = Dimension(COUNTER_LABEL_WIDTH, COMMAND_BUTTON_HEIGHT)
+            counterLabel.preferredSize =
+                Dimension(
+                    maxOf(COUNTER_LABEL_WIDTH, counterLabel.getFontMetrics(counterLabel.font).stringWidth("Searching…") + 8),
+                    COMMAND_BUTTON_HEIGHT,
+                )
             counterLabel.minimumSize = counterLabel.preferredSize
 
             queryField.document.addDocumentListener(
@@ -294,6 +296,12 @@ class SwingTerminalSearchBar
             refreshColors()
             component.isVisible = true
             setQueryText(terminal.currentSearchState().query)
+            if (searchObservation == null) {
+                searchObservation =
+                    searchScope.launch {
+                        terminal.searchState.collect { refreshCounter() }
+                    }
+            }
             refreshCounter()
             revalidateHost()
             queryField.requestFocusInWindow()
@@ -309,6 +317,8 @@ class SwingTerminalSearchBar
                 return
             }
             component.isVisible = false
+            searchObservation?.cancel()
+            searchObservation = null
             setQueryText("")
             terminal.clearSearch()
             refreshCounter()
@@ -361,10 +371,11 @@ class SwingTerminalSearchBar
         private fun refreshCounter() {
             val state = terminal.currentSearchState()
             counterLabel.text =
-                if (state.resultCount == 0) {
-                    "0/0"
-                } else {
-                    "${state.activeResultIndex + 1}/${state.resultCount}"
+                when {
+                    state.failure != null -> "Failed"
+                    state.isSearching -> "Searching…"
+                    state.resultCount == 0 -> "0/0"
+                    else -> "${state.activeResultIndex + 1}/${state.resultCount}"
                 }
         }
 

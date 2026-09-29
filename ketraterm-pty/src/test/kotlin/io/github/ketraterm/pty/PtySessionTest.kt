@@ -23,9 +23,9 @@ import io.github.ketraterm.input.event.TerminalKey
 import io.github.ketraterm.input.event.TerminalKeyEvent
 import io.github.ketraterm.input.event.TerminalPasteEvent
 import io.github.ketraterm.protocol.TerminalCapabilityIdentity
-import io.github.ketraterm.session.TerminalClipboardReadResult
-import io.github.ketraterm.session.TerminalSession
-import io.github.ketraterm.session.TerminalSessionState
+import io.github.ketraterm.session.*
+import io.github.ketraterm.shell.integration.OscShellIntegration
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
@@ -43,6 +43,96 @@ import kotlin.time.Duration.Companion.seconds
 
 class PtySessionTest {
     private val sessions = mutableListOf<TerminalSession>()
+
+    @ParameterizedTest
+    @ValueSource(booleans = [false, true])
+    fun `PTY assembly retains the host shell source through creation and start`(startImmediately: Boolean) {
+        val first = TerminalShellCommandLineSnapshot("git status", 4, 6, 1)
+        val source = MutableStateFlow<TerminalShellCommandLineSnapshot?>(first)
+        val process = FakePtyProcess.running()
+        val state = TerminalShellIntegrationState()
+        val options = PtyOptions(command = listOf("fake"), shellIntegration = TerminalShellIntegrationFactory.host(state, source))
+        val factory = FixedProcessFactory(process)
+        val session = if (startImmediately) PtySessions.start(options, factory) else PtySessions.create(options, factory)
+        sessions += session
+
+        assertSame(state, session.shellIntegrationState)
+        assertSame(first, session.activeShellCommandLine())
+        val changed = TerminalShellCommandLineSnapshot("git diff", 8, 10, 1)
+        source.value = changed
+        assertSame(changed, session.activeShellCommandLine())
+        source.value = null
+        assertNull(session.activeShellCommandLine())
+
+        session.close()
+        source.value = first
+        assertNull(session.activeShellCommandLine())
+        assertTrue(process.destroyed)
+        assertSame(first, source.value, "Closing the session must not mutate host-owned state")
+    }
+
+    @Test
+    fun `PTY options require selected shell integration before starting a startup command`() {
+        assertThrows(IllegalArgumentException::class.java) {
+            PtyOptions(
+                command = listOf("fake"),
+                startupCommand = TerminalStartupCommand("echo ready"),
+            )
+        }
+    }
+
+    @Test
+    fun `host prompt readiness submits a PTY startup command without OSC integration`() {
+        val ready = MutableStateFlow(false)
+        val state = TerminalShellIntegrationState()
+        val expected = "echo ready\r"
+        val process = FakePtyProcess.running(expectedOutputBytes = expected.length)
+        val session =
+            PtySessions.start(
+                PtyOptions(
+                    command = listOf("fake"),
+                    startupCommand = TerminalStartupCommand("echo ready"),
+                    shellIntegration = TerminalShellIntegrationFactory.host(state, promptReady = ready),
+                ),
+                FixedProcessFactory(process),
+            )
+        sessions += session
+        assertEquals(TerminalStartupCommandStatus.WAITING, session.startupCommandStatus?.value)
+        assertEquals("", process.outputText())
+
+        ready.value = true
+        process.awaitWrite()
+        runBlocking {
+            withTimeout(10.seconds) { requireNotNull(session.startupCommandStatus).first { it == TerminalStartupCommandStatus.SUBMITTED } }
+        }
+        assertEquals(expected, process.outputText())
+        assertEquals(0, state.recordCount())
+        session.close()
+        assertTrue(ready.value, "Closing the session must preserve the host's readiness source")
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = [false, true])
+    fun `PTY assembly applies shell protocol metadata only when explicitly selected`(integrationEnabled: Boolean) {
+        val output =
+            "\u001B]7;file:///workspace\u0007\u001B]133;A\u0007$ \u001B]133;B\u0007echo ready\r\n" +
+                "\u001B]133;C\u0007ready\r\n\u001B]133;D;0\u0007\u001B[6n"
+        val process = FakePtyProcess.running(inputBytes = output.ascii())
+        val session =
+            PtySessions.start(
+                PtyOptions(command = listOf("fake"), shellIntegration = if (integrationEnabled) OscShellIntegration else null),
+                FixedProcessFactory(process),
+            )
+        sessions += session
+        process.awaitWrite()
+
+        assertEquals(if (integrationEnabled) 1 else 0, session.shellIntegrationState.recordCount())
+        assertEquals(if (integrationEnabled) "file:///workspace" else null, session.currentWorkingDirectoryUri())
+        if (integrationEnabled) {
+            val state = session.shellIntegrationState
+            assertEquals("echo ready", state.commandMetadata(state.latestCommandRecordId())?.commandText)
+        }
+    }
 
     @Test
     fun createdSessionDefersOutputUntilExplicitStart() {

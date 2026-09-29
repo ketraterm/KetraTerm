@@ -28,22 +28,39 @@ import io.github.ketraterm.render.cache.TerminalRenderPublisher
 import io.github.ketraterm.session.TerminalSession
 import io.github.ketraterm.transport.TerminalConnector
 import io.github.ketraterm.transport.TerminalConnectorListener
-import org.junit.jupiter.api.Assertions.assertEquals
-import org.junit.jupiter.api.Assertions.assertTrue
+import kotlinx.coroutines.*
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.test.StandardTestDispatcher
+import kotlinx.coroutines.test.TestScope
+import org.junit.jupiter.api.AfterEach
+import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.Test
+import java.util.concurrent.CompletableFuture
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicInteger
 import javax.swing.SwingUtilities
+import kotlin.coroutines.CoroutineContext
 
 class TerminalSearchControllerTest {
+    private val dispatcher = StandardTestDispatcher()
+    private val scope = TestScope(dispatcher)
+
+    @AfterEach fun cleanupSearch() {
+        scope.cancel()
+    }
+
     @Test
     fun `content generation rollover adds and removes matches including empty results`() {
         val reader = SearchFrameReader(liveLines = listOf("absent"))
         val session = testSession(reader)
         val host = RecordingSearchHost(session, columns = reader.columns, rows = reader.visibleRows)
-        val controller = TerminalSearchController(host)
+        val controller = TerminalSearchController(host, scope, dispatcher)
         try {
             SwingUtilities.invokeAndWait {
                 host.renderCache.updateFrom(session)
                 controller.search("needle")
+                dispatcher.scheduler.runCurrent()
                 assertEquals(0, controller.state().resultCount)
                 val generations = longArrayOf(Long.MAX_VALUE, Long.MIN_VALUE, 0L)
                 for ((index, generation) in generations.withIndex()) {
@@ -52,6 +69,7 @@ class TerminalSearchControllerTest {
                     reader.frameGeneration++
                     host.renderCache.updateFrom(session)
                     controller.refreshForFrame()
+                    dispatcher.scheduler.runCurrent()
                     assertEquals(if (index == 1) 0 else 1, controller.state().resultCount)
                 }
             }
@@ -65,11 +83,12 @@ class TerminalSearchControllerTest {
         val reader = SearchFrameReader(historyLines = List(1000) { "needle" }, liveLines = listOf("needle"))
         val session = testSession(reader)
         val host = RecordingSearchHost(session, columns = reader.columns, rows = reader.visibleRows)
-        val controller = TerminalSearchController(host)
+        val controller = TerminalSearchController(host, scope, dispatcher)
         try {
             SwingUtilities.invokeAndWait {
                 host.renderCache.updateFrom(session)
                 controller.search("needle")
+                dispatcher.scheduler.runCurrent()
                 controller.findNext()
                 val active = controller.state().activeResultIndex
                 repeat(3) {
@@ -79,6 +98,7 @@ class TerminalSearchControllerTest {
                     val reads = reader.readCount
 
                     controller.refreshForFrame()
+                    dispatcher.scheduler.runCurrent()
 
                     assertEquals(reads, reader.readCount, "Unchanged content must not request another frame")
                     assertEquals(1001, controller.state().resultCount)
@@ -87,6 +107,7 @@ class TerminalSearchControllerTest {
                 }
                 host.renderCache.updateFrom(session, scrollbackOffset = 999, viewportRows = 1)
                 controller.refreshForFrame()
+                dispatcher.scheduler.runCurrent()
                 assertTrue(controller.viewportHighlights.isActive(0))
             }
         } finally {
@@ -99,11 +120,12 @@ class TerminalSearchControllerTest {
         val reader = SearchFrameReader(historyLines = listOf("needle"), liveLines = listOf("absent"))
         val session = testSession(reader)
         val host = RecordingSearchHost(session, columns = reader.columns, rows = reader.visibleRows)
-        val controller = TerminalSearchController(host)
+        val controller = TerminalSearchController(host, scope, dispatcher)
         try {
             SwingUtilities.invokeAndWait {
                 host.renderCache.updateFrom(session)
                 controller.search("needle")
+                dispatcher.scheduler.runCurrent()
                 assertEquals(1, controller.state().resultCount)
 
                 reader.liveLines = listOf("needle")
@@ -112,11 +134,13 @@ class TerminalSearchControllerTest {
                 host.renderCache.updateFrom(session, scrollbackOffset = 1, viewportRows = 1)
                 host.searchCache.updateFrom(session, scrollbackOffset = 1, viewportRows = 2)
                 controller.refreshForFrame()
+                dispatcher.scheduler.runCurrent()
 
                 assertEquals(2, controller.state().resultCount)
                 assertEquals(0, controller.state().activeResultIndex)
                 val reads = reader.readCount
                 controller.refreshForFrame()
+                dispatcher.scheduler.runCurrent()
                 assertEquals(reads, reader.readCount)
             }
         } finally {
@@ -129,7 +153,7 @@ class TerminalSearchControllerTest {
         val reader = SearchFrameReader(historyLines = listOf("needle"), liveLines = listOf("absent"))
         val session = testSession(reader)
         val host = RecordingSearchHost(session, columns = reader.columns, rows = reader.visibleRows)
-        val controller = TerminalSearchController(host)
+        val controller = TerminalSearchController(host, scope, dispatcher)
         try {
             SwingUtilities.invokeAndWait {
                 host.renderCache.updateFrom(session)
@@ -138,11 +162,13 @@ class TerminalSearchControllerTest {
                 reader.frameGeneration++
 
                 controller.search("needle")
+                dispatcher.scheduler.runCurrent()
 
                 assertEquals(3, controller.state().resultCount)
                 host.renderCache.updateFrom(session)
                 val reads = reader.readCount
                 controller.refreshForFrame()
+                dispatcher.scheduler.runCurrent()
                 assertEquals(reads, reader.readCount)
             }
         } finally {
@@ -155,12 +181,13 @@ class TerminalSearchControllerTest {
         val reader = SearchFrameReader(liveLines = listOf("needle"))
         val session = testSession(reader)
         val host = RecordingSearchHost(session, columns = reader.columns, rows = reader.visibleRows)
-        val controller = TerminalSearchController(host)
+        val controller = TerminalSearchController(host, scope, dispatcher)
         try {
             SwingUtilities.invokeAndWait {
                 host.renderCache.updateFrom(session)
                 val reads = reader.readCount
                 controller.refreshForFrame()
+                dispatcher.scheduler.runCurrent()
                 assertEquals(reads, reader.readCount)
             }
         } finally {
@@ -173,11 +200,12 @@ class TerminalSearchControllerTest {
         val reader = SearchFrameReader(historyLines = listOf("needle"), liveLines = listOf(""))
         val session = testSession(reader)
         val host = RecordingSearchHost(session, columns = reader.columns, rows = reader.visibleRows)
-        val controller = TerminalSearchController(host)
+        val controller = TerminalSearchController(host, scope, dispatcher)
 
         SwingUtilities.invokeAndWait {
             host.renderCache.updateFrom(session)
             controller.search("needle")
+            dispatcher.scheduler.runCurrent()
         }
 
         val state = controller.state()
@@ -185,7 +213,7 @@ class TerminalSearchControllerTest {
         assertEquals(1, state.resultCount)
         assertEquals(0, state.activeResultIndex)
         assertEquals(1, host.scrollRequestCount)
-        assertEquals(1, host.repaintCount)
+        assertEquals(2, host.repaintCount)
         session.close()
     }
 
@@ -194,11 +222,12 @@ class TerminalSearchControllerTest {
         val reader = SearchFrameReader(historyLines = listOf("needle"), liveLines = listOf(""))
         val session = testSession(reader)
         val host = RecordingSearchHost(session, columns = reader.columns, rows = reader.visibleRows)
-        val controller = TerminalSearchController(host)
+        val controller = TerminalSearchController(host, scope, dispatcher)
 
         SwingUtilities.invokeAndWait {
             host.renderCache.updateFrom(session)
             controller.search("needle")
+            dispatcher.scheduler.runCurrent()
             controller.reset(viewportRows = 1)
         }
 
@@ -215,11 +244,12 @@ class TerminalSearchControllerTest {
         val reader = SearchFrameReader(liveLines = listOf("aaa"))
         val session = testSession(reader)
         val host = RecordingSearchHost(session, columns = reader.columns, rows = reader.visibleRows)
-        val controller = TerminalSearchController(host)
+        val controller = TerminalSearchController(host, scope, dispatcher)
 
         SwingUtilities.invokeAndWait {
             host.renderCache.updateFrom(session)
             controller.search("a")
+            dispatcher.scheduler.runCurrent()
 
             assertEquals(3, controller.state().resultCount)
             assertEquals(0, controller.state().activeResultIndex)
@@ -242,19 +272,22 @@ class TerminalSearchControllerTest {
         val reader = SearchFrameReader(liveLines = listOf("Needle needle NEEDLE"))
         val session = testSession(reader)
         val host = RecordingSearchHost(session, columns = reader.columns, rows = reader.visibleRows)
-        val controller = TerminalSearchController(host)
+        val controller = TerminalSearchController(host, scope, dispatcher)
 
         SwingUtilities.invokeAndWait {
             host.renderCache.updateFrom(session)
             controller.search("Needle")
+            dispatcher.scheduler.runCurrent()
 
             assertEquals(3, controller.state().resultCount)
 
             controller.setIgnoreCase(false)
+            dispatcher.scheduler.runCurrent()
             assertEquals(1, controller.state().resultCount)
             assertEquals(0, controller.state().activeResultIndex)
 
             controller.setIgnoreCase(true)
+            dispatcher.scheduler.runCurrent()
             assertEquals(3, controller.state().resultCount)
         }
 
@@ -266,11 +299,12 @@ class TerminalSearchControllerTest {
         val reader = SearchFrameReader(liveLines = listOf("needle"))
         val session = testSession(reader)
         val host = RecordingSearchHost(session, columns = reader.columns, rows = reader.visibleRows)
-        val controller = TerminalSearchController(host)
+        val controller = TerminalSearchController(host, scope, dispatcher)
 
         SwingUtilities.invokeAndWait {
             host.renderCache.updateFrom(session)
             controller.search("needle")
+            dispatcher.scheduler.runCurrent()
             assertTrue(controller.viewportHighlights.segmentCount > 0)
 
             controller.clear()
@@ -285,13 +319,262 @@ class TerminalSearchControllerTest {
         session.close()
     }
 
+    @Test
+    fun `query replacement discards a completed worker result awaiting publication`() {
+        val worker = QueuedDispatcher()
+        val reader = SearchFrameReader(liveLines = listOf("alpha bravo"))
+        val session = testSession(reader)
+        val host = RecordingSearchHost(session, reader.columns, reader.visibleRows)
+        val controller = TerminalSearchController(host, scope, worker)
+        try {
+            SwingUtilities.invokeAndWait {
+                host.renderCache.updateFrom(session)
+                controller.search("alpha")
+                assertTrue(controller.state().isSearching)
+                assertEquals(0, controller.state().resultCount)
+                dispatcher.scheduler.runCurrent()
+                worker.runCurrent()
+                // The first result is ready, but its EDT continuation has not run.
+                controller.search("missing")
+                dispatcher.scheduler.runCurrent()
+                worker.runCurrent()
+                dispatcher.scheduler.runCurrent()
+                assertEquals(TerminalSearchState("missing", 0, -1), controller.state())
+                assertEquals(0, controller.viewportHighlights.segmentCount)
+            }
+        } finally {
+            session.close()
+        }
+    }
+
+    @Test
+    fun `clear and reset reject queued publication and release the worker slot`() {
+        val worker = QueuedDispatcher()
+        val reader = SearchFrameReader(liveLines = listOf("needle"))
+        val session = testSession(reader)
+        val host = RecordingSearchHost(session, reader.columns, reader.visibleRows)
+        val controller = TerminalSearchController(host, scope, worker)
+        try {
+            SwingUtilities.invokeAndWait {
+                host.renderCache.updateFrom(session)
+                repeat(2) { reset ->
+                    controller.search("needle")
+                    dispatcher.scheduler.runCurrent()
+                    worker.runCurrent()
+                    if (reset == 0) controller.clear() else controller.reset(1)
+                    dispatcher.scheduler.runCurrent()
+                    assertEquals(TerminalSearchState("", 0, -1), controller.state())
+                    assertEquals(0, controller.viewportHighlights.segmentCount)
+                }
+                controller.search("needle")
+                dispatcher.scheduler.runCurrent()
+                worker.runCurrent()
+                dispatcher.scheduler.runCurrent()
+                assertEquals(TerminalSearchState("needle", 1, 0), controller.state())
+            }
+        } finally {
+            session.close()
+        }
+    }
+
+    @Test
+    fun `refresh preserves the active match location when earlier matches are inserted`() {
+        val reader = SearchFrameReader(historyLines = listOf("absent", "needle"), liveLines = listOf("needle"))
+        val session = testSession(reader)
+        val host = RecordingSearchHost(session, reader.columns, reader.visibleRows)
+        val controller = TerminalSearchController(host, scope, dispatcher)
+        try {
+            SwingUtilities.invokeAndWait {
+                host.renderCache.updateFrom(session)
+                controller.search("needle")
+                dispatcher.scheduler.runCurrent()
+                controller.findNext()
+                assertEquals(1, controller.state().activeResultIndex)
+                reader.historyLines = listOf("needle", "needle")
+                reader.contentGeneration++
+                reader.frameGeneration++
+                host.renderCache.updateFrom(session)
+                controller.refreshForFrame()
+                dispatcher.scheduler.runCurrent()
+                assertEquals(3, controller.state().resultCount)
+                assertEquals(2, controller.state().activeResultIndex)
+            }
+        } finally {
+            session.close()
+        }
+    }
+
+    @Test
+    fun `reader failure is observable and changing the query retries`() {
+        val source = SearchFrameReader(liveLines = listOf("needle"))
+        val error = IllegalStateException("read failed")
+        var fail = true
+        val reader =
+            object : TerminalRenderFrameReader by source {
+                override fun readRenderFrameForAbsoluteRange(
+                    startAbsoluteRow: Long,
+                    endAbsoluteRow: Long,
+                    consumer: TerminalRenderFrameConsumer,
+                ) {
+                    if (fail) throw error
+                    source.readRenderFrameForAbsoluteRange(startAbsoluteRow, endAbsoluteRow, consumer)
+                }
+            }
+        val session = testSession(reader)
+        val host = RecordingSearchHost(session, source.columns, source.visibleRows)
+        val controller = TerminalSearchController(host, scope, dispatcher)
+        try {
+            SwingUtilities.invokeAndWait {
+                host.renderCache.updateFrom(session)
+                controller.search("needle")
+                dispatcher.scheduler.runCurrent()
+                assertFalse(controller.state().isSearching)
+                assertSame(error, generateSequence(controller.state().failure) { it.cause }.last())
+                fail = false
+                controller.search("needle")
+                dispatcher.scheduler.runCurrent()
+                assertEquals(TerminalSearchState("needle", 1, 0), controller.state())
+            }
+        } finally {
+            session.close()
+        }
+    }
+
+    @Test
+    fun `blocked background read keeps EDT responsive and query replacement waits for the worker`() {
+        val entered = CompletableFuture<Boolean>()
+        val release = CountDownLatch(1)
+        val reads = AtomicInteger()
+        val active = AtomicInteger()
+        val maximum = AtomicInteger()
+        val source = SearchFrameReader(liveLines = listOf("needle"))
+        val reader =
+            object : TerminalRenderFrameReader by source {
+                override fun readRenderFrameForAbsoluteRange(
+                    startAbsoluteRow: Long,
+                    endAbsoluteRow: Long,
+                    consumer: TerminalRenderFrameConsumer,
+                ) {
+                    maximum.accumulateAndGet(active.incrementAndGet(), ::maxOf)
+                    try {
+                        if (reads.incrementAndGet() == 1) {
+                            entered.complete(SwingUtilities.isEventDispatchThread())
+                            check(release.await(10, TimeUnit.SECONDS)) { "Test did not release search read" }
+                        }
+                        source.readRenderFrameForAbsoluteRange(startAbsoluteRow, endAbsoluteRow, consumer)
+                    } finally {
+                        active.decrementAndGet()
+                    }
+                }
+            }
+        val session = testSession(reader)
+        val host = RecordingSearchHost(session, source.columns, source.visibleRows)
+        val uiScope =
+            CoroutineScope(
+                SupervisorJob() +
+                    object : CoroutineDispatcher() {
+                        override fun isDispatchNeeded(context: CoroutineContext) = !SwingUtilities.isEventDispatchThread()
+
+                        override fun dispatch(
+                            context: CoroutineContext,
+                            block: Runnable,
+                        ) = SwingUtilities.invokeLater(block)
+                    },
+            )
+        val controller = TerminalSearchController(host, uiScope)
+        val completed = CompletableFuture<TerminalSearchState>()
+        try {
+            SwingUtilities.invokeAndWait {
+                uiScope.launch { completed.complete(controller.states.first { it.query == "missing" && !it.isSearching }) }
+                host.renderCache.updateFrom(session)
+                controller.search("needle")
+            }
+            assertFalse(entered.get(10, TimeUnit.SECONDS), "History copying must run off the EDT")
+            SwingUtilities.invokeAndWait {
+                controller.search("missing")
+                assertTrue(controller.state().isSearching)
+                assertEquals(0, controller.state().resultCount)
+            }
+            assertEquals(1, reads.get(), "An uncancellable read must retain the sole worker slot")
+            release.countDown()
+            assertEquals(TerminalSearchState("missing", 0, -1), completed.get(10, TimeUnit.SECONDS))
+            assertEquals(1, maximum.get())
+        } finally {
+            release.countDown()
+            SwingUtilities.invokeAndWait {
+                controller.reset(1)
+                uiScope.cancel()
+            }
+            session.close()
+        }
+    }
+
+    @Test
+    fun `continuous content changes publish completed passes instead of starving results`() {
+        val source = SearchFrameReader(historyLines = List(65) { "needle" }, liveLines = listOf("needle"))
+        var rangeReads = 0
+        val reader =
+            object : TerminalRenderFrameReader by source {
+                override fun readRenderFrameForAbsoluteRange(
+                    startAbsoluteRow: Long,
+                    endAbsoluteRow: Long,
+                    consumer: TerminalRenderFrameConsumer,
+                ) {
+                    source.readRenderFrameForAbsoluteRange(startAbsoluteRow, endAbsoluteRow, consumer)
+                    rangeReads++
+                    source.contentGeneration++
+                    source.frameGeneration++
+                }
+            }
+        val session = testSession(reader)
+        val host = RecordingSearchHost(session, source.columns, source.visibleRows)
+        val controller = TerminalSearchController(host, scope, dispatcher)
+        var published: TerminalSearchState? = null
+        try {
+            SwingUtilities.invokeAndWait {
+                scope.launch {
+                    controller.states.collect {
+                        if (it.resultCount > 0) {
+                            published = it
+                            controller.clear()
+                        }
+                    }
+                }
+                host.renderCache.updateFrom(session)
+                controller.search("needle")
+                dispatcher.scheduler.runCurrent()
+                assertEquals(66, published?.resultCount)
+                assertEquals(true, published?.isSearching, "Publication must precede catch-up work")
+                assertEquals(TerminalSearchState("", 0, -1), controller.state())
+                assertEquals(2, rangeReads, "A changed generation must not restart the same pass")
+            }
+        } finally {
+            session.close()
+        }
+    }
+
+    private class QueuedDispatcher : CoroutineDispatcher() {
+        private val queue = ArrayDeque<Runnable>()
+
+        override fun dispatch(
+            context: CoroutineContext,
+            block: Runnable,
+        ) {
+            queue.addLast(block)
+        }
+
+        fun runCurrent() {
+            while (queue.isNotEmpty()) queue.removeFirst().run()
+        }
+    }
+
     private class RecordingSearchHost(
         override val session: TerminalSession,
         columns: Int,
         rows: Int,
     ) : TerminalSearchHost {
         override val renderCache = TerminalRenderCache(columns, rows)
-        override val searchCache = TerminalRenderCache(columns, rows)
+        val searchCache = TerminalRenderCache(columns, rows)
         var scrollRequestCount: Int = 0
             private set
         var repaintCount: Int = 0
@@ -426,11 +709,17 @@ class TerminalSearchControllerTest {
             }
     }
 
-    private fun testSession(renderReader: SearchFrameReader): TerminalSession {
-        val terminal = TerminalBuffers.create(width = renderReader.columns, height = renderReader.visibleRows, maxHistory = 5)
+    private fun testSession(renderReader: TerminalRenderFrameReader): TerminalSession {
+        var columns = 1
+        var rows = 1
+        renderReader.readRenderFrame {
+            columns = it.columns
+            rows = it.rows
+        }
+        val terminal = TerminalBuffers.create(width = columns, height = rows, maxHistory = 5)
         return TerminalSession(
             terminal = terminal,
-            renderPublisher = TerminalRenderPublisher(renderReader.columns, renderReader.visibleRows),
+            renderPublisher = TerminalRenderPublisher(columns, rows),
             renderReader = renderReader,
             responseReader = terminal,
             connector = NoOpConnector,

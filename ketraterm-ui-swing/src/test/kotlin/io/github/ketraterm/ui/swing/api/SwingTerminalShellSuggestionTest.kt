@@ -19,6 +19,7 @@ import io.github.ketraterm.core.TerminalBuffers
 import io.github.ketraterm.input.api.TerminalInputEncoder
 import io.github.ketraterm.input.event.*
 import io.github.ketraterm.session.TerminalSession
+import io.github.ketraterm.shell.integration.OscShellIntegration
 import io.github.ketraterm.transport.TerminalConnector
 import io.github.ketraterm.transport.TerminalConnectorListener
 import io.github.ketraterm.ui.swing.settings.SwingPadding
@@ -87,7 +88,7 @@ class SwingTerminalShellSuggestionTest {
                 hostServices =
                     SwingHostServices(
                         shellSuggestionProvider =
-                            SwingShellSuggestionProvider {
+                            {
                                 flow {
                                     started.complete(Unit)
                                     try {
@@ -129,7 +130,7 @@ class SwingTerminalShellSuggestionTest {
             val terminal =
                 SwingTerminal(
                     settingsProvider = { SwingSettings(smartSuggestionsEnabled = true, padding = SwingPadding(5, 4, 7, 6)) },
-                    hostServices = SwingHostServices(shellSuggestionViewFactory = SwingShellSuggestionViewFactory { view }),
+                    hostServices = SwingHostServices(shellSuggestionViewFactory = { view }),
                 )
             try {
                 for (height in listOf(12, 100, 200, 500)) {
@@ -163,7 +164,7 @@ class SwingTerminalShellSuggestionTest {
                 hostServices =
                     SwingHostServices(
                         shellSuggestionProvider =
-                            SwingShellSuggestionProvider { request ->
+                            { request ->
                                 flow {
                                     if (request.commandText == "first") {
                                         firstStarted.complete(Unit)
@@ -210,7 +211,7 @@ class SwingTerminalShellSuggestionTest {
                 hostServices =
                     SwingHostServices(
                         shellSuggestionProvider =
-                            SwingShellSuggestionProvider { request ->
+                            { request ->
                                 providerFactoryWasOnEdt.complete(SwingUtilities.isEventDispatchThread())
                                 flow {
                                     providerWasOnEdt.complete(SwingUtilities.isEventDispatchThread())
@@ -249,7 +250,7 @@ class SwingTerminalShellSuggestionTest {
                 hostServices =
                     SwingHostServices(
                         shellSuggestionProvider =
-                            SwingShellSuggestionProvider { request ->
+                            { request ->
                                 flow {
                                     try {
                                         emit(suggestions(request.commandText))
@@ -338,7 +339,7 @@ class SwingTerminalShellSuggestionTest {
                 hostServices =
                     SwingHostServices(
                         shellSuggestionHandler =
-                            SwingShellSuggestionHandler { acceptance ->
+                            { acceptance ->
                                 accepted += acceptance.suggestion
                                 indexes += acceptance.index
                                 requests += acceptance.request
@@ -441,7 +442,7 @@ class SwingTerminalShellSuggestionTest {
                 settingsProvider = { SwingSettings(smartSuggestionsEnabled = true, padding = SwingPadding(0, 0, 0, 0)) },
                 hostServices =
                     SwingHostServices(
-                        shellSuggestionProvider = SwingShellSuggestionProvider { flowOf(suggestions("git s")) },
+                        shellSuggestionProvider = { flowOf(suggestions("git s")) },
                         shellSuggestionHandler = { accepted += it },
                         shellSuggestionViewFactory = view.factory(),
                     ),
@@ -482,7 +483,7 @@ class SwingTerminalShellSuggestionTest {
                 settingsProvider = { SwingSettings(smartSuggestionsEnabled = true, padding = SwingPadding(0, 0, 0, 0)) },
                 hostServices =
                     SwingHostServices(
-                        shellSuggestionProvider = SwingShellSuggestionProvider { emissions.receiveAsFlow() },
+                        shellSuggestionProvider = { emissions.receiveAsFlow() },
                         shellSuggestionViewFactory = view.factory(),
                     ),
             )
@@ -536,7 +537,7 @@ class SwingTerminalShellSuggestionTest {
                 settingsProvider = { SwingSettings(smartSuggestionsEnabled = true, padding = SwingPadding(0, 0, 0, 0)) },
                 hostServices =
                     SwingHostServices(
-                        shellSuggestionProvider = SwingShellSuggestionProvider { emissions.receiveAsFlow() },
+                        shellSuggestionProvider = { emissions.receiveAsFlow() },
                         shellSuggestionViewFactory = view.factory(),
                     ),
             )
@@ -590,7 +591,7 @@ class SwingTerminalShellSuggestionTest {
                 hostServices =
                     SwingHostServices(
                         shellSuggestionProvider =
-                            SwingShellSuggestionProvider { request ->
+                            { request ->
                                 providerRequests += request
                                 flowOf(suggestions(request.commandText))
                             },
@@ -637,7 +638,7 @@ class SwingTerminalShellSuggestionTest {
                 hostServices =
                     SwingHostServices(
                         shellSuggestionProvider =
-                            SwingShellSuggestionProvider { request -> flowOf(suggestions(request.commandText)) },
+                            { request -> flowOf(suggestions(request.commandText)) },
                     ),
             )
 
@@ -662,7 +663,7 @@ class SwingTerminalShellSuggestionTest {
                 settingsProvider = { SwingSettings(smartSuggestionsEnabled = true, shellSuggestionsEnabled = false) },
                 hostServices =
                     SwingHostServices(
-                        shellSuggestionProvider = SwingShellSuggestionProvider { flowOf(suggestions(it.commandText)) },
+                        shellSuggestionProvider = { flowOf(suggestions(it.commandText)) },
                     ),
             )
 
@@ -686,7 +687,7 @@ class SwingTerminalShellSuggestionTest {
                 hostServices =
                     SwingHostServices(
                         shellSuggestionProvider =
-                            SwingShellSuggestionProvider { request ->
+                            { request ->
                                 providerRequests += request
                                 flowOf(suggestions(request.commandText))
                             },
@@ -721,7 +722,7 @@ class SwingTerminalShellSuggestionTest {
                 hostServices =
                     SwingHostServices(
                         shellSuggestionProvider =
-                            SwingShellSuggestionProvider {
+                            { _ ->
                                 flow {
                                     providerStarted.complete(Unit)
                                     try {
@@ -1066,7 +1067,7 @@ class SwingTerminalShellSuggestionTest {
 
     private fun activeSuggestionSession(connector: RecordingConnector): TerminalSession {
         val terminal = TerminalBuffers.create(width = 30, height = 4, maxHistory = 20)
-        val session = TerminalSession.create(terminal = terminal, connector = connector)
+        val session = TerminalSession.create(terminal = terminal, connector = connector, shellIntegration = OscShellIntegration)
         session.start(columns = 30, rows = 4)
         return session
     }

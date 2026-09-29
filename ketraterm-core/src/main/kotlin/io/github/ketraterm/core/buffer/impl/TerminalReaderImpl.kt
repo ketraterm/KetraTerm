@@ -25,6 +25,7 @@ import io.github.ketraterm.render.api.TerminalColorPalette
 internal class TerminalReaderImpl(
     private val state: TerminalState,
 ) : TerminalReader {
+    override val isAlternateScreenActive: Boolean get() = state.isAltScreenActive
     override val palette: TerminalColorPalette get() = state.palette
     override val width: Int get() = state.dimensions.width
     override val height: Int get() = state.dimensions.height

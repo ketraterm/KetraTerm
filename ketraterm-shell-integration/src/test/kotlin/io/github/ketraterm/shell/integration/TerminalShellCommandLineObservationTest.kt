@@ -13,13 +13,14 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.github.ketraterm.session
+package io.github.ketraterm.shell.integration
 
 import io.github.ketraterm.core.TerminalBuffers
 import io.github.ketraterm.core.api.TerminalBuffer
 import io.github.ketraterm.render.api.TerminalRenderCursorShape
 import io.github.ketraterm.render.api.TerminalRenderFrameConsumer
 import io.github.ketraterm.render.api.TerminalRenderFrameReader
+import io.github.ketraterm.session.TerminalSession
 import io.github.ketraterm.testkit.MockConnector
 import kotlinx.coroutines.*
 import kotlinx.coroutines.test.StandardTestDispatcher
@@ -266,7 +267,7 @@ class TerminalShellCommandLineObservationTest {
                 fixture.session.requestRender(0)
                 runCurrent()
 
-                assertFalse(fixture.session.isCoroutineScopeActive)
+                assertTrue(fixture.session.isClosed)
                 assertEquals(1, fixture.terminal.historyReads)
             }
         }
@@ -276,7 +277,14 @@ class TerminalShellCommandLineObservationTest {
     ) : AutoCloseable {
         val terminal = HistoryCountingBuffer(TerminalBuffers.create(width = 30, height = 2))
         private val connector = MockConnector()
-        val session = TerminalSession.create(terminal, connector, workerDispatcher = dispatcher, ioDispatcher = UnconfinedTestDispatcher())
+        val session =
+            TerminalSession.create(
+                terminal,
+                connector,
+                shellIntegration = OscShellIntegration,
+                workerDispatcher = dispatcher,
+                ioDispatcher = UnconfinedTestDispatcher(),
+            )
 
         init {
             session.start(columns = 30, rows = 2)

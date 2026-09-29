@@ -13,6 +13,7 @@ This module is designed to be completely decoupled from any specific UI toolkit,
 - **`:ketraterm-render-api`** (render frame primitives and color palettes)
 - **`:ketraterm-transport-api`** (duplex connector contracts)
 - **`:ketraterm-session`** (session orchestration, lifecycle state, and render publication)
+- **`:ketraterm-shell-integration`** (explicit OSC producer selection for local workspace sessions)
 - **`:ketraterm-pty`** (local PTY process management and options)
 
 ---
@@ -55,6 +56,17 @@ For detailed specifications on the persistency configuration format and resoluti
 * [profile-config-toml.md](docs/profile-config-toml.md) - TOML config blocks syntax, configuration properties list, and directory resolution hierarchies per OS.
 
 ---
+
+## Shell metadata ownership
+
+The local workspace selects `OscShellIntegration` and prepares supported shell
+hooks according to launch options. Session and PTY APIs remain independent of
+that implementation. Synchronous selected-model notifications update workspace
+directories/titles before transport closure, and
+`TerminalWorkspaceListener.commandFinished(tab, metadata)` reports
+each completed command without looking up whichever record is latest later.
+Listener registrations end when the tab is removed; the metadata producer owns
+its model.
 
 ## How to Use
 

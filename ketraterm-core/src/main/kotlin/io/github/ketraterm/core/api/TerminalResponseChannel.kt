@@ -63,6 +63,10 @@ interface TerminalResponseChannel : TerminalHostResponseReader {
      * palette, independently of application color overrides. Unsupported
      * requests stay silent; the color-scheme protocol defines no failure reply.
      * Host adapters must enforce terminal-response policy before calling this API.
+     * Both cursor-position forms use one-based coordinates relative to the active
+     * origin: top margin under DECOM, and left margin under DECOM plus DECLRMM.
+     * With DECOM off they report absolute viewport coordinates. Positions restored
+     * before the origin report row/column 1 rather than a non-positive coordinate.
      *
      * @param mode The DSR mode parameter.
      * @param decPrivate `true` if this is a DEC private DSR (? prefix), `false` for standard ANSI.
@@ -178,7 +182,14 @@ interface TerminalResponseChannel : TerminalHostResponseReader {
     /**
      * Enqueues the response for a DCS DECRQSS request.
      *
-     * @param query the target query parameter.
+     * Only exact selectors in the core allowlist produce success responses.
+     * Cursor style uses `SP q` and reports the effective shape and blink state
+     * as `DCS 1 $r Ps SP q ST`, with `Ps` in 1..6. Bare `q` is unsupported.
+     * Unsupported selectors enqueue the empty failure `DCS 0 $r ST`, never
+     * the supplied query text. Invoke under the same synchronization as core
+     * mutation; callers must enforce terminal-response permission before invoking.
+     *
+     * @param query the decoded selector, matched without normalization.
      */
     fun queryStatusString(query: String)
 

@@ -272,7 +272,7 @@ class KetraTermIntellijSettingsTest {
             )
 
         assertEquals(SwingPadding(0, 4, 4, 6), settings.padding)
-        assertEquals(SwingPadding(0, 2, 2, 2), settings.alternateScreenPadding)
+        assertEquals(SwingPadding(0, 13, 4, 13), settings.alternateScreenPadding)
         assertEquals(16, settings.shellIntegrationDecorationGutterWidth)
     }
 

@@ -191,6 +191,8 @@ class ActionEngineTest {
     }
 
     private class RecordingTerminalCommandSink : TerminalCommandSink {
+        override val isAlternateScreenActive: Boolean get() = false
+
         override fun requestModeStatus(
             mode: Int,
             decPrivate: Boolean,

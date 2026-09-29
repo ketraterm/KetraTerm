@@ -39,6 +39,9 @@ interface TerminalConnectorListener {
 
     /**
      * Reports remote transport closure.
+     * Deliver all final bytes and finish their synchronous callbacks before
+     * invoking this method. No bytes may follow it. The listener may close its
+     * connector from this callback to release remaining transport resources.
      *
      * @param exitCode process exit code when the transport has one, otherwise
      * `null`.
@@ -47,6 +50,8 @@ interface TerminalConnectorListener {
 
     /**
      * Reports a remote transport failure.
+     * This is terminal for the session. The listener may close its connector
+     * reentrantly; cleanup must not require this callback to return first.
      *
      * @param error the transport exception or failure.
      */

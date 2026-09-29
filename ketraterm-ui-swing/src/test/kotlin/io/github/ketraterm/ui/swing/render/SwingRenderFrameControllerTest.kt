@@ -242,7 +242,6 @@ class SwingRenderFrameControllerTest {
                         "resetCursorBlinkForFrame",
                         "refreshRenderCacheFromSession",
                         "clampViewport",
-                        "syncTerminalGridToActiveChrome",
                         "refreshShellIntegrationDecorations",
                         "refreshSearchForFrame",
                         "publishViewportState",
@@ -271,33 +270,11 @@ class SwingRenderFrameControllerTest {
                 session.close()
             }
         }
-
-        @Test
-        fun `published frame requests follow up when active chrome resizes grid`() {
-            val session = createSession()
-            val host = RecordingRenderFrameHost(session = session, syncGridToChromeResult = true)
-            val controller = SwingRenderFrameController(host)
-
-            try {
-                controller.handlePublishedFrame()
-
-                assertEquals(1, host.refreshCount)
-                assertEquals(1, host.renderRequestCount)
-                assertEquals(1, host.clampViewportCallCount)
-                assertTrue(
-                    host.semanticCalls.indexOf("clampViewport") < host.semanticCalls.indexOf("syncTerminalGridToActiveChrome"),
-                    "published history must be reconciled before a resize installs its new viewport anchor",
-                )
-            } finally {
-                session.close()
-            }
-        }
     }
 
     private class RecordingRenderFrameHost(
         override val session: TerminalSession?,
         private val clampViewportResult: Boolean = false,
-        private val syncGridToChromeResult: Boolean = false,
         override val cursorPresentationEnabled: Boolean = true,
     ) : SwingRenderFrameHost {
         override val renderCache = TerminalRenderCache(80, 24)
@@ -346,11 +323,6 @@ class SwingRenderFrameControllerTest {
 
         override fun requestRender(session: TerminalSession) {
             renderRequestCount++
-        }
-
-        override fun syncTerminalGridToActiveChrome(): Boolean {
-            semanticCalls += "syncTerminalGridToActiveChrome"
-            return syncGridToChromeResult
         }
 
         override fun clampViewport(

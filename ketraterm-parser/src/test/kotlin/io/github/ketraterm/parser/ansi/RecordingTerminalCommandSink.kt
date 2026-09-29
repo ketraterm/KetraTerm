@@ -20,6 +20,8 @@ import io.github.ketraterm.protocol.NotificationLevel
 import io.github.ketraterm.protocol.ShellIntegrationEvent
 
 internal class RecordingTerminalCommandSink : TerminalCommandSink {
+    override var isAlternateScreenActive: Boolean = false
+
     override fun requestModeStatus(
         mode: Int,
         decPrivate: Boolean,
@@ -90,6 +92,7 @@ internal class RecordingTerminalCommandSink : TerminalCommandSink {
     }
 
     override fun resetTerminal() {
+        isAlternateScreenActive = false
         events += "resetTerminal"
     }
 
@@ -313,6 +316,7 @@ internal class RecordingTerminalCommandSink : TerminalCommandSink {
         mode: Int,
         enable: Boolean,
     ) {
+        if (mode == 47 || mode == 1047 || mode == 1049) isAlternateScreenActive = enable
         events += "setDecMode:$mode:$enable"
     }
 

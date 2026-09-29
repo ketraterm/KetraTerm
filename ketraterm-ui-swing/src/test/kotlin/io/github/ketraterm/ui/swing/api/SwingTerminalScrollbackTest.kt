@@ -26,6 +26,7 @@ import io.github.ketraterm.render.api.*
 import io.github.ketraterm.render.cache.TerminalRenderCache
 import io.github.ketraterm.render.cache.TerminalRenderPublisher
 import io.github.ketraterm.session.TerminalSession
+import io.github.ketraterm.session.TerminalShellIntegrationFactory
 import io.github.ketraterm.session.TerminalShellIntegrationState
 import io.github.ketraterm.transport.TerminalConnector
 import io.github.ketraterm.transport.TerminalConnectorListener
@@ -255,14 +256,14 @@ class SwingTerminalScrollbackTest {
         lateinit var event: MouseWheelEvent
         SwingUtilities.invokeAndWait {
             repeat(3) {
-                event = preciseWheelEvent(component, preciseRotation = -0.1)
+                event = preciseWheelEvent(component)
                 component.dispatchEvent(event)
             }
             assertEquals(0.0, component.viewportState().scrollbackOffset)
         }
 
         SwingUtilities.invokeAndWait {
-            event = preciseWheelEvent(component, preciseRotation = -0.1)
+            event = preciseWheelEvent(component)
             component.dispatchEvent(event)
         }
 
@@ -543,7 +544,7 @@ class SwingTerminalScrollbackTest {
                 parser = NoOpParser,
                 inputEncoder = NoOpInputEncoder,
                 workerDispatcher = dispatcher,
-                shellIntegrationState = shellIntegrationState,
+                shellIntegration = TerminalShellIntegrationFactory.host(shellIntegrationState),
             ).also(sessions::add)
         session.renderPublisher.updateAndPublish(reader)
         val component =
@@ -606,7 +607,7 @@ class SwingTerminalScrollbackTest {
                 parser = NoOpParser,
                 inputEncoder = NoOpInputEncoder,
                 workerDispatcher = dispatcher,
-                shellIntegrationState = shellIntegrationState,
+                shellIntegration = TerminalShellIntegrationFactory.host(shellIntegrationState),
             ).also(sessions::add)
         val settingsProvider =
             MutableSettingsProvider(
@@ -696,7 +697,7 @@ class SwingTerminalScrollbackTest {
     }
 
     @Test
-    fun `alternate screen chrome resizes terminal grid to explicit alternate padding`() {
+    fun `buffer switches preserve terminal grid despite different chrome`() {
         val connector = RecordingConnector()
         val terminal = TerminalBuffers.create(width = 3, height = 3, maxHistory = 0)
         val session =
@@ -710,10 +711,9 @@ class SwingTerminalScrollbackTest {
         val settings =
             SwingSettings(
                 padding = SwingPadding(0, 40, 8, 8),
-                alternateScreenPadding = SwingPadding(0, 8, 8, 8),
                 shellIntegrationDecorationGutterWidth = 32,
             )
-        val component = createComponent(settingsProvider = SwingSettingsProvider { settings })
+        val component = createComponent(settingsProvider = { settings })
 
         try {
             SwingUtilities.invokeAndWait {
@@ -728,17 +728,35 @@ class SwingTerminalScrollbackTest {
 
             terminal.enterAltBuffer()
             session.requestRender(scrollbackOffset = 0)
-            publishVisibleGridColumnsGreaterThan(component, primaryColumns)
+            SwingUtilities.invokeAndWait { dispatcher.scheduler.runCurrent() }
+            drainEdt()
 
             lateinit var alternateVisibleSize: java.awt.Dimension
             SwingUtilities.invokeAndWait {
                 alternateVisibleSize = component.visibleGridSize()
             }
 
-            assertTrue(alternateVisibleSize.width > primaryColumns)
-            assertEquals(alternateVisibleSize.width, terminal.width)
-            assertEquals(alternateVisibleSize.width, connector.lastColumns.get())
-            assertEquals(SwingPadding(0, 8, 8, 8), settings.alternateScreenPadding)
+            assertEquals(primaryColumns, alternateVisibleSize.width)
+            assertEquals(primaryColumns, terminal.width)
+            assertEquals(primaryColumns, connector.lastColumns.get())
+            assertEquals(3, terminal.height)
+
+            SwingUtilities.invokeAndWait {
+                component.size = component.preferredGridSize(20, 5)
+                component.dispatchEvent(ComponentEvent(component, ComponentEvent.COMPONENT_RESIZED))
+                dispatcher.scheduler.runCurrent()
+                assertEquals(20, terminal.width)
+                assertEquals(5, terminal.height)
+                assertEquals(component.preferredGridSize(20, 5), component.preferredGridSize(20, 5, TerminalRenderBufferKind.ALTERNATE))
+            }
+
+            terminal.exitAltBuffer()
+            session.requestRender(scrollbackOffset = 0)
+            SwingUtilities.invokeAndWait { dispatcher.scheduler.runCurrent() }
+            drainEdt()
+            assertEquals(20, terminal.width)
+            assertEquals(20, connector.lastColumns.get())
+            assertEquals(5, terminal.height)
         } finally {
             session.close()
         }
@@ -864,16 +882,6 @@ class SwingTerminalScrollbackTest {
         }
     }
 
-    private fun publishVisibleGridColumnsGreaterThan(
-        component: SwingTerminal,
-        columns: Int,
-    ) {
-        SwingUtilities.invokeAndWait {
-            dispatcher.scheduler.runCurrent()
-            assertTrue(component.visibleGridSize().width > columns, "visible grid was not resized")
-        }
-    }
-
     private fun publishRequestedRows(
         reader: ScrollbackFrameReader,
         expectedRows: Int,
@@ -891,10 +899,7 @@ class SwingTerminalScrollbackTest {
         assertEquals(expectedRows, publishedRows)
     }
 
-    private fun preciseWheelEvent(
-        component: SwingTerminal,
-        preciseRotation: Double,
-    ): MouseWheelEvent =
+    private fun preciseWheelEvent(component: SwingTerminal): MouseWheelEvent =
         MouseWheelEvent(
             component,
             MouseWheelEvent.MOUSE_WHEEL,
@@ -909,7 +914,7 @@ class SwingTerminalScrollbackTest {
             MouseWheelEvent.WHEEL_UNIT_SCROLL,
             3,
             0,
-            preciseRotation,
+            -0.1,
         )
 
     private fun scrollTestTerminal(
@@ -917,7 +922,7 @@ class SwingTerminalScrollbackTest {
         settings: SwingSettings = SwingSettings(padding = SwingPadding(0, 0, 0, 0)),
     ): SwingTerminal =
         createComponent(
-            settingsProvider = SwingSettingsProvider { settings },
+            settingsProvider = { settings },
             hostServices = hostServices,
         )
 

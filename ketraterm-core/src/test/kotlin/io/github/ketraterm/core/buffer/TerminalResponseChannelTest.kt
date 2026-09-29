@@ -21,11 +21,69 @@ import io.github.ketraterm.core.api.TerminalResponseChannel
 import io.github.ketraterm.protocol.TerminalCapabilityIdentity
 import io.github.ketraterm.protocol.keyboard.KittyKeyboardProgressiveFlag
 import io.github.ketraterm.render.api.TerminalColorPalette
-import org.junit.jupiter.api.Assertions.assertAll
-import org.junit.jupiter.api.Assertions.assertEquals
+import io.github.ketraterm.render.api.TerminalRenderCursorShape
+import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.Test
+import org.junit.jupiter.params.ParameterizedTest
+import org.junit.jupiter.params.provider.CsvSource
+import org.junit.jupiter.params.provider.ValueSource
 
 class TerminalResponseChannelTest {
+    @ParameterizedTest
+    @CsvSource("false,false", "false,true", "true,false", "true,true")
+    fun `cursor reports use the same origin as cursor positioning`(
+        origin: Boolean,
+        horizontalMargins: Boolean,
+    ) {
+        val buffer = TerminalBuffers.create(10, 6)
+        buffer.setScrollRegion(2, 5)
+        buffer.setLeftRightMarginMode(horizontalMargins)
+        buffer.setLeftRightMargins(3, 8)
+        buffer.setOriginMode(origin)
+        buffer.positionCursor(4, 2)
+
+        buffer.requestDeviceStatusReport(6, false)
+        buffer.requestDeviceStatusReport(6, true)
+
+        assertEquals("\u001B[3;5R\u001B[?3;5R", drain(buffer))
+        assertEquals(if (origin) 3 else 2, buffer.cursorRow)
+        assertEquals(if (origin && horizontalMargins) 6 else 4, buffer.cursorCol)
+    }
+
+    @Test
+    fun `cursor restored before a moved origin reports positive coordinates`() {
+        val buffer = TerminalBuffers.create(10, 6)
+        buffer.setOriginMode(true)
+        buffer.saveCursor()
+        buffer.setScrollRegion(3, 5)
+        buffer.restoreCursor()
+
+        buffer.requestDeviceStatusReport(6, false)
+        buffer.requestDeviceStatusReport(6, true)
+
+        assertEquals("\u001B[1;1R\u001B[?1;1R", drain(buffer))
+        assertEquals(0, buffer.cursorRow)
+    }
+
+    @ParameterizedTest
+    @CsvSource("1,2147483647", "2147483647,1", "-1,1", "0,-1", "4,1", "5,0")
+    fun `invalid response slices preserve queued bytes and destination`(
+        offset: Int,
+        length: Int,
+    ) {
+        val buffer = TerminalBuffers.create(10, 5)
+        buffer.requestDeviceStatusReport(5, false)
+        val destination = ByteArray(4) { 42 }
+
+        assertThrows(IllegalArgumentException::class.java) {
+            buffer.readResponseBytes(destination, offset, length)
+        }
+        assertArrayEquals(ByteArray(4) { 42 }, destination)
+        assertEquals(4, buffer.pendingResponseBytes)
+        assertEquals(0, buffer.readResponseBytes(destination, destination.size, 0))
+        assertEquals("\u001B[0n", drain(buffer))
+    }
+
     @Test
     fun `private color scheme query follows host palette independently of application colors and resets`() {
         val buffer = TerminalBuffers.create(width = 10, height = 5)
@@ -311,24 +369,61 @@ class TerminalResponseChannelTest {
     fun `queryStatusString returns valid or invalid status string responses`() {
         val buffer = TerminalBuffers.create(width = 80, height = 24)
 
-        // Valid SGR (default pen)
-        buffer.queryStatusString("m")
-        assertEquals("\u001BP1\$r0m\u001B\\", drain(buffer))
+        assertAll(
+            {
+                buffer.queryStatusString("m")
+                assertEquals("\u001BP1\$r0m\u001B\\", drain(buffer))
+            },
+            {
+                buffer.queryStatusString("r")
+                assertEquals("\u001BP1\$r1;24r\u001B\\", drain(buffer))
+            },
+            {
+                buffer.queryStatusString("s")
+                assertEquals("\u001BP1\$r1;80s\u001B\\", drain(buffer))
+            },
+            {
+                buffer.queryStatusString(" q")
+                assertEquals("\u001BP1\$r1 q\u001B\\", drain(buffer))
+            },
+            {
+                buffer.queryStatusString("invalid")
+                assertEquals("\u001BP0\$r\u001B\\", drain(buffer))
+            },
+        )
+    }
 
-        // Valid margins
-        buffer.queryStatusString("r")
-        assertEquals("\u001BP1\$r1;24r\u001B\\", drain(buffer))
+    @ParameterizedTest
+    @CsvSource("BLOCK,true,1", "BLOCK,false,2", "UNDERLINE,true,3", "UNDERLINE,false,4", "BAR,true,5", "BAR,false,6")
+    fun `cursor status reports the effective shape and blink state`(
+        shape: TerminalRenderCursorShape,
+        blinking: Boolean,
+        expectedStyle: Int,
+    ) {
+        val buffer = TerminalBuffers.create(width = 10, height = 5)
+        buffer.setCursorShape(shape)
+        buffer.setCursorBlinking(blinking)
 
-        buffer.queryStatusString("s")
-        assertEquals("\u001BP1\$r1;80s\u001B\\", drain(buffer))
+        buffer.queryStatusString(" q")
 
-        // Valid cursor style (default is blinking block -> 1)
-        buffer.queryStatusString("q")
-        assertEquals("\u001BP1\$r1 q\u001B\\", drain(buffer))
+        assertEquals("\u001BP1\$r$expectedStyle q\u001B\\", drain(buffer))
+        assertEquals(0, buffer.pendingResponseBytes)
+    }
 
-        // Invalid query
-        buffer.queryStatusString("invalid")
-        assertEquals("\u001BP0\$rinvalid\u001B\\", drain(buffer))
+    @ParameterizedTest
+    @ValueSource(
+        strings = [
+            "", "invalid", "\nAUDIT_MARKER\n", "\u010A", "\u011B[31m", "\u016D", "m\u0000", " m", "m ", "\uD800",
+            "q", "q ", "  q", " q ", "\tq", "\u00A0q", "\u0120q", " \u0171", " q\n",
+        ],
+    )
+    fun `unsupported status selectors enqueue only the empty failure`(query: String) {
+        val buffer = TerminalBuffers.create(width = 10, height = 5)
+
+        buffer.queryStatusString(query)
+
+        assertEquals("\u001BP0\$r\u001B\\", drain(buffer))
+        assertEquals(0, buffer.pendingResponseBytes)
     }
 
     @Test

@@ -31,6 +31,14 @@ import io.github.ketraterm.protocol.ShellIntegrationEvent
  * - The parser must not know terminal width, height, cursor bounds, or rendering details.
  */
 interface TerminalCommandSink {
+    /**
+     * Actual active screen, observed synchronously on the parser's serialized command thread.
+     * Must reflect effective transitions before [setDecMode] returns, including rejected or
+     * repeated requests. Parser uses it for screen-local charset saves; do not shadow host state.
+     * A sink without an alternate screen returns false.
+     */
+    val isAlternateScreenActive: Boolean
+
     /** Requests one ANSI or DEC private mode status; host policy controls replies. */
     fun requestModeStatus(
         mode: Int,

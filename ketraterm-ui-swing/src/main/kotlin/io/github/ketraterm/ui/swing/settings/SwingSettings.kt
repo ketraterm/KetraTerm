@@ -84,9 +84,10 @@ import java.util.*
  * the prompt gutter, reserves a stable right gutter for the overlay scrollbar,
  * and keeps a small bottom visual spacer.
  * @property alternateScreenPadding alternate-screen visual inset around the
- * terminal grid in pixels. The default keeps top padding at zero and uses small
- * symmetric side insets because alternate-screen applications do not use the
- * primary scrollback scrollbar or shell-integration prompt gutter.
+ * terminal grid in pixels. By default, it preserves primary top/bottom padding
+ * and splits the primary horizontal margin plus prompt gutter between both sides.
+ * Explicit overrides remain supported. Like other constructor properties,
+ * `copy` preserves this value unless a replacement is supplied.
  * @property pasteControlPolicy paste payload transformation applied before
  * host-bound input emission.
  * @property cursorShape default cursor shape configured for the session.
@@ -131,7 +132,7 @@ data class SwingSettings
         val shellIntegrationFailedCommandRailColor: Int = DEFAULT_SHELL_INTEGRATION_FAILED_COMMAND_RAIL_COLOR,
         val shellIntegrationFailedCommandRailWidth: Int = 3,
         val padding: SwingPadding = SwingPadding(0, 4, 4, 6),
-        val alternateScreenPadding: SwingPadding = SwingPadding(0, 2, 2, 2),
+        val alternateScreenPadding: SwingPadding = balancedAlternatePadding(padding, shellIntegrationDecorationGutterWidth),
         val pasteControlPolicy: PasteControlPolicy = PasteControlPolicy.PRESERVE,
         val cursorShape: TerminalRenderCursorShape = TerminalRenderCursorShape.BLOCK,
         val scrollbackLines: Int = 1000,
@@ -173,6 +174,16 @@ data class SwingSettings
         }
 
         companion object {
+            private fun balancedAlternatePadding(
+                padding: SwingPadding,
+                gutterWidth: Int,
+            ): SwingPadding {
+                val horizontal = padding.left.toLong() + gutterWidth + padding.right
+                require(horizontal in 0..Int.MAX_VALUE.toLong()) { "horizontal terminal padding is out of range" }
+                val left = horizontal.toInt() / 2
+                return SwingPadding(padding.top, left, padding.bottom, horizontal.toInt() - left)
+            }
+
             private const val DEFAULT_FONT_SIZE = 16
             private const val DEFAULT_HYPERLINK_ACTIVATION_FOREGROUND = 0xFF4DA3FF.toInt()
             private const val DEFAULT_SELECTION_BACKGROUND = 0x66FFFFFF

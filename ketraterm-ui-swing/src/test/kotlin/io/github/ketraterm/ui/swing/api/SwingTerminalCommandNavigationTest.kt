@@ -26,20 +26,122 @@ import io.github.ketraterm.render.api.*
 import io.github.ketraterm.render.cache.TerminalRenderPublisher
 import io.github.ketraterm.session.TerminalSession
 import io.github.ketraterm.session.TerminalShellIntegrationCommandRecord
+import io.github.ketraterm.session.TerminalShellIntegrationFactory
 import io.github.ketraterm.session.TerminalShellIntegrationState
 import io.github.ketraterm.transport.TerminalConnector
 import io.github.ketraterm.transport.TerminalConnectorListener
 import io.github.ketraterm.ui.swing.settings.SwingPadding
 import io.github.ketraterm.ui.swing.settings.SwingSettings
 import io.github.ketraterm.ui.swing.settings.TerminalClipboardHandler
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.test.StandardTestDispatcher
 import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.Test
+import org.junit.jupiter.params.ParameterizedTest
+import org.junit.jupiter.params.provider.EnumSource
 import java.awt.Cursor
 import java.awt.event.MouseEvent
+import java.util.concurrent.LinkedBlockingQueue
+import javax.swing.JComponent
+import javax.swing.RepaintManager
 import javax.swing.SwingUtilities
 
 class SwingTerminalCommandNavigationTest {
+    @Test
+    fun `host prompt updates repaint and clear marker hover without another render frame`() {
+        SwingUtilities.invokeAndWait {
+            HostModelFixture().use { fixture ->
+                val generation = fixture.session.renderGeneration.value
+                val state = fixture.session.shellIntegrationState
+                val repaints = fixture.repaints.count
+                fixture.moveToPromptGutter()
+                assertEquals(Cursor.DEFAULT_CURSOR, fixture.component.cursor.type)
+
+                state.recordPromptStart(lineIdForAbsoluteRow(6))
+                fixture.flush()
+                assertTrue(fixture.repaints.count > repaints)
+                fixture.moveToPromptGutter()
+
+                assertEquals(Cursor.HAND_CURSOR, fixture.component.cursor.type)
+                assertEquals(generation, fixture.session.renderGeneration.value)
+
+                state.clear()
+                fixture.flush()
+
+                assertEquals(Cursor.DEFAULT_CURSOR, fixture.component.cursor.type)
+                assertEquals(generation, fixture.session.renderGeneration.value)
+            }
+        }
+    }
+
+    @Test
+    fun `host command records support navigation selection and output copy without protocol markers`() {
+        SwingUtilities.invokeAndWait {
+            HostModelFixture().use { fixture ->
+                val state = fixture.session.shellIntegrationState
+                val generation = fixture.session.renderGeneration.value
+                state.recordPromptStart(lineIdForAbsoluteRow(5))
+                state.recordPromptEnd(lineIdForAbsoluteRow(5))
+                state.recordCommandStart(lineIdForAbsoluteRow(6), true, "host command")
+                state.recordCommandFinished(lineIdForAbsoluteRow(7), 2)
+                fixture.flush()
+                val commandId = state.latestCommandRecordId()
+
+                assertEquals(generation, fixture.session.renderGeneration.value)
+                assertEquals(commandId, fixture.component.commandRecordAt(0, 0))
+                assertEquals("row6        row7", fixture.component.commandOutputText(commandId))
+                assertTrue(fixture.component.selectCommandOutput(commandId))
+                assertEquals(CellSelection(0, 0, 12, 1), fixture.component.currentSelection())
+                assertTrue(fixture.component.copyCommandTextToClipboard(commandId))
+                assertEquals("host command", fixture.clipboard)
+                assertTrue(fixture.component.copyCommandOutputToClipboard(commandId))
+                assertEquals("row6        row7", fixture.clipboard)
+                fixture.component.scrollToPreviousCommand()
+                fixture.flush()
+                assertEquals(1, fixture.component.viewportState().renderOffset)
+            }
+        }
+    }
+
+    @ParameterizedTest
+    @EnumSource(HostBindingEnd::class)
+    fun `host metadata observation ends with its binding lifecycle`(end: HostBindingEnd) {
+        SwingUtilities.invokeAndWait {
+            HostModelFixture().use { fixture ->
+                val originalSession = fixture.session
+                when (end) {
+                    HostBindingEnd.UNBIND -> fixture.component.unbind()
+                    HostBindingEnd.REBIND -> fixture.component.bind(fixture.replacementSession)
+                    HostBindingEnd.DISPOSE -> fixture.component.dispose()
+                    HostBindingEnd.SESSION_CLOSE -> originalSession.close()
+                }
+                fixture.flush()
+                val repaints = fixture.repaints.count
+
+                originalSession.shellIntegrationState.recordPromptStart(lineIdForAbsoluteRow(6))
+                fixture.flush()
+
+                assertEquals(repaints, fixture.repaints.count)
+                if (end != HostBindingEnd.DISPOSE) {
+                    fixture.moveToPromptGutter()
+                    assertEquals(Cursor.DEFAULT_CURSOR, fixture.component.cursor.type)
+                }
+                if (end == HostBindingEnd.UNBIND || end == HostBindingEnd.DISPOSE) {
+                    assertFalse(fixture.component.hasActiveRenderBinding)
+                }
+            }
+        }
+    }
+
+    enum class HostBindingEnd {
+        UNBIND,
+        REBIND,
+        DISPOSE,
+        SESSION_CLOSE,
+    }
+
     @Test
     fun `previous command from inside command output reveals current command prompt`() {
         val reader = CommandFrameReader()
@@ -433,6 +535,8 @@ class SwingTerminalCommandNavigationTest {
         renderReader: TerminalRenderFrameReader,
         capacity: Int = 8,
         firstCommandHasOutput: Boolean = true,
+        populate: Boolean = true,
+        workerDispatcher: CoroutineDispatcher = Dispatchers.Unconfined,
     ): TerminalSession {
         val terminal = TerminalBuffers.create(width = 12, height = 2, maxHistory = HISTORY_SIZE)
         val session =
@@ -444,28 +548,115 @@ class SwingTerminalCommandNavigationTest {
                 connector = NoOpConnector,
                 parser = NoOpParser,
                 inputEncoder = NoOpInputEncoder,
-                shellIntegrationState =
-                    TerminalShellIntegrationState(capacity = capacity),
-                workerDispatcher = Dispatchers.Unconfined,
+                shellIntegration =
+                    TerminalShellIntegrationFactory.host(TerminalShellIntegrationState(capacity = capacity)),
+                workerDispatcher = workerDispatcher,
+                ioDispatcher = workerDispatcher,
             )
-        val state = session.shellIntegrationState
-        state.recordPromptStart(lineIdForAbsoluteRow(1))
-        state.recordPromptEnd(lineIdForAbsoluteRow(1))
-        if (firstCommandHasOutput) {
-            state.recordCommandStart(lineIdForAbsoluteRow(2), includeLine = false)
-            state.recordCommandFinished(lineIdForAbsoluteRow(3), exitCode = 0)
-        } else {
-            state.recordCommandStart(lineIdForAbsoluteRow(1), includeLine = false)
-            state.recordCommandFinished(lineIdForAbsoluteRow(2), exitCode = 0)
-            state.recordPromptStart(lineIdForAbsoluteRow(2))
+        if (populate) {
+            val state = session.shellIntegrationState
+            state.recordPromptStart(lineIdForAbsoluteRow(1))
+            state.recordPromptEnd(lineIdForAbsoluteRow(1))
+            if (firstCommandHasOutput) {
+                state.recordCommandStart(lineIdForAbsoluteRow(2), includeLine = false)
+                state.recordCommandFinished(lineIdForAbsoluteRow(3), exitCode = 0)
+            } else {
+                state.recordCommandStart(lineIdForAbsoluteRow(1), includeLine = false)
+                state.recordCommandFinished(lineIdForAbsoluteRow(2), exitCode = 0)
+                state.recordPromptStart(lineIdForAbsoluteRow(2))
+            }
+            state.recordPromptStart(lineIdForAbsoluteRow(4))
+            state.recordPromptStart(lineIdForAbsoluteRow(5))
+            state.recordPromptEnd(lineIdForAbsoluteRow(5))
+            state.recordCommandStart(lineIdForAbsoluteRow(6), includeLine = true)
+            state.recordCommandFinished(lineIdForAbsoluteRow(7), exitCode = 1)
         }
-        state.recordPromptStart(lineIdForAbsoluteRow(4))
-        state.recordPromptStart(lineIdForAbsoluteRow(5))
-        state.recordPromptEnd(lineIdForAbsoluteRow(5))
-        state.recordCommandStart(lineIdForAbsoluteRow(6), includeLine = true)
-        state.recordCommandFinished(lineIdForAbsoluteRow(7), exitCode = 1)
         session.renderPublisher.updateAndPublish(renderReader)
         return session
+    }
+
+    @OptIn(ExperimentalCoroutinesApi::class)
+    private inner class HostModelFixture : AutoCloseable {
+        private val worker = StandardTestDispatcher()
+        private val dispatches = LinkedBlockingQueue<Runnable>()
+        private val padding = SwingPadding(8, 12, 8, 8)
+        private val previousRepaints = RepaintManager.currentManager(null)
+        val repaints = RecordingRepaints(previousRepaints)
+        var clipboard: String? = null
+        val session = commandSession(CommandFrameReader(), populate = false, workerDispatcher = worker)
+        val replacementSession = commandSession(CommandFrameReader(), populate = false, workerDispatcher = worker)
+        val component =
+            SwingTerminal(
+                settingsProvider = { SwingSettings(padding = padding, cursorBlinkMillis = 0, useSystemFallbackFonts = false) },
+                hostServices =
+                    SwingHostServices(
+                        uiDispatcher = { dispatches += it },
+                        clipboardHandler =
+                            object : TerminalClipboardHandler {
+                                override fun copyText(text: String) {
+                                    clipboard = text
+                                }
+
+                                override fun readText(): String? = clipboard
+                            },
+                    ),
+            )
+
+        init {
+            check(SwingUtilities.isEventDispatchThread())
+            repaints.target = component
+            RepaintManager.setCurrentManager(repaints)
+            component.size = component.preferredGridSize(12, 2)
+            component.bind(session)
+            flush()
+        }
+
+        fun flush() {
+            do {
+                worker.scheduler.runCurrent()
+                var dispatched = false
+                while (true) {
+                    val runnable = dispatches.poll() ?: break
+                    dispatched = true
+                    runnable.run()
+                }
+            } while (dispatched)
+        }
+
+        fun moveToPromptGutter() {
+            component.dispatchEvent(
+                MouseEvent(component, MouseEvent.MOUSE_MOVED, 0, 0, padding.left, padding.top + 2, 0, false),
+            )
+        }
+
+        override fun close() {
+            try {
+                component.dispose()
+                session.close()
+                replacementSession.close()
+                flush()
+            } finally {
+                RepaintManager.setCurrentManager(previousRepaints)
+            }
+        }
+    }
+
+    private class RecordingRepaints(
+        private val delegate: RepaintManager,
+    ) : RepaintManager() {
+        var target: JComponent? = null
+        var count = 0
+
+        override fun addDirtyRegion(
+            component: JComponent,
+            x: Int,
+            y: Int,
+            width: Int,
+            height: Int,
+        ) {
+            if (component === target) count++
+            delegate.addDirtyRegion(component, x, y, width, height)
+        }
     }
 
     private class CommandFrameReader(

@@ -29,7 +29,6 @@ import io.github.ketraterm.parser.api.TerminalOutputParser
 import io.github.ketraterm.parser.api.TerminalParsers
 import io.github.ketraterm.protocol.NotificationLevel
 import io.github.ketraterm.protocol.ShellIntegrationEvent
-import io.github.ketraterm.protocol.ShellIntegrationMarker
 import io.github.ketraterm.protocol.keyboard.KittyKeyboardProgressiveFlag
 import io.github.ketraterm.render.api.*
 import io.github.ketraterm.render.cache.TerminalRenderCache
@@ -39,17 +38,13 @@ import io.github.ketraterm.transport.TerminalConnectorListener
 import io.github.ketraterm.transport.checkBounds
 import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.channels.consumeEach
 import kotlinx.coroutines.flow.*
 import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.atomic.AtomicLong
 import java.util.concurrent.atomic.AtomicReference
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.TimeSource
-
-private const val SHELL_COMMAND_LINE_CONTEXT_LONGS = 3
-private const val SHELL_COMMAND_LINE_CONTEXT_LINE_ID_INDEX = 0
-private const val SHELL_COMMAND_LINE_CONTEXT_COLUMN_INDEX = 1
-private const val SHELL_COMMAND_LINE_CONTEXT_ACTIVE_INDEX = 2
 
 /**
  * Runtime terminal session that binds core, parser, input encoding, and a
@@ -66,8 +61,14 @@ private const val SHELL_COMMAND_LINE_CONTEXT_ACTIVE_INDEX = 2
  * exhaustion or transport failure closes the session with [failure]; closing a
  * session discards pending output. A supplied [inputEncoder] owns its output sink.
  *
- * A session publishes one active render viewport. Two independently scrolling
- * renderers must use separate sessions so their viewport requests do not race.
+ * A session publishes one active render viewport. Independently scrolling
+ * views of the same session are unsupported: each new viewport request replaces
+ * the previous request. Separate sessions are separate terminal pipelines.
+ *
+ * Shell metadata comes exclusively from the integration selected at construction.
+ * With no integration, shell features are unavailable. Hosts can supply their own
+ * model using [TerminalShellIntegrationFactory.host], or select an optional protocol
+ * producer. Session closure stops observations without cancelling host-owned producers.
  *
  * @property terminal public terminal buffer mutated by host output.
  * @property renderPublisher the render publisher responsible for frame updates.
@@ -75,30 +76,77 @@ private const val SHELL_COMMAND_LINE_CONTEXT_ACTIVE_INDEX = 2
  * @property workerDispatcher non-owned dispatcher used for session background work.
  * @property ioDispatcher non-owned dispatcher for connector writes, metadata queries, and clipboard providers.
  */
-class TerminalSession(
+class TerminalSession private constructor(
     val terminal: TerminalBuffer,
-    val renderPublisher: TerminalRenderPublisher,
-    private val renderReader: TerminalRenderFrameReader,
+    private val runtime: SessionRuntime,
     private val responseReader: TerminalHostResponseReader,
     private val connector: TerminalConnector,
     private val parser: TerminalOutputParser,
     inputEncoder: TerminalInputEncoder? = null,
     private val hyperlinkResolver: TerminalHyperlinkResolver = TerminalHyperlinkResolver.NONE,
     private val outboundWriteLock: Any = Any(),
-    val shellIntegrationState: TerminalShellIntegrationState = TerminalShellIntegrationState(),
     private val hostCommandAdapter: HostCommandAdapter? = null,
     private var inputPolicy: TerminalInputPolicy = TerminalInputPolicy(),
     private val workerDispatcher: CoroutineDispatcher = Dispatchers.Default,
     private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
+    startupCommand: TerminalStartupCommand? = null,
 ) : TerminalConnectorListener,
     TerminalInputEncoder,
     TerminalRenderFrameReader,
     AutoCloseable {
+    /**
+     * Assembles a session around a caller-supplied parser and response reader.
+     * The caller owns the parser's host-event wiring, including accepted shell
+     * events if its selected producer interprets protocols. Use [create] for
+     * standard parser assembly and automatic dispatch to that producer.
+     * Host-owned models supplied through [TerminalShellIntegrationFactory.host]
+     * need no parser callbacks.
+     */
+    constructor(
+        terminal: TerminalBuffer,
+        renderPublisher: TerminalRenderPublisher,
+        renderReader: TerminalRenderFrameReader,
+        responseReader: TerminalHostResponseReader,
+        connector: TerminalConnector,
+        parser: TerminalOutputParser,
+        inputEncoder: TerminalInputEncoder? = null,
+        hyperlinkResolver: TerminalHyperlinkResolver = TerminalHyperlinkResolver.NONE,
+        outboundWriteLock: Any = Any(),
+        hostCommandAdapter: HostCommandAdapter? = null,
+        inputPolicy: TerminalInputPolicy = TerminalInputPolicy(),
+        workerDispatcher: CoroutineDispatcher = Dispatchers.Default,
+        ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
+        shellIntegration: TerminalShellIntegrationFactory? = null,
+    ) : this(
+        terminal,
+        SessionRuntime(renderReader, renderPublisher, shellIntegration),
+        responseReader,
+        connector,
+        parser,
+        inputEncoder,
+        hyperlinkResolver,
+        outboundWriteLock,
+        hostCommandAdapter,
+        inputPolicy,
+        workerDispatcher,
+        ioDispatcher,
+    )
+
+    /** Copied render data published by this session; views borrow frames through its reader. */
+    val renderPublisher: TerminalRenderPublisher get() = runtime.publisher
+
+    /** Bounded projection supplied by the selected shell producer, or an empty model when absent. */
+    val shellIntegrationState: TerminalShellIntegrationState get() = runtime.shellState
+    private val renderReader: TerminalRenderFrameReader get() = runtime.reader
     private val pendingRenderRequest = AtomicLong(packRenderRequest(scrollbackOffset = 0, viewportRows = 0))
     private val pendingRenderGeneration = AtomicLong(0)
 
-    private val mutationLock = Any()
-    private var startupSubmission: StartupCommandSubmission? = null
+    private val mutationLock: Any get() = runtime.mutationLock
+    private var processingOutput = false
+    private var connectorStarted = false
+    private val connectorLifecycleLock = Any()
+    private val closingEvent = AtomicReference<TerminalSessionCloseEvent?>(null)
+    private val startupSubmission = startupCommand?.let(::StartupCommandSubmission)
 
     /** Retained startup submission outcome, or null when no command was configured. */
     val startupCommandStatus: StateFlow<TerminalStartupCommandStatus>?
@@ -154,12 +202,13 @@ class TerminalSession(
         )
     }
     private val mutableState = MutableStateFlow<TerminalSessionState>(TerminalSessionState.Created)
-    private val mutableRenderGeneration = MutableStateFlow(NO_RENDER_GENERATION)
+    private val mutableRenderGeneration = runtime.renderGeneration
 
-    private var activeShellCommandLineProvider: (() -> TerminalShellCommandLineSnapshot?)? = null
-    private var activeShellCommandLineContextProvider: ((LongArray) -> Long)? = null
-
-    /** Lifecycle state retained for current and future collectors. */
+    /**
+     * Lifecycle state retained for current and future collectors. Closed is
+     * published after cleanup and the final frame publication attempt, so a
+     * successful final frame is available to both early and late observers.
+     */
     val state: StateFlow<TerminalSessionState> = mutableState.asStateFlow()
 
     /**
@@ -188,24 +237,21 @@ class TerminalSession(
      * subscription and released when the last collector leaves. Merely reading
      * [StateFlow.value] does not start tracking.
      *
-     * The value is `-1` before an active OSC 133 command line is observed and
+     * The value is `-1` before an active command line is observed and
      * resets to `-1` when tracking stops. A new subscription samples the latest
-     * published live frame without waiting for more terminal output.
+     * available context without waiting for more terminal output.
      *
-     * Nonnegative values identify render generations where command text, cursor
-     * anchor, or snapshot availability changed. Treat them as opaque revisions;
+     * The selected integration supplies changes. Host-owned editing state does
+     * not wait for rendering or require reading the grid.
+     *
+     * Nonnegative values identify changes in command text, cursor offset/anchor,
+     * or snapshot availability. Treat them as opaque revisions;
      * intermediate changes may be conflated. Consumers should debounce this
      * signal and call [activeShellCommandLine] when they need a command snapshot.
      * Session closure cancels tracking; collectors own their collection lifetime.
      */
     val activeShellCommandLineRevision: StateFlow<Long> by lazy {
-        flow {
-            val contextProvider = activeShellCommandLineContextProvider ?: return@flow
-            val tracker = ShellCommandLineRevisionTracker(contextProvider)
-            renderGeneration.collect { generation ->
-                if (generation >= 0L && tracker.update()) emit(generation)
-            }
-        }.stateIn(
+        (runtime.shellIntegration?.commandLineChanges ?: emptyFlow()).stateIn(
             scope = sessionScope,
             started = SharingStarted.WhileSubscribed(replayExpirationMillis = 0),
             initialValue = NO_SHELL_COMMAND_LINE_REVISION,
@@ -226,8 +272,25 @@ class TerminalSession(
             }
         }
         sessionScope.launch {
-            for (signal in renderRequests) {
+            renderRequests.consumeEach {
                 drainRenderRequests()
+            }
+        }
+        if (startupSubmission != null) {
+            sessionScope.launch {
+                combine(checkNotNull(runtime.shellIntegration).promptReady, state, startupSubmission.status) { ready, lifecycle, status ->
+                    Triple(ready, lifecycle, status)
+                }.takeWhile { (_, _, status) -> status == TerminalStartupCommandStatus.WAITING }
+                    .collect { (promptReady, lifecycle, _) ->
+                        val ready = promptReady && lifecycle == TerminalSessionState.Running
+                        if (ready) {
+                            try {
+                                submitStartupCommand()
+                            } catch (failure: OutboundCapacityException) {
+                                failWrite(failure)
+                            }
+                        }
+                    }
             }
         }
     }
@@ -235,6 +298,7 @@ class TerminalSession(
     /**
      * Returns true after either local shutdown, remote closure, or transport
      * failure has made the session unable to accept more input.
+     * This becomes true when shutdown starts; [state] reaches Closed after cleanup.
      */
     val isClosed: Boolean
         get() = isSessionClosed()
@@ -269,34 +333,39 @@ class TerminalSession(
         get() = synchronized(mutationLock) { terminal.palette }
 
     /**
-     * Returns the latest valid OSC 7 current-working-directory URI.
+     * Returns the latest recorded current-working-directory URI.
      *
-     * @return absolute `file://` URI reported by the shell, or `null` before
-     *   the shell reports one.
+     * The selected integration owns directory metadata. Raw OSC callbacks do
+     * not modify a host-owned model.
+     *
+     * @return absolute `file://` URI reported by the shell or host, or `null`
+     *   before one is recorded.
      */
     fun currentWorkingDirectoryUri(): String? = shellIntegrationState.currentWorkingDirectoryUri()
 
     /**
-     * Returns the active shell command-line snapshot, when OSC 133 prompt
-     * markers provide a trustworthy visible range.
+     * Returns the active shell command-line snapshot, or `null` after closure
+     * or when no trustworthy editing context is available.
      *
-     * The read is serialized with parser/core mutation and reconstructs text
-     * from the current render frame using the same prompt-end marker state used
-     * for completed command capture. `null` means the shell has not reported a
-     * prompt-end marker, the cursor is not at the visible command end, the
-     * command exceeds the bounded extraction limits, or no command is currently
-     * being edited.
+     * The selected integration is authoritative, including `null`. A host
+     * snapshot is read directly; a protocol producer may reconstruct bounded
+     * text from the grid. Hosts must keep UTF-16 offsets and live-grid anchors
+     * current after corresponding output and geometry changes.
      *
      * @return active command-line snapshot, or `null` when unavailable.
      */
-    fun activeShellCommandLine(): TerminalShellCommandLineSnapshot? =
-        synchronized(mutationLock) {
-            activeShellCommandLineProvider?.invoke()
-        }
+    fun activeShellCommandLine(): TerminalShellCommandLineSnapshot? {
+        if (isSessionClosed()) return null
+        val snapshot = runtime.shellIntegration?.activeCommandLine()
+        return if (isSessionClosed()) null else snapshot
+    }
 
     /**
      * Starts the connector after resizing core and transport to [columns] x
      * [rows].
+     *
+     * Startup failure closes owned resources, retains the failure in [state],
+     * and rethrows it with any cleanup failures suppressed.
      *
      * @param columns initial terminal width count.
      * @param rows initial terminal height count.
@@ -307,15 +376,34 @@ class TerminalSession(
     ) {
         require(columns > 0) { "columns must be positive, got $columns" }
         require(rows > 0) { "rows must be positive, got $rows" }
-        check(mutableState.compareAndSet(TerminalSessionState.Created, TerminalSessionState.Running)) {
-            "session already started or closed"
-        }
+        synchronized(connectorLifecycleLock) {
+            check(!isSessionClosed() && mutableState.compareAndSet(TerminalSessionState.Created, TerminalSessionState.Running)) {
+                "session already started or closed"
+            }
 
-        synchronized(mutationLock) {
-            terminal.resize(columns, rows)
+            try {
+                if (isSessionClosed()) return
+                synchronized(mutationLock) {
+                    terminal.resize(columns, rows)
+                }
+                if (isSessionClosed()) return
+                connector.resize(columns, rows)
+                if (!isSessionClosed()) {
+                    connector.start(this)
+                    synchronized(mutationLock) {
+                        connectorStarted = true
+                    }
+                }
+            } catch (failure: Throwable) {
+                transitionToClosed(TerminalSessionCloseEvent(exitCode = null, failure = failure, locallyRequested = false))
+                throw failure
+            }
         }
-        connector.resize(columns, rows)
-        connector.start(this)
+        try {
+            submitStartupCommand()
+        } catch (failure: OutboundCapacityException) {
+            failWrite(failure)
+        }
     }
 
     /**
@@ -576,14 +664,19 @@ class TerminalSession(
         bytes.checkBounds(offset, length)
         if (isSessionClosed()) return
 
-        synchronized(mutationLock) {
-            if (isSessionClosed()) return
-            parser.accept(bytes, offset, length)
-        }
-
         try {
-            drainResponses()
-            submitStartupCommand()
+            synchronized(mutationLock) {
+                if (isSessionClosed()) return
+                processingOutput = true
+                try {
+                    parser.accept(bytes, offset, length)
+                    runtime.shellIntegration?.outputProcessed()
+                    drainResponses()
+                } finally {
+                    processingOutput = false
+                }
+                submitStartupCommand()
+            }
         } catch (failure: OutboundCapacityException) {
             failWrite(failure)
         }
@@ -594,13 +687,12 @@ class TerminalSession(
         val submission = startupSubmission
         if (submission?.status?.value == TerminalStartupCommandStatus.WAITING) {
             synchronized(mutationLock) {
+                if (!connectorStarted || processingOutput || runtime.shellIntegration?.promptReady?.value != true) return
                 outboundWriter.submit {
                     if (isAcceptingInput()) {
                         renderReader.readRenderFrame { frame ->
                             if (frame.activeBuffer == TerminalRenderBufferKind.PRIMARY) {
-                                submission.submitIfReady(inputEncoder)
-                            } else {
-                                submission.invalidatePrompt()
+                                submission.submit(inputEncoder)
                             }
                         }
                     }
@@ -713,11 +805,15 @@ class TerminalSession(
 
             cancelSynchronizedOutputTimeout()
 
+            val context = currentCoroutineContext()
             try {
-                renderPublisher.updateAndPublish(this, offset, rows)
-                publishedGeneration = generation
-                currentCoroutineContext().ensureActive()
-                mutableRenderGeneration.value = generation
+                synchronized(mutationLock) {
+                    if (isSessionClosed()) return
+                    renderPublisher.updateAndPublish(this, offset, rows)
+                    publishedGeneration = generation
+                    context.ensureActive()
+                    mutableRenderGeneration.value = generation
+                }
             } catch (e: CancellationException) {
                 throw e
             } catch (_: Exception) {
@@ -732,146 +828,6 @@ class TerminalSession(
             withTimeoutOrNull(RENDER_PUBLICATION_INTERVAL_MS.milliseconds) {
                 immediateRenderRequests.receiveCatching()
             }
-        }
-    }
-
-    private inner class ShellCommandLineRevisionTracker(
-        private val contextProvider: (LongArray) -> Long,
-    ) {
-        private val contextScratch = LongArray(SHELL_COMMAND_LINE_CONTEXT_LONGS)
-        private val fingerprintScratch = LongArray(TERMINAL_SHELL_COMMAND_FINGERPRINT_LONGS)
-        private val previousFingerprint = LongArray(TERMINAL_SHELL_COMMAND_FINGERPRINT_LONGS)
-        private val extractor = ShellIntegrationCommandTextExtractor()
-        private var previousFingerprintAvailable = false
-        private var previousCursorRow = 0
-        private var previousCursorColumn = 0
-
-        fun update(): Boolean {
-            val contextRevision =
-                synchronized(mutationLock) {
-                    contextProvider(contextScratch)
-                }
-            val promptEndLineId = contextScratch[SHELL_COMMAND_LINE_CONTEXT_LINE_ID_INDEX]
-            val promptEndColumn = contextScratch[SHELL_COMMAND_LINE_CONTEXT_COLUMN_INDEX].toInt()
-            val active = contextScratch[SHELL_COMMAND_LINE_CONTEXT_ACTIVE_INDEX] != 0L
-
-            var status = TerminalShellCommandFingerprintStatus.INVALID
-            var cursorRow = 0
-            var cursorColumn = 0
-            var historySize = 0
-            var liveRows = 0
-            var liveViewport = true
-            if (active) {
-                renderPublisher.readCurrent { frame ->
-                    if (frame.scrollbackOffset != 0) {
-                        liveViewport = false
-                        return@readCurrent
-                    }
-                    historySize = frame.historySize
-                    liveRows = frame.rows
-                    cursorRow = frame.cursorRow
-                    cursorColumn = frame.cursorColumn
-                    status =
-                        extractor.fingerprint(
-                            cache = frame,
-                            promptEndLineId = promptEndLineId,
-                            promptEndColumn = promptEndColumn,
-                            cursorRow = cursorRow,
-                            cursorColumn = cursorColumn,
-                            destination = fingerprintScratch,
-                        )
-                }
-
-                if (!liveViewport) return false
-
-                if (status == TerminalShellCommandFingerprintStatus.MISSING_START_LINE && historySize > 0) {
-                    val historyRows = minOf(historySize, MAX_SHELL_INTEGRATION_COMMAND_ROWS)
-                    synchronized(mutationLock) {
-                        if (
-                            !contextMatches(
-                                contextRevision,
-                                promptEndLineId,
-                                promptEndColumn,
-                                expectedActive = true,
-                            )
-                        ) {
-                            return false
-                        }
-                        renderReader.readRenderFrame(
-                            scrollbackOffset = historyRows,
-                            viewportRows = liveRows + historyRows,
-                        ) { frame ->
-                            cursorRow = frame.cursor.row
-                            cursorColumn = frame.cursor.column
-                            status =
-                                extractor.fingerprint(
-                                    frame = frame,
-                                    promptEndLineId = promptEndLineId,
-                                    promptEndColumn = promptEndColumn,
-                                    cursorRow = cursorRow,
-                                    cursorColumn = cursorColumn,
-                                    destination = fingerprintScratch,
-                                )
-                        }
-                    }
-                }
-            }
-
-            synchronized(mutationLock) {
-                if (
-                    !contextMatches(
-                        contextRevision,
-                        promptEndLineId,
-                        promptEndColumn,
-                        expectedActive = active,
-                    )
-                ) {
-                    return false
-                }
-            }
-            return recordFingerprint(
-                available = active && status == TerminalShellCommandFingerprintStatus.COMPLETE,
-                cursorRow = cursorRow,
-                cursorColumn = cursorColumn,
-            )
-        }
-
-        private fun contextMatches(
-            expectedRevision: Long,
-            expectedLineId: Long,
-            expectedColumn: Int,
-            expectedActive: Boolean,
-        ): Boolean {
-            val revision = contextProvider(contextScratch)
-            return revision == expectedRevision &&
-                contextScratch[SHELL_COMMAND_LINE_CONTEXT_LINE_ID_INDEX] == expectedLineId &&
-                contextScratch[SHELL_COMMAND_LINE_CONTEXT_COLUMN_INDEX].toInt() == expectedColumn &&
-                (contextScratch[SHELL_COMMAND_LINE_CONTEXT_ACTIVE_INDEX] != 0L) == expectedActive
-        }
-
-        private fun recordFingerprint(
-            available: Boolean,
-            cursorRow: Int,
-            cursorColumn: Int,
-        ): Boolean {
-            val changed =
-                if (!available) {
-                    previousFingerprintAvailable
-                } else {
-                    !previousFingerprintAvailable ||
-                        previousCursorRow != cursorRow ||
-                        previousCursorColumn != cursorColumn ||
-                        !previousFingerprint.contentEquals(fingerprintScratch)
-                }
-            if (!changed) return false
-
-            previousFingerprintAvailable = available
-            if (available) {
-                fingerprintScratch.copyInto(previousFingerprint)
-                previousCursorRow = cursorRow
-                previousCursorColumn = cursorColumn
-            }
-            return true
         }
     }
 
@@ -942,7 +898,8 @@ class TerminalSession(
     }
 
     /**
-     * Records remote closure and closes the parser exactly once.
+     * Records remote closure, releases the connector, and finalizes parser/render
+     * state exactly once. The connector must deliver its final bytes first.
      */
     override fun onClosed(exitCode: Int?) {
         transitionToClosed(TerminalSessionCloseEvent(exitCode = exitCode, failure = null, locallyRequested = false))
@@ -959,12 +916,19 @@ class TerminalSession(
     }
 
     /**
-     * Requests local connector shutdown and closes parser input exactly once.
+     * Stops accepting input, releases the connector, flushes parser EOF, and
+     * synchronously publishes the last requested viewport, including synchronized
+     * output. Publication waits for active frame-copy callbacks and available
+     * render buffers; do not call from a render-reader or leased-cache callback.
+     *
+     * The first termination owns cleanup and its event is retained. Concurrent or
+     * reentrant calls return without waiting; observe [state] for completed cleanup.
+     * Every cleanup is attempted. Local cleanup failures are rethrown with later
+     * failures suppressed; failure-triggered cleanup adds them to the original cause.
      */
     override fun close() {
         transitionToClosed(
             event = TerminalSessionCloseEvent(exitCode = null, failure = null, locallyRequested = true),
-            closeConnector = true,
         )
     }
 
@@ -983,45 +947,58 @@ class TerminalSession(
     private fun failWrite(failure: Exception) {
         transitionToClosed(
             TerminalSessionCloseEvent(exitCode = null, failure = failure, locallyRequested = false),
-            closeConnector = true,
         )
     }
 
-    private fun transitionToClosed(
-        event: TerminalSessionCloseEvent,
-        closeConnector: Boolean = false,
-    ) {
-        while (true) {
-            val current = mutableState.value
-            if (current is TerminalSessionState.Closed) return
-            if (mutableState.compareAndSet(current, TerminalSessionState.Closed(event))) break
+    private fun transitionToClosed(event: TerminalSessionCloseEvent) {
+        if (!closingEvent.compareAndSet(null, event)) return
+        var failure: Throwable? = event.failure
+
+        fun cleanup(action: () -> Unit) {
+            try {
+                action()
+            } catch (error: Throwable) {
+                val previous = failure
+                if (previous == null) {
+                    failure = error
+                } else if (previous !== error) {
+                    previous.addSuppressed(error)
+                }
+            }
         }
 
         try {
-            if (closeConnector) connector.close()
+            cleanup { synchronized(connectorLifecycleLock) { connector.close() } }
+            cleanup { clipboardReads?.close() }
+            cleanup { outboundWriter.close() }
+            cleanup {
+                synchronized(outboundWriteLock) {
+                    startupSubmission?.cancel(TerminalStartupCommandStatus.CLOSED)
+                }
+            }
+            cancelSynchronizedOutputTimeout()
+            renderRequests.close()
+            immediateRenderRequests.close()
+            sessionScope.cancel(CancellationException("Terminal session closed"))
+            // Serialize against an in-flight publication so it cannot replace
+            // this final frame after EOF has been flushed.
+            synchronized(mutationLock) {
+                cleanup { parser.endOfInput() }
+                cleanup {
+                    val request = pendingRenderRequest.get()
+                    renderPublisher.updateAndPublish(this, unpackScrollbackOffset(request), unpackViewportRows(request))
+                    mutableRenderGeneration.value = pendingRenderGeneration.incrementAndGet()
+                }
+            }
         } finally {
-            cleanupParser()
+            mutableState.value = TerminalSessionState.Closed(event)
         }
+        if (event.failure == null) failure?.let { throw it }
     }
 
-    private fun cleanupParser() {
-        clipboardReads?.close()
-        outboundWriter.close()
-        synchronized(outboundWriteLock) {
-            startupSubmission?.cancel(TerminalStartupCommandStatus.CLOSED)
-        }
-        cancelSynchronizedOutputTimeout()
-        renderRequests.close()
-        immediateRenderRequests.close()
-        sessionScope.cancel(CancellationException("Terminal session closed"))
-        synchronized(mutationLock) {
-            parser.endOfInput()
-        }
-    }
+    private fun isSessionClosed(): Boolean = closingEvent.get() != null
 
-    private fun isSessionClosed(): Boolean = state.value is TerminalSessionState.Closed
-
-    private fun isAcceptingInput(): Boolean = state.value === TerminalSessionState.Running
+    private fun isAcceptingInput(): Boolean = !isSessionClosed() && state.value === TerminalSessionState.Running
 
     companion object {
         private val SESSION_COUNTER =
@@ -1055,11 +1032,13 @@ class TerminalSession(
          * the active input host can provide truthfully. Defaults to the
          * conservative portable-host profile.
          * @param workerDispatcher non-owned dispatcher used for render publication and timeouts.
-         * @param startupCommand optional command submitted once after a complete OSC 133 prompt.
-         * User input before readiness cancels submission; hosts must install supported shell hooks.
+         * @param startupCommand optional command submitted once after the selected integration reports prompt readiness.
+         * User input before readiness cancels submission.
          * @param ioDispatcher non-owned dispatcher for connector writes, metadata queries, and clipboard providers.
          * @param clipboardReader session-bound clipboard/consent operation, or null for unavailable reads.
          * @param clipboardReadTimeSource monotonic clock for the end-to-end read deadline.
+         * @param shellIntegration sole shell metadata producer; null leaves shell features unavailable.
+         * @throws IllegalArgumentException when [startupCommand] is supplied without [shellIntegration].
          * @return standard production terminal session.
          */
         @JvmStatic
@@ -1077,18 +1056,22 @@ class TerminalSession(
             modeReportCapabilities: Int = 0,
             clipboardReader: TerminalClipboardReader? = null,
             clipboardReadTimeSource: TimeSource = TimeSource.Monotonic,
+            shellIntegration: TerminalShellIntegrationFactory? = null,
         ): TerminalSession {
+            require(startupCommand == null || shellIntegration != null) {
+                "startupCommand requires a shell integration that supplies prompt readiness"
+            }
             val outboundWriteLock = Any()
             val renderReader =
                 terminal as? TerminalRenderFrameReader
                     ?: error("terminal must implement TerminalRenderFrameReader")
-            val shellIntegrationState = TerminalShellIntegrationState()
+            val renderPublisher = TerminalRenderPublisher(terminal.width, terminal.height)
+            val runtime = SessionRuntime(renderReader, renderPublisher, shellIntegration)
             val recordingHostEvents =
                 SessionHostEventSink(
                     delegate = hostEvents,
-                    renderReader = renderReader,
-                    state = shellIntegrationState,
                     connector = connector,
+                    shellIntegration = runtime.shellIntegration,
                 )
             val sink =
                 HostCommandAdapter(
@@ -1101,23 +1084,20 @@ class TerminalSession(
                 )
             val parser = TerminalParsers.create(sink, clipboardWriteLimitBytes = sink::clipboardWriteLimitBytes)
 
-            val renderPublisher = TerminalRenderPublisher(terminal.width, terminal.height)
-
             val session =
                 TerminalSession(
                     terminal = terminal,
-                    renderPublisher = renderPublisher,
-                    renderReader = renderReader,
+                    runtime = runtime,
                     responseReader = terminal,
                     connector = connector,
                     parser = parser,
                     hyperlinkResolver = TerminalHyperlinkResolver(sink::hyperlinkUri),
                     outboundWriteLock = outboundWriteLock,
-                    shellIntegrationState = shellIntegrationState,
                     hostCommandAdapter = sink,
                     inputPolicy = inputPolicy,
                     workerDispatcher = workerDispatcher,
                     ioDispatcher = ioDispatcher,
+                    startupCommand = startupCommand,
                 )
             val clipboardReads =
                 ClipboardReadHandler(
@@ -1137,27 +1117,29 @@ class TerminalSession(
                 session.drainResponses()
                 clipboardReads.request(request)
             }
-            session.activeShellCommandLineProvider = recordingHostEvents::activeCommandLine
-            val submission = startupCommand?.let(::StartupCommandSubmission)
-            session.startupSubmission = submission
-            if (submission != null) {
-                recordingHostEvents.startupMarkerObserver = { marker, primary ->
-                    synchronized(outboundWriteLock) {
-                        submission.observe(marker, primary)
-                    }
-                }
-            }
-            session.activeShellCommandLineContextProvider = recordingHostEvents::copyActiveCommandLineContext
             return session
         }
     }
 }
 
+private class SessionRuntime(
+    val reader: TerminalRenderFrameReader,
+    val publisher: TerminalRenderPublisher,
+    factory: TerminalShellIntegrationFactory?,
+) {
+    val mutationLock = Any()
+    val renderGeneration = MutableStateFlow(-1L)
+    val shellIntegration =
+        factory?.create(
+            TerminalShellIntegrationContext(mutationLock, reader, publisher, renderGeneration.asStateFlow()),
+        )
+    val shellState = shellIntegration?.state ?: TerminalShellIntegrationState()
+}
+
 private class SessionHostEventSink(
     private val delegate: HostEventSink,
-    private val renderReader: TerminalRenderFrameReader,
-    private val state: TerminalShellIntegrationState,
     private val connector: TerminalConnector,
+    private val shellIntegration: TerminalShellIntegration?,
 ) : HostEventSink {
     var clipboardReadRequest: ((TerminalClipboardReadRequest) -> Unit)? = null
 
@@ -1177,18 +1159,6 @@ private class SessionHostEventSink(
 
     override fun hyperlinksCleared() = delegate.hyperlinksCleared()
 
-    var startupMarkerObserver: ((ShellIntegrationMarker, Boolean) -> Unit)? = null
-    private val commandTextExtractor = ShellIntegrationCommandTextExtractor()
-    private var promptEndLineId = NO_LINE_ID
-    private var promptEndColumn = 0
-    private var promptStartedForCommandText = false
-    private var promptStartLineId = NO_LINE_ID
-    private var promptStartColumn = 0
-    private var promptScanCodeWords = IntArray(0)
-    private var promptScanAttrWords = LongArray(0)
-    private var promptScanFlags = IntArray(0)
-    private var activeCommandLineContextRevision = 0L
-
     override fun bell() {
         delegate.bell()
     }
@@ -1202,7 +1172,7 @@ private class SessionHostEventSink(
     }
 
     override fun currentWorkingDirectoryChanged(uri: String) {
-        state.recordCurrentWorkingDirectory(uri)
+        shellIntegration?.observeWorkingDirectory(uri)
         delegate.currentWorkingDirectoryChanged(uri)
     }
 
@@ -1255,246 +1225,8 @@ private class SessionHostEventSink(
     }
 
     override fun shellIntegrationMarker(event: ShellIntegrationEvent) {
-        var cursorLineId = NO_LINE_ID
-        var previousLineId = NO_LINE_ID
-        var cursorColumn = 0
-        var bottomAbsoluteRow = 0L
-        var commandText: String? = null
-        var visiblePromptStartLineId = NO_LINE_ID
-        var historySize = 0
-        var liveRows = 0
-        renderReader.readRenderFrame(scrollbackOffset = 0) { frame ->
-            startupMarkerObserver?.invoke(event.marker, frame.activeBuffer == TerminalRenderBufferKind.PRIMARY)
-            historySize = frame.historySize
-            liveRows = frame.rows
-            val firstVisibleRow = frame.discardedCount + frame.historySize
-            val cursor = frame.cursor
-            cursorColumn = cursor.column
-            if (cursor.row in 0 until frame.rows) {
-                cursorLineId = frame.lineId(cursor.row)
-            }
-            if (cursor.row > 0 && cursor.row - 1 < frame.rows) {
-                previousLineId = frame.lineId(cursor.row - 1)
-            }
-            bottomAbsoluteRow = firstVisibleRow + frame.rows - 1
-            if (event.marker == ShellIntegrationMarker.COMMAND_START) {
-                commandText =
-                    commandTextExtractor.extract(
-                        frame = frame,
-                        promptEndLineId = promptEndLineId,
-                        promptEndColumn = promptEndColumn,
-                        cursorRow = cursor.row,
-                        cursorColumn = cursor.column,
-                    )
-            }
-            if (event.marker == ShellIntegrationMarker.PROMPT_END && promptStartedForCommandText) {
-                visiblePromptStartLineId =
-                    firstRenderedPromptLineId(
-                        frame = frame,
-                        startLineId = promptStartLineId,
-                        startColumn = promptStartColumn,
-                        endRow = cursor.row,
-                        endColumn = cursor.column,
-                    )
-            }
-        }
-
-        if (event.marker == ShellIntegrationMarker.COMMAND_START && commandText == null && historySize > 0) {
-            val historyRows = minOf(historySize, MAX_SHELL_INTEGRATION_COMMAND_ROWS)
-            renderReader.readRenderFrame(
-                scrollbackOffset = historyRows,
-                viewportRows = liveRows + historyRows,
-            ) { frame ->
-                val cursor = frame.cursor
-                commandText =
-                    commandTextExtractor.extract(
-                        frame = frame,
-                        promptEndLineId = promptEndLineId,
-                        promptEndColumn = promptEndColumn,
-                        cursorRow = cursor.row,
-                        cursorColumn = cursor.column,
-                    )
-            }
-        }
-
-        state.observeLiveBottomRow(bottomAbsoluteRow)
-        when (event.marker) {
-            ShellIntegrationMarker.PROMPT_START -> {
-                promptEndLineId = NO_LINE_ID
-                promptEndColumn = 0
-                promptStartedForCommandText = true
-                promptStartLineId = cursorLineId
-                promptStartColumn = cursorColumn
-                recordIfAssigned(cursorLineId, state::recordPromptStart)
-            }
-            ShellIntegrationMarker.PROMPT_END -> {
-                if (cursorLineId != NO_LINE_ID && promptStartedForCommandText) {
-                    if (visiblePromptStartLineId != NO_LINE_ID && visiblePromptStartLineId != promptStartLineId) {
-                        state.reanchorActivePromptStart(visiblePromptStartLineId)
-                    }
-                    promptEndLineId = cursorLineId
-                    promptEndColumn = cursorColumn
-                    state.recordPromptEnd(cursorLineId)
-                }
-            }
-            ShellIntegrationMarker.COMMAND_START -> {
-                if (cursorLineId != NO_LINE_ID) {
-                    state.recordCommandStart(
-                        lineId = cursorLineId,
-                        includeLine = cursorColumn == 0,
-                        commandText = commandText,
-                        workingDirectoryUri = state.currentWorkingDirectoryUri(),
-                    )
-                }
-                promptStartedForCommandText = false
-            }
-            ShellIntegrationMarker.COMMAND_FINISHED -> {
-                val finishedLineId =
-                    if (cursorColumn == 0 && previousLineId != NO_LINE_ID) {
-                        previousLineId
-                    } else {
-                        cursorLineId
-                    }
-                if (finishedLineId != NO_LINE_ID) {
-                    state.recordCommandFinished(finishedLineId, event.exitCode)
-                }
-            }
-        }
-        activeCommandLineContextRevision++
-
+        shellIntegration?.observeShellMarker(event)
         delegate.shellIntegrationMarker(event)
-    }
-
-    fun copyActiveCommandLineContext(destination: LongArray): Long {
-        require(destination.size >= SHELL_COMMAND_LINE_CONTEXT_LONGS) {
-            "destination must contain at least $SHELL_COMMAND_LINE_CONTEXT_LONGS longs"
-        }
-        destination[SHELL_COMMAND_LINE_CONTEXT_LINE_ID_INDEX] = promptEndLineId
-        destination[SHELL_COMMAND_LINE_CONTEXT_COLUMN_INDEX] = promptEndColumn.toLong()
-        destination[SHELL_COMMAND_LINE_CONTEXT_ACTIVE_INDEX] =
-            if (promptStartedForCommandText && promptEndLineId != NO_LINE_ID) 1L else 0L
-        return activeCommandLineContextRevision
-    }
-
-    /**
-     * Returns the command line currently being edited after the latest prompt
-     * end marker.
-     *
-     * The caller must already hold the session mutation lock because this
-     * method reads the render frame directly through the raw render reader. It
-     * only returns a snapshot when the cursor is at the visible end of the
-     * command; middle-of-line editing is intentionally deferred until the
-     * session can expose the full logical shell-editor buffer.
-     *
-     * @return active command-line snapshot, or `null` when unavailable.
-     */
-    fun activeCommandLine(): TerminalShellCommandLineSnapshot? {
-        if (!promptStartedForCommandText || promptEndLineId == NO_LINE_ID) return null
-
-        var snapshot: TerminalShellCommandLineSnapshot? = null
-        var historySize = 0
-        var liveRows = 0
-        renderReader.readRenderFrame(scrollbackOffset = 0) { frame ->
-            historySize = frame.historySize
-            liveRows = frame.rows
-            snapshot = activeCommandLineFrom(frame)
-        }
-
-        if (snapshot == null && historySize > 0) {
-            val historyRows = minOf(historySize, MAX_SHELL_INTEGRATION_COMMAND_ROWS)
-            renderReader.readRenderFrame(
-                scrollbackOffset = historyRows,
-                viewportRows = liveRows + historyRows,
-            ) { frame ->
-                snapshot = activeCommandLineFrom(frame)
-            }
-        }
-
-        return snapshot
-    }
-
-    private fun activeCommandLineFrom(frame: TerminalRenderFrame): TerminalShellCommandLineSnapshot? {
-        val cursor = frame.cursor
-        if (cursor.row !in 0 until frame.rows) return null
-        if (!commandTextExtractor.isCursorAtVisibleLineEnd(frame, cursor.row, cursor.column)) return null
-        val commandText =
-            commandTextExtractor.extract(
-                frame = frame,
-                promptEndLineId = promptEndLineId,
-                promptEndColumn = promptEndColumn,
-                cursorRow = cursor.row,
-                cursorColumn = cursor.column,
-            ) ?: return null
-        return TerminalShellCommandLineSnapshot(
-            commandText = commandText,
-            cursorOffset = commandText.length,
-            cursorColumn = cursor.column,
-            cursorRow = cursor.row,
-        )
-    }
-
-    /**
-     * Returns the first line containing a rendered prompt cell between OSC 133
-     * A and B. Leading structurally blank rows are layout, not useful gutter
-     * anchors; when the bounded live frame cannot prove a better anchor, the
-     * caller preserves the original marker line.
-     */
-    private fun firstRenderedPromptLineId(
-        frame: TerminalRenderFrame,
-        startLineId: Long,
-        startColumn: Int,
-        endRow: Int,
-        endColumn: Int,
-    ): Long {
-        if (startLineId == NO_LINE_ID || endRow !in 0 until frame.rows || frame.columns <= 0) return NO_LINE_ID
-
-        var startRow = 0
-        while (startRow < frame.rows && frame.lineId(startRow) != startLineId) {
-            startRow++
-        }
-        if (startRow >= frame.rows || startRow > endRow) return NO_LINE_ID
-
-        ensurePromptScanCapacity(frame.columns)
-        var row = startRow
-        while (row <= endRow) {
-            frame.copyLine(
-                row = row,
-                codeWords = promptScanCodeWords,
-                attrWords = promptScanAttrWords,
-                flags = promptScanFlags,
-            )
-            val firstColumn = if (row == startRow) startColumn.coerceIn(0, frame.columns) else 0
-            val lastColumn = if (row == endRow) endColumn.coerceIn(0, frame.columns) else frame.columns
-            var column = firstColumn
-            while (column < lastColumn) {
-                val flags = promptScanFlags[column]
-                if (flags and PROMPT_CONTENT_FLAGS != 0) return frame.lineId(row)
-                column++
-            }
-            row++
-        }
-        return NO_LINE_ID
-    }
-
-    private fun ensurePromptScanCapacity(columns: Int) {
-        if (promptScanCodeWords.size >= columns) return
-        promptScanCodeWords = IntArray(columns)
-        promptScanAttrWords = LongArray(columns)
-        promptScanFlags = IntArray(columns)
-    }
-
-    private inline fun recordIfAssigned(
-        lineId: Long,
-        record: (Long) -> Unit,
-    ) {
-        if (lineId != NO_LINE_ID) {
-            record(lineId)
-        }
-    }
-
-    private companion object {
-        private const val NO_LINE_ID = 0L
-        private const val PROMPT_CONTENT_FLAGS = TerminalRenderCellFlags.CODEPOINT + TerminalRenderCellFlags.CLUSTER
     }
 
     override fun showNotification(

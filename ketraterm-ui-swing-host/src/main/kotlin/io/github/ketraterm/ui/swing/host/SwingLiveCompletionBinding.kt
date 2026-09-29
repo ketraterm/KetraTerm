@@ -21,6 +21,7 @@ import io.github.ketraterm.ui.swing.api.SwingTerminal
 import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionEligibilityListener
 import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionFeedbackHandler
 import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionInvalidationListener
+import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionTrigger
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -43,7 +44,9 @@ import javax.swing.SwingUtilities
  * Construct the binding before the terminal so [suggestionFeedbackHandler] can
  * be passed through [io.github.ketraterm.ui.swing.api.SwingHostServices]. After
  * binding the terminal to the session, call [attach]. Call [close] from the EDT
- * before disposing the terminal.
+ * before disposing the terminal. Before rebinding the terminal to another
+ * session, close or detach this binding and create one for the new session;
+ * this binding retains the session supplied at construction.
  */
 @OptIn(FlowPreview::class)
 class SwingLiveCompletionBinding
@@ -323,12 +326,7 @@ private class SwingTerminalLiveCompletionTarget(
     private val terminal: SwingTerminal,
 ) : SwingLiveCompletionTarget {
     override fun requestSuggestions(snapshot: TerminalShellCommandLineSnapshot) {
-        terminal.requestShellSuggestions(
-            commandText = snapshot.commandText,
-            cursorOffset = snapshot.cursorOffset,
-            anchorColumn = snapshot.cursorColumn,
-            anchorRow = snapshot.cursorRow,
-        )
+        terminal.requestActiveShellSuggestions(SwingShellSuggestionTrigger.AUTOMATIC)
     }
 
     override fun hideSuggestions() = terminal.hideShellSuggestions()

@@ -15,6 +15,7 @@ This module may:
   policy, theme settings, and scrollbars.
 - adapt external Swing scrollbars through `SwingTerminal` viewport APIs.
 - compose standalone completion sources, persistence settings, and lifecycle.
+- prepare standalone shell metadata, configuration paths, and companion commands.
 
 ## Boundary
 

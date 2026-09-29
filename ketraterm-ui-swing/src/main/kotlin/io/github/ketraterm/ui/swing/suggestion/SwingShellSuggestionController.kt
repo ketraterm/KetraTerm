@@ -205,6 +205,7 @@ internal class SwingShellSuggestionController(
 
     private fun acceptSelected(): Boolean {
         if (!host.settings.smartSuggestionsEnabled || selectedIndex !in suggestions.indices) return false
+        if (invalidateStaleContext()) return true
         val suggestion = suggestions[selectedIndex]
         val index = selectedIndex
         val acceptedRequest = request
@@ -230,7 +231,12 @@ internal class SwingShellSuggestionController(
     }
 
     private fun dismissSelected(): Boolean {
-        if (selectedIndex !in suggestions.indices) return hide()
+        if (invalidateStaleContext()) return true
+        if (selectedIndex !in suggestions.indices) {
+            hide()
+            host.invalidateSuggestions()
+            return true
+        }
         val suggestion = suggestions[selectedIndex]
         val index = selectedIndex
         val dismissedRequest = request
@@ -245,6 +251,13 @@ internal class SwingShellSuggestionController(
             ),
         )
         host.requestFocusInWindow()
+        return true
+    }
+
+    private fun invalidateStaleContext(): Boolean {
+        if (host.isSuggestionContextCurrent()) return false
+        hide()
+        host.invalidateSuggestions()
         return true
     }
 
@@ -311,4 +324,6 @@ internal interface SwingShellSuggestionHost {
     fun requestFocusInWindow(): Boolean
 
     fun invalidateSuggestions()
+
+    fun isSuggestionContextCurrent(): Boolean
 }

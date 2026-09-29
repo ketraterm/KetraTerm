@@ -26,6 +26,7 @@ import io.github.ketraterm.pty.TerminalSessions
 import io.github.ketraterm.session.TerminalSession
 import io.github.ketraterm.session.TerminalStartupCommand
 import io.github.ketraterm.session.TerminalStartupCommandStatus
+import io.github.ketraterm.shell.integration.OscShellIntegration
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
@@ -124,6 +125,7 @@ class TerminalStartupCommandPtyTest {
                             columns = 120,
                             rows = 20,
                             startupCommand = launch.startupCommand,
+                            shellIntegration = OscShellIntegration,
                             eventListener = listener,
                         ),
                     ).use { session ->

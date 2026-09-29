@@ -46,15 +46,6 @@ internal interface SwingRenderFrameHost {
 
     fun requestRender(session: TerminalSession)
 
-    /**
-     * Resizes the bound terminal grid when the latest rendered frame changes
-     * active-buffer chrome enough to alter visible rows or columns.
-     *
-     * @return true when the terminal grid was resized and another render
-     * publication must be requested.
-     */
-    fun syncTerminalGridToActiveChrome(): Boolean
-
     fun clampViewport(
         historySize: Int,
         discardedCount: Long,

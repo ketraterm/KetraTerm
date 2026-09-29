@@ -376,13 +376,15 @@ internal class BufferResponseChannel(
     }
 
     private fun enqueueCursorPositionReport(decPrivate: Boolean) {
+        val rowOrigin = if (state.modes.isOriginMode) state.scrollTop else 0
+        val colOrigin = if (state.modes.isOriginMode) state.effectiveLeftMargin else 0
         enqueueCsiPrefix()
         if (decPrivate) {
             state.hostResponses.enqueueByte('?'.code)
         }
-        state.hostResponses.enqueuePositiveDecimal(state.cursor.row + 1)
+        state.hostResponses.enqueuePositiveDecimal((state.cursor.row - rowOrigin).coerceAtLeast(0) + 1)
         state.hostResponses.enqueueByte(';'.code)
-        state.hostResponses.enqueuePositiveDecimal(state.cursor.col + 1)
+        state.hostResponses.enqueuePositiveDecimal((state.cursor.col - colOrigin).coerceAtLeast(0) + 1)
         state.hostResponses.enqueueByte('R'.code)
     }
 
@@ -462,7 +464,7 @@ internal class BufferResponseChannel(
                 val right = state.activeBuffer.rightMargin + 1
                 enqueueDecrqssResponse(status = 1, "$left;${right}s")
             }
-            "q" -> {
+            " q" -> {
                 val shapeCode =
                     when (state.cursorShape) {
                         io.github.ketraterm.render.api.TerminalRenderCursorShape.BLOCK -> if (state.modes.isCursorBlinking) 1 else 2
@@ -472,7 +474,7 @@ internal class BufferResponseChannel(
                 enqueueDecrqssResponse(status = 1, "$shapeCode q")
             }
             else -> {
-                enqueueDecrqssResponse(status = 0, query)
+                enqueueDecrqssResponse(status = 0, "")
             }
         }
     }
@@ -481,8 +483,8 @@ internal class BufferResponseChannel(
      * Emits `DCS [status] $ r [responseData] ST`.
      *
      * Status 1 = valid, status 0 = invalid/unsupported. Response data is the
-     * setting value for valid queries or the original query string for failures.
-     * All response data characters are ASCII, so char-by-char enqueue is safe.
+     * core-generated ASCII setting value for valid queries and empty for failures.
+     * Never include request text in a failure response.
      */
     private fun enqueueDecrqssResponse(
         status: Int,

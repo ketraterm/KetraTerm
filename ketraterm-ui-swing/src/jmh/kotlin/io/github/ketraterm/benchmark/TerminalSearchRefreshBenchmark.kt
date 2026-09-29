@@ -16,15 +16,19 @@
 package io.github.ketraterm.benchmark
 
 import io.github.ketraterm.core.TerminalBuffers
+import io.github.ketraterm.core.api.TerminalBuffer
 import io.github.ketraterm.render.cache.TerminalRenderCache
 import io.github.ketraterm.session.TerminalSession
 import io.github.ketraterm.ui.swing.search.TerminalSearchController
 import io.github.ketraterm.ui.swing.search.TerminalSearchHost
+import kotlinx.coroutines.*
+import kotlinx.coroutines.flow.first
 import org.openjdk.jmh.annotations.*
 import java.util.concurrent.TimeUnit
 import javax.swing.SwingUtilities
+import kotlin.coroutines.CoroutineContext
 
-/** Refreshes an active search against unchanged retained content; EDT dispatch is included per batch. */
+/** Refreshes active search against unchanged or edited retained content; EDT dispatch is included per batch. */
 @State(Scope.Thread)
 @Threads(1)
 @BenchmarkMode(Mode.AverageTime)
@@ -36,18 +40,45 @@ open class TerminalSearchRefreshBenchmark {
     @Param("0", "1000", "10000")
     var historyRows = 0
 
+    @Param("6", "80", "160")
+    var columns = 0
+
+    private lateinit var terminal: TerminalBuffer
     private lateinit var session: TerminalSession
+    private lateinit var host: SearchHost
     private lateinit var controller: TerminalSearchController
+    private val scope =
+        CoroutineScope(
+            SupervisorJob() +
+                object : CoroutineDispatcher() {
+                    override fun isDispatchNeeded(context: CoroutineContext) = !SwingUtilities.isEventDispatchThread()
+
+                    override fun dispatch(
+                        context: CoroutineContext,
+                        block: Runnable,
+                    ) = SwingUtilities.invokeLater(block)
+                },
+        )
     private var segmentCount = 0
+    private var uppercase = false
     private val refreshBatch =
         Runnable {
             repeat(REFRESHES_PER_BATCH) { controller.refreshForFrame() }
             segmentCount = controller.viewportHighlights.segmentCount
         }
+    private val changingRefreshBatch =
+        Runnable {
+            uppercase = !uppercase
+            terminal.positionCursor(0, 0)
+            terminal.writeCodepoint(if (uppercase) 'N'.code else 'n'.code)
+            host.renderCache.updateFrom(session)
+            controller.refreshForFrame()
+            segmentCount = controller.viewportHighlights.segmentCount
+        }
 
     @Setup
     open fun setup() {
-        val terminal = TerminalBuffers.create(width = 6, height = 1, maxHistory = historyRows)
+        terminal = TerminalBuffers.create(width = columns, height = 1, maxHistory = historyRows)
         repeat(historyRows + 1) { row ->
             if (row > 0) {
                 terminal.carriageReturn()
@@ -57,10 +88,13 @@ open class TerminalSearchRefreshBenchmark {
         }
         session = benchmarkSession(terminal)
         SwingUtilities.invokeAndWait {
-            val host = SearchHost(session)
+            host = SearchHost(session, columns)
             host.renderCache.updateFrom(session)
-            controller = TerminalSearchController(host)
+            controller = TerminalSearchController(host, scope)
             controller.search("needle")
+        }
+        awaitSearch()
+        SwingUtilities.invokeAndWait {
             check(controller.state().resultCount == historyRows + 1)
             refreshBatch.run()
             check(segmentCount == 1)
@@ -74,20 +108,39 @@ open class TerminalSearchRefreshBenchmark {
         return segmentCount
     }
 
+    /** Includes editing, EDT scheduling, bounded worker copies/scanning and completed result publication. */
+    @Benchmark
+    @OperationsPerInvocation(CHANGING_REFRESHES_PER_BATCH)
+    open fun refreshChangedSearchOnEdt(): Int {
+        repeat(CHANGING_REFRESHES_PER_BATCH) {
+            SwingUtilities.invokeAndWait(changingRefreshBatch)
+            awaitSearch()
+        }
+        return segmentCount
+    }
+
+    private fun awaitSearch() =
+        runBlocking {
+            val result = controller.states.first { !it.isSearching }
+            check(result.failure == null) { "Search failed: ${result.failure}" }
+            check(result.resultCount == historyRows + 1)
+        }
+
     @TearDown
     open fun tearDown() {
         try {
             SwingUtilities.invokeAndWait { controller.reset(1) }
         } finally {
+            scope.cancel()
             session.close()
         }
     }
 
     private class SearchHost(
         override val session: TerminalSession,
+        columns: Int,
     ) : TerminalSearchHost {
-        override val renderCache = TerminalRenderCache(6, 1)
-        override val searchCache = TerminalRenderCache(6, 1)
+        override val renderCache = TerminalRenderCache(columns, 1)
 
         override fun visibleGridRows(): Int = 1
 
@@ -105,5 +158,6 @@ open class TerminalSearchRefreshBenchmark {
 
     private companion object {
         const val REFRESHES_PER_BATCH = 1024
+        const val CHANGING_REFRESHES_PER_BATCH = 16
     }
 }

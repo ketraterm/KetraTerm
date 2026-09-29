@@ -24,6 +24,8 @@ import io.github.ketraterm.protocol.ShellIntegrationEvent
  * pure parser throughput.
  */
 internal class NoOpCommandSink : TerminalCommandSink {
+    override val isAlternateScreenActive: Boolean get() = false
+
     override fun requestModeStatus(
         mode: Int,
         decPrivate: Boolean,

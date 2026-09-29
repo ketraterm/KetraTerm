@@ -15,50 +15,55 @@
  */
 package io.github.ketraterm.ui.swing.search
 
+import io.github.ketraterm.render.api.TerminalRenderBufferKind
 import io.github.ketraterm.render.cache.TerminalRenderCache
 import io.github.ketraterm.session.TerminalSession
+import kotlinx.coroutines.*
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.asStateFlow
 
-/**
- * EDT-owned terminal search controller.
- *
- * The controller owns literal match scanning, active-result navigation, and
- * viewport highlight projection. It does not own visible search chrome, does
- * not paint, and does not allocate from the frame paint loop; painting consumes
- * precomputed [viewportHighlights].
- * Retained content is rescanned only when the query, case policy, source, or
- * content generation changes. Cursor-only frames reuse matches.
- *
- * @param host Swing terminal hooks needed to refresh caches and move viewport.
- */
+/** EDT-owned search lifecycle and navigation. One worker owns copying/matching; completed buffers transfer on the EDT. */
 internal class TerminalSearchController(
     private val host: TerminalSearchHost,
+    private val scope: CoroutineScope,
+    private val analysisDispatcher: CoroutineDispatcher = Dispatchers.Default,
 ) {
-    private var query: String = ""
+    private var query = ""
+    private var ignoreCase = true
     private var highlights: TerminalSearchHighlights? = null
-    private var ignoreCase: Boolean = true
-
-    private val model = TerminalSearchModel()
-
-    // Command navigation also refreshes the host cache; track the content actually searched.
+    private var model = TerminalSearchModel()
+    private var publishedModel = TerminalSearchModel()
+    private val scanner = TerminalSearchScan()
+    private var job: Job? = null
+    private var epoch = 0L
+    private var pending = false
+    private var scrollOnCompletion = false
     private var searchedSession: TerminalSession? = null
-    private var searchedContentGeneration: Long = 0L
-
+    private var searchedContentGeneration = 0L
+    private var searchedBuffer: TerminalRenderBufferKind? = null
+    private var searchedColumns = 0
+    private var failure: Throwable? = null
+    private val mutableState = MutableStateFlow(TerminalSearchState("", 0, -1))
+    val states = mutableState.asStateFlow()
     val viewportHighlights = TerminalSearchViewportHighlights()
 
+    fun state(): TerminalSearchState = states.value
+
     fun reset(viewportRows: Int) {
+        epoch++
+        job?.cancel()
         query = ""
+        pending = false
         highlights = null
+        failure = null
         searchedSession = null
         viewportHighlights.reset(viewportRows)
+        publishState()
     }
 
-    fun search(query: String) {
-        applyQuery(query)
-    }
+    fun search(query: String) = applyQuery(query)
 
-    fun clear() {
-        applyQuery("")
-    }
+    fun clear() = applyQuery("")
 
     fun setIgnoreCase(ignoreCase: Boolean) {
         if (this.ignoreCase == ignoreCase) return
@@ -70,52 +75,107 @@ internal class TerminalSearchController(
 
     fun findPrevious(): Boolean = activateRelativeResult(-1)
 
-    fun state(): TerminalSearchState =
-        TerminalSearchState(
-            query = query,
-            resultCount = highlights?.resultCount ?: 0,
-            activeResultIndex = highlights?.activeResultIndex ?: NO_ACTIVE_RESULT,
-        )
-
     fun refreshForFrame() {
-        if (query.isEmpty()) {
-            updateViewportHighlights()
-            return
+        if (highlights != null && (searchedBuffer != host.renderCache.activeBuffer || searchedColumns != host.renderCache.columns)) {
+            highlights = null
         }
-
-        val boundSession = host.session ?: return
-        val cache = host.renderCache
-        if (searchedSession !== boundSession ||
-            searchedContentGeneration != cache.contentGeneration
-        ) {
-            refreshMatches(boundSession, preserveActiveResult = true)
+        if (query.isNotEmpty() && failure == null) {
+            val session = host.session
+            if (session != null && (searchedSession !== session || searchedContentGeneration != host.renderCache.contentGeneration)) {
+                pending = true
+                startAnalysis()
+            }
         }
         updateViewportHighlights()
     }
 
     fun updateViewportHighlights() {
-        val currentHighlights = highlights
-        if (currentHighlights == null) {
+        val current = highlights
+        if (current == null) {
             viewportHighlights.reset(host.renderCache.rows)
-            return
+        } else {
+            current.buildViewportHighlights(host.renderCache, viewportHighlights)
         }
-        currentHighlights.buildViewportHighlights(host.renderCache, viewportHighlights)
     }
 
     private fun applyQuery(nextQuery: String) {
+        epoch++
+        job?.cancel()
         query = nextQuery
-        if (nextQuery.isEmpty()) {
-            highlights = null
-            viewportHighlights.reset(host.renderCache.rows)
-            host.repaint()
-            return
-        }
-
-        val boundSession = host.session ?: return
-        refreshMatches(boundSession, preserveActiveResult = false)
-        scrollToActiveResult()
+        highlights = null
+        failure = null
+        searchedSession = null
+        pending = query.isNotEmpty() && host.session != null
+        scrollOnCompletion = pending
         updateViewportHighlights()
+        startAnalysis()
+        publishState()
         host.repaint()
+    }
+
+    private fun publishState() {
+        mutableState.value =
+            TerminalSearchState(
+                query,
+                highlights?.resultCount ?: 0,
+                highlights?.activeResultIndex ?: -1,
+                query.isNotEmpty() && (pending || job != null),
+                failure,
+            )
+    }
+
+    private fun startAnalysis() {
+        if (job != null || !pending || !scope.isActive) return
+        val session = host.session ?: return
+        val requestEpoch = epoch
+        val requestQuery = query
+        val requestIgnoreCase = ignoreCase
+        pending = false
+        val task =
+            scope.launch(start = CoroutineStart.LAZY) {
+                try {
+                    val result = withContext(analysisDispatcher) { scanner.scan(session, model, requestQuery, requestIgnoreCase) }
+                    if (requestEpoch != epoch || host.session !== session) return@launch
+                    if (result == null || result.columns != host.renderCache.columns || result.buffer != host.renderCache.activeBuffer) {
+                        highlights = null
+                        updateViewportHighlights()
+                        return@launch
+                    }
+                    val oldRow = highlights?.activeStartAbsoluteRow() ?: NO_ACTIVE_ROW
+                    val oldColumn = highlights?.activeStartColumn() ?: -1
+                    val previous = publishedModel
+                    publishedModel = model
+                    model = previous
+                    highlights = result.highlights
+                    if (oldRow != NO_ACTIVE_ROW) result.highlights.activateNearest(oldRow, oldColumn)
+                    searchedSession = session
+                    searchedContentGeneration = result.generation
+                    searchedBuffer = result.buffer
+                    searchedColumns = result.columns
+                    // Output may continue throughout a pass. Publish completed work before catching up.
+                    pending = result.changedDuringScan || (pending && host.renderCache.contentGeneration != result.generation)
+                    if (scrollOnCompletion) {
+                        scrollOnCompletion = false
+                        scrollToActiveResult()
+                    }
+                    updateViewportHighlights()
+                    host.repaint()
+                } catch (cancelled: CancellationException) {
+                    throw cancelled
+                } catch (error: Exception) {
+                    if (requestEpoch == epoch && host.session === session) {
+                        failure = error
+                        pending = false
+                    }
+                } finally {
+                    job = null
+                    publishState()
+                    startAnalysis()
+                }
+            }
+        job = task
+        publishState()
+        task.start()
     }
 
     private fun activateRelativeResult(delta: Int): Boolean {
@@ -131,6 +191,7 @@ internal class TerminalSearchController(
         currentHighlights.activate(next)
         scrollToActiveResult()
         updateViewportHighlights()
+        publishState()
         host.repaint()
         return true
     }
@@ -148,38 +209,15 @@ internal class TerminalSearchController(
         )
     }
 
-    private fun refreshMatches(
-        boundSession: TerminalSession,
-        preserveActiveResult: Boolean,
-    ) {
-        val oldActive = if (preserveActiveResult) highlights?.activeResultIndex ?: NO_ACTIVE_RESULT else NO_ACTIVE_RESULT
-        // Resolve retained bounds under the session lock; the published viewport may lag output.
-        host.searchCache.updateFromAbsoluteRange(
-            reader = boundSession,
-            startAbsoluteRow = 0L,
-            endAbsoluteRow = Long.MAX_VALUE,
-        )
-        val cache = host.searchCache
-        val nextHighlights = model.search(cache, query, ignoreCase = ignoreCase)
-        if (oldActive in 0 until nextHighlights.resultCount) nextHighlights.activate(oldActive)
-        highlights = nextHighlights
-        searchedSession = boundSession
-        searchedContentGeneration = cache.contentGeneration
-    }
-
     private companion object {
-        private const val NO_ACTIVE_RESULT = -1
-        private const val NO_ACTIVE_ROW = Long.MIN_VALUE
+        const val NO_ACTIVE_ROW = Long.MIN_VALUE
     }
 }
 
-/**
- * Narrow host contract required by [TerminalSearchController].
- */
+/** UI-only hooks. Search scratch storage belongs exclusively to the worker. */
 internal interface TerminalSearchHost {
     val session: TerminalSession?
     val renderCache: TerminalRenderCache
-    val searchCache: TerminalRenderCache
 
     fun visibleGridRows(): Int
 

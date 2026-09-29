@@ -42,6 +42,7 @@ import org.junit.jupiter.api.Test
 import org.junit.jupiter.params.ParameterizedTest
 import org.junit.jupiter.params.provider.CsvSource
 import org.junit.jupiter.params.provider.ValueSource
+import java.awt.event.ComponentEvent
 import java.awt.event.InputEvent
 import java.awt.event.MouseEvent
 import java.awt.image.BufferedImage
@@ -52,6 +53,133 @@ import java.util.concurrent.atomic.AtomicReference
 import javax.swing.SwingUtilities
 
 class SwingTerminalSelectionTest {
+    @ParameterizedTest
+    @CsvSource("4,false", "4,true", "12,false", "12,true")
+    fun `ordinary column resize clears selection or preserves its copied text`(
+        resizedColumns: Int,
+        block: Boolean,
+    ) {
+        assertSelectionAfterResize(resizedColumns, 2, block)
+    }
+
+    @ParameterizedTest
+    @CsvSource("8,1,false", "8,1,true", "8,3,false", "8,3,true", "4,1,false", "4,1,true", "8,2,false", "8,2,true")
+    fun `grid resize clears physical selection including eviction but unchanged geometry preserves it`(
+        columns: Int,
+        rows: Int,
+        block: Boolean,
+    ) {
+        assertSelectionAfterResize(columns, rows, block)
+    }
+
+    @ParameterizedTest
+    @CsvSource("8,false", "8,true", "28,false", "28,true")
+    fun `font resize clears physical selection`(
+        fontSize: Float,
+        block: Boolean,
+    ) {
+        assertSelectionAfterResize(8, 2, block, fontSize)
+    }
+
+    private fun assertSelectionAfterResize(
+        resizedColumns: Int,
+        resizedRows: Int,
+        block: Boolean,
+        fontSize: Float? = null,
+    ) {
+        val terminal = TerminalBuffers.create(width = 8, height = 2, maxHistory = 0)
+        terminal.writeText("abcdefgh")
+        val dispatcher = StandardTestDispatcher()
+        val session =
+            TerminalSession(
+                terminal = terminal,
+                renderPublisher = TerminalRenderPublisher(8, 2),
+                renderReader = terminal as TerminalRenderFrameReader,
+                responseReader = terminal,
+                connector = NoOpConnector,
+                parser = NoOpParser,
+                inputEncoder = NoOpInputEncoder,
+                workerDispatcher = dispatcher,
+                ioDispatcher = dispatcher,
+            ).also(sessions::add)
+
+        SwingUtilities.invokeAndWait {
+            val clipboard = RecordingClipboard()
+            var settings =
+                SwingSettings(
+                    columns = 8,
+                    rows = 2,
+                    padding = SwingPadding(),
+                    shellIntegrationDecorationGutterWidth = 0,
+                    cursorBlinkMillis = 0,
+                )
+            val component =
+                createComponent(
+                    settingsProvider = { settings },
+                    hostServices = SwingHostServices(clipboardHandler = clipboard),
+                )
+            component.size = component.preferredGridSize(8, 2)
+            component.bind(session)
+            dispatcher.scheduler.runCurrent()
+            val pressed = if (block) mousePressedWithAlt(component, x = 1, y = 1) else mousePressed(component, x = 1, y = 1, clickCount = 3)
+            component.mouseListeners.forEach { it.mousePressed(pressed) }
+            if (block) {
+                val cellWidth = component.width / 8
+                val dragged =
+                    MouseEvent(
+                        component,
+                        MouseEvent.MOUSE_DRAGGED,
+                        0L,
+                        InputEvent.BUTTON1_DOWN_MASK or InputEvent.ALT_DOWN_MASK,
+                        cellWidth * 7 + cellWidth / 2,
+                        1,
+                        0,
+                        false,
+                        MouseEvent.BUTTON1,
+                    )
+                component.mouseMotionListeners.forEach { it.mouseDragged(dragged) }
+            }
+            val released = mouseReleased(component, x = 1, y = 1)
+            if (!block) component.mouseListeners.forEach { it.mouseReleased(released) }
+            assertEquals(block, component.currentSelection()?.isBlock)
+            assertTrue(component.copySelectionToClipboard())
+            assertEquals("abcdefgh", clipboard.copied.get())
+
+            if (fontSize != null) {
+                settings = settings.copy(font = settings.font.deriveFont(fontSize))
+                component.reloadSettings()
+            } else {
+                component.size = component.preferredGridSize(resizedColumns, resizedRows)
+                val resize = ComponentEvent(component, ComponentEvent.COMPONENT_RESIZED)
+                component.componentListeners.forEach { it.componentResized(resize) }
+            }
+            dispatcher.scheduler.runCurrent()
+            if (fontSize == null) {
+                assertEquals(resizedColumns, terminal.width)
+                assertEquals(resizedRows, terminal.height)
+                if (resizedColumns == 4 && resizedRows == 1) {
+                    (terminal as TerminalRenderFrameReader).readRenderFrame { frame ->
+                        assertTrue(frame.discardedCount > 0L, "Narrowing into one row must exercise eviction")
+                    }
+                }
+            } else {
+                assertNotEquals(8, terminal.width, "Font metrics must change the grid for this regression")
+            }
+
+            if (fontSize != null || resizedColumns != 8 || resizedRows != 2) {
+                assertNull(component.currentSelection(), "Physical selection must be cleared when the grid changes")
+                assertFalse(component.copySelectionToClipboard(), "A cleared selection must not copy stale coordinates")
+                component.mouseMotionListeners.forEach { it.mouseDragged(mouseDragged(component, x = 1, y = 1)) }
+                assertNull(component.currentSelection(), "A resize must stop an active selection drag")
+            } else {
+                assertNotNull(component.currentSelection(), "A no-op resize must preserve selection")
+                assertTrue(component.copySelectionToClipboard())
+                assertEquals("abcdefgh", clipboard.copied.get())
+            }
+            component.mouseListeners.forEach { it.mouseReleased(released) }
+        }
+    }
+
     @Test
     fun `published frames reconcile hover at a stationary pointer`() {
         fun frame(
@@ -170,8 +298,8 @@ class SwingTerminalSelectionTest {
                         hostServices =
                             SwingHostServices(
                                 hyperlinkHandler =
-                                    TerminalHyperlinkHandler {
-                                        openedLinks.add(it)
+                                    { link ->
+                                        openedLinks.add(link)
                                         true
                                     },
                             ),
@@ -293,7 +421,7 @@ class SwingTerminalSelectionTest {
                         hostServices =
                             SwingHostServices(
                                 hyperlinkHandler =
-                                    TerminalHyperlinkHandler {
+                                    {
                                         opened = it
                                         true
                                     },
@@ -352,8 +480,8 @@ class SwingTerminalSelectionTest {
                 hostServices =
                     SwingHostServices(
                         hyperlinkHandler =
-                            TerminalHyperlinkHandler {
-                                opened.set(it)
+                            { link ->
+                                opened.set(link)
                                 true
                             },
                     ),
@@ -366,6 +494,39 @@ class SwingTerminalSelectionTest {
                 component.mouseListeners.forEach { it.mousePressed(mousePressedWithCtrl(component, 1, 1)) }
             }
             assertEquals("https://example.com/3", opened.get())
+        } finally {
+            SwingUtilities.invokeAndWait { component.dispose() }
+            session.close()
+        }
+    }
+
+    @Test
+    fun `alternate screen mouse coordinates follow the centered grid`() {
+        val input = RecordingInputEncoder()
+        val frame =
+            object : TestRenderFrame(arrayOf(Array(3) { TestCell() })) {
+                override val activeBuffer = TerminalRenderBufferKind.ALTERNATE
+            }
+        val session = testSession(frame, inputEncoder = input)
+        val settings = SwingSettings(padding = SwingPadding(0, 4, 0, 6))
+        val component = createComponent(settingsProvider = { settings })
+        session.start(columns = 3, rows = 1)
+        session.terminal.setMouseTrackingMode(io.github.ketraterm.protocol.MouseTrackingMode.NORMAL)
+        try {
+            SwingUtilities.invokeAndWait {
+                component.setSize(200, 40)
+                component.bind(session)
+                session.renderPublisher.updateAndPublish(StaticFrameReader(frame))
+                val metrics = SwingMetrics.from(component.getFontMetrics(settings.font))
+                val left = 13
+                val x = left + metrics.cellWidth + 1
+                component.mouseListeners.forEach { it.mousePressed(mousePressed(component, x, 1, 1)) }
+                val event = requireNotNull(input.lastMouseEvent.get())
+                assertEquals(1, event.column)
+                assertEquals(metrics.cellWidth + 1, event.pixelX)
+                assertEquals(0, event.row)
+                assertEquals(1, event.pixelY)
+            }
         } finally {
             SwingUtilities.invokeAndWait { component.dispose() }
             session.close()
@@ -979,7 +1140,7 @@ class SwingTerminalSelectionTest {
                 hostServices =
                     SwingHostServices(
                         hyperlinkHandler =
-                            TerminalHyperlinkHandler { uri ->
+                            { uri ->
                                 opened.set(uri)
                                 true
                             },
@@ -1026,7 +1187,7 @@ class SwingTerminalSelectionTest {
                 hostServices =
                     SwingHostServices(
                         hyperlinkHandler =
-                            TerminalHyperlinkHandler {
+                            {
                                 opened.incrementAndGet()
                                 true
                             },

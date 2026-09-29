@@ -118,18 +118,6 @@ class HostCommandAdapter(
     private val windowTitleStack = ArrayDeque<String>()
     private val iconTitleStack = ArrayDeque<String>()
 
-    private var foreground: CellColor = CellColor.DEFAULT
-    private var background: CellColor = CellColor.DEFAULT
-    private var underlineColor: CellColor = CellColor.DEFAULT
-    private var bold: Boolean = false
-    private var faint: Boolean = false
-    private var italic: Boolean = false
-    private var underlineStyle: UnderlineStyle = UnderlineStyle.NONE
-    private var strikethrough: Boolean = false
-    private var overline: Boolean = false
-    private var blink: Boolean = false
-    private var inverse: Boolean = false
-    private var conceal: Boolean = false
     private var activeHyperlinkNumericId: Int = 0
 
     // Zero marks exhaustion. IDs can outlive registry entries in cells and UI snapshots.
@@ -190,7 +178,6 @@ class HostCommandAdapter(
 
     override fun softReset() {
         terminal.softReset()
-        resetPenMirror()
         activeHyperlinkUri = null
         activeHyperlinkId = null
         activeHyperlinkNumericId = 0
@@ -200,7 +187,6 @@ class HostCommandAdapter(
         val previousPalette = terminal.palette
         val hadHyperlinks = hyperlinkIds.isNotEmpty()
         terminal.reset()
-        resetPenMirror()
         activeHyperlinkUri = null
         activeHyperlinkId = null
         activeHyperlinkNumericId = 0
@@ -213,6 +199,8 @@ class HostCommandAdapter(
     override fun decaln() {
         terminal.decaln()
     }
+
+    override val isAlternateScreenActive: Boolean get() = terminal.isAlternateScreenActive
 
     override fun saveCursor() {
         terminal.saveCursor()
@@ -471,15 +459,11 @@ class HostCommandAdapter(
     }
 
     override fun scrollUp(n: Int) {
-        repeat(n.coerceAtLeast(0)) {
-            terminal.scrollUp()
-        }
+        terminal.scrollUp(n)
     }
 
     override fun scrollDown(n: Int) {
-        repeat(n.coerceAtLeast(0)) {
-            terminal.scrollDown()
-        }
+        terminal.scrollDown(n)
     }
 
     override fun setTabStop() {
@@ -742,68 +726,43 @@ class HostCommandAdapter(
     }
 
     override fun resetAttributes() {
-        resetPenMirror()
         terminal.resetPen()
     }
 
-    private fun resetPenMirror() {
-        foreground = CellColor.DEFAULT
-        background = CellColor.DEFAULT
-        underlineColor = CellColor.DEFAULT
-        bold = false
-        faint = false
-        italic = false
-        underlineStyle = UnderlineStyle.NONE
-        strikethrough = false
-        overline = false
-        blink = false
-        inverse = false
-        conceal = false
-    }
-
     override fun setBold(enabled: Boolean) {
-        bold = enabled
-        applyPen()
+        terminal.updatePenColors(bold = enabled)
     }
 
     override fun setFaint(enabled: Boolean) {
-        faint = enabled
-        applyPen()
+        terminal.updatePenColors(faint = enabled)
     }
 
     override fun setItalic(enabled: Boolean) {
-        italic = enabled
-        applyPen()
+        terminal.updatePenColors(italic = enabled)
     }
 
     override fun setUnderlineStyle(style: Int) {
-        underlineStyle = UnderlineStyle.fromSgrCode(style) ?: return
-        applyPen()
+        terminal.updatePenColors(underlineStyle = UnderlineStyle.fromSgrCode(style) ?: return)
     }
 
     override fun setBlink(enabled: Boolean) {
-        blink = enabled
-        applyPen()
+        terminal.updatePenColors(blink = enabled)
     }
 
     override fun setInverse(enabled: Boolean) {
-        inverse = enabled
-        applyPen()
+        terminal.updatePenColors(inverse = enabled)
     }
 
     override fun setConceal(enabled: Boolean) {
-        conceal = enabled
-        applyPen()
+        terminal.updatePenColors(conceal = enabled)
     }
 
     override fun setStrikethrough(enabled: Boolean) {
-        strikethrough = enabled
-        applyPen()
+        terminal.updatePenColors(strikethrough = enabled)
     }
 
     override fun setOverline(enabled: Boolean) {
-        overline = enabled
-        applyPen()
+        terminal.updatePenColors(overline = enabled)
     }
 
     override fun setSelectiveEraseProtection(enabled: Boolean) {
@@ -811,36 +770,30 @@ class HostCommandAdapter(
     }
 
     override fun setForegroundDefault() {
-        foreground = CellColor.DEFAULT
-        applyPen()
+        terminal.updatePenColors(foreground = CellColor.DEFAULT)
     }
 
     override fun setBackgroundDefault() {
-        background = CellColor.DEFAULT
-        applyPen()
+        terminal.updatePenColors(background = CellColor.DEFAULT)
     }
 
     override fun setUnderlineColorDefault() {
-        underlineColor = CellColor.DEFAULT
-        applyPen()
+        terminal.updatePenColors(underlineColor = CellColor.DEFAULT)
     }
 
     override fun setForegroundIndexed(index: Int) {
         if (index !in 0..255) return
-        foreground = CellColor.indexed(index)
-        applyPen()
+        terminal.updatePenColors(foreground = CellColor.indexed(index))
     }
 
     override fun setBackgroundIndexed(index: Int) {
         if (index !in 0..255) return
-        background = CellColor.indexed(index)
-        applyPen()
+        terminal.updatePenColors(background = CellColor.indexed(index))
     }
 
     override fun setUnderlineColorIndexed(index: Int) {
         if (index !in 0..255) return
-        underlineColor = CellColor.indexed(index)
-        applyPen()
+        terminal.updatePenColors(underlineColor = CellColor.indexed(index))
     }
 
     override fun setForegroundRgb(
@@ -848,8 +801,7 @@ class HostCommandAdapter(
         green: Int,
         blue: Int,
     ) {
-        foreground = CellColor.rgb(red, green, blue)
-        applyPen()
+        terminal.updatePenColors(foreground = CellColor.rgb(red, green, blue))
     }
 
     override fun setBackgroundRgb(
@@ -857,8 +809,7 @@ class HostCommandAdapter(
         green: Int,
         blue: Int,
     ) {
-        background = CellColor.rgb(red, green, blue)
-        applyPen()
+        terminal.updatePenColors(background = CellColor.rgb(red, green, blue))
     }
 
     override fun setUnderlineColorRgb(
@@ -866,8 +817,7 @@ class HostCommandAdapter(
         green: Int,
         blue: Int,
     ) {
-        underlineColor = CellColor.rgb(red, green, blue)
-        applyPen()
+        terminal.updatePenColors(underlineColor = CellColor.rgb(red, green, blue))
     }
 
     override fun setWindowTitle(title: String) {
@@ -1209,23 +1159,6 @@ class HostCommandAdapter(
             TerminalTitleOverflowPolicy.REJECT -> null
             TerminalTitleOverflowPolicy.CLAMP -> title.truncateAtScalarBoundary(policy.maxLength)
         }
-    }
-
-    private fun applyPen() {
-        terminal.setPenColors(
-            foreground = foreground,
-            background = background,
-            underlineColor = underlineColor,
-            bold = bold,
-            faint = faint,
-            italic = italic,
-            underlineStyle = underlineStyle,
-            strikethrough = strikethrough,
-            overline = overline,
-            blink = blink,
-            inverse = inverse,
-            conceal = conceal,
-        )
     }
 
     private companion object {

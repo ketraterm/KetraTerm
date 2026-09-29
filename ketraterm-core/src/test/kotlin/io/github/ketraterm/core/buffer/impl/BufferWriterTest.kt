@@ -15,6 +15,7 @@
  */
 package io.github.ketraterm.core.buffer.impl
 
+import io.github.ketraterm.core.TerminalBuffers
 import io.github.ketraterm.core.codec.AttributeCodec
 import io.github.ketraterm.core.engine.CursorEngine
 import io.github.ketraterm.core.engine.MutationEngine
@@ -22,10 +23,98 @@ import io.github.ketraterm.core.model.CellAttributes
 import io.github.ketraterm.core.model.CellColor
 import io.github.ketraterm.core.model.UnderlineStyle
 import io.github.ketraterm.core.state.TerminalState
+import io.github.ketraterm.render.api.TerminalRenderFrameReader
 import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.Test
+import org.junit.jupiter.params.ParameterizedTest
+import org.junit.jupiter.params.provider.CsvSource
 
 class BufferWriterTest {
+    @Test
+    fun `partial pen updates distinguish unchanged fields defaults and false flags`() {
+        val terminal = TerminalBuffers.create(4, 2)
+        terminal.setPenColors(CellColor.rgb(0x123456), CellColor.indexed(255), bold = true, faint = true)
+        terminal.setHyperlinkId(Int.MAX_VALUE)
+        terminal.setSelectiveEraseProtection(true)
+        terminal.writeCodepoint('A'.code)
+        val before = terminal.getAttrAt(0, 0)
+        terminal.updatePenColors()
+        terminal.writeCodepoint('B'.code)
+        assertEquals(before, terminal.getAttrAt(1, 0))
+        terminal.updatePenColors(foreground = CellColor.DEFAULT, bold = false, underlineStyle = UnderlineStyle.CURLY)
+        terminal.writeCodepoint('C'.code)
+        assertEquals(
+            before?.copy(foreground = CellColor.DEFAULT, bold = false, underlineStyle = UnderlineStyle.CURLY),
+            terminal.getAttrAt(2, 0),
+        )
+        assertEquals(before, terminal.getAttrAt(0, 0), "pen updates do not modify previously written cells")
+        terminal.saveCursor()
+        terminal.resetPen()
+        terminal.restoreCursor()
+        terminal.updatePenColors(background = CellColor.indexed(0), faint = false)
+        terminal.writeCodepoint('D'.code)
+        assertEquals(
+            CellAttributes(
+                background = CellColor.indexed(0),
+                underlineStyle = UnderlineStyle.CURLY,
+                hyperlinkId = Int.MAX_VALUE,
+                selectiveEraseProtected = true,
+            ),
+            terminal.getAttrAt(3, 0),
+        )
+    }
+
+    @ParameterizedTest
+    @CsvSource("true,false", "false,false", "true,true", "false,true")
+    fun `counted scroll preserves bounded scalar semantics for cells attributes and history`(
+        up: Boolean,
+        alternate: Boolean,
+    ) {
+        for (top in listOf(1, 2)) {
+            for (partialWidth in listOf(false, true)) {
+                for (count in listOf(-1, 0, 1, 2, 3, Int.MAX_VALUE)) {
+                    val actual = TerminalBuffers.create(8, 5, maxHistory = 2)
+                    val expected = TerminalBuffers.create(8, 5, maxHistory = 2)
+                    for (terminal in listOf(actual, expected)) {
+                        if (alternate) terminal.enterAltBuffer()
+                        for (row in 0 until 5) {
+                            terminal.positionCursor(0, row)
+                            terminal.writeText("${row}界")
+                            terminal.writeCluster(intArrayOf('e'.code, 0x0301), 2)
+                            terminal.writeText("END")
+                        }
+                        terminal.setScrollRegion(top, top + 2)
+                        if (partialWidth) {
+                            terminal.setLeftRightMarginMode(true)
+                            terminal.setLeftRightMargins(3, 6)
+                        }
+                        terminal.setPenAttributes(3, 5, bold = true)
+                        terminal.positionCursor(4, 2)
+                    }
+                    if (up) actual.scrollUp(count) else actual.scrollDown(count)
+                    repeat(count.coerceIn(0, 3)) {
+                        if (up) expected.scrollUp() else expected.scrollDown()
+                    }
+                    val context = "up=$up alternate=$alternate top=$top partial=$partialWidth count=$count"
+                    assertEquals(expected.getAllAsString(), actual.getAllAsString(), context)
+                    assertEquals(expected.historySize, actual.historySize, context)
+                    assertEquals(expected.cursorRow, actual.cursorRow, context)
+                    assertEquals(expected.cursorCol, actual.cursorCol, context)
+                    for (row in 0 until 5) {
+                        for (col in 0 until 8) {
+                            assertEquals(expected.getCodepointAt(col, row), actual.getCodepointAt(col, row), context)
+                            assertEquals(expected.getPackedAttrAt(col, row), actual.getPackedAttrAt(col, row), context)
+                            assertEquals(expected.getPackedExtendedAttrAt(col, row), actual.getPackedExtendedAttrAt(col, row), context)
+                        }
+                    }
+                    var discarded = -1L
+                    (expected as TerminalRenderFrameReader).readRenderFrame { discarded = it.discardedCount }
+                    (actual as TerminalRenderFrameReader).readRenderFrame { assertEquals(discarded, it.discardedCount, context) }
+                }
+            }
+        }
+    }
+
     @Test
     fun `writes codepoints and advances the cursor`() {
         val state = TerminalState(5, 2, 2)

@@ -89,8 +89,14 @@ interface TerminalWriter {
      * The caller owns segmentation and supplies the entire retained sequence, including
      * the previously published prefix. Core preserves the target's attributes, recalculates
      * width, and adjusts its occupied span and following cursor. This does not insert a new
-     * cell or advance past a second grapheme. If no remembered printable target remains,
-     * valid input is ignored. This operation does not validate grapheme boundaries or
+     * cell or advance past a second grapheme. In-row width changes recompute the following
+     * cursor and pending wrap; completed wraps, scrolls, overwrites and insert shifts are
+     * not reversed. Narrowing blanks the released spacer; widening overwrites the next
+     * cell only if it fits inside the right margin, otherwise the cluster stays in one
+     * cell. Updates never shift cells, including in insert mode. A write rejected by
+     * geometry or disabled autowrap clears the target; invalid input leaves it unchanged.
+     * If no remembered printable target remains, valid input is ignored.
+     * This operation does not validate grapheme boundaries or
      * compare the supplied prefix with stored text.
      *
      * The used prefix is copied into core-owned storage before returning; the caller may
@@ -174,6 +180,14 @@ interface TerminalWriter {
     fun scrollUp()
 
     /**
+     * Scrolls the active region up by [count] lines, capped at its height.
+     * Non-positive counts are ignored. Preserves the cursor position and uses
+     * the same horizontal-margin and history-admission rules as [scrollUp].
+     * Work is bounded by the grid dimensions, not the supplied count.
+     */
+    fun scrollUp(count: Int)
+
+    /**
      * Scrolls the active scroll region down by one line (SD, `CSI 1 T`).
      *
      * Only cells within the active horizontal margins move, exposing blank
@@ -181,6 +195,14 @@ interface TerminalWriter {
      * position is preserved.
      */
     fun scrollDown()
+
+    /**
+     * Scrolls the active region down by [count] lines, capped at its height.
+     * Non-positive counts are ignored. Preserves the cursor position and uses
+     * the same horizontal-margin rules as [scrollDown], without consuming history.
+     * Work is bounded by the grid dimensions, not the supplied count.
+     */
+    fun scrollDown(count: Int)
 
     /**
      * Inserts [count] blank lines at the cursor row within the active scroll
@@ -492,6 +514,27 @@ interface TerminalWriter {
         blink: Boolean = false,
         inverse: Boolean = false,
         conceal: Boolean = false,
+    )
+
+    /**
+     * Updates only the supplied SGR pen fields. A null field is unchanged;
+     * [CellColor.DEFAULT] explicitly selects the default color and `false` clears a flag.
+     * Hyperlink and selective-erase protection are preserved. With all fields null this is a no-op.
+     * Consumed synchronously; serialize with other terminal reads and writes. No cell is changed.
+     */
+    fun updatePenColors(
+        foreground: CellColor? = null,
+        background: CellColor? = null,
+        underlineColor: CellColor? = null,
+        bold: Boolean? = null,
+        faint: Boolean? = null,
+        italic: Boolean? = null,
+        underlineStyle: UnderlineStyle? = null,
+        strikethrough: Boolean? = null,
+        overline: Boolean? = null,
+        blink: Boolean? = null,
+        inverse: Boolean? = null,
+        conceal: Boolean? = null,
     )
 
     /**

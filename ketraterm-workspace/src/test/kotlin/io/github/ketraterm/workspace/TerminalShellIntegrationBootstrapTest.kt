@@ -15,6 +15,7 @@
  */
 package io.github.ketraterm.workspace
 
+import org.junit.jupiter.api.assertAll
 import org.junit.jupiter.api.io.TempDir
 import java.nio.file.Path
 import java.util.*
@@ -121,6 +122,7 @@ class TerminalShellIntegrationBootstrapTest {
                 id = "powershell",
                 displayName = "PowerShell",
                 command = listOf("pwsh.exe", "-NoLogo"),
+                environment = mapOf("Path" to "host-bin", "KetraTerm_CONFIG_PATH" to "host-settings.xml"),
             )
 
         val integrated = TerminalShellIntegrationBootstrap.apply(profile, enabled = false)
@@ -267,6 +269,7 @@ class TerminalShellIntegrationBootstrapTest {
                 id = "custom",
                 displayName = "Custom",
                 command = listOf("custom-shell"),
+                environment = mapOf("PATH" to "host-bin", "KetraTerm_CONFIG_PATH" to "host-settings.toml"),
                 kind = TerminalProfileKind.DEFAULT,
             )
 
@@ -341,7 +344,7 @@ class TerminalShellIntegrationBootstrapTest {
     }
 
     @Test
-    fun `injects config and version variables and writes wrapper scripts`(
+    fun `Bash shell hooks do not install standalone configuration or commands`(
         @TempDir tempDir: Path,
     ) {
         val profile =
@@ -353,31 +356,133 @@ class TerminalShellIntegrationBootstrapTest {
 
         val integrated = TerminalShellIntegrationBootstrap.apply(profile, enabled = true, scriptDirectory = tempDir)
 
-        // Verify version and config variables in environment
-        assertNotNull(integrated.environment["KetraTerm_VERSION"])
-        assertNotNull(integrated.environment["KetraTerm_CONFIG_PATH"])
-        assertNull(integrated.environment["KetraTerm_" + "HISTORY_PATH"])
+        val promptCommand = integrated.environment.getValue("PROMPT_COMMAND")
+        assertTrue(promptCommand.contains("]133;"))
+        assertTrue(promptCommand.contains("]7;"))
+        assertEquals("localhost", integrated.environment["KetraTerm_OSC7_AUTHORITY"])
+        assertAll(
+            { assertNull(integrated.environment["KetraTerm_CONFIG_PATH"], "The host chooses its settings location") },
+            { assertNull(integrated.environment["KetraTerm_VERSION"], "The host supplies its product version") },
+            { assertNull(integrated.environment["KetraTerm_OS"], "Shell hooks must not inject diagnostic metadata") },
+            { assertNull(integrated.environment["KetraTerm_JVM"], "Shell hooks must not inject diagnostic metadata") },
+            {
+                assertTrue(
+                    integrated.environment.keys.none {
+                        it.equals("PATH", ignoreCase = true)
+                    },
+                    "Shell hooks must retain the inherited executable search path",
+                )
+            },
+            { assertFalse(tempDir.resolve("bin/ketra").exists(), "Shell hooks must not install the standalone POSIX command") },
+            { assertFalse(tempDir.resolve("bin/ketra.bat").exists(), "Shell hooks must not install the standalone Windows command") },
+        )
+    }
 
-        // Verify PATH is prepended with the scripts bin directory
-        val pathKey = integrated.environment.keys.firstOrNull { it.equals("PATH", ignoreCase = true) }
-        assertNotNull(pathKey)
-        val pathVal = integrated.environment.getValue(pathKey)
-        val binDirStr = tempDir.resolve("bin").toAbsolutePath().toString()
-        assertTrue(pathVal.startsWith(binDirStr))
+    @Test
+    fun `Bash shell hooks preserve host selected configuration and executable search path`(
+        @TempDir tempDir: Path,
+    ) {
+        val hostPath = tempDir.resolve("host-bin").toString()
+        val hostConfig = tempDir.resolve("host-settings.toml").toString()
+        val profile =
+            TerminalProfile(
+                id = "bash",
+                displayName = "Bash",
+                command = listOf("bash"),
+                environment = mapOf("PATH" to hostPath, "KetraTerm_CONFIG_PATH" to hostConfig, "PROMPT_COMMAND" to "history -a"),
+            )
 
-        // Verify wrapper scripts are written to tempDir/bin
-        val posixScript = tempDir.resolve("bin/ketra")
-        val batchScript = tempDir.resolve("bin/ketra.bat")
-        assertTrue(posixScript.exists())
-        assertTrue(batchScript.exists())
+        val integrated = TerminalShellIntegrationBootstrap.apply(profile, enabled = true, scriptDirectory = tempDir)
 
-        // Verify script contents contain the correct keyword cases and paths
-        val posixContent = posixScript.readText()
-        val batchContent = batchScript.readText()
-        assertTrue(posixContent.contains("Usage: ketra"))
-        assertTrue(posixContent.contains("KetraTerm_CONFIG_PATH"))
-        assertTrue(batchContent.contains("Usage: ketra"))
-        assertTrue(batchContent.contains("KetraTerm_CONFIG_PATH"))
+        val promptCommand = integrated.environment.getValue("PROMPT_COMMAND")
+        assertTrue(promptCommand.contains("]133;"))
+        assertTrue(promptCommand.contains("]7;"))
+        assertTrue(promptCommand.endsWith("history -a"))
+        assertAll(
+            { assertEquals(hostConfig, integrated.environment["KetraTerm_CONFIG_PATH"]) },
+            { assertEquals(mapOf("PATH" to hostPath), integrated.environment.filterKeys { it.equals("PATH", ignoreCase = true) }) },
+            { assertFalse(tempDir.resolve("bin/ketra").exists()) },
+            { assertFalse(tempDir.resolve("bin/ketra.bat").exists()) },
+        )
+    }
+
+    @Test
+    fun `PowerShell hooks preserve host configuration and mixed case executable search path`(
+        @TempDir tempDir: Path,
+    ) {
+        val hostPath = tempDir.resolve("host-bin").toString()
+        val hostConfig = tempDir.resolve("host-settings.xml").toString()
+        val profile =
+            TerminalProfile(
+                id = "powershell",
+                displayName = "PowerShell",
+                command = listOf("pwsh.exe"),
+                environment = mapOf("Path" to hostPath, "KetraTerm_CONFIG_PATH" to hostConfig),
+            )
+
+        val integrated = TerminalShellIntegrationBootstrap.apply(profile, enabled = true, scriptDirectory = tempDir)
+
+        val script = decodePowerShellScript(integrated.command.last())
+        assertTrue(script.contains("]133;"))
+        assertTrue(script.contains("]7;"))
+        assertAll(
+            { assertEquals(hostConfig, integrated.environment["KetraTerm_CONFIG_PATH"]) },
+            { assertEquals(mapOf("Path" to hostPath), integrated.environment.filterKeys { it.equals("PATH", ignoreCase = true) }) },
+            { assertFalse(tempDir.resolve("bin/ketra").exists()) },
+            { assertFalse(tempDir.resolve("bin/ketra.bat").exists()) },
+        )
+    }
+
+    @Test
+    fun `shell families preserve host environment without introducing standalone policy`(
+        @TempDir tempDir: Path,
+    ) {
+        val profiles =
+            listOf(
+                TerminalProfile("powershell", "PowerShell", listOf("pwsh.exe")),
+                TerminalProfile("git-bash", "Git Bash", listOf("C:\\Program Files\\Git\\bin\\bash.exe", "-l")),
+                TerminalProfile("zsh", "Zsh", listOf("zsh", "-l")),
+                TerminalProfile("fish", "Fish", listOf("fish", "-l")),
+                TerminalProfile("wsl-bash", "WSL Bash", listOf("wsl.exe", "-e", "bash", "-l"), kind = TerminalProfileKind.WSL),
+                TerminalProfile("wsl-zsh", "WSL Zsh", listOf("wsl.exe", "-e", "zsh", "-l"), kind = TerminalProfileKind.WSL),
+                TerminalProfile("wsl-fish", "WSL Fish", listOf("wsl.exe", "-e", "fish", "-l"), kind = TerminalProfileKind.WSL),
+                TerminalProfile("ubuntu", "Ubuntu", listOf("ubuntu.exe", "run", "bash", "-l")),
+            )
+        val hostEnvironment =
+            mapOf(
+                "Path" to tempDir.resolve("host-bin").toString(),
+                "KetraTerm_CONFIG_PATH" to tempDir.resolve("host-settings.xml").toString(),
+                "KetraTerm_VERSION" to "host-version",
+                "KetraTerm_OS" to "host-os",
+                "KetraTerm_JVM" to "host-runtime",
+                "HOST_CUSTOM_VALUE" to "retained",
+            )
+
+        for (profile in profiles) {
+            val scriptDirectory = tempDir.resolve(profile.id)
+            val inherited = TerminalShellIntegrationBootstrap.apply(profile, enabled = true, scriptDirectory = scriptDirectory)
+            val explicit =
+                TerminalShellIntegrationBootstrap.apply(
+                    profile.copy(environment = hostEnvironment),
+                    enabled = true,
+                    scriptDirectory = scriptDirectory,
+                )
+
+            assertAll(
+                profile.displayName,
+                { assertNotEquals(profile, inherited, "The supported shell still receives integration hooks") },
+                { assertTrue(inherited.environment.keys.none { it.equals("PATH", ignoreCase = true) }) },
+                { assertTrue(inherited.environment.keys.none { it in hostEnvironment }, "The host owns product metadata") },
+                { assertEquals(hostEnvironment, explicit.environment.filterKeys { it in hostEnvironment }) },
+                {
+                    assertEquals(
+                        mapOf("Path" to hostEnvironment.getValue("Path")),
+                        explicit.environment.filterKeys { it.equals("PATH", true) },
+                    )
+                },
+                { assertFalse(scriptDirectory.resolve("bin").exists(), "Shell hooks must not install product commands") },
+            )
+        }
     }
 
     private fun decodePowerShellScript(encoded: String): String = String(Base64.getDecoder().decode(encoded), Charsets.UTF_16LE)

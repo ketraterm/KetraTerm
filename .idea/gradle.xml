@@ -23,6 +23,7 @@
             <option value="$PROJECT_DIR$/ketraterm-render-api" />
             <option value="$PROJECT_DIR$/ketraterm-render-cache" />
             <option value="$PROJECT_DIR$/ketraterm-session" />
+            <option value="$PROJECT_DIR$/ketraterm-shell-integration" />
             <option value="$PROJECT_DIR$/ketraterm-testkit" />
             <option value="$PROJECT_DIR$/ketraterm-transport-api" />
             <option value="$PROJECT_DIR$/ketraterm-ui-swing" />
@@ -52,6 +53,7 @@
                   <project path="$PROJECT_DIR$/ketraterm-render-api" />
                   <project path="$PROJECT_DIR$/ketraterm-render-cache" />
                   <project path="$PROJECT_DIR$/ketraterm-session" />
+                  <project path="$PROJECT_DIR$/ketraterm-shell-integration" />
                   <project path="$PROJECT_DIR$/ketraterm-testkit" />
                   <project path="$PROJECT_DIR$/ketraterm-transport-api" />
                   <project path="$PROJECT_DIR$/ketraterm-ui-swing" />
@@ -82,6 +84,7 @@
             <option value="$PROJECT_DIR$/ketraterm-render-api" />
             <option value="$PROJECT_DIR$/ketraterm-render-cache" />
             <option value="$PROJECT_DIR$/ketraterm-session" />
+            <option value="$PROJECT_DIR$/ketraterm-shell-integration" />
             <option value="$PROJECT_DIR$/ketraterm-testkit" />
             <option value="$PROJECT_DIR$/ketraterm-transport-api" />
             <option value="$PROJECT_DIR$/ketraterm-ui-swing" />

@@ -53,6 +53,11 @@ class SettingsModelTest {
     }
 
     @Test
+    fun `settings expose the active configuration path`() {
+        assertEquals(tempFile, settings.configPath)
+    }
+
+    @Test
     fun `fresh settings publish Ask and preserve it after restart`() {
         Files.delete(tempFile)
         val manager = TerminalWorkspaceConfigManager(tempFile)

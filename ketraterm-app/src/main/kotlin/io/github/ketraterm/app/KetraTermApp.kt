@@ -17,6 +17,7 @@ package io.github.ketraterm.app
 
 import io.github.ketraterm.workspace.TerminalProfileRegistry
 import java.nio.file.Path
+import java.util.*
 import javax.swing.SwingUtilities
 
 /**
@@ -26,6 +27,13 @@ fun main(args: Array<String>) {
     SwingUtilities.invokeLater {
         KetraTermApp.start(args.toList())
     }
+}
+
+/** Packaged standalone version, shared by the About dialog and companion CLI. */
+internal val appVersion: String by lazy {
+    KetraTermApp::class.java.getResourceAsStream("/io/github/ketraterm/app/version.properties")?.use { stream ->
+        Properties().apply { load(stream) }.getProperty("version")
+    } ?: "unknown"
 }
 
 private object KetraTermApp {

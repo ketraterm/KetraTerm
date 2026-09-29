@@ -174,6 +174,58 @@ internal object AttributeCodec {
         return v
     }
 
+    fun updatePrimary(
+        word: Long,
+        foreground: CellColor?,
+        background: CellColor?,
+        bold: Boolean?,
+        faint: Boolean?,
+        italic: Boolean?,
+        blink: Boolean?,
+        inverse: Boolean?,
+    ): Long {
+        var result = word
+        if (foreground != null) result = (result and COLOR_SLOT_MASK.inv()) or encodeColor(foreground).toLong()
+        if (background !=
+            null
+        ) {
+            result = (result and (COLOR_SLOT_MASK shl BG_SHIFT).inv()) or (encodeColor(background).toLong() shl BG_SHIFT)
+        }
+        if (bold != null) result = if (bold) result or (1L shl BOLD_BIT) else result and (1L shl BOLD_BIT).inv()
+        if (faint != null) result = if (faint) result or (1L shl FAINT_BIT) else result and (1L shl FAINT_BIT).inv()
+        if (italic != null) result = if (italic) result or (1L shl ITALIC_BIT) else result and (1L shl ITALIC_BIT).inv()
+        if (blink != null) result = if (blink) result or (1L shl BLINK_BIT) else result and (1L shl BLINK_BIT).inv()
+        if (inverse != null) result = if (inverse) result or (1L shl INVERSE_BIT) else result and (1L shl INVERSE_BIT).inv()
+        return result
+    }
+
+    fun updateExtended(
+        word: Long,
+        underlineColor: CellColor?,
+        underlineStyle: UnderlineStyle?,
+        strikethrough: Boolean?,
+        overline: Boolean?,
+        conceal: Boolean?,
+    ): Long {
+        var result = word
+        if (underlineColor != null) result = (result and COLOR_SLOT_MASK.inv()) or encodeColor(underlineColor).toLong()
+        if (underlineStyle !=
+            null
+        ) {
+            result =
+                (result and (UNDERLINE_STYLE_MASK shl UNDERLINE_STYLE_SHIFT).inv()) or
+                (underlineStyle.sgrCode.toLong() shl UNDERLINE_STYLE_SHIFT)
+        }
+        if (strikethrough !=
+            null
+        ) {
+            result = if (strikethrough) result or (1L shl STRIKETHROUGH_BIT) else result and (1L shl STRIKETHROUGH_BIT).inv()
+        }
+        if (overline != null) result = if (overline) result or (1L shl OVERLINE_BIT) else result and (1L shl OVERLINE_BIT).inv()
+        if (conceal != null) result = if (conceal) result or (1L shl CONCEAL_BIT) else result and (1L shl CONCEAL_BIT).inv()
+        return result
+    }
+
     fun foreground(v: Long): Int = colorCode((v and COLOR_SLOT_MASK).toInt())
 
     fun background(v: Long): Int = colorCode(((v ushr BG_SHIFT) and COLOR_SLOT_MASK).toInt())

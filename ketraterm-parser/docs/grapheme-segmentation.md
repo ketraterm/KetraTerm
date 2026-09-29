@@ -51,6 +51,11 @@ structural command. An unfinished UTF-8 scalar does not delay publication of an
 already decoded prefix. Unchanged prefixes are never published again. Normal flush
 publishes any pending update before clearing context; reset discards pending state.
 
+Both `accept` and `acceptByte` publish at their call boundary. Publication commits
+core grid effects; preserving segmentation across calls does not promise identical
+placement across calls. See the [streaming placement policy](../../docs/terminal-feature-map.md#streaming-grapheme-placement)
+for width changes after publication.
+
 Both array-based calls borrow the parser's reusable buffer only for the synchronous
 call. Sinks must consume or copy the used prefix before returning. Core stores its
 own copy and never retains the parser array. It does not assemble continuations from
@@ -78,3 +83,15 @@ The host adapter forwards these operations. Core owns cluster storage, width, cu
 and wrapping; its direct cluster-writing API has no new 32-codepoint restriction.
 The renderer consumes the retained text through its existing cache and shaping
 contracts. No grapheme policy is duplicated in those modules.
+
+## Charset save/restore ownership
+
+Live G0–G3 designations and GL/GR shifts remain parser-owned. DEC/SCO and 1048
+save/restore use separate primary/alternate charset slots, selected from the sink’s
+actual screen. An effective 1049 entry saves primary state; its exit restores it.
+Clearing alternate entry (1047/1049) resets that screen’s saved slot; repeated or
+rejected screen requests do not alter slots. Single shifts are transient and are
+cleared on restore. Unsaved slots, RIS and DECSTR use ASCII, GL=G0 and GR=G2.
+
+The sink must expose effective screen selection synchronously. Direct host resets
+of core should be paired with parser reset, as with other parser-owned state.

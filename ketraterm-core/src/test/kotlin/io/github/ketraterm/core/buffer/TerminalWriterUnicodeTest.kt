@@ -19,8 +19,108 @@ import io.github.ketraterm.core.TerminalBuffers
 import io.github.ketraterm.core.model.CellColor
 import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.Test
+import org.junit.jupiter.params.ParameterizedTest
+import org.junit.jupiter.params.provider.CsvSource
 
 class TerminalWriterUnicodeTest {
+    @ParameterizedTest
+    @CsvSource("1,false", "4,false", "6,true")
+    fun `rejected printable writes clear the continuation target`(
+        width: Int,
+        horizontalMargins: Boolean,
+    ) {
+        for (ingress in listOf("scalar", "text", "cluster")) {
+            for (alternate in listOf(false, true)) {
+                for (insert in listOf(false, true)) {
+                    val buffer = TerminalBuffers.create(width, 2)
+                    if (alternate) buffer.enterAltBuffer()
+                    val right = if (horizontalMargins) width - 2 else width - 1
+                    if (horizontalMargins) {
+                        buffer.setLeftRightMarginMode(true)
+                        buffer.setLeftRightMargins(2, right + 1)
+                    }
+                    buffer.setAutoWrap(false)
+                    buffer.setInsertMode(insert)
+                    val previous = maxOf(0, right - 1)
+                    buffer.positionCursor(previous, 0)
+                    buffer.writeCodepoint('A'.code)
+                    when (ingress) {
+                        "scalar" -> buffer.writeCodepoint(0x1F600)
+                        "text" -> buffer.writeText("\uD83D\uDE00")
+                        else -> buffer.writeCluster(intArrayOf(0x1F600, 0x0301))
+                    }
+                    val before = buffer.getAllAsString()
+                    buffer.updatePreviousCluster(intArrayOf(0x1F600, 0x0301, 0xFE0E))
+                    assertEquals(before, buffer.getAllAsString(), "$ingress alt=$alternate insert=$insert")
+                    assertEquals('A'.code, buffer.getCodepointAt(previous, 0))
+                    assertEquals(right, buffer.cursorCol)
+                    assertEquals(0, buffer.cursorRow)
+                    buffer.writeCodepoint('X'.code)
+                    buffer.updatePreviousCluster(intArrayOf('X'.code, 0x0301))
+                    val copied = IntArray(2)
+                    assertEquals(2, buffer.getLine(0).readCluster(right, copied))
+                    assertArrayEquals(intArrayOf('X'.code, 0x0301), copied)
+                }
+            }
+        }
+    }
+
+    @ParameterizedTest
+    @CsvSource(
+        "false,false,false",
+        "false,false,true",
+        "false,true,false",
+        "false,true,true",
+        "true,false,false",
+        "true,false,true",
+        "true,true,false",
+        "true,true,true",
+    )
+    fun `width changes within the row recompute the following cursor and pending wrap`(
+        shrink: Boolean,
+        autoWrap: Boolean,
+        horizontalMargins: Boolean,
+    ) {
+        val buffer = TerminalBuffers.create(6, 2)
+        val left = if (horizontalMargins) 1 else 0
+        val right = if (horizontalMargins) 4 else 5
+        if (horizontalMargins) {
+            buffer.setLeftRightMarginMode(true)
+            buffer.setLeftRightMargins(left + 1, right + 1)
+        }
+        buffer.setAutoWrap(autoWrap)
+        buffer.positionCursor(right - 1, 0)
+        buffer.setPenColors(CellColor.indexed(1), CellColor.indexed(2))
+        buffer.setHyperlinkId(17)
+        val cluster = if (shrink) intArrayOf(0x2615, 0xFE0E) else intArrayOf(0x2764, 0xFE0F)
+        buffer.writeCodepoint(cluster[0])
+        val originalAttr = buffer.getAttrAt(right - 1, 0)
+        buffer.setPenColors(CellColor.indexed(3), CellColor.indexed(4))
+        buffer.setHyperlinkId(99)
+        buffer.updatePreviousCluster(cluster)
+
+        val copied = IntArray(2)
+        assertEquals(2, buffer.getLine(0).readCluster(right - 1, copied))
+        assertArrayEquals(cluster, copied)
+        assertEquals(originalAttr, buffer.getAttrAt(right - 1, 0))
+        assertEquals(if (shrink) 0 else -1, buffer.getCodepointAt(right, 0))
+        assertEquals(right, buffer.cursorCol)
+        assertEquals(0, buffer.cursorRow)
+
+        buffer.writeCodepoint('X'.code)
+        val nextRow = if (!shrink && autoWrap) 1 else 0
+        val nextCol = if (!shrink && autoWrap) left else right
+        assertEquals('X'.code, buffer.getCodepointAt(nextCol, nextRow))
+        assertEquals(nextRow, buffer.cursorRow)
+        assertEquals(if (nextRow == 1) left + 1 else right, buffer.cursorCol)
+        assertEquals(CellColor.indexed(3), buffer.getAttrAt(nextCol, nextRow)?.foreground)
+        assertEquals(99, buffer.getAttrAt(nextCol, nextRow)?.hyperlinkId)
+        if (shrink || autoWrap) {
+            assertEquals(2, buffer.getLine(0).readCluster(right - 1, copied))
+            assertArrayEquals(cluster, copied, "following text must not overwrite the completed grapheme")
+        }
+    }
+
     @Test
     fun `full prefix updates preserve clusters beyond the parser retention limit`() {
         val buffer = TerminalBuffers.create(width = 6, height = 2)

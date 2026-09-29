@@ -31,46 +31,86 @@ internal class TerminalSearchModel {
     private var charStartColumns = IntArray(INITIAL_TEXT_CAPACITY)
     private var charEndColumns = IntArray(INITIAL_TEXT_CAPACITY)
     private val highlights = TerminalSearchHighlights()
+    private var rowIds = LongArray(INITIAL_TEXT_CAPACITY)
+    private var rowGenerations = LongArray(INITIAL_TEXT_CAPACITY)
+    private var firstAbsoluteRow = 0L
+    private var currentRow = 0
+    private var query = ""
+    private var ignoreCase = true
+    private var checkCancelled: () -> Unit = {}
 
     fun search(
         cache: TerminalRenderCache,
         query: String,
         ignoreCase: Boolean,
     ): TerminalSearchHighlights {
-        highlights.clear()
+        begin(query, ignoreCase, cache.discardedCount + cache.historySize - cache.scrollbackOffset)
         if (query.isEmpty()) return highlights
+        append(cache, firstAbsoluteRow)
+        return finish()
+    }
 
-        var row = 0
-        while (row < cache.rows) {
-            lineText.setLength(0)
-            do {
-                appendRow(cache, row)
-                row++
-            } while (row < cache.rows && cache.lineWrapped[row - 1])
+    fun begin(
+        query: String,
+        ignoreCase: Boolean,
+        firstAbsoluteRow: Long,
+        checkCancelled: () -> Unit = {},
+        validateRows: Boolean = false,
+    ) {
+        this.query = query
+        this.ignoreCase = ignoreCase
+        this.firstAbsoluteRow = firstAbsoluteRow
+        this.checkCancelled = checkCancelled
+        highlights.clear()
+        highlights.validatesRows = validateRows
+        discardPendingLine()
+    }
 
-            trimTrailingSpaces()
-            scanLine(
-                cache = cache,
-                query = query,
-                ignoreCase = ignoreCase,
-            )
+    fun discardPendingLine() {
+        lineText.setLength(0)
+    }
+
+    fun append(
+        cache: TerminalRenderCache,
+        firstRow: Long,
+    ) {
+        for (row in 0 until cache.rows) {
+            checkCancelled()
+            currentRow = (firstRow + row - firstAbsoluteRow).toInt()
+            if (currentRow >= rowIds.size) {
+                val capacity = nextCapacity(rowIds.size, currentRow + 1)
+                rowIds = rowIds.copyOf(capacity)
+                rowGenerations = rowGenerations.copyOf(capacity)
+            }
+            rowIds[currentRow] = cache.lineIds[row]
+            rowGenerations[currentRow] = cache.lineGenerations[row]
+            appendRow(cache, row)
+            if (!cache.lineWrapped[row]) finishLine()
         }
+    }
 
+    fun finish(): TerminalSearchHighlights {
+        finishLine()
         highlights.activate(if (highlights.resultCount == 0) -1 else 0)
         return highlights
     }
 
+    private fun finishLine() {
+        trimTrailingSpaces()
+        scanLine(query, ignoreCase)
+        discardPendingLine()
+    }
+
     private fun scanLine(
-        cache: TerminalRenderCache,
         query: String,
         ignoreCase: Boolean,
     ) {
         if (lineText.length < query.length) return
-        val firstAbsoluteRow = cache.discardedCount + cache.historySize - cache.scrollbackOffset
 
         var index = 0
         val lastStart = lineText.length - query.length
         while (index <= lastStart) {
+            checkCancelled()
             if (matchesAt(index, query, ignoreCase)) {
                 appendMatch(firstAbsoluteRow, index, index + query.length)
                 index += maxOf(1, query.length)
@@ -87,6 +127,7 @@ internal class TerminalSearchModel {
     ): Boolean {
         var index = 0
         while (index < query.length) {
+            if (index and 255 == 0) checkCancelled()
             val actual = lineText[startIndex + index]
             val expected = query[index]
             if (actual != expected) {
@@ -110,16 +151,17 @@ internal class TerminalSearchModel {
 
         var index = startChar
         while (index < endChar) {
+            if (index and 255 == 0) checkCancelled()
             val row = charRows[index]
             if (row != currentRow) {
-                highlights.addSegment(firstAbsoluteRow + currentRow, startColumn, endColumn)
+                highlights.addSegment(firstAbsoluteRow + currentRow, startColumn, endColumn, rowIds[currentRow], rowGenerations[currentRow])
                 currentRow = row
                 startColumn = charStartColumns[index]
             }
             endColumn = charEndColumns[index]
             index++
         }
-        highlights.addSegment(firstAbsoluteRow + currentRow, startColumn, endColumn)
+        highlights.addSegment(firstAbsoluteRow + currentRow, startColumn, endColumn, rowIds[currentRow], rowGenerations[currentRow])
         highlights.finishResult()
     }
 
@@ -129,6 +171,7 @@ internal class TerminalSearchModel {
     ) {
         var column = 0
         while (column < cache.columns) {
+            if (column and 255 == 0) checkCancelled()
             column = appendCell(cache, row, column)
         }
     }
@@ -140,7 +183,7 @@ internal class TerminalSearchModel {
     ): Int {
         val index = cache.rowOffset(row) + column
         val flags = cache.flags[index]
-        if (flags and TerminalRenderCellFlags.WIDE_TRAILING != 0) {
+        if (flags and (TerminalRenderCellFlags.WIDE_TRAILING or TerminalRenderCellFlags.WRAP_PADDING) != 0) {
             return column + 1
         }
 
@@ -149,24 +192,24 @@ internal class TerminalSearchModel {
             flags and TerminalRenderCellFlags.CLUSTER != 0 -> {
                 val ref = cache.clusterRefs[index]
                 if (ref == NO_CLUSTER_REF) {
-                    appendMappedCodePoint(' '.code, row, column, column + columnSpan)
+                    appendMappedCodePoint(' '.code, column, column + columnSpan)
                 } else {
                     val offset = cache.clusterOffset(ref)
                     val length = cache.clusterLength(ref)
                     var clusterIndex = offset
                     val end = offset + length
                     while (clusterIndex < end) {
-                        appendMappedCodePoint(cache.clusterCodepoints[clusterIndex], row, column, column + columnSpan)
+                        appendMappedCodePoint(cache.clusterCodepoints[clusterIndex], column, column + columnSpan)
                         clusterIndex++
                     }
                 }
             }
 
             flags and TerminalRenderCellFlags.CODEPOINT != 0 -> {
-                appendMappedCodePoint(cache.codeWords[index], row, column, column + columnSpan)
+                appendMappedCodePoint(cache.codeWords[index], column, column + columnSpan)
             }
 
-            else -> appendMappedCodePoint(' '.code, row, column, column + columnSpan)
+            else -> appendMappedCodePoint(' '.code, column, column + columnSpan)
         }
 
         return column + columnSpan
@@ -174,10 +217,10 @@ internal class TerminalSearchModel {
 
     private fun appendMappedCodePoint(
         codePoint: Int,
-        row: Int,
         startColumn: Int,
         endColumn: Int,
     ) {
+        checkCancelled()
         val charStart = lineText.length
         lineText.appendCodePoint(codePoint)
         val charEnd = lineText.length
@@ -185,7 +228,7 @@ internal class TerminalSearchModel {
 
         var charIndex = charStart
         while (charIndex < charEnd) {
-            charRows[charIndex] = row
+            charRows[charIndex] = currentRow
             charStartColumns[charIndex] = startColumn
             charEndColumns[charIndex] = endColumn
             charIndex++
@@ -195,6 +238,7 @@ internal class TerminalSearchModel {
     private fun trimTrailingSpaces() {
         var end = lineText.length
         while (end > 0 && lineText[end - 1] == ' ') {
+            if (end and 255 == 0) checkCancelled()
             end--
         }
         lineText.setLength(end)

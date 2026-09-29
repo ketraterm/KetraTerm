@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.github.ketraterm.session
+package io.github.ketraterm.shell.integration
 
 import io.github.ketraterm.render.api.TerminalRenderCellFlags
 import io.github.ketraterm.render.api.TerminalRenderClusterDataSink

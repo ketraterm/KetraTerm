@@ -51,6 +51,10 @@ internal class KetraTermSettings(
     val theme: TerminalTheme
         get() = TerminalTheme.fromId(config.theme) ?: TerminalTheme.ONE_DARK
 
+    /** Active configuration file used by this application instance. */
+    val configPath: Path
+        get() = configManager.configPath
+
     /** Path for the compact persisted command-completion stats index. */
     val commandCompletionStatsPath: Path
         get() = configManager.configPath.resolveSibling(TerminalCompletionLearningCoordinator.currentFileName())

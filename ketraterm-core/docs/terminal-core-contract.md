@@ -88,7 +88,14 @@ Render frames distinguish stored content from its global presentation:
   to the most recently written printable cell. The caller owns segmentation and
   includes the previously published prefix; core preserves the original attributes
   and applies width, occupied-span, and following-cursor changes. No new printable
-  cell is inserted. Valid updates without a remembered target are ignored.
+  cell is inserted. In-row width changes recompute the following cursor and its
+  pending-wrap flag using the active right margin and autowrap mode. Completed
+  wrapping, scrolling, overwrites and insert shifts are not reversed. Narrowing
+  blanks the released spacer; widening overwrites the next cell only if it fits
+  inside the right margin, otherwise the cluster stays in one cell. Updates do
+  not insert or shift cells. A printable write rejected by geometry or disabled
+  autowrap clears the continuation target; validation failures leave it unchanged.
+  Valid updates without a remembered target are ignored.
 - Both cluster APIs consume the borrowed array synchronously, copying its used prefix
   into core storage. Callers may reuse it immediately. Core neither compares prefixes
   nor validates grapheme boundaries, and imposes no parser retention limit.
@@ -103,8 +110,8 @@ Guaranteed behavior:
 - deferred wrap follows terminal semantics
 - clusters are stored in the active buffer arena and survive reflow by
   deep-copy into the new arena
-- parser-identified grapheme continuations preserve the cursor position and
-  wide spacer invariants
+- same-width grapheme continuations preserve cursor position; in-row width changes
+  update the following cursor while preserving wide spacer invariants
 
 Not guaranteed:
 
@@ -133,6 +140,9 @@ The writer surface owns:
 Guaranteed behavior:
 
 - structural edits cancel `pendingWrap`
+- counted `scrollUp` / `scrollDown` cap positive counts at the active region
+  height; non-positive counts are no-ops. Cursor position is preserved, and
+  one request can admit at most that many rows under the existing history rules
 - `ECH` erases without shifting
 - `ICH` / `DCH` are constrained by active horizontal margins
 - `IL` / `DL` are constrained by the active vertical region and are no-op when
@@ -152,6 +162,10 @@ The cursor surface owns:
 - `DECSC` / `DECRC`
 - tab stop commands
 
+Cursor counts and origin-relative coordinates clamp without integer overflow.
+Tab traversal stops at the applicable margin, so work is bounded by the viewport
+width rather than the supplied count.
+
 ### `DECSC` / `DECRC`
 
 The core-owned save slot includes:
@@ -168,10 +182,18 @@ The core does not save or restore:
 - locking shifts
 - parser-owned shift state
 
-Those remain parser state and must be handled outside `:ketraterm-core`.
+Those remain parser state and must be handled outside `:ketraterm-core`. The parser
+selects its saved charset slot from `TerminalReader.isAlternateScreenActive` through
+the command sink; it does not maintain an independent active-screen flag.
 
 If no save slot exists, `restoreCursor()` falls back to the core's documented
 absolute home plus pen reset behavior.
+
+`TerminalWriter.updatePenColors` changes only non-null SGR fields of the current
+core pen. Null means unchanged, `CellColor.DEFAULT` selects a default color, and
+false clears a style flag. Hyperlink IDs and selective-erase protection survive.
+The adapter uses this operation instead of retaining another pen representation.
+Like other writes, updates are synchronous and require external serialization.
 
 ### Tabs
 

@@ -16,9 +16,8 @@
 package io.github.ketraterm.app.ui
 
 import com.formdev.flatlaf.extras.FlatSVGIcon
+import io.github.ketraterm.app.appVersion
 import java.awt.*
-import java.io.InputStream
-import java.util.*
 import javax.swing.*
 import javax.swing.border.EmptyBorder
 
@@ -126,7 +125,7 @@ internal class AboutDialog(
                 alignmentX = LEFT_ALIGNMENT
             }
 
-        val version = getAppVersion()
+        val version = appVersion
         val versionLabel =
             JLabel("Version: $version").apply {
                 font = Font("Dialog", Font.PLAIN, 11)
@@ -188,20 +187,4 @@ internal class AboutDialog(
         panel.add(okButton)
         return panel
     }
-
-    private fun getAppVersion(): String =
-        try {
-            val properties = Properties()
-            val inputStream: InputStream? =
-                AboutDialog::class.java.classLoader
-                    .getResourceAsStream("io/github/ketraterm/app/version.properties")
-            if (inputStream != null) {
-                properties.load(inputStream)
-                properties.getProperty("version") ?: "0.1.0"
-            } else {
-                "0.1.0"
-            }
-        } catch (e: Exception) {
-            "0.1.0"
-        }
 }

@@ -24,8 +24,8 @@ import io.github.ketraterm.session.TerminalShellIntegrationState
 /**
  * Renderer-local snapshot of shell integration decorations for one viewport.
  *
- * The shared [TerminalShellIntegrationState] is a session-owned command
- * timeline. Swing projects the visible rows into these primitive arrays before
+ * The shared [TerminalShellIntegrationState] is the selected integration's command
+ * projection. Swing copies the visible rows into these primitive arrays before
  * painting so the row paint loop performs only array lookups.
  */
 internal class TerminalShellIntegrationViewportDecorations {

@@ -53,6 +53,7 @@ internal class TerminalSelectionController(
     private val host: TerminalSelectionHost,
 ) {
     private val selectionTextExtractor = TerminalSelectionTextExtractor()
+    private var viewportSelection: CellSelection? = null
 
     // Alt can change during a drag after its anchor row has left the viewport.
     // Retain both cell coordinates; selectionAnchorColumn is a half-open edge.
@@ -85,6 +86,7 @@ internal class TerminalSelectionController(
         stopSelectionDrag()
         selectionAnchorAbsoluteRow = null
         selectionCaretAbsoluteRow = null
+        viewportSelection = null
     }
 
     fun selectAbsoluteRows(
@@ -209,23 +211,19 @@ internal class TerminalSelectionController(
         val clampedEndRow = endViewportRow.coerceIn(0L, c.rows - 1L).toInt()
         val clampedEndCol = if (!selectionIsBlock && endViewportRow >= c.rows) c.columns else endCol.coerceIn(0, c.columns)
 
-        return if (isForward) {
-            CellSelection(
-                anchorColumn = clampedStartCol,
-                anchorRow = clampedStartRow,
-                caretColumn = clampedEndCol,
-                caretRow = clampedEndRow,
-                isBlock = selectionIsBlock,
-            )
-        } else {
-            CellSelection(
-                anchorColumn = clampedEndCol,
-                anchorRow = clampedEndRow,
-                caretColumn = clampedStartCol,
-                caretRow = clampedStartRow,
-                isBlock = selectionIsBlock,
-            )
+        val anchorColumn = if (isForward) clampedStartCol else clampedEndCol
+        val anchorRow = if (isForward) clampedStartRow else clampedEndRow
+        val caretColumn = if (isForward) clampedEndCol else clampedStartCol
+        val caretRow = if (isForward) clampedEndRow else clampedStartRow
+        val previous = viewportSelection
+        if (previous != null &&
+            previous.anchorColumn == anchorColumn && previous.anchorRow == anchorRow &&
+            previous.caretColumn == caretColumn && previous.caretRow == caretRow &&
+            previous.isBlock == selectionIsBlock
+        ) {
+            return previous
         }
+        return CellSelection(anchorColumn, anchorRow, caretColumn, caretRow, selectionIsBlock).also { viewportSelection = it }
     }
 
     fun getSelectedText(reader: io.github.ketraterm.render.api.TerminalRenderFrameReader): String? {

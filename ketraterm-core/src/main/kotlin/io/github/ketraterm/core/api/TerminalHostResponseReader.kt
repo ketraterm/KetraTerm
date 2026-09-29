@@ -30,6 +30,8 @@ interface TerminalHostResponseReader {
      * @param offset The starting offset in [dst] at which to begin writing bytes.
      * @param length The maximum number of bytes to read from the queue.
      * @return Number of bytes copied, or `0` when no response is pending.
+     * @throws IllegalArgumentException if the slice is outside [dst], including
+     * integer-overflow ranges. Rejection preserves queued bytes and [dst].
      */
     fun readResponseBytes(
         dst: ByteArray,

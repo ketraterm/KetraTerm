@@ -21,9 +21,9 @@ import io.github.ketraterm.host.*
 import io.github.ketraterm.input.api.TerminalInputEncoder
 import io.github.ketraterm.input.event.*
 import io.github.ketraterm.parser.api.TerminalOutputParser
+import io.github.ketraterm.parser.api.TerminalParsers
 import io.github.ketraterm.protocol.keyboard.KittyKeyboardProgressiveFlag
 import io.github.ketraterm.render.api.*
-import io.github.ketraterm.render.cache.TerminalRenderCache
 import io.github.ketraterm.render.cache.TerminalRenderPublisher
 import io.github.ketraterm.testkit.MockConnector
 import io.github.ketraterm.transport.TerminalConnector
@@ -37,13 +37,295 @@ import org.junit.jupiter.params.provider.CsvSource
 import org.junit.jupiter.params.provider.ValueSource
 import java.nio.charset.StandardCharsets
 import java.util.*
+import java.util.concurrent.CompletableFuture
 import java.util.concurrent.CountDownLatch
+import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicInteger
 import kotlin.time.Duration.Companion.milliseconds
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class TerminalSessionTest {
+    @ParameterizedTest
+    @ValueSource(strings = ["running", "resize"])
+    fun `reentrant shutdown during startup cannot start a disposed connector`(stage: String) =
+        runTest {
+            val recorded = MockConnector()
+            var starts = 0
+            lateinit var session: TerminalSession
+            val connector =
+                object : TerminalConnector by recorded {
+                    override fun resize(
+                        columns: Int,
+                        rows: Int,
+                    ) {
+                        recorded.resize(columns, rows)
+                        if (stage == "resize") session.close()
+                    }
+
+                    override fun start(listener: io.github.ketraterm.transport.TerminalConnectorListener) {
+                        starts++
+                        recorded.start(listener)
+                    }
+                }
+            session =
+                TerminalSession.create(
+                    terminal = TerminalBuffers.create(10, 3),
+                    connector = connector,
+                    workerDispatcher = StandardTestDispatcher(testScheduler),
+                    ioDispatcher = StandardTestDispatcher(testScheduler),
+                )
+            if (stage == "running") {
+                backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) {
+                    session.state.first { it === TerminalSessionState.Running }
+                    session.close()
+                }
+            }
+            session.use {
+                session.start(10, 3)
+                assertEquals(0, starts)
+                assertEquals(1, recorded.closeCount)
+                assertTrue((session.state.value as TerminalSessionState.Closed).event.locallyRequested)
+                assertFalse(session.isCoroutineScopeActive)
+            }
+        }
+
+    @Test
+    fun `close waits for an in flight publication then retains the EOF frame`() {
+        val copied = CountDownLatch(1)
+        val release = CountDownLatch(1)
+        val transportClosed = CountDownLatch(1)
+        val terminal = TerminalBuffers.create(10, 3)
+        val source = terminal as TerminalRenderFrameReader
+        val reads = AtomicInteger()
+        val renderReader =
+            object : TerminalRenderFrameReader by source {
+                override fun readRenderFrame(
+                    scrollbackOffset: Int,
+                    consumer: TerminalRenderFrameConsumer,
+                ) {
+                    readRenderFrame(scrollbackOffset, terminal.height, consumer)
+                }
+
+                override fun readRenderFrame(
+                    scrollbackOffset: Int,
+                    viewportRows: Int,
+                    consumer: TerminalRenderFrameConsumer,
+                ) {
+                    source.readRenderFrame(scrollbackOffset, viewportRows, consumer)
+                    if (reads.incrementAndGet() == 1) {
+                        copied.countDown()
+                        release.await()
+                    }
+                }
+            }
+        val recorded = MockConnector()
+        val worker = Executors.newSingleThreadExecutor().asCoroutineDispatcher()
+        val session =
+            TerminalSession(
+                terminal = terminal,
+                renderPublisher = TerminalRenderPublisher(10, 3),
+                renderReader = renderReader,
+                responseReader = terminal,
+                connector =
+                    object : TerminalConnector by recorded {
+                        override fun close() {
+                            recorded.close()
+                            transportClosed.countDown()
+                        }
+                    },
+                parser = TerminalParsers.create(HostCommandAdapter(terminal)),
+                workerDispatcher = worker,
+                ioDispatcher = worker,
+            )
+        try {
+            session.start(10, 3)
+            recorded.feedFromHost(byteArrayOf('A'.code.toByte(), 0xE2.toByte(), 0x82.toByte()))
+            assertTrue(copied.await(10, TimeUnit.SECONDS), "publication did not copy the pre-EOF frame")
+            val closing = CompletableFuture.runAsync(session::close)
+            try {
+                assertTrue(transportClosed.await(10, TimeUnit.SECONDS), "close did not reach transport disposal")
+                assertFalse(session.state.value is TerminalSessionState.Closed)
+            } finally {
+                release.countDown()
+                closing.get(10, TimeUnit.SECONDS)
+            }
+            assertArrayEquals(
+                intArrayOf('A'.code, 0xFFFD),
+                session.renderPublisher
+                    .current()!!
+                    .codeWords
+                    .copyOf(2),
+            )
+            assertTrue(session.state.value is TerminalSessionState.Closed)
+            assertFalse(session.isCoroutineScopeActive)
+        } finally {
+            release.countDown()
+            session.close()
+            worker.close()
+        }
+    }
+
+    @Test
+    fun `final publication preserves an active reader lease`() =
+        runTest {
+            val connector = MockConnector()
+            val session =
+                TerminalSession.create(
+                    terminal = TerminalBuffers.create(10, 3),
+                    connector = connector,
+                    workerDispatcher = StandardTestDispatcher(testScheduler),
+                    ioDispatcher = StandardTestDispatcher(testScheduler),
+                )
+            val leased = CountDownLatch(1)
+            val release = CountDownLatch(1)
+            session.use {
+                session.start(10, 3)
+                connector.feedFromHost("OLD".ascii())
+                runCurrent()
+                val reader =
+                    CompletableFuture.runAsync {
+                        session.renderPublisher.readCurrent { frame ->
+                            assertEquals('O'.code, frame.codeWords[0])
+                            leased.countDown()
+                            release.await()
+                            assertEquals('O'.code, frame.codeWords[0])
+                        }
+                    }
+                try {
+                    assertTrue(leased.await(10, TimeUnit.SECONDS))
+                    connector.feedFromHost("\rFINAL".ascii())
+                    session.close()
+                    assertEquals(
+                        'F'.code,
+                        session.renderPublisher
+                            .current()
+                            ?.codeWords
+                            ?.get(0),
+                    )
+                    assertTrue(session.state.value is TerminalSessionState.Closed)
+                } finally {
+                    release.countDown()
+                    reader.get(10, TimeUnit.SECONDS)
+                }
+            }
+        }
+
+    @Test
+    fun `cleanup failures cannot skip EOF publication or scope cancellation`() =
+        runTest {
+            val connectorFailure = IllegalStateException("connector close failed")
+            val eofFailure = IllegalStateException("EOF failed")
+            val recorded = MockConnector()
+            val terminal = TerminalBuffers.create(10, 3)
+            terminal.writeText("FINAL")
+            val session =
+                TerminalSession(
+                    terminal = terminal,
+                    renderPublisher = TerminalRenderPublisher(10, 3),
+                    renderReader = terminal as TerminalRenderFrameReader,
+                    responseReader = terminal,
+                    connector =
+                        object : TerminalConnector by recorded {
+                            override fun close() {
+                                recorded.close()
+                                throw connectorFailure
+                            }
+                        },
+                    parser =
+                        object : TerminalOutputParser by RecordingParser() {
+                            override fun endOfInput(): Unit = throw eofFailure
+                        },
+                    workerDispatcher = StandardTestDispatcher(testScheduler),
+                    ioDispatcher = StandardTestDispatcher(testScheduler),
+                )
+            assertSame(connectorFailure, assertThrows(IllegalStateException::class.java) { session.close() })
+            assertTrue(eofFailure in connectorFailure.suppressed)
+            assertEquals(
+                'F'.code,
+                session.renderPublisher
+                    .current()
+                    ?.codeWords
+                    ?.get(0),
+            )
+            assertTrue(session.isClosed)
+            assertFalse(session.isCoroutineScopeActive)
+            session.close()
+            assertEquals(1, recorded.closeCount)
+        }
+
+    @ParameterizedTest
+    @ValueSource(strings = ["resize", "start"])
+    fun `startup failure closes the connector and retains its cause`(stage: String) =
+        runTest {
+            val failure = IllegalStateException("startup $stage failed")
+            val recorded = MockConnector()
+            val connector =
+                object : TerminalConnector by recorded {
+                    override fun resize(
+                        columns: Int,
+                        rows: Int,
+                    ) {
+                        if (stage == "resize") throw failure
+                        recorded.resize(columns, rows)
+                    }
+
+                    override fun start(listener: io.github.ketraterm.transport.TerminalConnectorListener): Unit = throw failure
+                }
+            val session =
+                TerminalSession.create(
+                    terminal = TerminalBuffers.create(10, 3),
+                    connector = connector,
+                    workerDispatcher = StandardTestDispatcher(testScheduler),
+                    ioDispatcher = StandardTestDispatcher(testScheduler),
+                )
+            session.use {
+                assertSame(failure, assertThrows(IllegalStateException::class.java) { session.start(10, 3) })
+                assertTrue(session.isClosed)
+                assertSame(failure, session.failure)
+                assertEquals(1, recorded.closeCount)
+                assertFalse(session.isCoroutineScopeActive)
+            }
+            assertEquals(1, recorded.closeCount)
+        }
+
+    @Test
+    fun `closed observers see the final frame and released transport immediately`() =
+        runTest {
+            val connector = MockConnector()
+            val session =
+                TerminalSession.create(
+                    terminal = TerminalBuffers.create(10, 3),
+                    connector = connector,
+                    workerDispatcher = StandardTestDispatcher(testScheduler),
+                    ioDispatcher = StandardTestDispatcher(testScheduler),
+                )
+            session.use {
+                session.start(10, 3)
+                session.requestRender(0)
+                runCurrent()
+                val observed = mutableListOf<Pair<Int?, Int>>()
+                backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) {
+                    session.state.first { it is TerminalSessionState.Closed }
+                    observed += session.renderPublisher
+                        .current()
+                        ?.codeWords
+                        ?.get(0) to connector.closeCount
+                }
+                connector.feedFromHost("LAST".ascii())
+                connector.simulateClosed(7)
+                assertEquals(listOf('L'.code to 1), observed)
+                assertEquals(session.state.value, session.state.first())
+                assertEquals(
+                    'L'.code,
+                    session.renderPublisher
+                        .current()
+                        ?.codeWords
+                        ?.get(0),
+                )
+            }
+        }
+
     @Test
     fun `xterm resource queries and negotiated key bytes share the session output`() {
         val connector = MockConnector()
@@ -488,67 +770,210 @@ class TerminalSessionTest {
             assertFalse(session.isCoroutineScopeActive)
         }
 
+    @ParameterizedTest
+    @ValueSource(strings = ["local", "remote", "error"])
+    fun `cleanup disposes transport once and preserves the first termination event`(termination: String) =
+        runTest {
+            val dispatcher = StandardTestDispatcher(testScheduler)
+            val connector = MockConnector()
+            val failure = IllegalStateException("transport failed")
+            TerminalSession
+                .create(
+                    terminal = TerminalBuffers.create(10, 3),
+                    connector = connector,
+                    workerDispatcher = dispatcher,
+                    ioDispatcher = dispatcher,
+                ).use { session ->
+                    session.start(10, 3)
+                    when (termination) {
+                        "local" -> session.close()
+                        "remote" -> connector.simulateClosed(7)
+                        "error" -> connector.simulateCrash(failure)
+                        else -> error("unknown termination: $termination")
+                    }
+                    val expected =
+                        TerminalSessionState.Closed(
+                            TerminalSessionCloseEvent(
+                                exitCode = if (termination == "remote") 7 else null,
+                                failure = if (termination == "error") failure else null,
+                                locallyRequested = termination == "local",
+                            ),
+                        )
+                    assertEquals(expected, session.state.value)
+
+                    session.close()
+                    session.close()
+                    connector.simulateClosed(19)
+                    connector.simulateCrash(IllegalStateException("later failure"))
+                    runCurrent()
+
+                    assertAll(
+                        { assertEquals(1, connector.closeCount) },
+                        { assertTrue(connector.isClosed) },
+                        { assertEquals(expected, session.state.value) },
+                        { assertFalse(session.isCoroutineScopeActive) },
+                    )
+                }
+        }
+
     @Test
-    fun `remote close records exit code`() {
+    fun `connector closure callback cannot recursively dispose transport or replace the first event`() =
+        runTest {
+            val dispatcher = StandardTestDispatcher(testScheduler)
+            val recorded = MockConnector()
+            lateinit var session: TerminalSession
+            val connector =
+                object : TerminalConnector by recorded {
+                    override fun close() {
+                        recorded.close()
+                        session.onClosed(19)
+                    }
+                }
+            session =
+                TerminalSession.create(
+                    terminal = TerminalBuffers.create(10, 3),
+                    connector = connector,
+                    workerDispatcher = dispatcher,
+                    ioDispatcher = dispatcher,
+                )
+            session.use {
+                session.start(10, 3)
+                recorded.simulateClosed(7)
+                session.close()
+                session.close()
+                runCurrent()
+                assertAll(
+                    { assertEquals(1, recorded.closeCount) },
+                    {
+                        assertEquals(
+                            TerminalSessionState.Closed(
+                                TerminalSessionCloseEvent(exitCode = 7, failure = null, locallyRequested = false),
+                            ),
+                            session.state.value,
+                        )
+                    },
+                )
+            }
+        }
+
+    @ParameterizedTest
+    @CsvSource("local,false", "remote,false", "error,false", "local,true", "remote,true", "error,true")
+    fun `termination publishes final UTF8 cells when publication is pending`(
+        termination: String,
+        synchronizedOutput: Boolean,
+    ) = runTest {
+        val dispatcher = StandardTestDispatcher(testScheduler)
         val connector = MockConnector()
-        val session = createStartedSession(connector)
+        val terminal = TerminalBuffers.create(10, 3)
+        TerminalSession
+            .create(
+                terminal = terminal,
+                connector = connector,
+                workerDispatcher = dispatcher,
+                ioDispatcher = dispatcher,
+            ).use { session ->
+                session.start(10, 3)
+                session.requestRender(0)
+                runCurrent()
+                val before = session.renderGeneration.value
+                assertEquals(0, session.renderPublisher.current()!!.codeWords[0])
+                if (synchronizedOutput) connector.feedFromHost("\u001B[?2026h".ascii())
+                connector.feedFromHost("LAST \u20AC\r\n".encodeToByteArray())
+                when (termination) {
+                    "local" -> session.close()
+                    "remote" -> connector.simulateClosed(0)
+                    "error" -> connector.simulateCrash(IllegalStateException("read failed"))
+                    else -> error("unknown termination: $termination")
+                }
+                runCurrent()
 
-        connector.simulateClosed(7)
-
-        assertEquals(7, session.exitCode)
-        assertEquals(0, connector.closeCount)
-        assertEquals(
-            TerminalSessionState.Closed(
-                TerminalSessionCloseEvent(exitCode = 7, failure = null, locallyRequested = false),
-            ),
-            session.state.value,
-        )
+                assertEquals("LAST \u20AC", terminal.getLineAsString(0))
+                val expected = "LAST \u20AC".map(Char::code).toIntArray()
+                assertAll(
+                    {
+                        assertArrayEquals(
+                            expected,
+                            session.renderPublisher
+                                .current()!!
+                                .codeWords
+                                .copyOf(expected.size),
+                        )
+                    },
+                    { assertNotEquals(before, session.renderGeneration.value) },
+                    { assertTrue(session.isClosed) },
+                )
+            }
     }
 
+    @ParameterizedTest
+    @ValueSource(strings = ["local", "remote", "error"])
+    fun `termination publishes EOF replacement for incomplete UTF8 exactly once`(termination: String) =
+        runTest {
+            val dispatcher = StandardTestDispatcher(testScheduler)
+            val connector = MockConnector()
+            val terminal = TerminalBuffers.create(10, 3)
+            TerminalSession
+                .create(
+                    terminal = terminal,
+                    connector = connector,
+                    workerDispatcher = dispatcher,
+                    ioDispatcher = dispatcher,
+                ).use { session ->
+                    session.start(10, 3)
+                    session.requestRender(0)
+                    runCurrent()
+                    connector.feedFromHost(byteArrayOf(0xE2.toByte(), 0x82.toByte()))
+                    when (termination) {
+                        "local" -> session.close()
+                        "remote" -> connector.simulateClosed(0)
+                        "error" -> connector.simulateCrash(IllegalStateException("read failed"))
+                        else -> error("unknown termination: $termination")
+                    }
+                    session.close()
+                    connector.simulateClosed(19)
+                    runCurrent()
+                    assertEquals(0xFFFD, terminal.getCodepointAt(0, 0))
+                    assertEquals(0, terminal.getCodepointAt(1, 0))
+                    assertArrayEquals(
+                        intArrayOf(0xFFFD, 0),
+                        session.renderPublisher
+                            .current()!!
+                            .codeWords
+                            .copyOf(2),
+                    )
+                    assertTrue(session.isClosed)
+                }
+        }
+
     @Test
-    fun `remote error records failure and does not fake exit code`() {
-        val connector = MockConnector()
-        val session = createStartedSession(connector)
-        val failure = IllegalStateException("transport failed")
-
-        connector.simulateCrash(failure)
-
-        assertEquals(failure, session.failure)
-        assertNull(session.exitCode)
-        assertEquals(0, connector.closeCount)
-        assertEquals(
-            TerminalSessionState.Closed(
-                TerminalSessionCloseEvent(exitCode = null, failure = failure, locallyRequested = false),
-            ),
-            session.state.value,
-        )
-    }
-
-    @Test
-    fun `onClosed does not recursively close connector`() {
-        val connector = MockConnector()
-        createStartedSession(connector)
-
-        connector.simulateClosed(7)
-
-        assertEquals(0, connector.closeCount)
-    }
-
-    @Test
-    fun `local cleanup after remote close does not emit duplicate close event`() {
-        val connector = MockConnector()
-        val session = createStartedSession(connector)
-
-        connector.simulateClosed(1)
-        session.close()
-
-        assertEquals(
-            TerminalSessionState.Closed(
-                TerminalSessionCloseEvent(exitCode = 1, failure = null, locallyRequested = false),
-            ),
-            session.state.value,
-        )
-    }
+    fun `remote EOF preserves a final frame that was already published`() =
+        runTest {
+            val dispatcher = StandardTestDispatcher(testScheduler)
+            val connector = MockConnector()
+            TerminalSession
+                .create(
+                    terminal = TerminalBuffers.create(10, 3),
+                    connector = connector,
+                    workerDispatcher = dispatcher,
+                    ioDispatcher = dispatcher,
+                ).use { session ->
+                    session.start(10, 3)
+                    connector.feedFromHost("LAST LINE\r\n".ascii())
+                    session.requestRender(0)
+                    runCurrent()
+                    connector.simulateClosed(0)
+                    runCurrent()
+                    val expected = "LAST LINE".map(Char::code).toIntArray()
+                    assertArrayEquals(
+                        expected,
+                        session.renderPublisher
+                            .current()!!
+                            .codeWords
+                            .copyOf(expected.size),
+                    )
+                    assertEquals(0, session.exitCode)
+                }
+        }
 
     @Test
     fun `input key writes through connector`() {
@@ -844,95 +1269,6 @@ class TerminalSessionTest {
     }
 
     @Test
-    fun `OSC 133 markers populate shared shell integration state`() {
-        val connector = MockConnector()
-        val session = createStartedSession(connector, columns = 10, rows = 4)
-
-        connector.feedFromHost("\u001B]133;A\u0007prompt> \u001B]133;B\u0007\u001B]133;C\u0007run\r\nfailed\u001B]133;D;2\u0007".ascii())
-
-        val decorations = session.shellDecorations()
-        assertAll(
-            { assertTrue(decorations.promptStarts[0]) },
-        )
-        session.close()
-    }
-
-    @Test
-    fun `OSC 133 prompt marker skips leading blank layout row in multiline Bash prompt`() {
-        val connector = MockConnector()
-        val session = createStartedSession(connector, columns = 30, rows = 4)
-
-        connector.feedFromHost(
-            "\u001B]133;A\u0007\r\ngagik@host MINGW64 ~\r\n$ \u001B]133;B\u0007".ascii(),
-        )
-
-        val decorations = session.shellDecorations()
-        assertAll(
-            { assertFalse(decorations.promptStarts[0]) },
-            { assertTrue(decorations.promptStarts[1]) },
-            { assertFalse(decorations.promptStarts[2]) },
-        )
-        session.close()
-    }
-
-    @Test
-    fun `OSC 133 prompt marker remains on first row when prompt content begins there`() {
-        val connector = MockConnector()
-        val session = createStartedSession(connector, columns = 30, rows = 4)
-
-        connector.feedFromHost(
-            "\u001B]133;A\u0007gagik@host\r\n$ \u001B]133;B\u0007".ascii(),
-        )
-
-        val decorations = session.shellDecorations()
-        assertAll(
-            { assertTrue(decorations.promptStarts[0]) },
-            { assertFalse(decorations.promptStarts[1]) },
-        )
-        session.close()
-    }
-
-    @Test
-    fun `OSC 133 empty prompt span preserves original marker anchor`() {
-        val connector = MockConnector()
-        val session = createStartedSession(connector, columns = 30, rows = 4)
-
-        connector.feedFromHost("\u001B]133;A\u0007\r\n\u001B]133;B\u0007".ascii())
-
-        val decorations = session.shellDecorations()
-        assertAll(
-            { assertTrue(decorations.promptStarts[0]) },
-            { assertFalse(decorations.promptStarts[1]) },
-        )
-        session.close()
-    }
-
-    @Test
-    fun `OSC 7 updates session directory and OSC 133 snapshots it onto the command`() {
-        val connector = MockConnector()
-        val session = createStartedSession(connector, columns = 30, rows = 4)
-
-        connector.feedFromHost(
-            "\u001B]7;file:///workspace/My%20Project\u001B\\".ascii(),
-        )
-        connector.feedFromHost(
-            "\u001B]133;A\u0007PS> \u001B]133;B\u0007build\u001B]133;C\u0007".ascii(),
-        )
-
-        val recordId = session.shellDecorations().commandRecordIds[0]
-        assertAll(
-            { assertEquals("file:///workspace/My%20Project", session.currentWorkingDirectoryUri()) },
-            {
-                assertEquals(
-                    "file:///workspace/My%20Project",
-                    session.shellIntegrationState.commandWorkingDirectoryUri(recordId),
-                )
-            },
-        )
-        session.close()
-    }
-
-    @Test
     fun `OSC 52 audit and allowed write callbacks are forwarded through session wrapper`() {
         val connector = MockConnector()
         val events = RecordingHostEvents()
@@ -983,496 +1319,6 @@ class TerminalSessionTest {
             { assertEquals("Hello", events.clipboardPrompts.single().text) },
             { assertEquals(events.clipboardAudits.single(), events.clipboardPrompts.single().audit) },
             { assertTrue(events.clipboardWrites.isEmpty()) },
-        )
-        session.close()
-    }
-
-    @Test
-    fun `OSC 133 command start captures same line command text after prompt end`() {
-        val connector = MockConnector()
-        val session = createStartedSession(connector, columns = 30, rows = 4)
-
-        connector.feedFromHost("\u001B]133;A\u0007PS> \u001B]133;B\u0007git status\u001B]133;C\u0007\r\nok\u001B]133;D;0\u0007".ascii())
-
-        val decorations = session.shellDecorations()
-        val recordId = decorations.commandRecordIds[0]
-        assertAll(
-            { assertTrue(recordId != TerminalShellIntegrationCommandRecord.NONE) },
-            { assertEquals("git status", session.shellIntegrationState.commandText(recordId)) },
-        )
-        session.close()
-    }
-
-    @Test
-    fun `OSC 133 active command line captures visible text before command start`() {
-        val connector = MockConnector()
-        val session = createStartedSession(connector, columns = 30, rows = 4)
-
-        connector.feedFromHost("\u001B]133;A\u0007PS> \u001B]133;B\u0007git status".ascii())
-
-        assertEquals(
-            TerminalShellCommandLineSnapshot(
-                commandText = "git status",
-                cursorOffset = "git status".length,
-                cursorColumn = "PS> git status".length,
-                cursorRow = 0,
-            ),
-            session.activeShellCommandLine(),
-        )
-        session.close()
-    }
-
-    @Test
-    fun `OSC 133 active command line is unavailable after command start`() {
-        val connector = MockConnector()
-        val session = createStartedSession(connector, columns = 30, rows = 4)
-
-        connector.feedFromHost("\u001B]133;A\u0007PS> \u001B]133;B\u0007git status\u001B]133;C\u0007".ascii())
-
-        assertNull(session.activeShellCommandLine())
-        session.close()
-    }
-
-    @Test
-    fun `OSC 133 active command line is unavailable without prompt end`() {
-        val connector = MockConnector()
-        val session = createStartedSession(connector, columns = 30, rows = 4)
-
-        connector.feedFromHost("\u001B]133;A\u0007PS> git status".ascii())
-
-        assertNull(session.activeShellCommandLine())
-        session.close()
-    }
-
-    @Test
-    fun `OSC 133 active command line is unavailable when cursor is before visible command end`() {
-        val connector = MockConnector()
-        val session = createStartedSession(connector, columns = 30, rows = 4)
-
-        connector.feedFromHost("\u001B]133;A\u0007PS> \u001B]133;B\u0007git status\u001B[2D".ascii())
-
-        assertNull(session.activeShellCommandLine())
-        session.close()
-    }
-
-    @Test
-    fun `OSC 133 active command line reads bounded scrollback when prompt moved above live rows`() {
-        val connector = MockConnector()
-        val session = createStartedSession(connector, columns = 20, rows = 2)
-
-        connector.feedFromHost("\u001B]133;A\u0007P> \u001B]133;B\u0007one\r\ntwo\r\nthree".ascii())
-
-        assertEquals(
-            TerminalShellCommandLineSnapshot(
-                commandText = "one\ntwo\nthree",
-                cursorOffset = "one\ntwo\nthree".length,
-                cursorColumn = "three".length,
-                cursorRow = 2,
-            ),
-            session.activeShellCommandLine(),
-        )
-        session.close()
-    }
-
-    @Test
-    fun `OSC 133 command start captures previous line command text at column zero`() {
-        val connector = MockConnector()
-        val session = createStartedSession(connector, columns = 30, rows = 4)
-
-        connector.feedFromHost("\u001B]133;A\u0007PS> \u001B]133;B\u0007git status\r\n\u001B]133;C\u0007output\u001B]133;D;1\u0007".ascii())
-
-        val decorations = session.shellDecorations()
-        val recordId = decorations.commandRecordIds[1]
-        assertAll(
-            { assertTrue(recordId != TerminalShellIntegrationCommandRecord.NONE) },
-            { assertEquals("git status", session.shellIntegrationState.commandText(recordId)) },
-        )
-        session.close()
-    }
-
-    @Test
-    fun `OSC 133 command start preserves hard line breaks in multiline command text`() {
-        val connector = MockConnector()
-        val session = createStartedSession(connector, columns = 30, rows = 4)
-
-        connector.feedFromHost(
-            "\u001B]133;A\u0007PS> \u001B]133;B\u0007echo first\r\nsecond\u001B]133;C\u0007".ascii(),
-        )
-
-        val recordId = session.shellDecorations().commandRecordIds[1]
-        assertEquals("echo first\nsecond", session.shellIntegrationState.commandText(recordId))
-        session.close()
-    }
-
-    @Test
-    fun `OSC 133 command start joins soft wrapped command rows without a newline`() {
-        val connector = MockConnector()
-        val session = createStartedSession(connector, columns = 10, rows = 4)
-
-        connector.feedFromHost(
-            "\u001B]133;A\u0007P> \u001B]133;B\u0007abcdefghijk\u001B]133;C\u0007".ascii(),
-        )
-
-        val recordId = session.shellDecorations().commandRecordIds[0]
-        assertEquals("abcdefghijk", session.shellIntegrationState.commandText(recordId))
-        session.close()
-    }
-
-    @Test
-    fun `OSC 133 command start preserves argument separator at soft wrap`() {
-        val connector = MockConnector()
-        createStartedSession(connector, columns = 8, rows = 4).use { session ->
-            connector.feedFromHost(
-                "\u001B]133;A\u0007P> \u001B]133;B\u0007echo hello\u001B]133;C\u0007".ascii(),
-            )
-
-            val recordId = session.shellDecorations().commandRecordIds[0]
-            assertEquals("echo hello", session.shellIntegrationState.commandText(recordId))
-        }
-    }
-
-    @Test
-    fun `OSC 133 command start preserves a soft wrapped row containing only spaces`() {
-        val connector = MockConnector()
-        createStartedSession(connector, columns = 8, rows = 4).use { session ->
-            val command = "echo" + " ".repeat(9) + "hello"
-            connector.feedFromHost(
-                ("\u001B]133;A\u0007P> \u001B]133;B\u0007" + command + "\u001B]133;C\u0007").ascii(),
-            )
-
-            val recordId = session.shellDecorations().commandRecordIds[0]
-            assertEquals("echo" + " ".repeat(9) + "hello", session.shellIntegrationState.commandText(recordId))
-        }
-    }
-
-    @Test
-    fun `OSC 133 command start preserves wrapped argument separators after prompt enters scrollback`() {
-        val connector = MockConnector()
-        createStartedSession(connector, columns = 8, rows = 2).use { session ->
-            connector.feedFromHost(
-                "\u001B]133;A\u0007P> \u001B]133;B\u0007echo first second third\u001B]133;C\u0007".ascii(),
-            )
-
-            val recordId = session.shellDecorations().commandRecordIds[1]
-            assertEquals("echo first second third", session.shellIntegrationState.commandText(recordId))
-        }
-    }
-
-    @Test
-    fun `OSC 133 command start preserves spaces before wide glyph wrap padding`() {
-        val connector = MockConnector()
-        createStartedSession(connector, columns = 10, rows = 4).use { session ->
-            connector.feedFromHost(
-                "\u001B]133;A\u0007P> \u001B]133;B\u0007echo  \u754C\u001B]133;C\u0007"
-                    .toByteArray(StandardCharsets.UTF_8),
-            )
-
-            val recordId = session.shellDecorations().commandRecordIds[0]
-            assertEquals("echo  \u754C", session.shellIntegrationState.commandText(recordId))
-        }
-    }
-
-    @Test
-    fun `OSC 133 command start preserves spaces before grapheme cluster wrap padding`() {
-        val connector = MockConnector()
-        createStartedSession(connector, columns = 10, rows = 4).use { session ->
-            connector.feedFromHost(
-                "\u001B]133;A\u0007P> \u001B]133;B\u0007echo  \uD83D\uDC69\u200D\uD83D\uDCBB\u001B]133;C\u0007"
-                    .toByteArray(StandardCharsets.UTF_8),
-            )
-
-            val recordId = session.shellDecorations().commandRecordIds[0]
-            assertEquals("echo  \uD83D\uDC69\u200D\uD83D\uDCBB", session.shellIntegrationState.commandText(recordId))
-        }
-    }
-
-    @Test
-    fun `OSC 133 command start preserves erased cells at a soft wrap boundary`() {
-        val connector = MockConnector()
-        createStartedSession(connector, columns = 8, rows = 4).use { session ->
-            connector.feedFromHost(
-                "\u001B]133;A\u0007P> \u001B]133;B\u0007echoXhello\u001B[1;8H\u001B[X\u001B[2;6H\u001B]133;C\u0007".ascii(),
-            )
-
-            val recordId = session.shellDecorations().commandRecordIds[0]
-            assertEquals("echo hello", session.shellIntegrationState.commandText(recordId))
-        }
-    }
-
-    @ParameterizedTest
-    @ValueSource(strings = ["echo hello", "echo         hello", "echo  \u754C", "echo  \uD83D\uDC69\u200D\uD83D\uDCBB"])
-    fun `command text and frame and cache fingerprints agree across soft wrap widths`(command: String) {
-        val extractor = ShellIntegrationCommandTextExtractor()
-        val boundedExtractor = ShellIntegrationCommandTextExtractor(maxTextLength = command.length - 1)
-        var unwrappedFingerprint: LongArray? = null
-        for (columns in listOf(80, 8, 10)) {
-            val connector = MockConnector()
-            createStartedSession(connector, columns = columns, rows = 4).use { session ->
-                connector.feedFromHost(
-                    ("\u001B]133;A\u0007P> \u001B]133;B\u0007" + command + "\u001B[0m")
-                        .toByteArray(StandardCharsets.UTF_8),
-                )
-                val frameFingerprint = LongArray(TERMINAL_SHELL_COMMAND_FINGERPRINT_LONGS)
-                session.readRenderFrame { frame ->
-                    val lineId = frame.lineId(0)
-                    val cursor = frame.cursor
-                    assertEquals(command, extractor.extract(frame, lineId, 3, cursor.row, cursor.column))
-                    assertEquals(
-                        TerminalShellCommandFingerprintStatus.COMPLETE,
-                        extractor.fingerprint(frame, lineId, 3, cursor.row, cursor.column, frameFingerprint),
-                    )
-                    assertNull(boundedExtractor.extract(frame, lineId, 3, cursor.row, cursor.column))
-                    assertEquals(
-                        TerminalShellCommandFingerprintStatus.INVALID,
-                        boundedExtractor.fingerprint(
-                            frame,
-                            lineId,
-                            3,
-                            cursor.row,
-                            cursor.column,
-                            LongArray(TERMINAL_SHELL_COMMAND_FINGERPRINT_LONGS),
-                        ),
-                    )
-                }
-                val cache = TerminalRenderCache(columns, 4).also { it.updateFrom(session) }
-                val cacheFingerprint = LongArray(TERMINAL_SHELL_COMMAND_FINGERPRINT_LONGS)
-                assertEquals(
-                    TerminalShellCommandFingerprintStatus.COMPLETE,
-                    extractor.fingerprint(cache, cache.lineIds[0], 3, cache.cursorRow, cache.cursorColumn, cacheFingerprint),
-                )
-                assertArrayEquals(frameFingerprint, cacheFingerprint)
-                assertEquals(command.length.toLong(), frameFingerprint[TERMINAL_SHELL_COMMAND_FINGERPRINT_UTF16_LENGTH_INDEX])
-                assertEquals(
-                    TerminalShellCommandFingerprintStatus.INVALID,
-                    boundedExtractor.fingerprint(
-                        cache,
-                        cache.lineIds[0],
-                        3,
-                        cache.cursorRow,
-                        cache.cursorColumn,
-                        LongArray(TERMINAL_SHELL_COMMAND_FINGERPRINT_LONGS),
-                    ),
-                )
-                if (columns == 80) {
-                    unwrappedFingerprint = frameFingerprint
-                } else {
-                    assertArrayEquals(unwrappedFingerprint, frameFingerprint, "fingerprint at width $columns")
-                }
-            }
-        }
-    }
-
-    @ParameterizedTest
-    @ValueSource(ints = [0, TerminalRenderCellFlags.CLUSTER])
-    fun `wrapped command fingerprint rejects invalid cell flags or missing cluster data`(invalidFlags: Int) {
-        val connector = MockConnector()
-        createStartedSession(connector, columns = 8, rows = 4).use { session ->
-            connector.feedFromHost("\u001B]133;A\u0007P> \u001B]133;B\u0007echo hello\u001B[0m".ascii())
-            val cache = TerminalRenderCache(8, 4).also { it.updateFrom(session) }
-            cache.flags[4] = invalidFlags
-
-            assertEquals(
-                TerminalShellCommandFingerprintStatus.INVALID,
-                ShellIntegrationCommandTextExtractor().fingerprint(
-                    cache,
-                    cache.lineIds[0],
-                    3,
-                    cache.cursorRow,
-                    cache.cursorColumn,
-                    LongArray(TERMINAL_SHELL_COMMAND_FINGERPRINT_LONGS),
-                ),
-            )
-        }
-    }
-
-    @Test
-    fun `OSC 133 command start extracts multiline command whose prompt moved into scrollback`() {
-        val connector = MockConnector()
-        val session = createStartedSession(connector, columns = 10, rows = 2)
-
-        connector.feedFromHost(
-            "\u001B]133;A\u0007P> \u001B]133;B\u0007one\r\ntwo\r\nthree\u001B]133;C\u0007".ascii(),
-        )
-
-        val recordId = session.shellDecorations().commandRecordIds[1]
-        assertEquals("one\ntwo\nthree", session.shellIntegrationState.commandText(recordId))
-        session.close()
-    }
-
-    @Test
-    fun `OSC 133 command start preserves grapheme cluster command text`() {
-        val connector = MockConnector()
-        val session = createStartedSession(connector, columns = 30, rows = 4)
-
-        connector.feedFromHost(
-            "\u001B]133;A\u0007P> \u001B]133;B\u0007e\u0301\u001B]133;C\u0007"
-                .toByteArray(StandardCharsets.UTF_8),
-        )
-
-        val recordId = session.shellDecorations().commandRecordIds[0]
-        assertEquals("e\u0301", session.shellIntegrationState.commandText(recordId))
-        session.close()
-    }
-
-    @Test
-    fun `OSC 133 command start rejects command text above the retention bound`() {
-        val connector = MockConnector()
-        val session = createStartedSession(connector, columns = 5000, rows = 2)
-        val oversizedCommand = "a".repeat(DEFAULT_SHELL_INTEGRATION_COMMAND_TEXT_LENGTH + 1)
-
-        connector.feedFromHost(
-            ("\u001B]133;A\u0007P> \u001B]133;B\u0007" + oversizedCommand + "\u001B]133;C\u0007").ascii(),
-        )
-
-        val recordId = session.shellDecorations().commandRecordIds[0]
-        assertNull(session.shellIntegrationState.commandText(recordId))
-        session.close()
-    }
-
-    @Test
-    fun `OSC 133 command start stores unknown command text without prompt end`() {
-        val connector = MockConnector()
-        val session = createStartedSession(connector, columns = 30, rows = 4)
-
-        connector.feedFromHost("PS> git status\u001B]133;C\u0007".ascii())
-
-        val decorations = session.shellDecorations()
-        val recordId = decorations.commandRecordIds[0]
-        assertAll(
-            { assertTrue(recordId != TerminalShellIntegrationCommandRecord.NONE) },
-            { assertNull(session.shellIntegrationState.commandText(recordId)) },
-        )
-        session.close()
-    }
-
-    @Test
-    fun `OSC 133 command start stores unknown command text after orphan prompt end`() {
-        val connector = MockConnector()
-        val session = createStartedSession(connector, columns = 30, rows = 4)
-
-        connector.feedFromHost("PS> \u001B]133;B\u0007git status\u001B]133;C\u0007".ascii())
-
-        val decorations = session.shellDecorations()
-        val recordId = decorations.commandRecordIds[0]
-        assertAll(
-            { assertTrue(recordId != TerminalShellIntegrationCommandRecord.NONE) },
-            { assertNull(session.shellIntegrationState.commandText(recordId)) },
-        )
-        session.close()
-    }
-
-    @Test
-    fun `OSC 133 decorations re-anchor after clear screen and history`() {
-        val connector = MockConnector()
-        val session = createStartedSession(connector, columns = 30, rows = 4)
-
-        connector.feedFromHost(
-            (
-                "\u001B]133;A\u0007PS> \u001B]133;B\u0007bad\u001B]133;C\u0007\r\n" +
-                    "failed\u001B]133;D;1\u0007" +
-                    "\u001B[H\u001B[2J\u001B[3J" +
-                    "\u001B]133;A\u0007PS> \u001B]133;B\u0007"
-            ).ascii(),
-        )
-
-        val decorations = session.shellDecorations()
-        assertAll(
-            { assertTrue(decorations.lineIds.all { it > 0L }, "clear-history render frame exposed a zero line id") },
-            { assertTrue(decorations.promptStarts.any { it }, "new prompt marker did not re-anchor after clear") },
-        )
-        session.close()
-    }
-
-    @Test
-    fun `OSC 133 command finish followed by prompt preserves next prompt marker`() {
-        val connector = MockConnector()
-        val session = createStartedSession(connector, columns = 20, rows = 4)
-
-        connector.feedFromHost("\u001B]133;C\u0007failed\r\n\u001B]133;D;2\u0007\u001B]133;A\u0007PS> ".ascii())
-
-        val decorations = session.shellDecorations()
-        assertAll(
-            { assertTrue(decorations.promptStarts[1]) },
-        )
-        session.close()
-    }
-
-    @Test
-    fun `OSC 133 prompt start abandons unfinished command before stale finish marker`() {
-        val connector = MockConnector()
-        val session = createStartedSession(connector, columns = 20, rows = 4)
-
-        connector.feedFromHost("\u001B]133;C\u0007partial\r\n\u001B]133;A\u0007PS> \u001B]133;D;2\u0007".ascii())
-
-        val decorations = session.shellDecorations()
-        assertAll(
-            { assertTrue(decorations.promptStarts[1]) },
-        )
-        session.close()
-    }
-
-    @Test
-    fun `OSC 133 zero exit code records succeeded lifecycle`() {
-        val connector = MockConnector()
-        val session = createStartedSession(connector, columns = 20, rows = 4)
-
-        connector.feedFromHost("\u001B]133;C\u0007ok\u001B]133;D;0\u0007".ascii())
-
-        val decorations = session.shellDecorations()
-        assertAll(
-            { assertTrue(decorations.commandRecordIds[0] != TerminalShellIntegrationCommandRecord.NONE) },
-            { assertEquals(TerminalShellIntegrationCommandLifecycle.SUCCEEDED, decorations.commandLifecycleStates[0]) },
-        )
-        session.close()
-    }
-
-    @Test
-    fun `OSC 133 duplicate command start abandons first command and finishes newest command`() {
-        val connector = MockConnector()
-        val session = createStartedSession(connector, columns = 20, rows = 4)
-
-        connector.feedFromHost("\u001B]133;C\u0007partial\r\n\u001B]133;C\u0007new\r\n\u001B]133;D;1\u0007".ascii())
-
-        val decorations = session.shellDecorations()
-        assertAll(
-            { assertTrue(decorations.commandRecordIds[0] != TerminalShellIntegrationCommandRecord.NONE) },
-            { assertTrue(decorations.commandRecordIds[1] != TerminalShellIntegrationCommandRecord.NONE) },
-            { assertNotEquals(decorations.commandRecordIds[0], decorations.commandRecordIds[1]) },
-            { assertEquals(TerminalShellIntegrationCommandLifecycle.ABANDONED, decorations.commandLifecycleStates[0]) },
-            { assertEquals(TerminalShellIntegrationCommandLifecycle.FAILED, decorations.commandLifecycleStates[1]) },
-        )
-        session.close()
-    }
-
-    @Test
-    fun `OSC 133 finish without command start is ignored by command timeline`() {
-        val connector = MockConnector()
-        val session = createStartedSession(connector, columns = 20, rows = 4)
-
-        connector.feedFromHost("orphan\u001B]133;D;1\u0007".ascii())
-
-        val decorations = session.shellDecorations()
-        assertAll(
-            { assertEquals(TerminalShellIntegrationCommandRecord.NONE, decorations.commandRecordIds[0]) },
-            { assertEquals(TerminalShellIntegrationCommandLifecycle.NONE, decorations.commandLifecycleStates[0]) },
-        )
-        session.close()
-    }
-
-    @Test
-    fun `resize preserves shared shell integration timeline`() {
-        val connector = MockConnector()
-        val session = createStartedSession(connector, columns = 10, rows = 4)
-
-        connector.feedFromHost("\u001B]133;A\u0007prompt> ".ascii())
-        assertTrue(session.shellDecorations().promptStarts[0])
-
-        session.resize(columns = 4, rows = 4)
-
-        val decorations = session.shellDecorations()
-        assertAll(
-            { assertTrue(decorations.promptStarts[0]) },
-            { assertFalse(decorations.promptStarts[1]) },
         )
         session.close()
     }
@@ -2154,78 +2000,6 @@ class TerminalSessionTest {
 
         override fun terminalClipboardPrompt(event: TerminalClipboardPromptEvent) {
             clipboardPrompts += event
-        }
-    }
-
-    private fun TerminalSession.shellDecorations(): ShellDecorationSnapshot {
-        var lineIds = LongArray(0)
-        var promptStarts = BooleanArray(0)
-        var commandStarts = BooleanArray(0)
-        var commandEnds = BooleanArray(0)
-        var commandRecordIds = IntArray(0)
-        var commandLifecycleStates = IntArray(0)
-        readRenderFrame { frame ->
-            lineIds = LongArray(frame.rows)
-            var row = 0
-            while (row < frame.rows) {
-                lineIds[row] = frame.lineId(row)
-                row++
-            }
-            promptStarts = BooleanArray(frame.rows)
-            commandStarts = BooleanArray(frame.rows)
-            commandEnds = BooleanArray(frame.rows)
-            commandRecordIds = IntArray(frame.rows)
-            commandLifecycleStates = IntArray(frame.rows)
-            shellIntegrationState.copyViewport(
-                lineIds = lineIds,
-                rowCount = frame.rows,
-                promptStarts = promptStarts,
-                commandStarts = commandStarts,
-                commandEnds = commandEnds,
-                commandRecordIds = commandRecordIds,
-                commandLifecycleStates = commandLifecycleStates,
-            )
-        }
-        return ShellDecorationSnapshot(
-            lineIds = lineIds,
-            promptStarts = promptStarts,
-            commandStarts = commandStarts,
-            commandEnds = commandEnds,
-            commandRecordIds = commandRecordIds,
-            commandLifecycleStates = commandLifecycleStates,
-        )
-    }
-
-    private data class ShellDecorationSnapshot(
-        val lineIds: LongArray,
-        val promptStarts: BooleanArray,
-        val commandStarts: BooleanArray,
-        val commandEnds: BooleanArray,
-        val commandRecordIds: IntArray,
-        val commandLifecycleStates: IntArray,
-    ) {
-        override fun equals(other: Any?): Boolean {
-            if (this === other) return true
-            if (javaClass != other?.javaClass) return false
-
-            other as ShellDecorationSnapshot
-
-            if (!promptStarts.contentEquals(other.promptStarts)) return false
-            if (!commandStarts.contentEquals(other.commandStarts)) return false
-            if (!commandEnds.contentEquals(other.commandEnds)) return false
-            if (!commandRecordIds.contentEquals(other.commandRecordIds)) return false
-            if (!commandLifecycleStates.contentEquals(other.commandLifecycleStates)) return false
-
-            return true
-        }
-
-        override fun hashCode(): Int {
-            var result = promptStarts.contentHashCode()
-            result = 31 * result + commandStarts.contentHashCode()
-            result = 31 * result + commandEnds.contentHashCode()
-            result = 31 * result + commandRecordIds.contentHashCode()
-            result = 31 * result + commandLifecycleStates.contentHashCode()
-            return result
         }
     }
 

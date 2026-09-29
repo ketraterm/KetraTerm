@@ -27,6 +27,7 @@ import io.github.ketraterm.pty.PtyOptions
 import io.github.ketraterm.pty.TerminalSessions
 import io.github.ketraterm.render.api.TerminalColorPalette
 import io.github.ketraterm.session.*
+import io.github.ketraterm.shell.integration.OscShellIntegration
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.*
 import java.net.URI
@@ -60,11 +61,13 @@ class TerminalWorkspace internal constructor(
     private val tabs = ArrayList<TerminalWorkspaceTab>(INITIAL_TAB_CAPACITY)
     private val stateLock = Any()
     private val sessionStateJobs = HashMap<String, Job>()
+    private val shellMetadataRegistrations = HashMap<String, AutoCloseable>()
     private val workspaceJob = SupervisorJob()
     private val workspaceScope =
         CoroutineScope(workspaceJob + workerDispatcher + CoroutineName("terminal-workspace"))
     private val nextTabNumber = AtomicInteger(1)
     private var selectedTabId: String? = null
+    private var closed = false
 
     internal val isCoroutineScopeActive: Boolean
         get() = workspaceJob.isActive
@@ -90,6 +93,7 @@ class TerminalWorkspace internal constructor(
      * Opens a new local PTY-backed tab. Publishes it through
      * [TerminalWorkspaceListener.tabOpened] before starting output delivery.
      * Publication or startup failure closes the session and removes the tab.
+     * A closed workspace rejects new tabs before creating a session.
      *
      * @param profile launch profile for the new process.
      * @param options initial session dimensions and terminal policy.
@@ -99,6 +103,7 @@ class TerminalWorkspace internal constructor(
         profile: TerminalProfile,
         options: TerminalWorkspaceOpenOptions,
     ): TerminalWorkspaceTab {
+        synchronized(stateLock) { check(!closed) { "workspace is closed" } }
         val id = "terminal-${nextTabNumber.getAndIncrement()}"
         val session = sessionFactory.create(profile, options, tabEventListener(id))
         try {
@@ -115,10 +120,25 @@ class TerminalWorkspace internal constructor(
                     showForegroundProcessName = options.showForegroundProcessName,
                 )
             synchronized(stateLock) {
+                check(!closed) { "workspace is closed" }
                 tabs += tab
+                val commandFinishedRegistration =
+                    session.shellIntegrationState.addCommandFinishedListener { metadata ->
+                        if (!session.isClosed) tabBySession(session)?.let { listener.commandFinished(it, metadata) }
+                    }
+                val directoryRegistration =
+                    session.shellIntegrationState.addCurrentWorkingDirectoryListener { uri ->
+                        if (!session.isClosed) tabBySession(session)?.updateCurrentWorkingDirectoryUri(uri)
+                    }
+                shellMetadataRegistrations[id] =
+                    AutoCloseable {
+                        commandFinishedRegistration.close()
+                        directoryRegistration.close()
+                    }
             }
             selectTab(id)
             listener.tabOpened(tab)
+            session.currentWorkingDirectoryUri()?.let(tab::updateCurrentWorkingDirectoryUri)
             session.start(options.columns, options.rows)
 
             val stateJob =
@@ -139,31 +159,39 @@ class TerminalWorkspace internal constructor(
                                 }
                             }
                         }
-                    val closed = session.state.filterIsInstance<TerminalSessionState.Closed>().first()
-                    startupJob?.cancel()
-                    processTitleJob.cancelAndJoin()
-                    tab.updateForegroundProcessName(null)
-                    if (!closed.event.locallyRequested) {
-                        tabBySession(session)?.let {
-                            listener.sessionClosed(it, closed.event.exitCode, closed.event.failure)
+                    try {
+                        val closed = session.state.filterIsInstance<TerminalSessionState.Closed>().first()
+                        startupJob?.cancel()
+                        processTitleJob.cancelAndJoin()
+                        tab.updateForegroundProcessName(null)
+                        if (!closed.event.locallyRequested) {
+                            tabBySession(session)?.let {
+                                listener.sessionClosed(it, closed.event.exitCode, closed.event.failure)
+                            }
                         }
+                    } finally {
+                        synchronized(stateLock) { shellMetadataRegistrations.remove(id) }?.close()
                     }
                 }
             synchronized(stateLock) {
-                sessionStateJobs[id] = stateJob
+                if (!closed && tabByIdLocked(id) === tab) {
+                    sessionStateJobs[id] = stateJob
+                } else {
+                    stateJob.cancel(CancellationException("Terminal workspace tab closed during startup"))
+                }
             }
             return tab
         } catch (failure: Throwable) {
             try {
                 closeTab(id)
             } catch (cleanup: Throwable) {
-                failure.addSuppressed(cleanup)
+                if (failure !== cleanup) failure.addSuppressed(cleanup)
             }
             // Also covers failure before the tab entered the workspace registry.
             try {
                 session.close()
             } catch (cleanup: Throwable) {
-                failure.addSuppressed(cleanup)
+                if (failure !== cleanup) failure.addSuppressed(cleanup)
             }
             throw failure
         }
@@ -184,6 +212,8 @@ class TerminalWorkspace internal constructor(
 
     /**
      * Closes an existing tab and its session.
+     * Attempts session cleanup and every close/selection notification even when
+     * a callback throws. Rethrows the first failure with later failures suppressed.
      *
      * @param id tab id.
      */
@@ -197,13 +227,16 @@ class TerminalWorkspace internal constructor(
                 if (selectedTabId == id) {
                     selectedTabId = tabs.getOrNull(index.coerceAtMost(tabs.lastIndex))?.id
                 }
-                tab to selectedTabId
+                Triple(tab, selectedTabId, shellMetadataRegistrations.remove(id))
             }
-        val (tab, nextSelectedTabId) = result
-        tab.showForegroundProcessName = false
-        tab.session.close()
-        listener.tabClosed(id)
-        nextSelectedTabId?.let(listener::tabSelected)
+        val (tab, nextSelectedTabId, shellMetadataRegistration) = result
+        var failure: Throwable? = null
+        failure = captureCleanupFailure(failure) { shellMetadataRegistration?.close() }
+        failure = captureCleanupFailure(failure) { tab.showForegroundProcessName = false }
+        failure = captureCleanupFailure(failure) { tab.session.close() }
+        failure = captureCleanupFailure(failure) { listener.tabClosed(id) }
+        failure = captureCleanupFailure(failure) { nextSelectedTabId?.let(listener::tabSelected) }
+        failure?.let { throw it }
     }
 
     /**
@@ -222,13 +255,38 @@ class TerminalWorkspace internal constructor(
         }
     }
 
+    /**
+     * Rejects new tabs, attempts every tab cleanup, and cancels the workspace scope.
+     * Rethrows the first failure with later failures suppressed. Repeated or
+     * reentrant calls are no-ops; they do not wait for an active close to finish.
+     */
     override fun close() {
-        while (true) {
-            val id = synchronized(stateLock) { tabs.lastOrNull()?.id } ?: break
-            closeTab(id)
+        synchronized(stateLock) {
+            if (closed) return
+            closed = true
         }
-        workspaceScope.cancel(CancellationException("Terminal workspace closed"))
+        var failure: Throwable? = null
+        try {
+            while (true) {
+                val id = synchronized(stateLock) { tabs.lastOrNull()?.id } ?: break
+                failure = captureCleanupFailure(failure) { closeTab(id) }
+            }
+        } finally {
+            workspaceScope.cancel(CancellationException("Terminal workspace closed"))
+        }
+        failure?.let { throw it }
     }
+
+    private inline fun captureCleanupFailure(
+        previous: Throwable?,
+        action: () -> Unit,
+    ): Throwable? =
+        try {
+            action()
+            previous
+        } catch (failure: Throwable) {
+            previous?.apply { if (this !== failure) addSuppressed(failure) } ?: failure
+        }
 
     private fun tabEventListener(tabId: String): PtyEventListener =
         object : PtyEventListener {
@@ -247,14 +305,6 @@ class TerminalWorkspace internal constructor(
             ) {
                 val tab = tabById(tabId) ?: return
                 tab.updateDynamicTitle(title.takeIf { it.isNotBlank() })
-            }
-
-            override fun currentWorkingDirectoryChanged(
-                session: TerminalSession,
-                uri: String,
-            ) {
-                val tab = tabById(tabId) ?: return
-                tab.updateCurrentWorkingDirectoryUri(uri)
             }
 
             override fun resizeWindow(
@@ -428,6 +478,7 @@ private object LocalPtyWorkspaceSessionFactory : TerminalWorkspaceSessionFactory
                 hostPolicy = options.hostPolicy,
                 startupCommand = launchProfile.startupCommand,
                 modeReportCapabilities = options.modeReportCapabilities,
+                shellIntegration = OscShellIntegration,
             ),
         )
     }
@@ -474,7 +525,7 @@ data class TerminalWorkspaceOpenOptions(
  * @property id stable tab id.
  * @property profile launch profile used to create this tab.
  * @property title current host-visible tab title.
- * @property currentWorkingDirectoryUri latest valid OSC 7 directory URI, or
+ * @property currentWorkingDirectoryUri latest directory URI from the selected shell model, or
  *   `null` before one is reported.
  * @property session running terminal session.
  */
@@ -538,10 +589,11 @@ class TerminalWorkspaceTab internal constructor(
         }
 
     /**
-     * Latest host-validated OSC 7 current-working-directory URI.
+     * Latest current-working-directory URI from the selected shell model.
      *
      * The value is safe to read from host UI threads and remains `null` until
-     * the shell reports a directory.
+     * a directory is observed. Model publications update it synchronously until
+     * the session closes; the tab then retains its last observed value.
      */
     val currentWorkingDirectoryUri: String?
         get() = currentWorkingDirectory
@@ -808,6 +860,18 @@ interface TerminalWorkspaceListener {
     ) = Unit
 
     /**
+     * Called synchronously for each completion published by the selected shell model.
+     *
+     * Metadata is captured for the completed command, without replay or conflation.
+     * The callback runs on the producer thread and must not block. Registration
+     * ends when the tab or session closes; an already dispatched callback may finish.
+     */
+    fun commandFinished(
+        tab: TerminalWorkspaceTab,
+        metadata: TerminalShellIntegrationCommandMetadata,
+    ) = Unit
+
+    /**
      * Called when a tab title changes.
      *
      * Sources may notify from different threads. Hosts dispatching to a UI thread should
@@ -822,10 +886,11 @@ interface TerminalWorkspaceListener {
     ) = Unit
 
     /**
-     * Called after a tab accepts a new OSC 7 current-working-directory URI.
+     * Called after a tab observes a new current-working-directory URI in its shell model.
      *
      * Repeated reports of the same URI are coalesced. The tab property is
-     * updated before this callback runs.
+     * updated before this callback runs. The callback runs synchronously on the
+     * producer thread and must not block. Observation stops when the tab or session closes.
      *
      * @param tab tab whose working directory changed.
      * @param uri absolute `file://` URI reported by the shell.

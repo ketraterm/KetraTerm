@@ -190,6 +190,36 @@ class PtyRealProcessTest {
     }
 
     @Test
+    fun `real PTY retains the final output emitted immediately before process exit`() {
+        val expectedCount = 12_000
+        val marker = "KETRATERM_FINAL"
+        val session =
+            startReadySession(
+                finalOutputScript =
+                    if (isWindows()) {
+                        "[Console]::Out.Write(('x' * $expectedCount) + '$marker')"
+                    } else {
+                        "printf '%*s' $expectedCount '' | tr ' ' 'x'; printf '$marker'"
+                    },
+                columns = 200,
+                rows = 80,
+                readBufferSize = 257,
+            )
+        try {
+            releaseAndAwaitExit(session)
+            val text = session.terminal.getAllAsString()
+            assertAll(
+                { assertEquals(0, session.exitCode) },
+                { assertNull(session.failure) },
+                { assertEquals(expectedCount, text.count { it == 'x' }) },
+                { assertTrue(text.contains(marker), "final marker must be retained before closure") },
+            )
+        } finally {
+            session.close()
+        }
+    }
+
+    @Test
     fun `real PTY one byte reads preserve mixed line terminator output`() {
         val session =
             startReadySession(
@@ -280,6 +310,7 @@ class PtyRealProcessTest {
      */
     private fun startReadySession(
         outputScript: String = "",
+        finalOutputScript: String = "",
         exitCode: Int = 0,
         columns: Int = 40,
         rows: Int = 5,
@@ -297,15 +328,16 @@ class PtyRealProcessTest {
                 }
             }
         val prefix = if (outputScript.isEmpty()) "" else "$outputScript; "
+        val suffix = if (finalOutputScript.isEmpty()) "" else "$finalOutputScript; "
         val command =
             if (isWindows()) {
                 // Keep a shell parent so the Windows detector exercises descendant selection.
                 listOf("cmd.exe", "/d", "/c") +
                     powerShellCommand(
-                        "$prefix[Console]::Out.Write([char]7); [void][Console]::ReadLine(); exit $exitCode",
+                        "$prefix[Console]::Out.Write([char]7); [void][Console]::ReadLine(); ${suffix}exit $exitCode",
                     )
             } else {
-                listOf("/bin/sh", "-c", "${prefix}printf '\\007'; read -r release; exit $exitCode")
+                listOf("/bin/sh", "-c", "${prefix}printf '\\007'; read -r release; ${suffix}exit $exitCode")
             }
         val session =
             TerminalSessions.localPty(

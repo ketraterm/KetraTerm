@@ -27,6 +27,7 @@ import com.intellij.testFramework.PlatformTestUtil
 import com.intellij.testFramework.fixtures.BasePlatformTestCase
 import com.intellij.ui.content.ContentFactory
 import com.intellij.ui.content.ContentManager
+import com.intellij.ui.content.ContentManagerListener
 import io.github.ketraterm.intellij.settings.KetraTermIntellijSettings
 import io.github.ketraterm.intellij.settings.KetraTermProjectSettings
 import io.github.ketraterm.session.TerminalStartupCommand
@@ -37,6 +38,33 @@ import java.util.concurrent.atomic.AtomicInteger
 
 /** Verifies restart metadata through the project service without showing terminal panes or creating PTYs. */
 class KetraTermProjectTerminalPersistenceTest : BasePlatformTestCase() {
+    fun testDisposalFinishesWhenPersistenceListenerRemovalThrows() {
+        storage.loadState(TerminalTabsState(listOf(TerminalTabState(customTitle = "Pending")), 0))
+        val service = service()
+        val delegate = contentManager()
+        val failure = IllegalStateException("listener removal failed")
+        var removals = 0
+        val manager =
+            object : ContentManager by delegate {
+                override fun removeContentManagerListener(listener: ContentManagerListener) {
+                    removals++
+                    delegate.removeContentManagerListener(listener)
+                    throw failure
+                }
+            }
+        service.ensureInitialTab(toolWindow(manager))
+        assertTrue(service.hasOpenTabs())
+        try {
+            service.dispose()
+            fail("Expected the cleanup failure")
+        } catch (reported: IllegalStateException) {
+            assertSame(failure, reported)
+        }
+        assertFalse("Disposal must clear every pending tab despite listener failure", service.hasOpenTabs())
+        service.dispose()
+        assertEquals(1, removals)
+    }
+
     private lateinit var lifetime: Disposable
     private lateinit var storage: KetraTermTerminalTabsStorage
     private lateinit var originalTabs: TerminalTabsState

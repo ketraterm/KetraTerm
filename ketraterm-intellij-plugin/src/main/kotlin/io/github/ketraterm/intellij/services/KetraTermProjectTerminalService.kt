@@ -41,10 +41,9 @@ import io.github.ketraterm.intellij.ui.KetraTermTerminalPane
 import io.github.ketraterm.intellij.ui.KetraTermTerminalPaneHostActions
 import io.github.ketraterm.intellij.ui.KetraTermTerminalStartupView
 import io.github.ketraterm.protocol.NotificationLevel
-import io.github.ketraterm.protocol.ShellIntegrationEvent
-import io.github.ketraterm.protocol.ShellIntegrationMarker
 import io.github.ketraterm.session.TerminalClipboardReadResult
 import io.github.ketraterm.session.TerminalSessionState
+import io.github.ketraterm.session.TerminalShellIntegrationCommandMetadata
 import io.github.ketraterm.session.TerminalStartupCommand
 import io.github.ketraterm.ui.swing.host.SwingClipboardPrompts
 import io.github.ketraterm.ui.swing.host.SwingClipboardReader
@@ -343,27 +342,29 @@ class KetraTermProjectTerminalService internal constructor(
 
     override fun dispose() {
         if (disposed) return
-        persistence?.dispose()
         disposed = true
 
         val panes = panesByTabId.values.toList()
         val closeRegistrations = closeListenersByTabId.values.toList()
-        for (registration in closeRegistrations) {
-            registration.manager.removeContentManagerListener(registration.listener)
-        }
-
         panesByTabId.clear()
         contentsByTabId.clear()
         pendingTabsById.clear()
         closeListenersByTabId.clear()
 
-        KetraTermIntellijSettings.getInstance().removeChangeListener(settingsChangedListener)
-        synchronized(workspaceLock) {
-            workspace.close()
+        var failure: Throwable? = null
+        failure = captureCleanupFailure(failure) { persistence?.dispose() }
+        for ((manager, listener) in closeRegistrations) {
+            failure =
+                captureCleanupFailure(failure) {
+                    manager.removeContentManagerListener(listener)
+                }
         }
+        failure = captureCleanupFailure(failure) { KetraTermIntellijSettings.getInstance().removeChangeListener(settingsChangedListener) }
+        failure = captureCleanupFailure(failure) { synchronized(workspaceLock) { workspace.close() } }
         for (pane in panes) {
-            pane.close()
+            failure = captureCleanupFailure(failure, pane::close)
         }
+        failure?.let { throw it }
     }
 
     private fun closeTabFromContent(tabId: String) {
@@ -371,13 +372,12 @@ class KetraTermProjectTerminalService internal constructor(
 
         val pane = panesByTabId.remove(tabId)
         val content = contentsByTabId.remove(tabId)
-        removeCloseQueryListener(tabId)
-        if (pane == null && content == null) return
-
-        synchronized(workspaceLock) {
-            workspace.closeTab(tabId)
+        var failure = captureCleanupFailure(null) { removeCloseQueryListener(tabId) }
+        if (pane != null || content != null) {
+            failure = captureCleanupFailure(failure) { synchronized(workspaceLock) { workspace.closeTab(tabId) } }
+            failure = captureCleanupFailure(failure) { pane?.close() }
         }
-        pane?.close()
+        failure?.let { throw it }
     }
 
     private fun closeTabAfterRemoteSessionExit(tab: TerminalWorkspaceTab) {
@@ -385,14 +385,11 @@ class KetraTermProjectTerminalService internal constructor(
 
         val pane = panesByTabId.remove(tab.id) ?: return
         val content = contentsByTabId.remove(tab.id)
-        removeCloseQueryListener(tab.id)
-
-        synchronized(workspaceLock) {
-            workspace.closeTab(tab.id)
-        }
-        pane.close()
-
-        content?.manager?.removeContent(content, true)
+        var failure = captureCleanupFailure(null) { removeCloseQueryListener(tab.id) }
+        failure = captureCleanupFailure(failure) { synchronized(workspaceLock) { workspace.closeTab(tab.id) } }
+        failure = captureCleanupFailure(failure, pane::close)
+        failure = captureCleanupFailure(failure) { content?.manager?.removeContent(content, true) }
+        failure?.let { throw it }
 
         if (!closing && !hasOpenTabs()) {
             lastToolWindow?.let(::openDefaultTab)
@@ -631,17 +628,11 @@ class KetraTermProjectTerminalService internal constructor(
             return binding.read(request, SwingClipboardPrompts.readQuestion(tab.profile.displayName, "IDE clipboard"))
         }
 
-        override fun shellIntegrationMarker(
+        override fun commandFinished(
             tab: TerminalWorkspaceTab,
-            event: ShellIntegrationEvent,
+            metadata: TerminalShellIntegrationCommandMetadata,
         ) {
-            if (!KetraTermIntellijSettings.getInstance().state.smartSuggestionsEnabled ||
-                event.marker != ShellIntegrationMarker.COMMAND_FINISHED
-            ) {
-                return
-            }
-            val state = tab.session.shellIntegrationState
-            val metadata = state.commandMetadata(state.latestCommandRecordId()) ?: return
+            if (!KetraTermIntellijSettings.getInstance().state.smartSuggestionsEnabled) return
             KetraTermCompletionService.getInstanceIfCreated()?.recordFinishedCommand(tab, metadata)
         }
 
@@ -792,3 +783,14 @@ class KetraTermProjectTerminalService internal constructor(
 internal object IntellijOsc52ClipboardSelections {
     fun targetsIdeClipboard(selection: String): Boolean = selection.isEmpty() || selection.indexOf('c') >= 0
 }
+
+internal inline fun captureCleanupFailure(
+    previous: Throwable?,
+    action: () -> Unit,
+): Throwable? =
+    try {
+        action()
+        previous
+    } catch (failure: Throwable) {
+        previous?.apply { if (this !== failure) addSuppressed(failure) } ?: failure
+    }

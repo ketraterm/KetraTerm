@@ -11,7 +11,7 @@ OSC 52 reads use an optional session-bound suspending provider. Session owns the
 - `TerminalSession.state` retains `Created`, `Running`, or `Closed(TerminalSessionCloseEvent)`.
 - `TerminalSession.renderGeneration` publishes only successfully promoted frames.
 - `TerminalSession.renderPublisher` owns the leased primitive cache consumed by renderers.
-- A session has one active render viewport. Use separate sessions for independently scrolling views.
+- A session publishes one active render viewport; a new viewport request replaces the previous one. Independently scrolling views of the same session are unsupported. Separate sessions are separate terminal pipelines, not additional views of one process.
 - `mutationLock` protects parser/core mutation and borrowed frame reads.
 - Reentrant `outboundWriteLock` protects encoding and atomic admission; native writes never hold it.
 - Input return means acceptance, not write completion. Queue exhaustion or write failure closes the session with a failure; close discards pending bytes.
@@ -52,3 +52,87 @@ session.requestRender(scrollbackOffset = 0)
 ```
 
 Collectors own their scopes. Closing the session emits `Closed` before its child jobs are cancelled, so current and late collectors can observe the terminal lifecycle result.
+
+## Host-owned shell integration
+
+A plain session has no shell producer. `TerminalSession.create` wires the selected
+producer to parsed host events. With the low-level constructor, the caller owns
+its custom parser and host-event wiring; an already-built parser is not wrapped.
+
+An IDE that already owns shell integration can pass its semantic metadata and
+editing/readiness flows directly:
+
+```kotlin
+import io.github.ketraterm.session.TerminalShellCommandLineSnapshot
+import io.github.ketraterm.session.TerminalShellIntegrationFactory
+import io.github.ketraterm.session.TerminalShellIntegrationState
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.asStateFlow
+
+val shellState = TerminalShellIntegrationState()
+val commandLine = MutableStateFlow<TerminalShellCommandLineSnapshot?>(null)
+val promptReady = MutableStateFlow(false)
+val session = TerminalSession.create(
+    terminal = terminal,
+    connector = connector,
+    shellIntegration = TerminalShellIntegrationFactory.host(
+        state = shellState,
+        commandLine = commandLine.asStateFlow(),
+        promptReady = promptReady.asStateFlow(),
+    ),
+)
+```
+
+The host is the sole writer of this bounded terminal-facing projection. Feed its
+existing prompt/command events into `recordPromptStart`, `recordPromptEnd`,
+`recordCommandStart`, and `recordCommandFinished`; publish the validated directory
+through `recordCurrentWorkingDirectory`. The IDE keeps its own authoritative
+shell model, scripts, and protocol parser. KetraTerm does not reconstruct another
+history from OSC, replace host directories, or require synthetic terminal bytes.
+
+Preserve stream order: process the matching output, capture stable primary-buffer
+line identities, publish the semantic update, then deliver later bytes. For
+example, a host prompt-start callback can capture its anchor with:
+
+```kotlin
+var promptLineId = 0L
+session.readRenderFrame { frame ->
+    promptLineId = frame.lineId(frame.cursor.row)
+}
+shellState.recordPromptStart(promptLineId)
+```
+
+An IDE document offset or current row number is not a line identity. Capture each
+command output boundary at its matching event; `recordCommandStart(includeLine)`
+specifies whether its anchor belongs to output. Pass the known command text and
+directory URI explicitly. The model retains bounded history and supplies the
+primitive projection used by decorations, navigation, and output copy. Observe
+`revision` for repaint invalidation. `addCommandFinishedListener` and
+`addCurrentWorkingDirectoryListener` provide synchronous semantic notifications;
+close each registration with its consumer. Directory listeners report future
+changed URIs without replay, so read `currentWorkingDirectoryUri()` for the
+initial value. Callbacks run outside the model lock and must return promptly.
+
+Publish `commandLine` snapshots with complete known text, a UTF-16 cursor offset,
+and zero-based live-grid anchors after matching output/geometry changes. `null`
+is authoritative. Standard suggestions consume this source; revision observation
+is shared only while collected. The host owns source lifetime and text bounds.
+
+Publish `promptReady` only while the live primary prompt can accept a startup
+command. It is separate from initialization and editing availability. A supplied
+`startupCommand` uses this readiness through session's ordered writer, after the
+current parser batch and responses. Early input cancels it. Session stops
+observing readiness when submission finishes or is cancelled. Closing session
+stops its observations without clearing host metadata or cancelling host flows.
+
+## KetraTerm's optional producer
+
+Add `ketraterm-shell-integration` and select
+`io.github.ketraterm.shell.integration.OscShellIntegration` through the same
+`shellIntegration` parameter when launching a shell with compatible hooks. The
+standard workspace makes this selection and installs supported launch hooks.
+`PtyOptions.shellIntegration` forwards either selection; bare PTY creation has
+no producer. Selecting the factory alone does not install shell scripts.
+
+See the [concurrency contract](docs/session-concurrency-locks.md) for producer
+callback and lifecycle requirements.

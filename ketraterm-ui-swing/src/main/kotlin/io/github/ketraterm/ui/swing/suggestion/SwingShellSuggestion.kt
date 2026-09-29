@@ -288,6 +288,15 @@ data class SwingShellSuggestionRequest(
     }
 }
 
+/** Determines whether a provider request follows automatic observation or an explicit user action. */
+enum class SwingShellSuggestionTrigger {
+    /** Requires both smart suggestions and automatic popup to be enabled. */
+    AUTOMATIC,
+
+    /** Requires smart suggestions but remains available when automatic popup is disabled. */
+    EXPLICIT,
+}
+
 /**
  * Host/provider result accepted by the user.
  *

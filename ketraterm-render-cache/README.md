@@ -1,6 +1,6 @@
 # KetraTerm Render Cache (`:ketraterm-render-cache`)
 
-The `ketraterm-render-cache` module provides a high-performance, renderer-side double and triple-buffering publication system for **KetraTerm Terminal**. It consumes short-lived render frames exposed by `:ketraterm-render-api` and stores flat, primitive-packed, allocation-free snapshotted layouts.
+The `ketraterm-render-cache` module provides renderer-side double and triple-buffering publication for **KetraTerm Terminal**. It consumes short-lived frames from `:ketraterm-render-api` and copies them into reusable primitive arrays. Capacity growth and shape changes may allocate; reuse is not a whole-frame allocation guarantee.
 
 These cached layouts allow asynchronous UI paint loop threads to perform font resolution, selection calculations, and pixel drawing without directly accessing the stateful terminal core or blocking backend execution threads.
 
@@ -27,7 +27,7 @@ To guarantee safety, memory locality, and absolute performance, `ketraterm-rende
               ¦
               ? updateAndPublish()
   +------------------------+
-  ¦ TerminalRenderPublisher¦ (Triple-buffered rotation & lock-free read leases)
+  ¦ TerminalRenderPublisher¦ (Triple-buffered rotation & synchronized lease bookkeeping)
   +------------------------+
               ¦
               ? readCurrent { front -> ... }

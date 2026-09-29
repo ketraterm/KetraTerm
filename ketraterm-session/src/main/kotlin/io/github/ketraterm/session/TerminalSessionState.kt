@@ -30,7 +30,9 @@ sealed interface TerminalSessionState {
     data object Running : TerminalSessionState
 
     /**
-     * The session no longer accepts input.
+     * Shutdown cleanup and final render publication have been attempted. With
+     * the standard core reader, the final frame includes parser EOF output even
+     * when synchronized output was enabled. No further input is accepted.
      *
      * @property event immutable metadata describing why the session closed.
      */

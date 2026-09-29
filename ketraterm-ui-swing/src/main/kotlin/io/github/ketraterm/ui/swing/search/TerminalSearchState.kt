@@ -19,12 +19,20 @@ package io.github.ketraterm.ui.swing.search
  * Public snapshot of terminal search results.
  *
  * @property query current literal search query.
- * @property resultCount number of matches in the current buffer snapshot.
+ * @property resultCount matches in the last completed pass. While searching,
+ * these may lag output; a new query starts with zero matches.
  * @property activeResultIndex zero-based active match, or `-1` when no match is
  * active.
+ * @property isSearching whether a background pass is pending or running.
+ * @property failure failure of the last pass, or null. A failed pass is not
+ * reported as a successful empty search; changing the query retries it.
  */
-data class TerminalSearchState(
-    val query: String,
-    val resultCount: Int,
-    val activeResultIndex: Int,
-)
+data class TerminalSearchState
+    @JvmOverloads
+    constructor(
+        val query: String,
+        val resultCount: Int,
+        val activeResultIndex: Int,
+        val isSearching: Boolean = false,
+        val failure: Throwable? = null,
+    )

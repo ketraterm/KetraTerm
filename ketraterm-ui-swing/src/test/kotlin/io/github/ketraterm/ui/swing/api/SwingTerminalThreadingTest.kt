@@ -44,6 +44,8 @@ import org.junit.jupiter.params.ParameterizedTest
 import org.junit.jupiter.params.provider.ValueSource
 import java.awt.*
 import java.awt.event.ComponentEvent
+import java.awt.event.FocusEvent
+import java.io.ByteArrayOutputStream
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.FutureTask
 import java.util.concurrent.TimeUnit
@@ -56,6 +58,152 @@ import kotlin.concurrent.thread
 @OptIn(ExperimentalCoroutinesApi::class)
 class SwingTerminalThreadingTest {
     private val dispatcher = StandardTestDispatcher()
+
+    @ParameterizedTest
+    @ValueSource(booleans = [false, true])
+    fun `focus reports use the mode at each transition before outbound writes run`(temporary: Boolean) {
+        val output = ByteArrayOutputStream()
+        val session = focusSession(output)
+        val component = edtCall { SwingTerminal() }
+        try {
+            edtCall {
+                component.bind(session)
+                val gained = FocusEvent(component, FocusEvent.FOCUS_GAINED, temporary)
+                val lost = FocusEvent(component, FocusEvent.FOCUS_LOST, temporary)
+                val enable = "\u001B[?1004h".toByteArray(Charsets.US_ASCII)
+                val disable = "\u001B[?1004l".toByteArray(Charsets.US_ASCII)
+
+                component.focusListeners.forEach { it.focusGained(gained) }
+                session.onBytes(enable, 0, enable.size)
+                component.focusListeners.forEach { it.focusGained(gained) }
+                session.onBytes(disable, 0, disable.size)
+                component.focusListeners.forEach { it.focusLost(lost) }
+                session.onBytes(enable, 0, enable.size)
+                component.focusListeners.forEach { it.focusLost(lost) }
+                session.onBytes(disable, 0, disable.size)
+            }
+            assertEquals(0, output.size(), "focus callbacks queue output without writing on the EDT")
+            dispatcher.scheduler.runCurrent()
+            assertEquals("\u001B[I\u001B[O", output.toString(Charsets.US_ASCII))
+        } finally {
+            edtCall { component.dispose() }
+            session.close()
+            dispatcher.scheduler.runCurrent()
+        }
+    }
+
+    @Test
+    fun `focus events after session closure produce no output`() {
+        val output = ByteArrayOutputStream()
+        val session = focusSession(output)
+        val component = edtCall { SwingTerminal() }
+        try {
+            val enable = "\u001B[?1004h".toByteArray(Charsets.US_ASCII)
+            session.onBytes(enable, 0, enable.size)
+            edtCall { component.bind(session) }
+            session.close()
+            edtCall { dispatchFocusCycle(component) }
+            dispatcher.scheduler.runCurrent()
+            assertTrue(session.isClosed)
+            assertEquals("", output.toString(Charsets.US_ASCII))
+        } finally {
+            edtCall { component.dispose() }
+            session.close()
+            dispatcher.scheduler.runCurrent()
+        }
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = ["default", "enabled", "disabled"])
+    fun `Swing focus transitions obey DEC1004 reporting mode`(mode: String) {
+        val output = ByteArrayOutputStream()
+        val session = focusSession(output)
+        val component = edtCall { SwingTerminal() }
+        try {
+            edtCall { component.bind(session) }
+            val control =
+                when (mode) {
+                    "default" -> ""
+                    "enabled" -> "\u001B[?1004h"
+                    "disabled" -> "\u001B[?1004h\u001B[?1004l"
+                    else -> error("Unexpected mode $mode")
+                }.toByteArray(Charsets.US_ASCII)
+            session.onBytes(control, 0, control.size)
+
+            edtCall { dispatchFocusCycle(component) }
+            dispatcher.scheduler.runCurrent()
+
+            assertEquals(if (mode == "enabled") "\u001B[I\u001B[O" else "", output.toString(Charsets.US_ASCII))
+        } finally {
+            edtCall { component.dispose() }
+            session.close()
+            dispatcher.scheduler.runCurrent()
+        }
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = [false, true])
+    fun `unbound and disposed surfaces cannot report focus to their former session`(dispose: Boolean) {
+        val output = ByteArrayOutputStream()
+        val session = focusSession(output)
+        val component = edtCall { SwingTerminal() }
+        try {
+            val enable = "\u001B[?1004h".toByteArray(Charsets.US_ASCII)
+            session.onBytes(enable, 0, enable.size)
+            edtCall {
+                component.bind(session)
+                if (dispose) component.dispose() else component.unbind()
+            }
+            dispatcher.scheduler.runCurrent()
+            output.reset()
+
+            edtCall { dispatchFocusCycle(component) }
+            dispatcher.scheduler.runCurrent()
+
+            assertEquals("", output.toString(Charsets.US_ASCII))
+            assertFalse(session.isClosed, "The component must leave its host-owned session open")
+        } finally {
+            edtCall { component.dispose() }
+            session.close()
+            dispatcher.scheduler.runCurrent()
+        }
+    }
+
+    @Test
+    fun `focus reports after rebinding target only the current session`() {
+        val firstOutput = ByteArrayOutputStream()
+        val secondOutput = ByteArrayOutputStream()
+        val first = focusSession(firstOutput)
+        val second = focusSession(secondOutput)
+        val component = edtCall { SwingTerminal() }
+        try {
+            val enable = "\u001B[?1004h".toByteArray(Charsets.US_ASCII)
+            first.onBytes(enable, 0, enable.size)
+            second.onBytes(enable, 0, enable.size)
+            edtCall {
+                component.bind(first)
+                component.bind(second)
+            }
+            dispatcher.scheduler.runCurrent()
+            firstOutput.reset()
+            secondOutput.reset()
+
+            edtCall { dispatchFocusCycle(component) }
+            dispatcher.scheduler.runCurrent()
+
+            assertAll(
+                { assertEquals("", firstOutput.toString(Charsets.US_ASCII)) },
+                { assertEquals("\u001B[I\u001B[O", secondOutput.toString(Charsets.US_ASCII)) },
+                { assertFalse(first.isClosed) },
+                { assertFalse(second.isClosed) },
+            )
+        } finally {
+            edtCall { component.dispose() }
+            first.close()
+            second.close()
+            dispatcher.scheduler.runCurrent()
+        }
+    }
 
     @Test
     fun `clipboard paste larger than byte queue is accepted on EDT and streamed on IO dispatcher`() {
@@ -112,7 +260,7 @@ class SwingTerminalThreadingTest {
 
     @Test
     fun `paste policy applies on binding and reload while preserving transport line endings`() {
-        val output = java.io.ByteArrayOutputStream()
+        val output = ByteArrayOutputStream()
         val connector =
             object : TerminalConnector by NoOpConnector {
                 override fun write(
@@ -167,7 +315,7 @@ class SwingTerminalThreadingTest {
 
     @Test
     fun `host palette binding and reload update color scheme replies`() {
-        val replies = java.io.ByteArrayOutputStream()
+        val replies = ByteArrayOutputStream()
         val connector =
             object : TerminalConnector by NoOpConnector {
                 override fun write(
@@ -654,6 +802,32 @@ class SwingTerminalThreadingTest {
             edtCall { component.dispose() }
             session.close()
         }
+    }
+
+    private fun focusSession(output: ByteArrayOutputStream): TerminalSession =
+        TerminalSession
+            .create(
+                terminal = TerminalBuffers.create(width = 3, height = 1),
+                connector =
+                    object : TerminalConnector by NoOpConnector {
+                        override fun write(
+                            bytes: ByteArray,
+                            offset: Int,
+                            length: Int,
+                        ) {
+                            output.write(bytes, offset, length)
+                        }
+                    },
+                workerDispatcher = dispatcher,
+                ioDispatcher = dispatcher,
+            ).also { it.start(columns = 3, rows = 1) }
+
+    private fun dispatchFocusCycle(component: SwingTerminal) {
+        check(SwingUtilities.isEventDispatchThread())
+        val gained = FocusEvent(component, FocusEvent.FOCUS_GAINED)
+        val lost = FocusEvent(component, FocusEvent.FOCUS_LOST)
+        component.focusListeners.forEach { it.focusGained(gained) }
+        component.focusListeners.forEach { it.focusLost(lost) }
     }
 
     private fun testSession(connector: TerminalConnector = NoOpConnector): TerminalSession {

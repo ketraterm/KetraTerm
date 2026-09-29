@@ -25,6 +25,7 @@ import com.intellij.openapi.project.Project
 import com.intellij.openapi.ui.Messages
 import com.intellij.ui.components.JBScrollBar
 import io.github.ketraterm.intellij.services.KetraTermCompletionService
+import io.github.ketraterm.intellij.services.captureCleanupFailure
 import io.github.ketraterm.intellij.settings.KetraTermIntellijSettings
 import io.github.ketraterm.ui.swing.api.*
 import io.github.ketraterm.ui.swing.host.*
@@ -271,15 +272,19 @@ internal class KetraTermTerminalPane private constructor(
     fun close() {
         if (closed) return
         closed = true
-        clipboardReadPrompt.close()
-        completionService?.releaseResources(tab)
-        completionService?.removeResourceListener(completionChanged)
+        val service = completionService
         completionService = null
-        completionBinding.close()
-        searchBar.close()
-        shortcutController?.dispose()
+        val shortcuts = shortcutController
         shortcutController = null
-        terminal.dispose()
+        var failure: Throwable? = null
+        failure = captureCleanupFailure(failure, clipboardReadPrompt::close)
+        failure = captureCleanupFailure(failure) { service?.releaseResources(tab) }
+        failure = captureCleanupFailure(failure) { service?.removeResourceListener(completionChanged) }
+        failure = captureCleanupFailure(failure, completionBinding::close)
+        failure = captureCleanupFailure(failure, searchBar::close)
+        failure = captureCleanupFailure(failure) { shortcuts?.dispose() }
+        failure = captureCleanupFailure(failure, terminal::dispose)
+        failure?.let { throw it }
     }
 
     companion object {
