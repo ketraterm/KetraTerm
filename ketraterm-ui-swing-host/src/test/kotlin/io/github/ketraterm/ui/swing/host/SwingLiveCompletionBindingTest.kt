@@ -18,6 +18,8 @@ package io.github.ketraterm.ui.swing.host
 import io.github.ketraterm.core.TerminalBuffers
 import io.github.ketraterm.session.TerminalSession
 import io.github.ketraterm.session.TerminalShellCommandLineSnapshot
+import io.github.ketraterm.session.TerminalShellIntegrationFactory
+import io.github.ketraterm.session.TerminalShellIntegrationState
 import io.github.ketraterm.testkit.MockConnector
 import io.github.ketraterm.ui.swing.suggestion.*
 import kotlinx.coroutines.*
@@ -44,7 +46,7 @@ class SwingLiveCompletionBindingTest {
                     MockConnector(),
                     workerDispatcher = dispatcher,
                     ioDispatcher = dispatcher,
-                    shellCommandLineSource = source,
+                    shellIntegration = TerminalShellIntegrationFactory.host(TerminalShellIntegrationState(), source),
                 )
             val target = RecordingTarget()
             val binding =

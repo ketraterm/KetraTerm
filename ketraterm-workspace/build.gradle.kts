@@ -23,6 +23,7 @@ dependencies {
 
     api(project(":ketraterm-session"))
     implementation(project(":ketraterm-pty"))
+    implementation(project(":ketraterm-shell-integration"))
     implementation(project(":ketraterm-render-api"))
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:$kotlinxCoroutinesVersion")
 

@@ -46,6 +46,7 @@ dependencies {
     dokka(project(":ketraterm-render-cache"))
     dokka(project(":ketraterm-transport-api"))
     dokka(project(":ketraterm-session"))
+    dokka(project(":ketraterm-shell-integration"))
     dokka(project(":ketraterm-ui-swing"))
     dokka(project(":ketraterm-ui-swing-host"))
     dokka(project(":ketraterm-testkit"))

@@ -13,10 +13,13 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.github.ketraterm.session
+package io.github.ketraterm.shell.integration
 
 import io.github.ketraterm.core.TerminalBuffers
 import io.github.ketraterm.input.event.*
+import io.github.ketraterm.session.TerminalSession
+import io.github.ketraterm.session.TerminalStartupCommand
+import io.github.ketraterm.session.TerminalStartupCommandStatus
 import io.github.ketraterm.testkit.MockConnector
 import io.github.ketraterm.transport.TerminalConnector
 import io.github.ketraterm.transport.TerminalConnectorListener
@@ -52,12 +55,18 @@ class TerminalStartupCommandTest {
     @Test
     fun `unconfigured sessions do not submit commands on prompt markers`() {
         val connector = MockConnector()
-        TerminalSession.create(TerminalBuffers.create(40, 4), connector, ioDispatcher = UnconfinedTestDispatcher()).use { session ->
-            session.start(40, 4)
-            connector.feedFromHost(PROMPT.toByteArray())
-            assertNull(session.startupCommandStatus)
-            assertEquals("", connector.writtenBytes.decodeToString())
-        }
+        TerminalSession
+            .create(
+                TerminalBuffers.create(40, 4),
+                connector,
+                shellIntegration = OscShellIntegration,
+                ioDispatcher = UnconfinedTestDispatcher(),
+            ).use { session ->
+                session.start(40, 4)
+                connector.feedFromHost(PROMPT.toByteArray())
+                assertNull(session.startupCommandStatus)
+                assertEquals("", connector.writtenBytes.decodeToString())
+            }
     }
 
     @Test
@@ -217,6 +226,7 @@ class TerminalStartupCommandTest {
                 terminal = TerminalBuffers.create(width = 40, height = 4),
                 connector = connector,
                 startupCommand = TerminalStartupCommand(command),
+                shellIntegration = OscShellIntegration,
                 workerDispatcher = StandardTestDispatcher(),
                 ioDispatcher = ioDispatcher,
             ).also { it.start(40, 4) }

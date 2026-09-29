@@ -34,6 +34,7 @@ dependencies {
     implementation("net.java.dev.jna:jna:5.14.0")
 
     testImplementation(kotlin("test"))
+    testImplementation(project(":ketraterm-shell-integration"))
     testImplementation("org.junit.jupiter:junit-jupiter:6.1.3")
 }
 

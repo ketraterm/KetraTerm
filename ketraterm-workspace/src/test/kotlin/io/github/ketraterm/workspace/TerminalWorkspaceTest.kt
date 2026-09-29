@@ -32,7 +32,10 @@ import io.github.ketraterm.render.api.TerminalColorPalette
 import io.github.ketraterm.render.api.TerminalRenderFrameReader
 import io.github.ketraterm.render.cache.TerminalRenderPublisher
 import io.github.ketraterm.session.TerminalSession
+import io.github.ketraterm.session.TerminalShellIntegrationFactory
+import io.github.ketraterm.session.TerminalShellIntegrationState
 import io.github.ketraterm.session.TerminalStartupCommand
+import io.github.ketraterm.shell.integration.OscShellIntegration
 import io.github.ketraterm.transport.TerminalConnector
 import io.github.ketraterm.transport.TerminalConnectorListener
 import kotlinx.coroutines.CoroutineDispatcher
@@ -367,6 +370,7 @@ class TerminalWorkspaceTest {
                     terminal = TerminalBuffers.create(80, 24),
                     connector = RecordingConnector(),
                     startupCommand = TerminalStartupCommand("echo ready"),
+                    shellIntegration = OscShellIntegration,
                     workerDispatcher = StandardTestDispatcher(testScheduler),
                 )
             val cancellations = mutableListOf<String>()
@@ -446,58 +450,70 @@ class TerminalWorkspaceTest {
     }
 
     @Test
-    fun `current working directory is stored forwarded coalesced and used as title fallback`() {
-        var capturedEventListener: PtyEventListener? = null
-        val session = testSession()
-        val directoryEvents = mutableListOf<Pair<String, String>>()
-        val titleEvents = mutableListOf<String>()
-        val workspace =
-            TerminalWorkspace(
-                listener =
-                    object : TerminalWorkspaceListener {
-                        override fun currentWorkingDirectoryChanged(
-                            tab: TerminalWorkspaceTab,
-                            uri: String,
-                        ) {
-                            assertEquals(uri, tab.currentWorkingDirectoryUri)
-                            directoryEvents += tab.id to uri
-                        }
+    fun `current working directory is stored forwarded coalesced and used as title fallback`() =
+        runTest {
+            var capturedEventListener: PtyEventListener? = null
+            val state = TerminalShellIntegrationState()
+            val dispatcher = StandardTestDispatcher(testScheduler)
+            val session = testSession(dispatcher = dispatcher, shellIntegration = TerminalShellIntegrationFactory.host(state))
+            val directoryEvents = mutableListOf<Pair<String, String>>()
+            val titleEvents = mutableListOf<String>()
+            val workspace =
+                TerminalWorkspace(
+                    listener =
+                        object : TerminalWorkspaceListener {
+                            override fun currentWorkingDirectoryChanged(
+                                tab: TerminalWorkspaceTab,
+                                uri: String,
+                            ) {
+                                assertEquals(uri, tab.currentWorkingDirectoryUri)
+                                directoryEvents += tab.id to uri
+                            }
 
-                        override fun titleChanged(
-                            tab: TerminalWorkspaceTab,
-                            title: String,
-                        ) {
-                            titleEvents += title
-                        }
-                    },
-                sessionFactory =
-                    { _, _, eventListener ->
-                        capturedEventListener = eventListener
-                        session
-                    },
-            )
-        val tab =
-            workspace.openTab(
-                profile = TerminalProfile("p1", "Profile 1", listOf("mock-shell")),
-                options = TerminalWorkspaceOpenOptions(80, 24, false, 100),
-            )
-        val eventListener = requireNotNull(capturedEventListener)
+                            override fun titleChanged(
+                                tab: TerminalWorkspaceTab,
+                                title: String,
+                            ) {
+                                titleEvents += title
+                            }
+                        },
+                    sessionFactory =
+                        { _, _, eventListener ->
+                            capturedEventListener = eventListener
+                            session
+                        },
+                    workerDispatcher = dispatcher,
+                )
+            val tab =
+                workspace.openTab(
+                    profile = TerminalProfile("p1", "Profile 1", listOf("mock-shell")),
+                    options = TerminalWorkspaceOpenOptions(80, 24, false, 100),
+                )
+            val eventListener = requireNotNull(capturedEventListener)
 
-        eventListener.currentWorkingDirectoryChanged(session, "file:///home/user/My%20Project")
-        eventListener.currentWorkingDirectoryChanged(session, "file:///home/user/My%20Project")
+            state.recordCurrentWorkingDirectory("file:///home/user/My%20Project")
+            runCurrent()
+            state.recordCurrentWorkingDirectory("file:///home/user/My%20Project")
+            runCurrent()
 
-        assertEquals("file:///home/user/My%20Project", tab.currentWorkingDirectoryUri)
-        assertEquals("My Project", tab.title)
-        assertEquals(listOf(tab.id to "file:///home/user/My%20Project"), directoryEvents)
-        assertEquals(listOf("My Project"), titleEvents)
+            assertEquals("file:///home/user/My%20Project", tab.currentWorkingDirectoryUri)
+            assertEquals("My Project", tab.title)
+            assertEquals(listOf(tab.id to "file:///home/user/My%20Project"), directoryEvents)
+            assertEquals(listOf("My Project"), titleEvents)
 
-        eventListener.windowTitleChanged(session, "Build")
-        eventListener.currentWorkingDirectoryChanged(session, "file:///home/user/Other")
-        assertEquals("Build", tab.title)
+            eventListener.windowTitleChanged(session, "Build")
+            state.recordCurrentWorkingDirectory("file:///home/user/Other")
+            runCurrent()
+            assertEquals("Build", tab.title)
 
-        eventListener.windowTitleChanged(session, "")
-        assertEquals("Other", tab.title)
-    }
+            eventListener.windowTitleChanged(session, "")
+            assertEquals("Other", tab.title)
+            eventListener.currentWorkingDirectoryChanged(session, "file:///unselected-osc-directory")
+            runCurrent()
+            assertEquals("file:///home/user/Other", tab.currentWorkingDirectoryUri)
+            workspace.close()
+            runCurrent()
+        }
 
     @Test
     fun `workspace open options carry paste sanitization profile default`() {
@@ -740,7 +756,7 @@ class TerminalWorkspaceTest {
                         maxHistory = 100,
                     ),
             )
-        val event = testClipboardWriteEvent("copied")
+        val event = testClipboardWriteEvent()
 
         capturedEventListener!!.terminalClipboardWrite(session, event)
 
@@ -780,7 +796,7 @@ class TerminalWorkspaceTest {
                         maxHistory = 100,
                     ),
             )
-        val event = testClipboardPromptEvent("prompted")
+        val event = testClipboardPromptEvent()
 
         capturedEventListener!!.terminalClipboardPrompt(session, event)
 
@@ -868,8 +884,9 @@ class TerminalWorkspaceTest {
             }
         }
 
-    private fun testClipboardWriteEvent(text: String): TerminalClipboardWriteEvent =
-        TerminalClipboardWriteEvent(
+    private fun testClipboardWriteEvent(): TerminalClipboardWriteEvent {
+        val text = "copied"
+        return TerminalClipboardWriteEvent(
             selection = "c",
             text = text,
             audit =
@@ -882,9 +899,11 @@ class TerminalWorkspaceTest {
                     decision = TerminalClipboardDecision.ALLOWED_BY_POLICY,
                 ),
         )
+    }
 
-    private fun testClipboardPromptEvent(text: String): TerminalClipboardPromptEvent =
-        TerminalClipboardPromptEvent(
+    private fun testClipboardPromptEvent(): TerminalClipboardPromptEvent {
+        val text = "prompted"
+        return TerminalClipboardPromptEvent(
             selection = "c",
             text = text,
             audit =
@@ -897,10 +916,12 @@ class TerminalWorkspaceTest {
                     decision = TerminalClipboardDecision.PROMPT_REQUIRED,
                 ),
         )
+    }
 
     private fun testSession(
         connector: TerminalConnector = NoOpConnector,
         dispatcher: CoroutineDispatcher = StandardTestDispatcher(),
+        shellIntegration: TerminalShellIntegrationFactory? = null,
     ): TerminalSession {
         val terminal = TerminalBuffers.create(width = 80, height = 24, maxHistory = 100)
         return TerminalSession(
@@ -913,6 +934,7 @@ class TerminalWorkspaceTest {
             inputEncoder = NoOpInputEncoder,
             workerDispatcher = dispatcher,
             ioDispatcher = dispatcher,
+            shellIntegration = shellIntegration,
         )
     }
 

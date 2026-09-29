@@ -6,6 +6,7 @@ Release notes for library consumers and embedders. Product-specific changes are 
 
 ### Improvements and fixes
 
+- Made shell metadata updates independent of transport output. Swing observes the selected model, and workspace/product command learning uses exact semantic completion snapshots; observer registrations end with their view/tab lifetime.
 - Discarded stale shell suggestions when editing context changes or the session closes, including pending results and acceptance. Dismissing suggestions cancels provider work, and ineligible automatic requests leave explicit requests untouched.
 - Clarified Swing binding ownership: binding applies session settings and geometry; unbinding leaves the host-owned session open. Each session publishes one viewport.
 - Removed standalone CLI, configuration and PATH augmentation from workspace shell integration. Standalone product wiring now owns companion helpers and uses the active configuration path; embedded hosts retain their own environment.
@@ -25,7 +26,7 @@ Release notes for library consumers and embedders. Product-specific changes are 
 
 ### API changes
 
-- Added optional `shellCommandLineSource: StateFlow<TerminalShellCommandLineSnapshot?>` to session construction and `PtyOptions`. Hosts can supply authoritative active editing context without replacing standard session assembly; command history and directory metadata retain their existing ownership. Hosts using this source own startup readiness and submission, so it cannot be combined with `startupCommand`.
+- Replaced the active-edit-only `shellCommandLineSource` option with `shellIntegration: TerminalShellIntegrationFactory?` in session construction and `PtyOptions`. `TerminalShellIntegrationFactory.host` accepts a host-owned command projection, editing flow, and readiness flow; prompts, history, directories, suggestions, and startup submission no longer require KetraTerm's OSC recorder. Bare session/PTY creation installs no integration. Select `OscShellIntegration` from the new optional `ketraterm-shell-integration` module for the previous OSC behavior; the standard workspace does so explicitly. Consumer constructors/default arguments and `PtyOptions` copy methods require recompilation.
 - Added `SwingShellSuggestionTrigger` to supplied-context and active-session suggestion requests. Explicit requests use the existing provider lifecycle while automatic popups are disabled; the master switch still applies. Existing request defaults are preserved. Recompile consumers using session constructors, Kotlin default arguments, or `PtyOptions` generated copy methods.
 - `SwingTerminal.search()` is now asynchronous; observe `searchState` for progress, results and failures. `TerminalSearchState` adds `isSearching` and `failure`; consumers of its generated copy methods must recompile.
 - Custom core/parser implementations must support counted `scrollUp`/`scrollDown`, `TerminalWriter.updatePenColors`, and `isAlternateScreenActive` on `TerminalReader` and `TerminalCommandSink`. `updatePreviousCluster(codepoints, length)` replaces scalar grapheme continuation.

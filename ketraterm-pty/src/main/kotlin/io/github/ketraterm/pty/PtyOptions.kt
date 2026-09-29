@@ -21,9 +21,8 @@ import io.github.ketraterm.input.policy.PasteLineEndingPolicy
 import io.github.ketraterm.input.policy.TerminalInputPolicy
 import io.github.ketraterm.protocol.TerminalCapabilityIdentity
 import io.github.ketraterm.protocol.TerminalHostModeCapability
-import io.github.ketraterm.session.TerminalShellCommandLineSnapshot
+import io.github.ketraterm.session.TerminalShellIntegrationFactory
 import io.github.ketraterm.session.TerminalStartupCommand
-import kotlinx.coroutines.flow.StateFlow
 import java.nio.file.Path
 
 /**
@@ -52,12 +51,11 @@ import java.nio.file.Path
  * events such as BEL and title changes.
  * @param hostPolicy safety policy for terminal-triggered host actions.
  * @param modeReportCapabilities implemented host actions from TerminalHostModeCapability.
- * @param startupCommand command to submit once the shell emits a complete OSC 133 prompt.
- * The caller is responsible for installing shell integration before launch.
- * @param shellCommandLineSource optional host-owned active-edit state, forwarded
- * to [io.github.ketraterm.session.TerminalSession.create]. A supplied source is
- * authoritative, including null snapshots. The host owns its lifetime and
- * startup submission; it cannot be combined with [startupCommand].
+ * @param startupCommand command to submit once [shellIntegration] reports a ready prompt.
+ * The caller is responsible for installing its shell hooks before launch.
+ * @param shellIntegration selected producer of shell metadata, editing context and
+ * prompt readiness. Null installs no shell integration. PTY assembly does not
+ * select a protocol implementation or own the producer's lifetime.
  */
 data class PtyOptions
     @JvmOverloads
@@ -77,11 +75,11 @@ data class PtyOptions
         val hostPolicy: HostPolicy = HostPolicy(),
         val startupCommand: TerminalStartupCommand? = null,
         val modeReportCapabilities: Int = 0,
-        val shellCommandLineSource: StateFlow<TerminalShellCommandLineSnapshot?>? = null,
+        val shellIntegration: TerminalShellIntegrationFactory? = null,
     ) {
         init {
-            require(startupCommand == null || shellCommandLineSource == null) {
-                "startupCommand requires OSC shell integration; a host-owned shell command source owns startup submission"
+            require(startupCommand == null || shellIntegration != null) {
+                "startupCommand requires shell integration with prompt readiness"
             }
             require(modeReportCapabilities and TerminalHostModeCapability.ALL.inv() == 0) {
                 "invalid host mode-report capabilities: $modeReportCapabilities"

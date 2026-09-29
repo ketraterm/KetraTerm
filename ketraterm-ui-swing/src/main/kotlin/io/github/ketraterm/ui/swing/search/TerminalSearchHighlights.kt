@@ -140,7 +140,8 @@ internal class TerminalSearchHighlights {
             var valid = true
             while (visibleEnd < end && segmentRows[visibleEnd] <= lastAbsoluteRow) {
                 val row = (segmentRows[visibleEnd] - firstAbsoluteRow).toInt()
-                if (validatesRows && (
+                if (validatesRows &&
+                    (
                         segmentIds[visibleEnd] != cache.lineIds[row] ||
                             segmentGenerations[visibleEnd] != cache.lineGenerations[row]
                     )

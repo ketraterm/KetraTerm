@@ -22,7 +22,7 @@ Designed for embedding into IDEs, developer tools, and standalone desktop applic
 * **VT420 Rectangular Operations**: Supports protected, wide-glyph-safe rectangular erase, fill, copy, attribute updates, column edits, and active-page checksum responses for demanding text TUIs.
 * **Native Desktop Notifications**: Fully supports native desktop notifications triggered directly via iTerm2-style `OSC 9` and urxvt-style `OSC 777` sequences, featuring a KetraTerm-specific severity extension (`info`, `warning`, `error`, `none`), ConEmu subcommand conflict filtering, and self-cleaning tray icon management.
 * **Exceptional Utf-8 Support**: Supports UTF-8 input and output, with Unicode 17.0.0 data-backed grapheme segmentation, emoji properties, and East Asian width policies for modern emojis, symbols, and scripts.
-* **Modern Shell Integration**: Implements modern shell integration protocols (`OSC 133`, `OSC 7`) for accurate prompt detection, command lifecycle tracking, exit status reporting, and current working directory synchronization.
+* **Replaceable Shell Integration**: Hosts can supply their existing shell model for prompts, commands, directories, editing, and readiness. KetraTerm's OSC 133/7 producer is an optional module selected by the standard workspace.
 
 > For a complete specification of all supported capabilities, see the [Terminal Feature Map](docs/terminal-feature-map.md). A detailed list of current backlog items and compatibility decisions is maintained in the [Terminal Feature Gap Map](docs/terminal-feature-gap-map.md)
 
@@ -35,7 +35,10 @@ Designed for embedding into IDEs, developer tools, and standalone desktop applic
 
 ## Seamless Integration Guide
 
-Integrating a local shell into a Swing application requires only a few lines of configuration:
+The example below launches a plain PTY session. `TerminalSession.create` and
+`PtyOptions` install no shell integration unless one is selected. The standard
+workspace selects KetraTerm's optional producer; IDE hosts can supply their own
+model through the [session integration API](ketraterm-session/README.md#host-owned-shell-integration).
 
 ```kotlin
 import io.github.ketraterm.pty.TerminalSessions
@@ -98,7 +101,8 @@ KetraTerm is composed of strict, decoupled Gradle modules:
 * **`:ketraterm-render-api`**: Dependency-free visual frame contracts.
 * **`:ketraterm-render-cache`**: Double/triple-buffered publication cache.
 * **`:ketraterm-transport-api`**: Duplex I/O connector interfaces.
-* **`:ketraterm-session`**: Thread synchronization, lock controls, and event loop.
+* **`:ketraterm-session`**: Runtime synchronization, ordered writes, and neutral shell metadata contracts.
+* **`:ketraterm-shell-integration`**: Optional OSC shell metadata and bounded command extraction.
 * **`:ketraterm-pty`**: Local native process Pty4J launcher and stream pump.
 * **`:ketraterm-ui-swing`**: Reusable desktop `JComponent` painter and mouse interaction adapters.
 * **`:ketraterm-ui-swing-host`**: Optional host chrome, actions, and completion-to-Swing adapters.

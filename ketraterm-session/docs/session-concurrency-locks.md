@@ -40,32 +40,41 @@ Input methods return after admission, not transport completion. For ordinary inp
 
 Local close publishes the closed state and calls `connector.close` before taking cleanup locks. It does not join the writer while a native call is blocked. Remote close cancels pending writes too. A connector must tolerate concurrent close; session cancellation alone cannot interrupt an arbitrary native call. The ring is cleared/released and pending bulk references are dropped on cleanup. While open, active bulk work remains charged to the budgets until its callback returns. The bulk sink checks closure/cancellation before every chunk; a racing native call already entered can finish, and pure encoding between writes is bounded by admitted work. Writer scratch is cleared when its call returns and the coroutine unwinds.
 
-## Active shell editing context
+## Selected shell integration
 
-The default OSC 133 source reconstructs active command text under mutation
-serialization. Its revision tracker scans published live frames only while
-observed. An optional host-owned `shellCommandLineSource` replaces active editing
-context for the session's lifetime, including unavailable (`null`) values. It
-does not replace OSC command-history recording or directory metadata.
+Session selects one `TerminalShellIntegrationFactory` before starting output.
+`create` dispatches parsed shell events to that producer; low-level construction
+leaves custom-parser event dispatch to the caller.
+With no factory it installs no recorder or command extractor. Factory creation
+must not launch work. An implementation deriving metadata from output uses
+`TerminalShellIntegrationContext` for serialized frame reads and read-only leases
+of published caches; its synchronous protocol callbacks run under mutation
+serialization. The optional OSC producer uses cold primitive fingerprint tracking.
 
-The external source is a `StateFlow` of immutable snapshots. Snapshot reads use
-its current value without acquiring mutation serialization; one session child
-observes changes while revision collectors exist. Observation is independent of render publication and performs
-no grid scan. Equal values and intermediate updates may be conflated. Removing
-the final revision collector stops observation and clears the retained revision;
-a later collector samples the current source. Closure cancels observation and
-makes active snapshots unavailable without cancelling the host's producer.
+`TerminalShellIntegrationFactory.host` reads host-owned immutable editing snapshots
+without the mutation lock. The supplied bounded `TerminalShellIntegrationState`
+is the only terminal-facing timeline and directory projection; OSC never
+supplements it. Hosts serialize their own semantic events and publish updates
+after corresponding terminal output, capturing stable line IDs before delivering
+later bytes. They also refresh live-grid editing anchors after geometry changes.
 
-Hosts must publish source updates after the corresponding terminal output and
-geometry changes; the session cannot order an independently owned shell model.
-Hosts supplying a source also own startup readiness and command submission, so
-the factory rejects combining that source with `startupCommand`. Existing
-session input methods preserve outbound ordering for host-submitted commands.
+One session child shares active-edit revision observation while collectors exist.
+Equal values and intermediate updates may conflate; removing the final collector
+stops observation and clears the retained revision. A later collector samples the
+current source. Metadata `revision` is likewise conflated state, while synchronous
+command-finished listeners deliver each completed record outside the model lock.
+Directory listeners synchronously report future changed URIs without initial
+replay; same-URI reports are suppressed. Workspace uses these semantic callbacks
+so final directory and completion updates survive immediate transport closure.
+Observers must return promptly; their registrations belong to the consumer.
 
-Current directory can stay in the host's completion context. To populate session
-metadata instead, hosts can call `shellIntegrationState.recordCurrentWorkingDirectory`
-with a validated file URI and deny OSC 7 through
-`HostPolicy.currentWorkingDirectoryPolicy`, preventing remote replacement.
+Startup input requires a selected producer's explicit prompt readiness. Readiness
+can arrive without transport output. Submission still waits until transport start
+has completed and the current parser batch and its responses have been processed;
+the session rechecks readiness and primary-buffer state before queue admission.
+User input, closure, or submission ends readiness observation. Host flows and
+metadata remain host-owned after session closure; active editing becomes
+unavailable through the closed session.
 
 ## Clipboard read lifetime and output commitment
 

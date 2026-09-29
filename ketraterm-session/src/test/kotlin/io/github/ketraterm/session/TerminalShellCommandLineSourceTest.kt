@@ -18,8 +18,6 @@ package io.github.ketraterm.session
 import io.github.ketraterm.core.TerminalBuffers
 import io.github.ketraterm.core.api.TerminalBuffer
 import io.github.ketraterm.host.HostCommandAdapter
-import io.github.ketraterm.host.HostControlPolicy
-import io.github.ketraterm.host.HostPolicy
 import io.github.ketraterm.parser.api.TerminalParsers
 import io.github.ketraterm.render.api.TerminalRenderFrameReader
 import io.github.ketraterm.render.cache.TerminalRenderPublisher
@@ -159,7 +157,7 @@ class TerminalShellCommandLineSourceTest {
         }
 
     @Test
-    fun `null source values never fall back to OSC while command timeline recording remains available`() =
+    fun `host editing and command timeline never fall back to OSC`() =
         runTest {
             Fixture(StandardTestDispatcher(testScheduler)).use { fixture ->
                 backgroundScope.launch { fixture.session.activeShellCommandLineRevision.collect {} }
@@ -172,10 +170,8 @@ class TerminalShellCommandLineSourceTest {
                 fixture.feed("\u001B]133;C\u0007\r\noutput\r\n\u001B]133;D;0\u0007")
                 runCurrent()
                 assertEquals("host edit", fixture.session.activeShellCommandLine()?.commandText)
-                val recordId = fixture.session.shellIntegrationState.latestCommandRecordId()
-                val metadata = fixture.session.shellIntegrationState.commandMetadata(recordId)
-                assertEquals("echo timeline", metadata?.commandText)
-                assertEquals(TerminalShellIntegrationCommandLifecycle.SUCCEEDED, metadata?.lifecycle)
+                assertEquals(0, fixture.session.shellIntegrationState.recordCount())
+                assertNull(fixture.session.currentWorkingDirectoryUri())
 
                 fixture.source.value = null
                 fixture.feed(PROMPT + "another osc command")
@@ -350,10 +346,9 @@ class TerminalShellCommandLineSourceTest {
         }
 
     @Test
-    fun `external context and built in startup submission are rejected before session assembly`() =
+    fun `startup submission without a selected integration is rejected before assembly`() =
         runTest {
             val connector = MockConnector()
-            val source = MutableStateFlow<TerminalShellCommandLineSnapshot?>(null)
             // Deliberately lacks a render reader: argument validation must precede assembly.
             val terminal = object : TerminalBuffer by TerminalBuffers.create(30, 3) {}
             val dispatcher = StandardTestDispatcher(testScheduler)
@@ -365,17 +360,13 @@ class TerminalShellCommandLineSourceTest {
                         startupCommand = TerminalStartupCommand("echo startup"),
                         workerDispatcher = dispatcher,
                         ioDispatcher = dispatcher,
-                        shellCommandLineSource = source,
                     )
                 }
             runCurrent()
-
             assertTrue(failure.message.orEmpty().contains("startupCommand"))
-            assertTrue(failure.message.orEmpty().contains("shellCommandLineSource"))
             assertEquals(0, connector.startCount)
             assertEquals(0, connector.closeCount)
             assertTrue(connector.resizeCalls.isEmpty())
-            assertEquals(0, source.subscriptionCount.value)
         }
 
     @Test
@@ -394,7 +385,7 @@ class TerminalShellCommandLineSourceTest {
                 parser = TerminalParsers.create(HostCommandAdapter(terminal)),
                 workerDispatcher = dispatcher,
                 ioDispatcher = dispatcher,
-                shellCommandLineSource = source,
+                shellIntegration = TerminalShellIntegrationFactory.host(TerminalShellIntegrationState(), source),
             ).use { session ->
                 session.start(30, 3)
                 backgroundScope.launch { session.activeShellCommandLineRevision.collect {} }
@@ -414,20 +405,32 @@ class TerminalShellCommandLineSourceTest {
         }
 
     @Test
-    fun `host directory metadata remains authoritative when OSC directory reports are denied`() =
+    fun `host directory and command metadata remain authoritative even when OSC is allowed`() =
         runTest {
-            Fixture(
-                StandardTestDispatcher(testScheduler),
-                hostPolicy = HostPolicy(currentWorkingDirectoryPolicy = HostControlPolicy.DENY),
-            ).use { fixture ->
-                fixture.session.shellIntegrationState.recordCurrentWorkingDirectory("file:///host/project")
+            Fixture(StandardTestDispatcher(testScheduler)).use { fixture ->
+                val state = fixture.session.shellIntegrationState
+                state.recordCurrentWorkingDirectory("file:///host/project")
+                var lineId = 0L
+                fixture.session.readRenderFrame { lineId = it.lineId(0) }
+                state.recordPromptStart(lineId)
+                state.recordPromptEnd(lineId)
+                state.recordCommandStart(
+                    lineId,
+                    includeLine = false,
+                    commandText = "host command",
+                    workingDirectoryUri = state.currentWorkingDirectoryUri(),
+                )
+                val recordId = state.latestCommandRecordId()
                 fixture.source.value = snapshot("host command")
-                fixture.feed("\u001B]7;file:///remote/path\u0007" + PROMPT + "echo directory\u001B]133;C\u0007")
+                fixture.feed("\u001B]7;file:///remote/path\u0007" + PROMPT + "echo remote\u001B]133;C\u0007\u001B]133;D;7\u0007")
                 runCurrent()
 
                 assertEquals("file:///host/project", fixture.session.currentWorkingDirectoryUri())
-                val recordId = fixture.session.shellIntegrationState.latestCommandRecordId()
-                assertEquals("file:///host/project", fixture.session.shellIntegrationState.commandWorkingDirectoryUri(recordId))
+                assertEquals(1, state.recordCount())
+                assertEquals(recordId, state.latestCommandRecordId())
+                assertEquals("file:///host/project", state.commandWorkingDirectoryUri(recordId))
+                assertEquals("host command", state.commandText(recordId))
+                assertEquals(TerminalShellIntegrationCommandLifecycle.RUNNING, state.commandMetadata(recordId)?.lifecycle)
                 assertEquals("host command", fixture.session.activeShellCommandLine()?.commandText)
             }
         }
@@ -435,7 +438,6 @@ class TerminalShellCommandLineSourceTest {
     private class Fixture(
         dispatcher: CoroutineDispatcher,
         start: Boolean = true,
-        hostPolicy: HostPolicy = HostPolicy(),
     ) : AutoCloseable {
         val source = MutableStateFlow<TerminalShellCommandLineSnapshot?>(null)
         val connector = MockConnector()
@@ -443,10 +445,9 @@ class TerminalShellCommandLineSourceTest {
             TerminalSession.create(
                 terminal = TerminalBuffers.create(30, 3),
                 connector = connector,
-                hostPolicy = hostPolicy,
                 workerDispatcher = dispatcher,
                 ioDispatcher = dispatcher,
-                shellCommandLineSource = source,
+                shellIntegration = TerminalShellIntegrationFactory.host(TerminalShellIntegrationState(), source),
             )
 
         init {

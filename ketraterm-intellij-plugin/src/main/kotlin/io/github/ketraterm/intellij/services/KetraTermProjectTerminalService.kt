@@ -41,10 +41,9 @@ import io.github.ketraterm.intellij.ui.KetraTermTerminalPane
 import io.github.ketraterm.intellij.ui.KetraTermTerminalPaneHostActions
 import io.github.ketraterm.intellij.ui.KetraTermTerminalStartupView
 import io.github.ketraterm.protocol.NotificationLevel
-import io.github.ketraterm.protocol.ShellIntegrationEvent
-import io.github.ketraterm.protocol.ShellIntegrationMarker
 import io.github.ketraterm.session.TerminalClipboardReadResult
 import io.github.ketraterm.session.TerminalSessionState
+import io.github.ketraterm.session.TerminalShellIntegrationCommandMetadata
 import io.github.ketraterm.session.TerminalStartupCommand
 import io.github.ketraterm.ui.swing.host.SwingClipboardPrompts
 import io.github.ketraterm.ui.swing.host.SwingClipboardReader
@@ -629,17 +628,11 @@ class KetraTermProjectTerminalService internal constructor(
             return binding.read(request, SwingClipboardPrompts.readQuestion(tab.profile.displayName, "IDE clipboard"))
         }
 
-        override fun shellIntegrationMarker(
+        override fun commandFinished(
             tab: TerminalWorkspaceTab,
-            event: ShellIntegrationEvent,
+            metadata: TerminalShellIntegrationCommandMetadata,
         ) {
-            if (!KetraTermIntellijSettings.getInstance().state.smartSuggestionsEnabled ||
-                event.marker != ShellIntegrationMarker.COMMAND_FINISHED
-            ) {
-                return
-            }
-            val state = tab.session.shellIntegrationState
-            val metadata = state.commandMetadata(state.latestCommandRecordId()) ?: return
+            if (!KetraTermIntellijSettings.getInstance().state.smartSuggestionsEnabled) return
             KetraTermCompletionService.getInstanceIfCreated()?.recordFinishedCommand(tab, metadata)
         }
 

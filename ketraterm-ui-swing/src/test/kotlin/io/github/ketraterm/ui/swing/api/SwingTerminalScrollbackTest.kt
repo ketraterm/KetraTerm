@@ -26,6 +26,7 @@ import io.github.ketraterm.render.api.*
 import io.github.ketraterm.render.cache.TerminalRenderCache
 import io.github.ketraterm.render.cache.TerminalRenderPublisher
 import io.github.ketraterm.session.TerminalSession
+import io.github.ketraterm.session.TerminalShellIntegrationFactory
 import io.github.ketraterm.session.TerminalShellIntegrationState
 import io.github.ketraterm.transport.TerminalConnector
 import io.github.ketraterm.transport.TerminalConnectorListener
@@ -255,14 +256,14 @@ class SwingTerminalScrollbackTest {
         lateinit var event: MouseWheelEvent
         SwingUtilities.invokeAndWait {
             repeat(3) {
-                event = preciseWheelEvent(component, preciseRotation = -0.1)
+                event = preciseWheelEvent(component)
                 component.dispatchEvent(event)
             }
             assertEquals(0.0, component.viewportState().scrollbackOffset)
         }
 
         SwingUtilities.invokeAndWait {
-            event = preciseWheelEvent(component, preciseRotation = -0.1)
+            event = preciseWheelEvent(component)
             component.dispatchEvent(event)
         }
 
@@ -543,7 +544,7 @@ class SwingTerminalScrollbackTest {
                 parser = NoOpParser,
                 inputEncoder = NoOpInputEncoder,
                 workerDispatcher = dispatcher,
-                shellIntegrationState = shellIntegrationState,
+                shellIntegration = TerminalShellIntegrationFactory.host(shellIntegrationState),
             ).also(sessions::add)
         session.renderPublisher.updateAndPublish(reader)
         val component =
@@ -606,7 +607,7 @@ class SwingTerminalScrollbackTest {
                 parser = NoOpParser,
                 inputEncoder = NoOpInputEncoder,
                 workerDispatcher = dispatcher,
-                shellIntegrationState = shellIntegrationState,
+                shellIntegration = TerminalShellIntegrationFactory.host(shellIntegrationState),
             ).also(sessions::add)
         val settingsProvider =
             MutableSettingsProvider(
@@ -713,7 +714,7 @@ class SwingTerminalScrollbackTest {
                 alternateScreenPadding = SwingPadding(0, 8, 8, 8),
                 shellIntegrationDecorationGutterWidth = 32,
             )
-        val component = createComponent(settingsProvider = SwingSettingsProvider { settings })
+        val component = createComponent(settingsProvider = { settings })
 
         try {
             SwingUtilities.invokeAndWait {
@@ -891,10 +892,7 @@ class SwingTerminalScrollbackTest {
         assertEquals(expectedRows, publishedRows)
     }
 
-    private fun preciseWheelEvent(
-        component: SwingTerminal,
-        preciseRotation: Double,
-    ): MouseWheelEvent =
+    private fun preciseWheelEvent(component: SwingTerminal): MouseWheelEvent =
         MouseWheelEvent(
             component,
             MouseWheelEvent.MOUSE_WHEEL,
@@ -909,7 +907,7 @@ class SwingTerminalScrollbackTest {
             MouseWheelEvent.WHEEL_UNIT_SCROLL,
             3,
             0,
-            preciseRotation,
+            -0.1,
         )
 
     private fun scrollTestTerminal(
@@ -917,7 +915,7 @@ class SwingTerminalScrollbackTest {
         settings: SwingSettings = SwingSettings(padding = SwingPadding(0, 0, 0, 0)),
     ): SwingTerminal =
         createComponent(
-            settingsProvider = SwingSettingsProvider { settings },
+            settingsProvider = { settings },
             hostServices = hostServices,
         )
 

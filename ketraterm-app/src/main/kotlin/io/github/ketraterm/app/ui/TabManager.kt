@@ -25,6 +25,7 @@ import io.github.ketraterm.host.TerminalClipboardWriteEvent
 import io.github.ketraterm.protocol.TerminalHostModeCapability
 import io.github.ketraterm.session.TerminalClipboardReadResult
 import io.github.ketraterm.session.TerminalShellIntegrationCommandLifecycle
+import io.github.ketraterm.session.TerminalShellIntegrationCommandMetadata
 import io.github.ketraterm.session.TerminalStartupCommand
 import io.github.ketraterm.ui.swing.api.SwingTerminalContextMenuRequest
 import io.github.ketraterm.ui.swing.host.SwingClipboardPrompts
@@ -894,14 +895,11 @@ internal class TabManager(
     }
 
     private inner class StandaloneWorkspaceListener : TerminalWorkspaceListener {
-        override fun shellIntegrationMarker(
+        override fun commandFinished(
             tab: TerminalWorkspaceTab,
-            event: io.github.ketraterm.protocol.ShellIntegrationEvent,
+            metadata: TerminalShellIntegrationCommandMetadata,
         ) {
-            if (event.marker != io.github.ketraterm.protocol.ShellIntegrationMarker.COMMAND_FINISHED) return
             if (!settings.config.smartSuggestionsEnabled) return
-            val state = tab.session.shellIntegrationState
-            val metadata = state.commandMetadata(state.latestCommandRecordId()) ?: return
             metadata.commandText?.let { command ->
                 completionRegistry?.recordFinishedCommand(
                     commandLine = command,
@@ -936,7 +934,7 @@ internal class TabManager(
                                 taskbar.requestUserAttention(true, true)
                             }
                         }
-                    } catch (e: Exception) {
+                    } catch (_: Exception) {
                         // Ignore taskbar access failure on unsupported systems.
                     }
                 }

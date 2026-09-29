@@ -488,7 +488,8 @@ class SwingTerminal
 
                     override fun syncTerminalGridToActiveChrome(): Boolean {
                         // A parser-selected width must survive frame publication and chrome changes.
-                        return renderCache.columns == lastResizedColumns && this@SwingTerminal.resizeSessionToVisibleGridOnEdt(publishWhenUnchanged = false)
+                        return renderCache.columns == lastResizedColumns &&
+                            this@SwingTerminal.resizeSessionToVisibleGridOnEdt(publishWhenUnchanged = false)
                     }
 
                     override fun clampViewport(
@@ -802,7 +803,7 @@ class SwingTerminal
         /**
          * Scrolls to the nearest previous shell command.
          *
-         * The component uses session-owned OSC 133 command metadata and reveals
+         * The component uses the selected integration's command metadata and reveals
          * the command's prompt-start line when present, otherwise its command
          * start line. This method may be called from any thread; component state
          * is updated asynchronously on the EDT.
@@ -816,7 +817,7 @@ class SwingTerminal
         /**
          * Scrolls to the nearest next shell command.
          *
-         * The component uses session-owned OSC 133 command metadata and reveals
+         * The component uses the selected integration's command metadata and reveals
          * the command's prompt-start line when present, otherwise its command
          * start line. This method may be called from any thread; component state
          * is updated asynchronously on the EDT.
@@ -1076,11 +1077,26 @@ class SwingTerminal
             resizeSessionToVisibleGridOnEdt()
             bindingJob =
                 componentScope.launch {
-                    session.renderGeneration
-                        .filter { it >= 0L }
+                    launch {
+                        session.renderGeneration
+                            .filter { it >= 0L }
+                            .collect {
+                                if (this@SwingTerminal.session === session) {
+                                    renderFrameController.handlePublishedFrame()
+                                }
+                            }
+                    }
+                    combine(session.shellIntegrationState.revision, session.state) { _, state -> state }
+                        .takeWhile { it !is TerminalSessionState.Closed }
                         .collect {
-                            if (this@SwingTerminal.session === session) {
-                                renderFrameController.handlePublishedFrame()
+                            if (this@SwingTerminal.session !== session || session.isClosed || !renderCache.hasFrame) return@collect
+                            if (refreshShellIntegrationDecorations(session)) {
+                                if (hoveredPromptMarkerRow != NO_PROMPT_MARKER_ROW &&
+                                    !shellIntegrationDecorations.hasPromptStartAt(hoveredPromptMarkerRow)
+                                ) {
+                                    updateHoveredPromptMarker(NO_PROMPT_MARKER_ROW)
+                                }
+                                renderFrameController.repaintFrame(forceFullRepaint = true)
                             }
                         }
                 }
@@ -1395,8 +1411,7 @@ class SwingTerminal
          * Requests suggestions for the command line currently reported by the
          * bound [TerminalSession].
          *
-         * This method uses the session's selected command-context source: its
-         * standard OSC integration or the host-supplied source. It does not infer
+         * This method uses the session's selected shell integration. It does not infer
          * command text from key events or persistent command history. When no
          * active command line is available, any pending request is cancelled and
          * the popup is hidden. Explicit requests remain available when automatic

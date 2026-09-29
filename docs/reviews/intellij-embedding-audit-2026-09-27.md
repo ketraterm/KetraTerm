@@ -3,7 +3,8 @@
 This audit examines a concrete embedding scenario: IntelliJ owns its windows,
 tabs, process environment and optional shell
 integration/completion, while reusing KetraTerm's terminal and rendering stack.
-It does not propose a module rewrite or fix production behavior.
+The original review records findings rather than production fixes; E02 and E04
+include later scope clarifications. Current status belongs in the feature/gap maps.
 
 KetraTerm revision: `d26fa4553962ab11cc1de34843728cf1f1e745c3` plus the uncommitted
 audit/regression work. The [terminal quality audit](terminal-quality-audit-2026-09-27.md)
@@ -66,28 +67,28 @@ gating and byte encoding in input/session. Six new cases in
 cover default/enabled/reset mode, unbinding, disposal and rebinding. The enabled
 and replacement-session cases fail on missing bytes; the controls pass.
 
-### E02 — API gap: replacing the active shell context loses standard integration
+### E02 — API gap: replacing the complete shell integration model
 
-Host scripts emitting OSC 133 and OSC 7 already work with standard session
-assembly; script injection need not belong to KetraTerm. Custom suggestion
-providers and views are also supported. The limitation is **replacing the
-authoritative shell editing model**, not supplying different scripts.
+At the audited revision, `TerminalSession.create` always installed an OSC 133
+recorder, bounded command extractor, and OSC-based startup readiness. A different
+script emitting OSC 7/133 worked, but a host retaining its existing semantic shell
+model could not replace those producers. Public timeline mutations did not supply
+active editing or readiness, and the standard parser did not expose JetBrains'
+OSC 1341 protocol.
 
-[TerminalSession](../../ketraterm-session/src/main/kotlin/io/github/ketraterm/session/TerminalSession.kt#L159)
-has private active-command providers, installed only by `create` from its
-internal OSC 133 recorder (`:1085`, `:1140`, `:1150`). Updating the public command
-timeline does not update those providers or startup readiness. The standard
-parser's [OSC dispatcher](../../ketraterm-parser/src/main/kotlin/io/github/ketraterm/parser/ansi/osc/OscDispatcher.kt#L120)
-does not expose JetBrains OSC 1341. A custom parser can be supplied through the
-low-level session constructor, but that does not recreate the private integration
-wiring.
+The initial active-edit source addressed suggestions only. The clarified
+embedding requirement covers prompt and command boundaries, history metadata,
+directories, editing, and readiness together, with no second OSC recorder.
+The selected design keeps neutral model/runtime contracts in session and moves
+KetraTerm's recorder/extractor into an optional shell-integration module. Hosts
+adapt existing semantic events and flows; custom wire parsing and shell-script
+installation remain theirs. Startup can use host readiness through the session's
+ordered writer without requiring OSC bytes.
 
-Before v1, provide a small typed context/update boundary if the host must retain
-its own shell model. Reuse existing snapshots/events; choose one authoritative
-producer. Keep wire parsing in parser/host adapters and script installation in
-the product host. Do not require fake terminal bytes, duplicated screen parsing,
-or a general extension registry. Host-owned startup submission remains a valid
-alternative when the host retains readiness and command execution.
+Current implementation and regression status are recorded only under
+[embedding contracts](../terminal-feature-gap-map.md#embedding-contracts).
+The [session composition guide](../../ketraterm-session/README.md#host-owned-shell-integration)
+shows host selection, stable-line capture, and ownership requirements.
 
 ### E03 — API gap: custom-context completion lacks an explicit request path
 

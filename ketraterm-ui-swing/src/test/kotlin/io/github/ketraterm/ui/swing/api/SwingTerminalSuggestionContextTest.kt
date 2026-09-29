@@ -18,6 +18,8 @@ package io.github.ketraterm.ui.swing.api
 import io.github.ketraterm.core.TerminalBuffers
 import io.github.ketraterm.session.TerminalSession
 import io.github.ketraterm.session.TerminalShellCommandLineSnapshot
+import io.github.ketraterm.session.TerminalShellIntegrationFactory
+import io.github.ketraterm.session.TerminalShellIntegrationState
 import io.github.ketraterm.transport.TerminalConnector
 import io.github.ketraterm.transport.TerminalConnectorListener
 import io.github.ketraterm.ui.swing.settings.SwingSettings
@@ -549,7 +551,7 @@ class SwingTerminalSuggestionContextTest {
             TerminalSession.create(
                 terminal = TerminalBuffers.create(width = 30, height = 4),
                 connector = NoOpConnector,
-                shellCommandLineSource = source,
+                shellIntegration = TerminalShellIntegrationFactory.host(TerminalShellIntegrationState(), source),
                 workerDispatcher = workerDispatcher,
             )
         val replacementSession =

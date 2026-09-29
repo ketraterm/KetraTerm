@@ -18,10 +18,10 @@ package io.github.ketraterm.session
 /**
  * Immutable snapshot of the shell command line currently known to the session.
  *
- * The default session source extracts bounded text from OSC 133 prompt markers
+ * The optional OSC integration extracts bounded text from prompt markers
  * and synchronized render frames, only when the cursor is at the visible end.
  * A host-owned shell editor can instead supply its complete logical command
- * text and an offset anywhere in that text through `shellCommandLineSource`.
+ * text and an offset anywhere in that text through [TerminalShellIntegrationFactory.host].
  * Hosts own their source's text limits and publish updates when text, cursor,
  * anchor, or availability changes. Snapshots are consumed outside paint loops.
  *

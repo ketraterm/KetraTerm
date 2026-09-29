@@ -23,8 +23,10 @@ cross-project boundaries; module guides own local implementation detail.
 - `ketraterm-render-api`: dependency-free primitive render contracts.
 - `ketraterm-render-cache`: copied render data for consumers, without UI policy.
 - `ketraterm-transport-api`: ordered raw-byte connector contracts.
-- `ketraterm-session`: parser/core synchronization and serialized outbound
-  writes for input plus terminal responses.
+- `ketraterm-session`: parser/core synchronization, serialized outbound writes,
+  and neutral shell metadata contracts.
+- `ketraterm-shell-integration`: optional OSC shell metadata interpretation and
+  bounded command extraction through session-owned frame access.
 - `ketraterm-ui-swing`: reusable rendering and interaction, transport-agnostic.
 - `ketraterm-ui-swing-host`: host-neutral Swing actions and completion adapters,
   not product policy.

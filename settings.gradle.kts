@@ -32,6 +32,7 @@ include(
     ":ketraterm-pty",
     ":ketraterm-transport-api",
     ":ketraterm-session",
+    ":ketraterm-shell-integration",
     ":ketraterm-testkit",
     ":ketraterm-workspace",
     ":ketraterm-app",

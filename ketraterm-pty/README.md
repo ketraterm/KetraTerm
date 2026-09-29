@@ -59,6 +59,16 @@ Implement the suspending `PtyEventListener.readClipboard(session, request)` oper
 
 For hosts that must register a session before handling startup output, use `TerminalSessions.createLocalPty(options)`, publish the returned session, then call `session.start(options.columns, options.rows)`. The PTY process already exists, but output delivery has not started. Close the session if publication fails or startup is abandoned. `TerminalSessions.localPty(options)` remains the immediate-start convenience API.
 
+## Shell integration selection
+
+`PtyOptions.shellIntegration` accepts the session's neutral factory contract and
+defaults to `null`. PTY creation does not install shell scripts or add a dependency
+on KetraTerm's OSC producer. Select `OscShellIntegration` from
+`ketraterm-shell-integration` for compatible shell hooks, or supply a host model
+using `TerminalShellIntegrationFactory.host`. A configured startup command
+requires a selected integration and uses its prompt readiness. See the
+[session composition guide](../ketraterm-session/README.md#host-owned-shell-integration).
+
 ## How to Use
 
 The following example shows how to launch a local shell session (e.g. `/bin/bash` or `cmd.exe`) using the `TerminalSessions` factory:

@@ -80,7 +80,7 @@ internal object PtySessions {
                     inputPolicy = options.inputPolicy,
                     startupCommand = options.startupCommand,
                     modeReportCapabilities = options.modeReportCapabilities,
-                    shellCommandLineSource = options.shellCommandLineSource,
+                    shellIntegration = options.shellIntegration,
                 )
             hostEventBridge.attach(session)
             return session

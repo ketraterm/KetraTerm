@@ -15,6 +15,13 @@
  */
 package io.github.ketraterm.session
 
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
+import java.util.concurrent.CopyOnWriteArrayList
+
 /**
  * Primitive command-record id vocabulary used by shell-integration viewport projections.
  */
@@ -82,7 +89,7 @@ object TerminalShellIntegrationCommandBlockRange {
 }
 
 /**
- * Primitive lifecycle vocabulary for session-owned shell command records.
+ * Primitive lifecycle vocabulary for terminal-facing shell command records.
  *
  * These values are intentionally `Int` constants rather than enum instances so
  * viewport projections can use reusable primitive arrays with no per-row
@@ -95,12 +102,12 @@ object TerminalShellIntegrationCommandLifecycle {
     const val NONE: Int = 0
 
     /**
-     * A prompt marker was observed, but no command start has attached to it.
+     * A prompt was observed, but no command start has attached to it.
      */
     const val PROMPT_ONLY: Int = 1
 
     /**
-     * A command start marker was observed and no command finish has arrived yet.
+     * A command started and has not finished yet.
      */
     const val RUNNING: Int = 2
 
@@ -120,7 +127,7 @@ object TerminalShellIntegrationCommandLifecycle {
     const val FINISHED_UNKNOWN: Int = 5
 
     /**
-     * A newer prompt or command marker superseded an unfinished command.
+     * A newer prompt or command superseded an unfinished command.
      */
     const val ABANDONED: Int = 6
 }
@@ -134,7 +141,7 @@ object TerminalShellIntegrationCommandLifecycle {
  * @property recordId session-local command record identifier.
  * @property lifecycle primitive [TerminalShellIntegrationCommandLifecycle] value.
  * @property commandText captured command text, or `null` when unavailable.
- * @property workingDirectoryUri OSC 7 directory captured at command start, or `null`.
+ * @property workingDirectoryUri directory captured at command start, or `null`.
  * @property exitCode shell exit code, or `null` when unknown.
  * @property startedAtEpochMillis wall-clock command-start time.
  * @property finishedAtEpochMillis wall-clock completion time, or `null` while unfinished.
@@ -150,19 +157,24 @@ data class TerminalShellIntegrationCommandMetadata(
 )
 
 /**
- * Session-owned OSC 133 shell command timeline.
+ * Bounded, protocol-neutral terminal projection of shell commands and prompts.
  *
  * This model intentionally lives outside terminal core. Core owns bytes already
- * committed to the terminal grid; shell integration markers are host metadata
+ * committed to the terminal grid; shell commands and prompts are host metadata
  * about prompt and command lifecycle. Records are anchored to stable core line
  * identities, not absolute row numbers, so scrollback movement and resize
  * reflow do not detach decorations from the content they describe.
  *
  * Storage is data-oriented: each command field is a primitive column, records
  * are append-only until bounded eviction, and paint paths consume only projected
- * primitive arrays. All methods are thread-safe. Writers are normally invoked
- * from the serialized session parser path; readers are UI threads that snapshot
- * visible rows before painting.
+ * primitive arrays. One selected shell integration owns publication to this
+ * model; it may interpret terminal protocols or adapt a host's existing shell
+ * model. Readers never need to know which integration produced the records.
+ *
+ * All methods are thread-safe. The producer must serialize its publications,
+ * including synchronous listener delivery, to preserve lifecycle event order.
+ * Concurrent producers retain storage safety but have no notification ordering
+ * guarantee. Observers and revision collectors run outside the storage lock.
  *
  * @param capacity maximum retained command records before oldest-record eviction.
  * @param maxCommandTextLength maximum retained UTF-16 command-text length per
@@ -171,7 +183,7 @@ data class TerminalShellIntegrationCommandMetadata(
  */
 class TerminalShellIntegrationState(
     private val capacity: Int = DEFAULT_CAPACITY,
-    private val maxCommandTextLength: Int = DEFAULT_SHELL_INTEGRATION_COMMAND_TEXT_LENGTH,
+    private val maxCommandTextLength: Int = 4096,
     private val epochMillis: () -> Long = System::currentTimeMillis,
 ) {
     init {
@@ -199,6 +211,50 @@ class TerminalShellIntegrationState(
     private var nextRecordId = 1
     private var lastObservedBottomRow = NO_OBSERVED_ROW
     private var currentWorkingDirectory: String? = null
+    private var metadataRevision = 0L
+    private val mutableRevision = MutableStateFlow(0L)
+    private val commandFinishedListeners = CopyOnWriteArrayList<Listener<TerminalShellIntegrationCommandMetadata>>()
+    private val directoryListeners = CopyOnWriteArrayList<Listener<String>>()
+
+    /**
+     * Invalidation signal for prompt, command, and current-directory metadata.
+     *
+     * The initial revision is zero. Changed metadata advances the revision;
+     * equal directory/anchor updates and diagnostic observations do not. Values
+     * are opaque and updates may be conflated. Read the model after an update;
+     * use [addCommandFinishedListener] when every completion must be observed.
+     */
+    val revision: StateFlow<Long> = mutableRevision.asStateFlow()
+
+    /**
+     * Observes future explicit command completions without replay or conflation.
+     *
+     * The immutable metadata is captured with the completed record. Callbacks
+     * run synchronously on the producer thread, in registration order, outside
+     * the storage lock. They must be nonblocking and must not publish lifecycle
+     * events reentrantly. Ordinary listener exceptions are logged and isolated;
+     * cancellation is rethrown after the remaining listeners are notified.
+     * Abandoned commands and unmatched finishes do not produce notifications.
+     *
+     * Closing the registration is idempotent and prevents future dispatches;
+     * an already dispatched callback may finish. Clearing records does not remove
+     * listeners. The registration owner must close it when observation ends.
+     */
+    fun addCommandFinishedListener(listener: (TerminalShellIntegrationCommandMetadata) -> Unit): AutoCloseable =
+        addListener(commandFinishedListeners, listener)
+
+    /**
+     * Observes future changed directory URIs synchronously, without replay.
+     *
+     * Equal reports do not notify. Callbacks run on the producer thread outside
+     * the storage lock, after the new directory is recorded. Delivery and
+     * registration lifetime follow [addCommandFinishedListener]: observers must
+     * not block or publish lifecycle events reentrantly, ordinary exceptions are
+     * isolated, and cancellation is rethrown after the remaining observers run.
+     * Use this when the final directory must be captured before session closure;
+     * [revision] remains a conflated invalidation signal.
+     */
+    fun addCurrentWorkingDirectoryListener(listener: (String) -> Unit): AutoCloseable = addListener(directoryListeners, listener)
 
     /**
      * Records the latest host-validated current-working-directory URI.
@@ -210,9 +266,16 @@ class TerminalShellIntegrationState(
      */
     fun recordCurrentWorkingDirectory(uri: String) {
         require(uri.isNotEmpty()) { "uri must not be empty" }
-        synchronized(lock) {
-            currentWorkingDirectory = uri
-        }
+        var listeners: Iterator<Listener<String>>? = null
+        val changedRevision =
+            synchronized(lock) {
+                if (currentWorkingDirectory == uri) return
+                currentWorkingDirectory = uri
+                if (directoryListeners.isNotEmpty()) listeners = directoryListeners.iterator()
+                ++metadataRevision
+            }
+        publishRevision(changedRevision)
+        listeners?.let { notifyListeners(uri, it, "current-directory") }
     }
 
     /**
@@ -227,9 +290,9 @@ class TerminalShellIntegrationState(
 
     /**
      * Returns true while shell integration reports a command between
-     * command-start and command-finished markers.
+     * command-start and command-finished events.
      *
-     * Idle prompts, sessions that have not emitted shell integration markers,
+     * Idle prompts, sessions with no shell command information,
      * finished commands, and commands abandoned by a newer prompt all return
      * false. The query is allocation-free and safe for host close-policy checks.
      *
@@ -250,14 +313,17 @@ class TerminalShellIntegrationState(
      */
     fun recordPromptStart(lineId: Long) {
         require(lineId > 0L) { "lineId must be positive, was $lineId" }
-        synchronized(lock) {
-            abandonActiveCommandLocked()
-            activeCommandIndex = NO_INDEX
-            val index = appendCommandLocked()
-            promptStartLineIds[index] = lineId
-            lifecycles[index] = TerminalShellIntegrationCommandLifecycle.PROMPT_ONLY
-            activePromptIndex = index
-        }
+        val changedRevision =
+            synchronized(lock) {
+                abandonActiveCommandLocked()
+                activeCommandIndex = NO_INDEX
+                val index = appendCommandLocked()
+                promptStartLineIds[index] = lineId
+                lifecycles[index] = TerminalShellIntegrationCommandLifecycle.PROMPT_ONLY
+                activePromptIndex = index
+                ++metadataRevision
+            }
+        publishRevision(changedRevision)
     }
 
     /**
@@ -267,29 +333,42 @@ class TerminalShellIntegrationState(
      */
     fun recordPromptEnd(lineId: Long) {
         require(lineId > 0L) { "lineId must be positive, was $lineId" }
-        synchronized(lock) {
-            val index = activePromptIndex
-            if (index == NO_INDEX) return
+        val changedRevision =
+            synchronized(lock) {
+                val index = activePromptIndex
+                if (index == NO_INDEX || promptEndLineIds[index] == lineId) return
 
-            promptEndLineIds[index] = lineId
-        }
+                promptEndLineIds[index] = lineId
+                ++metadataRevision
+            }
+        publishRevision(changedRevision)
     }
 
-    /** Replaces the active prompt's visual start anchor with a proven rendered prompt line. */
-    internal fun reanchorActivePromptStart(lineId: Long) {
+    /**
+     * Corrects the active prompt's visual start to [lineId].
+     *
+     * Producers use this after determining which stable primary-buffer line
+     * actually contains the prompt, for example after a prompt redraw. The
+     * identity must come from a session render-frame read after matching output.
+     * Without an active prompt, or when the anchor is unchanged, this does nothing.
+     */
+    fun reanchorActivePromptStart(lineId: Long) {
         require(lineId > 0L) { "lineId must be positive, was $lineId" }
-        synchronized(lock) {
-            val index = activePromptIndex
-            if (index == NO_INDEX) return
-            promptStartLineIds[index] = lineId
-        }
+        val changedRevision =
+            synchronized(lock) {
+                val index = activePromptIndex
+                if (index == NO_INDEX || promptStartLineIds[index] == lineId) return
+                promptStartLineIds[index] = lineId
+                ++metadataRevision
+            }
+        publishRevision(changedRevision)
     }
 
     /**
      * Records command execution start.
      *
      * If no prompt record is active, an orphan command record is created so
-     * the lifecycle remains represented without inventing a prompt marker.
+     * the lifecycle remains represented without inventing a prompt.
      *
      * @param lineId stable render line identity where command output begins.
      * @param includeLine whether [lineId] itself belongs to command output.
@@ -303,31 +382,34 @@ class TerminalShellIntegrationState(
         workingDirectoryUri: String? = null,
     ) {
         require(lineId > 0L) { "lineId must be positive, was $lineId" }
-        synchronized(lock) {
-            val index = attachablePromptIndexLocked()
-            if (activeCommandIndex != NO_INDEX && activeCommandIndex != index) {
-                abandonActiveCommandLocked()
+        val changedRevision =
+            synchronized(lock) {
+                val index = attachablePromptIndexLocked()
+                if (activeCommandIndex != NO_INDEX && activeCommandIndex != index) {
+                    abandonActiveCommandLocked()
+                }
+                commandStartLineIds[index] = lineId
+                commandEndLineIds[index] = NO_LINE_ID
+                exitCodes[index] = TerminalShellIntegrationCommandRecord.UNKNOWN_EXIT_CODE
+                lifecycles[index] = TerminalShellIntegrationCommandLifecycle.RUNNING
+                commandTexts[index] = boundedCommandText(commandText)
+                commandWorkingDirectoryUris[index] = workingDirectoryUri
+                commandStartedAtEpochMillis[index] = epochMillis()
+                commandFinishedAtEpochMillis[index] = UNKNOWN_TIMESTAMP
+                flags[index] =
+                    if (includeLine) flags[index] or FLAG_COMMAND_START_INCLUSIVE else flags[index] and FLAG_COMMAND_START_INCLUSIVE.inv()
+                activeCommandIndex = index
+                ++metadataRevision
             }
-            commandStartLineIds[index] = lineId
-            commandEndLineIds[index] = NO_LINE_ID
-            exitCodes[index] = TerminalShellIntegrationCommandRecord.UNKNOWN_EXIT_CODE
-            lifecycles[index] = TerminalShellIntegrationCommandLifecycle.RUNNING
-            commandTexts[index] = boundedCommandText(commandText)
-            commandWorkingDirectoryUris[index] = workingDirectoryUri
-            commandStartedAtEpochMillis[index] = epochMillis()
-            commandFinishedAtEpochMillis[index] = UNKNOWN_TIMESTAMP
-            flags[index] =
-                if (includeLine) flags[index] or FLAG_COMMAND_START_INCLUSIVE else flags[index] and FLAG_COMMAND_START_INCLUSIVE.inv()
-            activeCommandIndex = index
-        }
+        publishRevision(changedRevision)
     }
 
     /**
      * Records command completion.
      *
      * A non-zero [exitCode] becomes a failed command range only when a
-     * matching command-start marker was observed. Omitted or malformed exit
-     * status remains `null` at the protocol layer and is stored as unknown.
+     * matching command start was recorded. An unavailable exit status is stored
+     * as unknown.
      *
      * @param lineId stable render line identity where command completion was observed.
      * @param exitCode shell-reported exit code, or null if omitted/malformed.
@@ -337,16 +419,28 @@ class TerminalShellIntegrationState(
         exitCode: Int?,
     ) {
         require(lineId > 0L) { "lineId must be positive, was $lineId" }
-        synchronized(lock) {
-            val index = activeCommandIndex
-            activeCommandIndex = NO_INDEX
-            if (index == NO_INDEX || commandStartLineIds[index] == NO_LINE_ID) return
+        var metadata: TerminalShellIntegrationCommandMetadata? = null
+        var listeners: Iterator<Listener<TerminalShellIntegrationCommandMetadata>>? = null
+        val changedRevision =
+            synchronized(lock) {
+                val index = activeCommandIndex
+                activeCommandIndex = NO_INDEX
+                if (index == NO_INDEX || commandStartLineIds[index] == NO_LINE_ID) return
 
-            commandEndLineIds[index] = lineId
-            exitCodes[index] = exitCode ?: TerminalShellIntegrationCommandRecord.UNKNOWN_EXIT_CODE
-            lifecycles[index] = lifecycleForExitCode(exitCode)
-            commandFinishedAtEpochMillis[index] = epochMillis()
-        }
+                commandEndLineIds[index] = lineId
+                exitCodes[index] = exitCode ?: TerminalShellIntegrationCommandRecord.UNKNOWN_EXIT_CODE
+                lifecycles[index] = lifecycleForExitCode(exitCode)
+                commandFinishedAtEpochMillis[index] = epochMillis()
+                if (commandFinishedListeners.isNotEmpty()) {
+                    metadata = commandMetadataLocked(index)
+                    listeners = commandFinishedListeners.iterator()
+                }
+                ++metadataRevision
+            }
+        publishRevision(changedRevision)
+        val completed = metadata ?: return
+        val observers = listeners ?: return
+        notifyListeners(completed, observers, "command completion")
     }
 
     /**
@@ -368,10 +462,10 @@ class TerminalShellIntegrationState(
     }
 
     /**
-     * Returns whether [lineId] has a prompt-start marker.
+     * Returns whether [lineId] starts a retained prompt.
      *
      * @param lineId stable render line identity to query.
-     * @return true when a prompt-start marker is anchored to the line.
+     * @return true when a prompt start is anchored to the line.
      */
     fun hasPromptStartAtLine(lineId: Long): Boolean {
         require(lineId > 0L) { "lineId must be positive, was $lineId" }
@@ -415,7 +509,7 @@ class TerminalShellIntegrationState(
      * Returns the retained command text for [recordId].
      *
      * Command text is optional metadata captured from the render frame at the
-     * command-start marker. `null` means the text was unavailable, ambiguous,
+     * command start. `null` means the text was unavailable, ambiguous,
      * too large for the configured bound, or the record has been evicted.
      *
      * @param recordId stable command record id previously exposed by viewport
@@ -435,7 +529,7 @@ class TerminalShellIntegrationState(
     }
 
     /**
-     * Returns the OSC 7 working-directory URI snapshotted when [recordId] began.
+     * Returns the working-directory URI snapshotted when [recordId] began.
      *
      * @param recordId stable retained command record id.
      * @return command working-directory URI, or `null` when unknown or evicted.
@@ -466,22 +560,8 @@ class TerminalShellIntegrationState(
         synchronized(lock) {
             val index = indexForRecordIdLocked(recordId)
             if (index == NO_INDEX || !isCommandRecordLocked(index)) return null
-            val startedAt = commandStartedAtEpochMillis[index]
-            if (startedAt == UNKNOWN_TIMESTAMP) return null
-            val storedExitCode = exitCodes[index]
-            val finishedAt = commandFinishedAtEpochMillis[index]
-            return TerminalShellIntegrationCommandMetadata(
-                recordId = recordIds[index],
-                lifecycle = lifecycles[index],
-                commandText = commandTexts[index],
-                workingDirectoryUri = commandWorkingDirectoryUris[index],
-                exitCode =
-                    storedExitCode.takeUnless {
-                        it == TerminalShellIntegrationCommandRecord.UNKNOWN_EXIT_CODE
-                    },
-                startedAtEpochMillis = startedAt,
-                finishedAtEpochMillis = finishedAt.takeUnless { it == UNKNOWN_TIMESTAMP },
-            )
+            if (commandStartedAtEpochMillis[index] == UNKNOWN_TIMESTAMP) return null
+            return commandMetadataLocked(index)
         }
     }
 
@@ -503,7 +583,7 @@ class TerminalShellIntegrationState(
     /**
      * Returns the preferred navigation anchor line for [recordId].
      *
-     * Commands with a prompt marker navigate to the prompt start. Orphan
+     * Commands with a prompt navigate to the prompt start. Orphan
      * command records navigate to the command-output start. Prompt-only records
      * and evicted records return `0`.
      *
@@ -555,12 +635,12 @@ class TerminalShellIntegrationState(
             if (start == NO_LINE_ID || end == NO_LINE_ID || start > end) return false
             val lastOutputLine = lastCommandOutputLineBeforePromptLocked(start, end)
             if (lastOutputLine < start) return false
-            if (!hasFlag(index, FLAG_COMMAND_START_INCLUSIVE) && lastOutputLine == start) return false
+            if (!isCommandStartInclusive(index) && lastOutputLine == start) return false
 
             destination[destinationOffset + TerminalShellIntegrationCommandOutputRange.START_LINE_ID_INDEX] = start
             destination[destinationOffset + TerminalShellIntegrationCommandOutputRange.END_LINE_ID_INDEX] = lastOutputLine
             destination[destinationOffset + TerminalShellIntegrationCommandOutputRange.START_INCLUSIVE_INDEX] =
-                if (hasFlag(index, FLAG_COMMAND_START_INCLUSIVE)) 1L else 0L
+                if (isCommandStartInclusive(index)) 1L else 0L
             return true
         }
     }
@@ -904,9 +984,76 @@ class TerminalShellIntegrationState(
      * Clears all stored prompt and command timeline records.
      */
     fun clear() {
-        synchronized(lock) {
-            clearLocked()
-            lastObservedBottomRow = NO_OBSERVED_ROW
+        val changedRevision =
+            synchronized(lock) {
+                lastObservedBottomRow = NO_OBSERVED_ROW
+                if (count == 0) return
+                clearLocked()
+                ++metadataRevision
+            }
+        publishRevision(changedRevision)
+    }
+
+    private fun publishRevision(changedRevision: Long) {
+        mutableRevision.update { current -> maxOf(current, changedRevision) }
+    }
+
+    private fun commandMetadataLocked(index: Int): TerminalShellIntegrationCommandMetadata =
+        TerminalShellIntegrationCommandMetadata(
+            recordId = recordIds[index],
+            lifecycle = lifecycles[index],
+            commandText = commandTexts[index],
+            workingDirectoryUri = commandWorkingDirectoryUris[index],
+            exitCode = exitCodes[index].takeUnless { it == TerminalShellIntegrationCommandRecord.UNKNOWN_EXIT_CODE },
+            startedAtEpochMillis = commandStartedAtEpochMillis[index],
+            finishedAtEpochMillis = commandFinishedAtEpochMillis[index].takeUnless { it == UNKNOWN_TIMESTAMP },
+        )
+
+    private fun <T> addListener(
+        listeners: CopyOnWriteArrayList<Listener<T>>,
+        callback: (T) -> Unit,
+    ): AutoCloseable {
+        val registration = Listener(listeners, callback)
+        listeners.add(registration)
+        return registration
+    }
+
+    private fun <T> notifyListeners(
+        value: T,
+        listeners: Iterator<Listener<T>>,
+        description: String,
+    ) {
+        var cancellation: CancellationException? = null
+        while (listeners.hasNext()) {
+            val listener = listeners.next().callback ?: continue
+            try {
+                listener(value)
+            } catch (cancelled: CancellationException) {
+                val first = cancellation
+                if (first == null) {
+                    cancellation = cancelled
+                } else if (first !== cancelled) {
+                    // Different observers may throw distinct exceptions or reuse the same instance.
+                    first.addSuppressed(cancelled)
+                }
+            } catch (failure: Exception) {
+                LOGGER.log(System.Logger.Level.WARNING, "Shell $description listener failed", failure)
+            }
+        }
+        cancellation?.let { throw it }
+    }
+
+    private class Listener<T>(
+        private val registrations: CopyOnWriteArrayList<Listener<T>>,
+        callback: (T) -> Unit,
+    ) : AutoCloseable {
+        @Volatile
+        var callback: ((T) -> Unit)? = callback
+            private set
+
+        override fun close() {
+            callback = null
+            registrations.remove(this)
         }
     }
 
@@ -1173,15 +1320,15 @@ class TerminalShellIntegrationState(
     ): Boolean {
         if (start > end) return false
         val lastOutputLine = lastCommandOutputLineBeforePromptLocked(start, end)
-        return !(lineId < start || lineId > lastOutputLine) && (hasFlag(index, FLAG_COMMAND_START_INCLUSIVE) || lineId != start)
+        return !(lineId < start || lineId > lastOutputLine) && (isCommandStartInclusive(index) || lineId != start)
     }
 
     /**
      * Returns the last line that can belong to output for a completed command.
      *
      * The next prompt is an authoritative output boundary. In particular, a
-     * shell can emit `D` on the same physical line that it will immediately use
-     * for the next `A` prompt. That line must never be treated as prior-command
+     * shell can finish on the same physical line that it will immediately use
+     * for the next prompt. That line must never be treated as prior-command
      * output by either decorations or copy/selection operations.
      */
     private fun lastCommandOutputLineBeforePromptLocked(
@@ -1218,10 +1365,7 @@ class TerminalShellIntegrationState(
         return lastBlockLine
     }
 
-    private fun hasFlag(
-        index: Int,
-        flag: Int,
-    ): Boolean = flags[index] and flag != 0
+    private fun isCommandStartInclusive(index: Int): Boolean = flags[index] and FLAG_COMMAND_START_INCLUSIVE != 0
 
     private fun lifecycleForExitCode(exitCode: Int?): Int =
         when {
@@ -1250,6 +1394,7 @@ class TerminalShellIntegrationState(
     }
 
     private companion object {
+        private val LOGGER = System.getLogger(TerminalShellIntegrationState::class.java.name)
         private const val DEFAULT_CAPACITY = 4096
         private const val NO_INDEX = -1
         private const val NO_LINE_ID = 0L
