@@ -40,6 +40,36 @@ import java.io.IOException
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class TerminalHostShellIntegrationTest {
+    @ParameterizedTest
+    @ValueSource(booleans = [false, true])
+    fun `host observation publishes unavailable context on subscription and restart`(initiallyAvailable: Boolean) =
+        runTest {
+            Fixture(StandardTestDispatcher(testScheduler), command = null).use { fixture ->
+                if (initiallyAvailable) {
+                    fixture.commandLine.value = TerminalShellCommandLineSnapshot("git s", 5, 5, 0)
+                }
+                val revisions = mutableListOf<Long>()
+                val observer =
+                    backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) {
+                        fixture.session.activeShellCommandLineRevision.collect { revisions += it }
+                    }
+                // The request has captured context, but the host collector has not started.
+                fixture.commandLine.value = null
+                runCurrent()
+                assertNull(fixture.session.activeShellCommandLine())
+                assertTrue(revisions.last() >= 0, "unavailable context must trigger revalidation")
+                val firstRevision = revisions.last()
+                observer.cancel()
+                runCurrent()
+                assertEquals(0, fixture.commandLine.subscriptionCount.value)
+                backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) {
+                    fixture.session.activeShellCommandLineRevision.collect { revisions += it }
+                }
+                runCurrent()
+                assertTrue(revisions.last() > firstRevision, "resubscription must revalidate even unchanged null context")
+            }
+        }
+
     @Test
     fun `session without integration forwards protocol events but creates no shell records`() =
         runTest {

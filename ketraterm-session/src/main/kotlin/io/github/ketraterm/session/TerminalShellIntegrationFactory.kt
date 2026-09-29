@@ -35,6 +35,8 @@ fun interface TerminalShellIntegrationFactory {
          * before consuming later bytes. In particular, IDE document offsets are
          * not terminal line identities. Host callbacks must preserve that ordering.
          *
+         * Each subscription signals the current editing context, including null,
+         * so consumers can revalidate snapshots captured before observation starts.
          * Null editing values are authoritative. Readiness is separate from shell
          * initialization and command completion. Publish false when the prompt
          * becomes unavailable, including alternate-screen programs. A supplied
@@ -60,13 +62,9 @@ fun interface TerminalShellIntegrationFactory {
                     private var nextRevision = 0L
                     override val commandLineChanges =
                         flow {
-                            var previous: TerminalShellCommandLineSnapshot? = null
-                            commandLine.collect { snapshot ->
-                                if (snapshot != previous) {
-                                    previous = snapshot
-                                    emit(nextRevision++)
-                                }
-                            }
+                            // StateFlow already suppresses equal values. Its first value,
+                            // including null, must revalidate context captured before subscription.
+                            commandLine.collect { emit(nextRevision++) }
                         }
 
                     override fun activeCommandLine(): TerminalShellCommandLineSnapshot? = commandLine.value

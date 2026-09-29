@@ -42,7 +42,9 @@ audit's [regression coverage](reviews/terminal-quality-audit-2026-09-27.md#regre
 Tests may fail until their owning defects are fixed; adding coverage does not
 close these entries.
 
-- `TODO(ui)`: visually verify agy help-transition animation after removing frame-triggered resizing. Default alternate padding now redistributes the primary horizontal inset and preserves vertical insets; regressions cover physical resizing while alternate-screen content is active. The resize/clear defect is corrected, but animation parity is not established.
+- `Done(ui)`: visually verify agy help-transition animation after removing frame-triggered resizing. Default alternate padding now redistributes the primary horizontal inset and preserves vertical insets; regressions cover physical resizing while alternate-screen content is active. The resize/clear defect is corrected, but animation parity is not established.
+
+- `DONE(session)`: host editing-context observation emits an initial revision even when context is unavailable. Deterministic subscription/restart regressions reproduce the missed-null cancellation race. The cursor/wrap campaign model also now applies the documented region-height bound to counted scrolling, with the minimized oversized-scroll regression retained.
 
 ### Tier 2: Regression coverage and modern compatibility
 

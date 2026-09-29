@@ -29,6 +29,17 @@ import kotlin.collections.ArrayDeque
 /** Deterministic model-based campaign for cursor movement, deferred wrap, and scrolling. */
 class TerminalCursorWrapModelCampaignTest {
     @Test
+    fun `counted scrolling cannot append more history than the region contains`() {
+        for (count in listOf(1, 2, 3, Int.MAX_VALUE)) {
+            val scenario = Scenario(BASE_SEED + 7, 3, 2, listOf(Operation.ScrollUp(count)))
+            val model = CursorWrapModel(3, 2, MAX_HISTORY)
+            scenario.operations.forEach(model::apply)
+            assertEquals(2 + minOf(count, 2), model.retainedRows.size)
+            verify(scenario)
+        }
+    }
+
+    @Test
     fun `partial width scrolling never adds whole rows to history`() {
         val scenario =
             Scenario(
@@ -391,11 +402,11 @@ class TerminalCursorWrapModelCampaignTest {
                 }
                 is Operation.ScrollUp -> {
                     pendingWrap = false
-                    scrollUpRegion(operation.count)
+                    scrollUpRegion(operation.count.coerceAtMost(scrollBottom - scrollTop + 1))
                 }
                 is Operation.ScrollDown -> {
                     pendingWrap = false
-                    scrollDownRegion(operation.count)
+                    scrollDownRegion(operation.count.coerceAtMost(scrollBottom - scrollTop + 1))
                 }
                 is Operation.SetHorizontalMargins -> {
                     horizontalMargins = true

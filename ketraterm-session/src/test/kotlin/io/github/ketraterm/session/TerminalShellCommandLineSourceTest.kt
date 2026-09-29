@@ -111,7 +111,7 @@ class TerminalShellCommandLineSourceTest {
             Fixture(StandardTestDispatcher(testScheduler)).use { fixture ->
                 backgroundScope.launch { fixture.session.activeShellCommandLineRevision.collect {} }
                 runCurrent()
-                assertEquals(-1L, fixture.session.activeShellCommandLineRevision.value)
+                assertEquals(0L, fixture.session.activeShellCommandLineRevision.value)
                 val initial = snapshot("git \uD83D\uDE00 status", cursorOffset = 6)
                 val states =
                     listOf(
@@ -123,7 +123,7 @@ class TerminalShellCommandLineSourceTest {
                         null,
                         initial,
                     )
-                var previousRevision = -1L
+                var previousRevision = fixture.session.activeShellCommandLineRevision.value
                 for (state in states) {
                     fixture.source.value = state
                     runCurrent()
@@ -164,7 +164,7 @@ class TerminalShellCommandLineSourceTest {
                 fixture.feed(PROMPT + "echo timeline")
                 runCurrent()
                 assertNull(fixture.session.activeShellCommandLine())
-                assertEquals(-1L, fixture.session.activeShellCommandLineRevision.value)
+                assertEquals(0L, fixture.session.activeShellCommandLineRevision.value)
 
                 fixture.source.value = snapshot("host edit")
                 fixture.feed("\u001B]133;C\u0007\r\noutput\r\n\u001B]133;D;0\u0007")
@@ -247,7 +247,7 @@ class TerminalShellCommandLineSourceTest {
         }
 
     @Test
-    fun `resubscription after context disappeared retains the unavailable initial revision`() =
+    fun `resubscription after context disappeared publishes an unavailable context revision`() =
         runTest {
             Fixture(StandardTestDispatcher(testScheduler)).use { fixture ->
                 fixture.source.value = snapshot("first")
@@ -261,7 +261,7 @@ class TerminalShellCommandLineSourceTest {
                 runCurrent()
 
                 assertNull(fixture.session.activeShellCommandLine())
-                assertEquals(-1L, fixture.session.activeShellCommandLineRevision.value)
+                assertEquals(1L, fixture.session.activeShellCommandLineRevision.value)
             }
         }
 
