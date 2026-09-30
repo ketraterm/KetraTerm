@@ -224,12 +224,51 @@ semantics, not claiming arbitrary chunk-independent placement.
 - `DONE(host/profile)`: IntelliJ project JDK environment injection and its default-on setting follow the reworked IntelliJ terminal's launch precedence. The [feature map](terminal-feature-map.md#7-embedding--swing-ui) defines the supported local SDK and shell boundaries.
 - `TODO(host/profile)`: Restore suggestion settings when they are ready for product exposure. Both settings forms retain commented `SUGGESTION_SETTINGS` blocks for the master switch, automatic popups, Enter acceptance, and persistence. Uncomment each form's fields, layout, change tracking where applicable, and Apply/Reset bindings together; uncomment the matching IntelliJ message key and update the hidden-controls tests. Keep the master default off. Learning-reset buttons also require reconnecting the removed host callbacks before restoring their confirmation UI (the previous wiring is in the parent of commit `4ef4d3f4`).
 - `DONE(host/session/input/ui/policy)`: [OSC 52 clipboard reads](terminal-feature-map.md#4-query-response-channels) support clipboard and available native primary selection in both products, with consent, deadlines, cancellation, and terminal/client isolation.
-- `DONE(ui)`: differentiated OSC 8 versus detected-link underlines and wrapped hover spans are implemented in Swing.
+- `DONE(ui)`: differentiated OSC 8 versus detected-link underlines and contiguous soft-wrapped hover spans are implemented in Swing. Explicit-ID grouping, retained discovery, lifecycle recovery and native IDE behavior remain in the staged repair below.
 - `TODO(policy)`: richer hyperlink validation and display policy beyond host resource limits, host allow/deny gating, and Swing's explicit-activation handler.
 - `DONE(parser/policy)`: current OSC/DCS families have explicit collection ceilings and overflow/recovery semantics in the [payload resource contract](terminal-feature-map.md#oscdcs-payload-resource-contract), including bounded unknown-family discard, hyperlink context clearing on completed overflow, and parser-to-host boundary tests. Ordinary commands retain the 4 KiB ceiling.
 - `TODO(parser/policy)`: graphics require separate bounded storage/transfer designs, APC where applicable, decoded/decompressed image bounds, and retained-image budgets; current clipboard/family ceilings alone do not enable graphics.
 - `DONE(host/policy)`: title/icon updates are host-gated through `HostPolicy.titlePolicy`, which models session-wide allow/deny decisions and configurable oversized-title handling (`clamp` by default for standalone compatibility, or `reject` for stricter profiles).
 - `DONE(policy)`: terminal capability identity policy is explicit in `TerminalCapabilityIdentity` and consumed by PTY launch defaults plus core terminal-to-host query responses.
+
+### URI highlighting staged repair
+
+The [2026-09-30 baseline](reviews/uri-highlighting-baseline-2026-09-30.md)
+records a sanitized actual agy stream, deterministic component lifecycle
+observations, completed-discovery JMH workloads and real IntelliJ provider
+measurements. Production behavior is unchanged by Stage 0. Work proceeds on
+`fix/uri-highlighting` in order **0 → 1 → 2 → 3 → 4 → 5 → 6 → 7**; each stage
+has its own tests/documentation and an uncommitted review gate. The user
+verifies and commits before the next stage begins.
+
+The target is one retained hyperlink model independent of the viewport.
+Discovery may allocate bounded text/result/action objects; applying changed
+results and growing retained storage may allocate. After warm-up, painting
+preparation, hit testing, hover updates and scrolling through prepared content
+must avoid allocations. Measure before introducing pooling. Core never
+parses URIs, shared UI never depends on IntelliJ, and the plugin owns a small
+native metadata adapter. Update detector APIs and repository callers together
+without a legacy pipeline or a generic analysis framework.
+
+| Stage | Status and owned work | Review gate |
+|---|---|---|
+| 0 — Reproduction/baseline | Evidence ready: actual agy OSC 8 grouping, controlled focus versus component reattachment, 80×24/160×48/240×48 discovery measurements and real SDK workloads. Native application-switch/tool-window event traces and retained-heap profiling remain unverified; source-based storage bounds are identified as estimates. | Review replay, diagnostic observations and measurement limits. No permanently failing/skipped bug tests or production changes. |
+| 1 — Permanent contracts | `TODO(core/render/session/ui/host/profile)`: history-content generation distinguishing replacement/reflow from append/eviction, conservative external-reader default, bounded absolute-range copying under the session lock and assembly outside it. Suspending independent/ordered detector contexts, source/dependency ranges, action/optional URI, presentation/activation metadata, binding/source/provider epochs and cancellation ownership. Share genuinely duplicated extraction rules. | Coordinate/generation tests; all callers compile; no platform types in shared modules. |
+| 2 — Retained index | `TODO(ui)`: stable occurrences/actions independent of projection slots; retain successful/empty results with their source; incremental changed live rows/new history, affected-record eviction, full logical lines beyond viewport boundaries, reusable primitive projection. Separate primary/alternate state with generation validation. | Prepared history works on its first displayed frame; saturated history keeps survivors; clipped wrapped URLs retain full destinations. |
+| 3 — Scheduling/lifecycle | `TODO(ui/host/profile)`: bind-lifetime work; preserve results/progress while hidden; reconcile on bind/show/focus including stationary pointer. Coalesce demand, prioritize missing visible content, publish bounded validated batches; scrolling/cursor movement cannot initiate detection. Immediate edited-target invalidation; distinguish cancellation/failure/empty success and bounded recovery; release on unbind/dispose. Trace native hide/show and app switching separately. | No scroll/output required for recovery; no obsolete publication after concurrent output/reset/disposal; native lifecycle triggers accounted for. |
+| 4 — Grouping/action lifetime | `TODO(ui)`: semantic visible-segment groups, explicit OSC 8 ID plus destination across hard breaks/gaps, preserved anonymous run identity, no merging independent same-URL occurrences. Cover soft wrap/padding/clipping/reflow/overwrite. Menus capture stable actions/URIs and expose Copy Link for detected URLs. | Every agy fragment hovers its whole intended group and opens the full target; independent repeats stay separate; existing menus never retarget. |
+| 5 — IntelliJ discovery | `TODO(host/profile)`: independent URL/path lanes plus ordered console providers, cached configuration, all applicable providers on mixed lines. Retain append-only filter state and result consumed-through dependencies; replay after earlier edits without discarding unaffected results or restarting for ordinary eviction. Short cancellable read actions, discard tainted state, provider/index/root/file invalidation. Historical output-directory resolution with launch fallback; supported VFS/navigation. Do not assume arbitrary singleton providers are resettable. | Mixed/backward-range results, indexing recovery, replay/cancellation and historical paths work; slow contextual providers cannot delay independent URLs. |
+| 6 — Native interaction | `TODO(ui/host/profile)`: adapt normal/hovered/active/followed/visibility styles outside painting; preserve hover callbacks/popup actions; visible versus implicit Ctrl/Cmd policy. Release-only activation with unchanged target/no drag; preserve mouse reporting, concealment and authored underlines. Overlap order: OSC 8, visible before implicit, narrower range, stable provider order. | Theme/gesture/selection/hover/menu tests for URLs, file URIs, paths and stack traces; no platform work in painting. |
+| 7 — Verification/documentation | `TODO(ui/host/profile)`: active-discovery and prepared-path profiling, real providers, dense output/large history/progress/eviction/rapid scroll/cold jump/slow cancellation, 80×24/160×48/240×48 plus agy and Unicode. Broader tests, Plugin Verifier, JMH compilation, KDoc/API migration notes, both maps and all three changelogs; remove superseded code. | Prepared content immediately linked and allocation target met; work proportional to changed content; measured bounded retention/disposal. |
+
+Correctness uses replay and controlled coroutine scheduling; timing/allocation
+claims use JMH and integration profiling. New output and genuinely unprocessed
+history remain asynchronous, with readiness latency measured separately;
+terminal display never waits for arbitrary filters. Stage 0 has no API
+migration or changelog entry. Changelogs consolidate meaningful shipped
+features and fixes, not individual commits, stages, tests or investigation;
+product entries stay concise. The support inventory remains in the feature
+map; this table owns the repair scope and completion gates.
 
 ### Embedding Contracts
 
