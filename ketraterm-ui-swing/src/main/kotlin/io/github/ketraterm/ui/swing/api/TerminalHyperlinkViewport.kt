@@ -25,7 +25,7 @@ internal class TerminalHyperlinkViewport {
     private var nextLines = ArrayList<Line>()
     private var ids = IntArray(0)
     private var nextIds = IntArray(0)
-    private val actions = ArrayList<SwingHyperlinkAction>()
+    private val actions = ArrayList<SwingHyperlink>()
     private var hasFrame = false
     private var frameGeneration = 0L
     private var structureGeneration = 0L
@@ -47,7 +47,7 @@ internal class TerminalHyperlinkViewport {
 
     fun update(
         cache: TerminalRenderCache,
-        context: SwingHyperlinkDetectionContext = SwingHyperlinkDetectionContext.LOGICAL_LINE,
+        context: SwingHyperlinkDetectionContext = SwingHyperlinkDetectionContext.INDEPENDENT_LINE,
     ): Boolean {
         if (matches(cache)) return false
         if (columns != cache.columns || activeBuffer != cache.activeBuffer || discardedCount != cache.discardedCount) clear()
@@ -58,7 +58,10 @@ internal class TerminalHyperlinkViewport {
             var endRow = startRow + 1
             while (endRow < cache.rows && cache.lineWrapped[endRow - 1]) endRow++
             val index = findPrevious(cache, startRow, endRow, previousIndex)
-            val previous = lines.getOrNull(index)
+            val previous =
+                lines.getOrNull(index)?.takeIf {
+                    it.snapshot.firstAbsoluteRow == cache.discardedCount + cache.historySize - cache.scrollbackOffset + startRow
+                }
             val snapshot =
                 if (previous != null && previous.snapshot.matchesRows(cache, startRow, endRow)) {
                     previous.snapshot
@@ -92,7 +95,7 @@ internal class TerminalHyperlinkViewport {
             previousIndex = if (index >= 0) index + 1 else previousIndex
             startRow = endRow
         }
-        if (context == SwingHyperlinkDetectionContext.VIEWPORT &&
+        if (context == SwingHyperlinkDetectionContext.ORDERED_CONTENT &&
             (lines.size != nextLines.size || lines.indices.any { lines[it].snapshot.text != nextLines[it].snapshot.text })
         ) {
             for (line in nextLines) {
@@ -116,9 +119,9 @@ internal class TerminalHyperlinkViewport {
     }
 
     fun pendingLines(
-        context: SwingHyperlinkDetectionContext = SwingHyperlinkDetectionContext.LOGICAL_LINE,
+        context: SwingHyperlinkDetectionContext = SwingHyperlinkDetectionContext.INDEPENDENT_LINE,
     ): List<TerminalHyperlinkLineSnapshot> =
-        if (context == SwingHyperlinkDetectionContext.VIEWPORT) {
+        if (context == SwingHyperlinkDetectionContext.ORDERED_CONTENT) {
             lines.map { it.snapshot }
         } else {
             lines.filter { !it.complete }.map { it.snapshot }
@@ -127,7 +130,7 @@ internal class TerminalHyperlinkViewport {
     fun accept(
         snapshots: List<TerminalHyperlinkLineSnapshot>,
         detected: List<List<TerminalDetectedHyperlink>>,
-        context: SwingHyperlinkDetectionContext = SwingHyperlinkDetectionContext.LOGICAL_LINE,
+        context: SwingHyperlinkDetectionContext = SwingHyperlinkDetectionContext.INDEPENDENT_LINE,
     ) {
         val sameViewport = snapshots.size == lines.size && snapshots.indices.all { snapshots[it].text == lines[it].snapshot.text }
         for (index in snapshots.indices) {
@@ -135,21 +138,21 @@ internal class TerminalHyperlinkViewport {
             val line = findCurrent(source) ?: continue
             val sameText = source.text == line.snapshot.text
             line.links =
-                if (sameText && (context == SwingHyperlinkDetectionContext.LOGICAL_LINE || sameViewport)) {
+                if (sameText && (context == SwingHyperlinkDetectionContext.INDEPENDENT_LINE || sameViewport)) {
                     detected[index]
                 } else {
                     detected[index].filter { (!it.viewportDependent || sameViewport) && it.remainsValid(source.text, line.snapshot.text) }
                 }
-            line.complete = sameText && (context == SwingHyperlinkDetectionContext.LOGICAL_LINE || sameViewport)
+            line.complete = sameText && (context == SwingHyperlinkDetectionContext.INDEPENDENT_LINE || sameViewport)
         }
     }
 
     fun idsFor(cache: TerminalRenderCache): IntArray = if (matches(cache)) ids else cache.hyperlinkIds
 
-    fun actionFor(
+    fun hyperlinkFor(
         id: Int,
         cache: TerminalRenderCache,
-    ): SwingHyperlinkAction? {
+    ): SwingHyperlink? {
         if (id >= 0 || !matches(cache)) return null
         return actions.getOrNull(-id - 1)
     }
@@ -179,7 +182,7 @@ internal class TerminalHyperlinkViewport {
                         }
                     }
                 }
-                if (accepted) actions.add(link.action)
+                if (accepted) actions.add(link.hyperlink)
             }
         }
         for (row in 0 until rows) {
@@ -226,10 +229,14 @@ internal class TerminalHyperlinkViewport {
     private fun findCurrent(snapshot: TerminalHyperlinkLineSnapshot): Line? {
         if (snapshot.columns != columns || snapshot.activeBuffer != activeBuffer) return null
         lines.firstOrNull { it.snapshot === snapshot }?.let { return it }
-        if (snapshot.firstLineId != 0L) return lines.firstOrNull { it.snapshot.firstLineId == snapshot.firstLineId }
+        if (snapshot.firstLineId != 0L) {
+            return lines.firstOrNull {
+                it.snapshot.firstLineId == snapshot.firstLineId && it.snapshot.firstAbsoluteRow == snapshot.firstAbsoluteRow
+            }
+        }
         var match: Line? = null
         for (line in lines) {
-            if (line.snapshot === snapshot || line.snapshot.sameIdentity(snapshot)) {
+            if (line.snapshot.firstAbsoluteRow == snapshot.firstAbsoluteRow && line.snapshot.sameIdentity(snapshot)) {
                 if (match != null) return null
                 match = line
             }

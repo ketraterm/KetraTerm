@@ -28,11 +28,13 @@ import com.intellij.testFramework.fixtures.BasePlatformTestCase
 import com.intellij.testFramework.fixtures.TempDirTestFixture
 import com.intellij.testFramework.fixtures.impl.TempDirTestFixtureImpl
 import com.intellij.util.concurrency.AppExecutorUtil
-import io.github.ketraterm.ui.swing.api.SwingHyperlinkAction
-import io.github.ketraterm.ui.swing.api.SwingHyperlinkDetectionRequest
-import io.github.ketraterm.ui.swing.api.SwingHyperlinkDetectionSink
+import io.github.ketraterm.ui.swing.api.*
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.job
+import kotlinx.coroutines.runBlocking
 import java.nio.file.Path
 import java.util.concurrent.Callable
+import java.util.concurrent.CancellationException
 import java.util.concurrent.TimeUnit
 
 /**
@@ -45,6 +47,123 @@ import java.util.concurrent.TimeUnit
  */
 class IntellijTerminalHyperlinkBaselineTest : BasePlatformTestCase() {
     override fun createTempDirTestFixture(): TempDirTestFixture = TempDirTestFixtureImpl()
+
+    fun testCancellingDiscoveryStopsBeforeTheNextProviderLine() {
+        val consumed = ArrayList<String>()
+        lateinit var discoveryJob: Job
+        val provider =
+            ConsoleFilterProvider {
+                arrayOf(
+                    object : Filter, DumbAware {
+                        override fun applyFilter(
+                            line: String,
+                            entireLength: Int,
+                        ): Filter.Result? {
+                            consumed += line
+                            discoveryJob.cancel()
+                            return null
+                        }
+                    },
+                )
+            }
+        ExtensionTestUtil.maskExtensions(ConsoleFilterProvider.FILTER_PROVIDERS, listOf(provider), testRootDisposable)
+        val request = detectionRequest(arrayOf("first\n", "second\n"))
+        val completed =
+            AppExecutorUtil.getAppExecutorService().submit(
+                Callable {
+                    try {
+                        runBlocking {
+                            discoveryJob = coroutineContext.job
+                            IntellijTerminalHyperlinkDetector(project).detect(request) {
+                                error("The cancelling provider returned no result")
+                            }
+                        }
+                        false
+                    } catch (_: CancellationException) {
+                        true
+                    }
+                },
+            )
+        try {
+            assertTrue(
+                "Coroutine cancellation was treated as successful empty analysis",
+                completed.get(30, TimeUnit.SECONDS),
+            )
+        } finally {
+            completed.cancel(true)
+        }
+        assertEquals(listOf("first\n"), consumed)
+    }
+
+    fun testOrderedProviderCanHighlightEarlierLogicalLines() {
+        val file = myFixture.addFileToProject("ordered/Source.kt", "fun source() = Unit\n").virtualFile
+        val lines = listOf("Context header\n", "at Source.kt:10\n", "producer\n")
+        val request =
+            SwingHyperlinkDetectionRequest(
+                lines,
+                longArrayOf(100, 104, 108),
+                context = SwingHyperlinkDetectionContext.ORDERED_CONTENT,
+            )
+        val provider =
+            ConsoleFilterProvider { contextProject ->
+                arrayOf(
+                    Filter { line, _ ->
+                        if (line == lines.last()) {
+                            Filter.Result(2, lines.first().length + 5, OpenFileHyperlinkInfo(contextProject, file, 0))
+                        } else {
+                            null
+                        }
+                    },
+                )
+            }
+        ExtensionTestUtil.maskExtensions(ConsoleFilterProvider.FILTER_PROVIDERS, listOf(provider), testRootDisposable)
+        val results = ArrayList<SwingHyperlink>()
+        val completed =
+            AppExecutorUtil.getAppExecutorService().submit(
+                Callable {
+                    runBlocking { IntellijTerminalHyperlinkDetector(project).detect(request, results::add) }
+                },
+            )
+        try {
+            completed.get(30, TimeUnit.SECONDS)
+        } finally {
+            completed.cancel(true)
+        }
+        assertEquals(1, results.size)
+        val result = results.single()
+        assertEquals(request.range(0, 2, 1, 5), result.sourceRange)
+        assertEquals(request.range(0, 0, 2, lines.last().length), result.dependencyRange)
+        assertEquals(SwingHyperlinkTextPosition(108, lines.last().length), result.consumedThrough)
+        assertNull("Opaque provider actions must not invent copyable destinations", result.uri)
+    }
+
+    fun testUrlResultsCarryTheCompleteCopyableDestination() {
+        val file = myFixture.addFileToProject("targets/Source.txt", "target\n").virtualFile
+        val targets = listOf("https://example.invalid/path?one=1&two=2#fragment", Path.of(file.path).toUri().toASCIIString())
+        val request =
+            SwingHyperlinkDetectionRequest(
+                targets.map { "prefix $it suffix\n" },
+                longArrayOf(12, 18),
+                context = SwingHyperlinkDetectionContext.ORDERED_CONTENT,
+            )
+        val results = ArrayList<SwingHyperlink>()
+        val completed =
+            AppExecutorUtil.getAppExecutorService().submit(
+                Callable {
+                    runBlocking { IntellijTerminalHyperlinkDetector(project).detect(request, results::add) }
+                },
+            )
+        try {
+            completed.get(30, TimeUnit.SECONDS)
+        } finally {
+            completed.cancel(true)
+        }
+        assertEquals(targets, results.map { it.uri })
+        for ((index, result) in results.withIndex()) {
+            assertEquals(request.range(index, 7, index, 7 + targets[index].length), result.sourceRange)
+            assertEquals(request.range(index, 6, index, 8 + targets[index].length), result.dependencyRange)
+        }
+    }
 
     fun testRecordsRealDetectorWorkAtSeveralLinkDensities() {
         val file =
@@ -78,7 +197,7 @@ class IntellijTerminalHyperlinkBaselineTest : BasePlatformTestCase() {
                             val lines = scenario.lines(lineCount, file.path, fileUri)
                             val request = detectionRequest(lines)
                             repeat(WARMUP_REQUESTS) {
-                                detector.detect(request, CountingSink(lines))
+                                runBlocking { detector.detect(request, CountingSink(lines)) }
                             }
 
                             val creationStart = probe.creations
@@ -90,7 +209,7 @@ class IntellijTerminalHyperlinkBaselineTest : BasePlatformTestCase() {
                             for (sample in nanos.indices) {
                                 val sink = CountingSink(lines)
                                 val start = System.nanoTime()
-                                detector.detect(request, sink)
+                                runBlocking { detector.detect(request, sink) }
                                 nanos[sample] = System.nanoTime() - start
                                 resultCounts[sample] = sink.results
                                 webCounts[sample] = sink.webUris
@@ -152,7 +271,7 @@ class IntellijTerminalHyperlinkBaselineTest : BasePlatformTestCase() {
         fun detect(): CountingSink {
             val completed =
                 AppExecutorUtil.getAppExecutorService().submit(
-                    Callable { CountingSink(lines).also { detector.detect(request, it) } },
+                    Callable { CountingSink(lines).also { runBlocking { detector.detect(request, it) } } },
                 )
             val sink =
                 try {
@@ -184,20 +303,12 @@ class IntellijTerminalHyperlinkBaselineTest : BasePlatformTestCase() {
         )
     }
 
-    /** Builds the cross-module immutable request without widening a production-internal constructor. */
-    private fun detectionRequest(lines: Array<String>): SwingHyperlinkDetectionRequest {
-        var offset = 0
-        val starts = IntArray(lines.size)
-        val ends = IntArray(lines.size)
-        for (index in lines.indices) {
-            starts[index] = offset
-            offset += lines[index].length
-            ends[index] = offset
-        }
-        return SwingHyperlinkDetectionRequest::class.java
-            .getDeclaredConstructor(Array<String>::class.java, IntArray::class.java, IntArray::class.java)
-            .newInstance(lines, starts, ends)
-    }
+    private fun detectionRequest(lines: Array<String>): SwingHyperlinkDetectionRequest =
+        SwingHyperlinkDetectionRequest(
+            lines.toList(),
+            LongArray(lines.size) { it.toLong() },
+            context = SwingHyperlinkDetectionContext.ORDERED_CONTENT,
+        )
 
     private class CountingProvider : ConsoleFilterProvider {
         var creations = 0
@@ -227,14 +338,12 @@ class IntellijTerminalHyperlinkBaselineTest : BasePlatformTestCase() {
         var fileUris = 0
         var invalidRanges = 0
 
-        override fun addHyperlink(
-            lineIndex: Int,
-            startOffset: Int,
-            endOffset: Int,
-            action: SwingHyperlinkAction,
-            validationStartOffset: Int,
-            validationEndOffset: Int,
-        ) {
+        override fun addHyperlink(hyperlink: SwingHyperlink) {
+            val lineIndex =
+                hyperlink.sourceRange.start.absoluteRow
+                    .toInt()
+            val startOffset = hyperlink.sourceRange.start.offset
+            val endOffset = hyperlink.sourceRange.end.offset
             val line = lines.getOrNull(lineIndex)
             if (line == null || startOffset < 0 || endOffset <= startOffset || endOffset > line.length) {
                 invalidRanges++

@@ -87,12 +87,14 @@ open class TerminalHyperlinkDiscoveryBenchmark {
                         SwingHyperlinkDetector { request, sink ->
                             for (line in 0 until request.lineCount) {
                                 sink.addHyperlink(
-                                    line,
-                                    0,
-                                    URL.length,
-                                    action,
-                                    validationStartOffset = 0,
-                                    validationEndOffset = URL.length + 1,
+                                    request.hyperlink(
+                                        line,
+                                        0,
+                                        URL.length,
+                                        action,
+                                        validationStartOffset = 0,
+                                        validationEndOffset = URL.length + 1,
+                                    ),
                                 )
                             }
                         }

@@ -34,6 +34,107 @@ import kotlin.coroutines.CoroutineContext
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class TerminalHyperlinkDiscoverySchedulingTest {
+    @ParameterizedTest
+    @ValueSource(strings = ["binding", "source", "provider"])
+    fun `epoch invalidation rejects suspended results and serializes the replacement`(changedEpoch: String) {
+        val release = CompletableDeferred<Unit>()
+        val requests = ArrayList<SwingHyperlinkDetectionRequest>()
+        var providerGeneration = 0L
+        val detector =
+            object : SwingHyperlinkDetector {
+                override val configurationGeneration: Long get() = providerGeneration
+
+                override suspend fun detect(
+                    request: SwingHyperlinkDetectionRequest,
+                    sink: SwingHyperlinkDetectionSink,
+                ) {
+                    requests += request
+                    if (requests.size == 1) release.await()
+                    sink.addHyperlink(request.hyperlink(0, 0, URL.length, { true }, uri = URL))
+                }
+            }
+        Fixture(detector = detector).use { fixture ->
+            fixture.show(URL)
+            fixture.drainUi()
+            fixture.worker.runCurrent()
+            assertEquals(1, requests.size)
+            when (changedEpoch) {
+                "binding" -> fixture.onEdt { fixture.controller.reset() }
+                "provider" -> providerGeneration++
+            }
+            fixture.show(URL, historyContentGeneration = if (changedEpoch == "source") 1L else 0L)
+            fixture.drainUi()
+            assertEquals(1, requests.size, "Suspension must not permit overlapping detector calls")
+            release.complete(Unit)
+            fixture.completeAnalysis()
+            fixture.onEdt { assertEquals(0, fixture.controller.hyperlinkIdAt(0, 0, fixture.cache)) }
+            fixture.completeAnalysis()
+            assertEquals(2, requests.size)
+            val first = requests.first()
+            val second = requests.last()
+            assertEquals(changedEpoch == "binding", first.bindingEpoch != second.bindingEpoch)
+            assertEquals(changedEpoch == "source", first.sourceEpoch != second.sourceEpoch)
+            assertEquals(changedEpoch == "provider", first.providerEpoch != second.providerEpoch)
+            fixture.onEdt {
+                val id = fixture.controller.hyperlinkIdAt(0, 0, fixture.cache)
+                assertTrue(fixture.controller.openDiscoveredHyperlink(id, fixture.cache))
+                assertEquals(URL, fixture.controller.discoveredHyperlink(id, fixture.cache)?.uri)
+            }
+            assertEquals(1, fixture.publications)
+        }
+    }
+
+    @Test
+    fun `disposal cancels suspended provider work without publishing`() {
+        val neverReleased = CompletableDeferred<Unit>()
+        var cancelled = false
+        val fixture =
+            Fixture(
+                detector =
+                    SwingHyperlinkDetector { _, _ ->
+                        try {
+                            neverReleased.await()
+                        } finally {
+                            cancelled = true
+                        }
+                    },
+            )
+        fixture.use {
+            fixture.show(URL)
+            fixture.drainUi()
+            fixture.worker.runCurrent()
+        }
+        assertTrue(cancelled)
+        assertEquals(0, fixture.publications)
+        assertEquals(0, fixture.worker.pendingTasks)
+    }
+
+    @Test
+    fun `failure does not become successful empty analysis or trigger busy retries`() {
+        var invocations = 0
+        Fixture(
+            detector =
+                SwingHyperlinkDetector { _, _ ->
+                    if (++invocations == 1) error("Provider failed")
+                },
+        ).use { fixture ->
+            fixture.show("plain text")
+            fixture.drainUi()
+            fixture.completeAnalysis()
+            assertEquals(1, invocations)
+            assertEquals(0, fixture.worker.pendingTasks)
+            assertEquals(0, fixture.publications)
+            fixture.show("plain text")
+            fixture.drainUi()
+            fixture.completeAnalysis()
+            assertEquals(2, invocations)
+            assertEquals(1, fixture.publications)
+            fixture.show("plain text")
+            fixture.drainUi()
+            assertEquals(0, fixture.worker.pendingTasks, "Successful empty results are reusable")
+        }
+    }
+
     @Test
     fun `newly visible links are detected without advancing time`() {
         Fixture().use { fixture ->
@@ -289,7 +390,7 @@ class TerminalHyperlinkDiscoverySchedulingTest {
                         assertTrue(release.await(3, TimeUnit.SECONDS), "Test did not release the original detector")
                     }
                     assertEquals("$URL\n", request.lineText(0))
-                    sink.addHyperlink(0, 0, URL.length, SwingHyperlinkAction { opened.add("request $invocation") })
+                    sink.addHyperlink(request.hyperlink(0, 0, URL.length, { opened.add("request $invocation") }))
                 } finally {
                     active.decrementAndGet()
                 }
@@ -352,9 +453,9 @@ class TerminalHyperlinkDiscoverySchedulingTest {
     fun `cancelled host detection does not continuously reschedule unchanged work`() {
         val invocations = AtomicInteger()
         val detector =
-            SwingHyperlinkDetector { _, sink ->
+            SwingHyperlinkDetector { request, sink ->
                 if (invocations.incrementAndGet() == 1) throw CancellationException("Host read was cancelled")
-                sink.addHyperlink(0, 0, URL.length, SwingHyperlinkAction { true })
+                sink.addHyperlink(request.hyperlink(0, 0, URL.length, { true }))
             }
         Fixture(detector = detector).use { fixture ->
             fixture.show(URL)
@@ -381,7 +482,7 @@ class TerminalHyperlinkDiscoverySchedulingTest {
                 val url = request.lineText(0).trimEnd('\n')
                 requests += url
                 if (requests.size == 1) throw CancellationException("Host read was cancelled")
-                sink.addHyperlink(0, 0, url.length, SwingHyperlinkAction { opened.add(url) })
+                sink.addHyperlink(request.hyperlink(0, 0, url.length, { opened.add(url) }))
             }
         Fixture(detector = detector).use { fixture ->
             fixture.show(URL)
@@ -407,7 +508,7 @@ class TerminalHyperlinkDiscoverySchedulingTest {
             viewportDetector { request, sink ->
                 requests += List(request.lineCount) { request.lineText(it) }
                 if (request.lineText(0) == "exception context\n") {
-                    sink.addHyperlink(1, 0, 6, SwingHyperlinkAction { true })
+                    sink.addHyperlink(request.hyperlink(1, 0, 6, { true }))
                 }
             }
         Fixture(detector = detector).use { fixture ->
@@ -435,7 +536,7 @@ class TerminalHyperlinkDiscoverySchedulingTest {
         val detector =
             viewportDetector { request, sink ->
                 val context = request.lineText(0)
-                sink.addHyperlink(1, 0, 6, SwingHyperlinkAction { opened.add(context) })
+                sink.addHyperlink(request.hyperlink(1, 0, 6, { opened.add(context) }))
                 emitUrls(request, sink, opened, validateUrlToken = true)
             }
         Fixture(detector = detector).use { fixture ->
@@ -467,7 +568,7 @@ class TerminalHyperlinkDiscoverySchedulingTest {
         val detector =
             viewportDetector { request, sink ->
                 val context = request.lineText(0)
-                sink.addHyperlink(1, 0, 6, SwingHyperlinkAction { opened.add(context) })
+                sink.addHyperlink(request.hyperlink(1, 0, 6, { opened.add(context) }))
                 emitUrls(request, sink, opened, validateUrlToken = true)
             }
         Fixture(detector = detector).use { fixture ->
@@ -529,8 +630,9 @@ class TerminalHyperlinkDiscoverySchedulingTest {
         fun show(
             vararg lines: String,
             lineIds: LongArray = LongArray(lines.size) { it + 1L },
+            historyContentGeneration: Long = 0L,
         ) = onEdt {
-            cache.accept(TextFrame(++frameGeneration, lines, lineIds))
+            cache.accept(TextFrame(++frameGeneration, lines, lineIds, historyContentGeneration))
             controller.scheduleForFrame()
         }
 
@@ -580,8 +682,10 @@ class TerminalHyperlinkDiscoverySchedulingTest {
         override val frameGeneration: Long,
         private val lines: Array<out String>,
         private val lineIds: LongArray,
+        override val historyContentGeneration: Long,
     ) : TerminalRenderFrame {
         override val structureGeneration = 1L
+        override val historySize = (lineIds.firstOrNull()?.minus(1L) ?: 0L).coerceAtLeast(0L).toInt()
         override val columns = COLUMNS
         override val rows = lines.size
         override val activeBuffer = TerminalRenderBufferKind.PRIMARY
@@ -624,12 +728,12 @@ class TerminalHyperlinkDiscoverySchedulingTest {
         private const val URL = "https://example.com"
 
         private fun viewportDetector(
-            onDetect: (SwingHyperlinkDetectionRequest, SwingHyperlinkDetectionSink) -> Unit,
+            onDetect: suspend (SwingHyperlinkDetectionRequest, SwingHyperlinkDetectionSink) -> Unit,
         ): SwingHyperlinkDetector =
             object : SwingHyperlinkDetector {
-                override val context = SwingHyperlinkDetectionContext.VIEWPORT
+                override val context = SwingHyperlinkDetectionContext.ORDERED_CONTENT
 
-                override fun detect(
+                override suspend fun detect(
                     request: SwingHyperlinkDetectionRequest,
                     sink: SwingHyperlinkDetectionSink,
                 ) = onDetect(request, sink)
@@ -647,12 +751,14 @@ class TerminalHyperlinkDiscoverySchedulingTest {
                 if (!text.startsWith("https://")) continue
                 val url = text.takeWhile { !it.isWhitespace() }
                 sink.addHyperlink(
-                    lineIndex = lineIndex,
-                    startOffset = 0,
-                    endOffset = url.length,
-                    action = SwingHyperlinkAction { opened.add(url) },
-                    validationStartOffset = 0,
-                    validationEndOffset = if (validateUrlToken) url.length + 1 else Int.MAX_VALUE,
+                    request.hyperlink(
+                        lineIndex = lineIndex,
+                        startOffset = 0,
+                        endOffset = url.length,
+                        action = { opened.add(url) },
+                        validationStartOffset = 0,
+                        validationEndOffset = if (validateUrlToken) url.length + 1 else Int.MAX_VALUE,
+                    ),
                 )
             }
         }

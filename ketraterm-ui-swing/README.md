@@ -144,3 +144,59 @@ val customServices = SwingHostServices(
     }
 )
 ```
+
+## Hyperlink detector contract and migration
+
+`SwingHyperlinkDetector.detect` is suspending. The discovery owner serializes
+invocations, owns cancellation and rejects results from obsolete binding,
+source or provider epochs. Providers must propagate cancellation and discard
+tainted ordered state; the request-confined sink cannot escape into detached
+work. Returning normally is successful analysis, including an empty result.
+Throwing means failure or cancellation, not an empty result.
+
+The current IntelliJ batch uses coroutine `readActionBlocking`: stateful filters
+and sink writes cannot safely be retried automatically by `readAction`. This
+still blocks IDE write actions while the batch runs. Short read actions and safe
+ordered-state replay remain part of Stage 5 in the repair map.
+
+Choose `INDEPENDENT_LINE` for text-derived links whose logical lines can be
+analyzed independently, or `ORDERED_CONTENT` for console filters that consume
+source order and may highlight earlier lines. `configurationGeneration` is an
+equality-only invalidation counter for changed provider configuration.
+
+Requests own their strings and row arrays. Each logical line includes one
+trailing newline; soft wrapping joins physical rows while omitting wrap padding
+and wide trailing cells. Coordinates use the first absolute physical row of the
+logical line and a UTF-16 offset in its extracted text, rather than viewport rows
+or terminal columns. Cumulative offsets remain local to the supplied batch for
+console-filter interoperability. Search and detection share cell extraction
+rules while retaining their own mapping and trimming policies.
+
+Report a `SwingHyperlink` containing the source range, dependency range, action,
+optional complete copyable URI, prepared presentation and activation policy.
+Dependencies include every character affecting detection/navigation, including
+token delimiters. Ordered results record the `consumedThrough` position that
+produced them. A result can refer to earlier source lines; coordinates outside
+the owner's captured source are ignored. Styles contain resolved colors and
+underline metadata; resolve theme/framework data outside painting.
+
+For a single-line result, the request builds absolute coordinates:
+
+```kotlin
+sink.addHyperlink(
+    request.hyperlink(
+        lineIndex, startOffset, endOffset, action,
+        validationStartOffset = tokenStart,
+        validationEndOffset = tokenEndIncludingDelimiter,
+        uri = completeDestination,
+    )
+)
+```
+
+Migration is atomic: replace `LOGICAL_LINE` with `INDEPENDENT_LINE`, `VIEWPORT`
+with `ORDERED_CONTENT`, make detector overrides suspending, and replace the
+positional sink overload with `addHyperlink(SwingHyperlink)` or the request
+factory above. There is no compatibility detector pipeline. The current
+projection still consumes viewport snapshots; retained history, lifecycle
+recovery, ordered replay and native style/gesture application follow their
+separate gates in the [repair map](../docs/terminal-feature-gap-map.md#uri-highlighting-staged-repair).

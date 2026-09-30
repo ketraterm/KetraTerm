@@ -74,13 +74,15 @@ internal class SwingTerminalHyperlinkLifecycleFixture : AutoCloseable {
                                 val start = request.lineText(line).indexOf(URL)
                                 if (start >= 0) {
                                     sink.addHyperlink(
-                                        line,
-                                        start,
-                                        start + URL.length,
-                                        {
-                                            check(SwingUtilities.isEventDispatchThread())
-                                            opened.add(URL)
-                                        },
+                                        request.hyperlink(
+                                            line,
+                                            start,
+                                            start + URL.length,
+                                            {
+                                                check(SwingUtilities.isEventDispatchThread())
+                                                opened.add(URL)
+                                            },
+                                        ),
                                     )
                                 }
                             }

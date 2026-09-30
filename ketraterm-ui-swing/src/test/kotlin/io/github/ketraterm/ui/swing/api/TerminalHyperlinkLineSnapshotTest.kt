@@ -89,8 +89,21 @@ class TerminalHyperlinkLineSnapshotTest {
                     val pending = viewport.pendingLines()
                     viewport.accept(
                         pending,
-                        pending.map { line ->
-                            listOf(TerminalDetectedHyperlink(0, line.text.length - 1, SwingHyperlinkAction.NONE, 0, line.text.length))
+                        pending.mapIndexed { index, line ->
+                            listOf(
+                                TerminalDetectedHyperlink(
+                                    0,
+                                    line.text.length - 1,
+                                    detectionRequest(pending).hyperlink(
+                                        index,
+                                        0,
+                                        line.text.length - 1,
+                                        SwingHyperlinkAction.NONE,
+                                    ),
+                                    0,
+                                    line.text.length,
+                                ),
+                            )
                         },
                     )
                     viewport.writeOverlay(cache) { _, _, _, _ -> }

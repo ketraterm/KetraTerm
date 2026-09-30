@@ -41,16 +41,22 @@ internal class TerminalHyperlinkDiscoveryController(
 ) {
     private val viewport = TerminalHyperlinkViewport()
     private var analysisJob: Job? = null
-    private var epoch = 0L
+    private var bindingEpoch = 0L
+    private var sourceEpoch = 0L
+    private var providerEpoch = 0L
+    private var providerGeneration = host.hyperlinkDetector.configurationGeneration
+    private var sourceGeneration = Long.MIN_VALUE
+    private var sourceColumns = 0
+    private var sourceBuffer = host.renderCache.activeBuffer
     private var frameRevision = 0L
     private var disposed = false
     private var detector = host.hyperlinkDetector
     private val repaintSpan = host::repaintHyperlinkSpan
 
     fun reset() {
-        epoch++
+        bindingEpoch++
         viewport.clear()
-        // A synchronous host detector may ignore cancellation. Keep its slot until it returns.
+        // A blocking host provider may ignore cancellation. Keep its slot until it returns.
     }
 
     fun dispose() {
@@ -62,9 +68,19 @@ internal class TerminalHyperlinkDiscoveryController(
 
     fun scheduleForFrame() {
         if (disposed) return
-        if (detector !== host.hyperlinkDetector) {
-            reset()
+        if (detector !== host.hyperlinkDetector || providerGeneration != host.hyperlinkDetector.configurationGeneration) {
+            providerEpoch++
+            viewport.clear()
             detector = host.hyperlinkDetector
+            providerGeneration = detector.configurationGeneration
+        }
+        val cache = host.renderCache
+        if (sourceGeneration != cache.historyContentGeneration || sourceColumns != cache.columns || sourceBuffer != cache.activeBuffer) {
+            sourceEpoch++
+            viewport.clear()
+            sourceGeneration = cache.historyContentGeneration
+            sourceColumns = cache.columns
+            sourceBuffer = cache.activeBuffer
         }
         if (detector === SwingHyperlinkDetector.NONE) return
         if (viewport.update(host.renderCache, detector.context)) {
@@ -88,16 +104,23 @@ internal class TerminalHyperlinkDiscoveryController(
     fun isDiscoveredHyperlinkResolvable(
         hyperlinkId: Int,
         cache: TerminalRenderCache,
-    ): Boolean = viewport.actionFor(hyperlinkId, cache) != null
+    ): Boolean = viewport.hyperlinkFor(hyperlinkId, cache) != null
 
     fun openDiscoveredHyperlink(
         hyperlinkId: Int,
         cache: TerminalRenderCache,
-    ): Boolean = viewport.actionFor(hyperlinkId, cache)?.open() == true
+    ): Boolean = viewport.hyperlinkFor(hyperlinkId, cache)?.action?.open() == true
+
+    fun discoveredHyperlink(
+        hyperlinkId: Int,
+        cache: TerminalRenderCache,
+    ): SwingHyperlink? = viewport.hyperlinkFor(hyperlinkId, cache)
 
     private fun startAnalysis() {
         if (analysisJob != null || disposed || !scope.isActive || !viewport.needsAnalysis) return
-        val requestEpoch = epoch
+        val requestBindingEpoch = bindingEpoch
+        val requestSourceEpoch = sourceEpoch
+        val requestProviderEpoch = providerEpoch
         val requestDetector = detector
         // Lazy start assigns the slot before even an immediate dispatcher can finish the coroutine.
         val job =
@@ -105,25 +128,33 @@ internal class TerminalHyperlinkDiscoveryController(
                 val requestRevision = frameRevision
                 var completed = false
                 try {
-                    if (requestEpoch != epoch) return@launch
+                    if (requestBindingEpoch != bindingEpoch || requestSourceEpoch != sourceEpoch ||
+                        requestProviderEpoch != providerEpoch
+                    ) {
+                        return@launch
+                    }
                     val lines = viewport.pendingLines(requestDetector.context)
                     if (lines.isEmpty()) return@launch
-                    val request = detectionRequest(lines)
+                    val request =
+                        detectionRequest(lines, requestDetector.context, requestBindingEpoch, requestSourceEpoch, requestProviderEpoch)
                     val result =
                         withContext(analysisDispatcher) {
-                            val sink = TerminalHyperlinkDetectionAccumulator(lines, requestDetector.context)
+                            val sink = TerminalHyperlinkDetectionAccumulator(lines)
                             try {
                                 requestDetector.detect(request, sink)
                             } catch (cancelled: CancellationException) {
                                 throw cancelled
                             } catch (_: Exception) {
-                                // Host discovery is best-effort; retry only after the text changes.
-                                return@withContext List(lines.size) { emptyList<TerminalDetectedHyperlink>() }
+                                // Failure leaves source unprocessed; automatic recovery is scheduled by its owner.
+                                return@withContext null
                             }
                             ensureActive()
                             sink.links
                         }
-                    if (!disposed && requestEpoch == epoch) {
+                    if (result == null) return@launch
+                    if (!disposed && requestBindingEpoch == bindingEpoch && requestSourceEpoch == sourceEpoch &&
+                        requestProviderEpoch == providerEpoch
+                    ) {
                         viewport.accept(lines, result, requestDetector.context)
                         publishOverlay()
                     }
@@ -132,7 +163,11 @@ internal class TerminalHyperlinkDiscoveryController(
                     analysisJob = null
                     if (!disposed &&
                         scope.isActive &&
-                        (completed || requestEpoch != epoch || requestRevision != frameRevision)
+                        (
+                            completed || requestBindingEpoch != bindingEpoch || requestSourceEpoch != sourceEpoch ||
+                                requestProviderEpoch != providerEpoch ||
+                                requestRevision != frameRevision
+                        )
                     ) {
                         startAnalysis()
                     }
@@ -148,59 +183,67 @@ internal class TerminalHyperlinkDiscoveryController(
     }
 }
 
-internal fun detectionRequest(lines: List<TerminalHyperlinkLineSnapshot>): SwingHyperlinkDetectionRequest {
-    var offset = 0
-    val starts = IntArray(lines.size)
-    val ends = IntArray(lines.size)
-    val text =
-        Array(lines.size) { index ->
-            starts[index] = offset
-            offset += lines[index].text.length
-            ends[index] = offset
-            lines[index].text
-        }
-    return SwingHyperlinkDetectionRequest(text, starts, ends)
-}
+internal fun detectionRequest(
+    lines: List<TerminalHyperlinkLineSnapshot>,
+    context: SwingHyperlinkDetectionContext = SwingHyperlinkDetectionContext.INDEPENDENT_LINE,
+    bindingEpoch: Long = 0L,
+    sourceEpoch: Long = 0L,
+    providerEpoch: Long = 0L,
+): SwingHyperlinkDetectionRequest =
+    SwingHyperlinkDetectionRequest(
+        lines.map { it.text },
+        LongArray(lines.size) { lines[it].firstAbsoluteRow },
+        LongArray(lines.size) { lines[it].lastAbsoluteRow },
+        context,
+        bindingEpoch,
+        sourceEpoch,
+        providerEpoch,
+    )
 
-private class TerminalHyperlinkDetectionAccumulator(
+/** Resolves absolute logical coordinates against owned snapshots, outside the mutation lock. */
+internal class TerminalHyperlinkDetectionAccumulator(
     private val lines: List<TerminalHyperlinkLineSnapshot>,
-    private val context: SwingHyperlinkDetectionContext,
 ) : SwingHyperlinkDetectionSink {
     val links = List(lines.size) { ArrayList<TerminalDetectedHyperlink>() }
 
-    override fun addHyperlink(
-        lineIndex: Int,
-        startOffset: Int,
-        endOffset: Int,
-        action: SwingHyperlinkAction,
-        validationStartOffset: Int,
-        validationEndOffset: Int,
-    ) {
-        if (lineIndex !in lines.indices) return
-        val text = lines[lineIndex].text
-        if (startOffset !in text.indices || endOffset <= startOffset || endOffset > text.length) return
-        val start = startOffset
-        val end = minOf(endOffset, text.length - 1)
-        if (start == end) return
-        val defaultContext = validationEndOffset == Int.MAX_VALUE
-        val validationEnd = if (defaultContext) text.length else validationEndOffset
-        if (validationStartOffset !in 0..start || validationEnd !in end..text.length) return
-        links[lineIndex] +=
-            TerminalDetectedHyperlink(
-                start,
-                end,
-                action,
-                if (defaultContext) 0 else validationStartOffset,
-                validationEnd,
-                viewportDependent = context == SwingHyperlinkDetectionContext.VIEWPORT && defaultContext,
-            )
+    override fun addHyperlink(hyperlink: SwingHyperlink) {
+        val source = hyperlink.sourceRange
+        val dependency = hyperlink.dependencyRange
+        val first = lines.indexOfFirst { it.firstAbsoluteRow == source.start.absoluteRow }
+        val last = lines.indexOfFirst { it.firstAbsoluteRow == source.end.absoluteRow }
+        val dependencyFirst = lines.indexOfFirst { it.firstAbsoluteRow == dependency.start.absoluteRow }
+        val dependencyLast = lines.indexOfFirst { it.firstAbsoluteRow == dependency.end.absoluteRow }
+        val producer = lines.indexOfFirst { it.firstAbsoluteRow == hyperlink.consumedThrough.absoluteRow }
+        if (first < 0 || last < first || dependencyFirst < 0 || dependencyLast < dependencyFirst) return
+        if (producer < 0 || hyperlink.consumedThrough.offset > lines[producer].text.length) return
+        if (source.start.offset >= lines[first].text.length || source.end.offset > lines[last].text.length) return
+        if (dependency.start.offset > lines[dependencyFirst].text.length ||
+            dependency.end.offset > lines[dependencyLast].text.length
+        ) {
+            return
+        }
+        for (index in first..last) {
+            val start = if (index == first) source.start.offset else 0
+            val end = minOf(if (index == last) source.end.offset else lines[index].text.length, lines[index].text.length - 1)
+            if (start >= end) continue
+            val independent = dependencyFirst == index && dependencyLast == index
+            links[index] +=
+                TerminalDetectedHyperlink(
+                    start,
+                    end,
+                    hyperlink,
+                    if (independent) dependency.start.offset else 0,
+                    if (independent) dependency.end.offset else lines[index].text.length,
+                    viewportDependent = !independent,
+                )
+        }
     }
 }
 
 internal class TerminalDetectedHyperlink(
     val startOffset: Int,
     val endOffset: Int,
-    val action: SwingHyperlinkAction,
+    val hyperlink: SwingHyperlink,
     val validationStartOffset: Int,
     val validationEndOffset: Int,
     val viewportDependent: Boolean = false,

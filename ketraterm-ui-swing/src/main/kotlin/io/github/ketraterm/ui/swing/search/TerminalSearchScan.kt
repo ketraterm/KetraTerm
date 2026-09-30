@@ -15,15 +15,16 @@
  */
 package io.github.ketraterm.ui.swing.search
 
-import io.github.ketraterm.render.api.*
-import io.github.ketraterm.render.cache.TerminalRenderCache
+import io.github.ketraterm.render.api.TerminalRenderBufferKind
+import io.github.ketraterm.render.api.TerminalRenderFrameReader
+import io.github.ketraterm.render.cache.TerminalRenderRangeCopy
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.yield
 
 /** Worker-owned bounded cell copy. Results and longest logical-line scratch grow with retained text. */
 internal class TerminalSearchScan {
-    private val cache = TerminalRenderCache(1, 1, rowCapacityReserve = COPY_ROWS - 1)
+    private val copy = TerminalRenderRangeCopy()
 
     suspend fun scan(
         reader: TerminalRenderFrameReader,
@@ -49,78 +50,17 @@ internal class TerminalSearchScan {
         var lastGeneration = generation
         while (next <= last) {
             context.ensureActive()
-            var copiedFirst = next
-            var copiedLast = next - 1
-            var valid = true
-            // Cell work per lock acquisition is bounded by COPY_CELLS, or one physical row.
-            val count = minOf(COPY_ROWS, maxOf(1, COPY_CELLS / columns))
-            val end = next + minOf(last - next, count - 1L)
-            reader.readRenderFrameForAbsoluteRange(next, end) { frame ->
-                context.ensureActive()
-                if (frame.columns != columns || frame.activeBuffer != buffer) {
-                    valid = false
-                    return@readRenderFrameForAbsoluteRange
-                }
-                lastGeneration = frame.contentGeneration
-                val top = frame.discardedCount + frame.historySize - frame.scrollbackOffset
-                copiedFirst = maxOf(next, top)
-                copiedLast = minOf(end, top + frame.rows - 1L)
-                if (copiedFirst > copiedLast) return@readRenderFrameForAbsoluteRange
-                val offset = (copiedFirst - top).toInt()
-                val rows = (copiedLast - copiedFirst + 1).toInt()
-                // The range API may include the live grid prefix. Copy only the requested intersection.
-                val slice =
-                    object : TerminalRenderFrame by frame {
-                        override val rows = rows
-
-                        override fun lineId(row: Int) = frame.lineId(offset + row)
-
-                        override fun lineGeneration(row: Int) = frame.lineGeneration(offset + row)
-
-                        override fun lineWrapped(row: Int) = frame.lineWrapped(offset + row)
-
-                        override fun copyLine(
-                            row: Int,
-                            codeWords: IntArray,
-                            codeOffset: Int,
-                            attrWords: LongArray,
-                            attrOffset: Int,
-                            flags: IntArray,
-                            flagOffset: Int,
-                            extraAttrWords: LongArray?,
-                            extraAttrOffset: Int,
-                            hyperlinkIds: IntArray?,
-                            hyperlinkOffset: Int,
-                            clusterSink: TerminalRenderClusterSink?,
-                            clusterDataSink: TerminalRenderClusterDataSink?,
-                        ) {
-                            context.ensureActive()
-                            frame.copyLine(
-                                offset + row,
-                                codeWords,
-                                codeOffset,
-                                attrWords,
-                                attrOffset,
-                                flags,
-                                flagOffset,
-                                extraAttrWords,
-                                extraAttrOffset,
-                                hyperlinkIds,
-                                hyperlinkOffset,
-                                clusterSink,
-                                clusterDataSink,
-                            )
-                        }
-                    }
-                cache.reset()
-                cache.accept(slice)
-            }
-            if (!valid) return null
+            val copied = copy.read(reader, next, last) { context.ensureActive() }
+            val copiedFirst = copy.firstAbsoluteRow
+            val copiedLast = copy.lastAbsoluteRow
+            val cache = copy.cache
+            if (copied && (cache.columns != columns || cache.activeBuffer != buffer)) return null
+            if (copied) lastGeneration = cache.contentGeneration
             if (copiedFirst > next) model.discardPendingLine()
             if (copiedFirst > last) break
             if (copiedLast >= copiedFirst) model.append(cache, copiedFirst) else model.discardPendingLine()
-            if (end == last) break
-            next = end + 1L
+            if (!copied || copiedLast == last) break
+            next = copiedLast + 1L
             yield()
         }
         val highlights = model.finish()
@@ -143,9 +83,4 @@ internal class TerminalSearchScan {
         val generation: Long,
         val changedDuringScan: Boolean,
     )
-
-    private companion object {
-        const val COPY_ROWS = 64
-        const val COPY_CELLS = 4096
-    }
 }

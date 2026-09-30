@@ -16,143 +16,150 @@
 package io.github.ketraterm.ui.swing.api
 
 /**
- * Host-provided visible-viewport hyperlink detector.
+ * Host discovery outside terminal mutation, painting and pointer handling.
  *
- * The reusable Swing terminal calls this outside painting and mouse movement,
- * after visible render-cache text has been snapshotted. Implementations may
- * allocate and may call host/IDE link-discovery APIs, but must not touch Swing
- * component state directly. Reported offsets are UTF-16 offsets within the
- * supplied line text.
- *
- * [context] declares whether detection depends on individual logical lines or
- * the complete visible viewport. Detectors must not depend on earlier requests.
+ * The binding owner serializes calls and owns their coroutine cancellation.
+ * Implementations may suspend and allocate bounded discovery results, acquire
+ * host-read access, and report to the request-confined sink. They must propagate
+ * cancellation, discard any tainted ordered state, and never touch Swing state.
+ * [configurationGeneration] changes when provider configuration becomes stale.
  */
 fun interface SwingHyperlinkDetector {
-    /** Text context required by detection and its actions, fixed for this detector's lifetime. */
-    val context: SwingHyperlinkDetectionContext
-        get() = SwingHyperlinkDetectionContext.LOGICAL_LINE
+    /** Fixed dependency discipline for this detector instance. */
+    val context: SwingHyperlinkDetectionContext get() = SwingHyperlinkDetectionContext.INDEPENDENT_LINE
+
+    /** Equality-only provider invalidation generation; the owner also tracks instance identity. */
+    val configurationGeneration: Long get() = 0L
 
     /**
-     * Detects hyperlinks in [request] and reports them to [sink].
-     *
-     * Implementations are called on a background worker owned by the Swing
-     * terminal. Host frameworks that require read locks or application
-     * dispatching should acquire them inside this method.
-     *
-     * @param request immutable visible-viewport text snapshot.
-     * @param sink receiver for detected ranges and activation actions.
-     * @throws java.util.concurrent.CancellationException when detection is
-     * cancelled; an interrupted attempt must not be cached as having no links.
+     * Reports one request's results. Return means successful completion, including
+     * an empty result; failure/cancellation must throw and cannot mean empty success.
+     * The sink belongs to this call and must not be retained or used by detached work.
+     * Ordered state is valid only within the request's binding/source/provider epochs.
      */
-    fun detect(
+    suspend fun detect(
         request: SwingHyperlinkDetectionRequest,
         sink: SwingHyperlinkDetectionSink,
     )
 
     companion object {
-        /**
-         * Detector that reports no links.
-         */
-        @JvmField
-        val NONE: SwingHyperlinkDetector = SwingHyperlinkDetector { _, _ -> }
+        /** Successful detector with no results. */
+        @JvmField val NONE = SwingHyperlinkDetector { _, _ -> }
     }
 }
 
-/** Text dependency used to schedule detection and validate cached results. */
+/** Text dependency and ordering required by a detector. */
 enum class SwingHyperlinkDetectionContext {
-    /**
-     * Each logical line is independent. Requests may contain only changed
-     * lines; results must not depend on neighboring lines or request positions.
-     */
-    LOGICAL_LINE,
+    /** Each logical line is independent; requests may omit unchanged lines. */
+    INDEPENDENT_LINE,
 
     /**
-     * Detection requires every visible logical line in viewport order. Results
-     * depend on that complete text and order unless they declare an explicit
-     * validation range through [SwingHyperlinkDetectionSink.addHyperlink].
+     * Logical lines are consumed in source order. Results may reference earlier
+     * source lines. Continuation/replay is owned by the binding's discovery owner;
+     * an epoch change requires fresh state, not continuation of an interrupted call.
      */
-    VIEWPORT,
+    ORDERED_CONTENT,
 }
 
 /**
- * Immutable visible terminal text snapshot passed to [SwingHyperlinkDetector].
+ * Owned immutable logical text and absolute row anchors for one discovery batch.
  *
- * Lines are logical terminal lines: soft-wrapped render rows are joined, and a
- * line separator is appended to each line to match IntelliJ-style console
- * filter contracts. Offsets returned by [lineStartOffset] and [lineEndOffset]
- * are cumulative UTF-16 offsets across the supplied lines in this request;
- * they are not offsets in the terminal's complete output.
+ * Soft-wrapped physical rows form a logical line, with one appended newline.
+ * UTF-16 cumulative offsets are local to this request (checked against overflow),
+ * while absolute row anchors survive append/eviction within a source epoch.
+ * The arrays/list are defensively copied. Empty requests are valid.
+ * Binding epochs separate resets/rebindings; source epochs separate replacement,
+ * reflow and buffer changes; provider epochs separate configuration/instance changes.
  */
-class SwingHyperlinkDetectionRequest internal constructor(
-    private val lines: Array<String>,
-    private val lineStartOffsets: IntArray,
-    private val lineEndOffsets: IntArray,
+class SwingHyperlinkDetectionRequest(
+    lineTexts: List<String>,
+    firstAbsoluteRows: LongArray,
+    lastAbsoluteRows: LongArray = firstAbsoluteRows,
+    val context: SwingHyperlinkDetectionContext = SwingHyperlinkDetectionContext.INDEPENDENT_LINE,
+    val bindingEpoch: Long = 0L,
+    val sourceEpoch: Long = 0L,
+    val providerEpoch: Long = 0L,
 ) {
-    /**
-     * Number of logical lines in this visible snapshot.
-     */
-    val lineCount: Int
-        get() = lines.size
+    private val lines = lineTexts.toTypedArray()
+    private val firstRows = firstAbsoluteRows.copyOf()
+    private val lastRows = lastAbsoluteRows.copyOf()
+    private val starts = IntArray(lines.size)
+    private val ends = IntArray(lines.size)
 
-    /**
-     * Returns the logical line text at [index].
-     *
-     * @param index zero-based logical line index.
-     * @return line text, including a trailing line separator.
-     */
+    init {
+        require(firstRows.size == lines.size && lastRows.size == lines.size)
+        var offset = 0
+        for (index in lines.indices) {
+            require(lines[index].endsWith('\n'))
+            require(firstRows[index] >= 0 && lastRows[index] >= firstRows[index])
+            require(index == 0 || firstRows[index] > lastRows[index - 1])
+            starts[index] = offset
+            offset = Math.addExact(offset, lines[index].length)
+            ends[index] = offset
+        }
+    }
+
+    /** Number of logical lines in this batch. */
+    val lineCount: Int get() = lines.size
+
+    /** Logical text, including the trailing newline. */
     fun lineText(index: Int): String = lines[index]
 
-    /**
-     * Returns the cumulative UTF-16 start offset for logical line [index].
-     *
-     * @param index zero-based logical line index.
-     * @return inclusive line start offset.
-     */
-    fun lineStartOffset(index: Int): Int = lineStartOffsets[index]
+    /** Inclusive cumulative UTF-16 start within this batch. */
+    fun lineStartOffset(index: Int): Int = starts[index]
+
+    /** Exclusive cumulative UTF-16 end within this batch. */
+    fun lineEndOffset(index: Int): Int = ends[index]
+
+    /** First physical row of the logical line, in this source epoch's absolute coordinates. */
+    fun lineFirstAbsoluteRow(index: Int): Long = firstRows[index]
+
+    /** Last physical row of that same logical line, inclusive. */
+    fun lineLastAbsoluteRow(index: Int): Long = lastRows[index]
+
+    /** Builds an absolute range from line-local UTF-16 offsets. */
+    fun range(
+        startLine: Int,
+        startOffset: Int,
+        endLine: Int,
+        endOffset: Int,
+    ): SwingHyperlinkTextRange =
+        SwingHyperlinkTextRange(
+            SwingHyperlinkTextPosition(firstRows[startLine], startOffset),
+            SwingHyperlinkTextPosition(firstRows[endLine], endOffset),
+        )
 
     /**
-     * Returns the cumulative UTF-16 end offset for logical line [index].
-     *
-     * @param index zero-based logical line index.
-     * @return exclusive line end offset.
+     * Builds a single-line occurrence with a conservative context dependency.
+     * Explicit validation bounds must contain the highlight and its delimiters.
+     * Ordered defaults depend on the whole supplied batch; specify a narrower
+     * dependency only when the action is genuinely independent of surrounding text.
+     * The retained owner validates source/validation offsets against its snapshots.
      */
-    fun lineEndOffset(index: Int): Int = lineEndOffsets[index]
-}
-
-/**
- * Receives detected visible-viewport hyperlink ranges.
- */
-interface SwingHyperlinkDetectionSink {
-    /**
-     * Adds a detected hyperlink.
-     *
-     * By default the result is valid only while its detector's [SwingHyperlinkDetector.context]
-     * is unchanged: the logical line or the complete visible viewport. A
-     * detector may supply an explicit validation range when the result depends
-     * on only part of one line. That range must contain the highlight
-     * and every character affecting detection or the action, including token
-     * delimiters. Include the trailing line separator when the result depends
-     * on the end of the line, so appended text invalidates it.
-     *
-     * Invalid ranges, including validation ranges that do not contain the
-     * highlight, are ignored.
-     *
-     * @param lineIndex logical line index from the detection request.
-     * @param startOffset inclusive UTF-16 offset within the line text.
-     * @param endOffset exclusive UTF-16 offset within the line text.
-     * @param action host-owned action invoked after explicit user activation.
-     * @param validationStartOffset inclusive UTF-16 offset of the text that
-     * determines this result; defaults to the start of the logical line.
-     * @param validationEndOffset exclusive UTF-16 offset of that text, including
-     * any required boundary characters. [Int.MAX_VALUE] retains the detector's
-     * default context dependency; explicit ranges use a concrete line offset.
-     */
-    fun addHyperlink(
+    fun hyperlink(
         lineIndex: Int,
         startOffset: Int,
         endOffset: Int,
         action: SwingHyperlinkAction,
         validationStartOffset: Int = 0,
         validationEndOffset: Int = Int.MAX_VALUE,
-    )
+        uri: String? = null,
+        presentation: SwingHyperlinkPresentation = SwingHyperlinkPresentation.DEFAULT,
+        activation: SwingHyperlinkActivation = SwingHyperlinkActivation.MODIFIER,
+    ): SwingHyperlink {
+        val source = range(lineIndex, startOffset, lineIndex, endOffset)
+        val dependency =
+            when {
+                validationEndOffset != Int.MAX_VALUE -> range(lineIndex, validationStartOffset, lineIndex, validationEndOffset)
+                context == SwingHyperlinkDetectionContext.ORDERED_CONTENT -> range(0, 0, lines.lastIndex, lines.last().length)
+                else -> range(lineIndex, 0, lineIndex, lines[lineIndex].length)
+            }
+        return SwingHyperlink(source, dependency, action, uri, presentation, activation)
+    }
+}
+
+/** Request-confined receiver; results can highlight earlier retained source lines. */
+fun interface SwingHyperlinkDetectionSink {
+    /** Reports an owned result. Unknown/out-of-bounds source coordinates are ignored by the owner. */
+    fun addHyperlink(hyperlink: SwingHyperlink)
 }

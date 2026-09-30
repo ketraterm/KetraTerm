@@ -64,10 +64,10 @@ class TerminalHyperlinkDiscoveryControllerTest {
         val host =
             TestDiscoveryHost(
                 cache,
-                SwingHyperlinkDetector { request, sink ->
+                { request, sink ->
                     for (line in 0 until request.lineCount) {
                         val url = request.lineText(line).trimEnd('\n')
-                        sink.addHyperlink(line, 0, url.length, SwingHyperlinkAction { opened.add(url) })
+                        sink.addHyperlink(request.hyperlink(line, 0, url.length, { opened.add(url) }))
                     }
                 },
             )
@@ -134,15 +134,17 @@ class TerminalHyperlinkDiscoveryControllerTest {
         val host =
             TestDiscoveryHost(
                 cache,
-                SwingHyperlinkDetector { _, sink ->
+                { request, sink ->
                     sink.addHyperlink(
-                        0,
-                        prefix.length,
-                        prefix.length + url.length,
-                        SwingHyperlinkAction {
-                            opened = true
-                            true
-                        },
+                        request.hyperlink(
+                            0,
+                            prefix.length,
+                            prefix.length + url.length,
+                            {
+                                opened = true
+                                true
+                            },
+                        ),
                     )
                 },
             )
@@ -188,6 +190,7 @@ class TerminalHyperlinkDiscoveryControllerTest {
             return StaticTextFrame(
                 frameGeneration = generation,
                 structureGeneration = if (shifted) 2L else 1L,
+                historySize = if (shifted) 11 else 10,
                 rowTexts = if (shifted) rows + "after" else arrayOf("before") + rows,
                 lineIds =
                     when {
@@ -211,10 +214,10 @@ class TerminalHyperlinkDiscoveryControllerTest {
         val host =
             TestDiscoveryHost(
                 cache,
-                SwingHyperlinkDetector { _, sink ->
+                { request, sink ->
                     detectorCalls.incrementAndGet()
-                    sink.addHyperlink(1, 3, 54, sharedAction)
-                    sink.addHyperlink(1, 55, 58, sharedAction)
+                    sink.addHyperlink(request.hyperlink(1, 3, 54, sharedAction))
+                    sink.addHyperlink(request.hyperlink(1, 55, 58, sharedAction))
                 },
                 repaintObserved,
             )
@@ -355,17 +358,19 @@ class TerminalHyperlinkDiscoveryControllerTest {
             TestDiscoveryHost(
                 renderCache = cache,
                 hyperlinkDetector =
-                    SwingHyperlinkDetector { request, sink ->
+                    { request, sink ->
                         assertEquals("https://example.com\n", request.lineText(0))
                         sink.addHyperlink(
-                            lineIndex = 0,
-                            startOffset = 0,
-                            endOffset = "https://example.com".length,
-                            action =
-                                SwingHyperlinkAction {
-                                    opened.set(true)
-                                    true
-                                },
+                            request.hyperlink(
+                                lineIndex = 0,
+                                startOffset = 0,
+                                endOffset = "https://example.com".length,
+                                action =
+                                    {
+                                        opened.set(true)
+                                        true
+                                    },
+                            ),
                         )
                     },
                 repaintObserved = repaintObserved,
@@ -405,17 +410,19 @@ class TerminalHyperlinkDiscoveryControllerTest {
             TestDiscoveryHost(
                 renderCache = cache,
                 hyperlinkDetector =
-                    SwingHyperlinkDetector { _, sink ->
+                    { request, sink ->
                         detectorCalls.incrementAndGet()
                         sink.addHyperlink(
-                            lineIndex = 1,
-                            startOffset = 0,
-                            endOffset = "https://example.com".length,
-                            action =
-                                SwingHyperlinkAction {
-                                    opened.set(true)
-                                    true
-                                },
+                            request.hyperlink(
+                                lineIndex = 1,
+                                startOffset = 0,
+                                endOffset = "https://example.com".length,
+                                action =
+                                    {
+                                        opened.set(true)
+                                        true
+                                    },
+                            ),
                         )
                     },
                 repaintObserved = repaintObserved,
@@ -433,6 +440,7 @@ class TerminalHyperlinkDiscoveryControllerTest {
                 frameGeneration = 2L,
                 structureGeneration = 2L,
                 rowTexts = arrayOf("new", "alpha", "https://example.com"),
+                scrollbackOffset = 1,
                 lineIds = longArrayOf(0L, 0L, 0L),
             ),
         )
@@ -463,15 +471,17 @@ class TerminalHyperlinkDiscoveryControllerTest {
             TestDiscoveryHost(
                 renderCache = cache,
                 hyperlinkDetector =
-                    SwingHyperlinkDetector { request, sink ->
+                    { request, sink ->
                         for (lineIndex in 0 until request.lineCount) {
                             if (request.lineText(lineIndex) != "https://example.com\n") continue
                             urlScans.incrementAndGet()
                             sink.addHyperlink(
-                                lineIndex = lineIndex,
-                                startOffset = 0,
-                                endOffset = "https://example.com".length,
-                                action = SwingHyperlinkAction.NONE,
+                                request.hyperlink(
+                                    lineIndex = lineIndex,
+                                    startOffset = 0,
+                                    endOffset = "https://example.com".length,
+                                    action = SwingHyperlinkAction.NONE,
+                                ),
                             )
                         }
                     },
@@ -489,6 +499,7 @@ class TerminalHyperlinkDiscoveryControllerTest {
                 frameGeneration = 2L,
                 structureGeneration = 2L,
                 rowTexts = arrayOf("new-1", "https://example.com", "alpha"),
+                scrollbackOffset = 1,
                 lineIds = longArrayOf(0L, 0L, 0L),
             ),
         )
@@ -501,6 +512,7 @@ class TerminalHyperlinkDiscoveryControllerTest {
                 frameGeneration = 3L,
                 structureGeneration = 3L,
                 rowTexts = arrayOf("new-2", "new-1", "https://example.com"),
+                scrollbackOffset = 2,
                 lineIds = longArrayOf(0L, 0L, 0L),
             ),
         )
@@ -529,13 +541,15 @@ class TerminalHyperlinkDiscoveryControllerTest {
             TestDiscoveryHost(
                 renderCache = cache,
                 hyperlinkDetector =
-                    SwingHyperlinkDetector { _, sink ->
+                    { request, sink ->
                         detectorCalls.incrementAndGet()
                         sink.addHyperlink(
-                            lineIndex = 1,
-                            startOffset = 0,
-                            endOffset = "https://example.com".length,
-                            action = SwingHyperlinkAction.NONE,
+                            request.hyperlink(
+                                lineIndex = 1,
+                                startOffset = 0,
+                                endOffset = "https://example.com".length,
+                                action = SwingHyperlinkAction.NONE,
+                            ),
                         )
                     },
                 repaintObserved = repaintObserved,
@@ -552,6 +566,7 @@ class TerminalHyperlinkDiscoveryControllerTest {
                 frameGeneration = 2L,
                 structureGeneration = 2L,
                 rowTexts = arrayOf("new", "alpha", "https://example.com", "omega"),
+                scrollbackOffset = 1,
                 lineIds = longArrayOf(0L, 0L, 0L, 0L),
             ),
         )
@@ -580,15 +595,17 @@ class TerminalHyperlinkDiscoveryControllerTest {
             TestDiscoveryHost(
                 renderCache = cache,
                 hyperlinkDetector =
-                    SwingHyperlinkDetector { request, sink ->
+                    { request, sink ->
                         for (lineIndex in 0 until request.lineCount) {
                             if (request.lineText(lineIndex) != "https://example.com\n") continue
                             urlScans.incrementAndGet()
                             sink.addHyperlink(
-                                lineIndex = lineIndex,
-                                startOffset = 0,
-                                endOffset = "https://example.com".length,
-                                action = SwingHyperlinkAction.NONE,
+                                request.hyperlink(
+                                    lineIndex = lineIndex,
+                                    startOffset = 0,
+                                    endOffset = "https://example.com".length,
+                                    action = SwingHyperlinkAction.NONE,
+                                ),
                             )
                         }
                     },
@@ -606,6 +623,7 @@ class TerminalHyperlinkDiscoveryControllerTest {
                 frameGeneration = 2L,
                 structureGeneration = 2L,
                 rowTexts = arrayOf("beta", "gamma"),
+                historySize = 12,
                 lineIds = longArrayOf(0L, 0L),
             ),
         )
@@ -643,13 +661,15 @@ class TerminalHyperlinkDiscoveryControllerTest {
             TestDiscoveryHost(
                 renderCache = cache,
                 hyperlinkDetector =
-                    SwingHyperlinkDetector { _, sink ->
+                    { request, sink ->
                         detectorCalls.incrementAndGet()
                         sink.addHyperlink(
-                            lineIndex = 0,
-                            startOffset = 0,
-                            endOffset = "https://example.com".length,
-                            action = SwingHyperlinkAction.NONE,
+                            request.hyperlink(
+                                lineIndex = 0,
+                                startOffset = 0,
+                                endOffset = "https://example.com".length,
+                                action = SwingHyperlinkAction.NONE,
+                            ),
                         )
                     },
                 repaintObserved = repaintObserved,
@@ -667,6 +687,7 @@ class TerminalHyperlinkDiscoveryControllerTest {
                 structureGeneration = 2L,
                 rowTexts = arrayOf("new", "https://example.com"),
                 lineIds = longArrayOf(9L, 10L),
+                scrollbackOffset = 1,
                 lineGenerations = longArrayOf(1L, 2L),
             ),
         )
@@ -692,12 +713,14 @@ class TerminalHyperlinkDiscoveryControllerTest {
             TestDiscoveryHost(
                 renderCache = cache,
                 hyperlinkDetector =
-                    SwingHyperlinkDetector { _, sink ->
+                    { request, sink ->
                         sink.addHyperlink(
-                            lineIndex = 0,
-                            startOffset = 0,
-                            endOffset = "https://example.com".length,
-                            action = SwingHyperlinkAction.NONE,
+                            request.hyperlink(
+                                lineIndex = 0,
+                                startOffset = 0,
+                                endOffset = "https://example.com".length,
+                                action = SwingHyperlinkAction.NONE,
+                            ),
                         )
                     },
                 repaintObserved = repaintObserved,
@@ -715,6 +738,7 @@ class TerminalHyperlinkDiscoveryControllerTest {
                 structureGeneration = 2L,
                 rowTexts = arrayOf("new", "https://example.com"),
                 lineIds = longArrayOf(0L, 0L),
+                scrollbackOffset = 1,
                 hyperlinkIds =
                     arrayOf(
                         IntArray(24),
@@ -895,7 +919,15 @@ class TerminalHyperlinkDiscoveryControllerTest {
                 if (end >
                     link.start
                 ) {
-                    detected[link.line].add(TerminalDetectedHyperlink(link.start, end, link.action, 0, lines[link.line].text.length))
+                    detected[link.line].add(
+                        TerminalDetectedHyperlink(
+                            link.start,
+                            end,
+                            request.hyperlink(link.line, link.start, end, link.action),
+                            0,
+                            lines[link.line].text.length,
+                        ),
+                    )
                 }
             }
             viewport.accept(lines, detected)
@@ -963,7 +995,7 @@ class TerminalHyperlinkDiscoveryControllerTest {
                 },
         )
 
-    private data class FrameScheduleResult(
+    private class FrameScheduleResult(
         val ids: IntArray,
         val detectorCalls: Int,
     )
@@ -995,8 +1027,11 @@ class TerminalHyperlinkDiscoveryControllerTest {
         private val lineGenerations: LongArray = LongArray(rowTexts.size) { 1L },
         private val wrappedRows: BooleanArray = BooleanArray(rowTexts.size),
         private val hyperlinkIds: Array<IntArray> = Array(rowTexts.size) { IntArray(DEFAULT_COLUMNS) },
+        override val historySize: Int = 10,
+        override val scrollbackOffset: Int = 0,
     ) : TerminalRenderFrame {
         override val columns: Int = DEFAULT_COLUMNS
+        override val historyContentGeneration: Long = 0L
         override val rows: Int = rowTexts.size
         override val activeBuffer: TerminalRenderBufferKind = TerminalRenderBufferKind.PRIMARY
         override val cursor: TerminalRenderCursor =

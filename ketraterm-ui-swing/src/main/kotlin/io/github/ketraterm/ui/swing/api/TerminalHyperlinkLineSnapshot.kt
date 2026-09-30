@@ -18,10 +18,13 @@ package io.github.ketraterm.ui.swing.api
 import io.github.ketraterm.render.api.TerminalRenderBufferKind
 import io.github.ketraterm.render.api.TerminalRenderCellFlags
 import io.github.ketraterm.render.cache.TerminalRenderCache
+import io.github.ketraterm.ui.swing.render.forEachLogicalTextCell
 
 /** Immutable text and UTF-16-to-cell mapping for one soft-wrapped logical line. */
 internal class TerminalHyperlinkLineSnapshot(
     val text: String,
+    val firstAbsoluteRow: Long,
+    val lastAbsoluteRow: Long,
     val columns: Int,
     val activeBuffer: TerminalRenderBufferKind,
     val cellStarts: IntArray,
@@ -39,6 +42,7 @@ internal class TerminalHyperlinkLineSnapshot(
         end: Int,
     ): Boolean {
         if (end - start != lineIds.size || cache.columns != columns || cache.activeBuffer != activeBuffer) return false
+        if (firstAbsoluteRow != cache.discardedCount + cache.historySize - cache.scrollbackOffset + start) return false
         for (offset in lineIds.indices) {
             val row = start + offset
             if (cache.lineIds[row] != lineIds[offset] || cache.lineWrapped[row] != wrapped[offset]) return false
@@ -72,33 +76,9 @@ internal class TerminalHyperlinkLineSnapshotBuilder {
     ): TerminalHyperlinkLineSnapshot {
         text.setLength(0)
         for (row in startRow until endRow) {
-            val rowOffset = cache.rowOffset(row)
-            var column = 0
-            while (column < cache.columns) {
-                val index = rowOffset + column
-                val flags = cache.flags[index]
-                if (flags and (TerminalRenderCellFlags.WIDE_TRAILING or TerminalRenderCellFlags.WRAP_PADDING) != 0) {
-                    column++
-                    continue
-                }
-                val span = if (flags and TerminalRenderCellFlags.WIDE_LEADING != 0) 2 else 1
-                val start = (row - startRow) * cache.columns + column
-                val end = (row - startRow) * cache.columns + minOf(cache.columns, column + span)
-                when {
-                    flags and TerminalRenderCellFlags.CLUSTER != 0 -> {
-                        val ref = cache.clusterRefs[index]
-                        if (ref == 0L) {
-                            appendCodePoint(0x20, start, end)
-                        } else {
-                            val clusterStart = cache.clusterOffset(ref)
-                            val clusterEnd = clusterStart + cache.clusterLength(ref)
-                            for (offset in clusterStart until clusterEnd) appendCodePoint(cache.clusterCodepoints[offset], start, end)
-                        }
-                    }
-                    flags and TerminalRenderCellFlags.CODEPOINT != 0 -> appendCodePoint(cache.codeWords[index], start, end)
-                    else -> appendCodePoint(0x20, start, end)
-                }
-                column += span
+            forEachLogicalTextCell(cache, row) { codePoint, startColumn, endColumn ->
+                val offset = (row - startRow) * cache.columns
+                appendCodePoint(codePoint, offset + startColumn, offset + endColumn)
             }
         }
         while (text.isNotEmpty() && text.last() == ' ') text.setLength(text.length - 1)
@@ -107,6 +87,8 @@ internal class TerminalHyperlinkLineSnapshotBuilder {
         val rowCount = endRow - startRow
         return TerminalHyperlinkLineSnapshot(
             text.toString(),
+            cache.discardedCount + cache.historySize - cache.scrollbackOffset + startRow,
+            cache.discardedCount + cache.historySize - cache.scrollbackOffset + endRow - 1L,
             cache.columns,
             cache.activeBuffer,
             starts.copyOf(length),

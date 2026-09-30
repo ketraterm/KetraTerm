@@ -184,6 +184,10 @@ class TerminalRenderCache(
     var contentGeneration: Long = UNINITIALIZED_GENERATION
         private set
 
+    /** Last copied retained-history replacement/reflow generation. */
+    var historyContentGeneration: Long = UNINITIALIZED_GENERATION
+        private set
+
     /**
      * Last copied active buffer kind.
      */
@@ -515,6 +519,7 @@ class TerminalRenderCache(
         hasBlinkingText = source.hasBlinkingText
         frameGeneration = source.frameGeneration
         contentGeneration = source.contentGeneration
+        historyContentGeneration = source.historyContentGeneration
         structureGeneration = source.structureGeneration
         activeBuffer = source.activeBuffer
         palette = source.palette
@@ -633,6 +638,7 @@ class TerminalRenderCache(
         this.scrollbackOffset = frame.scrollbackOffset
         frameGeneration = frame.frameGeneration
         contentGeneration = frame.contentGeneration
+        historyContentGeneration = frame.historyContentGeneration
         structureGeneration = frame.structureGeneration
         discardedCount = frame.discardedCount
         hasFrame = true
@@ -692,6 +698,7 @@ class TerminalRenderCache(
         discardedCount = 0L
         frameGeneration = UNINITIALIZED_GENERATION
         contentGeneration = UNINITIALIZED_GENERATION
+        historyContentGeneration = UNINITIALIZED_GENERATION
         structureGeneration = UNINITIALIZED_GENERATION
         activeBuffer = TerminalRenderBufferKind.PRIMARY
         palette = emptyPalette

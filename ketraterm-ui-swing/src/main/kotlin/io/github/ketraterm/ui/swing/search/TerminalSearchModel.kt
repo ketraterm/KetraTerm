@@ -15,8 +15,8 @@
  */
 package io.github.ketraterm.ui.swing.search
 
-import io.github.ketraterm.render.api.TerminalRenderCellFlags
 import io.github.ketraterm.render.cache.TerminalRenderCache
+import io.github.ketraterm.ui.swing.render.forEachLogicalTextCell
 
 /**
  * Scans primitive render-cache rows for literal text matches.
@@ -169,50 +169,9 @@ internal class TerminalSearchModel {
         cache: TerminalRenderCache,
         row: Int,
     ) {
-        var column = 0
-        while (column < cache.columns) {
-            if (column and 255 == 0) checkCancelled()
-            column = appendCell(cache, row, column)
+        forEachLogicalTextCell(cache, row, checkCancelled) { codePoint, startColumn, endColumn ->
+            appendMappedCodePoint(codePoint, startColumn, endColumn)
         }
-    }
-
-    private fun appendCell(
-        cache: TerminalRenderCache,
-        row: Int,
-        column: Int,
-    ): Int {
-        val index = cache.rowOffset(row) + column
-        val flags = cache.flags[index]
-        if (flags and (TerminalRenderCellFlags.WIDE_TRAILING or TerminalRenderCellFlags.WRAP_PADDING) != 0) {
-            return column + 1
-        }
-
-        val columnSpan = if (flags and TerminalRenderCellFlags.WIDE_LEADING != 0) 2 else 1
-        when {
-            flags and TerminalRenderCellFlags.CLUSTER != 0 -> {
-                val ref = cache.clusterRefs[index]
-                if (ref == NO_CLUSTER_REF) {
-                    appendMappedCodePoint(' '.code, column, column + columnSpan)
-                } else {
-                    val offset = cache.clusterOffset(ref)
-                    val length = cache.clusterLength(ref)
-                    var clusterIndex = offset
-                    val end = offset + length
-                    while (clusterIndex < end) {
-                        appendMappedCodePoint(cache.clusterCodepoints[clusterIndex], column, column + columnSpan)
-                        clusterIndex++
-                    }
-                }
-            }
-
-            flags and TerminalRenderCellFlags.CODEPOINT != 0 -> {
-                appendMappedCodePoint(cache.codeWords[index], column, column + columnSpan)
-            }
-
-            else -> appendMappedCodePoint(' '.code, column, column + columnSpan)
-        }
-
-        return column + columnSpan
     }
 
     private fun appendMappedCodePoint(
@@ -254,7 +213,6 @@ internal class TerminalSearchModel {
 
     private companion object {
         private const val INITIAL_TEXT_CAPACITY = 256
-        private const val NO_CLUSTER_REF = 0L
 
         private fun nextCapacity(
             current: Int,

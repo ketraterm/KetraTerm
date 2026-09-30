@@ -17,12 +17,15 @@ package io.github.ketraterm.intellij.ui
 
 import com.intellij.execution.filters.*
 import com.intellij.openapi.application.ApplicationManager
+import com.intellij.openapi.application.readActionBlocking
 import com.intellij.openapi.progress.ProcessCanceledException
 import com.intellij.openapi.progress.ProgressManager
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.util.TextRange
 import com.intellij.psi.search.GlobalSearchScope
 import io.github.ketraterm.ui.swing.api.*
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import java.util.concurrent.CancellationException
 
 /**
@@ -37,21 +40,25 @@ internal class IntellijTerminalHyperlinkDetector(
     private val project: Project,
 ) : SwingHyperlinkDetector {
     // Console filters can carry exception/navigation context between consecutive lines.
-    override val context: SwingHyperlinkDetectionContext = SwingHyperlinkDetectionContext.VIEWPORT
+    override val context: SwingHyperlinkDetectionContext = SwingHyperlinkDetectionContext.ORDERED_CONTENT
 
-    override fun detect(
+    override suspend fun detect(
         request: SwingHyperlinkDetectionRequest,
         sink: SwingHyperlinkDetectionSink,
     ) {
+        val coroutineContext = currentCoroutineContext()
+        coroutineContext.ensureActive()
         if (project.isDisposed) return
         try {
-            ApplicationManager.getApplication().runReadAction {
-                if (project.isDisposed) return@runReadAction
+            // Filters and sink writes are stateful, so this batch cannot be retried by readAction.
+            readActionBlocking {
+                if (project.isDisposed) return@readActionBlocking
                 val urlFilter = UrlFilter(project)
                 val providerFilter = CompositeFilter(project, providerFilters())
                 val emittedRanges = HashSet<DetectedRangeKey>()
                 var lineIndex = 0
                 while (lineIndex < request.lineCount) {
+                    coroutineContext.ensureActive()
                     ProgressManager.checkCanceled()
                     applyFilter(request, sink, urlFilter, providerFilter, emittedRanges, lineIndex)
                     lineIndex++
@@ -74,7 +81,6 @@ internal class IntellijTerminalHyperlinkDetector(
         lineIndex: Int,
     ) {
         val lineText = request.lineText(lineIndex)
-        val lineStartOffset = request.lineStartOffset(lineIndex)
         val lineEndOffset = request.lineEndOffset(lineIndex)
         // UrlFilter precedes provider filters and returns EXIT for every match.
         // Keep its provenance so only its text-derived actions can outlive edits elsewhere.
@@ -94,26 +100,43 @@ internal class IntellijTerminalHyperlinkDetector(
 
         for (item in result.resultItems) {
             val hyperlinkInfo = item.hyperlinkInfo ?: continue
-            val startOffset = item.highlightStartOffset.coerceIn(lineStartOffset, lineEndOffset)
-            val endOffset = item.highlightEndOffset.coerceIn(startOffset, lineEndOffset)
-            if (startOffset >= endOffset) continue
-
-            val rangeKey = DetectedRangeKey(lineIndex, startOffset, endOffset)
-            if (!emittedRanges.add(rangeKey)) continue
-
-            val validationRange =
-                if (urlResult != null) {
-                    urlValidationRange(lineText, startOffset - lineStartOffset, endOffset - lineStartOffset)
+            val startOffset = item.highlightStartOffset
+            val endOffset = item.highlightEndOffset
+            if (startOffset < 0 || endOffset <= startOffset || endOffset > lineEndOffset) continue
+            val first =
+                (0..lineIndex).firstOrNull { startOffset >= request.lineStartOffset(it) && startOffset < request.lineEndOffset(it) }
+                    ?: continue
+            val last = (first..lineIndex).firstOrNull { endOffset <= request.lineEndOffset(it) } ?: continue
+            if (!emittedRanges.add(DetectedRangeKey(first, startOffset, endOffset))) continue
+            val source = request.range(first, startOffset - request.lineStartOffset(first), last, endOffset - request.lineStartOffset(last))
+            val validation =
+                if (urlResult != null && first == last) {
+                    urlValidationRange(request.lineText(first), source.start.offset, source.end.offset)
+                } else {
+                    null
+                }
+            val dependency =
+                if (validation == null) {
+                    request.range(0, 0, lineIndex, lineText.length)
+                } else {
+                    request.range(first, validation.startOffset, first, validation.endOffset)
+                }
+            val uri =
+                if (urlResult != null &&
+                    first == last
+                ) {
+                    request.lineText(first).substring(source.start.offset, source.end.offset)
                 } else {
                     null
                 }
             sink.addHyperlink(
-                lineIndex = lineIndex,
-                startOffset = startOffset - lineStartOffset,
-                endOffset = endOffset - lineStartOffset,
-                action = IntellijTerminalHyperlinkAction(project, hyperlinkInfo),
-                validationStartOffset = validationRange?.startOffset ?: 0,
-                validationEndOffset = validationRange?.endOffset ?: Int.MAX_VALUE,
+                SwingHyperlink(
+                    sourceRange = source,
+                    dependencyRange = dependency,
+                    action = IntellijTerminalHyperlinkAction(project, hyperlinkInfo),
+                    uri = uri,
+                    consumedThrough = SwingHyperlinkTextPosition(request.lineFirstAbsoluteRow(lineIndex), lineText.length),
+                ),
             )
         }
     }

@@ -77,6 +77,21 @@ interface TerminalRenderFrame {
         get() = frameGeneration
 
     /**
+     * Generation of retained-history identity and layout in [activeBuffer].
+     *
+     * Replacement, clearing and resize/reflow advance this generation. Ordinary
+     * live-row edits, history admission and oldest-row eviction preserve it;
+     * use row identities/generations and [discardedCount] for those changes.
+     * A non-clearing buffer switch preserves each buffer's own generation.
+     * Compare for equality, and include source identity and buffer kind in keys.
+     *
+     * Readers without separate history tracking conservatively invalidate on
+     * every [contentGeneration] change.
+     */
+    val historyContentGeneration: Long
+        get() = contentGeneration
+
+    /**
      * Generation that changes when terminal-owned row mapping or shape changes.
      *
      * Resize, full reset, scrolling, buffer switches, and reflow should advance

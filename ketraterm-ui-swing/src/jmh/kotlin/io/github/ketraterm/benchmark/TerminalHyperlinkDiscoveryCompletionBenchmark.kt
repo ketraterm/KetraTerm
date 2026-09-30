@@ -102,9 +102,9 @@ open class TerminalHyperlinkDiscoveryCompletionBenchmark {
                     override val renderCache = cache
                     override val hyperlinkDetector =
                         object : SwingHyperlinkDetector {
-                            override val context = SwingHyperlinkDetectionContext.VIEWPORT
+                            override val context = SwingHyperlinkDetectionContext.ORDERED_CONTENT
 
-                            override fun detect(
+                            override suspend fun detect(
                                 request: SwingHyperlinkDetectionRequest,
                                 sink: SwingHyperlinkDetectionSink,
                             ) {
@@ -124,12 +124,14 @@ open class TerminalHyperlinkDiscoveryCompletionBenchmark {
                                                 true
                                             }
                                         sink.addHyperlink(
-                                            line,
-                                            start,
-                                            end,
-                                            action,
-                                            validationStartOffset = maxOf(0, start - 1),
-                                            validationEndOffset = minOf(text.length, end + 1),
+                                            request.hyperlink(
+                                                line,
+                                                start,
+                                                end,
+                                                action,
+                                                validationStartOffset = maxOf(0, start - 1),
+                                                validationEndOffset = minOf(text.length, end + 1),
+                                            ),
                                         )
                                         emittedLinks++
                                         start = text.indexOf("https://", end)
