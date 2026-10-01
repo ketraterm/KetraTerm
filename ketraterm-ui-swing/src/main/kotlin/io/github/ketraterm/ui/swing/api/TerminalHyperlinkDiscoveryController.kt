@@ -24,7 +24,7 @@ internal interface TerminalHyperlinkDiscoveryHost {
     val renderCache: TerminalRenderCache
     val hyperlinkDetector: SwingHyperlinkDetector
 
-    /** Bound source, or null when only explicitly supplied render frames are available. */
+    /** Bound content source; null means the terminal is unbound. */
     val hyperlinkSource: TerminalRenderFrameReader?
 
     /** Reconciles interaction state after asynchronously detected links have been installed. */
@@ -98,18 +98,29 @@ internal class TerminalHyperlinkDiscoveryController(
 
     fun scheduleForFrame() {
         val cache = host.renderCache
-        if (disposed || !cache.hasFrame) return
+        if (disposed) return
+        val source = host.hyperlinkSource
+        if (source == null) {
+            if (enabled) reset()
+            return
+        }
+        if (!cache.hasFrame) return
         var changed = !enabled || contentGeneration != cache.contentGeneration
         var sourceReplaced = false
         if (detector !== host.hyperlinkDetector || providerGeneration != host.hyperlinkDetector.configurationGeneration) {
+            val replaced = detector !== host.hyperlinkDetector
             if (ordered.analysisJob == null) detector.discardOrderedState()
             providerEpoch++
-            index.clear()
+            if (replaced) {
+                index.clear()
+                configurationJob?.cancel(CancellationException("Hyperlink provider replaced"))
+                configurationJob = null
+            } else {
+                index.refreshProvider(providerEpoch)
+            }
             detector = host.hyperlinkDetector
             providerGeneration = detector.configurationGeneration
             changed = true
-            configurationJob?.cancel(CancellationException("Hyperlink provider changed"))
-            configurationJob = null
             lanes.forEach { it.analysisJob?.cancel(CancellationException("Hyperlink provider changed")) }
         }
         if (sourceGeneration != cache.historyContentGeneration || sourceColumns != cache.columns || sourceBuffer != cache.activeBuffer) {
@@ -128,14 +139,13 @@ internal class TerminalHyperlinkDiscoveryController(
             host.hyperlinksChanged()
             return
         }
-        val projectionChanged = index.update(cache, detector.context, captureVisible = host.hyperlinkSource == null)
+        val projectionChanged = index.update(cache, detector.context)
         if (sourceReplaced) index.restartOrdered()
         if (configurationJob == null) {
             val changes = detector.configurationChanges
             configurationJob = scope.launch { changes.collect { scheduleForFrame() } }
         }
-        val source = host.hyperlinkSource
-        if (changed && source != null && previousLiveTop >= 0L) index.invalidateUnobservedEdits(source, cache, previousLiveTop)
+        if (changed && previousLiveTop >= 0L) index.invalidateUnobservedEdits(source, cache, previousLiveTop)
         previousLiveTop = cache.discardedCount + cache.historySize
         if (projectionChanged || changed) {
             if (index.writeOverlay(cache, repaintSpan)) host.hyperlinksChanged()
@@ -146,7 +156,7 @@ internal class TerminalHyperlinkDiscoveryController(
     /** Reconciles a returning binding/show/focus without needing output or a scroll event. */
     fun reconcile() {
         scheduleForFrame()
-        if (enabled && (lanes.any { index.hasPending(it.context) } || needsSourceScan())) requestAnalysis()
+        if (enabled && (lanes.any { usesLane(it) && index.hasPending(it.context) } || needsSourceScan())) requestAnalysis()
         host.hyperlinksChanged()
     }
 
@@ -164,7 +174,9 @@ internal class TerminalHyperlinkDiscoveryController(
 
     fun hyperlinkIdsFor(cache: TerminalRenderCache): IntArray = index.idsFor(cache)
 
-    val styles: TerminalHyperlinkActions get() = index.actions
+    val followedHyperlinkId: Int get() = index.actions.followedId
+
+    fun hyperlinkPresentationsFor(cache: TerminalRenderCache): Array<SwingHyperlinkPresentation?>? = index.presentationsFor(cache)
 
     fun hyperlinkIdAt(
         row: Int,
@@ -217,17 +229,19 @@ internal class TerminalHyperlinkDiscoveryController(
         cache: TerminalRenderCache,
     ): SwingHyperlink? = index.hyperlinkFor(hyperlinkId, cache)
 
-    private fun needsSourceScan(): Boolean = host.hyperlinkSource != null && !index.isSourceAnalyzed(host.renderCache.contentGeneration)
+    private fun needsSourceScan(): Boolean = !index.isSourceAnalyzed(host.renderCache.contentGeneration)
+
+    private fun usesLane(lane: AnalysisLane): Boolean =
+        detector.context == lane.context || detector.context == SwingHyperlinkDetectionContext.INDEPENDENT_AND_ORDERED
 
     private fun startAnalysis() {
         for (lane in lanes) {
-            if (detector.context == lane.context || detector.context == SwingHyperlinkDetectionContext.INDEPENDENT_AND_ORDERED) {
-                startAnalysis(lane)
-            }
+            if (usesLane(lane)) startAnalysis(lane)
         }
     }
 
     private fun startAnalysis(lane: AnalysisLane) {
+        val requestSource = host.hyperlinkSource ?: return
         val scansSource = lane === independent || detector.context == SwingHyperlinkDetectionContext.ORDERED_CONTENT
         if (lane === ordered && !scansSource && needsSourceScan()) return
         if (lane.analysisJob != null ||
@@ -246,7 +260,6 @@ internal class TerminalHyperlinkDiscoveryController(
         val requestDetector = detector
         val requestContext = lane.context
         val requestAnalysisEpoch = index.orderedEpoch
-        val requestSource = host.hyperlinkSource
         val scanner = lane.sourceScan ?: TerminalHyperlinkSourceScan().also { lane.sourceScan = it }
         var entered = false
         // Assign the slot before an immediate dispatcher can complete the coroutine.
@@ -260,7 +273,7 @@ internal class TerminalHyperlinkDiscoveryController(
                     if (!isCurrent(requestBindingEpoch, requestSourceEpoch, requestProviderEpoch)) return@launch
                     val cache = host.renderCache
                     val history = cache.historyContentGeneration
-                    if (scansSource && requestSource != null && needsSourceScan()) {
+                    if (scansSource && needsSourceScan()) {
                         val top = cache.discardedCount + cache.historySize - cache.scrollbackOffset
                         if (priorityTop != top) {
                             priorityTop = top
@@ -318,6 +331,12 @@ internal class TerminalHyperlinkDiscoveryController(
                         completed = true
                         return@launch
                     }
+                    var validationLines =
+                        if (lane === ordered) {
+                            index.orderedValidationLines(lines, cache.discardedCount + cache.historySize)
+                        } else {
+                            lines
+                        }
                     val request =
                         detectionRequest(
                             lines,
@@ -334,38 +353,46 @@ internal class TerminalHyperlinkDiscoveryController(
                         return@launch
                     }
                     if (!isCurrent(requestBindingEpoch, requestSourceEpoch, requestProviderEpoch)) return@launch
-                    var validSources: BooleanArray? = null
-                    if (requestSource != null) {
-                        val validation =
-                            withContext(analysisDispatcher) {
-                                scanner.validate(requestSource, lines, history)
-                            }
-                        if (!isCurrent(requestBindingEpoch, requestSourceEpoch, requestProviderEpoch)) return@launch
-                        var current = false
-                        requestSource.readRenderFrame { frame ->
-                            current = validation != null &&
-                                frame.contentGeneration == validation.contentGeneration &&
-                                frame.historyContentGeneration == history &&
-                                frame.activeBuffer == sourceBuffer &&
-                                frame.columns == sourceColumns
+                    if (lane === independent) validationLines = index.independentValidationLines(lines)
+                    val validSources: BooleanArray
+                    val validation =
+                        withContext(analysisDispatcher) {
+                            scanner.validate(requestSource, validationLines, history)
                         }
-                        if (!current) {
-                            index.invalidateSource(lines)
-                            publishOverlay()
-                            priorityTop = -1L
-                            recover = true
-                            return@launch
+                    if (!isCurrent(requestBindingEpoch, requestSourceEpoch, requestProviderEpoch)) return@launch
+                    var current = false
+                    requestSource.readRenderFrame { frame ->
+                        current = validation != null &&
+                            frame.contentGeneration == validation.contentGeneration &&
+                            frame.historyContentGeneration == history &&
+                            frame.activeBuffer == sourceBuffer &&
+                            frame.columns == sourceColumns
+                    }
+                    if (!current) {
+                        index.invalidateSource(validationLines)
+                        publishOverlay()
+                        priorityTop = -1L
+                        recover = true
+                        return@launch
+                    }
+                    val validLines = checkNotNull(validation).validLines
+                    if (lane === ordered && validLines.any { !it }) {
+                        index.invalidateSource(validationLines, validLines)
+                        publishOverlay()
+                        priorityTop = -1L
+                        recover = true
+                        return@launch
+                    }
+                    validSources =
+                        if (validationLines.size == lines.size) {
+                            validLines
+                        } else {
+                            validLines.copyOfRange(validationLines.size - lines.size, validLines.size)
                         }
-                        validSources = validation?.validLines
-                        if (lane === ordered && !index.isSourceAnalyzed(checkNotNull(validation).contentGeneration)) {
-                            recover = true
-                            return@launch
-                        }
-                        if (validSources?.any { !it } == true) {
-                            index.invalidateSource(lines, validSources)
-                            priorityTop = -1L
-                            recover = true
-                        }
+                    if (validSources.any { !it }) {
+                        index.invalidateSource(validationLines, validSources)
+                        priorityTop = -1L
+                        recover = true
                     }
                     // Configuration can change while the worker is running, before another UI frame.
                     if (requestDetector !== host.hyperlinkDetector || providerGeneration != requestDetector.configurationGeneration) {
@@ -426,17 +453,17 @@ internal class TerminalHyperlinkDiscoveryController(
         request: SwingHyperlinkDetectionRequest,
     ): List<SwingHyperlink>? =
         withContext(analysisDispatcher) {
-            val results = ArrayList<SwingHyperlink>()
-            try {
-                detector.detect(request) { results.add(it) }
-            } catch (cancelled: CancellationException) {
-                // A provider read may be interrupted while the binding itself remains active.
-                currentCoroutineContext().ensureActive()
-                return@withContext null
-            } catch (failure: Exception) {
-                LOGGER.log(System.Logger.Level.WARNING, "Hyperlink provider failed: {0}", failure.javaClass.name)
-                return@withContext null
-            }
+            val results =
+                try {
+                    detector.detect(request)
+                } catch (cancelled: CancellationException) {
+                    // A provider read may be interrupted while the binding itself remains active.
+                    currentCoroutineContext().ensureActive()
+                    return@withContext null
+                } catch (failure: Exception) {
+                    LOGGER.log(System.Logger.Level.WARNING, "Hyperlink provider failed: {0}", failure.javaClass.name)
+                    return@withContext null
+                }
             ensureActive()
             results
         }
@@ -506,64 +533,3 @@ internal fun detectionRequest(
         firstRetainedRow,
         LongArray(lines.size) { lines[it].firstLineId },
     )
-
-/** Resolves absolute logical coordinates against owned snapshots, outside the mutation lock. */
-internal class TerminalHyperlinkDetectionAccumulator(
-    private val lines: List<TerminalHyperlinkLineSnapshot>,
-) : SwingHyperlinkDetectionSink {
-    val links = List(lines.size) { ArrayList<TerminalDetectedHyperlink>() }
-
-    override fun addHyperlink(hyperlink: SwingHyperlink) {
-        val source = hyperlink.sourceRange
-        val dependency = hyperlink.dependencyRange
-        val first = lines.indexOfFirst { it.firstAbsoluteRow == source.start.absoluteRow }
-        val last = lines.indexOfFirst { it.firstAbsoluteRow == source.end.absoluteRow }
-        val dependencyFirst = lines.indexOfFirst { it.firstAbsoluteRow == dependency.start.absoluteRow }
-        val dependencyLast = lines.indexOfFirst { it.firstAbsoluteRow == dependency.end.absoluteRow }
-        val producer = lines.indexOfFirst { it.firstAbsoluteRow == hyperlink.consumedThrough.absoluteRow }
-        if (first < 0 || last < first || dependencyFirst < 0 || dependencyLast < dependencyFirst) return
-        if (producer < 0 || hyperlink.consumedThrough.offset > lines[producer].text.length) return
-        if (source.start.offset >= lines[first].text.length || source.end.offset > lines[last].text.length) return
-        if (dependency.start.offset > lines[dependencyFirst].text.length ||
-            dependency.end.offset > lines[dependencyLast].text.length
-        ) {
-            return
-        }
-        for (index in first..last) {
-            val start = if (index == first) source.start.offset else 0
-            val end = minOf(if (index == last) source.end.offset else lines[index].text.length, lines[index].text.length - 1)
-            if (start >= end) continue
-            val independent = dependencyFirst == index && dependencyLast == index
-            links[index] +=
-                TerminalDetectedHyperlink(
-                    start,
-                    end,
-                    hyperlink,
-                    if (independent) dependency.start.offset else 0,
-                    if (independent) dependency.end.offset else lines[index].text.length,
-                    viewportDependent = !independent,
-                )
-        }
-    }
-}
-
-internal class TerminalDetectedHyperlink(
-    val startOffset: Int,
-    val endOffset: Int,
-    val hyperlink: SwingHyperlink,
-    val validationStartOffset: Int,
-    val validationEndOffset: Int,
-    val viewportDependent: Boolean = false,
-) {
-    fun remainsValid(
-        previousText: String,
-        currentText: String,
-    ): Boolean =
-        validationEndOffset <= currentText.length &&
-            previousText.regionMatches(
-                validationStartOffset,
-                currentText,
-                validationStartOffset,
-                validationEndOffset - validationStartOffset,
-            )
-}

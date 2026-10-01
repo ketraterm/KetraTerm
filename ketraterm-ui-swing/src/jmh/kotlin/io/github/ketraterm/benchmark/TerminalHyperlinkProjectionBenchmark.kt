@@ -20,10 +20,7 @@ import io.github.ketraterm.render.api.TerminalRenderClusterDataSink
 import io.github.ketraterm.render.api.TerminalRenderClusterSink
 import io.github.ketraterm.render.api.TerminalRenderFrame
 import io.github.ketraterm.render.cache.TerminalRenderCache
-import io.github.ketraterm.ui.swing.api.SwingHyperlinkAction
-import io.github.ketraterm.ui.swing.api.TerminalHyperlinkDetectionAccumulator
-import io.github.ketraterm.ui.swing.api.TerminalHyperlinkIndex
-import io.github.ketraterm.ui.swing.api.detectionRequest
+import io.github.ketraterm.ui.swing.api.*
 import org.openjdk.jmh.annotations.*
 import java.lang.management.ManagementFactory
 import java.util.concurrent.TimeUnit
@@ -64,14 +61,18 @@ open class TerminalHyperlinkProjectionBenchmark {
         val full = TerminalRenderCache(columns, retainedRows).apply { accept(source) }
         index = TerminalHyperlinkIndex()
         index.update(full)
+        val builder = TerminalHyperlinkLineSnapshotBuilder()
+        for (row in 0 until retainedRows) {
+            index.ingest(
+                builder.snapshot(full, row, row + 1),
+                SwingHyperlinkDetectionContext.INDEPENDENT_LINE,
+            )
+        }
         while (index.needsAnalysis) {
             val lines = index.pendingLines()
             val request = detectionRequest(lines)
-            val sink = TerminalHyperlinkDetectionAccumulator(lines)
-            for (line in lines.indices) {
-                sink.addHyperlink(request.hyperlink(line, 0, URL.length, SwingHyperlinkAction.NONE, uri = URL))
-            }
-            index.accept(lines, sink.links)
+            val results = lines.indices.map { request.hyperlink(it, 0, URL.length, SwingHyperlinkAction.NONE, uri = URL) }
+            index.acceptResults(lines, results, SwingHyperlinkDetectionContext.INDEPENDENT_LINE, null)
         }
         frame = ScrollingFrame(source, rows)
         cache = TerminalRenderCache(columns, rows)

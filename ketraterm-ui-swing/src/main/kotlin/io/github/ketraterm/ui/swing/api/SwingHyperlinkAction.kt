@@ -19,12 +19,12 @@ import java.awt.event.MouseEvent
 import javax.swing.JComponent
 
 /**
- * Host-owned action for a hyperlink discovered from visible terminal text.
+ * Host-owned navigation and optional hover behavior for a discovered hyperlink.
  *
- * Reusable Swing UI stores only compact primitive ids in its paint and hit-test
- * paths. The host action is invoked only after explicit user activation, such
- * as Ctrl-left-click, and may route to an IDE, browser, file opener, or a
- * security prompt.
+ * Actions belong to retained occurrences independently of the viewport. Swing UI
+ * invokes activation and hover callbacks on the EDT, never during painting.
+ * [open] follows the occurrence's [SwingHyperlinkActivation] policy or an explicit
+ * context-menu request and may navigate through an IDE, browser, or file opener.
  */
 fun interface SwingHyperlinkAction {
     /**

@@ -8,6 +8,13 @@ behavior. The ordered implementation scope and gates live in the
 
 ## Captured agy output
 
+Correction from the October 1 regression investigation: the original sanitizer
+assigned every OSC 8 opening the same replacement ID without checking equality.
+The fixture alone therefore cannot establish original ID grouping. A fresh isolated
+capture subsequently confirmed the five URL fragments and caption do share an ID
+and destination in the installed agy. That protocol identity does not establish
+the desired visual hover grouping; the caption must remain separate.
+
 The [sanitized ConPTY capture](../../ketraterm-ui-swing/src/test/resources/hyperlinks/README.md)
 comes from a fresh signed-out instance of the locally installed agy executable,
 at **176×32**. It preserves all 7,502 bytes of layout and control structure,

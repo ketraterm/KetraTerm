@@ -17,7 +17,24 @@ package io.github.ketraterm.ui.swing.render
 
 import io.github.ketraterm.render.api.TerminalRenderAttrs
 import io.github.ketraterm.render.api.TerminalRenderCellFlags
+import io.github.ketraterm.ui.swing.api.SwingHyperlinkPresentation
+import io.github.ketraterm.ui.swing.api.SwingHyperlinkStyle
 import java.awt.Font
+
+/** Selects existing prepared metadata; painting never constructs a style. */
+@JvmSynthetic
+internal fun SwingHyperlinkPresentation.styleFor(
+    hovered: Boolean,
+    active: Boolean,
+    followed: Boolean,
+): SwingHyperlinkStyle? {
+    val base = if (followed) this.followed ?: normal else normal
+    return when {
+        hovered && active -> this.active ?: this.hovered ?: base
+        hovered -> this.hovered ?: base
+        else -> base
+    }
+}
 
 /** Artificial wrap padding has no link; authored spaces and wide trailing cells keep their identity. */
 internal fun hyperlinkIdForCell(

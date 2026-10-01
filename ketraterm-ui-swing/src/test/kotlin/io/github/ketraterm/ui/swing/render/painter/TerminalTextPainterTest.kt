@@ -17,6 +17,7 @@ package io.github.ketraterm.ui.swing.render.painter
 
 import io.github.ketraterm.render.api.*
 import io.github.ketraterm.render.cache.TerminalRenderCache
+import io.github.ketraterm.ui.swing.api.TerminalHyperlinkHover
 import io.github.ketraterm.ui.swing.render.*
 import io.github.ketraterm.ui.swing.render.cache.AwtColorCache
 import io.github.ketraterm.ui.swing.render.cache.TerminalShapedGlyphVectorCache
@@ -106,12 +107,11 @@ class TerminalTextPainterTest {
     fun `hover underline stays within its occurrence without an activation color override`(text: String) {
         val fixture = fixture()
         val cache = renderCache(TestRenderFrame.text(text))
-        cache.hyperlinkIds.fill(8)
-        cache.hyperlinkIds[1] = 7
+        cache.hyperlinkIds.fill(7)
         try {
             fixture.paintRow(
                 cache,
-                hoveredHyperlinkId = 7,
+                hoverProjection = hyperlinkHover(7, start = 1, end = 2),
             )
 
             val secondUnderlineY = fixture.metrics.underlineY + 1
@@ -1914,6 +1914,7 @@ class TerminalTextPainterTest {
             hoveredHyperlinkId: Int = 0,
             hyperlinkActivationHover: Boolean = false,
             hyperlinkActivationForeground: Int = 0xFF4DA3FF.toInt(),
+            hoverProjection: TerminalHyperlinkHover? = null,
         ) {
             g.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, settings.textAntialiasing)
             g.setRenderingHint(RenderingHints.KEY_FRACTIONALMETRICS, settings.fractionalMetrics)
@@ -1926,8 +1927,7 @@ class TerminalTextPainterTest {
                 fontRenderContext = g.fontRenderContext,
                 textBlinkVisible = textBlinkVisible,
                 hyperlinkIds = hyperlinkIds,
-                hoveredHyperlinkId = hoveredHyperlinkId,
-                hyperlinkActivationHover = hyperlinkActivationHover,
+                hyperlinkHover = hoverProjection ?: hyperlinkHover(hoveredHyperlinkId, hyperlinkActivationHover, row),
                 hyperlinkActivationForeground = hyperlinkActivationForeground,
             )
         }

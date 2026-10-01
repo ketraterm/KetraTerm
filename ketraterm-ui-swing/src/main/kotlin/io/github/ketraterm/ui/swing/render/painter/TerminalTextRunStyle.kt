@@ -19,11 +19,10 @@ import io.github.ketraterm.render.api.TerminalColorPalette
 import io.github.ketraterm.render.api.TerminalRenderAttrs
 import io.github.ketraterm.render.api.TerminalRenderUnderline
 import io.github.ketraterm.render.cache.TerminalRenderCache
-import io.github.ketraterm.ui.swing.api.TerminalHyperlinkActions
-import io.github.ketraterm.ui.swing.render.SwingColors
-import io.github.ketraterm.ui.swing.render.hyperlinkIdForCell
-import io.github.ketraterm.ui.swing.render.isTextHidden
-import io.github.ketraterm.ui.swing.render.terminalFontStyle
+import io.github.ketraterm.ui.swing.api.SwingHyperlinkPresentation
+import io.github.ketraterm.ui.swing.api.SwingHyperlinkStyle
+import io.github.ketraterm.ui.swing.api.TerminalHyperlinkHover
+import io.github.ketraterm.ui.swing.render.*
 
 /**
  * Reusable resolved style for one text run, shared by ASCII, complex-cell and shaped painters.
@@ -59,27 +58,31 @@ internal class TerminalTextRunStyle {
     private var decoration = 0L
     private var textBlinkVisible = true
     private var hyperlinkIds = IntArray(0)
-    private var hoveredHyperlinkId = 0
+    private var hyperlinkHover: TerminalHyperlinkHover? = null
+    private var row = 0
     private var activationHover = false
     private var activationForeground = 0
-    private var hyperlinkStyles: TerminalHyperlinkActions? = null
-    private var styleOffset = -1
-    private var styleFlags = 0
+    private var hyperlinkPresentations: Array<SwingHyperlinkPresentation?>? = null
+    private var followedHyperlinkId = 0
+    private var hyperlinkStyle: SwingHyperlinkStyle? = null
 
     fun configureRow(
         textBlinkVisible: Boolean,
         hyperlinkIds: IntArray,
-        hoveredHyperlinkId: Int,
-        hyperlinkActivationHover: Boolean,
+        hyperlinkHover: TerminalHyperlinkHover?,
         hyperlinkActivationForeground: Int,
-        hyperlinkStyles: TerminalHyperlinkActions? = null,
+        hyperlinkPresentations: Array<SwingHyperlinkPresentation?>? = null,
+        followedHyperlinkId: Int = 0,
+        row: Int = 0,
     ) {
         this.textBlinkVisible = textBlinkVisible
         this.hyperlinkIds = hyperlinkIds
-        this.hoveredHyperlinkId = hoveredHyperlinkId
-        activationHover = hyperlinkActivationHover
+        this.hyperlinkHover = hyperlinkHover
+        this.row = row
+        activationHover = hyperlinkHover?.activation == true
         activationForeground = hyperlinkActivationForeground
-        this.hyperlinkStyles = hyperlinkStyles
+        this.hyperlinkPresentations = hyperlinkPresentations
+        this.followedHyperlinkId = followedHyperlinkId
     }
 
     fun begin(
@@ -92,14 +95,16 @@ internal class TerminalTextRunStyle {
         attr = cache.attrWords[index]
         extraAttr = cache.extraAttrWords[index]
         hyperlinkId = hyperlinkIdForCell(hyperlinkIds[index], cache.flags[index])
-        hovered = isHovered(hyperlinkId)
-        styleOffset = hyperlinkStyles?.styleOffset(hyperlinkId, hovered, activationHover) ?: -1
-        styleFlags = if (styleOffset < 0) 0 else checkNotNull(hyperlinkStyles).flags(styleOffset)
+        hovered = hyperlinkHover?.isHovered(hyperlinkId, row, column) == true
+        hyperlinkStyle =
+            if (hyperlinkId < 0) {
+                hyperlinkPresentations?.get(index)?.styleFor(hovered, activationHover, hyperlinkId == followedHyperlinkId)
+            } else {
+                null
+            }
         foreground = effectiveForeground(palette, attr, cache.codeWords[index], hovered)
         hyperlinkUnderline =
-            if (styleFlags and TerminalHyperlinkActions.UNDERLINE_STYLE != 0) {
-                styleFlags ushr 8
-            } else {
+            hyperlinkStyle?.underlineStyle ?: run {
                 if (hovered) {
                     TerminalRenderUnderline.SINGLE
                 } else if (hyperlinkId >
@@ -110,22 +115,13 @@ internal class TerminalTextRunStyle {
                     TerminalRenderUnderline.NONE
                 }
             }
-        hyperlinkUnderlineColor =
-            if (styleFlags and TerminalHyperlinkActions.UNDERLINE_COLOR !=
-                0
-            ) {
-                checkNotNull(hyperlinkStyles).underlineColor(styleOffset)
-            } else {
-                foreground
-            }
+        hyperlinkUnderlineColor = hyperlinkStyle?.underlineArgb ?: foreground
         fontStyle = terminalFontStyle(attr)
         hyperlinkUnderlineThickness =
-            if (styleFlags and TerminalHyperlinkActions.UNDERLINE_STYLE == 0) {
+            if (hyperlinkStyle?.underlineStyle == null) {
                 if (hovered) 2 else 1
-            } else if (styleFlags and TerminalHyperlinkActions.BOLD_UNDERLINE != 0) {
-                2
             } else {
-                1
+                checkNotNull(hyperlinkStyle).underlineThickness
             }
         decoration = decorationKey(attr, extraAttr)
         textHidden = isTextHidden(attr, textBlinkVisible)
@@ -143,12 +139,11 @@ internal class TerminalTextRunStyle {
             isTextHidden(candidateAttr, textBlinkVisible) != textHidden ||
                 terminalFontStyle(candidateAttr) != fontStyle ||
                 decorationKey(candidateAttr, cache.extraAttrWords[index]) != decoration ||
-                hyperlinkIdForCell(hyperlinkIds[index], cache.flags[index]) != hyperlinkId
+                hyperlinkIdForCell(hyperlinkIds[index], cache.flags[index]) != hyperlinkId ||
+                (hyperlinkHover?.isHovered(hyperlinkId, row, column) == true) != hovered
         ) &&
             effectiveForeground(palette, candidateAttr, cache.codeWords[index], hovered) == foreground
     }
-
-    private fun isHovered(hyperlinkId: Int): Boolean = hyperlinkId != 0 && hyperlinkId == hoveredHyperlinkId
 
     private fun effectiveForeground(
         palette: TerminalColorPalette,
@@ -156,11 +151,20 @@ internal class TerminalTextRunStyle {
         codePoint: Int,
         hovered: Boolean,
     ): Int =
-        when {
-            styleFlags and TerminalHyperlinkActions.FOREGROUND != 0 -> checkNotNull(hyperlinkStyles).foreground(styleOffset)
-            hovered && activationHover && styleFlags == 0 -> activationForeground
-            else -> SwingColors.foreground(palette, attr, codePoint)
+        hyperlinkStyle?.foregroundArgb ?: if (hovered && activationHover && inheritsHyperlinkStyle()) {
+            activationForeground
+        } else {
+            SwingColors.foreground(palette, attr, codePoint)
         }
+
+    private fun inheritsHyperlinkStyle(): Boolean {
+        val style = hyperlinkStyle ?: return true
+        return style.foregroundArgb == null &&
+            style.backgroundArgb == null &&
+            style.underlineArgb == null &&
+            style.underlineStyle == null &&
+            style.underlineThickness == 1
+    }
 
     private fun decorationKey(
         attr: Long,

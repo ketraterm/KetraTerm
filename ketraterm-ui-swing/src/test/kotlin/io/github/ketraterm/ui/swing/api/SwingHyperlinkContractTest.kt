@@ -23,6 +23,61 @@ import org.junit.jupiter.api.Test
 
 class SwingHyperlinkContractTest {
     @Test
+    fun `prepared presentations follow replacement empty results resize and clearing`() {
+        val terminal = TerminalBuffers.create(width = 8, height = 2)
+        terminal.writeText("link")
+        val reader = terminal as TerminalRenderFrameReader
+        val cache = TerminalRenderCache(8, 2).apply { updateFrom(reader) }
+        val index = TerminalHyperlinkIndex()
+        index.ingestFullLines(cache)
+        val first = SwingHyperlinkPresentation(normal = SwingHyperlinkStyle(foregroundArgb = 0xff123456.toInt()))
+        val second = SwingHyperlinkPresentation(normal = SwingHyperlinkStyle(foregroundArgb = 0xff654321.toInt()))
+
+        fun publish(presentation: SwingHyperlinkPresentation?) {
+            val lines = index.pendingLines()
+            val results =
+                if (presentation == null) {
+                    emptyList()
+                } else {
+                    listOf(detectionRequest(lines).hyperlink(0, 0, 4, SwingHyperlinkAction.NONE, presentation = presentation))
+                }
+            index.acceptResults(lines, results, SwingHyperlinkDetectionContext.INDEPENDENT_LINE, null)
+            index.writeOverlay(cache) { _, _, _, _ -> }
+        }
+
+        publish(first)
+        val original = checkNotNull(index.presentationsFor(cache))
+        assertSame(first, original[0])
+        assertNull(original[4])
+        index.refreshProvider(1)
+        assertSame(first, index.presentationsFor(cache)?.get(0), "Pending discovery keeps prepared presentation")
+        publish(second)
+        assertSame(second, index.presentationsFor(cache)?.get(0))
+        assertTrue(original.all { it == null }, "Scratch projection must release retired presentation references")
+        index.refreshProvider(2)
+        publish(null)
+        assertTrue(checkNotNull(index.presentationsFor(cache)).all { it == null })
+        assertTrue(index.idsFor(cache).all { it == 0 })
+
+        terminal.resize(16, 3)
+        cache.updateFrom(reader)
+        index.ingestFullLines(cache)
+        publish(first)
+        assertSame(first, index.presentationsFor(cache)?.get(0))
+        assertTrue(checkNotNull(index.presentationsFor(cache)).size >= 48)
+        terminal.resize(6, 3)
+        cache.updateFrom(reader)
+        index.ingestFullLines(cache)
+        publish(second)
+        val finalProjection = checkNotNull(index.presentationsFor(cache))
+        assertSame(second, finalProjection[0])
+        assertTrue(finalProjection.drop(4).all { it == null }, "Shrinking the viewport must not retain hidden styles")
+        index.clear()
+        assertNull(index.presentationsFor(cache))
+        assertTrue(finalProjection.all { it == null })
+    }
+
+    @Test
     fun `backward results cross batches and empty producer replay removes every old span`() {
         val terminal = TerminalBuffers.create(width = 16, height = 3)
         for (text in listOf("first", "second", "producer")) {
@@ -35,7 +90,7 @@ class SwingHyperlinkContractTest {
         val cache = TerminalRenderCache(16, 3).apply { updateFrom(terminal as TerminalRenderFrameReader) }
         val index = TerminalHyperlinkIndex()
         val context = SwingHyperlinkDetectionContext.ORDERED_CONTENT
-        index.update(cache, context)
+        index.ingestFullLines(cache, context)
         val lines = index.pendingLines(context)
         index.acceptResults(lines.take(2), emptyList(), context, null)
         val source = SwingHyperlinkTextRange(SwingHyperlinkTextPosition(0, 1), SwingHyperlinkTextPosition(1, 3))
@@ -63,7 +118,7 @@ class SwingHyperlinkContractTest {
         val cache = TerminalRenderCache(16, 1).apply { updateFrom(terminal as TerminalRenderFrameReader) }
         cache.hyperlinkIds[3] = 42
         val index = TerminalHyperlinkIndex()
-        index.update(cache)
+        index.ingestFullLines(cache)
         val lines = index.pendingLines()
         val request = detectionRequest(lines)
 
@@ -99,6 +154,12 @@ class SwingHyperlinkContractTest {
         assertEquals("narrow", index.hyperlinkFor(ids[2], cache)?.uri)
         assertEquals(42, ids[3])
         assertEquals("narrow", index.hyperlinkFor(ids[4], cache)?.uri)
+        val presentations = checkNotNull(index.presentationsFor(cache))
+        for (cell in listOf(0, 1, 2, 4)) {
+            assertSame(index.hyperlinkFor(ids[cell], cache)?.presentation, presentations[cell])
+        }
+        assertNull(presentations[3], "OSC 8 retains its own terminal presentation")
+        assertNull(presentations[8])
     }
 
     @Test
@@ -120,8 +181,6 @@ class SwingHyperlinkContractTest {
         first.fill(0L)
         last.fill(0L)
         assertEquals("a\uD83D\uDE00b\n", request.lineText(0))
-        assertEquals(5, request.lineStartOffset(1))
-        assertEquals(10, request.lineEndOffset(1))
         assertEquals(40L, request.lineFirstAbsoluteRow(0))
         assertEquals(43L, request.lineLastAbsoluteRow(0))
         assertEquals(3L, request.bindingEpoch)
@@ -207,31 +266,135 @@ class SwingHyperlinkContractTest {
                 SwingHyperlinkTextPosition(2, request.lineText(2).length),
                 providerOrder = 7,
             )
-        val sink = TerminalHyperlinkDetectionAccumulator(lines)
-        sink.addHyperlink(result)
-        assertEquals(1, sink.links[0].size)
-        assertEquals(1, sink.links[1].size)
-        assertTrue(sink.links[2].isEmpty())
-        assertEquals(1, sink.links[0].single().startOffset)
-        assertEquals(5, sink.links[0].single().endOffset, "Trailing newline is not a highlighted cell")
-        assertEquals(3, sink.links[1].single().endOffset)
-        for (index in 0..1) {
-            val span = sink.links[index].single()
-            assertSame(result, span.hyperlink)
-            assertTrue(span.viewportDependent)
-            assertSame(style, span.hyperlink.presentation.normal)
-            assertEquals(7, span.hyperlink.providerOrder)
-        }
-        val size = sink.links.sumOf { it.size }
-        sink.addHyperlink(SwingHyperlink(request.range(0, 0, 0, 100), request.range(0, 0, 0, 100), SwingHyperlinkAction.NONE))
-        sink.addHyperlink(
-            SwingHyperlink(
-                SwingHyperlinkTextRange(SwingHyperlinkTextPosition(100, 0), SwingHyperlinkTextPosition(100, 3)),
-                SwingHyperlinkTextRange(SwingHyperlinkTextPosition(100, 0), SwingHyperlinkTextPosition(100, 3)),
-                SwingHyperlinkAction.NONE,
+        val index = TerminalHyperlinkIndex()
+        val context = SwingHyperlinkDetectionContext.ORDERED_CONTENT
+        index.update(cache, context)
+        for (line in lines) index.ingest(line, context)
+        index.acceptResults(
+            lines,
+            listOf(
+                result,
+                SwingHyperlink(request.range(0, 0, 0, 100), request.range(0, 0, 0, 100), SwingHyperlinkAction.NONE),
+                SwingHyperlink(
+                    SwingHyperlinkTextRange(SwingHyperlinkTextPosition(100, 0), SwingHyperlinkTextPosition(100, 3)),
+                    SwingHyperlinkTextRange(SwingHyperlinkTextPosition(100, 0), SwingHyperlinkTextPosition(100, 3)),
+                    SwingHyperlinkAction.NONE,
+                ),
             ),
+            context,
+            null,
         )
-        assertEquals(size, sink.links.sumOf { it.size }, "Invalid results must not partially mutate accumulated spans")
+        index.writeOverlay(cache) { _, _, _, _ -> }
+        val ids = index.idsFor(cache)
+        val id = ids[1]
+        assertTrue(id < 0)
+        assertEquals(0, ids[0], "Invalid results must not partially publish spans")
+        for (cell in 1 until 5) assertEquals(id, ids[cell])
+        assertEquals(0, ids[5], "Trailing newline is not a highlighted cell")
+        for (cell in 0 until 3) assertEquals(id, ids[cache.rowOffset(1) + cell])
+        assertEquals(0, ids[cache.rowOffset(1) + 3])
+        assertEquals(0, ids[cache.rowOffset(2)])
+        assertSame(result, index.hyperlinkFor(id, cache))
+        assertSame(style, index.hyperlinkFor(id, cache)?.presentation?.normal)
+        assertEquals(7, index.hyperlinkFor(id, cache)?.providerOrder)
+    }
+
+    @Test
+    fun `ordered dependency invalidation preserves independent readiness and unaffected actions`() {
+        val terminal = TerminalBuffers.create(width = 24, height = 2)
+        terminal.writeText("context")
+        terminal.carriageReturn()
+        terminal.newLine()
+        terminal.writeText("url target")
+        val reader = terminal as TerminalRenderFrameReader
+        val cache = TerminalRenderCache(24, 2).apply { updateFrom(reader) }
+        val index = TerminalHyperlinkIndex()
+        val context = SwingHyperlinkDetectionContext.INDEPENDENT_AND_ORDERED
+        index.ingestFullLines(cache, context)
+        val lines = index.pendingLines()
+        val request = detectionRequest(lines)
+        val independent = request.hyperlink(1, 0, 3, { true }, validationStartOffset = 0, validationEndOffset = 4)
+        index.acceptResults(lines, listOf(independent), SwingHyperlinkDetectionContext.INDEPENDENT_LINE, null)
+        val ordered = SwingHyperlink(request.range(1, 4, 1, 10), request.range(0, 0, 1, 11), { true })
+        index.acceptResults(lines, listOf(ordered), SwingHyperlinkDetectionContext.ORDERED_CONTENT, null)
+        index.writeOverlay(cache) { _, _, _, _ -> }
+        val independentId = index.idsFor(cache)[cache.rowOffset(1)]
+        assertFalse(index.hasPending(SwingHyperlinkDetectionContext.INDEPENDENT_LINE))
+        assertTrue(index.idsFor(cache)[cache.rowOffset(1) + 4] < 0)
+
+        terminal.positionCursor(0, 0)
+        terminal.writeText("changed")
+        cache.updateFrom(reader)
+        index.update(cache, context)
+        index.writeOverlay(cache) { _, _, _, _ -> }
+        assertEquals(listOf(0L), index.pendingLines().map { it.firstAbsoluteRow }, "Only the edited line needs independent discovery")
+        assertEquals(independentId, index.idsFor(cache)[cache.rowOffset(1)])
+        assertEquals(0, index.idsFor(cache)[cache.rowOffset(1) + 4], "The invalid ordered result must disappear immediately")
+        index.acceptResults(index.pendingLines(), emptyList(), SwingHyperlinkDetectionContext.INDEPENDENT_LINE, null)
+        assertFalse(index.hasPending(SwingHyperlinkDetectionContext.INDEPENDENT_LINE))
+        assertTrue(index.hasPending(SwingHyperlinkDetectionContext.ORDERED_CONTENT))
+    }
+
+    @Test
+    fun `independent results cannot reference retained lines outside their request`() {
+        val terminal = TerminalBuffers.create(width = 16, height = 2)
+        terminal.writeText("first")
+        terminal.carriageReturn()
+        terminal.newLine()
+        terminal.writeText("second")
+        val cache = TerminalRenderCache(16, 2).apply { updateFrom(terminal as TerminalRenderFrameReader) }
+        val index = TerminalHyperlinkIndex()
+        index.ingestFullLines(cache)
+        val lines = index.pendingLines()
+        val result =
+            SwingHyperlink(
+                SwingHyperlinkTextRange(SwingHyperlinkTextPosition(0, 0), SwingHyperlinkTextPosition(0, 5)),
+                SwingHyperlinkTextRange(SwingHyperlinkTextPosition(0, 0), SwingHyperlinkTextPosition(1, 7)),
+                { true },
+            )
+        index.acceptResults(lines.takeLast(1), listOf(result), SwingHyperlinkDetectionContext.INDEPENDENT_LINE, null)
+        index.writeOverlay(cache) { _, _, _, _ -> }
+        assertTrue(index.idsFor(cache).all { it == 0 })
+    }
+
+    @Test
+    fun `ordered range with unavailable interior source cannot publish a partial link`() {
+        val terminal = TerminalBuffers.create(width = 16, height = 3)
+        for (text in listOf("first", "missing", "last")) {
+            if (text != "first") {
+                terminal.carriageReturn()
+                terminal.newLine()
+            }
+            terminal.writeText(text)
+        }
+        val cache = TerminalRenderCache(16, 3).apply { updateFrom(terminal as TerminalRenderFrameReader) }
+        val builder = TerminalHyperlinkLineSnapshotBuilder()
+        val first = builder.snapshot(cache, 0, 1)
+        val last = builder.snapshot(cache, 2, 3)
+        val index = TerminalHyperlinkIndex()
+        val context = SwingHyperlinkDetectionContext.ORDERED_CONTENT
+        index.update(cache, context)
+        index.ingest(first, context)
+        index.ingest(last, context)
+        val range = SwingHyperlinkTextRange(SwingHyperlinkTextPosition(0, 0), SwingHyperlinkTextPosition(2, 4))
+        index.acceptResults(listOf(last), listOf(SwingHyperlink(range, range, { true })), context, null)
+        index.writeOverlay(cache) { _, _, _, _ -> }
+        assertTrue(index.idsFor(cache).all { it == 0 })
+    }
+
+    private fun TerminalHyperlinkIndex.ingestFullLines(
+        cache: TerminalRenderCache,
+        context: SwingHyperlinkDetectionContext = SwingHyperlinkDetectionContext.INDEPENDENT_LINE,
+    ) {
+        update(cache, context)
+        val builder = TerminalHyperlinkLineSnapshotBuilder()
+        var row = 0
+        while (row < cache.rows) {
+            var end = row + 1
+            while (end < cache.rows && cache.lineWrapped[end - 1]) end++
+            ingest(builder.snapshot(cache, row, end), context)
+            row = end
+        }
     }
 
     private fun SwingHyperlinkDetectionRequest.range(

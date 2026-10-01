@@ -36,6 +36,10 @@ open class TerminalHyperlinkHoverBenchmark {
     @JvmField
     var grid = "80x24"
 
+    @Param("detected", "osc8")
+    @JvmField
+    var linkKind = "detected"
+
     private lateinit var cache: TerminalRenderCache
     private lateinit var controller: TerminalHyperlinkController
     private lateinit var allocationBean: ThreadMXBean
@@ -47,9 +51,10 @@ open class TerminalHyperlinkHoverBenchmark {
     open fun setup() {
         val (columns, rows) = grid.split('x').map(String::toInt)
         cache = TerminalRenderCache(columns, rows)
+        val sign = if (linkKind == "osc8") 1 else -1
         for (index in cache.hyperlinkIds.indices) {
-            // Three groups separated by unlinked cells; negative IDs exercise the same occurrence contract.
-            cache.hyperlinkIds[index] = if (index % 4 == 3) 0 else -(index % 4 + 1)
+            // The OSC 8 variant also selects one connected occurrence among repeated destinations.
+            cache.hyperlinkIds[index] = if (index % 4 == 3) 0 else sign * (index % 4 + 1)
         }
         controller =
             TerminalHyperlinkController(

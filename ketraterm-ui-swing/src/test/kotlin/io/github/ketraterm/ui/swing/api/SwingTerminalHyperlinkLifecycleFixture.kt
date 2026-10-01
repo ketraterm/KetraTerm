@@ -17,17 +17,18 @@ package io.github.ketraterm.ui.swing.api
 
 import io.github.ketraterm.core.TerminalBuffers
 import io.github.ketraterm.session.TerminalSession
+import io.github.ketraterm.session.TerminalShellIntegrationFactory
+import io.github.ketraterm.session.TerminalShellIntegrationState
 import io.github.ketraterm.transport.TerminalConnector
 import io.github.ketraterm.transport.TerminalConnectorListener
-import io.github.ketraterm.ui.swing.settings.SwingPadding
-import io.github.ketraterm.ui.swing.settings.SwingSettings
-import io.github.ketraterm.ui.swing.settings.TerminalClipboardHandler
-import io.github.ketraterm.ui.swing.settings.TerminalHyperlinkHandler
+import io.github.ketraterm.ui.swing.settings.*
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.StandardTestDispatcher
 import java.awt.Point
 import java.awt.event.FocusEvent
+import java.awt.event.KeyEvent
 import java.awt.event.MouseEvent
+import java.awt.image.BufferedImage
 import java.util.concurrent.Callable
 import java.util.concurrent.FutureTask
 import java.util.concurrent.LinkedBlockingQueue
@@ -37,20 +38,25 @@ import javax.swing.SwingUtilities
 
 /** Real component lifecycle with queued UI handoffs; detector work never needs a timing assumption. */
 @OptIn(ExperimentalCoroutinesApi::class)
-internal class SwingTerminalHyperlinkLifecycleFixture : AutoCloseable {
+internal class SwingTerminalHyperlinkLifecycleFixture(
+    private val gutterWidth: Int = 0,
+    presentation: SwingHyperlinkPresentation = SwingHyperlinkPresentation(isVisible = true),
+    activation: SwingHyperlinkActivation = SwingHyperlinkActivation.DIRECT,
+) : AutoCloseable {
     private val worker = StandardTestDispatcher()
     private val uiTasks = LinkedBlockingQueue<Runnable>()
     private val detectorCalls = AtomicInteger()
     private val opened = ArrayList<String>()
     private var menuRequest: SwingTerminalContextMenuRequest? = null
     private var copiedText: String? = null
-    private var pointer: Point? = Point(1, 1)
+    private var pointer: Point? = Point(gutterWidth + 1, 1)
     private val session =
         TerminalSession.create(
             terminal = TerminalBuffers.create(width = 40, height = 2, maxHistory = 10),
             connector = NoOpConnector,
             workerDispatcher = worker,
             ioDispatcher = worker,
+            shellIntegration = if (gutterWidth == 0) null else TerminalShellIntegrationFactory.host(TerminalShellIntegrationState()),
         )
     private val container = onEdt { JPanel() }
     private val terminal =
@@ -62,7 +68,7 @@ internal class SwingTerminalHyperlinkLifecycleFixture : AutoCloseable {
                         rows = 2,
                         padding = SwingPadding(),
                         cursorBlinkMillis = 0,
-                        shellIntegrationDecorationGutterWidth = 0,
+                        shellIntegrationDecorationGutterWidth = gutterWidth,
                         smartSuggestionsEnabled = false,
                     )
                 },
@@ -70,13 +76,14 @@ internal class SwingTerminalHyperlinkLifecycleFixture : AutoCloseable {
                     SwingHostServices(
                         uiDispatcher = { uiTasks.add(it) },
                         hyperlinkHandler = TerminalHyperlinkHandler { opened.add(it) },
-                        hyperlinkDetector = { request, sink ->
+                        hyperlinkDetector = { request ->
                             check(!SwingUtilities.isEventDispatchThread())
                             detectorCalls.incrementAndGet()
+                            val results = ArrayList<SwingHyperlink>()
                             for (line in 0 until request.lineCount) {
                                 val start = request.lineText(line).indexOf(URL)
                                 if (start >= 0) {
-                                    sink.addHyperlink(
+                                    results.add(
                                         request.hyperlink(
                                             line,
                                             start,
@@ -86,12 +93,13 @@ internal class SwingTerminalHyperlinkLifecycleFixture : AutoCloseable {
                                                 opened.add(URL)
                                             },
                                             uri = URL,
-                                            presentation = SwingHyperlinkPresentation(isVisible = true),
-                                            activation = SwingHyperlinkActivation.DIRECT,
+                                            presentation = presentation,
+                                            activation = activation,
                                         ),
                                     )
                                 }
                             }
+                            results
                         },
                         contextMenuHandler = {
                             menuRequest = it
@@ -147,6 +155,56 @@ internal class SwingTerminalHyperlinkLifecycleFixture : AutoCloseable {
 
     fun cursorType(): Int = onEdt { terminal.cursor.type }
 
+    fun movePointer(
+        x: Int,
+        y: Int = 1,
+        modifiers: Int = 0,
+    ) = onEdt {
+        pointer = Point(x, y)
+        terminal.dispatchEvent(MouseEvent(terminal, MouseEvent.MOUSE_MOVED, 0L, modifiers, x, y, x, y, 0, false, MouseEvent.NOBUTTON))
+    }
+
+    fun keyModifier(
+        keyCode: Int,
+        pressed: Boolean,
+        modifiers: Int,
+    ) = onEdt {
+        val event =
+            KeyEvent(
+                terminal,
+                if (pressed) KeyEvent.KEY_PRESSED else KeyEvent.KEY_RELEASED,
+                0L,
+                modifiers,
+                keyCode,
+                KeyEvent.CHAR_UNDEFINED,
+            )
+        for (listener in terminal.keyListeners) {
+            if (pressed) listener.keyPressed(event) else listener.keyReleased(event)
+        }
+    }
+
+    fun firstRowUnderlinePixels(): IntArray =
+        onEdt {
+            val image = BufferedImage(terminal.width, terminal.height, BufferedImage.TYPE_INT_ARGB)
+            val graphics = image.createGraphics()
+            try {
+                terminal.paint(graphics)
+            } finally {
+                graphics.dispose()
+            }
+            val metrics = SwingMetrics.from(terminal.getFontMetrics(terminal.font))
+            image.getRGB(gutterWidth, metrics.underlineY, URL.length * metrics.cellWidth, 1, null, 0, URL.length * metrics.cellWidth)
+        }
+
+    fun setMouseReporting(enabled: Boolean) = writeOutput("\u001b[?1003" + if (enabled) "h" else "l")
+
+    fun markFirstRowAsPrompt() {
+        onEdt {
+            session.readRenderFrame { frame -> session.shellIntegrationState.recordPromptStart(frame.lineId(0)) }
+        }
+        settle()
+    }
+
     fun show(visible: Boolean) = onEdt { container.isVisible = visible }
 
     fun unbind() = onEdt { terminal.unbind() }
@@ -180,8 +238,10 @@ internal class SwingTerminalHyperlinkLifecycleFixture : AutoCloseable {
 
     fun copyCaptured(link: SwingTerminalContextHyperlink): String? = onEdt { if (link.copyUri()) copiedText else null }
 
-    fun replaceOutput(text: String) {
-        val bytes = ("\u001b[H\u001b[2J" + text).encodeToByteArray()
+    fun replaceOutput(text: String) = writeOutput("\u001b[H\u001b[2J" + text)
+
+    private fun writeOutput(text: String) {
+        val bytes = text.encodeToByteArray()
         session.onBytes(bytes, 0, bytes.size)
         requestFrame()
         settle()
@@ -220,7 +280,8 @@ internal class SwingTerminalHyperlinkLifecycleFixture : AutoCloseable {
 
     private fun contextHyperlink(): SwingTerminalContextHyperlink? {
         menuRequest = null
-        val event = MouseEvent(terminal, MouseEvent.MOUSE_PRESSED, 0L, 0, 1, 1, 1, 1, 1, true, MouseEvent.BUTTON3)
+        val event =
+            MouseEvent(terminal, MouseEvent.MOUSE_PRESSED, 0L, 0, gutterWidth + 1, 1, gutterWidth + 1, 1, 1, true, MouseEvent.BUTTON3)
         for (listener in terminal.mouseListeners) listener.mousePressed(event)
         return checkNotNull(menuRequest) { "The host did not receive the context-menu request" }.hyperlink
     }

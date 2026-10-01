@@ -41,6 +41,7 @@ class TerminalLibraryConsumerCompilationTest {
         "host,io.github.ketraterm.host.HostPolicy",
         "parser,io.github.ketraterm.parser.api.TerminalOutputParser",
         "completion,io.github.ketraterm.completion.api.TerminalCompletionCandidateKind",
+        "ui-swing,io.github.ketraterm.ui.swing.api.SwingTerminal",
     )
     fun `isolated consumer classpaths contain the requested library and Kotlin runtime`(
         module: String,
@@ -125,6 +126,30 @@ class TerminalLibraryConsumerCompilationTest {
             final class Consumer {
                 Object stream(TerminalCompletionEngine engine, TerminalCompletionRequest request) {
                     return engine.completions(request);
+                }
+            }
+            """.trimIndent(),
+        )
+    }
+
+    @Test
+    fun `Swing dependency exports session and flow types needed by host integration`() {
+        assertCompiles(
+            "ui-swing",
+            """
+            import io.github.ketraterm.session.TerminalSession;
+            import io.github.ketraterm.ui.swing.api.SwingHyperlinkDetector;
+            import io.github.ketraterm.ui.swing.api.SwingTerminal;
+            import kotlinx.coroutines.flow.Flow;
+            import kotlin.Unit;
+
+            final class Consumer {
+                void bind(SwingTerminal terminal, TerminalSession session) {
+                    terminal.bind(session);
+                }
+
+                Flow<Unit> changes(SwingHyperlinkDetector detector) {
+                    return detector.getConfigurationChanges();
                 }
             }
             """.trimIndent(),

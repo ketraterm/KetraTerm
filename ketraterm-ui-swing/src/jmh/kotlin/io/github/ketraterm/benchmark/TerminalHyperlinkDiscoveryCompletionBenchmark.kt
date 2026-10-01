@@ -16,6 +16,8 @@
 package io.github.ketraterm.benchmark
 
 import io.github.ketraterm.render.api.TerminalRenderFrame
+import io.github.ketraterm.render.api.TerminalRenderFrameConsumer
+import io.github.ketraterm.render.api.TerminalRenderFrameReader
 import io.github.ketraterm.render.cache.TerminalRenderCache
 import io.github.ketraterm.ui.swing.api.*
 import kotlinx.coroutines.CoroutineDispatcher
@@ -29,13 +31,13 @@ import javax.swing.SwingUtilities
 import kotlin.coroutines.CoroutineContext
 
 /**
- * One changed frame through EDT snapshotting, active viewport detection, and EDT publication.
+ * One changed source frame through bounded copying, ordered detection, validation and EDT publication.
  *
  * Scenarios encode columns, rows, and URLs per row without a Cartesian parameter expansion.
  * The last character of the last visible URL changes on each invocation. Completion requires
  * that URL's published action to open its new complete target; an invalidation notification
- * alone cannot finish the operation. The detector requests the same viewport context as
- * IntelliJ, but uses a deterministic token scan. Each result captures its own target string
+ * alone cannot finish the operation. The detector uses ordered content and a deterministic
+ * token scan. Each result captures its own target string
  * and action, whose construction is included. IntelliJ filters, read actions, and painting
  * are outside this measurement.
  *
@@ -72,10 +74,9 @@ open class TerminalHyperlinkDiscoveryCompletionBenchmark {
     private var publishedGeneration = 0L
     private val updateFrame =
         Runnable {
-            frame.generation++
-            expectedTarget = changedTargets[(frame.generation % changedTargets.size).toInt()]
+            expectedTarget = changedTargets[((frame.generation + 1) % changedTargets.size).toInt()]
+            frame.advance(changedColumn, expectedTarget.last().code)
             cache.accept(frame)
-            cache.codeWords[cache.rowOffset(cache.rows - 1) + changedColumn] = expectedTarget.last().code
             controller.scheduleForFrame()
         }
 
@@ -100,18 +101,16 @@ open class TerminalHyperlinkDiscoveryCompletionBenchmark {
             val host =
                 object : TerminalHyperlinkDiscoveryHost {
                     override val renderCache = cache
-                    override val hyperlinkSource = null
+                    override val hyperlinkSource = frame
                     override val hyperlinkDetector =
                         object : SwingHyperlinkDetector {
                             override val context = SwingHyperlinkDetectionContext.ORDERED_CONTENT
 
-                            override suspend fun detect(
-                                request: SwingHyperlinkDetectionRequest,
-                                sink: SwingHyperlinkDetectionSink,
-                            ) {
+                            override suspend fun detect(request: SwingHyperlinkDetectionRequest): List<SwingHyperlink> {
                                 check(!SwingUtilities.isEventDispatchThread())
                                 detectorCalls++
                                 detectedLines += request.lineCount
+                                val results = ArrayList<SwingHyperlink>()
                                 for (line in 0 until request.lineCount) {
                                     val text = request.lineText(line)
                                     var start = text.indexOf("https://")
@@ -124,7 +123,7 @@ open class TerminalHyperlinkDiscoveryCompletionBenchmark {
                                                 openedTarget = target
                                                 true
                                             }
-                                        sink.addHyperlink(
+                                        results.add(
                                             request.hyperlink(
                                                 line,
                                                 start,
@@ -138,6 +137,7 @@ open class TerminalHyperlinkDiscoveryCompletionBenchmark {
                                         start = text.indexOf("https://", end)
                                     }
                                 }
+                                return results
                             }
                         }
 
@@ -164,7 +164,7 @@ open class TerminalHyperlinkDiscoveryCompletionBenchmark {
             controller.scheduleForFrame()
         }
         awaitPublication()
-        check(detectorCalls == 1L && detectedLines == rows.toLong() && emittedLinks == expectedLinks.toLong())
+        check(detectedLines == rows.toLong() && emittedLinks == expectedLinks.toLong())
         SwingUtilities.invokeAndWait {
             for (row in 0 until rows) {
                 var start = lines[row].indexOf("https://")
@@ -221,12 +221,34 @@ open class TerminalHyperlinkDiscoveryCompletionBenchmark {
 
     private class UpdatingFrame(
         lines: List<String>,
-    ) : TerminalRenderFrame by TerminalRenderBenchmarkFrame(lines) {
+        private val cells: TerminalRenderBenchmarkFrame = TerminalRenderBenchmarkFrame(lines),
+    ) : TerminalRenderFrame by cells,
+        TerminalRenderFrameReader {
         var generation = 1L
+            private set
         override val frameGeneration: Long get() = generation
         override val contentGeneration: Long get() = generation
+        override val historyContentGeneration: Long get() = 1L
 
         override fun lineGeneration(row: Int): Long = if (row == rows - 1) generation else 1L
+
+        @Synchronized
+        fun advance(
+            column: Int,
+            codePoint: Int,
+        ) {
+            generation++
+            cells.setCodePoint(rows - 1, column, codePoint)
+        }
+
+        @Synchronized
+        override fun readRenderFrame(consumer: TerminalRenderFrameConsumer) = consumer.accept(this)
+
+        override fun readRenderFrameForAbsoluteRange(
+            startAbsoluteRow: Long,
+            endAbsoluteRow: Long,
+            consumer: TerminalRenderFrameConsumer,
+        ) = readRenderFrame(consumer)
     }
 
     private object EdtDispatcher : CoroutineDispatcher() {

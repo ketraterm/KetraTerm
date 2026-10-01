@@ -60,7 +60,7 @@ class SwingTerminalInputControllerTest {
 
             assertEquals(1, host.hostKeyPressCount)
             assertEquals(1, host.shellSuggestionKeyPressCount)
-            assertTrue(host.hyperlinkHoverUpdates.isEmpty())
+            assertEquals(listOf(hyperlinkNavigationModifierDown(event)), host.hyperlinkHoverUpdates)
             assertEquals(0, host.cursorBlinkResetCount)
             assertTrue(event.isConsumed)
         }
@@ -265,8 +265,8 @@ class SwingTerminalInputControllerTest {
         var shellSuggestionKeyPressCount = 0
         var invalidationCount = 0
 
-        override fun updateHyperlinkActivationHover(active: Boolean) {
-            hyperlinkHoverUpdates += active
+        override fun updatePointerModifiers(modifiers: Int) {
+            hyperlinkHoverUpdates += modifiers and hyperlinkNavigationModifierMask != 0
         }
 
         override fun resetCursorBlink() {

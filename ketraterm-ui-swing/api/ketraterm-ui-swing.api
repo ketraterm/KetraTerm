@@ -1,0 +1,284 @@
+public final class io/github/ketraterm/ui/swing/api/SwingHostServices {
+	public fun <init> ()V
+	public fun <init> (Lio/github/ketraterm/ui/swing/api/TerminalUiDispatcher;)V
+	public fun <init> (Lio/github/ketraterm/ui/swing/api/TerminalUiDispatcher;Lio/github/ketraterm/ui/swing/settings/TerminalClipboardHandler;)V
+	public fun <init> (Lio/github/ketraterm/ui/swing/api/TerminalUiDispatcher;Lio/github/ketraterm/ui/swing/settings/TerminalClipboardHandler;Lio/github/ketraterm/ui/swing/settings/TerminalHyperlinkHandler;)V
+	public fun <init> (Lio/github/ketraterm/ui/swing/api/TerminalUiDispatcher;Lio/github/ketraterm/ui/swing/settings/TerminalClipboardHandler;Lio/github/ketraterm/ui/swing/settings/TerminalHyperlinkHandler;Lio/github/ketraterm/ui/swing/api/SwingHyperlinkDetector;)V
+	public fun <init> (Lio/github/ketraterm/ui/swing/api/TerminalUiDispatcher;Lio/github/ketraterm/ui/swing/settings/TerminalClipboardHandler;Lio/github/ketraterm/ui/swing/settings/TerminalHyperlinkHandler;Lio/github/ketraterm/ui/swing/api/SwingHyperlinkDetector;Lio/github/ketraterm/ui/swing/api/TerminalViewportListener;)V
+	public fun <init> (Lio/github/ketraterm/ui/swing/api/TerminalUiDispatcher;Lio/github/ketraterm/ui/swing/settings/TerminalClipboardHandler;Lio/github/ketraterm/ui/swing/settings/TerminalHyperlinkHandler;Lio/github/ketraterm/ui/swing/api/SwingHyperlinkDetector;Lio/github/ketraterm/ui/swing/api/TerminalViewportListener;Z)V
+	public fun <init> (Lio/github/ketraterm/ui/swing/api/TerminalUiDispatcher;Lio/github/ketraterm/ui/swing/settings/TerminalClipboardHandler;Lio/github/ketraterm/ui/swing/settings/TerminalHyperlinkHandler;Lio/github/ketraterm/ui/swing/api/SwingHyperlinkDetector;Lio/github/ketraterm/ui/swing/api/TerminalViewportListener;ZLio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionProvider;)V
+	public fun <init> (Lio/github/ketraterm/ui/swing/api/TerminalUiDispatcher;Lio/github/ketraterm/ui/swing/settings/TerminalClipboardHandler;Lio/github/ketraterm/ui/swing/settings/TerminalHyperlinkHandler;Lio/github/ketraterm/ui/swing/api/SwingHyperlinkDetector;Lio/github/ketraterm/ui/swing/api/TerminalViewportListener;ZLio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionProvider;Lio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionHandler;)V
+	public fun <init> (Lio/github/ketraterm/ui/swing/api/TerminalUiDispatcher;Lio/github/ketraterm/ui/swing/settings/TerminalClipboardHandler;Lio/github/ketraterm/ui/swing/settings/TerminalHyperlinkHandler;Lio/github/ketraterm/ui/swing/api/SwingHyperlinkDetector;Lio/github/ketraterm/ui/swing/api/TerminalViewportListener;ZLio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionProvider;Lio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionHandler;Lio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionFeedbackHandler;)V
+	public fun <init> (Lio/github/ketraterm/ui/swing/api/TerminalUiDispatcher;Lio/github/ketraterm/ui/swing/settings/TerminalClipboardHandler;Lio/github/ketraterm/ui/swing/settings/TerminalHyperlinkHandler;Lio/github/ketraterm/ui/swing/api/SwingHyperlinkDetector;Lio/github/ketraterm/ui/swing/api/TerminalViewportListener;ZLio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionProvider;Lio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionHandler;Lio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionFeedbackHandler;Lio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionKeymap;)V
+	public fun <init> (Lio/github/ketraterm/ui/swing/api/TerminalUiDispatcher;Lio/github/ketraterm/ui/swing/settings/TerminalClipboardHandler;Lio/github/ketraterm/ui/swing/settings/TerminalHyperlinkHandler;Lio/github/ketraterm/ui/swing/api/SwingHyperlinkDetector;Lio/github/ketraterm/ui/swing/api/TerminalViewportListener;ZLio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionProvider;Lio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionHandler;Lio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionFeedbackHandler;Lio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionKeymap;Lio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionViewFactory;)V
+	public fun <init> (Lio/github/ketraterm/ui/swing/api/TerminalUiDispatcher;Lio/github/ketraterm/ui/swing/settings/TerminalClipboardHandler;Lio/github/ketraterm/ui/swing/settings/TerminalHyperlinkHandler;Lio/github/ketraterm/ui/swing/api/SwingHyperlinkDetector;Lio/github/ketraterm/ui/swing/api/TerminalViewportListener;ZLio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionProvider;Lio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionHandler;Lio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionFeedbackHandler;Lio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionKeymap;Lio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionViewFactory;Lio/github/ketraterm/ui/swing/api/SwingTerminalHostKeyHandler;)V
+	public fun <init> (Lio/github/ketraterm/ui/swing/api/TerminalUiDispatcher;Lio/github/ketraterm/ui/swing/settings/TerminalClipboardHandler;Lio/github/ketraterm/ui/swing/settings/TerminalHyperlinkHandler;Lio/github/ketraterm/ui/swing/api/SwingHyperlinkDetector;Lio/github/ketraterm/ui/swing/api/TerminalViewportListener;ZLio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionProvider;Lio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionHandler;Lio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionFeedbackHandler;Lio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionKeymap;Lio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionViewFactory;Lio/github/ketraterm/ui/swing/api/SwingTerminalHostKeyHandler;Lio/github/ketraterm/ui/swing/api/SwingTerminalContextMenuHandler;)V
+	public fun <init> (Lio/github/ketraterm/ui/swing/api/TerminalUiDispatcher;Lio/github/ketraterm/ui/swing/settings/TerminalClipboardHandler;Lio/github/ketraterm/ui/swing/settings/TerminalHyperlinkHandler;Lio/github/ketraterm/ui/swing/api/SwingHyperlinkDetector;Lio/github/ketraterm/ui/swing/api/TerminalViewportListener;ZLio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionProvider;Lio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionHandler;Lio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionFeedbackHandler;Lio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionKeymap;Lio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionViewFactory;Lio/github/ketraterm/ui/swing/api/SwingTerminalHostKeyHandler;Lio/github/ketraterm/ui/swing/api/SwingTerminalContextMenuHandler;Lio/github/ketraterm/ui/swing/api/TerminalFontResolver;)V
+	public synthetic fun <init> (Lio/github/ketraterm/ui/swing/api/TerminalUiDispatcher;Lio/github/ketraterm/ui/swing/settings/TerminalClipboardHandler;Lio/github/ketraterm/ui/swing/settings/TerminalHyperlinkHandler;Lio/github/ketraterm/ui/swing/api/SwingHyperlinkDetector;Lio/github/ketraterm/ui/swing/api/TerminalViewportListener;ZLio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionProvider;Lio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionHandler;Lio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionFeedbackHandler;Lio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionKeymap;Lio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionViewFactory;Lio/github/ketraterm/ui/swing/api/SwingTerminalHostKeyHandler;Lio/github/ketraterm/ui/swing/api/SwingTerminalContextMenuHandler;Lio/github/ketraterm/ui/swing/api/TerminalFontResolver;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Lio/github/ketraterm/ui/swing/api/TerminalUiDispatcher;
+	public final fun component10 ()Lio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionKeymap;
+	public final fun component11 ()Lio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionViewFactory;
+	public final fun component12 ()Lio/github/ketraterm/ui/swing/api/SwingTerminalHostKeyHandler;
+	public final fun component13 ()Lio/github/ketraterm/ui/swing/api/SwingTerminalContextMenuHandler;
+	public final fun component14 ()Lio/github/ketraterm/ui/swing/api/TerminalFontResolver;
+	public final fun component2 ()Lio/github/ketraterm/ui/swing/settings/TerminalClipboardHandler;
+	public final fun component3 ()Lio/github/ketraterm/ui/swing/settings/TerminalHyperlinkHandler;
+	public final fun component4 ()Lio/github/ketraterm/ui/swing/api/SwingHyperlinkDetector;
+	public final fun component5 ()Lio/github/ketraterm/ui/swing/api/TerminalViewportListener;
+	public final fun component6 ()Z
+	public final fun component7 ()Lio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionProvider;
+	public final fun component8 ()Lio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionHandler;
+	public final fun component9 ()Lio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionFeedbackHandler;
+	public final fun copy (Lio/github/ketraterm/ui/swing/api/TerminalUiDispatcher;Lio/github/ketraterm/ui/swing/settings/TerminalClipboardHandler;Lio/github/ketraterm/ui/swing/settings/TerminalHyperlinkHandler;Lio/github/ketraterm/ui/swing/api/SwingHyperlinkDetector;Lio/github/ketraterm/ui/swing/api/TerminalViewportListener;ZLio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionProvider;Lio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionHandler;Lio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionFeedbackHandler;Lio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionKeymap;Lio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionViewFactory;Lio/github/ketraterm/ui/swing/api/SwingTerminalHostKeyHandler;Lio/github/ketraterm/ui/swing/api/SwingTerminalContextMenuHandler;Lio/github/ketraterm/ui/swing/api/TerminalFontResolver;)Lio/github/ketraterm/ui/swing/api/SwingHostServices;
+	public static synthetic fun copy$default (Lio/github/ketraterm/ui/swing/api/SwingHostServices;Lio/github/ketraterm/ui/swing/api/TerminalUiDispatcher;Lio/github/ketraterm/ui/swing/settings/TerminalClipboardHandler;Lio/github/ketraterm/ui/swing/settings/TerminalHyperlinkHandler;Lio/github/ketraterm/ui/swing/api/SwingHyperlinkDetector;Lio/github/ketraterm/ui/swing/api/TerminalViewportListener;ZLio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionProvider;Lio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionHandler;Lio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionFeedbackHandler;Lio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionKeymap;Lio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionViewFactory;Lio/github/ketraterm/ui/swing/api/SwingTerminalHostKeyHandler;Lio/github/ketraterm/ui/swing/api/SwingTerminalContextMenuHandler;Lio/github/ketraterm/ui/swing/api/TerminalFontResolver;ILjava/lang/Object;)Lio/github/ketraterm/ui/swing/api/SwingHostServices;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getClipboardHandler ()Lio/github/ketraterm/ui/swing/settings/TerminalClipboardHandler;
+	public final fun getContextMenuHandler ()Lio/github/ketraterm/ui/swing/api/SwingTerminalContextMenuHandler;
+	public final fun getFontResolver ()Lio/github/ketraterm/ui/swing/api/TerminalFontResolver;
+	public final fun getHostKeyHandler ()Lio/github/ketraterm/ui/swing/api/SwingTerminalHostKeyHandler;
+	public final fun getHyperlinkDetector ()Lio/github/ketraterm/ui/swing/api/SwingHyperlinkDetector;
+	public final fun getHyperlinkHandler ()Lio/github/ketraterm/ui/swing/settings/TerminalHyperlinkHandler;
+	public final fun getScrollbarOverlayEnabled ()Z
+	public final fun getShellSuggestionFeedbackHandler ()Lio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionFeedbackHandler;
+	public final fun getShellSuggestionHandler ()Lio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionHandler;
+	public final fun getShellSuggestionKeymap ()Lio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionKeymap;
+	public final fun getShellSuggestionProvider ()Lio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionProvider;
+	public final fun getShellSuggestionViewFactory ()Lio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionViewFactory;
+	public final fun getUiDispatcher ()Lio/github/ketraterm/ui/swing/api/TerminalUiDispatcher;
+	public final fun getViewportListener ()Lio/github/ketraterm/ui/swing/api/TerminalViewportListener;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class io/github/ketraterm/ui/swing/api/SwingHyperlink {
+	public fun <init> (Lio/github/ketraterm/ui/swing/api/SwingHyperlinkTextRange;Lio/github/ketraterm/ui/swing/api/SwingHyperlinkTextRange;Lio/github/ketraterm/ui/swing/api/SwingHyperlinkAction;Ljava/lang/String;Lio/github/ketraterm/ui/swing/api/SwingHyperlinkPresentation;Lio/github/ketraterm/ui/swing/api/SwingHyperlinkActivation;Lio/github/ketraterm/ui/swing/api/SwingHyperlinkTextPosition;I)V
+	public synthetic fun <init> (Lio/github/ketraterm/ui/swing/api/SwingHyperlinkTextRange;Lio/github/ketraterm/ui/swing/api/SwingHyperlinkTextRange;Lio/github/ketraterm/ui/swing/api/SwingHyperlinkAction;Ljava/lang/String;Lio/github/ketraterm/ui/swing/api/SwingHyperlinkPresentation;Lio/github/ketraterm/ui/swing/api/SwingHyperlinkActivation;Lio/github/ketraterm/ui/swing/api/SwingHyperlinkTextPosition;IILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun getAction ()Lio/github/ketraterm/ui/swing/api/SwingHyperlinkAction;
+	public final fun getActivation ()Lio/github/ketraterm/ui/swing/api/SwingHyperlinkActivation;
+	public final fun getConsumedThrough ()Lio/github/ketraterm/ui/swing/api/SwingHyperlinkTextPosition;
+	public final fun getDependencyRange ()Lio/github/ketraterm/ui/swing/api/SwingHyperlinkTextRange;
+	public final fun getPresentation ()Lio/github/ketraterm/ui/swing/api/SwingHyperlinkPresentation;
+	public final fun getProviderOrder ()I
+	public final fun getSourceRange ()Lio/github/ketraterm/ui/swing/api/SwingHyperlinkTextRange;
+	public final fun getUri ()Ljava/lang/String;
+}
+
+public abstract interface class io/github/ketraterm/ui/swing/api/SwingHyperlinkAction {
+	public static final field Companion Lio/github/ketraterm/ui/swing/api/SwingHyperlinkAction$Companion;
+	public static final field NONE Lio/github/ketraterm/ui/swing/api/SwingHyperlinkAction;
+	public fun mouseEntered (Ljavax/swing/JComponent;IIII)V
+	public fun mouseExited ()V
+	public abstract fun open ()Z
+	public fun open (Ljava/awt/event/MouseEvent;)Z
+}
+
+public final class io/github/ketraterm/ui/swing/api/SwingHyperlinkAction$Companion {
+}
+
+public final class io/github/ketraterm/ui/swing/api/SwingHyperlinkAction$DefaultImpls {
+	public static fun mouseEntered (Lio/github/ketraterm/ui/swing/api/SwingHyperlinkAction;Ljavax/swing/JComponent;IIII)V
+	public static fun mouseExited (Lio/github/ketraterm/ui/swing/api/SwingHyperlinkAction;)V
+	public static fun open (Lio/github/ketraterm/ui/swing/api/SwingHyperlinkAction;Ljava/awt/event/MouseEvent;)Z
+}
+
+public final class io/github/ketraterm/ui/swing/api/SwingHyperlinkActivation : java/lang/Enum {
+	public static final field DIRECT Lio/github/ketraterm/ui/swing/api/SwingHyperlinkActivation;
+	public static final field MODIFIER Lio/github/ketraterm/ui/swing/api/SwingHyperlinkActivation;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public static fun valueOf (Ljava/lang/String;)Lio/github/ketraterm/ui/swing/api/SwingHyperlinkActivation;
+	public static fun values ()[Lio/github/ketraterm/ui/swing/api/SwingHyperlinkActivation;
+}
+
+public final class io/github/ketraterm/ui/swing/api/SwingHyperlinkDetectionContext : java/lang/Enum {
+	public static final field INDEPENDENT_AND_ORDERED Lio/github/ketraterm/ui/swing/api/SwingHyperlinkDetectionContext;
+	public static final field INDEPENDENT_LINE Lio/github/ketraterm/ui/swing/api/SwingHyperlinkDetectionContext;
+	public static final field ORDERED_CONTENT Lio/github/ketraterm/ui/swing/api/SwingHyperlinkDetectionContext;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public static fun valueOf (Ljava/lang/String;)Lio/github/ketraterm/ui/swing/api/SwingHyperlinkDetectionContext;
+	public static fun values ()[Lio/github/ketraterm/ui/swing/api/SwingHyperlinkDetectionContext;
+}
+
+public final class io/github/ketraterm/ui/swing/api/SwingHyperlinkDetectionRequest {
+	public fun <init> (Ljava/util/List;[J[JLio/github/ketraterm/ui/swing/api/SwingHyperlinkDetectionContext;JJJJJ[J)V
+	public synthetic fun <init> (Ljava/util/List;[J[JLio/github/ketraterm/ui/swing/api/SwingHyperlinkDetectionContext;JJJJJ[JILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun getAnalysisEpoch ()J
+	public final fun getBindingEpoch ()J
+	public final fun getContext ()Lio/github/ketraterm/ui/swing/api/SwingHyperlinkDetectionContext;
+	public final fun getFirstRetainedRow ()J
+	public final fun getLineCount ()I
+	public final fun getProviderEpoch ()J
+	public final fun getSourceEpoch ()J
+	public final fun hyperlink (IIILio/github/ketraterm/ui/swing/api/SwingHyperlinkAction;IILjava/lang/String;Lio/github/ketraterm/ui/swing/api/SwingHyperlinkPresentation;Lio/github/ketraterm/ui/swing/api/SwingHyperlinkActivation;)Lio/github/ketraterm/ui/swing/api/SwingHyperlink;
+	public static synthetic fun hyperlink$default (Lio/github/ketraterm/ui/swing/api/SwingHyperlinkDetectionRequest;IIILio/github/ketraterm/ui/swing/api/SwingHyperlinkAction;IILjava/lang/String;Lio/github/ketraterm/ui/swing/api/SwingHyperlinkPresentation;Lio/github/ketraterm/ui/swing/api/SwingHyperlinkActivation;ILjava/lang/Object;)Lio/github/ketraterm/ui/swing/api/SwingHyperlink;
+	public final fun lineFirstAbsoluteRow (I)J
+	public final fun lineFirstId (I)J
+	public final fun lineLastAbsoluteRow (I)J
+	public final fun lineText (I)Ljava/lang/String;
+	public final fun range (IIII)Lio/github/ketraterm/ui/swing/api/SwingHyperlinkTextRange;
+}
+
+public abstract interface class io/github/ketraterm/ui/swing/api/SwingHyperlinkDetector {
+	public static final field Companion Lio/github/ketraterm/ui/swing/api/SwingHyperlinkDetector$Companion;
+	public static final field NONE Lio/github/ketraterm/ui/swing/api/SwingHyperlinkDetector;
+	public abstract fun detect (Lio/github/ketraterm/ui/swing/api/SwingHyperlinkDetectionRequest;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public fun discardOrderedState ()V
+	public fun getConfigurationChanges ()Lkotlinx/coroutines/flow/Flow;
+	public fun getConfigurationGeneration ()J
+	public fun getContext ()Lio/github/ketraterm/ui/swing/api/SwingHyperlinkDetectionContext;
+}
+
+public final class io/github/ketraterm/ui/swing/api/SwingHyperlinkDetector$Companion {
+}
+
+public final class io/github/ketraterm/ui/swing/api/SwingHyperlinkDetector$DefaultImpls {
+	public static fun discardOrderedState (Lio/github/ketraterm/ui/swing/api/SwingHyperlinkDetector;)V
+	public static fun getConfigurationChanges (Lio/github/ketraterm/ui/swing/api/SwingHyperlinkDetector;)Lkotlinx/coroutines/flow/Flow;
+	public static fun getConfigurationGeneration (Lio/github/ketraterm/ui/swing/api/SwingHyperlinkDetector;)J
+	public static fun getContext (Lio/github/ketraterm/ui/swing/api/SwingHyperlinkDetector;)Lio/github/ketraterm/ui/swing/api/SwingHyperlinkDetectionContext;
+}
+
+public final class io/github/ketraterm/ui/swing/api/SwingHyperlinkPresentation {
+	public static final field Companion Lio/github/ketraterm/ui/swing/api/SwingHyperlinkPresentation$Companion;
+	public static final field DEFAULT Lio/github/ketraterm/ui/swing/api/SwingHyperlinkPresentation;
+	public fun <init> ()V
+	public fun <init> (Lio/github/ketraterm/ui/swing/api/SwingHyperlinkStyle;Lio/github/ketraterm/ui/swing/api/SwingHyperlinkStyle;Lio/github/ketraterm/ui/swing/api/SwingHyperlinkStyle;Lio/github/ketraterm/ui/swing/api/SwingHyperlinkStyle;Z)V
+	public synthetic fun <init> (Lio/github/ketraterm/ui/swing/api/SwingHyperlinkStyle;Lio/github/ketraterm/ui/swing/api/SwingHyperlinkStyle;Lio/github/ketraterm/ui/swing/api/SwingHyperlinkStyle;Lio/github/ketraterm/ui/swing/api/SwingHyperlinkStyle;ZILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Lio/github/ketraterm/ui/swing/api/SwingHyperlinkStyle;
+	public final fun component2 ()Lio/github/ketraterm/ui/swing/api/SwingHyperlinkStyle;
+	public final fun component3 ()Lio/github/ketraterm/ui/swing/api/SwingHyperlinkStyle;
+	public final fun component4 ()Lio/github/ketraterm/ui/swing/api/SwingHyperlinkStyle;
+	public final fun component5 ()Z
+	public final fun copy (Lio/github/ketraterm/ui/swing/api/SwingHyperlinkStyle;Lio/github/ketraterm/ui/swing/api/SwingHyperlinkStyle;Lio/github/ketraterm/ui/swing/api/SwingHyperlinkStyle;Lio/github/ketraterm/ui/swing/api/SwingHyperlinkStyle;Z)Lio/github/ketraterm/ui/swing/api/SwingHyperlinkPresentation;
+	public static synthetic fun copy$default (Lio/github/ketraterm/ui/swing/api/SwingHyperlinkPresentation;Lio/github/ketraterm/ui/swing/api/SwingHyperlinkStyle;Lio/github/ketraterm/ui/swing/api/SwingHyperlinkStyle;Lio/github/ketraterm/ui/swing/api/SwingHyperlinkStyle;Lio/github/ketraterm/ui/swing/api/SwingHyperlinkStyle;ZILjava/lang/Object;)Lio/github/ketraterm/ui/swing/api/SwingHyperlinkPresentation;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getActive ()Lio/github/ketraterm/ui/swing/api/SwingHyperlinkStyle;
+	public final fun getFollowed ()Lio/github/ketraterm/ui/swing/api/SwingHyperlinkStyle;
+	public final fun getHovered ()Lio/github/ketraterm/ui/swing/api/SwingHyperlinkStyle;
+	public final fun getNormal ()Lio/github/ketraterm/ui/swing/api/SwingHyperlinkStyle;
+	public fun hashCode ()I
+	public final fun isVisible ()Z
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class io/github/ketraterm/ui/swing/api/SwingHyperlinkPresentation$Companion {
+}
+
+public final class io/github/ketraterm/ui/swing/api/SwingHyperlinkStyle {
+	public fun <init> ()V
+	public fun <init> (Ljava/lang/Integer;Ljava/lang/Integer;Ljava/lang/Integer;Ljava/lang/Integer;I)V
+	public synthetic fun <init> (Ljava/lang/Integer;Ljava/lang/Integer;Ljava/lang/Integer;Ljava/lang/Integer;IILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Ljava/lang/Integer;
+	public final fun component2 ()Ljava/lang/Integer;
+	public final fun component3 ()Ljava/lang/Integer;
+	public final fun component4 ()Ljava/lang/Integer;
+	public final fun component5 ()I
+	public final fun copy (Ljava/lang/Integer;Ljava/lang/Integer;Ljava/lang/Integer;Ljava/lang/Integer;I)Lio/github/ketraterm/ui/swing/api/SwingHyperlinkStyle;
+	public static synthetic fun copy$default (Lio/github/ketraterm/ui/swing/api/SwingHyperlinkStyle;Ljava/lang/Integer;Ljava/lang/Integer;Ljava/lang/Integer;Ljava/lang/Integer;IILjava/lang/Object;)Lio/github/ketraterm/ui/swing/api/SwingHyperlinkStyle;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getBackgroundArgb ()Ljava/lang/Integer;
+	public final fun getForegroundArgb ()Ljava/lang/Integer;
+	public final fun getUnderlineArgb ()Ljava/lang/Integer;
+	public final fun getUnderlineStyle ()Ljava/lang/Integer;
+	public final fun getUnderlineThickness ()I
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class io/github/ketraterm/ui/swing/api/SwingHyperlinkTextPosition : java/lang/Comparable {
+	public fun <init> (JI)V
+	public fun compareTo (Lio/github/ketraterm/ui/swing/api/SwingHyperlinkTextPosition;)I
+	public synthetic fun compareTo (Ljava/lang/Object;)I
+	public final fun component1 ()J
+	public final fun component2 ()I
+	public final fun copy (JI)Lio/github/ketraterm/ui/swing/api/SwingHyperlinkTextPosition;
+	public static synthetic fun copy$default (Lio/github/ketraterm/ui/swing/api/SwingHyperlinkTextPosition;JIILjava/lang/Object;)Lio/github/ketraterm/ui/swing/api/SwingHyperlinkTextPosition;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getAbsoluteRow ()J
+	public final fun getOffset ()I
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class io/github/ketraterm/ui/swing/api/SwingHyperlinkTextRange {
+	public fun <init> (Lio/github/ketraterm/ui/swing/api/SwingHyperlinkTextPosition;Lio/github/ketraterm/ui/swing/api/SwingHyperlinkTextPosition;)V
+	public final fun component1 ()Lio/github/ketraterm/ui/swing/api/SwingHyperlinkTextPosition;
+	public final fun component2 ()Lio/github/ketraterm/ui/swing/api/SwingHyperlinkTextPosition;
+	public final fun contains (Lio/github/ketraterm/ui/swing/api/SwingHyperlinkTextRange;)Z
+	public final fun copy (Lio/github/ketraterm/ui/swing/api/SwingHyperlinkTextPosition;Lio/github/ketraterm/ui/swing/api/SwingHyperlinkTextPosition;)Lio/github/ketraterm/ui/swing/api/SwingHyperlinkTextRange;
+	public static synthetic fun copy$default (Lio/github/ketraterm/ui/swing/api/SwingHyperlinkTextRange;Lio/github/ketraterm/ui/swing/api/SwingHyperlinkTextPosition;Lio/github/ketraterm/ui/swing/api/SwingHyperlinkTextPosition;ILjava/lang/Object;)Lio/github/ketraterm/ui/swing/api/SwingHyperlinkTextRange;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getEnd ()Lio/github/ketraterm/ui/swing/api/SwingHyperlinkTextPosition;
+	public final fun getStart ()Lio/github/ketraterm/ui/swing/api/SwingHyperlinkTextPosition;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class io/github/ketraterm/ui/swing/api/SwingTerminal : javax/swing/JComponent, io/github/ketraterm/ui/swing/api/SwingScrollbarScroller {
+	public fun <init> (Lio/github/ketraterm/ui/swing/settings/SwingSettingsProvider;)V
+	public fun <init> (Lio/github/ketraterm/ui/swing/settings/SwingSettingsProvider;Lio/github/ketraterm/ui/swing/api/SwingHostServices;)V
+	public synthetic fun <init> (Lio/github/ketraterm/ui/swing/settings/SwingSettingsProvider;Lio/github/ketraterm/ui/swing/api/SwingHostServices;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun addNotify ()V
+	public final fun addShellSuggestionEligibilityListener (Lio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionEligibilityListener;)V
+	public final fun addShellSuggestionInvalidationListener (Lio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionInvalidationListener;)V
+	public final fun bind (Lio/github/ketraterm/session/TerminalSession;)V
+	public final fun clearScreen ()Z
+	public final fun clearSearch ()V
+	public final fun commandOutputText (I)Ljava/lang/String;
+	public final fun commandRecordAt (II)I
+	public final fun copyCommandOutputToClipboard (I)Z
+	public final fun copyCommandTextToClipboard (I)Z
+	public final fun copySelectionToClipboard ()Z
+	public final fun copyTextToClipboard (Ljava/lang/String;)Z
+	public final fun currentSearchState ()Lio/github/ketraterm/ui/swing/search/TerminalSearchState;
+	public final fun currentSelection ()Lio/github/ketraterm/ui/swing/api/CellSelection;
+	public final fun currentShellSuggestionState ()Lio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionState;
+	public final fun dispose ()V
+	public fun doLayout ()V
+	public final fun getSearchState ()Lkotlinx/coroutines/flow/StateFlow;
+	public final fun hideShellSuggestions ()V
+	public final fun isAutomaticShellSuggestionEligible ()Z
+	public final fun pasteClipboardText ()Z
+	public final fun preferredGridSize (II)Ljava/awt/Dimension;
+	public final fun preferredGridSize (IILio/github/ketraterm/render/api/TerminalRenderBufferKind;)Ljava/awt/Dimension;
+	public static synthetic fun preferredGridSize$default (Lio/github/ketraterm/ui/swing/api/SwingTerminal;IILio/github/ketraterm/render/api/TerminalRenderBufferKind;ILjava/lang/Object;)Ljava/awt/Dimension;
+	public final fun reloadSettings ()V
+	public fun removeNotify ()V
+	public final fun removeShellSuggestionEligibilityListener (Lio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionEligibilityListener;)V
+	public final fun removeShellSuggestionInvalidationListener (Lio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionInvalidationListener;)V
+	public final fun requestActiveShellSuggestions ()V
+	public final fun requestActiveShellSuggestions (Lio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionTrigger;)V
+	public static synthetic fun requestActiveShellSuggestions$default (Lio/github/ketraterm/ui/swing/api/SwingTerminal;Lio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionTrigger;ILjava/lang/Object;)V
+	public final fun requestShellSuggestions (Ljava/lang/String;III)V
+	public final fun requestShellSuggestions (Ljava/lang/String;IIILio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionTrigger;)V
+	public static synthetic fun requestShellSuggestions$default (Lio/github/ketraterm/ui/swing/api/SwingTerminal;Ljava/lang/String;IIILio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionTrigger;ILjava/lang/Object;)V
+	public fun scrollFromScrollbar (IZ)V
+	public final fun scrollToLiveViewport ()V
+	public final fun scrollToNextCommand ()V
+	public final fun scrollToPreviousCommand ()V
+	public final fun scrollToScrollbackOffset (I)V
+	public final fun scrollViewportBy (D)V
+	public final fun search (Ljava/lang/String;)V
+	public final fun selectAll ()Z
+	public final fun selectCommandOutput (I)Z
+	public final fun selectCommandOutputAt (II)Z
+	public final fun selectNextSearchResult ()V
+	public final fun selectPreviousSearchResult ()V
+	public final fun setSearchCaseSensitive (Z)V
+	public final fun showShellSuggestions (Lio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionRequest;Ljava/util/List;)V
+	public final fun showShellSuggestions (Lio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionRequest;Ljava/util/List;I)V
+	public static synthetic fun showShellSuggestions$default (Lio/github/ketraterm/ui/swing/api/SwingTerminal;Lio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionRequest;Ljava/util/List;IILjava/lang/Object;)V
+	public final fun showVisualBell ()V
+	public final fun unbind ()V
+	public final fun viewportState ()Lio/github/ketraterm/ui/swing/api/TerminalViewportState;
+	public final fun visibleGridSize ()Ljava/awt/Dimension;
+}
+
+public abstract interface class io/github/ketraterm/ui/swing/api/TerminalUiDispatcher {
+	public static final field Companion Lio/github/ketraterm/ui/swing/api/TerminalUiDispatcher$Companion;
+	public static final field SWING Lio/github/ketraterm/ui/swing/api/TerminalUiDispatcher;
+	public abstract fun dispatch (Ljava/lang/Runnable;)V
+}
+
+public final class io/github/ketraterm/ui/swing/api/TerminalUiDispatcher$Companion {
+}
+

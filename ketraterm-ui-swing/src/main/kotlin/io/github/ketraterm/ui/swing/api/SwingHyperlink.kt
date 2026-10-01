@@ -57,7 +57,14 @@ data class SwingHyperlinkStyle(
     }
 }
 
-/** Prepared provider styles; theme/framework lookup must happen before construction, never in paint. */
+/**
+ * Prepared provider styles; theme/framework lookup happens before construction, never in paint.
+ *
+ * Without an explicit [hovered] style, hovering preserves [normal], or [followed]
+ * for the last activated occurrence. [active] applies while hovered and eligible
+ * for activation; when absent it uses [hovered] with the same fallback.
+ * A missing [followed] style inherits [normal].
+ */
 data class SwingHyperlinkPresentation(
     val normal: SwingHyperlinkStyle? = null,
     val hovered: SwingHyperlinkStyle? = null,

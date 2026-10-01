@@ -24,7 +24,7 @@ import kotlinx.coroutines.flow.emptyFlow
  * The binding owner serializes calls within each context and owns their cancellation.
  * A detector declaring both contexts must permit concurrent independent and ordered calls.
  * Implementations may suspend and allocate bounded discovery results, acquire
- * host-read access, and report to the request-confined sink. They must propagate
+ * host-read access, and return owned results. They must propagate
  * cancellation, discard any tainted ordered state, and never touch Swing state.
  * [configurationGeneration] changes when provider configuration becomes stale.
  */
@@ -32,10 +32,22 @@ fun interface SwingHyperlinkDetector {
     /** Fixed dependency discipline for this detector instance. */
     val context: SwingHyperlinkDetectionContext get() = SwingHyperlinkDetectionContext.INDEPENDENT_LINE
 
-    /** Equality-only provider invalidation generation; the owner also tracks instance identity. */
+    /**
+     * Equality-only configuration generation. Publish changed configuration and a distinct generation
+     * before emitting [configurationChanges]; a notification with the same generation does not invalidate
+     * results. Without a notification, the owner observes the generation on its next reconciliation.
+     *
+     * The owner reanalyzes retained text in bounded batches, keeping prepared links until each replacement
+     * is ready. A different detector instance retires previous results immediately; use instance replacement
+     * when old actions must not remain usable.
+     */
     val configurationGeneration: Long get() = 0L
 
-    /** Binding-owned subscription for provider/index/theme changes even without terminal output. */
+    /**
+     * Reconciliation notifications for provider/index/theme changes without terminal output.
+     * The binding owns collection and cancellation. Publish [configurationGeneration] before emitting;
+     * this signal alone does not invalidate results when the generation and detector instance are unchanged.
+     */
     val configurationChanges: Flow<Unit> get() = emptyFlow()
 
     /**
@@ -46,19 +58,17 @@ fun interface SwingHyperlinkDetector {
     fun discardOrderedState() = Unit
 
     /**
-     * Reports one request's results. Return means successful completion, including
-     * an empty result; failure/cancellation must throw and cannot mean empty success.
-     * The sink belongs to this call and must not be retained or used by detached work.
+     * Returns one request's completed results. An empty list means successful detection
+     * with no links; failure/cancellation must throw and cannot mean empty success.
+     * The returned list and its results must not be mutated after return.
+     * Unknown/out-of-bounds source coordinates are ignored by the owner.
      * Ordered state is valid only within the request's binding/source/provider/analysis epochs.
      */
-    suspend fun detect(
-        request: SwingHyperlinkDetectionRequest,
-        sink: SwingHyperlinkDetectionSink,
-    )
+    suspend fun detect(request: SwingHyperlinkDetectionRequest): List<SwingHyperlink>
 
     companion object {
         /** Successful detector with no results. */
-        @JvmField val NONE = SwingHyperlinkDetector { _, _ -> }
+        @JvmField val NONE = SwingHyperlinkDetector { emptyList() }
     }
 }
 
@@ -82,8 +92,8 @@ enum class SwingHyperlinkDetectionContext {
  * Owned immutable logical text and absolute row anchors for one discovery batch.
  *
  * Soft-wrapped physical rows form a logical line, with one appended newline.
- * UTF-16 cumulative offsets are local to this request (checked against overflow),
- * while absolute row anchors survive append/eviction within a source epoch.
+ * UTF-16 offsets are local to each logical line, while absolute row anchors
+ * survive append/eviction within a source epoch.
  * The arrays/list are defensively copied. Empty requests are valid.
  * Binding epochs separate resets/rebindings; source epochs separate replacement,
  * reflow and buffer changes; provider epochs separate configuration/instance changes.
@@ -106,21 +116,15 @@ class SwingHyperlinkDetectionRequest(
     private val firstRows = firstAbsoluteRows.copyOf()
     private val lastRows = lastAbsoluteRows.copyOf()
     private val lineIds = firstLineIds.copyOf()
-    private val starts = IntArray(lines.size)
-    private val ends = IntArray(lines.size)
 
     init {
         require(firstRows.size == lines.size && lastRows.size == lines.size && lineIds.size == lines.size)
         require(context != SwingHyperlinkDetectionContext.INDEPENDENT_AND_ORDERED)
         require(firstRetainedRow >= 0)
-        var offset = 0
         for (index in lines.indices) {
             require(lines[index].endsWith('\n'))
             require(firstRows[index] >= 0 && lastRows[index] >= firstRows[index])
             require(index == 0 || firstRows[index] > lastRows[index - 1])
-            starts[index] = offset
-            offset = Math.addExact(offset, lines[index].length)
-            ends[index] = offset
         }
     }
 
@@ -129,12 +133,6 @@ class SwingHyperlinkDetectionRequest(
 
     /** Logical text, including the trailing newline. */
     fun lineText(index: Int): String = lines[index]
-
-    /** Inclusive cumulative UTF-16 start within this batch. */
-    fun lineStartOffset(index: Int): Int = starts[index]
-
-    /** Exclusive cumulative UTF-16 end within this batch. */
-    fun lineEndOffset(index: Int): Int = ends[index]
 
     /** First physical row of the logical line, in this source epoch's absolute coordinates. */
     fun lineFirstAbsoluteRow(index: Int): Long = firstRows[index]
@@ -184,10 +182,4 @@ class SwingHyperlinkDetectionRequest(
             }
         return SwingHyperlink(source, dependency, action, uri, presentation, activation)
     }
-}
-
-/** Request-confined receiver; results can highlight earlier retained source lines. */
-fun interface SwingHyperlinkDetectionSink {
-    /** Reports an owned result. Unknown/out-of-bounds source coordinates are ignored by the owner. */
-    fun addHyperlink(hyperlink: SwingHyperlink)
 }

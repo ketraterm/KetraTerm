@@ -15,11 +15,136 @@
  */
 package io.github.ketraterm.ui.swing.api
 
+import io.github.ketraterm.render.api.TerminalRenderUnderline
+import io.github.ketraterm.ui.swing.input.hyperlinkNavigationModifierMask
 import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.Test
+import org.junit.jupiter.params.ParameterizedTest
+import org.junit.jupiter.params.provider.ValueSource
 import java.awt.Cursor
+import java.awt.event.InputEvent
+import java.awt.event.KeyEvent
 
 class SwingTerminalHyperlinkLifecycleTest {
+    @ParameterizedTest
+    @ValueSource(booleans = [false, true])
+    fun `consecutive mouse moves within a prepared link preserve the hand cursor`(osc8: Boolean) {
+        SwingTerminalHyperlinkLifecycleFixture().use { fixture ->
+            fixture.awaitHyperlink()
+            if (osc8) {
+                fixture.replaceOutput("\u001b]8;id=cursor;https://example.com/osc8\u0007OSC8 link\u001b]8;;\u0007")
+            }
+            fixture.movePointer(400)
+            assertEquals(Cursor.DEFAULT_CURSOR, fixture.cursorType())
+            for (modifiers in listOf(0, hyperlinkNavigationModifierMask)) {
+                for (x in 1..4) {
+                    fixture.movePointer(x, modifiers = modifiers)
+                    assertEquals(Cursor.HAND_CURSOR, fixture.cursorType(), "Move $x within the same prepared occurrence")
+                }
+            }
+            fixture.movePointer(400)
+            assertEquals(Cursor.DEFAULT_CURSOR, fixture.cursorType())
+        }
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = [false, true])
+    fun `mouse reporting reconciles stationary links and preserves Shift override`(osc8: Boolean) {
+        SwingTerminalHyperlinkLifecycleFixture().use { fixture ->
+            fixture.awaitHyperlink()
+            if (osc8) fixture.replaceOutput("\u001b]8;id=cursor;https://example.com/osc8\u0007OSC8 link\u001b]8;;\u0007")
+            fixture.movePointer(1)
+            assertEquals(Cursor.HAND_CURSOR, fixture.cursorType())
+            fixture.setMouseReporting(true)
+            assertEquals(Cursor.DEFAULT_CURSOR, fixture.cursorType(), "Mode changes suppress a stationary hyperlink")
+            fixture.focus(false)
+            fixture.focus(true)
+            assertEquals(Cursor.DEFAULT_CURSOR, fixture.cursorType(), "Focus return respects application mouse reporting")
+            fixture.keyModifier(KeyEvent.VK_SHIFT, pressed = true, modifiers = InputEvent.SHIFT_DOWN_MASK)
+            assertEquals(Cursor.HAND_CURSOR, fixture.cursorType(), "Shift restores UI interaction without pointer motion")
+            fixture.movePointer(2, modifiers = InputEvent.SHIFT_DOWN_MASK)
+            fixture.requestFrame()
+            fixture.settle()
+            assertEquals(Cursor.HAND_CURSOR, fixture.cursorType(), "Frames preserve the remembered Shift override")
+            fixture.keyModifier(KeyEvent.VK_SHIFT, pressed = false, modifiers = 0)
+            assertEquals(Cursor.DEFAULT_CURSOR, fixture.cursorType())
+            fixture.movePointer(3)
+            assertEquals(Cursor.DEFAULT_CURSOR, fixture.cursorType())
+            fixture.setMouseReporting(false)
+            assertEquals(Cursor.HAND_CURSOR, fixture.cursorType(), "Disabling reporting restores the latest pointer position")
+        }
+    }
+
+    @Test
+    fun `implicit detected link paints ordinary hover and modifier activation across its whole occurrence`() {
+        val hoverColor = 0xff668877.toInt()
+        val activeColor = 0xffff00ff.toInt()
+        val presentation =
+            SwingHyperlinkPresentation(
+                normal = SwingHyperlinkStyle(underlineStyle = TerminalRenderUnderline.NONE),
+                hovered = SwingHyperlinkStyle(underlineArgb = hoverColor, underlineStyle = TerminalRenderUnderline.SINGLE),
+                active = SwingHyperlinkStyle(underlineArgb = activeColor, underlineStyle = TerminalRenderUnderline.SINGLE),
+            )
+        SwingTerminalHyperlinkLifecycleFixture(presentation = presentation, activation = SwingHyperlinkActivation.MODIFIER).use { fixture ->
+            fixture.awaitHyperlink()
+            fixture.movePointer(400)
+            val outside = fixture.firstRowUnderlinePixels()
+            assertEquals(0, outside.count { it == activeColor })
+            for (x in 1..4) {
+                fixture.movePointer(x)
+                assertEquals(Cursor.DEFAULT_CURSOR, fixture.cursorType())
+            }
+            val hovered = fixture.firstRowUnderlinePixels()
+            assertTrue(hovered.all { it == hoverColor }, "Ordinary hover must underline the complete published occurrence")
+            for (x in 1..4) {
+                fixture.movePointer(x, modifiers = hyperlinkNavigationModifierMask)
+                assertEquals(Cursor.HAND_CURSOR, fixture.cursorType())
+            }
+            val active = fixture.firstRowUnderlinePixels()
+            assertTrue(active.all { it == activeColor }, "The complete published occurrence must render its active underline")
+            val navigationKey = if (hyperlinkNavigationModifierMask == InputEvent.META_DOWN_MASK) KeyEvent.VK_META else KeyEvent.VK_CONTROL
+            fixture.keyModifier(navigationKey, pressed = false, modifiers = 0)
+            assertEquals(Cursor.DEFAULT_CURSOR, fixture.cursorType())
+            assertArrayEquals(
+                hovered,
+                fixture.firstRowUnderlinePixels(),
+                "Releasing the modifier restores ordinary hover without mouse movement",
+            )
+            fixture.movePointer(400)
+            assertArrayEquals(outside, fixture.firstRowUnderlinePixels(), "Leaving the link removes hover decoration")
+        }
+    }
+
+    @Test
+    fun `prompt marker and hyperlink cursor ownership survives entry exit and unchanged marker rows`() {
+        val gutter = 16
+        SwingTerminalHyperlinkLifecycleFixture(gutterWidth = gutter).use { fixture ->
+            fixture.awaitHyperlink()
+            fixture.markFirstRowAsPrompt()
+            fixture.movePointer(gutter + 1)
+            assertEquals(Cursor.HAND_CURSOR, fixture.cursorType())
+            fixture.movePointer(gutter + 2)
+            assertEquals(Cursor.HAND_CURSOR, fixture.cursorType())
+            fixture.movePointer(1)
+            assertEquals(Cursor.HAND_CURSOR, fixture.cursorType())
+            fixture.movePointer(2)
+            assertEquals(Cursor.HAND_CURSOR, fixture.cursorType())
+            fixture.setMouseReporting(true)
+            assertEquals(Cursor.HAND_CURSOR, fixture.cursorType(), "Prompt gutter retains priority over application mouse reporting")
+            fixture.setMouseReporting(false)
+            fixture.focus(false)
+            assertEquals(Cursor.DEFAULT_CURSOR, fixture.cursorType())
+            fixture.focus(true)
+            assertEquals(Cursor.HAND_CURSOR, fixture.cursorType())
+            fixture.movePointer(gutter + 1)
+            assertEquals(Cursor.HAND_CURSOR, fixture.cursorType())
+            fixture.movePointer(gutter + 2)
+            assertEquals(Cursor.HAND_CURSOR, fixture.cursorType())
+            fixture.movePointer(400)
+            assertEquals(Cursor.DEFAULT_CURSOR, fixture.cursorType())
+        }
+    }
+
     @Test
     fun `detected menu keeps action and copy URI after output replacement and rebinding`() {
         SwingTerminalHyperlinkLifecycleFixture().use { f ->

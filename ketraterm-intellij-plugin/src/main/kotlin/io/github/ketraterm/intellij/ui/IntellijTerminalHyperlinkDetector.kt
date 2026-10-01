@@ -33,6 +33,7 @@ import com.intellij.openapi.util.TextRange
 import com.intellij.openapi.vfs.LocalFileSystem
 import com.intellij.openapi.vfs.VirtualFileManager
 import com.intellij.openapi.vfs.newvfs.BulkFileListener
+import com.intellij.openapi.vfs.newvfs.events.VFileContentChangeEvent
 import com.intellij.openapi.vfs.newvfs.events.VFileEvent
 import com.intellij.psi.search.GlobalSearchScope
 import io.github.ketraterm.ui.swing.api.*
@@ -42,7 +43,6 @@ import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
-import java.lang.ref.WeakReference
 import java.net.URI
 import java.nio.file.InvalidPathException
 import java.nio.file.Path
@@ -51,7 +51,8 @@ import java.util.concurrent.atomic.AtomicLong
 
 /**
  * Independent URL/path discovery and a serialized ordered console-filter chain.
- * Provider state never crosses binding/source/configuration/replay epochs.
+ * Ordered offsets are rebuilt across binding/source/configuration/replay epochs;
+ * console providers control the lifetime of the filter instances they return.
  */
 internal class IntellijTerminalHyperlinkDetector(
     private val project: Project,
@@ -91,7 +92,9 @@ internal class IntellijTerminalHyperlinkDetector(
                 applicationConnection.subscribe(
                     VirtualFileManager.VFS_CHANGES,
                     object : BulkFileListener {
-                        override fun after(events: List<VFileEvent>) = changed()
+                        override fun after(events: List<VFileEvent>) {
+                            if (events.any { it !is VFileContentChangeEvent }) changed()
+                        }
                     },
                 )
                 applicationConnection.subscribe(
@@ -108,30 +111,23 @@ internal class IntellijTerminalHyperlinkDetector(
 
     // Only ordered requests access this state. Independent calls do not wait for it.
     private var ordered: OrderedState? = null
-    private var retiredFilters: List<WeakReference<Filter>> = emptyList()
 
     override fun discardOrderedState() {
-        ordered?.let { retiredFilters = it.filters.map(::WeakReference) }
         ordered = null
     }
 
-    override suspend fun detect(
-        request: SwingHyperlinkDetectionRequest,
-        sink: SwingHyperlinkDetectionSink,
-    ) {
+    override suspend fun detect(request: SwingHyperlinkDetectionRequest): List<SwingHyperlink> {
         currentCoroutineContext().ensureActive()
-        if (project.isDisposed) return
-        when (request.context) {
-            SwingHyperlinkDetectionContext.INDEPENDENT_LINE -> detectIndependent(request, sink)
-            SwingHyperlinkDetectionContext.ORDERED_CONTENT -> detectOrdered(request, sink)
+        if (project.isDisposed) return emptyList()
+        return when (request.context) {
+            SwingHyperlinkDetectionContext.INDEPENDENT_LINE -> detectIndependent(request)
+            SwingHyperlinkDetectionContext.ORDERED_CONTENT -> detectOrdered(request)
             SwingHyperlinkDetectionContext.INDEPENDENT_AND_ORDERED -> error("Discovery requests must select one lane")
         }
     }
 
-    private suspend fun detectIndependent(
-        request: SwingHyperlinkDetectionRequest,
-        sink: SwingHyperlinkDetectionSink,
-    ) {
+    private suspend fun detectIndependent(request: SwingHyperlinkDetectionRequest): List<SwingHyperlink> {
+        val results = ArrayList<SwingHyperlink>()
         for (line in 0 until request.lineCount) {
             currentCoroutineContext().ensureActive()
             val text = request.lineText(line)
@@ -156,7 +152,7 @@ internal class IntellijTerminalHyperlinkDetector(
                         )
                     }
                 }
-            urls.forEach(sink::addHyperlink)
+            results.addAll(urls)
             val directory = outputDirectory(request.lineFirstId(line))
             for (match in FILE_REFERENCE.findAll(text)) {
                 currentCoroutineContext().ensureActive()
@@ -164,7 +160,7 @@ internal class IntellijTerminalHyperlinkDetector(
                 val end = match.range.last + 1
                 if (urls.any { start < it.sourceRange.end.offset && end > it.sourceRange.start.offset }) continue
                 val raw = match.groups[1]?.value ?: match.groups[2]?.value ?: match.groups[3]?.value ?: continue
-                if (!raw.contains('/') && !raw.contains('\\') && !raw.contains('.')) continue
+                if (raw == "." || raw == ".." || raw.all { it == '/' || it == '\\' }) continue
                 val path =
                     try {
                         val parsed = Path.of(raw)
@@ -177,9 +173,9 @@ internal class IntellijTerminalHyperlinkDetector(
                 val result =
                     readAction {
                         val file = LocalFileSystem.getInstance().findFileByNioFile(path) ?: return@readAction null
-                        if (!file.isValid || file.isDirectory) return@readAction null
+                        if (!file.isValid) return@readAction null
                         val info = OpenFileHyperlinkInfo(project, file, lineNumber, column)
-                        val item = Filter.ResultItem(start, end, info)
+                        val item = Filter.ResultItem(start, end, info).also { it.isInvisibleLink = true }
                         request.hyperlink(
                             line,
                             start,
@@ -190,9 +186,10 @@ internal class IntellijTerminalHyperlinkDetector(
                             activation = intellijHyperlinkActivation(item),
                         )
                     }
-                if (result != null) sink.addHyperlink(result)
+                if (result != null) results.add(result)
             }
         }
+        return results
     }
 
     private fun fileCoordinate(value: String?): Int? = if (value == null) 0 else value.toIntOrNull()?.takeIf { it > 0 }?.minus(1)
@@ -210,24 +207,17 @@ internal class IntellijTerminalHyperlinkDetector(
         }
     }
 
-    private suspend fun detectOrdered(
-        request: SwingHyperlinkDetectionRequest,
-        sink: SwingHyperlinkDetectionSink,
-    ) {
-        if (request.lineCount == 0) return
+    private suspend fun detectOrdered(request: SwingHyperlinkDetectionRequest): List<SwingHyperlink> {
+        if (request.lineCount == 0) return emptyList()
         val key = Epochs(request.bindingEpoch, request.sourceEpoch, request.providerEpoch, request.analysisEpoch, configurationGeneration)
         var state = ordered
         if (state == null || state.epochs != key) {
-            val previous = state?.filters ?: retiredFilters.mapNotNull { it.get() }
             val filters = readAction { providerFilters() }
-            check(filters.none { candidate -> previous.any { it === candidate } }) {
-                "A console provider reused a filter instance across an ordered replay; safe state reconstruction requires a fresh instance"
-            }
             state = OrderedState(key, filters)
             ordered = state
-            retiredFilters = emptyList()
         }
         val chain = state
+        val results = ArrayList<SwingHyperlink>()
         try {
             while (chain.lines
                     .firstEntry()
@@ -249,7 +239,7 @@ internal class IntellijTerminalHyperlinkDetector(
                     currentCoroutineContext().ensureActive()
                     var invoked = false
                     var retried = false
-                    val results =
+                    val providerResults =
                         readAction {
                             // A write action can retry this lambda. Never retry mutated provider state.
                             if (invoked) {
@@ -287,15 +277,15 @@ internal class IntellijTerminalHyperlinkDetector(
                             }
                         }
                     if (retried) throw CancellationException("Console read interrupted; ordered replay required")
-                    results.forEach(sink::addHyperlink)
+                    results.addAll(providerResults)
                 }
                 chain.offset = end
             }
         } catch (failure: Throwable) {
-            retiredFilters = chain.filters.map(::WeakReference)
             ordered = null
             throw failure
         }
+        return results
     }
 
     private fun providerFilters(): List<Filter> {

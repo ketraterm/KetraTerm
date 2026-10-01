@@ -22,6 +22,8 @@ import io.github.ketraterm.ui.swing.render.painter.TerminalTextRunStyle
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
+import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.params.ParameterizedTest
@@ -37,6 +39,13 @@ import javax.swing.SwingUtilities
 import kotlin.coroutines.CoroutineContext
 
 class TerminalHyperlinkDiscoveryControllerTest {
+    private val scopes = ArrayList<CoroutineScope>()
+
+    @AfterEach
+    fun closeScopes() {
+        SwingUtilities.invokeAndWait { scopes.forEach { it.cancel() } }
+    }
+
     @ParameterizedTest
     @CsvSource("true, 0", "true, 1", "true, 2", "false, 0", "false, 1", "false, 2")
     fun `editing a wrapped url removes its entire old action before detection finishes`(
@@ -48,6 +57,7 @@ class TerminalHyperlinkDiscoveryControllerTest {
         val originalUrl = originalRows.take(3).joinToString("")
         val changedUrl = changedRows.take(3).joinToString("")
         val cache = TerminalRenderCache(24, 4)
+        val contentSource = TerminalHyperlinkTestSource(cache)
 
         fun frame(generation: Long) =
             StaticTextFrame(
@@ -58,17 +68,20 @@ class TerminalHyperlinkDiscoveryControllerTest {
                 lineGenerations = LongArray(4) { if (generation > 1L && it == changedRow) 2L else 1L },
                 wrappedRows = booleanArrayOf(true, true, false, false),
             )
-        cache.accept(frame(1L))
+        contentSource.publish(frame(1L))
         val opened = ArrayList<String>()
         val firstDetection = CountDownLatch(1)
         val nextDetection = CountDownLatch(1)
         val host =
             TestDiscoveryHost(
+                contentSource,
                 cache,
-                { request, sink ->
-                    for (line in 0 until request.lineCount) {
-                        val url = request.lineText(line).trimEnd('\n')
-                        sink.addHyperlink(request.hyperlink(line, 0, url.length, { opened.add(url) }))
+                { request ->
+                    buildList {
+                        for (line in 0 until request.lineCount) {
+                            val url = request.lineText(line).trimEnd('\n')
+                            add(request.hyperlink(line, 0, url.length, { opened.add(url) }))
+                        }
                     }
                 },
             )
@@ -85,7 +98,7 @@ class TerminalHyperlinkDiscoveryControllerTest {
                     if (controller.hyperlinkIdAt(0, 0, cache) < 0) nextDetection.countDown()
                 }
                 for (generation in 2L..3L) {
-                    cache.accept(frame(generation))
+                    contentSource.publish(frame(generation))
                     controller.scheduleForFrame()
                     for (row in 0..2) {
                         for (column in changedRows[row].indices) {
@@ -122,8 +135,9 @@ class TerminalHyperlinkDiscoveryControllerTest {
         val prefix = "context".padEnd(24)
         val url = "https://example.com"
         val cache = TerminalRenderCache(24, 2)
+        val contentSource = TerminalHyperlinkTestSource(cache)
         val lineIds = if (stableLineIds) longArrayOf(1L, 2L) else LongArray(2)
-        cache.accept(
+        contentSource.publish(
             StaticTextFrame(
                 frameGeneration = 1L,
                 structureGeneration = 1L,
@@ -136,19 +150,22 @@ class TerminalHyperlinkDiscoveryControllerTest {
         val published = CountDownLatch(1)
         val host =
             TestDiscoveryHost(
+                contentSource,
                 cache,
-                { request, sink ->
-                    sink.addHyperlink(
-                        request.hyperlink(
-                            0,
-                            prefix.length,
-                            prefix.length + url.length,
-                            {
-                                opened = true
-                                true
-                            },
-                        ),
-                    )
+                { request ->
+                    buildList {
+                        add(
+                            request.hyperlink(
+                                0,
+                                prefix.length,
+                                prefix.length + url.length,
+                                {
+                                    opened = true
+                                    true
+                                },
+                            ),
+                        )
+                    }
                 },
             )
         host.onHyperlinksChanged = { published.countDown() }
@@ -158,7 +175,7 @@ class TerminalHyperlinkDiscoveryControllerTest {
             awaitRepaintAndDrainEdt(published)
             SwingUtilities.invokeAndWait {
                 assertTrue(controller.hyperlinkIdAt(1, 0, cache) < 0)
-                cache.accept(
+                contentSource.publish(
                     StaticTextFrame(
                         frameGeneration = 2L,
                         structureGeneration = 1L,
@@ -186,6 +203,7 @@ class TerminalHyperlinkDiscoveryControllerTest {
         scroll: Boolean,
     ) {
         val cache = TerminalRenderCache(24, 4)
+        val contentSource = TerminalHyperlinkTestSource(cache)
         val rows = arrayOf("go https://example.com/ab", "cdefghijklmnopqrstuvwxyz", "012345 end")
 
         fun frame(generation: Long): StaticTextFrame {
@@ -205,7 +223,7 @@ class TerminalHyperlinkDiscoveryControllerTest {
                     if (shifted) booleanArrayOf(true, true, false, false) else booleanArrayOf(false, true, true, false),
             )
         }
-        cache.accept(frame(1L))
+        contentSource.publish(frame(1L))
         val detectorCalls = AtomicInteger()
         var opened = 0
         val sharedAction =
@@ -216,11 +234,14 @@ class TerminalHyperlinkDiscoveryControllerTest {
         val repaintObserved = CountDownLatch(1)
         val host =
             TestDiscoveryHost(
+                contentSource,
                 cache,
-                { request, sink ->
-                    detectorCalls.incrementAndGet()
-                    sink.addHyperlink(request.hyperlink(1, 3, 54, sharedAction))
-                    sink.addHyperlink(request.hyperlink(1, 55, 58, sharedAction))
+                { request ->
+                    buildList {
+                        detectorCalls.incrementAndGet()
+                        add(request.hyperlink(1, 3, 54, sharedAction))
+                        add(request.hyperlink(1, 55, 58, sharedAction))
+                    }
                 },
                 repaintObserved,
             )
@@ -271,7 +292,7 @@ class TerminalHyperlinkDiscoveryControllerTest {
                 assertTrue(hover.hoveredHyperlinkId < 0, "Async detection must activate hover without another mouse event")
                 assertTrue(hover.hyperlinkActivationHover)
                 repeat(3) { iteration ->
-                    cache.accept(frame(iteration + 2L))
+                    contentSource.publish(frame(iteration + 2L))
                     controller.scheduleForFrame()
                     val ids = controller.hyperlinkIdsFor(cache)
                     val firstRow = if (scroll) 0 else 1
@@ -348,9 +369,9 @@ class TerminalHyperlinkDiscoveryControllerTest {
                         style.configureRow(
                             true,
                             ids,
-                            hover.hoveredHyperlinkId,
-                            hover.hyperlinkActivationHover,
+                            hover.hover,
                             activationForeground,
+                            row = row,
                         )
                         for (column in 0 until cache.columns) {
                             val index = cache.rowOffset(row) + column
@@ -372,27 +393,31 @@ class TerminalHyperlinkDiscoveryControllerTest {
     @Test
     fun `scheduled analysis publishes discovered url overlay`() {
         val cache = TerminalRenderCache(24, 1)
-        cache.accept(StaticTextFrame(1L, 1L, arrayOf("https://example.com"), longArrayOf(1L)))
+        val contentSource = TerminalHyperlinkTestSource(cache)
+        contentSource.publish(StaticTextFrame(1L, 1L, arrayOf("https://example.com"), longArrayOf(1L)))
         val opened = AtomicBoolean(false)
         val repaintObserved = CountDownLatch(1)
         val host =
             TestDiscoveryHost(
+                contentSource,
                 renderCache = cache,
                 hyperlinkDetector =
-                    { request, sink ->
-                        assertEquals("https://example.com\n", request.lineText(0))
-                        sink.addHyperlink(
-                            request.hyperlink(
-                                lineIndex = 0,
-                                startOffset = 0,
-                                endOffset = "https://example.com".length,
-                                action =
-                                    {
-                                        opened.set(true)
-                                        true
-                                    },
-                            ),
-                        )
+                    { request ->
+                        buildList {
+                            assertEquals("https://example.com\n", request.lineText(0))
+                            add(
+                                request.hyperlink(
+                                    lineIndex = 0,
+                                    startOffset = 0,
+                                    endOffset = "https://example.com".length,
+                                    action =
+                                        {
+                                            opened.set(true)
+                                            true
+                                        },
+                                ),
+                            )
+                        }
                     },
                 repaintObserved = repaintObserved,
             )
@@ -416,7 +441,8 @@ class TerminalHyperlinkDiscoveryControllerTest {
     @Test
     fun `scroll preserves discovered links for matching visible row identities before rescan`() {
         val cache = TerminalRenderCache(24, 3)
-        cache.accept(
+        val contentSource = TerminalHyperlinkTestSource(cache)
+        contentSource.publish(
             StaticTextFrame(
                 frameGeneration = 1L,
                 structureGeneration = 1L,
@@ -429,22 +455,25 @@ class TerminalHyperlinkDiscoveryControllerTest {
         val repaintObserved = CountDownLatch(1)
         val host =
             TestDiscoveryHost(
+                contentSource,
                 renderCache = cache,
                 hyperlinkDetector =
-                    { request, sink ->
-                        detectorCalls.incrementAndGet()
-                        sink.addHyperlink(
-                            request.hyperlink(
-                                lineIndex = 1,
-                                startOffset = 0,
-                                endOffset = "https://example.com".length,
-                                action =
-                                    {
-                                        opened.set(true)
-                                        true
-                                    },
-                            ),
-                        )
+                    { request ->
+                        buildList {
+                            detectorCalls.incrementAndGet()
+                            add(
+                                request.hyperlink(
+                                    lineIndex = 1,
+                                    startOffset = 0,
+                                    endOffset = "https://example.com".length,
+                                    action =
+                                        {
+                                            opened.set(true)
+                                            true
+                                        },
+                                ),
+                            )
+                        }
                     },
                 repaintObserved = repaintObserved,
             )
@@ -456,7 +485,7 @@ class TerminalHyperlinkDiscoveryControllerTest {
         awaitRepaintAndDrainEdt(repaintObserved)
         assertEquals(1, detectorCalls.get())
 
-        cache.accept(
+        contentSource.publish(
             StaticTextFrame(
                 frameGeneration = 2L,
                 structureGeneration = 2L,
@@ -478,7 +507,8 @@ class TerminalHyperlinkDiscoveryControllerTest {
     @Test
     fun `scroll carries discovered links across repeated render-cache row shifts without detector rescan`() {
         val cache = TerminalRenderCache(24, 3)
-        cache.accept(
+        val contentSource = TerminalHyperlinkTestSource(cache)
+        contentSource.publish(
             StaticTextFrame(
                 frameGeneration = 1L,
                 structureGeneration = 1L,
@@ -490,20 +520,23 @@ class TerminalHyperlinkDiscoveryControllerTest {
         val repaintObserved = CountDownLatch(1)
         val host =
             TestDiscoveryHost(
+                contentSource,
                 renderCache = cache,
                 hyperlinkDetector =
-                    { request, sink ->
-                        for (lineIndex in 0 until request.lineCount) {
-                            if (request.lineText(lineIndex) != "https://example.com\n") continue
-                            urlScans.incrementAndGet()
-                            sink.addHyperlink(
-                                request.hyperlink(
-                                    lineIndex = lineIndex,
-                                    startOffset = 0,
-                                    endOffset = "https://example.com".length,
-                                    action = SwingHyperlinkAction.NONE,
-                                ),
-                            )
+                    { request ->
+                        buildList {
+                            for (lineIndex in 0 until request.lineCount) {
+                                if (request.lineText(lineIndex) != "https://example.com\n") continue
+                                urlScans.incrementAndGet()
+                                add(
+                                    request.hyperlink(
+                                        lineIndex = lineIndex,
+                                        startOffset = 0,
+                                        endOffset = "https://example.com".length,
+                                        action = SwingHyperlinkAction.NONE,
+                                    ),
+                                )
+                            }
                         }
                     },
                 repaintObserved = repaintObserved,
@@ -515,7 +548,7 @@ class TerminalHyperlinkDiscoveryControllerTest {
         }
         awaitRepaintAndDrainEdt(repaintObserved)
 
-        cache.accept(
+        contentSource.publish(
             StaticTextFrame(
                 frameGeneration = 2L,
                 structureGeneration = 2L,
@@ -528,7 +561,7 @@ class TerminalHyperlinkDiscoveryControllerTest {
         assertEquals(-1, carry.ids[cache.rowOffset(1)])
         assertEquals(1, carry.detectorCalls)
 
-        cache.accept(
+        contentSource.publish(
             StaticTextFrame(
                 frameGeneration = 3L,
                 structureGeneration = 3L,
@@ -548,7 +581,8 @@ class TerminalHyperlinkDiscoveryControllerTest {
     @Test
     fun `scroll carries discovered links when render-cache overscan row count changes`() {
         val cache = TerminalRenderCache(24, 3)
-        cache.accept(
+        val contentSource = TerminalHyperlinkTestSource(cache)
+        contentSource.publish(
             StaticTextFrame(
                 frameGeneration = 1L,
                 structureGeneration = 1L,
@@ -560,18 +594,21 @@ class TerminalHyperlinkDiscoveryControllerTest {
         val repaintObserved = CountDownLatch(1)
         val host =
             TestDiscoveryHost(
+                contentSource,
                 renderCache = cache,
                 hyperlinkDetector =
-                    { request, sink ->
-                        detectorCalls.incrementAndGet()
-                        sink.addHyperlink(
-                            request.hyperlink(
-                                lineIndex = 1,
-                                startOffset = 0,
-                                endOffset = "https://example.com".length,
-                                action = SwingHyperlinkAction.NONE,
-                            ),
-                        )
+                    { request ->
+                        buildList {
+                            detectorCalls.incrementAndGet()
+                            add(
+                                request.hyperlink(
+                                    lineIndex = 1,
+                                    startOffset = 0,
+                                    endOffset = "https://example.com".length,
+                                    action = SwingHyperlinkAction.NONE,
+                                ),
+                            )
+                        }
                     },
                 repaintObserved = repaintObserved,
             )
@@ -582,7 +619,7 @@ class TerminalHyperlinkDiscoveryControllerTest {
         }
         awaitRepaintAndDrainEdt(repaintObserved)
 
-        cache.accept(
+        contentSource.publish(
             StaticTextFrame(
                 frameGeneration = 2L,
                 structureGeneration = 2L,
@@ -602,7 +639,8 @@ class TerminalHyperlinkDiscoveryControllerTest {
     @Test
     fun `retained history restores a discovered link on the first displayed frame`() {
         val cache = TerminalRenderCache(24, 2)
-        cache.accept(
+        val contentSource = TerminalHyperlinkTestSource(cache)
+        contentSource.publish(
             StaticTextFrame(
                 frameGeneration = 1L,
                 structureGeneration = 1L,
@@ -614,20 +652,23 @@ class TerminalHyperlinkDiscoveryControllerTest {
         val repaintObserved = CountDownLatch(1)
         val host =
             TestDiscoveryHost(
+                contentSource,
                 renderCache = cache,
                 hyperlinkDetector =
-                    { request, sink ->
-                        for (lineIndex in 0 until request.lineCount) {
-                            if (request.lineText(lineIndex) != "https://example.com\n") continue
-                            urlScans.incrementAndGet()
-                            sink.addHyperlink(
-                                request.hyperlink(
-                                    lineIndex = lineIndex,
-                                    startOffset = 0,
-                                    endOffset = "https://example.com".length,
-                                    action = SwingHyperlinkAction.NONE,
-                                ),
-                            )
+                    { request ->
+                        buildList {
+                            for (lineIndex in 0 until request.lineCount) {
+                                if (request.lineText(lineIndex) != "https://example.com\n") continue
+                                urlScans.incrementAndGet()
+                                add(
+                                    request.hyperlink(
+                                        lineIndex = lineIndex,
+                                        startOffset = 0,
+                                        endOffset = "https://example.com".length,
+                                        action = SwingHyperlinkAction.NONE,
+                                    ),
+                                )
+                            }
                         }
                     },
                 repaintObserved = repaintObserved,
@@ -639,7 +680,7 @@ class TerminalHyperlinkDiscoveryControllerTest {
         }
         awaitRepaintAndDrainEdt(repaintObserved)
 
-        cache.accept(
+        contentSource.publish(
             StaticTextFrame(
                 frameGeneration = 2L,
                 structureGeneration = 2L,
@@ -651,7 +692,7 @@ class TerminalHyperlinkDiscoveryControllerTest {
         var carry = scheduleForFrameAndReadIds(controller, cache, urlScans)
         assertEquals(0, carry.ids[cache.rowOffset(0)])
 
-        cache.accept(
+        contentSource.publish(
             StaticTextFrame(
                 frameGeneration = 3L,
                 structureGeneration = 3L,
@@ -668,7 +709,8 @@ class TerminalHyperlinkDiscoveryControllerTest {
     @Test
     fun `scroll preserves discovered links when generation changes but text stays identical`() {
         val cache = TerminalRenderCache(24, 2)
-        cache.accept(
+        val contentSource = TerminalHyperlinkTestSource(cache)
+        contentSource.publish(
             StaticTextFrame(
                 frameGeneration = 1L,
                 structureGeneration = 1L,
@@ -680,18 +722,21 @@ class TerminalHyperlinkDiscoveryControllerTest {
         val repaintObserved = CountDownLatch(1)
         val host =
             TestDiscoveryHost(
+                contentSource,
                 renderCache = cache,
                 hyperlinkDetector =
-                    { request, sink ->
-                        detectorCalls.incrementAndGet()
-                        sink.addHyperlink(
-                            request.hyperlink(
-                                lineIndex = 0,
-                                startOffset = 0,
-                                endOffset = "https://example.com".length,
-                                action = SwingHyperlinkAction.NONE,
-                            ),
-                        )
+                    { request ->
+                        buildList {
+                            detectorCalls.incrementAndGet()
+                            add(
+                                request.hyperlink(
+                                    lineIndex = 0,
+                                    startOffset = 0,
+                                    endOffset = "https://example.com".length,
+                                    action = SwingHyperlinkAction.NONE,
+                                ),
+                            )
+                        }
                     },
                 repaintObserved = repaintObserved,
             )
@@ -702,7 +747,7 @@ class TerminalHyperlinkDiscoveryControllerTest {
         }
         awaitRepaintAndDrainEdt(repaintObserved)
 
-        cache.accept(
+        contentSource.publish(
             StaticTextFrame(
                 frameGeneration = 2L,
                 structureGeneration = 2L,
@@ -721,7 +766,8 @@ class TerminalHyperlinkDiscoveryControllerTest {
     @Test
     fun `preserved discovered links do not overwrite current OSC8 ids`() {
         val cache = TerminalRenderCache(24, 2)
-        cache.accept(
+        val contentSource = TerminalHyperlinkTestSource(cache)
+        contentSource.publish(
             StaticTextFrame(
                 frameGeneration = 1L,
                 structureGeneration = 1L,
@@ -732,17 +778,20 @@ class TerminalHyperlinkDiscoveryControllerTest {
         val repaintObserved = CountDownLatch(1)
         val host =
             TestDiscoveryHost(
+                contentSource,
                 renderCache = cache,
                 hyperlinkDetector =
-                    { request, sink ->
-                        sink.addHyperlink(
-                            request.hyperlink(
-                                lineIndex = 0,
-                                startOffset = 0,
-                                endOffset = "https://example.com".length,
-                                action = SwingHyperlinkAction.NONE,
-                            ),
-                        )
+                    { request ->
+                        buildList {
+                            add(
+                                request.hyperlink(
+                                    lineIndex = 0,
+                                    startOffset = 0,
+                                    endOffset = "https://example.com".length,
+                                    action = SwingHyperlinkAction.NONE,
+                                ),
+                            )
+                        }
                     },
                 repaintObserved = repaintObserved,
             )
@@ -753,7 +802,7 @@ class TerminalHyperlinkDiscoveryControllerTest {
         }
         awaitRepaintAndDrainEdt(repaintObserved)
 
-        cache.accept(
+        contentSource.publish(
             StaticTextFrame(
                 frameGeneration = 2L,
                 structureGeneration = 2L,
@@ -785,7 +834,7 @@ class TerminalHyperlinkDiscoveryControllerTest {
 
         assertEquals(1, snapshot.request.lineCount)
         assertEquals("https://a\n", snapshot.request.lineText(0))
-        assertEquals(10, snapshot.request.lineEndOffset(0))
+        assertEquals(10, snapshot.request.lineText(0).length)
 
         val overlay =
             snapshot.buildOverlay(
@@ -930,28 +979,24 @@ class TerminalHyperlinkDiscoveryControllerTest {
         private val cache: TerminalRenderCache,
     ) {
         private val viewport = TerminalHyperlinkIndex().apply { update(cache) }
-        private val lines = viewport.pendingLines()
+        private val lines =
+            buildList {
+                val builder = TerminalHyperlinkLineSnapshotBuilder()
+                var start = 0
+                while (start < cache.rows) {
+                    var end = start + 1
+                    while (end < cache.rows && cache.lineWrapped[end - 1]) end++
+                    add(builder.snapshot(cache, start, end))
+                    start = end
+                }
+            }.also { snapshots ->
+                snapshots.forEach { viewport.ingest(it, SwingHyperlinkDetectionContext.INDEPENDENT_LINE) }
+            }
         val request = detectionRequest(lines)
 
         fun buildOverlay(links: List<TestDetectedHyperlink>): IntArray? {
-            val detected = List(lines.size) { ArrayList<TerminalDetectedHyperlink>() }
-            for (link in links) {
-                val end = minOf(link.end, lines[link.line].text.length - 1)
-                if (end >
-                    link.start
-                ) {
-                    detected[link.line].add(
-                        TerminalDetectedHyperlink(
-                            link.start,
-                            end,
-                            request.hyperlink(link.line, link.start, end, link.action),
-                            0,
-                            lines[link.line].text.length,
-                        ),
-                    )
-                }
-            }
-            viewport.accept(lines, detected)
+            val detected = links.map { request.hyperlink(it.line, it.start, it.end, it.action) }
+            viewport.acceptResults(lines, detected, SwingHyperlinkDetectionContext.INDEPENDENT_LINE, null)
             viewport.writeOverlay(cache) { _, _, _, _ -> }
             val ids = viewport.idsFor(cache)
             return if (ids.any { it < 0 }) ids else null
@@ -1014,7 +1059,7 @@ class TerminalHyperlinkDiscoveryControllerTest {
                         SwingUtilities.invokeLater(block)
                     }
                 },
-        )
+        ).also(scopes::add)
 
     private class FrameScheduleResult(
         val ids: IntArray,
@@ -1022,11 +1067,11 @@ class TerminalHyperlinkDiscoveryControllerTest {
     )
 
     private class TestDiscoveryHost(
+        override val hyperlinkSource: TerminalRenderFrameReader,
         override val renderCache: TerminalRenderCache,
         override val hyperlinkDetector: SwingHyperlinkDetector,
         private val repaintObserved: CountDownLatch = CountDownLatch(0),
     ) : TerminalHyperlinkDiscoveryHost {
-        override val hyperlinkSource = null
         var onHyperlinksChanged: () -> Unit = {}
 
         override fun hyperlinksChanged() = onHyperlinksChanged()

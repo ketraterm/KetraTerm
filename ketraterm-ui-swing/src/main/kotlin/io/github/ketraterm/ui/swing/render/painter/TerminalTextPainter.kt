@@ -18,8 +18,9 @@ package io.github.ketraterm.ui.swing.render.painter
 import io.github.ketraterm.render.api.TerminalColorPalette
 import io.github.ketraterm.render.api.TerminalRenderCellFlags
 import io.github.ketraterm.render.cache.TerminalRenderCache
+import io.github.ketraterm.ui.swing.api.SwingHyperlinkPresentation
 import io.github.ketraterm.ui.swing.api.TerminalFontResolver
-import io.github.ketraterm.ui.swing.api.TerminalHyperlinkActions
+import io.github.ketraterm.ui.swing.api.TerminalHyperlinkHover
 import io.github.ketraterm.ui.swing.render.*
 import io.github.ketraterm.ui.swing.render.cache.*
 import io.github.ketraterm.ui.swing.render.font.TerminalTextRunBuffer
@@ -89,18 +90,19 @@ internal class TerminalTextPainter(
         fontRenderContext: FontRenderContext,
         textBlinkVisible: Boolean = true,
         hyperlinkIds: IntArray = cache.hyperlinkIds,
-        hoveredHyperlinkId: Int = NO_HYPERLINK_ID,
-        hyperlinkActivationHover: Boolean = false,
+        hyperlinkHover: TerminalHyperlinkHover? = null,
         hyperlinkActivationForeground: Int = DEFAULT_HYPERLINK_ACTIVATION_FOREGROUND,
-        hyperlinkStyles: TerminalHyperlinkActions? = null,
+        hyperlinkPresentations: Array<SwingHyperlinkPresentation?>? = null,
+        followedHyperlinkId: Int = 0,
     ) {
         runStyle.configureRow(
             textBlinkVisible = textBlinkVisible,
             hyperlinkIds = hyperlinkIds,
-            hoveredHyperlinkId = hoveredHyperlinkId,
-            hyperlinkActivationHover = hyperlinkActivationHover,
+            hyperlinkHover = hyperlinkHover,
+            row = row,
             hyperlinkActivationForeground = hyperlinkActivationForeground,
-            hyperlinkStyles = hyperlinkStyles,
+            hyperlinkPresentations = hyperlinkPresentations,
+            followedHyperlinkId = followedHyperlinkId,
         )
         val bidi = cellGeometry.row(cache, row)
         val flagsPlane = cache.flags
@@ -513,7 +515,6 @@ internal class TerminalTextPainter(
 
     private companion object {
         private const val INITIAL_TEXT_RUN_CAPACITY = 256
-        private const val NO_HYPERLINK_ID = 0
         private const val DEFAULT_HYPERLINK_ACTIVATION_FOREGROUND = 0xFF4DA3FF.toInt()
     }
 }

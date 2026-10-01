@@ -27,7 +27,19 @@ extra["kotlinxCoroutinesVersion"] = "1.10.2"
 // release signing or remote publishing. Consumer fixtures resolve only this repository.
 val consumerRepository = layout.buildDirectory.dir("library-consumer-repository")
 val prepareLibraryConsumerRepository = tasks.register("prepareLibraryConsumerRepository")
-val consumerModules = setOf("protocol", "render-api", "core", "parser", "host", "completion")
+val consumerModules = setOf(
+    "protocol",
+    "render-api",
+    "render-cache",
+    "core",
+    "parser",
+    "host",
+    "input",
+    "transport-api",
+    "session",
+    "ui-swing",
+    "completion",
+)
 
 repositories {
     mavenCentral()

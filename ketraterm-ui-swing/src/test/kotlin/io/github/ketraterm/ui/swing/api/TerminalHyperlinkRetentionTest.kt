@@ -28,6 +28,7 @@ import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.params.ParameterizedTest
 import org.junit.jupiter.params.provider.CsvSource
+import org.junit.jupiter.params.provider.ValueSource
 import java.util.concurrent.Callable
 import java.util.concurrent.ConcurrentLinkedQueue
 import java.util.concurrent.FutureTask
@@ -72,6 +73,55 @@ class TerminalHyperlinkRetentionTest {
             fixture.settle()
             assertTrue(fixture.openAt(0))
             assertEquals(url, fixture.opened.last())
+        }
+    }
+
+    @Test
+    fun `unpublished append cannot block an unchanged ordered history batch`() {
+        val release = CompletableDeferred<Unit>()
+        Fixture(80, 3, 200, ordered = true, beforeDetection = { release.await() }).use { fixture ->
+            repeat(100) { fixture.output("https://example.invalid/$it") }
+            fixture.showAbsolute(0)
+            fixture.settle()
+            assertEquals(listOf(64), fixture.requestSizes)
+
+            fixture.output("https://example.invalid/appended")
+            release.complete(Unit)
+            fixture.settle()
+
+            assertTrue(fixture.openAt(0), "An append outside the consumed range must not discard prepared history")
+            assertEquals("https://example.invalid/0", fixture.opened.last())
+            assertEquals(1, fixture.detected.count { it == "https://example.invalid/0\n" })
+        }
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = [false, true])
+    fun `unpublished edit before an ordered batch rejects its dependent result`(admittedToHistory: Boolean) {
+        val release = CompletableDeferred<Unit>()
+        var requests = 0
+        Fixture(80, 128, 256, ordered = true, beforeDetection = { if (++requests == 2) release.await() }).use { fixture ->
+            repeat(128) { fixture.output("https://example.invalid/$it") }
+            fixture.show()
+            fixture.settle()
+            assertEquals(listOf(64, 64), fixture.requestSizes)
+            assertTrue(fixture.openAt(0))
+
+            fixture.terminal.positionCursor(0, 0)
+            fixture.terminal.writeText("https://example.invalid/changed")
+            if (admittedToHistory) {
+                fixture.terminal.positionCursor(0, 127)
+                fixture.terminal.newLine()
+                (fixture.terminal as TerminalRenderFrameReader).readRenderFrame { assertEquals(1, it.historySize) }
+            }
+            release.complete(Unit)
+            fixture.settle()
+
+            assertFalse(fixture.openAt(64), "Earlier live rows remain dependencies after a provider consumes them")
+            fixture.showAbsolute(0)
+            fixture.settle()
+            assertTrue(fixture.openAt(64))
+            assertEquals("https://example.invalid/64", fixture.opened.last())
         }
     }
 
@@ -461,6 +511,33 @@ class TerminalHyperlinkRetentionTest {
         }
 
     @Test
+    fun `cached action lookup retires only after its last segment and ignores unknown future identities`() {
+        val actions = TerminalHyperlinkActions()
+        val range = SwingHyperlinkTextRange(SwingHyperlinkTextPosition(0, 0), SwingHyperlinkTextPosition(0, 1))
+        val original = SwingHyperlink(range, range, SwingHyperlinkAction.NONE)
+        assertNull(actions.get(-1))
+        val id = actions.add(original)
+        assertEquals(-1, id)
+        actions.retain(id)
+        actions.retain(id)
+        assertSame(original, actions.get(id))
+        assertSame(original, actions.get(id))
+        actions.release(id)
+        assertSame(original, actions.get(id))
+        actions.release(id)
+        assertNull(actions.get(id))
+        assertNull(actions.get(-2))
+        val replacement = SwingHyperlink(range, range, SwingHyperlinkAction.NONE)
+        val replacementId = actions.add(replacement)
+        actions.retain(replacementId)
+        assertSame(replacement, actions.get(replacementId))
+        assertNull(actions.get(id))
+        assertSame(replacement, actions.get(replacementId))
+        actions.release(replacementId)
+        assertNull(actions.get(replacementId))
+    }
+
+    @Test
     fun `stable action lookup survives removal and repeated table reuse without retargeting`() {
         val actions = TerminalHyperlinkActions()
         val range = SwingHyperlinkTextRange(SwingHyperlinkTextPosition(0, 0), SwingHyperlinkTextPosition(0, 1))
@@ -511,25 +588,36 @@ class TerminalHyperlinkRetentionTest {
                                     SwingHyperlinkDetectionContext.INDEPENDENT_LINE
                                 }
 
-                            override suspend fun detect(
-                                request: SwingHyperlinkDetectionRequest,
-                                sink: SwingHyperlinkDetectionSink,
-                            ) {
+                            override suspend fun detect(request: SwingHyperlinkDetectionRequest): List<SwingHyperlink> {
                                 assertFalse(SwingUtilities.isEventDispatchThread())
                                 requestSizes.add(request.lineCount)
                                 beforeDetection()
+                                val results = ArrayList<SwingHyperlink>()
                                 for (index in 0 until request.lineCount) {
                                     val text = request.lineText(index)
                                     detected.add(text)
                                     if (!text.startsWith("https://")) continue
                                     val url = text.takeWhile { !it.isWhitespace() }
-                                    sink.addHyperlink(
-                                        request.hyperlink(index, 0, url.length, {
+                                    val action =
+                                        SwingHyperlinkAction {
                                             assertTrue(SwingUtilities.isEventDispatchThread())
                                             opened.add(url)
-                                        }, validationEndOffset = url.length + 1, uri = url),
-                                    )
+                                        }
+                                    val link =
+                                        if (ordered) {
+                                            val consumed = SwingHyperlinkTextPosition(request.lineFirstAbsoluteRow(index), text.length)
+                                            SwingHyperlink(
+                                                request.range(index, 0, index, url.length),
+                                                SwingHyperlinkTextRange(SwingHyperlinkTextPosition(request.firstRetainedRow, 0), consumed),
+                                                action,
+                                                uri = url,
+                                            )
+                                        } else {
+                                            request.hyperlink(index, 0, url.length, action, validationEndOffset = url.length + 1, uri = url)
+                                        }
+                                    results.add(link)
                                 }
+                                return results
                             }
                         }
 

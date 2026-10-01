@@ -150,23 +150,27 @@ val customServices = SwingHostServices(
 `SwingHyperlinkDetector.detect` is suspending. The discovery owner serializes
 invocations within each context, owns cancellation and rejects results from obsolete binding,
 source, provider or analysis epochs. Providers must propagate cancellation and discard
-tainted ordered state; the request-confined sink cannot escape into detached
-work. Returning normally is successful analysis, including an empty result.
-Throwing means failure or cancellation, not an empty result.
+tainted ordered state. Return a completed `List<SwingHyperlink>` and do not mutate
+it afterwards. An empty list is successful analysis without links; throwing means
+failure or cancellation. Discovery may allocate ordinary Kotlin results and collections.
 
 The IntelliJ adapter uses a cancellable `readAction` per line/provider. If a write
 interrupts an invocation, its mutated filter state is discarded and reconstructed
 through ordered replay. A read-action retry never invokes that same mutated filter
-again. Sink publication happens outside the read action.
+again. Completed results are published outside the read action.
 
 Choose `INDEPENDENT_LINE` for text-derived links whose logical lines can be
 analyzed independently, or `ORDERED_CONTENT` for console filters that consume
 source order and may highlight earlier lines. `INDEPENDENT_AND_ORDERED` enables both
 lanes; such detectors must allow the two contexts to run concurrently. Each request
 selects one context. Slow console filters cannot hold up independent URLs/paths.
-`configurationGeneration` is an equality-only invalidation counter; emit
-`configurationChanges` when changes must reconcile without new terminal output.
-The binding owns that flow's subscription and cancellation.
+`configurationGeneration` is an equality-only invalidation counter. Publish the
+changed configuration and a distinct generation before emitting `configurationChanges`
+so it reconciles without new terminal output. A signal with an unchanged generation
+does not invalidate results; a generation change without a signal is observed at the
+next reconciliation. The binding owns the flow's subscription and cancellation.
+A configuration refresh keeps prepared links until replacement batches arrive,
+including successful empty replacements. Replacing the detector instance retires old actions immediately.
 Implement `discardOrderedState` when a detector retains ordered source/provider
 state. The owner invokes it at binding/provider teardown only after the ordered
 call has exited, so cleanup cannot race a running filter.
@@ -175,9 +179,9 @@ Requests own their strings and row arrays. Each logical line includes one
 trailing newline; soft wrapping joins physical rows while omitting wrap padding
 and wide trailing cells. Coordinates use the first absolute physical row of the
 logical line and a UTF-16 offset in its extracted text, rather than viewport rows
-or terminal columns. Cumulative offsets remain local to the supplied batch for
-console-filter interoperability. Search and detection share cell extraction
-rules while retaining their own mapping and trimming policies.
+or terminal columns. Platform-specific cumulative console offsets belong to the
+plugin's ordered filter state. Search and detection share cell extraction rules
+while retaining their own mapping and trimming policies.
 
 Report a `SwingHyperlink` containing the source range, dependency range, action,
 optional complete copyable URI, prepared presentation and activation policy.
@@ -190,7 +194,7 @@ underline metadata; resolve theme/framework data outside painting.
 For a single-line result, the request builds absolute coordinates:
 
 ```kotlin
-sink.addHyperlink(
+return listOf(
     request.hyperlink(
         lineIndex, startOffset, endOffset, action,
         validationStartOffset = tokenStart,
@@ -201,16 +205,19 @@ sink.addHyperlink(
 ```
 
 Migration is atomic: replace `LOGICAL_LINE` with `INDEPENDENT_LINE`, `VIEWPORT`
-with `ORDERED_CONTENT`, make detector overrides suspending, and replace the
-positional sink overload with `addHyperlink(SwingHyperlink)` or the request
-factory above. There is no compatibility detector pipeline.
+with `ORDERED_CONTENT` and make detector overrides suspending. The current signature
+is `suspend fun detect(request: SwingHyperlinkDetectionRequest): List<SwingHyperlink>`.
+Replace sink publication with a returned list, using the request factory above for
+single-line ranges. The sink interface and batch cumulative-offset accessors were
+removed; use logical-line anchors and UTF-16 offsets. There is no compatibility
+detector pipeline.
 
-Hover uses the occurrence identity in the prepared cell plane. Explicit OSC 8
-ID/destination pairs hover together across hard breaks and separated segments;
-anonymous OSC 8 runs and independent detector results keep distinct identities.
-Painting compares primitive IDs, and reusable row/start/end buffers retain the
-visible group for precise repainting after edits or viewport changes. Moving
-within the same group does not scan its cells or request additional painting.
+Hover shares one primitive row/start/end projection between interaction, painting
+and repainting. OSC 8 runs join adjacent overlapping spans and terminal soft wraps;
+disconnected captions or runs hover separately even when the application reuses
+one ID/destination. Detected links keep their semantic occurrence across visible
+fragments. Moving within the selected region does not reconstruct it or request
+additional painting. Reflow and frame changes reproject current geometry.
 
 Context menus capture the resolved action and optional complete URI when opened.
 They retain their target across output changes, eviction and rebinding. Detectors
@@ -225,9 +232,16 @@ empty results are retained too. Incremental source scans use bounded absolute-ra
 copies under session synchronization and assemble full logical text outside the lock,
 including soft-wrapped lines that cross copy or viewport boundaries. Newly admitted
 history is reconciled even if it was edited before its admission was published.
+Every discovery request uses this source-backed path, including fixtures; an
+unbound terminal has no discovery source. The index alone validates result ranges
+and splits them into line segments. Independent-line readiness is separate from
+ordered progress: replaying an ordered dependency does not reanalyze unchanged URLs.
 
 Scrolling prepared content projects existing results synchronously into reusable
-primitive buffers; hit testing and action lookup do not allocate or run detectors.
+ID and presentation-reference buffers without running detectors. The strict
+allocation constraint applies to recurring frame and paint work. Discovery,
+publication, hit testing and interaction may use ordinary Kotlin objects and
+collections; their retained lifetime and work must remain bounded.
 Projection clips the UTF-16 mapping before visiting cells, so a long wrapped link
 does not incur whole-destination traversal on each frame. Eviction retires affected
 records/actions without changing surviving occurrence IDs; partially retained
@@ -260,15 +274,50 @@ Results can highlight earlier retained lines and must identify the producer thro
 Unchanged occurrences before an edit preserve their identities/actions during replay.
 The request's `lineFirstId` associates output with historical host directory metadata.
 
-Prepared normal, hovered, active and followed styles are stored as primitive paint
-records. Terminal-authored underlines and concealment retain precedence. Native
+Prepared normal, hovered, active and followed styles remain immutable Kotlin
+objects. Painting reads projected references using a renderer-internal extension
+that selects the existing style; the public presentation model only describes data.
+Painting performs no action-map or framework lookup. Terminal-authored underlines and
+concealment retain precedence. Native
 visible links activate directly; implicit links require Ctrl (Cmd on macOS). Both
 activate on release only while the pressed occurrence remains unchanged and no drag
 occurred. Modifier clicks preserve existing selection; direct links still permit
 selection dragging. Application mouse reporting retains precedence, with the existing
 Shift override. OSC 8 wins overlaps, then visible links, narrower ranges and stable
-provider order. Hover callbacks run at semantic transitions, outside painting.
+provider order. Actions remain attached to retained occurrences independently of
+the viewport. Activation and hover callbacks run on the EDT; hover callbacks run
+at semantic transitions, outside painting.
 
 The [repair map](../docs/terminal-feature-gap-map.md#uri-highlighting-staged-repair)
 tracks remaining integration profiling and native desktop verification. Changelogs
 consolidate the completed user-facing repair.
+
+## Consumer and ABI verification
+
+The [published consumer fixtures](../ketraterm-testkit/src/consumerTest/README.md)
+compile Kotlin and Java with one direct dependency on this module. They exercise
+public host services, a suspending hyperlink detector and binding/disposal on the
+EDT with both Gradle module metadata and POM-only dependency resolution:
+
+```text
+./gradlew :ketraterm-testkit:publishedConsumerTest
+```
+
+Kotlin's [built-in ABI validation](https://kotlinlang.org/docs/gradle-binary-compatibility-validation.html)
+tracks the hyperlink types, `SwingHostServices`, `SwingTerminal` and
+`TerminalUiDispatcher` in [the signature baseline](api/ketraterm-ui-swing.api).
+It reads Kotlin visibility metadata; internal rendering and discovery helpers
+are outside this contract. Referenced settings and service types appear in
+signatures but are not recursively baselined.
+
+```text
+./gradlew :ketraterm-ui-swing:checkKotlinAbi
+./gradlew :ketraterm-ui-swing:updateKotlinAbi
+```
+
+`checkKotlinAbi` runs with this module's `check` task and explicitly in test CI.
+Run `updateKotlinAbi` only for intentional signature changes, then review its diff
+alongside the source. Keep compiler-generated default-argument and data-class
+members in the generated baseline. A matching snapshot guards against accidental
+signature changes; cross-release compiled-client compatibility and the broader
+v1 contract remain tracked in the [API verification map](../docs/terminal-feature-gap-map.md#api-and-product-verification).

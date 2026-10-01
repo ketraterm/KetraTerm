@@ -33,6 +33,8 @@ internal class TerminalHyperlinkIndex {
     val actions = TerminalHyperlinkActions()
     private var ids = IntArray(0)
     private var nextIds = IntArray(0)
+    private var presentations = arrayOfNulls<SwingHyperlinkPresentation>(0)
+    private var nextPresentations = arrayOfNulls<SwingHyperlinkPresentation>(0)
     private var hasFrame = false
     private var frameGeneration = 0L
     private var structureGeneration = 0L
@@ -41,6 +43,7 @@ internal class TerminalHyperlinkIndex {
     private var activeBuffer = TerminalRenderBufferKind.PRIMARY
     private var columns = 0
     private var rows = 0
+    private var providerEpoch = 0L
 
     val orderedEpoch: Long get() = buffer.orderedEpoch
     val firstRetainedRow: Long get() = buffer.firstRetainedRow
@@ -104,7 +107,7 @@ internal class TerminalHyperlinkIndex {
             if (line.snapshot !== snapshot) continue
             release(line)
             line.sourceCurrent = false
-            line.complete = false
+            line.independentComplete = false
             restartOrdered()
             invalidateDependencies(snapshot.firstAbsoluteRow, snapshot.lastAbsoluteRow)
             buffer.nextSourceRow = minOf(buffer.nextSourceRow, snapshot.firstAbsoluteRow)
@@ -162,7 +165,7 @@ internal class TerminalHyperlinkIndex {
             if (!valid) {
                 release(line)
                 line.sourceCurrent = false
-                line.complete = false
+                line.independentComplete = false
                 invalidateSourceScan()
                 restartOrdered()
                 invalidateDependencies(snapshot.firstAbsoluteRow, snapshot.lastAbsoluteRow)
@@ -187,7 +190,23 @@ internal class TerminalHyperlinkIndex {
     fun clear() {
         clear(primary)
         clear(alternate)
+        presentations.fill(null)
+        nextPresentations.fill(null)
         hasFrame = false
+    }
+
+    /** Reanalyzes configuration changes without blanking prepared links or recopying source. */
+    fun refreshProvider(epoch: Long) {
+        providerEpoch = epoch
+        for (state in arrayOf(primary, alternate)) {
+            for (index in state.head until state.lines.size) {
+                val line = state.lines[index]
+                line.independentComplete = false
+                state.pending.add(line)
+            }
+            state.orderedEpoch++
+            state.orderedNextRow = state.firstRetainedRow
+        }
     }
 
     private fun clear(state: Buffer) {
@@ -212,7 +231,6 @@ internal class TerminalHyperlinkIndex {
     fun update(
         cache: TerminalRenderCache,
         context: SwingHyperlinkDetectionContext = SwingHyperlinkDetectionContext.INDEPENDENT_LINE,
-        captureVisible: Boolean = true,
     ): Boolean {
         if (matches(cache)) return false
         buffer = if (cache.activeBuffer == TerminalRenderBufferKind.PRIMARY) primary else alternate
@@ -237,13 +255,13 @@ internal class TerminalHyperlinkIndex {
             var end = row + 1
             while (end < cache.rows && cache.lineWrapped[end - 1]) end++
             // A clipped line must be rebuilt from the source, never from its visible suffix.
-            val completeStart = previous == null || previous.snapshot.firstAbsoluteRow == top + row
+            val completeStart = previous?.snapshot?.firstAbsoluteRow == top + row
             val completeEnd = !cache.lineWrapped[end - 1]
-            if ((captureVisible || previous != null) && completeStart && (captureVisible || completeEnd)) {
+            if (completeStart && completeEnd) {
                 ingest(builder.snapshot(cache, row, end), context)
             } else if (previous != null) {
                 release(previous)
-                previous.complete = false
+                previous.independentComplete = false
                 previous.sourceCurrent = false
                 invalidateSourceScan()
                 restartOrdered()
@@ -294,7 +312,7 @@ internal class TerminalHyperlinkIndex {
         val line = Line(snapshot)
         if (previous != null) {
             val sameText = previous.snapshot.text == snapshot.text
-            line.complete = sameText && previous.complete
+            line.independentComplete = sameText && previous.independentComplete
             line.links = previous.links.filter { sameText || it.detected.remainsValid(previous.snapshot.text, snapshot.text) }
             for (link in line.links) actions.retain(link.id)
         }
@@ -302,7 +320,7 @@ internal class TerminalHyperlinkIndex {
         for (index in start until end) release(buffer.lines[index])
         if (end > start) buffer.lines.subList(start, end).clear()
         buffer.lines.add(start, line)
-        if (!line.complete) buffer.pending.add(line)
+        if (!line.independentComplete) buffer.pending.add(line)
         registerResults(line)
         if (changedText && end > start && context != SwingHyperlinkDetectionContext.INDEPENDENT_LINE) {
             if (previous != null || snapshot.firstAbsoluteRow < buffer.orderedNextRow) restartOrdered()
@@ -320,16 +338,21 @@ internal class TerminalHyperlinkIndex {
             val retained =
                 line.links.filter {
                     val dependency = it.detected.hyperlink.dependencyRange
-                    !it.detected.viewportDependent || dependency.end.absoluteRow < first || dependency.start.absoluteRow > last
+                    !it.detected.contextDependent || dependency.end.absoluteRow < first || dependency.start.absoluteRow > last
                 }
             if (retained.size != line.links.size) {
                 unregisterOrderedResults(line, buffer)
-                for (link in line.links) if (link !in retained) actions.release(link.id)
+                for (link in line.links) {
+                    if (link in retained) continue
+                    actions.release(link.id)
+                    if (link.context == SwingHyperlinkDetectionContext.INDEPENDENT_LINE) {
+                        line.independentComplete = false
+                        buffer.pending.add(line)
+                    }
+                }
                 line.links = retained
                 registerOrderedResults(line)
-                line.complete = false
-                buffer.pending.add(line)
-                if (retained.none { it.detected.viewportDependent }) iterator.remove()
+                if (retained.none { it.detected.contextDependent }) iterator.remove()
             }
         }
     }
@@ -364,9 +387,43 @@ internal class TerminalHyperlinkIndex {
         return result
     }
 
-    fun accept(
+    /** Selects current snapshots for source validation; acceptance still checks the original token dependencies. */
+    fun independentValidationLines(requested: List<TerminalHyperlinkLineSnapshot>): List<TerminalHyperlinkLineSnapshot> =
+        requested.map { snapshot ->
+            val current = lineAt(snapshot.firstAbsoluteRow)
+            if (current != null && current.sourceCurrent &&
+                current.snapshot.firstAbsoluteRow == snapshot.firstAbsoluteRow && current.snapshot.firstLineId == snapshot.firstLineId
+            ) {
+                current.snapshot
+            } else {
+                snapshot
+            }
+        }
+
+    /**
+     * Earlier consumed history is immutable within its history generation. Earlier live rows can
+     * still change while a filter runs, so include their snapshots in ordered result validation.
+     */
+    fun orderedValidationLines(
+        requested: List<TerminalHyperlinkLineSnapshot>,
+        firstLiveRow: Long,
+    ): List<TerminalHyperlinkLineSnapshot> {
+        val firstRequested = requested.first().firstAbsoluteRow
+        if (firstLiveRow >= firstRequested) return requested
+        val result = ArrayList<TerminalHyperlinkLineSnapshot>()
+        var row = firstLiveRow
+        while (row < firstRequested) {
+            val snapshot = checkNotNull(lineAt(row)) { "Ordered validation requires prepared source at $row" }.snapshot
+            result.add(snapshot)
+            row = snapshot.lastAbsoluteRow + 1L
+        }
+        result.addAll(requested)
+        return result
+    }
+
+    private fun accept(
         snapshots: List<TerminalHyperlinkLineSnapshot>,
-        detected: List<List<TerminalDetectedHyperlink>>,
+        detected: List<List<DetectedSpan>>,
         context: SwingHyperlinkDetectionContext = SwingHyperlinkDetectionContext.INDEPENDENT_LINE,
         validSources: BooleanArray? = null,
     ) {
@@ -390,17 +447,19 @@ internal class TerminalHyperlinkIndex {
             val sameText = line.snapshot.text == snapshot.text
             val links =
                 detected[index].filter {
-                    (!it.viewportDependent || sameContext) && (sameText || it.remainsValid(snapshot.text, line.snapshot.text))
+                    (!it.contextDependent || sameContext) && (sameText || it.remainsValid(snapshot.text, line.snapshot.text))
                 }
             // Replayed context may rediscover an unchanged occurrence. Keep its prepared action
             // and identity when its source, dependencies and presentation still describe it.
             if (sameText &&
-                line.complete &&
+                line.independentComplete &&
                 links.size == line.links.count { it.context == context } &&
                 line.links
                     .filter { it.context == context }
                     .zip(links)
-                    .all { (old, new) -> sameOccurrence(old.detected, new) }
+                    .all { (old, new) ->
+                        (old.providerEpoch == providerEpoch || old.detected === new) && sameOccurrence(old.detected, new)
+                    }
             ) {
                 continue
             }
@@ -410,16 +469,25 @@ internal class TerminalHyperlinkIndex {
             for (link in preserved) actions.retain(link.id)
             val retained =
                 links.map {
-                    val previous = previousByOccurrence[occurrenceKey(it)]
+                    val previous =
+                        previousByOccurrence[occurrenceKey(it)]?.takeIf { old ->
+                            old.providerEpoch == providerEpoch || old.detected === it
+                        }
                     val id = occurrences.getOrPut(it.hyperlink) { previous?.id ?: actions.add(it.hyperlink) }
                     actions.retain(id)
-                    Link(id, previous?.detected ?: it, context, previous?.spanLength ?: sourceLength(it.hyperlink.sourceRange))
+                    Link(
+                        id,
+                        previous?.detected ?: it,
+                        context,
+                        previous?.spanLength ?: sourceLength(it.hyperlink.sourceRange),
+                        previous?.providerEpoch ?: providerEpoch,
+                    )
                 }
-            val complete = if (context == SwingHyperlinkDetectionContext.ORDERED_CONTENT) line.complete else sameText
+            val complete = if (context == SwingHyperlinkDetectionContext.ORDERED_CONTENT) line.independentComplete else sameText
             release(line)
             line.links = (preserved + retained).sortedWith(LINK_ORDER)
-            line.complete = complete
-            if (!line.complete) buffer.pending.add(line)
+            line.independentComplete = complete
+            if (!line.independentComplete) buffer.pending.add(line)
             registerResults(line)
         }
         if (context == SwingHyperlinkDetectionContext.ORDERED_CONTENT && sameContext && snapshots.isNotEmpty()) {
@@ -434,60 +502,23 @@ internal class TerminalHyperlinkIndex {
         context: SwingHyperlinkDetectionContext,
         validSources: BooleanArray?,
     ) {
-        if (context == SwingHyperlinkDetectionContext.INDEPENDENT_LINE) {
-            val sink = TerminalHyperlinkDetectionAccumulator(requested)
-            results.forEach(sink::addHyperlink)
-            accept(requested, sink.links, context, validSources)
-            return
-        }
-        if (validSources?.any { !it } == true) return
-        val affected = TreeMap<Long, TerminalHyperlinkLineSnapshot>()
-        requested.forEach { affected[it.firstAbsoluteRow] = it }
+        if (requested.isEmpty()) return
+        val ordered = context == SwingHyperlinkDetectionContext.ORDERED_CONTENT
+        if (ordered && validSources?.any { !it } == true) return
+        val requestedByRow = requested.associateBy { it.firstAbsoluteRow }
+        val affected = TreeMap<Long, TerminalHyperlinkLineSnapshot>().apply { putAll(requestedByRow) }
         val producedFirst = requested.first().firstAbsoluteRow
         val producedLast = requested.last().lastAbsoluteRow
-        for (lines in buffer.orderedResults.subMap(producedFirst, true, producedLast, true).values) {
-            for (line in lines) affected[line.snapshot.firstAbsoluteRow] = line.snapshot
+        if (ordered) {
+            for (lines in buffer.orderedResults.subMap(producedFirst, true, producedLast, true).values) {
+                for (line in lines) affected[line.snapshot.firstAbsoluteRow] = line.snapshot
+            }
         }
-        val mapped = HashMap<Long, MutableList<TerminalDetectedHyperlink>>()
-        for (result in results) {
-            val source = result.sourceRange
-            val dependency = result.dependencyRange
-            val first = lineAt(source.start.absoluteRow) ?: continue
-            val last = lineAt(source.end.absoluteRow) ?: continue
-            val producer = lineAt(result.consumedThrough.absoluteRow) ?: continue
-            if (source.start.absoluteRow != first.snapshot.firstAbsoluteRow ||
-                source.end.absoluteRow != last.snapshot.firstAbsoluteRow ||
-                source.start.offset >= first.snapshot.text.length ||
-                source.end.offset > last.snapshot.text.length ||
-                result.consumedThrough.absoluteRow !in producedFirst..producedLast ||
-                result.consumedThrough.offset > producer.snapshot.text.length
-            ) {
-                continue
-            }
-            val dependencyLast = lineAt(dependency.end.absoluteRow) ?: continue
-            if (dependency.end.offset > dependencyLast.snapshot.text.length) continue
-            if (dependency.start.absoluteRow >= buffer.firstRetainedRow) {
-                val dependencyFirst = lineAt(dependency.start.absoluteRow) ?: continue
-                if (dependency.start.offset > dependencyFirst.snapshot.text.length) continue
-            }
-            var row = source.start.absoluteRow
-            while (row <= source.end.absoluteRow) {
-                val line = lineAt(row) ?: break
-                val snapshot = line.snapshot
-                val start = if (row == source.start.absoluteRow) source.start.offset else 0
-                val end = minOf(if (row == source.end.absoluteRow) source.end.offset else snapshot.text.length, snapshot.text.length - 1)
-                affected[row] = snapshot
-                if (start <
-                    end
-                ) {
-                    mapped
-                        .getOrPut(
-                            row,
-                        ) { ArrayList() }
-                        .add(TerminalDetectedHyperlink(start, end, result, 0, snapshot.text.length, true))
-                }
-                row = snapshot.lastAbsoluteRow + 1L
-            }
+        val mapped = HashMap<Long, MutableList<DetectedSpan>>()
+        for (result in results) mapResult(result, requestedByRow, ordered, affected, mapped)
+        if (!ordered) {
+            accept(requested, requested.map { mapped[it.firstAbsoluteRow].orEmpty() }, context, validSources)
+            return
         }
         val snapshots = affected.values.toList()
         val detected =
@@ -505,7 +536,67 @@ internal class TerminalHyperlinkIndex {
         buffer.orderedNextRow = requested.last().lastAbsoluteRow + 1L
     }
 
+    /** Validates every coordinate before any span is published; independent results stay within their request. */
+    private fun mapResult(
+        hyperlink: SwingHyperlink,
+        requested: Map<Long, TerminalHyperlinkLineSnapshot>,
+        ordered: Boolean,
+        affected: MutableMap<Long, TerminalHyperlinkLineSnapshot>,
+        mapped: MutableMap<Long, MutableList<DetectedSpan>>,
+    ) {
+        fun snapshotAt(row: Long): TerminalHyperlinkLineSnapshot? =
+            if (ordered) {
+                lineAt(row)?.snapshot?.takeIf { it.firstAbsoluteRow == row }
+            } else {
+                requested[row]
+            }
+
+        val source = hyperlink.sourceRange
+        val dependency = hyperlink.dependencyRange
+        val first = snapshotAt(source.start.absoluteRow) ?: return
+        val last = snapshotAt(source.end.absoluteRow) ?: return
+        val producer = requested[hyperlink.consumedThrough.absoluteRow] ?: return
+        val dependencyLast = snapshotAt(dependency.end.absoluteRow) ?: return
+        if (source.start.offset >= first.text.length || source.end.offset > last.text.length ||
+            hyperlink.consumedThrough.offset > producer.text.length || dependency.end.offset > dependencyLast.text.length
+        ) {
+            return
+        }
+        // Ordered filter state may still depend on an already consumed, evicted prefix.
+        if (!ordered || dependency.start.absoluteRow >= buffer.firstRetainedRow) {
+            val dependencyFirst = snapshotAt(dependency.start.absoluteRow) ?: return
+            if (dependency.start.offset > dependencyFirst.text.length) return
+        }
+        val sourceLines = ArrayList<TerminalHyperlinkLineSnapshot>()
+        var row = source.start.absoluteRow
+        while (row <= source.end.absoluteRow) {
+            val snapshot = snapshotAt(row) ?: return
+            sourceLines.add(snapshot)
+            row = snapshot.lastAbsoluteRow + 1L
+        }
+        for (snapshot in sourceLines) {
+            val anchor = snapshot.firstAbsoluteRow
+            val start = if (anchor == source.start.absoluteRow) source.start.offset else 0
+            val end = minOf(if (anchor == source.end.absoluteRow) source.end.offset else snapshot.text.length, snapshot.text.length - 1)
+            if (start >= end) continue
+            val independent = !ordered && dependency.start.absoluteRow == anchor && dependency.end.absoluteRow == anchor
+            affected[anchor] = snapshot
+            mapped.getOrPut(anchor) { ArrayList() }.add(
+                DetectedSpan(
+                    start,
+                    end,
+                    hyperlink,
+                    if (independent) dependency.start.offset else 0,
+                    if (independent) dependency.end.offset else snapshot.text.length,
+                    contextDependent = !independent,
+                ),
+            )
+        }
+    }
+
     fun idsFor(cache: TerminalRenderCache): IntArray = if (matches(cache)) ids else cache.hyperlinkIds
+
+    fun presentationsFor(cache: TerminalRenderCache): Array<SwingHyperlinkPresentation?>? = if (matches(cache)) presentations else null
 
     fun hyperlinkFor(
         id: Int,
@@ -520,6 +611,7 @@ internal class TerminalHyperlinkIndex {
         var changed = false
         val size = rows * columns
         if (nextIds.size < size) nextIds = IntArray(size)
+        if (nextPresentations.size < size) nextPresentations = arrayOfNulls(size)
         cache.hyperlinkIds.copyInto(nextIds, endIndex = size)
         val top = cache.discardedCount + cache.historySize - cache.scrollbackOffset
         var row = 0
@@ -542,7 +634,10 @@ internal class TerminalHyperlinkIndex {
                     val end = minOf(lastCell, snapshot.cellEnds[offset].toLong())
                     for (cell in start until end) {
                         val target = ((snapshot.firstAbsoluteRow - top) * columns + cell).toInt()
-                        if (nextIds[target] == 0) nextIds[target] = link.id
+                        if (nextIds[target] == 0) {
+                            nextIds[target] = link.id
+                            nextPresentations[target] = link.detected.hyperlink.presentation
+                        }
                     }
                 }
             }
@@ -569,6 +664,10 @@ internal class TerminalHyperlinkIndex {
         val old = ids
         ids = nextIds
         nextIds = old
+        val oldPresentations = presentations
+        presentations = nextPresentations
+        nextPresentations = oldPresentations
+        nextPresentations.fill(null)
         return changed
     }
 
@@ -609,7 +708,7 @@ internal class TerminalHyperlinkIndex {
     }
 
     private fun registerResults(line: Line) {
-        if (line.links.any { it.detected.viewportDependent }) buffer.contextual.add(line)
+        if (line.links.any { it.detected.contextDependent }) buffer.contextual.add(line)
         registerOrderedResults(line)
     }
 
@@ -635,11 +734,11 @@ internal class TerminalHyperlinkIndex {
     }
 
     private fun sameOccurrence(
-        first: TerminalDetectedHyperlink,
-        second: TerminalDetectedHyperlink,
+        first: DetectedSpan,
+        second: DetectedSpan,
     ): Boolean = occurrenceKey(first) == occurrenceKey(second)
 
-    private fun occurrenceKey(link: TerminalDetectedHyperlink): OccurrenceKey {
+    private fun occurrenceKey(link: DetectedSpan): OccurrenceKey {
         val hyperlink = link.hyperlink
         return OccurrenceKey(
             link.startOffset,
@@ -702,17 +801,39 @@ internal class TerminalHyperlinkIndex {
     private class Line(
         val snapshot: TerminalHyperlinkLineSnapshot,
     ) {
-        var complete = snapshot.text == "\n"
+        var independentComplete = snapshot.text == "\n"
         var sourceCurrent = true
         var links: List<Link> = emptyList()
     }
 
     private class Link(
         val id: Int,
-        val detected: TerminalDetectedHyperlink,
+        val detected: DetectedSpan,
         val context: SwingHyperlinkDetectionContext,
         val spanLength: Long,
+        val providerEpoch: Long,
     )
+
+    private class DetectedSpan(
+        val startOffset: Int,
+        val endOffset: Int,
+        val hyperlink: SwingHyperlink,
+        val validationStartOffset: Int,
+        val validationEndOffset: Int,
+        val contextDependent: Boolean,
+    ) {
+        fun remainsValid(
+            previousText: String,
+            currentText: String,
+        ): Boolean =
+            validationEndOffset <= currentText.length &&
+                previousText.regionMatches(
+                    validationStartOffset,
+                    currentText,
+                    validationStartOffset,
+                    validationEndOffset - validationStartOffset,
+                )
+    }
 
     /** Transient changed-result lookup; excludes actions because retained source owns their lifetime. */
     private data class OccurrenceKey(

@@ -44,6 +44,7 @@ internal class SwingTerminalInputController(
     val keyListener =
         object : KeyAdapter() {
             override fun keyPressed(event: KeyEvent) {
+                host.updatePointerModifiers(event.modifiersEx)
                 when (claimedKeyLifecycle.repeatedPressOwner(event)) {
                     ClaimedSwingKeyOwner.SUGGESTION -> {
                         host.handleShellSuggestionKeyPressed(event)
@@ -69,7 +70,6 @@ internal class SwingTerminalInputController(
                     return
                 }
 
-                host.updateHyperlinkActivationHover(hyperlinkNavigationModifierDown(event))
                 host.resetCursorBlink()
 
                 val keyEvent = keyMapper.keyPressed(event) ?: return
@@ -79,7 +79,7 @@ internal class SwingTerminalInputController(
             }
 
             override fun keyReleased(event: KeyEvent) {
-                host.updateHyperlinkActivationHover(hyperlinkNavigationModifierDown(event))
+                host.updatePointerModifiers(event.modifiersEx)
                 if (claimedKeyLifecycle.release(event)) {
                     event.consume()
                     return

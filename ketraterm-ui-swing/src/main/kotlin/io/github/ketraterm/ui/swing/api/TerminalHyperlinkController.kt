@@ -80,17 +80,12 @@ internal class TerminalHyperlinkController(
         private fun unpackCellRow(packed: Long): Int = packed.toInt()
     }
 
-    var hoveredHyperlinkId: Int = NO_HYPERLINK_ID
+    var hover = TerminalHyperlinkHover()
         private set
-    var hyperlinkActivationHover: Boolean = false
-        private set
-
-    // Row/start/end triples retain the previous projection so erased or moved segments are repainted.
-    private var segments = IntArray(0)
-    private var pendingSegments = IntArray(0)
-    var hoveredSegmentCount: Int = 0
-        private set
-    private var pendingSegmentCount = 0
+    private var pendingHover = TerminalHyperlinkHover()
+    val hoveredHyperlinkId: Int get() = hover.hyperlinkId
+    val hyperlinkActivationHover: Boolean get() = hover.activation
+    val hoveredSegmentCount: Int get() = hover.segmentCount
     private var pointerKnown = false
     private var pointerX = 0
     private var pointerY = 0
@@ -98,19 +93,27 @@ internal class TerminalHyperlinkController(
     private var pressedHyperlinkId = 0
     private var hoverAction: SwingHyperlinkAction? = null
 
-    fun segmentRow(index: Int): Int = segments[index * 3]
+    fun segmentRow(index: Int): Int = hover.row(index)
 
-    fun segmentStartColumn(index: Int): Int = segments[index * 3 + 1]
+    fun segmentStartColumn(index: Int): Int = hover.start(index)
 
-    fun segmentEndColumn(index: Int): Int = segments[index * 3 + 2]
+    fun segmentEndColumn(index: Int): Int = hover.end(index)
 
-    fun handleMouseMoved(event: MouseEvent) {
+    fun handleMouseMoved(
+        event: MouseEvent,
+        enabled: Boolean = true,
+    ) {
         controlDown = hyperlinkNavigationModifierDown(event)
         pointerKnown = true
         pointerX = event.x
         pointerY = event.y
+        if (!enabled) {
+            clearHyperlinkHover(forgetPointer = false)
+            return
+        }
         val id = hyperlinkIdAt(event)
-        if (id == hoveredHyperlinkId) {
+        val cell = host.cellAt(event.x, event.y)
+        if (id == hoveredHyperlinkId && hover.contains(unpackCellRow(cell), unpackCellColumn(cell))) {
             updateHyperlinkActivationHover(controlDown)
         } else {
             refreshHyperlinkHover()
@@ -121,11 +124,12 @@ internal class TerminalHyperlinkController(
     fun updatePointerPosition(
         x: Int,
         y: Int,
+        enabled: Boolean = true,
     ) {
         pointerKnown = true
         pointerX = x
         pointerY = y
-        refreshHyperlinkHover()
+        if (enabled) refreshHyperlinkHover() else clearHyperlinkHover(forgetPointer = false)
     }
 
     fun handleMouseExited() = clearHyperlinkHover()
@@ -142,6 +146,7 @@ internal class TerminalHyperlinkController(
         if (hyperlinkId != NO_HYPERLINK_ID &&
             canActivate(hyperlinkId, hyperlinkNavigationModifierDown(event))
         ) {
+            updatePointerPosition(event.x, event.y)
             pressedHyperlinkId = hyperlinkId
         }
         // Direct links still allow a selection drag. Modifier clicks preserve an existing selection.
@@ -154,10 +159,12 @@ internal class TerminalHyperlinkController(
 
     fun handleMouseReleased(event: MouseEvent): Boolean {
         val pressed = pressedHyperlinkId
+        val releasedCell = host.cellAt(event.x, event.y)
         pressedHyperlinkId = 0
         if (!SwingUtilities.isLeftMouseButton(event) ||
             pressed == 0 ||
             hyperlinkIdAt(event) != pressed ||
+            !hover.contains(unpackCellRow(releasedCell), unpackCellColumn(releasedCell)) ||
             !canActivate(pressed, hyperlinkNavigationModifierDown(event)) ||
             !host.openHyperlink(pressed, event)
         ) {
@@ -182,16 +189,18 @@ internal class TerminalHyperlinkController(
         controlDown = active
         val activation = hoveredHyperlinkId != NO_HYPERLINK_ID && canActivate(hoveredHyperlinkId, active)
         if (hoveredHyperlinkId == NO_HYPERLINK_ID || hyperlinkActivationHover == activation) return
-        hyperlinkActivationHover = activation
+        hover.activation = activation
         updateCursor(hoveredHyperlinkId, activation)
         repaintSegments()
     }
 
-    fun clearHyperlinkHover() {
-        pointerKnown = false
-        controlDown = false
+    fun clearHyperlinkHover(forgetPointer: Boolean = true) {
+        if (forgetPointer) {
+            pointerKnown = false
+            controlDown = false
+        }
         pressedHyperlinkId = 0
-        pendingSegmentCount = 0
+        pendingHover.reset()
         applyHyperlinkHover(NO_HYPERLINK_ID)
     }
 
@@ -201,9 +210,9 @@ internal class TerminalHyperlinkController(
         val cache = host.renderCache
         val cell = if (cache.columns > 0 && cache.rows > 0) host.cellAt(pointerX, pointerY) else -1L
         val id = resolvableHyperlinkIdAt(cell)
-        pendingSegmentCount = 0
+        pendingHover.reset()
         if (id != NO_HYPERLINK_ID) {
-            // Identity distinguishes explicit OSC 8 groups, anonymous runs and detector occurrences.
+            // Detector IDs identify occurrences; OSC 8 IDs can be shared by separate displayed links.
             for (row in 0 until cache.rows) {
                 var column = 0
                 while (column < cache.columns) {
@@ -213,42 +222,22 @@ internal class TerminalHyperlinkController(
                     }
                     val start = column++
                     while (column < cache.columns && hyperlinkIdAt(row, column) == id) column++
-                    val offset = pendingSegmentCount * 3
-                    if (offset + 3 > pendingSegments.size) {
-                        pendingSegments = pendingSegments.copyOf(maxOf(24, pendingSegments.size * 2))
-                    }
-                    pendingSegments[offset] = row
-                    pendingSegments[offset + 1] = start
-                    pendingSegments[offset + 2] = column
-                    pendingSegmentCount++
+                    pendingHover.add(row, start, column)
                 }
             }
         }
+        if (id > 0) pendingHover.retainConnected(unpackCellRow(cell), unpackCellColumn(cell), cache)
         applyHyperlinkHover(id)
     }
 
     private fun applyHyperlinkHover(id: Int) {
         val activation = id != NO_HYPERLINK_ID && canActivate(id, controlDown)
-        var changed =
-            hoveredHyperlinkId != id ||
-                hyperlinkActivationHover != activation ||
-                hoveredSegmentCount != pendingSegmentCount
-        if (!changed) {
-            for (index in 0 until hoveredSegmentCount * 3) {
-                if (segments[index] != pendingSegments[index]) {
-                    changed = true
-                    break
-                }
-            }
-        }
-        if (changed) {
+        pendingHover.setIdentity(id, activation)
+        if (!hover.sameAs(pendingHover)) {
             repaintSegments()
-            val previous = segments
-            segments = pendingSegments
-            pendingSegments = previous
-            hoveredSegmentCount = pendingSegmentCount
-            hoveredHyperlinkId = id
-            hyperlinkActivationHover = activation
+            val previous = hover
+            hover = pendingHover
+            pendingHover = previous
             repaintSegments()
         }
         val action = if (id == 0) null else host.hyperlinkAction(id)

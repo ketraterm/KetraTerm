@@ -22,6 +22,8 @@ import com.intellij.openapi.editor.colors.EditorColorsManager
 import com.intellij.openapi.editor.markup.EffectType
 import com.intellij.openapi.editor.markup.TextAttributes
 import com.intellij.openapi.project.Project
+import com.intellij.ui.ColorUtil
+import com.intellij.ui.JBColor
 import com.intellij.ui.awt.RelativePoint
 import io.github.ketraterm.render.api.TerminalRenderUnderline
 import io.github.ketraterm.ui.swing.api.SwingHyperlinkAction
@@ -35,14 +37,24 @@ import javax.swing.JComponent
 /** All platform style resolution happens during discovery, outside Swing painting. */
 internal fun intellijHyperlinkPresentation(item: Filter.ResultItem): SwingHyperlinkPresentation {
     val scheme = EditorColorsManager.getInstance().globalScheme
-    val normal = item.highlightAttributes ?: scheme.getAttributes(CodeInsightColors.HYPERLINK_ATTRIBUTES)
+    val linkAttributes = scheme.getAttributes(CodeInsightColors.HYPERLINK_ATTRIBUTES)
+    val normal = item.highlightAttributes ?: linkAttributes
     val followed = item.followedHyperlinkAttributes ?: scheme.getAttributes(CodeInsightColors.FOLLOWED_HYPERLINK_ATTRIBUTES)
-    val hovered = item.hoveredHyperlinkAttributes ?: normal
     val implicit = SwingHyperlinkStyle(underlineStyle = TerminalRenderUnderline.NONE)
+    val hovered =
+        item.hoveredHyperlinkAttributes?.toSwingStyle()
+            ?: if (item.isInvisibleLink) {
+                SwingHyperlinkStyle(
+                    underlineArgb = ColorUtil.withAlpha(scheme.defaultForeground, if (JBColor.isBright()) 0.4 else 0.5).rgb,
+                    underlineStyle = TerminalRenderUnderline.SINGLE,
+                )
+            } else {
+                null
+            }
     return SwingHyperlinkPresentation(
         normal = if (item.isInvisibleLink) implicit else normal.toSwingStyle(),
-        hovered = if (item.isInvisibleLink) implicit else hovered.toSwingStyle(),
-        active = hovered.toSwingStyle(),
+        hovered = hovered,
+        active = if (item.isInvisibleLink) linkAttributes.toSwingStyle() else hovered,
         followed = if (item.isInvisibleLink) implicit else followed.toSwingStyle(),
         isVisible = !item.isInvisibleLink,
     )

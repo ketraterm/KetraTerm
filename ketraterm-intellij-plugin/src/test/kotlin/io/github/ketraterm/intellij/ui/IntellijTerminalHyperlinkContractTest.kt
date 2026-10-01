@@ -16,19 +16,39 @@
 package io.github.ketraterm.intellij.ui
 
 import com.intellij.execution.filters.*
+import com.intellij.ide.util.PsiNavigationSupport
 import com.intellij.openapi.actionSystem.DefaultActionGroup
+import com.intellij.openapi.application.ApplicationManager
+import com.intellij.openapi.application.ReadAction
+import com.intellij.openapi.application.WriteAction
+import com.intellij.openapi.editor.LogicalPosition
+import com.intellij.openapi.editor.colors.CodeInsightColors
+import com.intellij.openapi.editor.colors.EditorColorsManager
 import com.intellij.openapi.editor.markup.EffectType
 import com.intellij.openapi.editor.markup.TextAttributes
+import com.intellij.openapi.fileEditor.FileEditorManager
 import com.intellij.openapi.project.DumbAware
 import com.intellij.openapi.project.Project
+import com.intellij.openapi.vfs.VirtualFile
+import com.intellij.openapi.vfs.VirtualFileManager
+import com.intellij.openapi.vfs.newvfs.events.VFileContentChangeEvent
+import com.intellij.openapi.vfs.newvfs.events.VFileCreateEvent
+import com.intellij.openapi.vfs.newvfs.events.VFileDeleteEvent
+import com.intellij.openapi.vfs.newvfs.events.VFileEvent
+import com.intellij.pom.Navigatable
+import com.intellij.psi.PsiDirectory
+import com.intellij.psi.PsiElement
+import com.intellij.psi.PsiManager
 import com.intellij.testFramework.ExtensionTestUtil
+import com.intellij.testFramework.PsiTestUtil
 import com.intellij.testFramework.fixtures.BasePlatformTestCase
 import com.intellij.testFramework.fixtures.TempDirTestFixture
 import com.intellij.testFramework.fixtures.impl.TempDirTestFixtureImpl
+import com.intellij.testFramework.replaceService
 import com.intellij.util.concurrency.AppExecutorUtil
 import io.github.ketraterm.render.api.TerminalRenderUnderline
 import io.github.ketraterm.ui.swing.api.*
-import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.*
 import java.awt.Color
 import java.awt.Rectangle
 import java.awt.event.MouseEvent
@@ -40,6 +60,56 @@ import javax.swing.JPanel
 
 class IntellijTerminalHyperlinkContractTest : BasePlatformTestCase() {
     override fun createTempDirTestFixture(): TempDirTestFixture = TempDirTestFixtureImpl()
+
+    fun testFileContentUpdatesPreserveConfigurationAndStructuralUpdatesInvalidateIt() {
+        val file = myFixture.addFileToProject("paths/source.kt", "source").virtualFile
+        val detector = IntellijTerminalHyperlinkDetector(project)
+        val publisher = ApplicationManager.getApplication().messageBus.syncPublisher(VirtualFileManager.VFS_CHANGES)
+
+        fun publish(events: List<VFileEvent>) {
+            WriteAction.run<RuntimeException> { publisher.after(events) }
+        }
+        runBlocking {
+            val subscription = launch(start = CoroutineStart.UNDISPATCHED) { detector.configurationChanges.collect {} }
+            try {
+                yield()
+                val original = detector.configurationGeneration
+                publish(emptyList())
+                publish(listOf(VFileContentChangeEvent(this, file, 0L, 1L)))
+                assertEquals(original, detector.configurationGeneration)
+                publish(listOf(VFileCreateEvent(this, file.parent, "created.kt", false, null, null, null)))
+                assertEquals(original + 1, detector.configurationGeneration)
+                publish(listOf(VFileDeleteEvent(this, file)))
+                assertEquals(original + 2, detector.configurationGeneration)
+            } finally {
+                subscription.cancelAndJoin()
+            }
+            val disposed = detector.configurationGeneration
+            publish(listOf(VFileDeleteEvent(this, file)))
+            assertEquals(disposed, detector.configurationGeneration)
+        }
+    }
+
+    fun testStatelessSingletonProviderRemainsUsableAfterReplayAndCancellationCleanup() {
+        val singleton =
+            object : Filter, DumbAware {
+                override fun applyFilter(
+                    line: String,
+                    entireLength: Int,
+                ): Filter.Result {
+                    val start = entireLength - line.length
+                    return Filter.Result(start, start + 6, HyperlinkInfo {})
+                }
+            }
+        val provider = ConsoleFilterProvider { arrayOf(singleton) }
+        ExtensionTestUtil.maskExtensions(ConsoleFilterProvider.FILTER_PROVIDERS, listOf(provider), testRootDisposable)
+        val detector = IntellijTerminalHyperlinkDetector(project)
+        val expected = SwingHyperlinkTextRange(SwingHyperlinkTextPosition(0, 0), SwingHyperlinkTextPosition(0, 6))
+        assertEquals(expected, detect(detector, request("target\n")).single().sourceRange)
+        assertEquals(expected, detect(detector, request("target\n", replay = 1)).single().sourceRange)
+        detector.discardOrderedState()
+        assertEquals(expected, detect(detector, request("target\n", replay = 2)).single().sourceRange)
+    }
 
     fun testInterruptedProviderStateIsReconstructedBeforeReplay() {
         var creations = 0
@@ -54,7 +124,7 @@ class IntellijTerminalHyperlinkContractTest : BasePlatformTestCase() {
                             entireLength: Int,
                         ): Filter.Result? {
                             consumed.add(instance to line)
-                            if (instance == 1 && line == "second\n") throw kotlinx.coroutines.CancellationException("Interrupted read")
+                            if (instance == 1 && line == "second\n") throw CancellationException("Interrupted read")
                             return null
                         }
                     },
@@ -115,6 +185,111 @@ class IntellijTerminalHyperlinkContractTest : BasePlatformTestCase() {
         assertEquals(Path.of(file.path).toUri().toASCIIString(), links.single().uri)
     }
 
+    fun testExistingDirectoriesAndFileUrisUseNativeDirectoryNavigation() {
+        val directory = myFixture.addFileToProject("cwd/src/source.kt", "source").virtualFile.parent
+        val detector = IntellijTerminalHyperlinkDetector(project, Path.of(directory.parent.path))
+        val uri = Path.of(directory.path).toUri().toASCIIString()
+        val navigated = ArrayList<VirtualFile>()
+        val systemDirectories = ArrayList<Path>()
+        val originalNavigation = PsiNavigationSupport.getInstance()
+        val navigation =
+            object : PsiNavigationSupport() {
+                override fun getDescriptor(element: PsiElement): Navigatable? = originalNavigation.getDescriptor(element)
+
+                override fun createNavigatable(
+                    project: Project,
+                    file: VirtualFile,
+                    offset: Int,
+                ): Navigatable = originalNavigation.createNavigatable(project, file, offset)
+
+                override fun canNavigate(element: PsiElement): Boolean = originalNavigation.canNavigate(element)
+
+                override fun navigateToDirectory(
+                    directory: PsiDirectory,
+                    requestFocus: Boolean,
+                ) {
+                    assertTrue(requestFocus)
+                    navigated.add(directory.virtualFile)
+                }
+
+                override fun openDirectoryInSystemFileManager(path: Path) {
+                    systemDirectories.add(path)
+                }
+            }
+        ApplicationManager.getApplication().replaceService(PsiNavigationSupport::class.java, navigation, testRootDisposable)
+        val paths = listOf(directory.path, "${directory.path}/", "./src", "src/", "src")
+        val fileUris = listOf(uri.removeSuffix("/"), uri)
+
+        fun assertNavigation(inProject: Boolean) {
+            val actualInProject =
+                ReadAction.computeBlocking<Boolean, RuntimeException> {
+                    val manager = PsiManager.getInstance(project)
+                    manager.isInProject(checkNotNull(manager.findDirectory(directory)))
+                }
+            assertEquals("Directory navigation depends on registered project content", inProject, actualInProject)
+            for (text in paths + fileUris) {
+                val link = detect(detector, request("$text\n", SwingHyperlinkDetectionContext.INDEPENDENT_LINE)).single()
+                assertEquals(text, SwingHyperlinkTextPosition(0, 0), link.sourceRange.start)
+                assertEquals(text, SwingHyperlinkTextPosition(0, text.length), link.sourceRange.end)
+                if (text in paths) {
+                    assertEquals(text, uri, link.uri)
+                    assertFalse(text, link.presentation.isVisible)
+                    assertEquals(text, SwingHyperlinkActivation.MODIFIER, link.activation)
+                    assertEquals(text, TerminalRenderUnderline.NONE, link.presentation.normal?.underlineStyle)
+                    assertEquals(text, TerminalRenderUnderline.SINGLE, link.presentation.hovered?.underlineStyle)
+                } else {
+                    assertEquals(text, link.uri)
+                    assertTrue(text, link.presentation.isVisible)
+                    assertEquals(text, SwingHyperlinkActivation.DIRECT, link.activation)
+                }
+                val ideCount = navigated.size
+                val systemCount = systemDirectories.size
+                assertTrue(text, link.action.open())
+                if (inProject) {
+                    assertEquals(text, listOf(directory), navigated.drop(ideCount))
+                    assertEquals(text, systemCount, systemDirectories.size)
+                } else {
+                    assertEquals(text, listOf(Path.of(directory.path)), systemDirectories.drop(systemCount))
+                    assertEquals(text, ideCount, navigated.size)
+                }
+            }
+        }
+        assertNavigation(inProject = false)
+        PsiTestUtil.addContentRoot(myFixture.module, directory.parent)
+        try {
+            assertNavigation(inProject = true)
+        } finally {
+            PsiTestUtil.removeContentEntry(myFixture.module, directory.parent)
+        }
+        assertEquals(paths.size + fileUris.size, navigated.size)
+        assertEquals(paths.size + fileUris.size, systemDirectories.size)
+    }
+
+    fun testBareChildFilesResolveButMissingChildrenAndPathNoiseDoNot() {
+        val file = myFixture.addFileToProject("cwd/README", "source").virtualFile
+        val detector = IntellijTerminalHyperlinkDetector(project, Path.of(file.parent.path))
+        val links =
+            detect(
+                detector,
+                request("README missing . .. / // \\ \\\\ \n", SwingHyperlinkDetectionContext.INDEPENDENT_LINE),
+            )
+        assertEquals(1, links.size)
+        assertEquals(Path.of(file.path).toUri().toASCIIString(), links.single().uri)
+        assertEquals(SwingHyperlinkTextPosition(0, 6), links.single().sourceRange.end)
+    }
+
+    fun testFileCoordinatesNavigateToTheRequestedLineAndColumn() {
+        val file = myFixture.addFileToProject("cwd/source.txt", "first\nsecond\nthird").virtualFile
+        val detector = IntellijTerminalHyperlinkDetector(project, Path.of(file.parent.path))
+        for ((text, position) in listOf("source.txt:2:3" to LogicalPosition(1, 2), "source.txt(3,2)" to LogicalPosition(2, 1))) {
+            val link = detect(detector, request("$text\n", SwingHyperlinkDetectionContext.INDEPENDENT_LINE)).single()
+            assertTrue(text, link.action.open())
+            val editor = FileEditorManager.getInstance(project).selectedTextEditor
+            assertNotNull(text, editor)
+            assertEquals(text, position, editor?.caretModel?.logicalPosition)
+        }
+    }
+
     fun testMixedLineRunsIndependentPathsAndEveryOrderedProvider() {
         val file = myFixture.addFileToProject("cwd/source.kt", "fun source() = Unit").virtualFile
         val applied = ArrayList<Int>()
@@ -137,13 +312,32 @@ class IntellijTerminalHyperlinkContractTest : BasePlatformTestCase() {
             }
         ExtensionTestUtil.maskExtensions(ConsoleFilterProvider.FILTER_PROVIDERS, providers, testRootDisposable)
         val detector = IntellijTerminalHyperlinkDetector(project, Path.of(file.parent.path))
-        val text = "https://example.invalid/mixed source.kt:2:3 trace\n"
+        val fileUri = Path.of(file.path).toUri().toASCIIString()
+        val text = "https://example.invalid/mixed $fileUri source.kt:2:3 trace\n"
         val independent = detect(detector, request(text, SwingHyperlinkDetectionContext.INDEPENDENT_LINE))
         val ordered = detect(detector, request(text))
-        assertEquals(listOf("https://example.invalid/mixed", Path.of(file.path).toUri().toASCIIString()), independent.map { it.uri })
+        assertEquals(
+            listOf("https://example.invalid/mixed", fileUri, fileUri),
+            independent.sortedBy { it.sourceRange.start.offset }.map { it.uri },
+        )
         assertEquals(listOf(0, 1), applied)
         assertEquals(listOf(2, 3), ordered.map { it.providerOrder })
-        assertTrue(independent.all { it.presentation.isVisible && it.activation == SwingHyperlinkActivation.DIRECT })
+        for (explicit in independent.take(2)) {
+            assertTrue(explicit.presentation.isVisible)
+            assertEquals(SwingHyperlinkActivation.DIRECT, explicit.activation)
+            assertNull(explicit.presentation.hovered)
+            assertNull(explicit.presentation.active)
+        }
+        val path = independent.last()
+        assertFalse(path.presentation.isVisible)
+        assertEquals(SwingHyperlinkActivation.MODIFIER, path.activation)
+        assertNull(path.presentation.normal?.foregroundArgb)
+        assertNull(path.presentation.hovered?.foregroundArgb)
+        assertEquals(TerminalRenderUnderline.NONE, path.presentation.normal?.underlineStyle)
+        assertEquals(TerminalRenderUnderline.SINGLE, path.presentation.hovered?.underlineStyle)
+        val hoverAlpha = checkNotNull(path.presentation.hovered?.underlineArgb).ushr(24)
+        assertTrue(hoverAlpha in 1..254)
+        assertEquals(independent.first().presentation.normal, path.presentation.active)
     }
 
     fun testHistoricalDirectoryWinsOverLaunchDirectory() {
@@ -243,8 +437,17 @@ class IntellijTerminalHyperlinkContractTest : BasePlatformTestCase() {
         val implicit = intellijHyperlinkPresentation(item)
         assertFalse(implicit.isVisible)
         assertNull(implicit.normal?.foregroundArgb)
-        assertEquals(TerminalRenderUnderline.NONE, implicit.hovered?.underlineStyle)
-        assertEquals(Color.GREEN.rgb, implicit.active?.foregroundArgb)
+        assertEquals(TerminalRenderUnderline.DOTTED, implicit.hovered?.underlineStyle)
+        assertEquals(Color.GREEN.rgb, implicit.hovered?.foregroundArgb)
+        assertEquals(
+            EditorColorsManager
+                .getInstance()
+                .globalScheme
+                .getAttributes(CodeInsightColors.HYPERLINK_ATTRIBUTES)
+                ?.foregroundColor
+                ?.rgb,
+            implicit.active?.foregroundArgb,
+        )
         assertEquals(SwingHyperlinkActivation.MODIFIER, intellijHyperlinkActivation(item))
         val action = IntellijTerminalHyperlinkAction(project, info)
         val component = JPanel()
@@ -278,7 +481,7 @@ class IntellijTerminalHyperlinkContractTest : BasePlatformTestCase() {
         val result =
             AppExecutorUtil.getAppExecutorService().submit(
                 Callable {
-                    runBlocking { ArrayList<SwingHyperlink>().also { detector.detect(request, it::add) } }
+                    runBlocking { detector.detect(request) }
                 },
             )
         return try {

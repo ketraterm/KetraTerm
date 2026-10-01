@@ -1,6 +1,6 @@
 # agy authentication replay
 
-`agy-auth-176x32.ansi` is a sanitized, byte-preserving capture of the installed
+`agy-auth-176x32.ansi` is a sanitized, layout-preserving capture of the installed
 Antigravity CLI on Windows ConPTY, taken on 2026-09-30. The capture starts at
 process startup and ends when the OAuth authorization-code prompt is visible.
 It is **7,502 bytes**, UTF-8 with terminal control sequences; do not normalize
@@ -31,8 +31,21 @@ The URL occupies five separately emitted fragments of 174, 174, 174, 174, and
 8 characters. The sixth segment is the separate authentication label.
 The capture demonstrates application-authored line layout, not a single URL
 left to terminal soft wrapping. Replay assertions establish its actual grid
-geometry, destination identity, and whole-group hover/repaint from every fragment.
-The separate authentication caption belongs to the same explicit OSC 8 group.
+geometry, complete destinations, and separate visible-occurrence hover/repaint.
+The separate authentication caption shares the explicit OSC 8 identity, but it
+is a separate displayed occurrence. Hovering a URL fragment selects the five
+connected URL rows; hovering the caption selects only its own row. Complete
+activation destinations remain unchanged.
+
+The original sanitizer replaced every explicit ID with one constant without
+checking their original equality. That was a provenance defect: the sanitized
+fixture alone cannot prove the original ID relationship. A fresh signed-out,
+isolated ConPTY capture on 2026-10-01 independently confirmed that this installed
+agy version does emit the same explicit ID and destination for all six openings.
+Only equality classes and lengths were recorded in diagnostic output; no sign-in
+was completed. The fresh 7,466-byte stream has the same 174/174/174/174/8 URL
+fragments and caption. It was not substituted for this fixture. Future captures
+must preserve the equality partition of application IDs during sanitization.
 
 This is a fresh reproduction of the screen reported by the user, not a recovery
 of the bytes behind their screenshot. The screenshot alone does not establish

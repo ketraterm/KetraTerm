@@ -28,7 +28,10 @@ import com.intellij.testFramework.fixtures.BasePlatformTestCase
 import com.intellij.testFramework.fixtures.TempDirTestFixture
 import com.intellij.testFramework.fixtures.impl.TempDirTestFixtureImpl
 import com.intellij.util.concurrency.AppExecutorUtil
-import io.github.ketraterm.ui.swing.api.*
+import io.github.ketraterm.ui.swing.api.SwingHyperlink
+import io.github.ketraterm.ui.swing.api.SwingHyperlinkDetectionContext
+import io.github.ketraterm.ui.swing.api.SwingHyperlinkDetectionRequest
+import io.github.ketraterm.ui.swing.api.SwingHyperlinkTextPosition
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.job
 import kotlinx.coroutines.runBlocking
@@ -74,9 +77,7 @@ class IntellijTerminalHyperlinkBaselineTest : BasePlatformTestCase() {
                     try {
                         runBlocking {
                             discoveryJob = coroutineContext.job
-                            IntellijTerminalHyperlinkDetector(project).detect(request) {
-                                error("The cancelling provider returned no result")
-                            }
+                            assertEmpty(IntellijTerminalHyperlinkDetector(project).detect(request))
                         }
                         false
                     } catch (_: CancellationException) {
@@ -117,18 +118,18 @@ class IntellijTerminalHyperlinkBaselineTest : BasePlatformTestCase() {
                 )
             }
         ExtensionTestUtil.maskExtensions(ConsoleFilterProvider.FILTER_PROVIDERS, listOf(provider), testRootDisposable)
-        val results = ArrayList<SwingHyperlink>()
         val completed =
             AppExecutorUtil.getAppExecutorService().submit(
                 Callable {
-                    runBlocking { IntellijTerminalHyperlinkDetector(project).detect(request, results::add) }
+                    runBlocking { IntellijTerminalHyperlinkDetector(project).detect(request) }
                 },
             )
-        try {
-            completed.get(30, TimeUnit.SECONDS)
-        } finally {
-            completed.cancel(true)
-        }
+        val results =
+            try {
+                completed.get(30, TimeUnit.SECONDS)
+            } finally {
+                completed.cancel(true)
+            }
         assertEquals(1, results.size)
         val result = results.single()
         assertEquals(request.range(0, 2, 1, 5), result.sourceRange)
@@ -146,18 +147,18 @@ class IntellijTerminalHyperlinkBaselineTest : BasePlatformTestCase() {
                 longArrayOf(12, 18),
                 context = SwingHyperlinkDetectionContext.INDEPENDENT_LINE,
             )
-        val results = ArrayList<SwingHyperlink>()
         val completed =
             AppExecutorUtil.getAppExecutorService().submit(
                 Callable {
-                    runBlocking { IntellijTerminalHyperlinkDetector(project).detect(request, results::add) }
+                    runBlocking { IntellijTerminalHyperlinkDetector(project).detect(request) }
                 },
             )
-        try {
-            completed.get(30, TimeUnit.SECONDS)
-        } finally {
-            completed.cancel(true)
-        }
+        val results =
+            try {
+                completed.get(30, TimeUnit.SECONDS)
+            } finally {
+                completed.cancel(true)
+            }
         assertEquals(targets, results.map { it.uri })
         for ((index, result) in results.withIndex()) {
             assertEquals(request.range(index, 7, index, 7 + targets[index].length), result.sourceRange)
@@ -196,7 +197,7 @@ class IntellijTerminalHyperlinkBaselineTest : BasePlatformTestCase() {
                         for (scenario in Scenario.entries) {
                             val lines = scenario.lines(lineCount, file.path, fileUri)
                             repeat(WARMUP_REQUESTS) {
-                                runBlocking { detectBoth(detector, lines, CountingSink(lines)) }
+                                runBlocking { detectBoth(detector, lines) }
                             }
 
                             val creationStart = probe.creations
@@ -206,16 +207,16 @@ class IntellijTerminalHyperlinkBaselineTest : BasePlatformTestCase() {
                             val webCounts = IntArray(MEASURED_REQUESTS)
                             val fileUriCounts = IntArray(MEASURED_REQUESTS)
                             for (sample in nanos.indices) {
-                                val sink = CountingSink(lines)
                                 val start = System.nanoTime()
-                                runBlocking { detectBoth(detector, lines, sink) }
+                                val results = runBlocking { detectBoth(detector, lines) }
                                 nanos[sample] = System.nanoTime() - start
-                                resultCounts[sample] = sink.results
-                                webCounts[sample] = sink.webUris
-                                fileUriCounts[sample] = sink.fileUris
-                                assertEquals("$scenario returned invalid ranges", 0, sink.invalidRanges)
-                                assertEquals("$scenario lost web URLs", scenario.webUriCount(lineCount), sink.webUris)
-                                assertEquals("$scenario lost file URIs", scenario.fileUriCount(lineCount), sink.fileUris)
+                                val counts = ResultCounts(lines, results)
+                                resultCounts[sample] = counts.results
+                                webCounts[sample] = counts.webUris
+                                fileUriCounts[sample] = counts.fileUris
+                                assertEquals("$scenario returned invalid ranges", 0, counts.invalidRanges)
+                                assertEquals("$scenario lost web URLs", scenario.webUriCount(lineCount), counts.webUris)
+                                assertEquals("$scenario lost file URIs", scenario.fileUriCount(lineCount), counts.fileUris)
                             }
                             println(
                                 "HYPERLINK_BASELINE {\"kind\":\"detector\",\"scenario\":\"${scenario.name}\"," +
@@ -266,21 +267,21 @@ class IntellijTerminalHyperlinkBaselineTest : BasePlatformTestCase() {
         val detector = IntellijTerminalHyperlinkDetector(project)
         val observedCounts = ArrayList<Int>()
 
-        fun detect(): CountingSink {
+        fun detect(): ResultCounts {
             val completed =
                 AppExecutorUtil.getAppExecutorService().submit(
-                    Callable { CountingSink(lines).also { runBlocking { detectBoth(detector, lines, it) } } },
+                    Callable { ResultCounts(lines, runBlocking { detectBoth(detector, lines) }) },
                 )
-            val sink =
+            val counts =
                 try {
                     completed.get(30, TimeUnit.SECONDS)
                 } finally {
                     completed.cancel(true)
                 }
-            assertEquals(0, sink.invalidRanges)
-            assertEquals(1, sink.webUris)
-            observedCounts += sink.results
-            return sink
+            assertEquals(0, counts.invalidRanges)
+            assertEquals(1, counts.webUris)
+            observedCounts += counts.results
+            return counts
         }
 
         assertFalse(DumbService.getInstance(project).isDumb)
@@ -306,20 +307,21 @@ class IntellijTerminalHyperlinkBaselineTest : BasePlatformTestCase() {
     private suspend fun detectBoth(
         detector: IntellijTerminalHyperlinkDetector,
         lines: Array<String>,
-        sink: SwingHyperlinkDetectionSink,
-    ) {
-        for (context in listOf(SwingHyperlinkDetectionContext.INDEPENDENT_LINE, SwingHyperlinkDetectionContext.ORDERED_CONTENT)) {
-            detector.detect(
-                SwingHyperlinkDetectionRequest(
-                    lines.toList(),
-                    LongArray(lines.size) { it.toLong() },
-                    context = context,
-                    analysisEpoch = ++replay,
-                ),
-                sink,
-            )
+    ): List<SwingHyperlink> =
+        buildList {
+            for (context in listOf(SwingHyperlinkDetectionContext.INDEPENDENT_LINE, SwingHyperlinkDetectionContext.ORDERED_CONTENT)) {
+                addAll(
+                    detector.detect(
+                        SwingHyperlinkDetectionRequest(
+                            lines.toList(),
+                            LongArray(lines.size) { it.toLong() },
+                            context = context,
+                            analysisEpoch = ++replay,
+                        ),
+                    ),
+                )
+            }
         }
-    }
 
     private fun detectionRequest(lines: Array<String>): SwingHyperlinkDetectionRequest =
         SwingHyperlinkDetectionRequest(
@@ -348,28 +350,31 @@ class IntellijTerminalHyperlinkBaselineTest : BasePlatformTestCase() {
         }
     }
 
-    private class CountingSink(
-        private val lines: Array<String>,
-    ) : SwingHyperlinkDetectionSink {
+    private class ResultCounts(
+        lines: Array<String>,
+        hyperlinks: List<SwingHyperlink>,
+    ) {
         var results = 0
         var webUris = 0
         var fileUris = 0
         var invalidRanges = 0
 
-        override fun addHyperlink(hyperlink: SwingHyperlink) {
-            val lineIndex =
-                hyperlink.sourceRange.start.absoluteRow
-                    .toInt()
-            val startOffset = hyperlink.sourceRange.start.offset
-            val endOffset = hyperlink.sourceRange.end.offset
-            val line = lines.getOrNull(lineIndex)
-            if (line == null || startOffset < 0 || endOffset <= startOffset || endOffset > line.length) {
-                invalidRanges++
-                return
+        init {
+            for (hyperlink in hyperlinks) {
+                val lineIndex =
+                    hyperlink.sourceRange.start.absoluteRow
+                        .toInt()
+                val startOffset = hyperlink.sourceRange.start.offset
+                val endOffset = hyperlink.sourceRange.end.offset
+                val line = lines.getOrNull(lineIndex)
+                if (line == null || startOffset < 0 || endOffset <= startOffset || endOffset > line.length) {
+                    invalidRanges++
+                    continue
+                }
+                results++
+                if (line.startsWith("https://", startOffset)) webUris++
+                if (line.startsWith("file:", startOffset)) fileUris++
             }
-            results++
-            if (line.startsWith("https://", startOffset)) webUris++
-            if (line.startsWith("file:", startOffset)) fileUris++
         }
     }
 

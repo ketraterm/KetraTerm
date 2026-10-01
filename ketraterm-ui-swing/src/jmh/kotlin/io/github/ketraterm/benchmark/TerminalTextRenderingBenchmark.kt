@@ -19,6 +19,7 @@ import io.github.ketraterm.render.api.TerminalRenderAttrs
 import io.github.ketraterm.render.api.TerminalRenderBufferKind
 import io.github.ketraterm.render.api.TerminalRenderColorKind
 import io.github.ketraterm.render.cache.TerminalRenderCache
+import io.github.ketraterm.ui.swing.api.TerminalHyperlinkHover
 import io.github.ketraterm.ui.swing.render.cache.*
 import io.github.ketraterm.ui.swing.render.painter.TerminalDecorationPainter
 import io.github.ketraterm.ui.swing.render.painter.TerminalTextPainter
@@ -66,6 +67,11 @@ open class TerminalTextRenderingBenchmark {
     private lateinit var styledCache: TerminalRenderCache
     private lateinit var styleCache: TerminalRenderCache
     private val runStyle = TerminalTextRunStyle()
+    private val hover =
+        TerminalHyperlinkHover().apply {
+            reset(7)
+            add(0, 0, Int.MAX_VALUE)
+        }
     private var hoverActive = false
     private val hyperlinkDecorations = TerminalDecorationPainter(AwtColorCache())
     private val asciiChars = "AAAAAA".toCharArray()
@@ -196,6 +202,7 @@ open class TerminalTextRenderingBenchmark {
     @Benchmark
     open fun paintDottedHyperlinkChangingColor() {
         hoverActive = !hoverActive
+        hover.activation = hoverActive
         val color = if (hoverActive) Color.WHITE.rgb else Color.RED.rgb
         hyperlinkDecorations.paintHyperlink(hyperlinkGraphics, color, 3, 83, 0, metrics, false)
     }
@@ -265,11 +272,11 @@ open class TerminalTextRenderingBenchmark {
     @Benchmark
     open fun scanHyperlinkStyles(): Int {
         hoverActive = !hoverActive
+        hover.activation = hoverActive
         runStyle.configureRow(
             textBlinkVisible = hoverActive,
             hyperlinkIds = styleCache.hyperlinkIds,
-            hoveredHyperlinkId = 7,
-            hyperlinkActivationHover = hoverActive,
+            hyperlinkHover = hover,
             hyperlinkActivationForeground = 0xFF4DA3FF.toInt(),
         )
         runStyle.begin(styleCache, styleCache.palette, 0, 0)

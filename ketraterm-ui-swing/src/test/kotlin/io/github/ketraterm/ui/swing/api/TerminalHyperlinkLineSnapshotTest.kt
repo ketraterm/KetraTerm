@@ -88,25 +88,14 @@ class TerminalHyperlinkLineSnapshotTest {
                     }
                     val viewport = TerminalHyperlinkIndex()
                     viewport.update(cache)
+                    viewport.ingest(snapshot, SwingHyperlinkDetectionContext.INDEPENDENT_LINE)
                     val pending = viewport.pendingLines()
-                    viewport.accept(
+                    val request = detectionRequest(pending)
+                    viewport.acceptResults(
                         pending,
-                        pending.mapIndexed { index, line ->
-                            listOf(
-                                TerminalDetectedHyperlink(
-                                    0,
-                                    line.text.length - 1,
-                                    detectionRequest(pending).hyperlink(
-                                        index,
-                                        0,
-                                        line.text.length - 1,
-                                        SwingHyperlinkAction.NONE,
-                                    ),
-                                    0,
-                                    line.text.length,
-                                ),
-                            )
-                        },
+                        pending.mapIndexed { index, line -> request.hyperlink(index, 0, line.text.length - 1, SwingHyperlinkAction.NONE) },
+                        SwingHyperlinkDetectionContext.INDEPENDENT_LINE,
+                        null,
                     )
                     viewport.writeOverlay(cache) { _, _, _, _ -> }
                     val ids = viewport.idsFor(cache)

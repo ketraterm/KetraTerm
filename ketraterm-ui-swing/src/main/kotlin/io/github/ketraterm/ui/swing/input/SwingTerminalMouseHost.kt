@@ -72,7 +72,10 @@ internal interface SwingTerminalMouseHost {
 
     fun handleHyperlinkMouseDragged()
 
-    fun handleHyperlinkMouseMoved(event: MouseEvent)
+    fun handleHyperlinkMouseMoved(
+        event: MouseEvent,
+        enabled: Boolean,
+    )
 
     fun handleHyperlinkMouseExited()
 

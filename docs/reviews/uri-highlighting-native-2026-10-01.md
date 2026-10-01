@@ -1,7 +1,10 @@
 # URI highlighting: IntelliJ discovery and native interaction
 
-Stages 5 and 6 are implemented together at the user's request on
-**fix/uri-highlighting**. Changes remain uncommitted for verification.
+Stages 5 and 6 were implemented together on **fix/uri-highlighting**.
+The subsequent desktop review found regressions; the test totals below did not
+establish native behavior or completion. See the
+[regression investigation](uri-highlighting-regressions-2026-10-01.md) for corrections
+and remaining architectural limits.
 
 ## Discovery and ownership
 
@@ -31,24 +34,24 @@ Painting never queries the IDE, VFS, provider actions or theme services.
 
 A cancellable coroutine read action covers one line/provider invocation. A retry
 after provider invocation never calls that mutated instance again; cancellation
-discards the chain, and bounded owner recovery replays with fresh filter instances.
+discards the chain, and bounded owner recovery asks providers for their filters again.
 See the [official coroutine read-action contract](https://plugins.jetbrains.com/docs/intellij/coroutine-read-actions.html).
 The implementation and metadata adapter were checked against the installed
 IntelliJ 2026.2 SDK, including its supported listener/navigation APIs.
 
-ConsoleFilterProvider has no general reset operation. A provider returning the
-same filter instance on reconstruction is rejected rather than assumed resettable.
-This failure uses bounded ordered-lane recovery; independent links remain available.
-Weak identity guards do not keep retired providers alive. Binding/provider teardown
-releases ordered state only after its invocation exits, including cancellation
-before worker dispatch.
+ConsoleFilterProvider has no general reset or fresh-instance contract. The initial
+identity guard incorrectly rejected providers returning a reusable stateless filter;
+that guard and its weak-reference bookkeeping have been removed. Provider factories
+own their filter construction semantics. Binding/provider teardown releases ordered
+state only after its invocation exits, including cancellation before worker dispatch.
 
 ## Presentation and interaction
 
 The plugin converts native normal, hover, followed and visibility metadata into
-neutral immutable styles. The retained action table prepares primitive colors,
-underline styles and thickness for painting. Hover/active/followed state selects
-those records without allocating. Terminal-authored underlines and concealment
+neutral immutable styles. The follow-up removes the action table's packed style
+copies: viewport projection keeps references to the original presentations.
+Hover/active/followed state selects an existing style without allocating or looking
+up an action. Terminal-authored underlines and concealment
 retain precedence; selection/search painting remains above link backgrounds.
 
 Visible native links activate directly; implicit links require Ctrl, or Cmd on

@@ -13,9 +13,18 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-pluginManagement {
-    repositories { gradlePluginPortal() }
-    plugins { kotlin("jvm") version providers.gradleProperty("kotlinVersion").get() }
-}
-rootProject.name = "published-library-consumers"
-include("parser", "host", "completion", "ui-swing")
+package io.github.ketraterm.ui.swing.render
+
+import io.github.ketraterm.ui.swing.api.TerminalHyperlinkHover
+
+internal fun hyperlinkHover(
+    id: Int,
+    active: Boolean = false,
+    row: Int = 0,
+    start: Int = 0,
+    end: Int = Int.MAX_VALUE,
+): TerminalHyperlinkHover =
+    TerminalHyperlinkHover().apply {
+        reset(id, active)
+        if (id != 0) add(row, start, end)
+    }

@@ -15,142 +15,58 @@
  */
 package io.github.ketraterm.ui.swing.api
 
-/** Stable occurrence ownership with unboxed lookup on hover/hit-test paths. EDT-confined. */
+/** Stable occurrence ownership shared by retained segments. EDT-confined. */
 internal class TerminalHyperlinkActions {
-    private var keys = IntArray(16)
-    private var values = arrayOfNulls<SwingHyperlink>(16)
-    private var references = IntArray(16)
-    private var styles = IntArray(16 * STYLE_RECORD_SIZE)
-    private var followedId = 0
-    private var occupied = 0
-    private var size = 0
+    private val entries = HashMap<Int, Entry>()
     private var nextId = 1
+    private var cachedId = 0
+    private var cachedHyperlink: SwingHyperlink? = null
+    var followedId = 0
+        private set
 
     fun add(hyperlink: SwingHyperlink): Int {
         check(nextId > 0) { "Hyperlink occurrence identity exhausted" }
-        if ((occupied + 1) * 2 >= keys.size) rebuild(if ((size + 1) * 4 >= keys.size) keys.size * 2 else keys.size)
-        val key = nextId++
-        var slot = hash(key) and (keys.size - 1)
-        while (keys[slot] > 0) slot = (slot + 1) and (keys.size - 1)
-        if (keys[slot] == 0) occupied++
-        keys[slot] = key
-        values[slot] = hyperlink
-        references[slot] = 0
-        val presentation = hyperlink.presentation
-        writeStyle(slot, 0, presentation.normal)
-        writeStyle(slot, 1, presentation.hovered ?: presentation.normal)
-        writeStyle(slot, 2, presentation.active ?: presentation.hovered ?: presentation.normal)
-        writeStyle(slot, 3, presentation.followed ?: presentation.normal)
-        size++
-        return -key
+        val id = -nextId++
+        entries[id] = Entry(hyperlink)
+        return id
     }
 
-    fun get(id: Int): SwingHyperlink? = values[find(-id)]
-
-    /** Primitive style record for painting; no actions or framework objects enter the paint path. */
-    fun styleOffset(
-        id: Int,
-        hovered: Boolean,
-        active: Boolean,
-    ): Int {
-        if (id >= 0) return -1
-        val slot = find(-id)
-        if (keys[slot] != -id) return -1
-        val state =
-            when {
-                hovered && active -> 2
-                hovered -> 1
-                id == followedId -> 3
-                else -> 0
-            }
-        return slot * STYLE_RECORD_SIZE + state * 4
+    /** Repeated stationary-hover frame reconciliation reuses one successful lookup without boxing. */
+    fun get(id: Int): SwingHyperlink? {
+        if (id == cachedId) return cachedHyperlink
+        val hyperlink = entries[id]?.hyperlink ?: return null
+        cachedId = id
+        cachedHyperlink = hyperlink
+        return hyperlink
     }
-
-    fun foreground(offset: Int): Int = styles[offset]
-
-    fun background(offset: Int): Int = styles[offset + 1]
-
-    fun underlineColor(offset: Int): Int = styles[offset + 2]
-
-    fun flags(offset: Int): Int = styles[offset + 3]
 
     /** Returns the previously followed occurrence so both styles can be repainted. */
     fun follow(id: Int): Int {
         val previous = followedId
-        if (get(id) != null) followedId = id
+        if (id in entries) followedId = id
         return previous
     }
 
-    private fun writeStyle(
-        slot: Int,
-        state: Int,
-        style: SwingHyperlinkStyle?,
-    ) {
-        val offset = slot * STYLE_RECORD_SIZE + state * 4
-        styles[offset] = style?.foregroundArgb ?: 0
-        styles[offset + 1] = style?.backgroundArgb ?: 0
-        styles[offset + 2] = style?.underlineArgb ?: 0
-        styles[offset + 3] =
-            (if (style?.foregroundArgb != null) FOREGROUND else 0) or
-            (if (style?.backgroundArgb != null) BACKGROUND else 0) or
-            (if (style?.underlineArgb != null) UNDERLINE_COLOR else 0) or
-            (if (style?.underlineThickness == 2) BOLD_UNDERLINE else 0) or
-            (if (style?.underlineStyle != null) UNDERLINE_STYLE or (style.underlineStyle shl 8) else 0)
-    }
-
     fun retain(id: Int) {
-        references[find(-id)]++
+        checkNotNull(entries[id]) { "Unknown hyperlink occurrence $id" }.references++
     }
 
     fun release(id: Int) {
-        val slot = find(-id)
-        check(keys[slot] == -id && references[slot] > 0)
-        if (--references[slot] == 0) {
-            keys[slot] = -1
-            values[slot] = null
+        val entry = checkNotNull(entries[id]) { "Unknown hyperlink occurrence $id" }
+        check(entry.references > 0)
+        if (--entry.references == 0) {
+            entries.remove(id)
+            if (cachedId == id) {
+                cachedId = 0
+                cachedHyperlink = null
+            }
             if (followedId == id) followedId = 0
-            size--
         }
     }
 
-    private fun find(key: Int): Int {
-        var slot = hash(key) and (keys.size - 1)
-        while (keys[slot] != 0 && keys[slot] != key) slot = (slot + 1) and (keys.size - 1)
-        return slot
-    }
-
-    private fun hash(key: Int): Int {
-        val mixed = key * -1640531527
-        return mixed xor (mixed ushr 16)
-    }
-
-    private fun rebuild(capacity: Int) {
-        val oldKeys = keys
-        val oldValues = values
-        val oldReferences = references
-        val oldStyles = styles
-        keys = IntArray(capacity)
-        values = arrayOfNulls(capacity)
-        references = IntArray(capacity)
-        styles = IntArray(capacity * STYLE_RECORD_SIZE)
-        occupied = size
-        for (index in oldKeys.indices) {
-            val key = oldKeys[index]
-            if (key <= 0) continue
-            val slot = find(key)
-            keys[slot] = key
-            values[slot] = oldValues[index]
-            references[slot] = oldReferences[index]
-            oldStyles.copyInto(styles, slot * STYLE_RECORD_SIZE, index * STYLE_RECORD_SIZE, (index + 1) * STYLE_RECORD_SIZE)
-        }
-    }
-
-    companion object {
-        const val FOREGROUND = 1
-        const val BACKGROUND = 2
-        const val UNDERLINE_COLOR = 4
-        const val UNDERLINE_STYLE = 8
-        const val BOLD_UNDERLINE = 16
-        private const val STYLE_RECORD_SIZE = 16
+    private class Entry(
+        val hyperlink: SwingHyperlink,
+    ) {
+        var references = 0
     }
 }

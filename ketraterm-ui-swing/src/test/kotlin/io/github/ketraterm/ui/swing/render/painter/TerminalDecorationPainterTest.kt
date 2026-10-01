@@ -19,7 +19,8 @@ import io.github.ketraterm.render.api.TerminalRenderAttrs
 import io.github.ketraterm.render.api.TerminalRenderColorKind
 import io.github.ketraterm.render.api.TerminalRenderExtraAttrs
 import io.github.ketraterm.render.api.TerminalRenderUnderline
-import io.github.ketraterm.ui.swing.api.*
+import io.github.ketraterm.ui.swing.api.SwingHyperlinkPresentation
+import io.github.ketraterm.ui.swing.api.SwingHyperlinkStyle
 import io.github.ketraterm.ui.swing.render.*
 import io.github.ketraterm.ui.swing.render.cache.AwtColorCache
 import io.github.ketraterm.ui.swing.settings.SwingMetrics
@@ -46,7 +47,7 @@ class TerminalDecorationPainterTest {
             val cache = renderCache(TestRenderFrame.text(" "))
             cache.hyperlinkIds[0] = id
             val style = TerminalTextRunStyle()
-            style.configureRow(true, cache.hyperlinkIds, if (hovered) id else 0, false, TEST_BLUE)
+            style.configureRow(true, cache.hyperlinkIds, hyperlinkHover(if (hovered) id else 0), TEST_BLUE)
             style.begin(cache, cache.palette, 0, 0)
             fixture.painter.paintTextRun(fixture.g, cache.palette, style, 0, 1, 0, fixture.metrics)
             val expectedColor = if (id > 0 || hovered) cache.palette.defaultForeground else 0
@@ -63,25 +64,14 @@ class TerminalDecorationPainterTest {
         val fixture = fixture()
         try {
             val cache = renderCache(TestRenderFrame.text(" "))
-            val actions = TerminalHyperlinkActions()
-            val range = SwingHyperlinkTextRange(SwingHyperlinkTextPosition(0, 0), SwingHyperlinkTextPosition(0, 1))
             val nativeStyle =
                 SwingHyperlinkStyle(
                     foregroundArgb = TEST_BLUE,
                     underlineArgb = TEST_RED,
                     underlineStyle = TerminalRenderUnderline.SINGLE,
                 )
-            val nativeId =
-                actions.add(
-                    SwingHyperlink(
-                        range,
-                        range,
-                        SwingHyperlinkAction.NONE,
-                        presentation = SwingHyperlinkPresentation(normal = nativeStyle),
-                    ),
-                )
-            actions.retain(nativeId)
-            val id = if (native) nativeId else 7
+            val presentations = arrayOf<SwingHyperlinkPresentation?>(SwingHyperlinkPresentation(normal = nativeStyle))
+            val id = if (native) -1 else 7
             cache.hyperlinkIds[0] = id
             cache.attrWords[0] = TerminalRenderAttrs.pack(underlineStyle = TerminalRenderUnderline.DOUBLE)
             cache.extraAttrWords[0] =
@@ -90,7 +80,7 @@ class TerminalDecorationPainterTest {
                     underlineColorValue = 0x00FF00,
                 )
             val style = TerminalTextRunStyle()
-            style.configureRow(true, cache.hyperlinkIds, id, true, TEST_BLUE, actions)
+            style.configureRow(true, cache.hyperlinkIds, hyperlinkHover(id, true), TEST_BLUE, presentations)
             style.begin(cache, cache.palette, 0, 0)
             fixture.painter.paintTextRun(fixture.g, cache.palette, style, 0, 1, 0, fixture.metrics)
             assertEquals(TEST_GREEN, fixture.image.getRGB(1, fixture.metrics.underlineY))

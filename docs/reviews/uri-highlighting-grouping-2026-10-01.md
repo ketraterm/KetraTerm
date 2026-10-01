@@ -4,7 +4,44 @@ Stage 4 on `fix/uri-highlighting`, following Stage 3 commit `00fd401a`.
 Scope and subsequent gates remain in the
 [canonical repair map](../terminal-feature-gap-map.md#uri-highlighting-staged-repair).
 
-## Findings and implementation
+## Correction after interactive review
+
+The original Stage 4 assertions below were too broad: they deliberately hovered
+both agy's wrapped URL and its separate authentication caption. The user rejected
+that behavior. OSC 8 identity remains the destination/action identity; it no longer
+means that every disconnected displayed occurrence must hover together.
+
+Shared interaction and painting now consume one reusable primitive hover
+projection. For OSC 8, the pointed segment connects to overlapping segments on
+adjacent rows and actual terminal soft-wrap continuations, including artificial
+wide-character wrap padding. Separate runs on the same row and occurrences
+separated by nonlinked rows remain separate. Detector IDs already identify a
+specific discovered occurrence and retain their multi-segment grouping. This
+visible-occurrence policy also applies to anonymous OSC 8 runs; overwritten
+content that separates a run into disconnected islands separates its hover.
+No host-registry identity or complete activation target changes.
+
+The agy replay now expects five connected URL fragments or the one caption,
+never both. Painter regressions verify that even cells sharing one OSC 8 ID can
+paint different hover states, including shaped text. Mouse movement between
+such occurrences reprojects/repaints the old and new segments; a release over a
+different visible occurrence cannot activate the pressed occurrence.
+
+Fixture review also found that the old sanitizer collapsed every explicit ID to
+one constant without validating the original equality partition. The original
+capture was deleted, so its identity claim cannot be recovered from that fixture.
+A fresh isolated, signed-out ConPTY capture independently confirmed that the
+installed agy emits one explicit ID/destination across all six openings. Its
+metadata is recorded under ignored `build/uri-regression/agy-identity-metadata.json`;
+no OAuth URI or private ID was printed and no sign-in was completed. The existing
+staged ANSI fixture remains unchanged. Future sanitization must preserve distinct
+IDs as distinct inert replacements.
+
+The historical test counts and allocation figures below describe the previous
+implementation, not validation of this correction. Current validation belongs in
+the [regression review](uri-highlighting-regressions-2026-10-01.md).
+
+## Original Stage 4 findings and implementation
 
 The host registry already assigns one positive numeric identity to an explicit
 OSC 8 ID/destination pair, and a distinct identity to each anonymous opening.
@@ -37,7 +74,7 @@ against a different projection or session. Detected results supplying `uri`
 automatically expose the existing host Copy Link item. Menu construction may
 allocate; the frame and hover paths do not construct actions or URI strings.
 
-## Correctness evidence
+## Original correctness evidence (superseded grouping expectations)
 
 - The unchanged 7,502-byte agy capture is replayed at 176×32 with chunk sizes
   1, 7 and whole input. Hovering any of the five URL fragments or the separate
@@ -70,7 +107,7 @@ verification retains the existing explicit-coroutine-dependency warning.
 Graphify updates successfully, with its existing partial-parser warnings for
 three unrelated Kotlin files; Kotlin compilation succeeds.
 
-## Prepared-path allocation measurements
+## Original prepared-path allocation measurements
 
 JMH 1.37 on JBR 25.0.4.1+1-b610.67, one fork, two one-second warmups and
 three one-second measurements, with no concurrent builds or Graphify work.

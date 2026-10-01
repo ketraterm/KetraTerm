@@ -121,7 +121,7 @@ class TerminalHyperlinkControllerTest {
 
     @ParameterizedTest
     @ValueSource(ints = [1, 7, Int.MAX_VALUE])
-    fun `captured agy authentication segments retain their complete OSC8 target across input chunks`(chunkSize: Int) {
+    fun `captured agy URL fragments hover together independently of the authentication caption across input chunks`(chunkSize: Int) {
         val bytes = agyCapture()
         val uri = agyTarget(bytes)
         assertEquals(704, uri.length)
@@ -165,9 +165,10 @@ class TerminalHyperlinkControllerTest {
                 assertEquals("→ Click here to authenticate", visibleTexts.last())
                 for (segment in segments) {
                     assertFalse(fixture.cache.lineWrapped[segment.row], "The captured TUI uses explicit row placement at $segment")
-                    fixture.hover(segment.startColumn, segment.row)
-                    assertEquals(segments.size, fixture.controller.hoveredSegmentCount)
-                    for ((index, expected) in segments.withIndex()) {
+                    val occurrence = if (segment == segments.last()) listOf(segment) else segments.take(5)
+                    fixture.hover(segment.startColumn, segment.row, activationHover = true)
+                    assertEquals(occurrence.size, fixture.controller.hoveredSegmentCount)
+                    for ((index, expected) in occurrence.withIndex()) {
                         assertEquals(expected.row, fixture.controller.segmentRow(index))
                         assertEquals(expected.startColumn, fixture.controller.segmentStartColumn(index))
                         assertEquals(expected.endColumn, fixture.controller.segmentEndColumn(index))
@@ -176,7 +177,8 @@ class TerminalHyperlinkControllerTest {
                     assertTrue(fixture.click(segment.startColumn, segment.row))
                 }
                 assertEquals(List(6) { uri }, opened)
-                assertEquals(segments.map { RepaintSpan(it.row, it.startColumn, it.row, it.endColumn) }, fixture.host.repaintSpans)
+                val urlSpans = segments.take(5).map { RepaintSpan(it.row, it.startColumn, it.row, it.endColumn) }
+                assertEquals(urlSpans + urlSpans + RepaintSpan(17, 1, 17, 29), fixture.host.repaintSpans)
             }
         }
     }
@@ -194,7 +196,70 @@ class TerminalHyperlinkControllerTest {
     }
 
     @Test
-    fun `explicit group spans hard breaks and gaps but separates differing IDs or destinations`() {
+    fun `wide-character padding connects nonoverlapping fragments only through a soft wrap`() {
+        Osc8PipelineFixture(8, 3).use { f ->
+            f.accept("......" + osc8("https://example.com/wide", "a中"))
+            f.refresh()
+            f.hover(0, 1)
+            assertEquals(2, f.controller.hoveredSegmentCount)
+            assertEquals(listOf(RepaintSpan(0, 6, 0, 7), RepaintSpan(1, 0, 1, 2)), f.host.repaintSpans)
+            f.hover(7, 0)
+            f.assertNoHover()
+        }
+    }
+
+    @Test
+    fun `release over a separate occurrence with the same OSC8 identity does not activate`() {
+        val opened = ArrayList<String>()
+        Osc8PipelineFixture(10, 2, hyperlinkHandler = TerminalHyperlinkHandler { opened.add(it) }).use { f ->
+            val uri = "https://example.com/shared"
+            f.accept(osc8(uri, "AA", "shared") + "  " + osc8(uri, "BB", "shared"))
+            f.refresh()
+            val component = JButton()
+            val press =
+                MouseEvent(
+                    component,
+                    MouseEvent.MOUSE_PRESSED,
+                    0L,
+                    hyperlinkNavigationModifierMask,
+                    CELL_WIDTH / 2,
+                    CELL_HEIGHT / 2,
+                    1,
+                    false,
+                    MouseEvent.BUTTON1,
+                )
+            val release =
+                MouseEvent(
+                    component,
+                    MouseEvent.MOUSE_RELEASED,
+                    0L,
+                    hyperlinkNavigationModifierMask,
+                    4 * CELL_WIDTH + CELL_WIDTH / 2,
+                    CELL_HEIGHT / 2,
+                    1,
+                    false,
+                    MouseEvent.BUTTON1,
+                )
+            assertTrue(f.controller.handleMousePressed(press))
+            assertFalse(f.controller.handleMouseReleased(release))
+            assertTrue(opened.isEmpty())
+        }
+    }
+
+    @Test
+    fun `hard breaks do not connect nonoverlapping same-id occurrences at opposite row edges`() {
+        Osc8PipelineFixture(8, 3).use { f ->
+            val uri = "https://example.com/shared"
+            f.accept("......" + osc8(uri, "AA", "shared") + "\r\n" + osc8(uri, "BB", "shared"))
+            f.refresh()
+            f.hover(0, 1)
+            assertEquals(1, f.controller.hoveredSegmentCount)
+            assertEquals(listOf(RepaintSpan(1, 0, 1, 2)), f.host.repaintSpans)
+        }
+    }
+
+    @Test
+    fun `explicit destination identity does not join occurrences across intervening rows`() {
         Osc8PipelineFixture(12, 4).use { f ->
             val uri = "https://example.com/group"
             f.accept(
@@ -203,8 +268,8 @@ class TerminalHyperlinkControllerTest {
             )
             f.refresh()
             f.hover(0, 2)
-            assertEquals(2, f.controller.hoveredSegmentCount)
-            assertEquals(listOf(RepaintSpan(0, 0, 0, 2), RepaintSpan(2, 0, 2, 2)), f.host.repaintSpans)
+            assertEquals(1, f.controller.hoveredSegmentCount)
+            assertEquals(listOf(RepaintSpan(2, 0, 2, 2)), f.host.repaintSpans)
             f.hover(3, 0)
             assertEquals(1, f.controller.hoveredSegmentCount)
             assertNotEquals(1, f.controller.hoveredHyperlinkId)
@@ -223,13 +288,12 @@ class TerminalHyperlinkControllerTest {
             f.accept("\u001b[1;2Hx")
             f.refresh()
             f.controller.refreshHyperlinkHover()
-            assertEquals(3, f.controller.hoveredSegmentCount)
+            assertEquals(2, f.controller.hoveredSegmentCount)
             assertEquals(
                 listOf(
                     RepaintSpan(0, 0, 0, 4),
                     RepaintSpan(1, 0, 1, 2),
                     RepaintSpan(0, 0, 0, 1),
-                    RepaintSpan(0, 2, 0, 4),
                     RepaintSpan(1, 0, 1, 2),
                 ),
                 f.host.repaintSpans,
@@ -564,7 +628,7 @@ class TerminalHyperlinkControllerTest {
     }
 
     @Test
-    fun `hover over repeated same id includes separated visible segments`() {
+    fun `hover over repeated same id isolates separated occurrences on one row`() {
         val cache =
             TerminalRenderCache(6, 2).apply {
                 hyperlinkIds[rowOffset(1) + 1] = 5
@@ -594,8 +658,12 @@ class TerminalHyperlinkControllerTest {
         assertEquals(1, controller.segmentRow(0))
         assertEquals(1, controller.segmentStartColumn(0))
         assertEquals(1, controller.segmentRow(controller.hoveredSegmentCount - 1))
-        assertEquals(5, controller.segmentEndColumn(controller.hoveredSegmentCount - 1))
-        assertEquals(2, controller.hoveredSegmentCount)
+        assertEquals(3, controller.segmentEndColumn(controller.hoveredSegmentCount - 1))
+        assertEquals(1, controller.hoveredSegmentCount)
+        controller.handleMouseMoved(MouseEvent(button, MouseEvent.MOUSE_MOVED, 0L, 0, 45, 25, 0, false))
+        assertEquals(1, controller.hoveredSegmentCount)
+        assertEquals(4, controller.segmentStartColumn(0))
+        assertEquals(5, controller.segmentEndColumn(0))
     }
 
     @Test
@@ -659,16 +727,16 @@ class TerminalHyperlinkControllerTest {
         val button = JButton()
 
         controller.handleMouseMoved(MouseEvent(button, MouseEvent.MOUSE_MOVED, System.currentTimeMillis(), 0, 15, 25, 0, false))
-        assertEquals(listOf(RepaintSpan(1, 1, 1, 3), RepaintSpan(1, 4, 1, 5)), host.repaintSpans)
+        assertEquals(listOf(RepaintSpan(1, 1, 1, 3)), host.repaintSpans)
         assertEquals(0, host.repaints)
 
         controller.updateHyperlinkActivationHover(true)
-        assertEquals(List(2) { listOf(RepaintSpan(1, 1, 1, 3), RepaintSpan(1, 4, 1, 5)) }.flatten(), host.repaintSpans)
+        assertEquals(List(2) { RepaintSpan(1, 1, 1, 3) }, host.repaintSpans)
         assertEquals(0, host.repaints)
 
         controller.handleMouseMoved(MouseEvent(button, MouseEvent.MOUSE_MOVED, System.currentTimeMillis(), 0, 45, 25, 0, false))
         assertEquals(
-            List(3) { listOf(RepaintSpan(1, 1, 1, 3), RepaintSpan(1, 4, 1, 5)) }.flatten(),
+            List(3) { RepaintSpan(1, 1, 1, 3) } + RepaintSpan(1, 4, 1, 5),
             host.repaintSpans,
         )
         assertEquals(0, host.repaints)
