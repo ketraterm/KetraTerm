@@ -83,6 +83,10 @@ class SwingTerminal
         private val settingsProvider: SwingSettingsProvider,
         private val hostServices: SwingHostServices,
         searchDispatcher: CoroutineDispatcher,
+        hyperlinkDispatcher: CoroutineDispatcher = Dispatchers.Default,
+        private val pointerPosition: (JComponent) -> Point? = {
+            if (it.isShowing && !GraphicsEnvironment.isHeadless()) it.mousePosition else null
+        },
     ) : JComponent(),
         SwingScrollbarScroller {
         @JvmOverloads
@@ -289,6 +293,7 @@ class SwingTerminal
                         ) = this@SwingTerminal.repaintHyperlinkSpan(startRow, startColumn, endRow, endColumn)
                     },
                 scope = componentScope,
+                analysisDispatcher = hyperlinkDispatcher,
             )
         private val hyperlinkController: TerminalHyperlinkController =
             TerminalHyperlinkController(
@@ -357,6 +362,7 @@ class SwingTerminal
 
                     override fun setTerminalFocused(focused: Boolean) {
                         this@SwingTerminal.terminalFocused = focused
+                        if (focused) reconcileHyperlinksOnEdt() else hyperlinkController.clearHyperlinkHover()
                     }
 
                     override fun repaintCursorState() {
@@ -536,6 +542,13 @@ class SwingTerminal
 
         private var ancestorWindow: Window? = null
 
+        private val windowFocusListener =
+            object : WindowAdapter() {
+                override fun windowGainedFocus(event: WindowEvent) = reconcileHyperlinksOnEdt()
+
+                override fun windowLostFocus(event: WindowEvent) = hyperlinkController.clearHyperlinkHover()
+            }
+
         private val windowStateListener =
             WindowStateListener { event ->
                 val iconified = (event.newState and Frame.ICONIFIED) != 0
@@ -607,6 +620,11 @@ class SwingTerminal
             addMouseMotionListener(terminalMouseMotionListener)
             addMouseWheelListener(mouseController.wheelListener)
             addComponentListener(resizeListener)
+            addHierarchyListener { event ->
+                if (event.changeFlags and HierarchyEvent.SHOWING_CHANGED.toLong() != 0L) {
+                    if (isShowing) reconcileHyperlinksOnEdt() else hyperlinkController.clearHyperlinkHover()
+                }
+            }
             preferredSize = preferredGridSize(settings.columns, settings.rows)
             cursorTimer.isRepeats = true
             configureCursorTimerOnEdt()
@@ -914,6 +932,7 @@ class SwingTerminal
 
         override fun addNotify() {
             super.addNotify()
+            if (disposed) return
             terminalFocused = isFocusOwner
             configureCursorTimerOnEdt()
 
@@ -921,8 +940,10 @@ class SwingTerminal
             if (window != null) {
                 ancestorWindow = window
                 window.addWindowStateListener(windowStateListener)
+                window.addWindowFocusListener(windowFocusListener)
                 updateMinimizedStateFromAncestor()
             }
+            reconcileHyperlinksOnEdt()
         }
 
         override fun removeNotify() {
@@ -931,10 +952,9 @@ class SwingTerminal
             visualBellController.stop()
             viewportController.finishScroll()
             selectionController.stopSelectionDrag()
-            hyperlinkDiscoveryController.reset()
+            hyperlinkController.clearHyperlinkHover()
 
-            ancestorWindow?.removeWindowStateListener(windowStateListener)
-            ancestorWindow = null
+            detachAncestorWindow()
 
             super.removeNotify()
         }
@@ -1103,6 +1123,7 @@ class SwingTerminal
                 renderFrameController.handlePublishedFrame()
             }
             requestRenderFromSession(session)
+            reconcileHyperlinksOnEdt()
             publishViewportState(renderCache.historySize)
             repaint()
         }
@@ -1134,6 +1155,7 @@ class SwingTerminal
             if (disposed) return
             disposed = true
             unbindOnEdt()
+            detachAncestorWindow()
             cursorTimer.stop()
             visualBellController.stop()
             viewportController.finishScroll()
@@ -1181,7 +1203,7 @@ class SwingTerminal
                 resizeSessionToVisibleGridOnEdt()
                 searchController.updateViewportHighlights()
                 hyperlinkController.clearHyperlinkHover()
-                hyperlinkDiscoveryController.reset()
+                hyperlinkDiscoveryController.reconcile()
                 session?.let { requestRenderFromSession(it) }
             }
             if (geometryChanged || next.columns != previous.columns || next.rows != previous.rows) {
@@ -2061,6 +2083,25 @@ class SwingTerminal
                 renderCache.updateFrom(published)
             } ?: return
             hyperlinkDiscoveryController.scheduleForFrame()
+        }
+
+        private fun reconcileHyperlinksOnEdt() {
+            if (disposed) return
+            val boundSession = session ?: return
+            refreshRenderCacheFromSession(boundSession)
+            hyperlinkDiscoveryController.reconcile()
+            val position = pointerPosition(this)
+            if (position == null) {
+                hyperlinkController.clearHyperlinkHover()
+            } else {
+                hyperlinkController.updatePointerPosition(position.x, position.y)
+            }
+        }
+
+        private fun detachAncestorWindow() {
+            ancestorWindow?.removeWindowStateListener(windowStateListener)
+            ancestorWindow?.removeWindowFocusListener(windowFocusListener)
+            ancestorWindow = null
         }
 
         private fun requestRenderFromSession(session: TerminalSession) {

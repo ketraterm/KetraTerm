@@ -214,7 +214,25 @@ records/actions without changing surviving occurrence IDs; partially retained
 wrapped occurrences keep their complete prepared destination until their final
 source row leaves retention. Reset/reflow invalidates the affected buffer's state.
 
-Unprocessed content remains asynchronous. Lifecycle recovery, ordered provider
+Discovery belongs to the session binding. Temporary hiding/removal preserves its
+index and running work; showing, reattachment, component focus and ancestor-window
+focus reconcile prepared links and the current stationary pointer. Unbind/dispose
+cancel work and release retained results. A provider that ignores cancellation
+keeps the serialization slot until it returns, and cannot publish obsolete results.
+
+Content demand is conflated independently of viewport/cursor frames. Missing visible
+content is copied first; independent results publish in batches of up to 64 logical
+lines. Worker validation rechecks current source rows after detection, preserving
+valid independent results when unrelated lines changed. Changed visible targets,
+including wrapped targets with an edited off-screen live tail, lose activation
+before rediscovery. Only the latter case needs bounded primitive row-stamp reads on
+the EDT; complete text extraction and provider execution stay on the worker.
+
+Failures and interrupted provider reads retain unprocessed work and allow three
+delayed retries (100 ms, 500 ms, 2 s). Successful empty analysis is retained.
+Scroll/cursor frames cannot restart exhausted recovery. New content, provider/source
+invalidation or an explicit bind/show/focus reconciliation starts a fresh attempt.
+Unprocessed content remains asynchronous. Ordered provider
 continuation/replay, native styles/gestures and semantic OSC 8 hover groups follow
 their separate gates in the [repair map](../docs/terminal-feature-gap-map.md#uri-highlighting-staged-repair).
 The current ordered detector receives bounded preceding context with pending text

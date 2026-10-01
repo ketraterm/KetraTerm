@@ -35,6 +35,99 @@ import kotlin.coroutines.CoroutineContext
 @OptIn(ExperimentalCoroutinesApi::class)
 class TerminalHyperlinkDiscoverySchedulingTest {
     @ParameterizedTest
+    @ValueSource(booleans = [false, true])
+    fun `failure and provider cancellation recover without output or scrolling`(cancelled: Boolean) {
+        var calls = 0
+        Fixture(
+            detector =
+                SwingHyperlinkDetector { request, sink ->
+                    if (++calls == 1) {
+                        if (cancelled) throw CancellationException("Read interrupted") else error("Provider unavailable")
+                    }
+                    sink.addHyperlink(request.hyperlink(0, 0, URL.length, { true }))
+                },
+        ).use { fixture ->
+            fixture.show(URL)
+            fixture.drainUi()
+            fixture.completeAnalysis()
+            assertEquals(1, calls)
+            assertEquals(0, fixture.worker.pendingTasks)
+            fixture.onEdt { fixture.uiDispatcher.scheduler.advanceTimeBy(100) }
+            fixture.drainUi()
+            fixture.completeAnalysis()
+            fixture.onEdt { assertTrue(fixture.openAt(0)) }
+            assertEquals(2, calls)
+        }
+    }
+
+    @Test
+    fun `persistent failure exhausts bounded recovery and viewport frames cannot restart it`() {
+        var calls = 0
+        Fixture(
+            detector =
+                SwingHyperlinkDetector { _, _ ->
+                    calls++
+                    error("Unavailable")
+                },
+        ).use { fixture ->
+            fixture.show(URL, contentGeneration = 42L)
+            fixture.drainUi()
+            fixture.completeAnalysis()
+            for (delay in longArrayOf(100, 500, 2000)) {
+                fixture.onEdt { fixture.uiDispatcher.scheduler.advanceTimeBy(delay) }
+                fixture.drainUi()
+                fixture.completeAnalysis()
+            }
+            assertEquals(4, calls)
+            repeat(10) {
+                fixture.show(URL, contentGeneration = 42L)
+                fixture.drainUi()
+                fixture.completeAnalysis()
+            }
+            fixture.onEdt { fixture.uiDispatcher.scheduler.advanceTimeBy(60_000) }
+            fixture.drainUi()
+            assertEquals(4, calls)
+            assertEquals(0, fixture.worker.pendingTasks)
+            fixture.onEdt { fixture.controller.reconcile() }
+            fixture.drainUi()
+            fixture.completeAnalysis()
+            assertEquals(5, calls, "A lifecycle return explicitly permits a fresh recovery attempt")
+        }
+    }
+
+    @Test
+    fun `successful empty analysis does not schedule recovery`() {
+        var calls = 0
+        Fixture(detector = SwingHyperlinkDetector { _, _ -> calls++ }).use { fixture ->
+            fixture.show("plain")
+            fixture.drainUi()
+            fixture.completeAnalysis()
+            fixture.onEdt { fixture.uiDispatcher.scheduler.advanceTimeBy(60_000) }
+            fixture.drainUi()
+            assertEquals(1, calls)
+            assertEquals(0, fixture.worker.pendingTasks)
+        }
+    }
+
+    @Test
+    fun `independent results publish in bounded batches`() {
+        Fixture().use { fixture ->
+            fixture.show(*Array(200) { "$URL/$it" })
+            fixture.drainUi()
+            fixture.completeAnalysis()
+            assertEquals(64, fixture.requests.single().size)
+            fixture.onEdt {
+                assertTrue(fixture.openAt(0))
+                assertFalse(fixture.openAt(199))
+            }
+            repeat(3) { fixture.completeAnalysis() }
+            assertTrue(fixture.requests.all { it.size <= 64 })
+            assertEquals(200, fixture.requests.sumOf { it.size })
+            fixture.onEdt { assertTrue(fixture.openAt(199)) }
+        }
+    }
+
+    @ParameterizedTest
     @ValueSource(strings = ["binding", "source", "provider"])
     fun `epoch invalidation rejects suspended results and serializes the replacement`(changedEpoch: String) {
         val release = CompletableDeferred<Unit>()
@@ -632,8 +725,10 @@ class TerminalHyperlinkDiscoverySchedulingTest {
             vararg lines: String,
             lineIds: LongArray = LongArray(lines.size) { it + 1L },
             historyContentGeneration: Long = 0L,
+            contentGeneration: Long? = null,
         ) = onEdt {
-            cache.accept(TextFrame(++frameGeneration, lines, lineIds, historyContentGeneration))
+            val generation = ++frameGeneration
+            cache.accept(TextFrame(generation, lines, lineIds, historyContentGeneration, contentGeneration ?: generation))
             controller.scheduleForFrame()
         }
 
@@ -684,6 +779,7 @@ class TerminalHyperlinkDiscoverySchedulingTest {
         private val lines: Array<out String>,
         private val lineIds: LongArray,
         override val historyContentGeneration: Long,
+        override val contentGeneration: Long = frameGeneration,
     ) : TerminalRenderFrame {
         override val structureGeneration = 1L
         override val historySize = (lineIds.firstOrNull()?.minus(1L) ?: 0L).coerceAtLeast(0L).toInt()

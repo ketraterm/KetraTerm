@@ -17,6 +17,7 @@ package io.github.ketraterm.ui.swing.api
 
 import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.Test
+import java.awt.Cursor
 
 class SwingTerminalHyperlinkLifecycleTest {
     @Test
@@ -35,20 +36,24 @@ class SwingTerminalHyperlinkLifecycleTest {
         SwingTerminalHyperlinkLifecycleFixture().use { fixture ->
             fixture.awaitHyperlink()
             val initial = fixture.observation()
+            assertEquals(Cursor.HAND_CURSOR, fixture.cursorType())
 
             fixture.focus(false)
+            assertEquals(Cursor.DEFAULT_CURSOR, fixture.cursorType())
             fixture.focus(true)
 
             val returned = fixture.observation()
             assertEquals(initial.contentGeneration, returned.contentGeneration)
             assertTrue(returned.hasHyperlink)
+            assertEquals(initial.detectorCalls, returned.detectorCalls)
+            assertEquals(Cursor.HAND_CURSOR, fixture.cursorType())
             assertTrue(fixture.openHyperlink())
             assertEquals(listOf(SwingTerminalHyperlinkLifecycleFixture.URL), fixture.openedTargets())
         }
     }
 
     @Test
-    fun `reattachment retains terminal text and frame publication supports activation`() {
+    fun `reattachment restores prepared links and stationary hover without another frame`() {
         SwingTerminalHyperlinkLifecycleFixture().use { fixture ->
             fixture.awaitHyperlink()
             val initial = fixture.observation()
@@ -64,10 +69,49 @@ class SwingTerminalHyperlinkLifecycleTest {
             assertEquals(initial.contentGeneration, attached.contentGeneration)
             assertEquals(SwingTerminalHyperlinkLifecycleFixture.URL, fixture.copyAllText())
 
-            fixture.requestFrame()
-            fixture.awaitHyperlink()
+            assertTrue(attached.hasHyperlink)
+            assertEquals(initial.detectorCalls, attached.detectorCalls)
+            assertEquals(Cursor.HAND_CURSOR, fixture.cursorType())
             assertTrue(fixture.openHyperlink())
             assertEquals(listOf(SwingTerminalHyperlinkLifecycleFixture.URL), fixture.openedTargets())
+        }
+    }
+
+    @Test
+    fun `hiding preserves pending discovery and showing reconciles the stationary pointer`() {
+        SwingTerminalHyperlinkLifecycleFixture().use { fixture ->
+            fixture.show(false)
+            fixture.settle()
+            val hidden = fixture.observation()
+            assertTrue(hidden.hasHyperlink)
+            fixture.show(true)
+            assertEquals(hidden.detectorCalls, fixture.observation().detectorCalls)
+            assertEquals(Cursor.HAND_CURSOR, fixture.cursorType())
+            assertTrue(fixture.openHyperlink())
+        }
+    }
+
+    @Test
+    fun `returning with the pointer outside removes stale hover`() {
+        SwingTerminalHyperlinkLifecycleFixture().use { fixture ->
+            fixture.awaitHyperlink()
+            fixture.focus(false)
+            fixture.pointerOutside()
+            fixture.focus(true)
+            assertEquals(Cursor.DEFAULT_CURSOR, fixture.cursorType())
+            assertTrue(fixture.observation().hasHyperlink)
+        }
+    }
+
+    @Test
+    fun `unbind before worker dispatch releases the slot and rebinding still discovers`() {
+        SwingTerminalHyperlinkLifecycleFixture().use { fixture ->
+            fixture.unbind()
+            fixture.settle()
+            assertEquals(0, fixture.observation().detectorCalls)
+            fixture.rebind()
+            fixture.awaitHyperlink()
+            assertTrue(fixture.openHyperlink())
         }
     }
 

@@ -16,6 +16,7 @@
 package io.github.ketraterm.ui.swing.api
 
 import io.github.ketraterm.render.api.TerminalRenderBufferKind
+import io.github.ketraterm.render.api.TerminalRenderFrameReader
 import io.github.ketraterm.render.cache.TerminalRenderCache
 import java.util.*
 
@@ -53,6 +54,101 @@ internal class TerminalHyperlinkIndex {
     fun finishSourceScan(contentGeneration: Long) {
         buffer.analyzedContentGeneration = contentGeneration
         buffer.hasAnalyzedContent = true
+    }
+
+    /** A rejected source copy must be retried even without another published frame. */
+    fun invalidateSourceScan() {
+        buffer.hasAnalyzedContent = false
+    }
+
+    fun missingSourceRow(
+        cache: TerminalRenderCache,
+        fromRow: Long,
+    ): Long {
+        val top = cache.discardedCount + cache.historySize - cache.scrollbackOffset
+        var row = maxOf(top, fromRow)
+        while (row < top + cache.rows) {
+            val line = lineAt(row)
+            if (line == null || !line.sourceCurrent) return row
+            row = line.snapshot.lastAbsoluteRow + 1L
+        }
+        return -1L
+    }
+
+    /** Invalid copied text cannot be detected again until the source has been recopied. */
+    fun invalidateSource(
+        snapshots: List<TerminalHyperlinkLineSnapshot>,
+        validLines: BooleanArray? = null,
+    ) {
+        invalidateSourceScan()
+        for (index in snapshots.indices) {
+            if (validLines?.get(index) == true) continue
+            val snapshot = snapshots[index]
+            val line = lineAt(snapshot.firstAbsoluteRow) ?: continue
+            if (line.snapshot !== snapshot) continue
+            release(line)
+            line.sourceCurrent = false
+            line.complete = false
+            buffer.nextSourceRow = minOf(buffer.nextSourceRow, snapshot.firstAbsoluteRow)
+        }
+    }
+
+    /**
+     * A visible wrapped prefix may depend on live rows outside the viewport. On content changes,
+     * inspect only those previously live row stamps in bounded locked reads; mutate the index
+     * after unlocking. Complete text reconstruction stays on the worker.
+     */
+    fun invalidateUnobservedEdits(
+        reader: TerminalRenderFrameReader,
+        cache: TerminalRenderCache,
+        previousLiveTop: Long,
+    ) {
+        val top = cache.discardedCount + cache.historySize - cache.scrollbackOffset
+        val end = top + cache.rows
+        var row = top
+        while (row < end) {
+            val line = lineAt(row)
+            if (line == null) {
+                row++
+                continue
+            }
+            val snapshot = line.snapshot
+            row = snapshot.lastAbsoluteRow + 1L
+            if (!line.sourceCurrent || line.links.isEmpty()) continue
+            var next = maxOf(snapshot.firstAbsoluteRow, previousLiveTop, cache.discardedCount)
+            var valid = true
+            while (valid && next <= snapshot.lastAbsoluteRow) {
+                if (next in top until end) {
+                    next = end
+                    continue
+                }
+                val last = minOf(snapshot.lastAbsoluteRow, next + ANALYSIS_LINES - 1L, if (next < top) top - 1L else Long.MAX_VALUE)
+                valid = false
+                reader.readRenderFrameForAbsoluteRange(next, last) { frame ->
+                    val first = frame.discardedCount + frame.historySize - frame.scrollbackOffset
+                    valid =
+                        frame.historyContentGeneration == cache.historyContentGeneration &&
+                        first <= next &&
+                        first + frame.rows > last
+                    if (valid) {
+                        for (absolute in next..last) {
+                            if (!snapshot.matchesSourceRow(frame, (absolute - first).toInt(), absolute)) {
+                                valid = false
+                                break
+                            }
+                        }
+                    }
+                }
+                next = last + 1L
+            }
+            if (!valid) {
+                release(line)
+                line.sourceCurrent = false
+                line.complete = false
+                invalidateSourceScan()
+                buffer.nextSourceRow = minOf(buffer.nextSourceRow, snapshot.firstAbsoluteRow)
+            }
+        }
     }
 
     fun beginSourceScan(
@@ -125,7 +221,9 @@ internal class TerminalHyperlinkIndex {
             } else if (previous != null) {
                 release(previous)
                 previous.complete = false
-                buffer.pending.add(previous)
+                previous.sourceCurrent = false
+                invalidateSourceScan()
+                buffer.nextSourceRow = minOf(buffer.nextSourceRow, previous.snapshot.firstAbsoluteRow)
             }
             row = end
         }
@@ -210,15 +308,32 @@ internal class TerminalHyperlinkIndex {
 
     fun pendingLines(
         context: SwingHyperlinkDetectionContext = SwingHyperlinkDetectionContext.INDEPENDENT_LINE,
+        visibleFirst: Long = -1L,
+        visibleLast: Long = -1L,
     ): List<TerminalHyperlinkLineSnapshot> {
         val result = ArrayList<TerminalHyperlinkLineSnapshot>()
         if (context == SwingHyperlinkDetectionContext.INDEPENDENT_LINE) {
-            for (line in buffer.pending) result.add(line.snapshot)
+            for (line in buffer.pending) {
+                if (line.snapshot.lastAbsoluteRow >= visibleFirst && line.snapshot.firstAbsoluteRow <= visibleLast) {
+                    result.add(line.snapshot)
+                    if (result.size == ANALYSIS_LINES) break
+                }
+            }
+            for (line in buffer.pending) {
+                if (result.size == ANALYSIS_LINES) break
+                if (line.snapshot.lastAbsoluteRow < visibleFirst || line.snapshot.firstAbsoluteRow > visibleLast) result.add(line.snapshot)
+            }
             result.sortBy { it.firstAbsoluteRow }
             return result
         }
         var firstPending = Long.MAX_VALUE
         for (line in buffer.pending) firstPending = minOf(firstPending, line.snapshot.firstAbsoluteRow)
+        for (line in buffer.pending) {
+            if (line.snapshot.lastAbsoluteRow >= visibleFirst && line.snapshot.firstAbsoluteRow <= visibleLast) {
+                firstPending = line.snapshot.firstAbsoluteRow
+                break
+            }
+        }
         if (firstPending == Long.MAX_VALUE) return result
         val first = lowerBound(firstPending)
         // Until the provider owns a persistent ordered chain, capture bounded preceding context.
@@ -234,8 +349,9 @@ internal class TerminalHyperlinkIndex {
         snapshots: List<TerminalHyperlinkLineSnapshot>,
         detected: List<List<TerminalDetectedHyperlink>>,
         context: SwingHyperlinkDetectionContext = SwingHyperlinkDetectionContext.INDEPENDENT_LINE,
+        validSources: BooleanArray? = null,
     ) {
-        var sameContext = true
+        var sameContext = validSources?.all { it } != false
         for (snapshot in snapshots) {
             if (lineAt(snapshot.firstAbsoluteRow)?.snapshot?.text != snapshot.text) {
                 sameContext = false
@@ -244,6 +360,7 @@ internal class TerminalHyperlinkIndex {
         }
         val occurrences = IdentityHashMap<SwingHyperlink, Int>()
         for (index in snapshots.indices) {
+            if (validSources?.get(index) == false) continue
             val snapshot = snapshots[index]
             val line = lineAt(snapshot.firstAbsoluteRow) ?: continue
             if (line.snapshot.firstAbsoluteRow != snapshot.firstAbsoluteRow ||
@@ -292,8 +409,9 @@ internal class TerminalHyperlinkIndex {
     fun writeOverlay(
         cache: TerminalRenderCache,
         repaint: (Int, Int, Int, Int) -> Unit,
-    ) {
-        if (!matches(cache)) return
+    ): Boolean {
+        if (!matches(cache)) return false
+        var changed = false
         val size = rows * columns
         if (nextIds.size < size) nextIds = IntArray(size)
         cache.hyperlinkIds.copyInto(nextIds, endIndex = size)
@@ -339,11 +457,13 @@ internal class TerminalHyperlinkIndex {
                     column++
                 }
                 repaint(r, start, r, column)
+                changed = true
             }
         }
         val old = ids
         ids = nextIds
         nextIds = old
+        return changed
     }
 
     fun evictBefore(first: Long) {
@@ -435,6 +555,7 @@ internal class TerminalHyperlinkIndex {
         val snapshot: TerminalHyperlinkLineSnapshot,
     ) {
         var complete = snapshot.text == "\n"
+        var sourceCurrent = true
         var links: List<Link> = emptyList()
     }
 

@@ -37,15 +37,20 @@ internal interface TerminalHyperlinkDiscoveryHost {
     )
 }
 
-/** EDT-owned discovery lifecycle. A running detector finishes before the latest pending work starts. */
+/**
+ * EDT-owned, binding-lifetime discovery. One serialized worker drains coalesced content demand;
+ * prepared viewport changes only project the index. Failure recovery is bounded per demand.
+ */
 internal class TerminalHyperlinkDiscoveryController(
     private val host: TerminalHyperlinkDiscoveryHost,
     private val scope: CoroutineScope,
     private val analysisDispatcher: CoroutineDispatcher = Dispatchers.Default,
 ) {
     private val index = TerminalHyperlinkIndex()
-    private val sourceScan = TerminalHyperlinkSourceScan()
+    private var sourceScan: TerminalHyperlinkSourceScan? = null
     private var analysisJob: Job? = null
+    private var recoveryJob: Job? = null
+    private var recoveryAttempt = 0
     private var bindingEpoch = 0L
     private var sourceEpoch = 0L
     private var providerEpoch = 0L
@@ -53,44 +58,87 @@ internal class TerminalHyperlinkDiscoveryController(
     private var sourceGeneration = Long.MIN_VALUE
     private var sourceColumns = 0
     private var sourceBuffer = host.renderCache.activeBuffer
-    private var frameRevision = 0L
+    private var contentGeneration = 0L
+    private var demandRevision = 0L
+    private var enabled = false
     private var disposed = false
     private var detector = host.hyperlinkDetector
+    private var priorityTop = -1L
+    private var priorityNextRow = -1L
+    private var previousLiveTop = -1L
     private val repaintSpan = host::repaintHyperlinkSpan
 
+    /** Ends the binding, cancels owned work, and releases retained text/actions. */
     fun reset() {
+        enabled = false
         bindingEpoch++
+        recoveryJob?.cancel(CancellationException("Hyperlink binding replaced"))
+        recoveryJob = null
+        recoveryAttempt = 0
+        analysisJob?.cancel(CancellationException("Hyperlink binding replaced"))
+        // An uncooperative provider retains the serialization slot until it returns.
+        sourceScan = null
         index.clear()
-        // A blocking host provider may ignore cancellation. Keep its slot until it returns.
+        priorityTop = -1L
+        previousLiveTop = -1L
     }
 
     fun dispose() {
         if (disposed) return
         disposed = true
         reset()
-        analysisJob?.cancel(CancellationException("Hyperlink discovery disposed"))
     }
 
     fun scheduleForFrame() {
-        if (disposed) return
+        val cache = host.renderCache
+        if (disposed || !cache.hasFrame) return
+        var changed = !enabled || contentGeneration != cache.contentGeneration
         if (detector !== host.hyperlinkDetector || providerGeneration != host.hyperlinkDetector.configurationGeneration) {
             providerEpoch++
             index.clear()
             detector = host.hyperlinkDetector
             providerGeneration = detector.configurationGeneration
+            changed = true
+            analysisJob?.cancel(CancellationException("Hyperlink provider changed"))
         }
-        val cache = host.renderCache
         if (sourceGeneration != cache.historyContentGeneration || sourceColumns != cache.columns || sourceBuffer != cache.activeBuffer) {
             sourceEpoch++
             sourceGeneration = cache.historyContentGeneration
             sourceColumns = cache.columns
             sourceBuffer = cache.activeBuffer
+            previousLiveTop = -1L
+            changed = true
+            analysisJob?.cancel(CancellationException("Hyperlink source replaced"))
         }
-        if (detector === SwingHyperlinkDetector.NONE) return
-        if (index.update(host.renderCache, detector.context, captureVisible = host.hyperlinkSource == null)) {
-            frameRevision++
-            index.writeOverlay(host.renderCache, repaintSpan)
+        enabled = detector !== SwingHyperlinkDetector.NONE
+        contentGeneration = cache.contentGeneration
+        if (!enabled) {
+            host.hyperlinksChanged()
+            return
         }
+        val projectionChanged = index.update(cache, detector.context, captureVisible = host.hyperlinkSource == null)
+        val source = host.hyperlinkSource
+        if (changed && source != null && previousLiveTop >= 0L) index.invalidateUnobservedEdits(source, cache, previousLiveTop)
+        previousLiveTop = cache.discardedCount + cache.historySize
+        if (projectionChanged || changed) {
+            if (index.writeOverlay(cache, repaintSpan)) host.hyperlinksChanged()
+        }
+        if (changed) requestAnalysis()
+    }
+
+    /** Reconciles a returning binding/show/focus without needing output or a scroll event. */
+    fun reconcile() {
+        scheduleForFrame()
+        if (enabled && (index.needsAnalysis || needsSourceScan())) requestAnalysis()
+        host.hyperlinksChanged()
+    }
+
+    private fun requestAnalysis() {
+        demandRevision++
+        recoveryAttempt = 0
+        recoveryJob?.cancel(CancellationException("Hyperlink demand superseded"))
+        recoveryJob = null
+        priorityTop = -1L
         startAnalysis()
     }
 
@@ -123,116 +171,208 @@ internal class TerminalHyperlinkDiscoveryController(
     private fun needsSourceScan(): Boolean = host.hyperlinkSource != null && !index.isSourceAnalyzed(host.renderCache.contentGeneration)
 
     private fun startAnalysis() {
-        if (analysisJob != null || disposed || !scope.isActive || (!index.needsAnalysis && !needsSourceScan())) return
+        if (analysisJob != null ||
+            recoveryJob != null ||
+            disposed ||
+            !enabled ||
+            !scope.isActive ||
+            (!index.needsAnalysis && !needsSourceScan())
+        ) {
+            return
+        }
         val requestBindingEpoch = bindingEpoch
         val requestSourceEpoch = sourceEpoch
         val requestProviderEpoch = providerEpoch
         val requestDetector = detector
         val requestSource = host.hyperlinkSource
-        // Lazy start assigns the slot before even an immediate dispatcher can finish the coroutine.
+        val scanner = sourceScan ?: TerminalHyperlinkSourceScan().also { sourceScan = it }
+        // Assign the slot before an immediate dispatcher can complete the coroutine.
         val job =
             scope.launch(start = CoroutineStart.LAZY) {
-                val requestRevision = frameRevision
+                val requestRevision = demandRevision
                 var completed = false
+                var recover = false
                 try {
-                    if (requestBindingEpoch != bindingEpoch ||
-                        requestSourceEpoch != sourceEpoch ||
-                        requestProviderEpoch != providerEpoch
-                    ) {
-                        return@launch
-                    }
+                    if (!isCurrent(requestBindingEpoch, requestSourceEpoch, requestProviderEpoch)) return@launch
+                    val cache = host.renderCache
+                    val history = cache.historyContentGeneration
                     if (requestSource != null && needsSourceScan()) {
-                        val cache = host.renderCache
+                        val top = cache.discardedCount + cache.historySize - cache.scrollbackOffset
+                        if (priorityTop != top) {
+                            priorityTop = top
+                            priorityNextRow = top
+                        }
+                        val missing = index.missingSourceRow(cache, priorityNextRow)
                         index.beginSourceScan(cache.contentGeneration, cache.discardedCount + cache.historySize)
-                        val nextRow = index.nextSourceRow
+                        val nextRow = if (missing >= 0L) missing else index.nextSourceRow
                         val buffer = cache.activeBuffer
                         val columns = cache.columns
-                        val history = cache.historyContentGeneration
-                        val contentGeneration = cache.contentGeneration
+                        val observedContent = cache.contentGeneration
                         val scanned =
                             withContext(analysisDispatcher) {
-                                sourceScan.scan(requestSource, nextRow, buffer, columns, history)
-                            } ?: return@launch
-                        if (requestBindingEpoch != bindingEpoch ||
-                            requestSourceEpoch != sourceEpoch ||
-                            requestProviderEpoch != providerEpoch ||
-                            disposed
-                        ) {
+                                scanner.scan(requestSource, nextRow, buffer, columns, history)
+                            }
+                        if (!isCurrent(requestBindingEpoch, requestSourceEpoch, requestProviderEpoch)) return@launch
+                        if (scanned == null) {
+                            recover = true
                             return@launch
                         }
                         index.evictBefore(scanned.firstRetainedRow)
+                        var rejected = false
                         for (snapshot in scanned.lines) {
-                            val top = cache.discardedCount + cache.historySize - cache.scrollbackOffset
+                            val currentTop = cache.discardedCount + cache.historySize - cache.scrollbackOffset
                             var matchesVisible = true
-                            val first = maxOf(snapshot.firstAbsoluteRow, top)
-                            val last = minOf(snapshot.lastAbsoluteRow, top + cache.rows - 1L)
+                            val first = maxOf(snapshot.firstAbsoluteRow, currentTop)
+                            val last = minOf(snapshot.lastAbsoluteRow, currentTop + cache.rows - 1L)
                             for (row in first..last) {
-                                if (!snapshot.matchesTextRow(cache, (row - top).toInt(), row)) {
+                                if (!snapshot.matchesTextRow(cache, (row - currentTop).toInt(), row)) {
                                     matchesVisible = false
                                     break
                                 }
                             }
-                            if (matchesVisible) index.ingest(snapshot, requestDetector.context)
+                            if (matchesVisible) index.ingest(snapshot, requestDetector.context) else rejected = true
                         }
-                        index.nextSourceRow = if (scanned.reachedEnd) scanned.liveTop else scanned.nextSourceRow
-                        // The source can be ahead of the published cache. Drain this observed
-                        // demand once; a later published content generation requests reconciliation.
-                        if (scanned.reachedEnd) index.finishSourceScan(contentGeneration)
+                        if (missing >= 0L) {
+                            priorityNextRow = scanned.nextSourceRow
+                        } else {
+                            index.nextSourceRow = if (scanned.reachedEnd) scanned.liveTop else scanned.nextSourceRow
+                            if (scanned.reachedEnd && !rejected) index.finishSourceScan(observedContent)
+                        }
+                        if (rejected) {
+                            recover = true
+                            return@launch
+                        }
                     }
-                    val lines = index.pendingLines(requestDetector.context)
+                    val top = cache.discardedCount + cache.historySize - cache.scrollbackOffset
+                    val lines = index.pendingLines(requestDetector.context, top, top + cache.rows - 1L)
                     if (lines.isEmpty()) {
+                        publishOverlay()
                         completed = true
                         return@launch
                     }
                     val request =
                         detectionRequest(lines, requestDetector.context, requestBindingEpoch, requestSourceEpoch, requestProviderEpoch)
-                    val result =
-                        withContext(analysisDispatcher) {
-                            val sink = TerminalHyperlinkDetectionAccumulator(lines)
-                            try {
-                                requestDetector.detect(request, sink)
-                            } catch (cancelled: CancellationException) {
-                                throw cancelled
-                            } catch (_: Exception) {
-                                // Failure leaves source unprocessed; automatic recovery is scheduled by its owner.
-                                return@withContext null
-                            }
-                            ensureActive()
-                            sink.links
-                        }
-                    if (result == null) return@launch
-                    if (!disposed &&
-                        requestBindingEpoch == bindingEpoch &&
-                        requestSourceEpoch == sourceEpoch &&
-                        requestProviderEpoch == providerEpoch
-                    ) {
-                        index.accept(lines, result, requestDetector.context)
-                        publishOverlay()
+                    val result = detect(requestDetector, request, lines)
+                    if (result == null) {
+                        recover = true
+                        return@launch
                     }
-                    completed = true
+                    if (!isCurrent(requestBindingEpoch, requestSourceEpoch, requestProviderEpoch)) return@launch
+                    var validSources: BooleanArray? = null
+                    if (requestSource != null) {
+                        val validation =
+                            withContext(analysisDispatcher) {
+                                scanner.validate(requestSource, lines, history)
+                            }
+                        if (!isCurrent(requestBindingEpoch, requestSourceEpoch, requestProviderEpoch)) return@launch
+                        var current = false
+                        requestSource.readRenderFrame { frame ->
+                            current = validation != null &&
+                                frame.contentGeneration == validation.contentGeneration &&
+                                frame.historyContentGeneration == history &&
+                                frame.activeBuffer == sourceBuffer &&
+                                frame.columns == sourceColumns
+                        }
+                        if (!current) {
+                            index.invalidateSource(lines)
+                            publishOverlay()
+                            priorityTop = -1L
+                            recover = true
+                            return@launch
+                        }
+                        validSources = validation?.validLines
+                        if (validSources?.any { !it } == true) {
+                            index.invalidateSource(lines, validSources)
+                            priorityTop = -1L
+                            recover = true
+                        }
+                    }
+                    // Configuration can change while the worker is running, before another UI frame.
+                    if (requestDetector !== host.hyperlinkDetector || providerGeneration != requestDetector.configurationGeneration) {
+                        scheduleForFrame()
+                        return@launch
+                    }
+                    index.accept(lines, result, requestDetector.context, validSources)
+                    publishOverlay()
+                    completed = !recover
                 } finally {
                     analysisJob = null
-                    if (!disposed &&
-                        scope.isActive &&
-                        (
-                            completed ||
-                                requestBindingEpoch != bindingEpoch ||
-                                requestSourceEpoch != sourceEpoch ||
-                                requestProviderEpoch != providerEpoch ||
-                                requestRevision != frameRevision
-                        )
-                    ) {
-                        startAnalysis()
+                    if (!disposed && enabled && scope.isActive) {
+                        if (requestRevision != demandRevision ||
+                            !isCurrent(requestBindingEpoch, requestSourceEpoch, requestProviderEpoch)
+                        ) {
+                            startAnalysis()
+                        } else if (completed) {
+                            recoveryAttempt = 0
+                            startAnalysis()
+                        } else if (recover) {
+                            scheduleRecovery()
+                        }
                     }
                 }
             }
         analysisJob = job
+        job.invokeOnCompletion {
+            // Cancellation before dispatch never enters the body's finally block.
+            scope.launch {
+                if (analysisJob === job) {
+                    analysisJob = null
+                    startAnalysis()
+                }
+            }
+        }
+        job.start()
+    }
+
+    /** Only the external provider is an exception-isolation boundary; index failures propagate. */
+    private suspend fun detect(
+        detector: SwingHyperlinkDetector,
+        request: SwingHyperlinkDetectionRequest,
+        lines: List<TerminalHyperlinkLineSnapshot>,
+    ): List<List<TerminalDetectedHyperlink>>? =
+        withContext(analysisDispatcher) {
+            val sink = TerminalHyperlinkDetectionAccumulator(lines)
+            try {
+                detector.detect(request, sink)
+            } catch (cancelled: CancellationException) {
+                // A provider read may be interrupted while the binding itself remains active.
+                currentCoroutineContext().ensureActive()
+                return@withContext null
+            } catch (failure: Exception) {
+                LOGGER.log(System.Logger.Level.WARNING, "Hyperlink provider failed: {0}", failure.javaClass.name)
+                return@withContext null
+            }
+            ensureActive()
+            sink.links
+        }
+
+    private fun isCurrent(
+        binding: Long,
+        source: Long,
+        provider: Long,
+    ): Boolean = !disposed && enabled && binding == bindingEpoch && source == sourceEpoch && provider == providerEpoch
+
+    private fun scheduleRecovery() {
+        if (recoveryJob != null || recoveryAttempt == RECOVERY_DELAYS.size) return
+        val waitMillis = RECOVERY_DELAYS[recoveryAttempt++]
+        val job =
+            scope.launch(start = CoroutineStart.LAZY) {
+                delay(waitMillis)
+                recoveryJob = null
+                startAnalysis()
+            }
+        recoveryJob = job
         job.start()
     }
 
     private fun publishOverlay() {
         index.writeOverlay(host.renderCache, repaintSpan)
         host.hyperlinksChanged()
+    }
+
+    private companion object {
+        val RECOVERY_DELAYS = longArrayOf(100L, 500L, 2_000L)
+        val LOGGER: System.Logger = System.getLogger(TerminalHyperlinkDiscoveryController::class.java.name)
     }
 }
 

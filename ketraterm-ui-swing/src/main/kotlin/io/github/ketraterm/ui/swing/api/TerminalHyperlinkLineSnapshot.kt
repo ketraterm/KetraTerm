@@ -17,6 +17,7 @@ package io.github.ketraterm.ui.swing.api
 
 import io.github.ketraterm.render.api.TerminalRenderBufferKind
 import io.github.ketraterm.render.api.TerminalRenderCellFlags
+import io.github.ketraterm.render.api.TerminalRenderFrame
 import io.github.ketraterm.render.cache.TerminalRenderCache
 import io.github.ketraterm.ui.swing.render.forEachLogicalTextCell
 
@@ -35,6 +36,21 @@ internal class TerminalHyperlinkLineSnapshot(
     private val wrapped: BooleanArray,
 ) {
     val firstLineId: Long get() = lineIds[0]
+
+    /** Primitive validation for live source rows outside the published viewport. */
+    fun matchesSourceRow(
+        frame: TerminalRenderFrame,
+        row: Int,
+        absoluteRow: Long,
+    ): Boolean {
+        val offset = (absoluteRow - firstAbsoluteRow).toInt()
+        return offset in lineIds.indices &&
+            frame.columns == columns &&
+            frame.activeBuffer == activeBuffer &&
+            frame.lineId(row) == lineIds[offset] &&
+            frame.lineGeneration(row) == generations[offset] &&
+            frame.lineWrapped(row) == wrapped[offset]
+    }
 
     /** First UTF-16 unit owning a cell after the given physical-cell boundary. */
     fun firstOffsetAfterCell(cell: Long): Int {
@@ -64,13 +80,14 @@ internal class TerminalHyperlinkLineSnapshot(
         absoluteRow: Long,
     ): Boolean {
         val offset = (absoluteRow - firstAbsoluteRow).toInt()
-        return !(offset !in lineIds.indices || cache.columns != columns || cache.activeBuffer != activeBuffer) && cache.lineIds[row] == lineIds[offset] &&
-                cache.lineWrapped[row] == wrapped[offset] &&
-                if (lineIds[offset] != 0L) {
-                    cache.lineGenerations[row] == generations[offset]
-                } else {
-                    rowFingerprint(cache, row) == fingerprints[offset]
-                }
+        return !(offset !in lineIds.indices || cache.columns != columns || cache.activeBuffer != activeBuffer) &&
+            cache.lineIds[row] == lineIds[offset] &&
+            cache.lineWrapped[row] == wrapped[offset] &&
+            if (lineIds[offset] != 0L) {
+                cache.lineGenerations[row] == generations[offset]
+            } else {
+                rowFingerprint(cache, row) == fingerprints[offset]
+            }
     }
 
     /** Validates copied source text even when presentation-only mutations advanced row generations. */

@@ -24,12 +24,12 @@ import io.github.ketraterm.ui.swing.settings.SwingSettings
 import io.github.ketraterm.ui.swing.settings.TerminalClipboardHandler
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.StandardTestDispatcher
+import java.awt.Point
 import java.awt.event.FocusEvent
 import java.awt.event.MouseEvent
 import java.util.concurrent.Callable
 import java.util.concurrent.FutureTask
 import java.util.concurrent.LinkedBlockingQueue
-import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicInteger
 import javax.swing.JPanel
 import javax.swing.SwingUtilities
@@ -43,6 +43,7 @@ internal class SwingTerminalHyperlinkLifecycleFixture : AutoCloseable {
     private val opened = ArrayList<String>()
     private var menuRequest: SwingTerminalContextMenuRequest? = null
     private var copiedText: String? = null
+    private var pointer: Point? = Point(1, 1)
     private val session =
         TerminalSession.create(
             terminal = TerminalBuffers.create(width = 40, height = 2, maxHistory = 10),
@@ -100,6 +101,9 @@ internal class SwingTerminalHyperlinkLifecycleFixture : AutoCloseable {
                                 override fun readText(): String? = copiedText
                             },
                     ),
+                searchDispatcher = worker,
+                hyperlinkDispatcher = worker,
+                pointerPosition = { pointer },
             ).apply {
                 size = preferredGridSize(40, 2)
                 container.add(this)
@@ -111,11 +115,38 @@ internal class SwingTerminalHyperlinkLifecycleFixture : AutoCloseable {
         }
 
     fun awaitHyperlink() {
-        while (!observation().hasHyperlink) {
-            val next = checkNotNull(uiTasks.poll(5, TimeUnit.SECONDS)) { "No UI handoff restored the hyperlink" }
-            onEdt { next.run() }
+        settle()
+        check(observation().hasHyperlink) { "Discovery did not restore the hyperlink" }
+    }
+
+    fun settle() {
+        var turns = 0
+        while (true) {
+            check(++turns < 1000) { "Discovery did not become idle" }
+            worker.scheduler.runCurrent()
+            val dispatched =
+                onEdt {
+                    var count = 0
+                    while (true) {
+                        val next = uiTasks.poll() ?: break
+                        count++
+                        next.run()
+                    }
+                    count
+                }
+            if (dispatched == 0) return
         }
     }
+
+    fun pointerOutside() = onEdt { pointer = null }
+
+    fun cursorType(): Int = onEdt { terminal.cursor.type }
+
+    fun show(visible: Boolean) = onEdt { container.isVisible = visible }
+
+    fun unbind() = onEdt { terminal.unbind() }
+
+    fun rebind() = onEdt { terminal.bind(session) }
 
     fun focus(focused: Boolean) =
         onEdt {

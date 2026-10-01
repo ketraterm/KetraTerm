@@ -64,13 +64,15 @@ open class TerminalHyperlinkProjectionBenchmark {
         val full = TerminalRenderCache(columns, retainedRows).apply { accept(source) }
         index = TerminalHyperlinkIndex()
         index.update(full)
-        val lines = index.pendingLines()
-        val request = detectionRequest(lines)
-        val sink = TerminalHyperlinkDetectionAccumulator(lines)
-        for (line in lines.indices) {
-            sink.addHyperlink(request.hyperlink(line, 0, URL.length, SwingHyperlinkAction.NONE, uri = URL))
+        while (index.needsAnalysis) {
+            val lines = index.pendingLines()
+            val request = detectionRequest(lines)
+            val sink = TerminalHyperlinkDetectionAccumulator(lines)
+            for (line in lines.indices) {
+                sink.addHyperlink(request.hyperlink(line, 0, URL.length, SwingHyperlinkAction.NONE, uri = URL))
+            }
+            index.accept(lines, sink.links)
         }
-        index.accept(lines, sink.links)
         frame = ScrollingFrame(source, rows)
         cache = TerminalRenderCache(columns, rows)
         repeat(2) { scrollPreparedHistory() }

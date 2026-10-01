@@ -28,6 +28,61 @@ internal class TerminalHyperlinkSourceScan {
     private val builder = TerminalHyperlinkLineSnapshotBuilder()
 
     /**
+     * Revalidates a bounded detector batch against current source rows. Provider execution can
+     * outlive a frame; unpublished edits must not install an action for obsolete text. An evicted
+     * wrapped prefix is valid only while the retained suffix still has the same identity/text.
+     */
+    suspend fun validate(
+        reader: TerminalRenderFrameReader,
+        lines: List<TerminalHyperlinkLineSnapshot>,
+        historyGeneration: Long,
+    ): Validation? {
+        val firstLine = lines.first()
+        val context = currentCoroutineContext()
+        var first = 0L
+        var last = 0L
+        var generation = 0L
+        var valid = false
+        reader.readRenderFrame { frame ->
+            first = frame.discardedCount
+            last = first + frame.historySize + frame.rows - 1L
+            generation = frame.contentGeneration
+            valid = frame.activeBuffer == firstLine.activeBuffer &&
+                frame.columns == firstLine.columns &&
+                frame.historyContentGeneration == historyGeneration
+        }
+        if (!valid) return null
+        val validLines = BooleanArray(lines.size)
+        for (index in lines.indices) {
+            val line = lines[index]
+            var next = maxOf(first, line.firstAbsoluteRow)
+            if (next > line.lastAbsoluteRow || line.lastAbsoluteRow > last) continue
+            var sameText = true
+            while (next <= line.lastAbsoluteRow) {
+                context.ensureActive()
+                if (!copy.read(reader, next, line.lastAbsoluteRow) { context.ensureActive() }) return null
+                if (copy.firstAbsoluteRow != next ||
+                    !matches(firstLine.activeBuffer, firstLine.columns, historyGeneration, generation)
+                ) {
+                    return null
+                }
+                for (row in 0 until copy.cache.rows) {
+                    if (!line.matchesTextRow(copy.cache, row, next + row)) sameText = false
+                }
+                next += copy.cache.rows
+                yield()
+            }
+            validLines[index] = sameText
+        }
+        return Validation(generation, validLines)
+    }
+
+    internal class Validation(
+        val contentGeneration: Long,
+        val validLines: BooleanArray,
+    )
+
+    /**
      * Reads newly admitted history and changed live rows in batches. A soft-wrapped line is never
      * split between results; copying remains bounded even when that line crosses many batches.
      */

@@ -78,10 +78,18 @@ internal class TerminalHyperlinkController(
     private var controlDown = false
 
     fun handleMouseMoved(event: MouseEvent) {
-        pointerKnown = true
-        pointerX = event.x
-        pointerY = event.y
         controlDown = event.isControlDown
+        updatePointerPosition(event.x, event.y)
+    }
+
+    /** Restores stationary-pointer state after showing or returning to the application. */
+    fun updatePointerPosition(
+        x: Int,
+        y: Int,
+    ) {
+        pointerKnown = true
+        pointerX = x
+        pointerY = y
         refreshHyperlinkHover()
     }
 

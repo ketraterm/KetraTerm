@@ -80,7 +80,9 @@ class TerminalHyperlinkDiscoveryControllerTest {
                 assertTrue(controller.openDiscoveredHyperlink(controller.hyperlinkIdAt(0, 0, cache), cache))
                 assertEquals(listOf(originalUrl), opened)
                 opened.clear()
-                host.onHyperlinksChanged = { nextDetection.countDown() }
+                host.onHyperlinksChanged = {
+                    if (controller.hyperlinkIdAt(0, 0, cache) < 0) nextDetection.countDown()
+                }
                 for (generation in 2L..3L) {
                     cache.accept(frame(generation))
                     controller.scheduleForFrame()
@@ -351,7 +353,7 @@ class TerminalHyperlinkDiscoveryControllerTest {
     @Test
     fun `scheduled analysis publishes discovered url overlay`() {
         val cache = TerminalRenderCache(24, 1)
-        writeText(cache, row = 0, text = "https://example.com")
+        cache.accept(StaticTextFrame(1L, 1L, arrayOf("https://example.com"), longArrayOf(1L)))
         val opened = AtomicBoolean(false)
         val repaintObserved = CountDownLatch(1)
         val host =

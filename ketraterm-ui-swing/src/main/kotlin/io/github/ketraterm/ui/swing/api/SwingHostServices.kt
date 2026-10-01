@@ -88,8 +88,8 @@ fun interface SwingTerminalHostKeyHandler {
  * @property hyperlinkHandler host policy for explicit Ctrl-click hyperlink
  * activation.
  * @property hyperlinkDetector host detector for links discovered from the
- * currently visible terminal viewport. Detection runs outside paint and mouse
- * movement, and reported actions are invoked only after explicit activation.
+ * retained terminal content. Binding-owned detection runs outside paint and mouse
+ * movement, continues while temporarily hidden, and invokes actions only after explicit activation.
  * @property viewportListener host scrollbar adapter notified when the terminal
  * scrollback viewport changes.
  * @property scrollbarOverlayEnabled whether the reusable component should draw

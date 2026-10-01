@@ -36,6 +36,121 @@ import kotlin.coroutines.CoroutineContext
 
 class TerminalHyperlinkRetentionTest {
     @Test
+    fun `unchanged offscreen wrapped tail keeps its action through unrelated live output`() {
+        Fixture(8, 4, 100).use { fixture ->
+            val url = "https://example.invalid/" + "a".repeat(100)
+            fixture.output(url)
+            fixture.output("footer")
+            fixture.show()
+            fixture.settle()
+            fixture.showAbsolute(11)
+            val id = fixture.idAt(0)
+            assertTrue(id < 0)
+            fixture.terminal.positionCursor(0, 3)
+            fixture.terminal.writeText("changed")
+            fixture.showAbsolute(11)
+            assertEquals(id, fixture.idAt(0))
+            fixture.settle()
+            assertEquals(id, fixture.idAt(0))
+            assertTrue(fixture.openAt(0))
+            assertEquals(url, fixture.opened.last())
+        }
+    }
+
+    @Test
+    fun `unpublished unrelated output cannot block an unchanged independent result`() {
+        val release = CompletableDeferred<Unit>()
+        Fixture(80, 3, 100, beforeDetection = { release.await() }).use { fixture ->
+            val url = "https://example.invalid/stable"
+            fixture.output(url)
+            fixture.output("progress 0%")
+            fixture.show()
+            fixture.settle()
+            fixture.terminal.positionCursor(0, 1)
+            fixture.terminal.writeText("progress 1%")
+            release.complete(Unit)
+            fixture.settle()
+            assertTrue(fixture.openAt(0))
+            assertEquals(url, fixture.opened.last())
+        }
+    }
+
+    @Test
+    fun `an offscreen live edit invalidates the visible wrapped prefix before analysis`() {
+        Fixture(8, 3, 200).use { fixture ->
+            val url = "https://example.invalid/" + "a".repeat(100)
+            fixture.output(url)
+            fixture.show()
+            fixture.settle()
+            fixture.showAbsolute(0)
+            val previous = fixture.idAt(0)
+            assertTrue(previous < 0)
+            fixture.terminal.positionCursor(0, 2)
+            fixture.terminal.writeText("z")
+            fixture.showAbsolute(0)
+            assertEquals(0, fixture.idAt(0))
+            assertFalse(fixture.resolvable(previous))
+            fixture.settle()
+            assertTrue(fixture.openAt(0))
+            assertNotEquals(url, fixture.opened.last())
+        }
+    }
+
+    @Test
+    fun `cold bind prioritizes visible links before backfilling older history`() {
+        Fixture(80, 24, 2000).use { fixture ->
+            repeat(1000) { fixture.output("https://example.invalid/$it") }
+            fixture.show()
+            fixture.settle()
+            assertEquals("https://example.invalid/976\n", fixture.detected.first())
+            assertTrue(fixture.openAt(0))
+            fixture.showAbsolute(0)
+            assertTrue(fixture.openAt(0))
+            assertEquals("https://example.invalid/0", fixture.opened.last())
+        }
+    }
+
+    @Test
+    fun `unpublished edits during provider suspension cannot publish obsolete actions`() {
+        val release = CompletableDeferred<Unit>()
+        Fixture(80, 3, 100, beforeDetection = { release.await() }).use { fixture ->
+            fixture.output("https://example.invalid/old")
+            fixture.show()
+            fixture.settle()
+            assertEquals(1, fixture.requestSizes.size)
+            fixture.terminal.positionCursor(0, 0)
+            fixture.terminal.writeText("https://example.invalid/new")
+            release.complete(Unit)
+            fixture.settle()
+            assertFalse(fixture.openAt(0), "The cache still has old text, but the source already changed")
+            fixture.show()
+            fixture.settle()
+            assertTrue(fixture.openAt(0))
+            assertEquals("https://example.invalid/new", fixture.opened.last())
+        }
+    }
+
+    @Test
+    fun `unpublished reset rejects an otherwise identical provider result`() {
+        val release = CompletableDeferred<Unit>()
+        Fixture(80, 3, 100, beforeDetection = { release.await() }).use { fixture ->
+            val url = "https://example.invalid/same"
+            fixture.output(url)
+            fixture.show()
+            fixture.settle()
+            assertEquals(1, fixture.requestSizes.size)
+            fixture.terminal.reset()
+            fixture.terminal.writeText(url)
+            release.complete(Unit)
+            fixture.settle()
+            assertFalse(fixture.openAt(0))
+            fixture.show()
+            fixture.settle()
+            assertTrue(fixture.openAt(0))
+        }
+    }
+
+    @Test
     fun `every content generation value distinguishes unprocessed and analyzed source`() {
         val index = TerminalHyperlinkIndex()
         for (generation in longArrayOf(Long.MIN_VALUE, Long.MAX_VALUE, -1L, 0L)) {
@@ -368,6 +483,7 @@ class TerminalHyperlinkRetentionTest {
         rows: Int,
         history: Int,
         ordered: Boolean = false,
+        beforeDetection: suspend () -> Unit = {},
     ) : AutoCloseable {
         val terminal: TerminalBuffer = TerminalBuffers.create(columns, rows, maxHistory = history)
         private val source = terminal as TerminalRenderFrameReader
@@ -398,6 +514,7 @@ class TerminalHyperlinkRetentionTest {
                             ) {
                                 assertFalse(SwingUtilities.isEventDispatchThread())
                                 requestSizes.add(request.lineCount)
+                                beforeDetection()
                                 for (index in 0 until request.lineCount) {
                                     val text = request.lineText(index)
                                     detected.add(text)
