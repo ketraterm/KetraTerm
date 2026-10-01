@@ -22,6 +22,7 @@ import io.github.ketraterm.transport.TerminalConnectorListener
 import io.github.ketraterm.ui.swing.settings.SwingPadding
 import io.github.ketraterm.ui.swing.settings.SwingSettings
 import io.github.ketraterm.ui.swing.settings.TerminalClipboardHandler
+import io.github.ketraterm.ui.swing.settings.TerminalHyperlinkHandler
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.StandardTestDispatcher
 import java.awt.Point
@@ -68,6 +69,7 @@ internal class SwingTerminalHyperlinkLifecycleFixture : AutoCloseable {
                 hostServices =
                     SwingHostServices(
                         uiDispatcher = { uiTasks.add(it) },
+                        hyperlinkHandler = TerminalHyperlinkHandler { opened.add(it) },
                         hyperlinkDetector = { request, sink ->
                             check(!SwingUtilities.isEventDispatchThread())
                             detectorCalls.incrementAndGet()
@@ -83,6 +85,7 @@ internal class SwingTerminalHyperlinkLifecycleFixture : AutoCloseable {
                                                 check(SwingUtilities.isEventDispatchThread())
                                                 opened.add(URL)
                                             },
+                                            uri = URL,
                                         ),
                                     )
                                 }
@@ -168,6 +171,19 @@ internal class SwingTerminalHyperlinkLifecycleFixture : AutoCloseable {
     fun openHyperlink(): Boolean = onEdt { contextHyperlink()?.open() == true }
 
     fun openedTargets(): List<String> = onEdt { opened.toList() }
+
+    fun captureHyperlink(): SwingTerminalContextHyperlink = onEdt { checkNotNull(contextHyperlink()) }
+
+    fun openCaptured(link: SwingTerminalContextHyperlink): Boolean = onEdt { link.open() }
+
+    fun copyCaptured(link: SwingTerminalContextHyperlink): String? = onEdt { if (link.copyUri()) copiedText else null }
+
+    fun replaceOutput(text: String) {
+        val bytes = ("\u001b[H\u001b[2J" + text).encodeToByteArray()
+        session.onBytes(bytes, 0, bytes.size)
+        requestFrame()
+        settle()
+    }
 
     fun copyAllText(): String? =
         onEdt {

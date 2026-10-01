@@ -103,8 +103,11 @@ class SwingTerminalContextMenuRequest internal constructor(
 /**
  * Hyperlink context available to a terminal context menu.
  *
- * @property uri resolved OSC 8 URI when available. Host-discovered links may
- * expose only [open] and leave this value `null`.
+ * The target and action are captured when the menu is requested. Later output,
+ * scrolling, eviction, or rebinding cannot change the menu's destination.
+ *
+ * @property uri complete OSC 8 or host-discovered URI when available. Navigation
+ * actions without a copyable URI expose only [open] and leave this value `null`.
  */
 class SwingTerminalContextHyperlink internal constructor(
     val uri: String?,

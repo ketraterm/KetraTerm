@@ -89,22 +89,13 @@ internal class TerminalTextPainter(
         textBlinkVisible: Boolean = true,
         hyperlinkIds: IntArray = cache.hyperlinkIds,
         hoveredHyperlinkId: Int = NO_HYPERLINK_ID,
-        hoveredHyperlinkStartRow: Int = DEFAULT_HOVER_START_ROW,
-        hoveredHyperlinkStartColumn: Int = 0,
-        hoveredHyperlinkEndRow: Int = DEFAULT_HOVER_END_ROW,
-        hoveredHyperlinkEndColumn: Int = DEFAULT_HOVER_END_COLUMN,
         hyperlinkActivationHover: Boolean = false,
         hyperlinkActivationForeground: Int = DEFAULT_HYPERLINK_ACTIVATION_FOREGROUND,
     ) {
         runStyle.configureRow(
-            row = row,
             textBlinkVisible = textBlinkVisible,
             hyperlinkIds = hyperlinkIds,
             hoveredHyperlinkId = hoveredHyperlinkId,
-            hoveredHyperlinkStartRow = hoveredHyperlinkStartRow,
-            hoveredHyperlinkStartColumn = hoveredHyperlinkStartColumn,
-            hoveredHyperlinkEndRow = hoveredHyperlinkEndRow,
-            hoveredHyperlinkEndColumn = hoveredHyperlinkEndColumn,
             hyperlinkActivationHover = hyperlinkActivationHover,
             hyperlinkActivationForeground = hyperlinkActivationForeground,
         )
@@ -520,9 +511,6 @@ internal class TerminalTextPainter(
     private companion object {
         private const val INITIAL_TEXT_RUN_CAPACITY = 256
         private const val NO_HYPERLINK_ID = 0
-        private const val DEFAULT_HOVER_START_ROW = 0
-        private const val DEFAULT_HOVER_END_ROW = Int.MAX_VALUE
-        private const val DEFAULT_HOVER_END_COLUMN = Int.MAX_VALUE
         private const val DEFAULT_HYPERLINK_ACTIVATION_FOREGROUND = 0xFF4DA3FF.toInt()
     }
 }

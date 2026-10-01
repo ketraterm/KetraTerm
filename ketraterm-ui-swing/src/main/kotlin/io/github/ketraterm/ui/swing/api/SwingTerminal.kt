@@ -1041,10 +1041,6 @@ class SwingTerminal
                     hoveredPromptMarkerRow = hoveredPromptMarkerRow,
                     hyperlinkIds = hyperlinkDiscoveryController.hyperlinkIdsFor(renderCache),
                     hoveredHyperlinkId = hyperlinkController.hoveredHyperlinkId,
-                    hoveredHyperlinkStartRow = hyperlinkController.hoveredHyperlinkStartRow,
-                    hoveredHyperlinkStartColumn = hyperlinkController.hoveredHyperlinkStartColumn,
-                    hoveredHyperlinkEndRow = hyperlinkController.hoveredHyperlinkEndRow,
-                    hoveredHyperlinkEndColumn = hyperlinkController.hoveredHyperlinkEndColumn,
                     hyperlinkActivationHover = hyperlinkController.hyperlinkActivationHover,
                 )
                 if (hostServices.scrollbarOverlayEnabled) {
@@ -1787,10 +1783,20 @@ class SwingTerminal
         private fun contextHyperlinkAt(event: MouseEvent): SwingTerminalContextHyperlink? {
             val hyperlinkId = hyperlinkController.hyperlinkIdAt(event)
             if (hyperlinkId == NO_HYPERLINK_ID) return null
-            val uri = if (hyperlinkId > 0) session?.hyperlinkUri(hyperlinkId) else null
+            val detected = hyperlinkDiscoveryController.discoveredHyperlink(hyperlinkId, renderCache)
+            val uri = if (hyperlinkId > 0) session?.hyperlinkUri(hyperlinkId) else detected?.uri
+            val openAction: () -> Boolean =
+                if (hyperlinkId > 0) {
+                    if (uri == null) return null
+                    val handler = hostServices.hyperlinkHandler
+                    { handler.openHyperlink(uri) }
+                } else {
+                    val action = detected?.action ?: return null
+                    action::open
+                }
             return SwingTerminalContextHyperlink(
                 uri = uri,
-                openAction = { openHyperlink(hyperlinkId) },
+                openAction = openAction,
                 copyUriAction = {
                     uri != null && copyTextToClipboard(uri)
                 },

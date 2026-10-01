@@ -31,8 +31,8 @@ The URL occupies five separately emitted fragments of 174, 174, 174, 174, and
 8 characters. The sixth segment is the separate authentication label.
 The capture demonstrates application-authored line layout, not a single URL
 left to terminal soft wrapping. Replay assertions establish its actual grid
-geometry and destination identity; hover grouping observations are diagnostic
-until the grouping implementation is corrected.
+geometry, destination identity, and whole-group hover/repaint from every fragment.
+The separate authentication caption belongs to the same explicit OSC 8 group.
 
 This is a fresh reproduction of the screen reported by the user, not a recovery
 of the bytes behind their screenshot. The screenshot alone does not establish

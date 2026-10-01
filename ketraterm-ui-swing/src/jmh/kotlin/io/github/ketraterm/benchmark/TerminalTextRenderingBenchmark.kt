@@ -114,7 +114,8 @@ open class TerminalTextRenderingBenchmark {
         styleCache =
             TerminalRenderCache(80, 1).apply {
                 accept(TerminalRenderBenchmarkFrame(listOf("A".repeat(80))))
-                hyperlinkIds.fill(7)
+                hyperlinkIds.fill(8)
+                hyperlinkIds.fill(7, 20, 60)
             }
         val asciiColors = AwtColorCache()
         asciiPainter = TerminalTextPainter(asciiColors, TerminalDecorationPainter(asciiColors)).apply { updateSettings(settings) }
@@ -265,14 +266,9 @@ open class TerminalTextRenderingBenchmark {
     open fun scanHyperlinkStyles(): Int {
         hoverActive = !hoverActive
         runStyle.configureRow(
-            row = 0,
             textBlinkVisible = hoverActive,
             hyperlinkIds = styleCache.hyperlinkIds,
             hoveredHyperlinkId = 7,
-            hoveredHyperlinkStartRow = 0,
-            hoveredHyperlinkStartColumn = 20,
-            hoveredHyperlinkEndRow = 0,
-            hoveredHyperlinkEndColumn = 60,
             hyperlinkActivationHover = hoverActive,
             hyperlinkActivationForeground = 0xFF4DA3FF.toInt(),
         )

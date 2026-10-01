@@ -19,13 +19,14 @@ import io.github.ketraterm.render.api.TerminalColorPalette
 import io.github.ketraterm.render.api.TerminalRenderAttrs
 import io.github.ketraterm.render.cache.TerminalRenderCache
 import io.github.ketraterm.ui.swing.render.SwingColors
+import io.github.ketraterm.ui.swing.render.hyperlinkIdForCell
 import io.github.ketraterm.ui.swing.render.isTextHidden
 import io.github.ketraterm.ui.swing.render.terminalFontStyle
 
 /**
  * Reusable resolved style for one text run, shared by ASCII, complex-cell and shaped painters.
  *
- * The owning text painter configures the hover interval and blink phase once per row, then
+ * The owning text painter configures the hover identity and blink phase once per row, then
  * calls [begin] before scanning or painting each run. [matches] leaves that run's style intact.
  * All state is painter-local; no style objects or hover ranges are allocated during painting.
  * Like the painter's other scratch buffers, this instance is confined to one paint invocation
@@ -51,29 +52,19 @@ internal class TerminalTextRunStyle {
     private var textBlinkVisible = true
     private var hyperlinkIds = IntArray(0)
     private var hoveredHyperlinkId = 0
-    private var hoverStartColumn = 0
-    private var hoverEndColumn = 0
     private var activationHover = false
     private var activationForeground = 0
 
     fun configureRow(
-        row: Int,
         textBlinkVisible: Boolean,
         hyperlinkIds: IntArray,
         hoveredHyperlinkId: Int,
-        hoveredHyperlinkStartRow: Int,
-        hoveredHyperlinkStartColumn: Int,
-        hoveredHyperlinkEndRow: Int,
-        hoveredHyperlinkEndColumn: Int,
         hyperlinkActivationHover: Boolean,
         hyperlinkActivationForeground: Int,
     ) {
         this.textBlinkVisible = textBlinkVisible
         this.hyperlinkIds = hyperlinkIds
-        this.hoveredHyperlinkId =
-            if (row >= hoveredHyperlinkStartRow && row <= hoveredHyperlinkEndRow) hoveredHyperlinkId else 0
-        hoverStartColumn = if (row == hoveredHyperlinkStartRow) hoveredHyperlinkStartColumn else 0
-        hoverEndColumn = if (row == hoveredHyperlinkEndRow) hoveredHyperlinkEndColumn else Int.MAX_VALUE
+        this.hoveredHyperlinkId = hoveredHyperlinkId
         activationHover = hyperlinkActivationHover
         activationForeground = hyperlinkActivationForeground
     }
@@ -87,8 +78,8 @@ internal class TerminalTextRunStyle {
         val index = rowOffset + column
         attr = cache.attrWords[index]
         extraAttr = cache.extraAttrWords[index]
-        hyperlinkId = hyperlinkIds[index]
-        hovered = isHovered(hyperlinkId, column)
+        hyperlinkId = hyperlinkIdForCell(hyperlinkIds[index], cache.flags[index])
+        hovered = isHovered(hyperlinkId)
         foreground = effectiveForeground(palette, attr, cache.codeWords[index], hovered)
         fontStyle = terminalFontStyle(attr)
         decoration = decorationKey(attr, extraAttr)
@@ -103,28 +94,13 @@ internal class TerminalTextRunStyle {
     ): Boolean {
         val index = rowOffset + column
         val candidateAttr = cache.attrWords[index]
-        if (
-            isTextHidden(candidateAttr, textBlinkVisible) != textHidden ||
-            terminalFontStyle(candidateAttr) != fontStyle ||
-            decorationKey(candidateAttr, cache.extraAttrWords[index]) != decoration ||
-            hyperlinkIds[index] != hyperlinkId
-        ) {
-            return false
-        }
-
-        val candidateHovered = isHovered(hyperlinkId, column)
-        return candidateHovered == hovered &&
-            effectiveForeground(palette, candidateAttr, cache.codeWords[index], candidateHovered) == foreground
+        return !(isTextHidden(candidateAttr, textBlinkVisible) != textHidden ||
+                terminalFontStyle(candidateAttr) != fontStyle ||
+                decorationKey(candidateAttr, cache.extraAttrWords[index]) != decoration ||
+                hyperlinkIdForCell(hyperlinkIds[index], cache.flags[index]) != hyperlinkId) && effectiveForeground(palette, candidateAttr, cache.codeWords[index], hovered) == foreground
     }
 
-    private fun isHovered(
-        hyperlinkId: Int,
-        column: Int,
-    ): Boolean =
-        hyperlinkId != 0 &&
-            hyperlinkId == hoveredHyperlinkId &&
-            column >= hoverStartColumn &&
-            column < hoverEndColumn
+    private fun isHovered(hyperlinkId: Int): Boolean = hyperlinkId != 0 && hyperlinkId == hoveredHyperlinkId
 
     private fun effectiveForeground(
         palette: TerminalColorPalette,

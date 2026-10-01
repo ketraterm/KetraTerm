@@ -21,6 +21,36 @@ import java.awt.Cursor
 
 class SwingTerminalHyperlinkLifecycleTest {
     @Test
+    fun `detected menu keeps action and copy URI after output replacement and rebinding`() {
+        SwingTerminalHyperlinkLifecycleFixture().use { f ->
+            f.awaitHyperlink()
+            val captured = f.captureHyperlink()
+            f.replaceOutput("plain")
+            assertFalse(f.observation().hasHyperlink)
+            f.unbind()
+            f.rebind()
+            f.settle()
+            assertTrue(f.openCaptured(captured))
+            assertEquals(SwingTerminalHyperlinkLifecycleFixture.URL, f.copyCaptured(captured))
+            assertEquals(listOf(SwingTerminalHyperlinkLifecycleFixture.URL), f.openedTargets())
+        }
+    }
+
+    @Test
+    fun `OSC8 menu keeps original target after registry reset and replacement`() {
+        SwingTerminalHyperlinkLifecycleFixture().use { f ->
+            f.awaitHyperlink()
+            val original = "https://example.com/original"
+            f.replaceOutput("\u001b]8;id=menu;$original\u0007old\u001b]8;;\u0007")
+            val captured = f.captureHyperlink()
+            f.replaceOutput("\u001bc\u001b]8;id=menu;https://example.com/replaced\u0007new\u001b]8;;\u0007")
+            assertTrue(f.openCaptured(captured))
+            assertEquals(original, f.copyCaptured(captured))
+            assertEquals(listOf(original), f.openedTargets())
+        }
+    }
+
+    @Test
     fun `published detected link exposes its full target through the host menu`() {
         SwingTerminalHyperlinkLifecycleFixture().use { fixture ->
             fixture.awaitHyperlink()

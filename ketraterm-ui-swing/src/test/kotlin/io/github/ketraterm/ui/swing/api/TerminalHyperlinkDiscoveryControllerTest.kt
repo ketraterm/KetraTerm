@@ -290,14 +290,24 @@ class TerminalHyperlinkDiscoveryControllerTest {
 
                     hover.clearHyperlinkHover()
                     repaints.clear()
-                    val expectedSpan = CellSelection(3, firstRow, 6, firstRow + 2)
+                    val expectedSpans =
+                        listOf(
+                            CellSelection(3, firstRow, cache.columns, firstRow),
+                            CellSelection(
+                                0,
+                                firstRow + 1,
+                                cache.columns,
+                                firstRow + 1,
+                            ),
+                            CellSelection(0, firstRow + 2, 6, firstRow + 2),
+                        )
                     for (row in firstRow..firstRow + 2) {
                         hover.handleMouseMoved(MouseEvent(source, MouseEvent.MOUSE_MOVED, 0L, 0, 4, row, 0, false))
                         assertEquals(linkId, hover.hoveredHyperlinkId)
-                        assertEquals(firstRow, hover.hoveredHyperlinkStartRow)
-                        assertEquals(3, hover.hoveredHyperlinkStartColumn)
-                        assertEquals(firstRow + 2, hover.hoveredHyperlinkEndRow)
-                        assertEquals(6, hover.hoveredHyperlinkEndColumn)
+                        assertEquals(firstRow, hover.segmentRow(0))
+                        assertEquals(3, hover.segmentStartColumn(0))
+                        assertEquals(firstRow + 2, hover.segmentRow(hover.hoveredSegmentCount - 1))
+                        assertEquals(6, hover.segmentEndColumn(hover.hoveredSegmentCount - 1))
                         val click =
                             MouseEvent(
                                 source,
@@ -314,22 +324,17 @@ class TerminalHyperlinkDiscoveryControllerTest {
                         assertTrue(click.isConsumed)
                     }
                     assertEquals(
-                        listOf(expectedSpan),
+                        expectedSpans,
                         repaints,
                         "Moving between segments must not repaint separate row spans",
                     )
                     hover.updateHyperlinkActivationHover(true)
-                    assertEquals(listOf(expectedSpan, expectedSpan), repaints)
+                    assertEquals(expectedSpans + expectedSpans, repaints)
                     for (row in firstRow..firstRow + 2) {
                         style.configureRow(
-                            row,
                             true,
                             ids,
                             hover.hoveredHyperlinkId,
-                            hover.hoveredHyperlinkStartRow,
-                            hover.hoveredHyperlinkStartColumn,
-                            hover.hoveredHyperlinkEndRow,
-                            hover.hoveredHyperlinkEndColumn,
                             hover.hyperlinkActivationHover,
                             activationForeground,
                         )

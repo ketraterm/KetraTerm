@@ -198,6 +198,18 @@ with `ORDERED_CONTENT`, make detector overrides suspending, and replace the
 positional sink overload with `addHyperlink(SwingHyperlink)` or the request
 factory above. There is no compatibility detector pipeline.
 
+Hover uses the occurrence identity in the prepared cell plane. Explicit OSC 8
+ID/destination pairs hover together across hard breaks and separated segments;
+anonymous OSC 8 runs and independent detector results keep distinct identities.
+Painting compares primitive IDs, and reusable row/start/end buffers retain the
+visible group for precise repainting after edits or viewport changes. Moving
+within the same group does not scan its cells or request additional painting.
+
+Context menus capture the resolved action and optional complete URI when opened.
+They retain their target across output changes, eviction and rebinding. Detectors
+should provide `SwingHyperlink.uri` when their target can be copied; the existing
+host menu then exposes Copy Link. This adds no detector API migration.
+
 Discovery now uses one retained logical-line index for the binding, with separate
 primary/alternate state validated against each buffer's history-content generation.
 Stable occurrence IDs own actions independently of viewport projection. Successful
@@ -233,7 +245,7 @@ delayed retries (100 ms, 500 ms, 2 s). Successful empty analysis is retained.
 Scroll/cursor frames cannot restart exhausted recovery. New content, provider/source
 invalidation or an explicit bind/show/focus reconciliation starts a fresh attempt.
 Unprocessed content remains asynchronous. Ordered provider
-continuation/replay, native styles/gestures and semantic OSC 8 hover groups follow
+continuation/replay and native styles/gestures follow
 their separate gates in the [repair map](../docs/terminal-feature-gap-map.md#uri-highlighting-staged-repair).
 The current ordered detector receives bounded preceding context with pending text
 (up to 64 preceding and 64 pending logical lines per request). Preserving provider

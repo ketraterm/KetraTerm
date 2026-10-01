@@ -19,6 +19,12 @@ import io.github.ketraterm.render.api.TerminalRenderAttrs
 import io.github.ketraterm.render.api.TerminalRenderCellFlags
 import java.awt.Font
 
+/** Artificial wrap padding has no link; authored spaces and wide trailing cells keep their identity. */
+internal fun hyperlinkIdForCell(
+    hyperlinkId: Int,
+    flags: Int,
+): Int = if (flags and TerminalRenderCellFlags.WRAP_PADDING == 0) hyperlinkId else 0
+
 internal fun terminalFontStyle(attr: Long): Int {
     var style = Font.PLAIN
     if (TerminalRenderAttrs.isBold(attr)) style = style or Font.BOLD

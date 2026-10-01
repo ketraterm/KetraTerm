@@ -103,17 +103,15 @@ class TerminalTextPainterTest {
 
     @ParameterizedTest
     @ValueSource(strings = ["AAA", "ééé", "\u0915\u0915\u0915", "\u05D0\u05D0\u05D0"])
-    fun `hover underline stays within its span without an activation color override`(text: String) {
+    fun `hover underline stays within its occurrence without an activation color override`(text: String) {
         val fixture = fixture()
         val cache = renderCache(TestRenderFrame.text(text))
-        cache.hyperlinkIds.fill(7)
+        cache.hyperlinkIds.fill(8)
+        cache.hyperlinkIds[1] = 7
         try {
             fixture.paintRow(
                 cache,
                 hoveredHyperlinkId = 7,
-                hoveredHyperlinkStartColumn = 1,
-                hoveredHyperlinkEndColumn = 2,
-                hoveredHyperlinkEndRow = 0,
             )
 
             val secondUnderlineY = fixture.metrics.underlineY + 1
@@ -161,10 +159,6 @@ class TerminalTextPainterTest {
                                 textBlinkVisible = phase % 2 == 0,
                                 hyperlinkIds = if (phase < 3) discoveredHyperlinks else cache.hyperlinkIds,
                                 hoveredHyperlinkId = if (phase < 2) 7 else 0,
-                                hoveredHyperlinkStartRow = 0,
-                                hoveredHyperlinkStartColumn = 1,
-                                hoveredHyperlinkEndRow = 1,
-                                hoveredHyperlinkEndColumn = 2,
                                 hyperlinkActivationHover = phase == 0,
                             )
                         }
@@ -652,7 +646,7 @@ class TerminalTextPainterTest {
         }
 
         @Test
-        fun `ctrl hovered hyperlink span does not bleed into another same-id span`() {
+        fun `ctrl hover paints separated segments with the same semantic id`() {
             val activationBlue = 0xFF4DA3FF.toInt()
             val fixture = fixture()
             val cache =
@@ -679,17 +673,13 @@ class TerminalTextPainterTest {
             fixture.paintRow(
                 cache = cache,
                 hoveredHyperlinkId = 7,
-                hoveredHyperlinkStartRow = 0,
-                hoveredHyperlinkStartColumn = 0,
-                hoveredHyperlinkEndRow = 0,
-                hoveredHyperlinkEndColumn = 1,
                 hyperlinkActivationHover = true,
                 hyperlinkActivationForeground = activationBlue,
             )
 
             assertEquals(activationBlue, fixture.image.getRGB(0, fixture.metrics.underlineY))
             for (x in fixture.metrics.cellWidth * 2 until fixture.metrics.cellWidth * 3) {
-                assertEquals(if (x % 3 == 0) TEST_RED else 0, fixture.image.getRGB(x, fixture.metrics.underlineY))
+                assertEquals(activationBlue, fixture.image.getRGB(x, fixture.metrics.underlineY))
             }
         }
 
@@ -725,10 +715,6 @@ class TerminalTextPainterTest {
                 cache = cache,
                 row = 0,
                 hoveredHyperlinkId = 7,
-                hoveredHyperlinkStartRow = 0,
-                hoveredHyperlinkStartColumn = 1,
-                hoveredHyperlinkEndRow = 1,
-                hoveredHyperlinkEndColumn = 1,
                 hyperlinkActivationHover = true,
                 hyperlinkActivationForeground = activationBlue,
             )
@@ -736,10 +722,6 @@ class TerminalTextPainterTest {
                 cache = cache,
                 row = 1,
                 hoveredHyperlinkId = 7,
-                hoveredHyperlinkStartRow = 0,
-                hoveredHyperlinkStartColumn = 1,
-                hoveredHyperlinkEndRow = 1,
-                hoveredHyperlinkEndColumn = 1,
                 hyperlinkActivationHover = true,
                 hyperlinkActivationForeground = activationBlue,
             )
@@ -1930,10 +1912,6 @@ class TerminalTextPainterTest {
             textBlinkVisible: Boolean = true,
             hyperlinkIds: IntArray = cache.hyperlinkIds,
             hoveredHyperlinkId: Int = 0,
-            hoveredHyperlinkStartRow: Int = 0,
-            hoveredHyperlinkStartColumn: Int = 0,
-            hoveredHyperlinkEndRow: Int = Int.MAX_VALUE,
-            hoveredHyperlinkEndColumn: Int = Int.MAX_VALUE,
             hyperlinkActivationHover: Boolean = false,
             hyperlinkActivationForeground: Int = 0xFF4DA3FF.toInt(),
         ) {
@@ -1949,10 +1927,6 @@ class TerminalTextPainterTest {
                 textBlinkVisible = textBlinkVisible,
                 hyperlinkIds = hyperlinkIds,
                 hoveredHyperlinkId = hoveredHyperlinkId,
-                hoveredHyperlinkStartRow = hoveredHyperlinkStartRow,
-                hoveredHyperlinkStartColumn = hoveredHyperlinkStartColumn,
-                hoveredHyperlinkEndRow = hoveredHyperlinkEndRow,
-                hoveredHyperlinkEndColumn = hoveredHyperlinkEndColumn,
                 hyperlinkActivationHover = hyperlinkActivationHover,
                 hyperlinkActivationForeground = hyperlinkActivationForeground,
             )

@@ -56,10 +56,10 @@ class TerminalHyperlinkControllerTest {
         cache.lineWrapped[0] = true
         controller.refreshHyperlinkHover()
         assertEquals(-1, controller.hoveredHyperlinkId)
-        assertEquals(0, controller.hoveredHyperlinkStartRow)
-        assertEquals(1, controller.hoveredHyperlinkStartColumn)
-        assertEquals(1, controller.hoveredHyperlinkEndRow)
-        assertEquals(3, controller.hoveredHyperlinkEndColumn)
+        assertEquals(0, controller.segmentRow(0))
+        assertEquals(1, controller.segmentStartColumn(0))
+        assertEquals(1, controller.segmentRow(controller.hoveredSegmentCount - 1))
+        assertEquals(3, controller.segmentEndColumn(controller.hoveredSegmentCount - 1))
         assertTrue(controller.hyperlinkActivationHover)
         host.repaintSpans.clear()
         controller.refreshHyperlinkHover()
@@ -70,9 +70,9 @@ class TerminalHyperlinkControllerTest {
         cache.lineWrapped[0] = false
         controller.refreshHyperlinkHover()
         assertEquals(-2, controller.hoveredHyperlinkId)
-        assertEquals(0, controller.hoveredHyperlinkStartColumn)
-        assertEquals(0, controller.hoveredHyperlinkEndRow)
-        assertEquals(4, controller.hoveredHyperlinkEndColumn)
+        assertEquals(0, controller.segmentStartColumn(0))
+        assertEquals(0, controller.segmentRow(controller.hoveredSegmentCount - 1))
+        assertEquals(4, controller.segmentEndColumn(controller.hoveredSegmentCount - 1))
 
         cache.hyperlinkIds.fill(0)
         cache.hyperlinkIds[cache.rowOffset(1)] = -2
@@ -165,11 +165,77 @@ class TerminalHyperlinkControllerTest {
                 for (segment in segments) {
                     assertFalse(fixture.cache.lineWrapped[segment.row], "The captured TUI uses explicit row placement at $segment")
                     fixture.hover(segment.startColumn, segment.row)
+                    assertEquals(segments.size, fixture.controller.hoveredSegmentCount)
+                    for ((index, expected) in segments.withIndex()) {
+                        assertEquals(expected.row, fixture.controller.segmentRow(index))
+                        assertEquals(expected.startColumn, fixture.controller.segmentStartColumn(index))
+                        assertEquals(expected.endColumn, fixture.controller.segmentEndColumn(index))
+                    }
                     assertEquals(Cursor.HAND_CURSOR, fixture.host.cursor.type)
                     assertTrue(fixture.click(segment.startColumn, segment.row))
                 }
                 assertEquals(List(6) { uri }, opened)
+                assertEquals(segments.map { RepaintSpan(it.row, it.startColumn, it.row, it.endColumn) }, fixture.host.repaintSpans)
             }
+        }
+    }
+
+    @Test
+    fun `wide-character wrap padding is excluded from the semantic hover group`() {
+        Osc8PipelineFixture(3, 3).use { f ->
+            f.accept(osc8("https://example.com/wide", "ab中Z"))
+            f.refresh()
+            f.hover(0, 1)
+            assertEquals(listOf(RepaintSpan(0, 0, 0, 2), RepaintSpan(1, 0, 1, 3)), f.host.repaintSpans)
+            f.hover(2, 0)
+            f.assertNoHover()
+        }
+    }
+
+    @Test
+    fun `explicit group spans hard breaks and gaps but separates differing IDs or destinations`() {
+        Osc8PipelineFixture(12, 4).use { f ->
+            val uri = "https://example.com/group"
+            f.accept(
+                osc8(uri, "AA", "group") + " " + osc8(uri, "BB", "other") + "\r\n" +
+                    osc8("https://example.com/other", "CC", "group") + "\r\n" + osc8(uri, "DD", "group"),
+            )
+            f.refresh()
+            f.hover(0, 2)
+            assertEquals(2, f.controller.hoveredSegmentCount)
+            assertEquals(listOf(RepaintSpan(0, 0, 0, 2), RepaintSpan(2, 0, 2, 2)), f.host.repaintSpans)
+            f.hover(3, 0)
+            assertEquals(1, f.controller.hoveredSegmentCount)
+            assertNotEquals(1, f.controller.hoveredHyperlinkId)
+        }
+    }
+
+    @Test
+    fun `anonymous run survives hard breaks and partial overwrite without joining another run`() {
+        Osc8PipelineFixture(8, 3).use { f ->
+            val uri = "https://example.com/run"
+            f.accept(osc8(uri, "ABCD\r\nEF") + " " + osc8(uri, "GH"))
+            f.refresh()
+            f.hover(0, 1)
+            assertEquals(listOf(RepaintSpan(0, 0, 0, 4), RepaintSpan(1, 0, 1, 2)), f.host.repaintSpans)
+            f.host.repaintSpans.clear()
+            f.accept("\u001b[1;2Hx")
+            f.refresh()
+            f.controller.refreshHyperlinkHover()
+            assertEquals(3, f.controller.hoveredSegmentCount)
+            assertEquals(
+                listOf(
+                    RepaintSpan(0, 0, 0, 4),
+                    RepaintSpan(1, 0, 1, 2),
+                    RepaintSpan(0, 0, 0, 1),
+                    RepaintSpan(0, 2, 0, 4),
+                    RepaintSpan(1, 0, 1, 2),
+                ),
+                f.host.repaintSpans,
+            )
+            f.hover(3, 1)
+            assertEquals(2, f.controller.hoveredHyperlinkId)
+            assertEquals(1, f.controller.hoveredSegmentCount)
         }
     }
 
@@ -346,10 +412,25 @@ class TerminalHyperlinkControllerTest {
             endColumn: Int,
         ) {
             assertEquals(hyperlinkId, controller.hoveredHyperlinkId)
-            assertEquals(startRow, controller.hoveredHyperlinkStartRow)
-            assertEquals(startColumn, controller.hoveredHyperlinkStartColumn)
-            assertEquals(endRow, controller.hoveredHyperlinkEndRow)
-            assertEquals(endColumn, controller.hoveredHyperlinkEndColumn)
+            assertEquals(startRow, controller.segmentRow(0))
+            assertEquals(startColumn, controller.segmentStartColumn(0))
+            assertEquals(endRow, controller.segmentRow(controller.hoveredSegmentCount - 1))
+            assertEquals(endColumn, controller.segmentEndColumn(controller.hoveredSegmentCount - 1))
+            assertEquals(endRow - startRow + 1, controller.hoveredSegmentCount)
+            for (index in 0 until controller.hoveredSegmentCount) {
+                assertEquals(startRow + index, controller.segmentRow(index))
+                assertEquals(if (index == 0) startColumn else 0, controller.segmentStartColumn(index))
+                assertEquals(
+                    if (index ==
+                        controller.hoveredSegmentCount - 1
+                    ) {
+                        endColumn
+                    } else {
+                        cache.columns
+                    },
+                    controller.segmentEndColumn(index),
+                )
+            }
         }
 
         fun click(
@@ -423,10 +504,10 @@ class TerminalHyperlinkControllerTest {
         controller.handleMouseMoved(event)
 
         assertEquals(5, controller.hoveredHyperlinkId)
-        assertEquals(1, controller.hoveredHyperlinkStartRow)
-        assertEquals(1, controller.hoveredHyperlinkStartColumn)
-        assertEquals(1, controller.hoveredHyperlinkEndRow)
-        assertEquals(2, controller.hoveredHyperlinkEndColumn)
+        assertEquals(1, controller.segmentRow(0))
+        assertEquals(1, controller.segmentStartColumn(0))
+        assertEquals(1, controller.segmentRow(controller.hoveredSegmentCount - 1))
+        assertEquals(2, controller.segmentEndColumn(controller.hoveredSegmentCount - 1))
         assertEquals(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR), host.cursor)
     }
 
@@ -462,7 +543,7 @@ class TerminalHyperlinkControllerTest {
     }
 
     @Test
-    fun `hover over repeated same id tracks only the contiguous span under the pointer`() {
+    fun `hover over repeated same id includes separated visible segments`() {
         val cache =
             TerminalRenderCache(6, 2).apply {
                 hyperlinkIds[rowOffset(1) + 1] = 5
@@ -489,10 +570,11 @@ class TerminalHyperlinkControllerTest {
         controller.handleMouseMoved(event)
 
         assertEquals(5, controller.hoveredHyperlinkId)
-        assertEquals(1, controller.hoveredHyperlinkStartRow)
-        assertEquals(1, controller.hoveredHyperlinkStartColumn)
-        assertEquals(1, controller.hoveredHyperlinkEndRow)
-        assertEquals(3, controller.hoveredHyperlinkEndColumn)
+        assertEquals(1, controller.segmentRow(0))
+        assertEquals(1, controller.segmentStartColumn(0))
+        assertEquals(1, controller.segmentRow(controller.hoveredSegmentCount - 1))
+        assertEquals(5, controller.segmentEndColumn(controller.hoveredSegmentCount - 1))
+        assertEquals(2, controller.hoveredSegmentCount)
     }
 
     @Test
@@ -525,10 +607,10 @@ class TerminalHyperlinkControllerTest {
         controller.handleMouseMoved(event)
 
         assertEquals(5, controller.hoveredHyperlinkId)
-        assertEquals(0, controller.hoveredHyperlinkStartRow)
-        assertEquals(1, controller.hoveredHyperlinkStartColumn)
-        assertEquals(1, controller.hoveredHyperlinkEndRow)
-        assertEquals(2, controller.hoveredHyperlinkEndColumn)
+        assertEquals(0, controller.segmentRow(0))
+        assertEquals(1, controller.segmentStartColumn(0))
+        assertEquals(1, controller.segmentRow(controller.hoveredSegmentCount - 1))
+        assertEquals(2, controller.segmentEndColumn(controller.hoveredSegmentCount - 1))
     }
 
     @Test
@@ -556,21 +638,16 @@ class TerminalHyperlinkControllerTest {
         val button = JButton()
 
         controller.handleMouseMoved(MouseEvent(button, MouseEvent.MOUSE_MOVED, System.currentTimeMillis(), 0, 15, 25, 0, false))
-        assertEquals(listOf(RepaintSpan(1, 1, 1, 3)), host.repaintSpans)
+        assertEquals(listOf(RepaintSpan(1, 1, 1, 3), RepaintSpan(1, 4, 1, 5)), host.repaintSpans)
         assertEquals(0, host.repaints)
 
         controller.updateHyperlinkActivationHover(true)
-        assertEquals(listOf(RepaintSpan(1, 1, 1, 3), RepaintSpan(1, 1, 1, 3)), host.repaintSpans)
+        assertEquals(List(2) { listOf(RepaintSpan(1, 1, 1, 3), RepaintSpan(1, 4, 1, 5)) }.flatten(), host.repaintSpans)
         assertEquals(0, host.repaints)
 
         controller.handleMouseMoved(MouseEvent(button, MouseEvent.MOUSE_MOVED, System.currentTimeMillis(), 0, 45, 25, 0, false))
         assertEquals(
-            listOf(
-                RepaintSpan(1, 1, 1, 3),
-                RepaintSpan(1, 1, 1, 3),
-                RepaintSpan(1, 1, 1, 3),
-                RepaintSpan(1, 4, 1, 5),
-            ),
+            List(3) { listOf(RepaintSpan(1, 1, 1, 3), RepaintSpan(1, 4, 1, 5)) }.flatten(),
             host.repaintSpans,
         )
         assertEquals(0, host.repaints)
@@ -824,8 +901,10 @@ class TerminalHyperlinkControllerTest {
                         println(
                             "segment=$segment, wrapped=${fixture.cache.lineWrapped[segment.row]}, " +
                                 "id=${hover.hoveredHyperlinkId}, " +
-                                "hover=${hover.hoveredHyperlinkStartRow}:${hover.hoveredHyperlinkStartColumn}" +
-                                "..${hover.hoveredHyperlinkEndRow}:${hover.hoveredHyperlinkEndColumn}",
+                                "hover=${hover.segmentRow(0)}:${hover.segmentStartColumn(0)}" +
+                                "..${hover.segmentRow(
+                                    hover.hoveredSegmentCount - 1,
+                                )}:${hover.segmentEndColumn(hover.hoveredSegmentCount - 1)}",
                         )
                     }
                 }

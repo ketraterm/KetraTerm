@@ -87,10 +87,6 @@ internal class GridPainter(
         hoveredPromptMarkerRow: Int = -1,
         hyperlinkIds: IntArray = cache.hyperlinkIds,
         hoveredHyperlinkId: Int = 0,
-        hoveredHyperlinkStartRow: Int = 0,
-        hoveredHyperlinkStartColumn: Int = 0,
-        hoveredHyperlinkEndRow: Int = Int.MAX_VALUE,
-        hoveredHyperlinkEndColumn: Int = Int.MAX_VALUE,
         hyperlinkActivationHover: Boolean = false,
     ) {
         val palette = cache.palette
@@ -163,10 +159,6 @@ internal class GridPainter(
                     textBlinkVisible = textBlinkVisible,
                     hyperlinkIds = hyperlinkIds,
                     hoveredHyperlinkId = hoveredHyperlinkId,
-                    hoveredHyperlinkStartRow = hoveredHyperlinkStartRow,
-                    hoveredHyperlinkStartColumn = hoveredHyperlinkStartColumn,
-                    hoveredHyperlinkEndRow = hoveredHyperlinkEndRow,
-                    hoveredHyperlinkEndColumn = hoveredHyperlinkEndColumn,
                     hyperlinkActivationHover = hyperlinkActivationHover,
                     hyperlinkActivationForeground = settings.hyperlinkActivationForeground,
                 )
