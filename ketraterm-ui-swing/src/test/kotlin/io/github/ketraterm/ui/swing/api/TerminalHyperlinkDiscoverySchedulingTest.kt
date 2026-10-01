@@ -605,6 +605,7 @@ class TerminalHyperlinkDiscoverySchedulingTest {
         private val host =
             object : TerminalHyperlinkDiscoveryHost {
                 override val renderCache = cache
+                override val hyperlinkSource = null
                 override val hyperlinkDetector =
                     detector ?: SwingHyperlinkDetector { request, sink ->
                         requests += List(request.lineCount) { request.lineText(it) }

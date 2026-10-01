@@ -36,31 +36,101 @@ internal class TerminalHyperlinkLineSnapshot(
 ) {
     val firstLineId: Long get() = lineIds[0]
 
-    fun matchesRows(
-        cache: TerminalRenderCache,
-        start: Int,
-        end: Int,
-    ): Boolean {
-        if (end - start != lineIds.size || cache.columns != columns || cache.activeBuffer != activeBuffer) return false
-        if (firstAbsoluteRow != cache.discardedCount + cache.historySize - cache.scrollbackOffset + start) return false
-        for (offset in lineIds.indices) {
-            val row = start + offset
-            if (cache.lineIds[row] != lineIds[offset] || cache.lineWrapped[row] != wrapped[offset]) return false
-            if (lineIds[offset] != 0L) {
-                if (cache.lineGenerations[row] != generations[offset]) return false
-            } else if (rowFingerprint(cache, row) != fingerprints[offset]) {
-                return false
-            }
+    /** First UTF-16 unit owning a cell after the given physical-cell boundary. */
+    fun firstOffsetAfterCell(cell: Long): Int {
+        var low = 0
+        var high = cellEnds.size
+        while (low < high) {
+            val middle = (low + high) ushr 1
+            if (cellEnds[middle] <= cell) low = middle + 1 else high = middle
         }
-        return true
+        return low
     }
 
-    fun sameIdentity(other: TerminalHyperlinkLineSnapshot): Boolean =
-        columns == other.columns &&
-            activeBuffer == other.activeBuffer &&
-            lineIds.contentEquals(other.lineIds) &&
-            fingerprints.contentEquals(other.fingerprints) &&
-            wrapped.contentEquals(other.wrapped)
+    /** Exclusive UTF-16 bound before the given physical-cell boundary. */
+    fun endOffsetBeforeCell(cell: Long): Int {
+        var low = 0
+        var high = cellStarts.size
+        while (low < high) {
+            val middle = (low + high) ushr 1
+            if (cellStarts[middle] < cell) low = middle + 1 else high = middle
+        }
+        return low
+    }
+
+    fun matchesRow(
+        cache: TerminalRenderCache,
+        row: Int,
+        absoluteRow: Long,
+    ): Boolean {
+        val offset = (absoluteRow - firstAbsoluteRow).toInt()
+        return !(offset !in lineIds.indices || cache.columns != columns || cache.activeBuffer != activeBuffer) && cache.lineIds[row] == lineIds[offset] &&
+                cache.lineWrapped[row] == wrapped[offset] &&
+                if (lineIds[offset] != 0L) {
+                    cache.lineGenerations[row] == generations[offset]
+                } else {
+                    rowFingerprint(cache, row) == fingerprints[offset]
+                }
+    }
+
+    /** Validates copied source text even when presentation-only mutations advanced row generations. */
+    fun matchesTextRow(
+        cache: TerminalRenderCache,
+        row: Int,
+        absoluteRow: Long,
+    ): Boolean {
+        val offset = (absoluteRow - firstAbsoluteRow).toInt()
+        return offset in lineIds.indices &&
+            cache.columns == columns &&
+            cache.activeBuffer == activeBuffer &&
+            cache.lineIds[row] == lineIds[offset] &&
+            cache.lineWrapped[row] == wrapped[offset] &&
+            rowFingerprint(cache, row) == fingerprints[offset]
+    }
+
+    /** Keeps an evicted prefix only while its copied, still-retained suffix is unchanged. */
+    fun withRetainedSuffix(suffix: TerminalHyperlinkLineSnapshot): TerminalHyperlinkLineSnapshot? {
+        if (suffix.columns != columns ||
+            suffix.activeBuffer != activeBuffer ||
+            suffix.firstAbsoluteRow <= firstAbsoluteRow ||
+            suffix.lastAbsoluteRow != lastAbsoluteRow
+        ) {
+            return null
+        }
+        val rowOffset = (suffix.firstAbsoluteRow - firstAbsoluteRow).toInt()
+        val cellOffset = rowOffset * columns
+        val textOffset = firstOffsetAfterCell(cellOffset.toLong())
+        if (text.length - textOffset != suffix.text.length ||
+            !text.regionMatches(textOffset, suffix.text, 0, suffix.text.length)
+        ) {
+            return null
+        }
+        for (row in suffix.lineIds.indices) {
+            if (lineIds[rowOffset + row] != suffix.lineIds[row] || wrapped[rowOffset + row] != suffix.wrapped[row]) return null
+        }
+        for (offset in suffix.cellStarts.indices) {
+            if (cellStarts[textOffset + offset] != cellOffset + suffix.cellStarts[offset] ||
+                cellEnds[textOffset + offset] != cellOffset + suffix.cellEnds[offset]
+            ) {
+                return null
+            }
+        }
+        val updatedGenerations = generations.copyOf()
+        suffix.generations.copyInto(updatedGenerations, rowOffset)
+        return TerminalHyperlinkLineSnapshot(
+            text,
+            firstAbsoluteRow,
+            lastAbsoluteRow,
+            columns,
+            activeBuffer,
+            cellStarts,
+            cellEnds,
+            lineIds,
+            updatedGenerations,
+            fingerprints,
+            wrapped,
+        )
+    }
 }
 
 /** Reuses extraction scratch storage; snapshots are created only for changed logical lines. */
@@ -68,36 +138,79 @@ internal class TerminalHyperlinkLineSnapshotBuilder {
     private val text = StringBuilder(256)
     private var starts = IntArray(256)
     private var ends = IntArray(256)
+    private var ids = LongArray(16)
+    private var generations = LongArray(16)
+    private var fingerprints = LongArray(16)
+    private var wrapped = BooleanArray(16)
+    private var rowCount = 0
+    private var first = 0L
+    private var columns = 0
+    private var buffer = TerminalRenderBufferKind.PRIMARY
+
+    fun begin(
+        firstAbsoluteRow: Long,
+        columns: Int,
+        buffer: TerminalRenderBufferKind,
+    ) {
+        text.setLength(0)
+        rowCount = 0
+        first = firstAbsoluteRow
+        this.columns = columns
+        this.buffer = buffer
+    }
+
+    fun append(
+        cache: TerminalRenderCache,
+        row: Int,
+    ) {
+        if (rowCount == ids.size) {
+            val size = ids.size * 2
+            ids = ids.copyOf(size)
+            generations = generations.copyOf(size)
+            fingerprints = fingerprints.copyOf(size)
+            wrapped = wrapped.copyOf(size)
+        }
+        ids[rowCount] = cache.lineIds[row]
+        generations[rowCount] = cache.lineGenerations[row]
+        fingerprints[rowCount] = rowFingerprint(cache, row)
+        wrapped[rowCount] = cache.lineWrapped[row]
+        forEachLogicalTextCell(cache, row) { codePoint, startColumn, endColumn ->
+            val offset = rowCount * columns
+            appendCodePoint(codePoint, offset + startColumn, offset + endColumn)
+        }
+        rowCount++
+    }
+
+    fun finish(): TerminalHyperlinkLineSnapshot {
+        check(rowCount > 0)
+        while (text.isNotEmpty() && text.last() == ' ') text.setLength(text.length - 1)
+        val length = text.length
+        text.append('\n')
+        return TerminalHyperlinkLineSnapshot(
+            text.toString(),
+            first,
+            first + rowCount - 1L,
+            columns,
+            buffer,
+            starts.copyOf(length),
+            ends.copyOf(length),
+            ids.copyOf(rowCount),
+            generations.copyOf(rowCount),
+            fingerprints.copyOf(rowCount),
+            wrapped.copyOf(rowCount),
+        )
+    }
 
     fun snapshot(
         cache: TerminalRenderCache,
         startRow: Int,
         endRow: Int,
     ): TerminalHyperlinkLineSnapshot {
-        text.setLength(0)
+        begin(cache.discardedCount + cache.historySize - cache.scrollbackOffset + startRow, cache.columns, cache.activeBuffer)
         for (row in startRow until endRow) {
-            forEachLogicalTextCell(cache, row) { codePoint, startColumn, endColumn ->
-                val offset = (row - startRow) * cache.columns
-                appendCodePoint(codePoint, offset + startColumn, offset + endColumn)
-            }
+            append(cache, row)
         }
-        while (text.isNotEmpty() && text.last() == ' ') text.setLength(text.length - 1)
-        val length = text.length
-        text.append('\n')
-        val rowCount = endRow - startRow
-        return TerminalHyperlinkLineSnapshot(
-            text.toString(),
-            cache.discardedCount + cache.historySize - cache.scrollbackOffset + startRow,
-            cache.discardedCount + cache.historySize - cache.scrollbackOffset + endRow - 1L,
-            cache.columns,
-            cache.activeBuffer,
-            starts.copyOf(length),
-            ends.copyOf(length),
-            cache.lineIds.copyOfRange(startRow, endRow),
-            cache.lineGenerations.copyOfRange(startRow, endRow),
-            LongArray(rowCount) { rowFingerprint(cache, startRow + it) },
-            cache.lineWrapped.copyOfRange(startRow, endRow),
-        )
+        return finish()
     }
 
     private fun appendCodePoint(

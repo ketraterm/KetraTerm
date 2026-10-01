@@ -15,12 +15,16 @@
  */
 package io.github.ketraterm.ui.swing.api
 
+import io.github.ketraterm.render.api.TerminalRenderFrameReader
 import io.github.ketraterm.render.cache.TerminalRenderCache
 import kotlinx.coroutines.*
 
 internal interface TerminalHyperlinkDiscoveryHost {
     val renderCache: TerminalRenderCache
     val hyperlinkDetector: SwingHyperlinkDetector
+
+    /** Bound source, or null when only explicitly supplied render frames are available. */
+    val hyperlinkSource: TerminalRenderFrameReader?
 
     /** Reconciles interaction state after asynchronously detected links have been installed. */
     fun hyperlinksChanged()
@@ -39,7 +43,8 @@ internal class TerminalHyperlinkDiscoveryController(
     private val scope: CoroutineScope,
     private val analysisDispatcher: CoroutineDispatcher = Dispatchers.Default,
 ) {
-    private val viewport = TerminalHyperlinkViewport()
+    private val index = TerminalHyperlinkIndex()
+    private val sourceScan = TerminalHyperlinkSourceScan()
     private var analysisJob: Job? = null
     private var bindingEpoch = 0L
     private var sourceEpoch = 0L
@@ -55,7 +60,7 @@ internal class TerminalHyperlinkDiscoveryController(
 
     fun reset() {
         bindingEpoch++
-        viewport.clear()
+        index.clear()
         // A blocking host provider may ignore cancellation. Keep its slot until it returns.
     }
 
@@ -70,27 +75,26 @@ internal class TerminalHyperlinkDiscoveryController(
         if (disposed) return
         if (detector !== host.hyperlinkDetector || providerGeneration != host.hyperlinkDetector.configurationGeneration) {
             providerEpoch++
-            viewport.clear()
+            index.clear()
             detector = host.hyperlinkDetector
             providerGeneration = detector.configurationGeneration
         }
         val cache = host.renderCache
         if (sourceGeneration != cache.historyContentGeneration || sourceColumns != cache.columns || sourceBuffer != cache.activeBuffer) {
             sourceEpoch++
-            viewport.clear()
             sourceGeneration = cache.historyContentGeneration
             sourceColumns = cache.columns
             sourceBuffer = cache.activeBuffer
         }
         if (detector === SwingHyperlinkDetector.NONE) return
-        if (viewport.update(host.renderCache, detector.context)) {
+        if (index.update(host.renderCache, detector.context, captureVisible = host.hyperlinkSource == null)) {
             frameRevision++
-            viewport.writeOverlay(host.renderCache, repaintSpan)
+            index.writeOverlay(host.renderCache, repaintSpan)
         }
         startAnalysis()
     }
 
-    fun hyperlinkIdsFor(cache: TerminalRenderCache): IntArray = viewport.idsFor(cache)
+    fun hyperlinkIdsFor(cache: TerminalRenderCache): IntArray = index.idsFor(cache)
 
     fun hyperlinkIdAt(
         row: Int,
@@ -104,37 +108,82 @@ internal class TerminalHyperlinkDiscoveryController(
     fun isDiscoveredHyperlinkResolvable(
         hyperlinkId: Int,
         cache: TerminalRenderCache,
-    ): Boolean = viewport.hyperlinkFor(hyperlinkId, cache) != null
+    ): Boolean = index.hyperlinkFor(hyperlinkId, cache) != null
 
     fun openDiscoveredHyperlink(
         hyperlinkId: Int,
         cache: TerminalRenderCache,
-    ): Boolean = viewport.hyperlinkFor(hyperlinkId, cache)?.action?.open() == true
+    ): Boolean = index.hyperlinkFor(hyperlinkId, cache)?.action?.open() == true
 
     fun discoveredHyperlink(
         hyperlinkId: Int,
         cache: TerminalRenderCache,
-    ): SwingHyperlink? = viewport.hyperlinkFor(hyperlinkId, cache)
+    ): SwingHyperlink? = index.hyperlinkFor(hyperlinkId, cache)
+
+    private fun needsSourceScan(): Boolean = host.hyperlinkSource != null && !index.isSourceAnalyzed(host.renderCache.contentGeneration)
 
     private fun startAnalysis() {
-        if (analysisJob != null || disposed || !scope.isActive || !viewport.needsAnalysis) return
+        if (analysisJob != null || disposed || !scope.isActive || (!index.needsAnalysis && !needsSourceScan())) return
         val requestBindingEpoch = bindingEpoch
         val requestSourceEpoch = sourceEpoch
         val requestProviderEpoch = providerEpoch
         val requestDetector = detector
+        val requestSource = host.hyperlinkSource
         // Lazy start assigns the slot before even an immediate dispatcher can finish the coroutine.
         val job =
             scope.launch(start = CoroutineStart.LAZY) {
                 val requestRevision = frameRevision
                 var completed = false
                 try {
-                    if (requestBindingEpoch != bindingEpoch || requestSourceEpoch != sourceEpoch ||
+                    if (requestBindingEpoch != bindingEpoch ||
+                        requestSourceEpoch != sourceEpoch ||
                         requestProviderEpoch != providerEpoch
                     ) {
                         return@launch
                     }
-                    val lines = viewport.pendingLines(requestDetector.context)
-                    if (lines.isEmpty()) return@launch
+                    if (requestSource != null && needsSourceScan()) {
+                        val cache = host.renderCache
+                        index.beginSourceScan(cache.contentGeneration, cache.discardedCount + cache.historySize)
+                        val nextRow = index.nextSourceRow
+                        val buffer = cache.activeBuffer
+                        val columns = cache.columns
+                        val history = cache.historyContentGeneration
+                        val contentGeneration = cache.contentGeneration
+                        val scanned =
+                            withContext(analysisDispatcher) {
+                                sourceScan.scan(requestSource, nextRow, buffer, columns, history)
+                            } ?: return@launch
+                        if (requestBindingEpoch != bindingEpoch ||
+                            requestSourceEpoch != sourceEpoch ||
+                            requestProviderEpoch != providerEpoch ||
+                            disposed
+                        ) {
+                            return@launch
+                        }
+                        index.evictBefore(scanned.firstRetainedRow)
+                        for (snapshot in scanned.lines) {
+                            val top = cache.discardedCount + cache.historySize - cache.scrollbackOffset
+                            var matchesVisible = true
+                            val first = maxOf(snapshot.firstAbsoluteRow, top)
+                            val last = minOf(snapshot.lastAbsoluteRow, top + cache.rows - 1L)
+                            for (row in first..last) {
+                                if (!snapshot.matchesTextRow(cache, (row - top).toInt(), row)) {
+                                    matchesVisible = false
+                                    break
+                                }
+                            }
+                            if (matchesVisible) index.ingest(snapshot, requestDetector.context)
+                        }
+                        index.nextSourceRow = if (scanned.reachedEnd) scanned.liveTop else scanned.nextSourceRow
+                        // The source can be ahead of the published cache. Drain this observed
+                        // demand once; a later published content generation requests reconciliation.
+                        if (scanned.reachedEnd) index.finishSourceScan(contentGeneration)
+                    }
+                    val lines = index.pendingLines(requestDetector.context)
+                    if (lines.isEmpty()) {
+                        completed = true
+                        return@launch
+                    }
                     val request =
                         detectionRequest(lines, requestDetector.context, requestBindingEpoch, requestSourceEpoch, requestProviderEpoch)
                     val result =
@@ -152,10 +201,12 @@ internal class TerminalHyperlinkDiscoveryController(
                             sink.links
                         }
                     if (result == null) return@launch
-                    if (!disposed && requestBindingEpoch == bindingEpoch && requestSourceEpoch == sourceEpoch &&
+                    if (!disposed &&
+                        requestBindingEpoch == bindingEpoch &&
+                        requestSourceEpoch == sourceEpoch &&
                         requestProviderEpoch == providerEpoch
                     ) {
-                        viewport.accept(lines, result, requestDetector.context)
+                        index.accept(lines, result, requestDetector.context)
                         publishOverlay()
                     }
                     completed = true
@@ -164,7 +215,9 @@ internal class TerminalHyperlinkDiscoveryController(
                     if (!disposed &&
                         scope.isActive &&
                         (
-                            completed || requestBindingEpoch != bindingEpoch || requestSourceEpoch != sourceEpoch ||
+                            completed ||
+                                requestBindingEpoch != bindingEpoch ||
+                                requestSourceEpoch != sourceEpoch ||
                                 requestProviderEpoch != providerEpoch ||
                                 requestRevision != frameRevision
                         )
@@ -178,7 +231,7 @@ internal class TerminalHyperlinkDiscoveryController(
     }
 
     private fun publishOverlay() {
-        viewport.writeOverlay(host.renderCache, repaintSpan)
+        index.writeOverlay(host.renderCache, repaintSpan)
         host.hyperlinksChanged()
     }
 }

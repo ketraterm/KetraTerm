@@ -83,6 +83,7 @@ open class TerminalHyperlinkDiscoveryBenchmark {
             val host =
                 object : TerminalHyperlinkDiscoveryHost {
                     override val renderCache: TerminalRenderCache = cache
+                    override val hyperlinkSource = null
                     override val hyperlinkDetector =
                         SwingHyperlinkDetector { request, sink ->
                             for (line in 0 until request.lineCount) {

@@ -100,6 +100,7 @@ open class TerminalHyperlinkDiscoveryCompletionBenchmark {
             val host =
                 object : TerminalHyperlinkDiscoveryHost {
                     override val renderCache = cache
+                    override val hyperlinkSource = null
                     override val hyperlinkDetector =
                         object : SwingHyperlinkDetector {
                             override val context = SwingHyperlinkDetectionContext.ORDERED_CONTENT

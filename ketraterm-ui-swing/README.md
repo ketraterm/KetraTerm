@@ -196,7 +196,28 @@ sink.addHyperlink(
 Migration is atomic: replace `LOGICAL_LINE` with `INDEPENDENT_LINE`, `VIEWPORT`
 with `ORDERED_CONTENT`, make detector overrides suspending, and replace the
 positional sink overload with `addHyperlink(SwingHyperlink)` or the request
-factory above. There is no compatibility detector pipeline. The current
-projection still consumes viewport snapshots; retained history, lifecycle
-recovery, ordered replay and native style/gesture application follow their
-separate gates in the [repair map](../docs/terminal-feature-gap-map.md#uri-highlighting-staged-repair).
+factory above. There is no compatibility detector pipeline.
+
+Discovery now uses one retained logical-line index for the binding, with separate
+primary/alternate state validated against each buffer's history-content generation.
+Stable occurrence IDs own actions independently of viewport projection. Successful
+empty results are retained too. Incremental source scans use bounded absolute-range
+copies under session synchronization and assemble full logical text outside the lock,
+including soft-wrapped lines that cross copy or viewport boundaries. Newly admitted
+history is reconciled even if it was edited before its admission was published.
+
+Scrolling prepared content projects existing results synchronously into reusable
+primitive buffers; hit testing and action lookup do not allocate or run detectors.
+Projection clips the UTF-16 mapping before visiting cells, so a long wrapped link
+does not incur whole-destination traversal on each frame. Eviction retires affected
+records/actions without changing surviving occurrence IDs; partially retained
+wrapped occurrences keep their complete prepared destination until their final
+source row leaves retention. Reset/reflow invalidates the affected buffer's state.
+
+Unprocessed content remains asynchronous. Lifecycle recovery, ordered provider
+continuation/replay, native styles/gestures and semantic OSC 8 hover groups follow
+their separate gates in the [repair map](../docs/terminal-feature-gap-map.md#uri-highlighting-staged-repair).
+The current ordered detector receives bounded preceding context with pending text
+(up to 64 preceding and 64 pending logical lines per request). Preserving provider
+execution state and reconstructing full contextual replay are
+Stage 5 work. Changelogs consolidate the completed user-facing repair.

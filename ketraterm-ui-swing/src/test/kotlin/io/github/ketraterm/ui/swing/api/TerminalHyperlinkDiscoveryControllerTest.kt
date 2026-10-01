@@ -579,7 +579,7 @@ class TerminalHyperlinkDiscoveryControllerTest {
     }
 
     @Test
-    fun `render-cache bounded carry drops discovered link after it leaves the cache`() {
+    fun `retained history restores a discovered link on the first displayed frame`() {
         val cache = TerminalRenderCache(24, 2)
         cache.accept(
             StaticTextFrame(
@@ -640,7 +640,7 @@ class TerminalHyperlinkDiscoveryControllerTest {
         )
         carry = scheduleForFrameAndReadIds(controller, cache, urlScans)
 
-        assertEquals(0, carry.ids[cache.rowOffset(0)])
+        assertEquals(-1, carry.ids[cache.rowOffset(0)])
         assertEquals(1, carry.detectorCalls)
     }
 
@@ -908,7 +908,7 @@ class TerminalHyperlinkDiscoveryControllerTest {
     private class TestSnapshot(
         private val cache: TerminalRenderCache,
     ) {
-        private val viewport = TerminalHyperlinkViewport().apply { update(cache) }
+        private val viewport = TerminalHyperlinkIndex().apply { update(cache) }
         private val lines = viewport.pendingLines()
         val request = detectionRequest(lines)
 
@@ -1005,6 +1005,7 @@ class TerminalHyperlinkDiscoveryControllerTest {
         override val hyperlinkDetector: SwingHyperlinkDetector,
         private val repaintObserved: CountDownLatch = CountDownLatch(0),
     ) : TerminalHyperlinkDiscoveryHost {
+        override val hyperlinkSource = null
         var onHyperlinksChanged: () -> Unit = {}
 
         override fun hyperlinksChanged() = onHyperlinksChanged()

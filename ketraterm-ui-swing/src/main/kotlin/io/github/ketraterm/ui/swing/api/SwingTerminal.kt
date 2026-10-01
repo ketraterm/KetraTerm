@@ -277,6 +277,7 @@ class SwingTerminal
                         override val renderCache: TerminalRenderCache get() = this@SwingTerminal.renderCache
                         override val hyperlinkDetector: SwingHyperlinkDetector
                             get() = this@SwingTerminal.hostServices.hyperlinkDetector
+                        override val hyperlinkSource get() = this@SwingTerminal.session
 
                         override fun hyperlinksChanged() = hyperlinkController.refreshHyperlinkHover()
 
