@@ -217,6 +217,8 @@ internal class KetraTermTerminalPane private constructor(
         val group = DefaultActionGroup()
         val hyperlink = request.hyperlink
         if (hyperlink != null) {
+            val providerGroup = (hyperlink.providerAction as? IntellijTerminalHyperlinkAction)?.popupGroup(request.triggerEvent)
+            if (providerGroup != null) group.add(providerGroup)
             group.add(
                 object : DumbAwareAction("Open Link") {
                     override fun actionPerformed(event: com.intellij.openapi.actionSystem.AnActionEvent) {
@@ -311,7 +313,15 @@ internal class KetraTermTerminalPane private constructor(
                     hostServices =
                         SwingHostServices(
                             clipboardHandler = clipboard,
-                            hyperlinkDetector = IntellijTerminalHyperlinkDetector(project),
+                            hyperlinkDetector =
+                                IntellijTerminalHyperlinkDetector(
+                                    project,
+                                    tab.profile.workingDirectory ?: java.nio.file.Path
+                                        .of(System.getProperty("user.home")),
+                                ) { lineId ->
+                                    val state = tab.session.shellIntegrationState
+                                    if (lineId > 0L) state.commandWorkingDirectoryUri(state.commandRecordIdAtLine(lineId)) else null
+                                },
                             viewportListener = scrollbarAdapter,
                             scrollbarOverlayEnabled = false,
                             shellSuggestionProvider = completionBinding.provider,

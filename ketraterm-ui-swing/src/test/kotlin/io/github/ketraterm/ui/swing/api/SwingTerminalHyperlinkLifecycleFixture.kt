@@ -86,6 +86,8 @@ internal class SwingTerminalHyperlinkLifecycleFixture : AutoCloseable {
                                                 opened.add(URL)
                                             },
                                             uri = URL,
+                                            presentation = SwingHyperlinkPresentation(isVisible = true),
+                                            activation = SwingHyperlinkActivation.DIRECT,
                                         ),
                                     )
                                 }

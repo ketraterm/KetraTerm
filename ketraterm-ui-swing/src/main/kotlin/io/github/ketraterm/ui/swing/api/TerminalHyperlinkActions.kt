@@ -20,6 +20,8 @@ internal class TerminalHyperlinkActions {
     private var keys = IntArray(16)
     private var values = arrayOfNulls<SwingHyperlink>(16)
     private var references = IntArray(16)
+    private var styles = IntArray(16 * STYLE_RECORD_SIZE)
+    private var followedId = 0
     private var occupied = 0
     private var size = 0
     private var nextId = 1
@@ -34,11 +36,67 @@ internal class TerminalHyperlinkActions {
         keys[slot] = key
         values[slot] = hyperlink
         references[slot] = 0
+        val presentation = hyperlink.presentation
+        writeStyle(slot, 0, presentation.normal)
+        writeStyle(slot, 1, presentation.hovered ?: presentation.normal)
+        writeStyle(slot, 2, presentation.active ?: presentation.hovered ?: presentation.normal)
+        writeStyle(slot, 3, presentation.followed ?: presentation.normal)
         size++
         return -key
     }
 
     fun get(id: Int): SwingHyperlink? = values[find(-id)]
+
+    /** Primitive style record for painting; no actions or framework objects enter the paint path. */
+    fun styleOffset(
+        id: Int,
+        hovered: Boolean,
+        active: Boolean,
+    ): Int {
+        if (id >= 0) return -1
+        val slot = find(-id)
+        if (keys[slot] != -id) return -1
+        val state =
+            when {
+                hovered && active -> 2
+                hovered -> 1
+                id == followedId -> 3
+                else -> 0
+            }
+        return slot * STYLE_RECORD_SIZE + state * 4
+    }
+
+    fun foreground(offset: Int): Int = styles[offset]
+
+    fun background(offset: Int): Int = styles[offset + 1]
+
+    fun underlineColor(offset: Int): Int = styles[offset + 2]
+
+    fun flags(offset: Int): Int = styles[offset + 3]
+
+    /** Returns the previously followed occurrence so both styles can be repainted. */
+    fun follow(id: Int): Int {
+        val previous = followedId
+        if (get(id) != null) followedId = id
+        return previous
+    }
+
+    private fun writeStyle(
+        slot: Int,
+        state: Int,
+        style: SwingHyperlinkStyle?,
+    ) {
+        val offset = slot * STYLE_RECORD_SIZE + state * 4
+        styles[offset] = style?.foregroundArgb ?: 0
+        styles[offset + 1] = style?.backgroundArgb ?: 0
+        styles[offset + 2] = style?.underlineArgb ?: 0
+        styles[offset + 3] =
+            (if (style?.foregroundArgb != null) FOREGROUND else 0) or
+            (if (style?.backgroundArgb != null) BACKGROUND else 0) or
+            (if (style?.underlineArgb != null) UNDERLINE_COLOR else 0) or
+            (if (style?.underlineThickness == 2) BOLD_UNDERLINE else 0) or
+            (if (style?.underlineStyle != null) UNDERLINE_STYLE or (style.underlineStyle shl 8) else 0)
+    }
 
     fun retain(id: Int) {
         references[find(-id)]++
@@ -50,6 +108,7 @@ internal class TerminalHyperlinkActions {
         if (--references[slot] == 0) {
             keys[slot] = -1
             values[slot] = null
+            if (followedId == id) followedId = 0
             size--
         }
     }
@@ -69,9 +128,11 @@ internal class TerminalHyperlinkActions {
         val oldKeys = keys
         val oldValues = values
         val oldReferences = references
+        val oldStyles = styles
         keys = IntArray(capacity)
         values = arrayOfNulls(capacity)
         references = IntArray(capacity)
+        styles = IntArray(capacity * STYLE_RECORD_SIZE)
         occupied = size
         for (index in oldKeys.indices) {
             val key = oldKeys[index]
@@ -80,6 +141,16 @@ internal class TerminalHyperlinkActions {
             keys[slot] = key
             values[slot] = oldValues[index]
             references[slot] = oldReferences[index]
+            oldStyles.copyInto(styles, slot * STYLE_RECORD_SIZE, index * STYLE_RECORD_SIZE, (index + 1) * STYLE_RECORD_SIZE)
         }
+    }
+
+    companion object {
+        const val FOREGROUND = 1
+        const val BACKGROUND = 2
+        const val UNDERLINE_COLOR = 4
+        const val UNDERLINE_STYLE = 8
+        const val BOLD_UNDERLINE = 16
+        private const val STYLE_RECORD_SIZE = 16
     }
 }

@@ -17,7 +17,9 @@ package io.github.ketraterm.ui.swing.render.painter
 
 import io.github.ketraterm.render.api.TerminalColorPalette
 import io.github.ketraterm.render.api.TerminalRenderAttrs
+import io.github.ketraterm.render.api.TerminalRenderUnderline
 import io.github.ketraterm.render.cache.TerminalRenderCache
+import io.github.ketraterm.ui.swing.api.TerminalHyperlinkActions
 import io.github.ketraterm.ui.swing.render.SwingColors
 import io.github.ketraterm.ui.swing.render.hyperlinkIdForCell
 import io.github.ketraterm.ui.swing.render.isTextHidden
@@ -47,6 +49,12 @@ internal class TerminalTextRunStyle {
         private set
     var textHidden: Boolean = false
         private set
+    var hyperlinkUnderline: Int = TerminalRenderUnderline.NONE
+        private set
+    var hyperlinkUnderlineColor: Int = 0
+        private set
+    var hyperlinkUnderlineThickness: Int = 1
+        private set
 
     private var decoration = 0L
     private var textBlinkVisible = true
@@ -54,6 +62,9 @@ internal class TerminalTextRunStyle {
     private var hoveredHyperlinkId = 0
     private var activationHover = false
     private var activationForeground = 0
+    private var hyperlinkStyles: TerminalHyperlinkActions? = null
+    private var styleOffset = -1
+    private var styleFlags = 0
 
     fun configureRow(
         textBlinkVisible: Boolean,
@@ -61,12 +72,14 @@ internal class TerminalTextRunStyle {
         hoveredHyperlinkId: Int,
         hyperlinkActivationHover: Boolean,
         hyperlinkActivationForeground: Int,
+        hyperlinkStyles: TerminalHyperlinkActions? = null,
     ) {
         this.textBlinkVisible = textBlinkVisible
         this.hyperlinkIds = hyperlinkIds
         this.hoveredHyperlinkId = hoveredHyperlinkId
         activationHover = hyperlinkActivationHover
         activationForeground = hyperlinkActivationForeground
+        this.hyperlinkStyles = hyperlinkStyles
     }
 
     fun begin(
@@ -80,8 +93,40 @@ internal class TerminalTextRunStyle {
         extraAttr = cache.extraAttrWords[index]
         hyperlinkId = hyperlinkIdForCell(hyperlinkIds[index], cache.flags[index])
         hovered = isHovered(hyperlinkId)
+        styleOffset = hyperlinkStyles?.styleOffset(hyperlinkId, hovered, activationHover) ?: -1
+        styleFlags = if (styleOffset < 0) 0 else checkNotNull(hyperlinkStyles).flags(styleOffset)
         foreground = effectiveForeground(palette, attr, cache.codeWords[index], hovered)
+        hyperlinkUnderline =
+            if (styleFlags and TerminalHyperlinkActions.UNDERLINE_STYLE != 0) {
+                styleFlags ushr 8
+            } else {
+                if (hovered) {
+                    TerminalRenderUnderline.SINGLE
+                } else if (hyperlinkId >
+                    0
+                ) {
+                    TerminalRenderUnderline.DOTTED
+                } else {
+                    TerminalRenderUnderline.NONE
+                }
+            }
+        hyperlinkUnderlineColor =
+            if (styleFlags and TerminalHyperlinkActions.UNDERLINE_COLOR !=
+                0
+            ) {
+                checkNotNull(hyperlinkStyles).underlineColor(styleOffset)
+            } else {
+                foreground
+            }
         fontStyle = terminalFontStyle(attr)
+        hyperlinkUnderlineThickness =
+            if (styleFlags and TerminalHyperlinkActions.UNDERLINE_STYLE == 0) {
+                if (hovered) 2 else 1
+            } else if (styleFlags and TerminalHyperlinkActions.BOLD_UNDERLINE != 0) {
+                2
+            } else {
+                1
+            }
         decoration = decorationKey(attr, extraAttr)
         textHidden = isTextHidden(attr, textBlinkVisible)
     }
@@ -94,10 +139,13 @@ internal class TerminalTextRunStyle {
     ): Boolean {
         val index = rowOffset + column
         val candidateAttr = cache.attrWords[index]
-        return !(isTextHidden(candidateAttr, textBlinkVisible) != textHidden ||
+        return !(
+            isTextHidden(candidateAttr, textBlinkVisible) != textHidden ||
                 terminalFontStyle(candidateAttr) != fontStyle ||
                 decorationKey(candidateAttr, cache.extraAttrWords[index]) != decoration ||
-                hyperlinkIdForCell(hyperlinkIds[index], cache.flags[index]) != hyperlinkId) && effectiveForeground(palette, candidateAttr, cache.codeWords[index], hovered) == foreground
+                hyperlinkIdForCell(hyperlinkIds[index], cache.flags[index]) != hyperlinkId
+        ) &&
+            effectiveForeground(palette, candidateAttr, cache.codeWords[index], hovered) == foreground
     }
 
     private fun isHovered(hyperlinkId: Int): Boolean = hyperlinkId != 0 && hyperlinkId == hoveredHyperlinkId
@@ -107,7 +155,12 @@ internal class TerminalTextRunStyle {
         attr: Long,
         codePoint: Int,
         hovered: Boolean,
-    ): Int = if (hovered && activationHover) activationForeground else SwingColors.foreground(palette, attr, codePoint)
+    ): Int =
+        when {
+            styleFlags and TerminalHyperlinkActions.FOREGROUND != 0 -> checkNotNull(hyperlinkStyles).foreground(styleOffset)
+            hovered && activationHover && styleFlags == 0 -> activationForeground
+            else -> SwingColors.foreground(palette, attr, codePoint)
+        }
 
     private fun decorationKey(
         attr: Long,

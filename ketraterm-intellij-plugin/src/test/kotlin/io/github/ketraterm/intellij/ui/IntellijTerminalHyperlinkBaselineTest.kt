@@ -144,7 +144,7 @@ class IntellijTerminalHyperlinkBaselineTest : BasePlatformTestCase() {
             SwingHyperlinkDetectionRequest(
                 targets.map { "prefix $it suffix\n" },
                 longArrayOf(12, 18),
-                context = SwingHyperlinkDetectionContext.ORDERED_CONTENT,
+                context = SwingHyperlinkDetectionContext.INDEPENDENT_LINE,
             )
         val results = ArrayList<SwingHyperlink>()
         val completed =
@@ -195,9 +195,8 @@ class IntellijTerminalHyperlinkBaselineTest : BasePlatformTestCase() {
                     for (lineCount in intArrayOf(32, 128, 512)) {
                         for (scenario in Scenario.entries) {
                             val lines = scenario.lines(lineCount, file.path, fileUri)
-                            val request = detectionRequest(lines)
                             repeat(WARMUP_REQUESTS) {
-                                runBlocking { detector.detect(request, CountingSink(lines)) }
+                                runBlocking { detectBoth(detector, lines, CountingSink(lines)) }
                             }
 
                             val creationStart = probe.creations
@@ -209,7 +208,7 @@ class IntellijTerminalHyperlinkBaselineTest : BasePlatformTestCase() {
                             for (sample in nanos.indices) {
                                 val sink = CountingSink(lines)
                                 val start = System.nanoTime()
-                                runBlocking { detector.detect(request, sink) }
+                                runBlocking { detectBoth(detector, lines, sink) }
                                 nanos[sample] = System.nanoTime() - start
                                 resultCounts[sample] = sink.results
                                 webCounts[sample] = sink.webUris
@@ -264,14 +263,13 @@ class IntellijTerminalHyperlinkBaselineTest : BasePlatformTestCase() {
             testRootDisposable,
         )
         val lines = arrayOf("$token\n", "https://example.invalid/indexing\n")
-        val request = detectionRequest(lines)
         val detector = IntellijTerminalHyperlinkDetector(project)
         val observedCounts = ArrayList<Int>()
 
         fun detect(): CountingSink {
             val completed =
                 AppExecutorUtil.getAppExecutorService().submit(
-                    Callable { CountingSink(lines).also { runBlocking { detector.detect(request, it) } } },
+                    Callable { CountingSink(lines).also { runBlocking { detectBoth(detector, lines, it) } } },
                 )
             val sink =
                 try {
@@ -301,6 +299,26 @@ class IntellijTerminalHyperlinkBaselineTest : BasePlatformTestCase() {
                 "\"results\":${observedCounts.joinToString(prefix = "[", postfix = "]")}," +
                 "\"resubmission\":\"explicit detector call; no Swing invalidation exercised\"}",
         )
+    }
+
+    private var replay = 0L
+
+    private suspend fun detectBoth(
+        detector: IntellijTerminalHyperlinkDetector,
+        lines: Array<String>,
+        sink: SwingHyperlinkDetectionSink,
+    ) {
+        for (context in listOf(SwingHyperlinkDetectionContext.INDEPENDENT_LINE, SwingHyperlinkDetectionContext.ORDERED_CONTENT)) {
+            detector.detect(
+                SwingHyperlinkDetectionRequest(
+                    lines.toList(),
+                    LongArray(lines.size) { it.toLong() },
+                    context = context,
+                    analysisEpoch = ++replay,
+                ),
+                sink,
+            )
+        }
     }
 
     private fun detectionRequest(lines: Array<String>): SwingHyperlinkDetectionRequest =

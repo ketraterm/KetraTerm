@@ -44,19 +44,21 @@ data class SwingHyperlinkTextRange(
 }
 
 /** Resolved, host-neutral colors and decoration. Null fields inherit terminal presentation. */
-class SwingHyperlinkStyle(
+data class SwingHyperlinkStyle(
     val foregroundArgb: Int? = null,
     val backgroundArgb: Int? = null,
     val underlineArgb: Int? = null,
     val underlineStyle: Int? = null,
+    val underlineThickness: Int = 1,
 ) {
     init {
         require(underlineStyle == null || underlineStyle in TerminalRenderUnderline.NONE..TerminalRenderUnderline.DASHED)
+        require(underlineThickness in 1..2)
     }
 }
 
 /** Prepared provider styles; theme/framework lookup must happen before construction, never in paint. */
-class SwingHyperlinkPresentation(
+data class SwingHyperlinkPresentation(
     val normal: SwingHyperlinkStyle? = null,
     val hovered: SwingHyperlinkStyle? = null,
     val active: SwingHyperlinkStyle? = null,

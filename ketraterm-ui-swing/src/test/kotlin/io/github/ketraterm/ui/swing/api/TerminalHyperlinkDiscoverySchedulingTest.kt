@@ -34,6 +34,115 @@ import kotlin.coroutines.CoroutineContext
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class TerminalHyperlinkDiscoverySchedulingTest {
+    @Test
+    fun `binding disposal releases ordered provider state only after its invocation exits`() {
+        val gate = CompletableDeferred<Unit>()
+        var running = false
+        var discarded = 0
+        val detector =
+            object : SwingHyperlinkDetector {
+                override val context = SwingHyperlinkDetectionContext.ORDERED_CONTENT
+
+                override suspend fun detect(
+                    request: SwingHyperlinkDetectionRequest,
+                    sink: SwingHyperlinkDetectionSink,
+                ) {
+                    running = true
+                    try {
+                        withContext(NonCancellable) { gate.await() }
+                    } finally {
+                        running = false
+                    }
+                }
+
+                override fun discardOrderedState() {
+                    assertFalse(running, "A binding must not clear provider state under a running filter")
+                    discarded++
+                }
+            }
+        Fixture(detector = detector).use { fixture ->
+            fixture.show(URL)
+            fixture.drainUi()
+            fixture.completeAnalysis()
+            assertTrue(running)
+            fixture.onEdt { fixture.controller.reset() }
+            assertEquals(0, discarded)
+            gate.complete(Unit)
+            fixture.completeAnalysis()
+            assertFalse(running)
+            assertEquals(1, discarded)
+        }
+    }
+
+    @Test
+    fun `slow ordered filters cannot delay independent URLs`() {
+        val gate = CompletableDeferred<Unit>()
+        var orderedEntered = false
+        val detector =
+            object : SwingHyperlinkDetector {
+                override val context = SwingHyperlinkDetectionContext.INDEPENDENT_AND_ORDERED
+
+                override suspend fun detect(
+                    request: SwingHyperlinkDetectionRequest,
+                    sink: SwingHyperlinkDetectionSink,
+                ) {
+                    if (request.context == SwingHyperlinkDetectionContext.ORDERED_CONTENT) {
+                        orderedEntered = true
+                        gate.await()
+                        sink.addHyperlink(request.hyperlink(1, 0, 4, { true }))
+                    } else {
+                        emitUrls(request, sink, ArrayList(), true)
+                    }
+                }
+            }
+        Fixture(detector = detector).use { fixture ->
+            fixture.show(URL, "file")
+            fixture.drainUi()
+            fixture.completeAnalysis()
+            assertTrue(orderedEntered)
+            fixture.onEdt {
+                assertTrue(fixture.openAt(0))
+                assertFalse(fixture.openAt(1))
+            }
+            gate.complete(Unit)
+            fixture.completeAnalysis()
+            fixture.onEdt { assertTrue(fixture.openAt(1)) }
+        }
+    }
+
+    @Test
+    fun `provider configuration flow reconciles without a terminal frame`() {
+        val changes = kotlinx.coroutines.flow.MutableSharedFlow<Unit>(extraBufferCapacity = 1)
+        var revision = 0L
+        var calls = 0
+        val detector =
+            object : SwingHyperlinkDetector {
+                override val configurationGeneration get() = revision
+                override val configurationChanges = changes
+
+                override suspend fun detect(
+                    request: SwingHyperlinkDetectionRequest,
+                    sink: SwingHyperlinkDetectionSink,
+                ) {
+                    calls++
+                    if (revision > 0) sink.addHyperlink(request.hyperlink(0, 0, URL.length, { true }))
+                }
+            }
+        Fixture(detector = detector).use { fixture ->
+            fixture.show(URL)
+            fixture.drainUi()
+            fixture.completeAnalysis()
+            assertEquals(1, calls)
+            fixture.onEdt { assertFalse(fixture.openAt(0)) }
+            revision++
+            assertTrue(changes.tryEmit(Unit))
+            fixture.drainUi()
+            fixture.completeAnalysis()
+            fixture.onEdt { assertTrue(fixture.openAt(0)) }
+            assertEquals(2, calls)
+        }
+    }
+
     @ParameterizedTest
     @ValueSource(booleans = [false, true])
     fun `failure and provider cancellation recover without output or scrolling`(cancelled: Boolean) {
@@ -659,10 +768,20 @@ class TerminalHyperlinkDiscoverySchedulingTest {
     fun `in-flight viewport results reject changed context but accept independent URLs`() {
         val opened = ArrayList<String>()
         val detector =
-            viewportDetector { request, sink ->
-                val context = request.lineText(0)
-                sink.addHyperlink(request.hyperlink(1, 0, 6, { opened.add(context) }))
-                emitUrls(request, sink, opened, validateUrlToken = true)
+            object : SwingHyperlinkDetector {
+                override val context = SwingHyperlinkDetectionContext.INDEPENDENT_AND_ORDERED
+
+                override suspend fun detect(
+                    request: SwingHyperlinkDetectionRequest,
+                    sink: SwingHyperlinkDetectionSink,
+                ) {
+                    if (request.context == SwingHyperlinkDetectionContext.INDEPENDENT_LINE) {
+                        emitUrls(request, sink, opened, validateUrlToken = true)
+                    } else {
+                        val context = request.lineText(0)
+                        sink.addHyperlink(request.hyperlink(1, 0, 6, { opened.add(context) }))
+                    }
+                }
             }
         Fixture(detector = detector).use { fixture ->
             fixture.show("old context", "source.kt:10", URL)

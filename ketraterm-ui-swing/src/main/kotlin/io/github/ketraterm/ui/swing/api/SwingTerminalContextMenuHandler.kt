@@ -15,6 +15,8 @@
  */
 package io.github.ketraterm.ui.swing.api
 
+import java.awt.event.MouseEvent
+
 /**
  * Host-owned terminal context-menu hook.
  *
@@ -62,6 +64,8 @@ class SwingTerminalContextMenuRequest internal constructor(
     val y: Int,
     val forcedByShift: Boolean,
     val hyperlink: SwingTerminalContextHyperlink?,
+    /** Original popup gesture, for host-owned provider actions. */
+    val triggerEvent: MouseEvent,
 ) {
     /**
      * Returns whether the terminal currently has selected text.
@@ -113,6 +117,8 @@ class SwingTerminalContextHyperlink internal constructor(
     val uri: String?,
     private val openAction: () -> Boolean,
     private val copyUriAction: () -> Boolean,
+    /** Captured host action metadata; opaque to shared UI. */
+    val providerAction: SwingHyperlinkAction? = null,
 ) {
     /**
      * Opens the hyperlink target.

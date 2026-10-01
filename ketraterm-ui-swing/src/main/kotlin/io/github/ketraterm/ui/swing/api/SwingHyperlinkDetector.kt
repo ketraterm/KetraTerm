@@ -15,10 +15,14 @@
  */
 package io.github.ketraterm.ui.swing.api
 
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.emptyFlow
+
 /**
  * Host discovery outside terminal mutation, painting and pointer handling.
  *
- * The binding owner serializes calls and owns their coroutine cancellation.
+ * The binding owner serializes calls within each context and owns their cancellation.
+ * A detector declaring both contexts must permit concurrent independent and ordered calls.
  * Implementations may suspend and allocate bounded discovery results, acquire
  * host-read access, and report to the request-confined sink. They must propagate
  * cancellation, discard any tainted ordered state, and never touch Swing state.
@@ -31,11 +35,21 @@ fun interface SwingHyperlinkDetector {
     /** Equality-only provider invalidation generation; the owner also tracks instance identity. */
     val configurationGeneration: Long get() = 0L
 
+    /** Binding-owned subscription for provider/index/theme changes even without terminal output. */
+    val configurationChanges: Flow<Unit> get() = emptyFlow()
+
+    /**
+     * Releases retained ordered source/provider state at a binding or provider boundary.
+     * The owner calls this only after the ordered invocation has finished (including cancellation
+     * before dispatch). It must be nonblocking, may run on any thread, and must not touch independent state.
+     */
+    fun discardOrderedState() = Unit
+
     /**
      * Reports one request's results. Return means successful completion, including
      * an empty result; failure/cancellation must throw and cannot mean empty success.
      * The sink belongs to this call and must not be retained or used by detached work.
-     * Ordered state is valid only within the request's binding/source/provider epochs.
+     * Ordered state is valid only within the request's binding/source/provider/analysis epochs.
      */
     suspend fun detect(
         request: SwingHyperlinkDetectionRequest,
@@ -59,6 +73,9 @@ enum class SwingHyperlinkDetectionContext {
      * an epoch change requires fresh state, not continuation of an interrupted call.
      */
     ORDERED_CONTENT,
+
+    /** Separate independently scheduled requests for text-derived and ordered provider results. */
+    INDEPENDENT_AND_ORDERED,
 }
 
 /**
@@ -79,15 +96,23 @@ class SwingHyperlinkDetectionRequest(
     val bindingEpoch: Long = 0L,
     val sourceEpoch: Long = 0L,
     val providerEpoch: Long = 0L,
+    /** Changes when earlier content requires ordered state reconstruction. */
+    val analysisEpoch: Long = 0L,
+    /** Absolute retained boundary; eviction alone does not restart ordered provider state. */
+    val firstRetainedRow: Long = 0L,
+    firstLineIds: LongArray = firstAbsoluteRows,
 ) {
     private val lines = lineTexts.toTypedArray()
     private val firstRows = firstAbsoluteRows.copyOf()
     private val lastRows = lastAbsoluteRows.copyOf()
+    private val lineIds = firstLineIds.copyOf()
     private val starts = IntArray(lines.size)
     private val ends = IntArray(lines.size)
 
     init {
-        require(firstRows.size == lines.size && lastRows.size == lines.size)
+        require(firstRows.size == lines.size && lastRows.size == lines.size && lineIds.size == lines.size)
+        require(context != SwingHyperlinkDetectionContext.INDEPENDENT_AND_ORDERED)
+        require(firstRetainedRow >= 0)
         var offset = 0
         for (index in lines.indices) {
             require(lines[index].endsWith('\n'))
@@ -116,6 +141,9 @@ class SwingHyperlinkDetectionRequest(
 
     /** Last physical row of that same logical line, inclusive. */
     fun lineLastAbsoluteRow(index: Int): Long = lastRows[index]
+
+    /** Stable source line identity for host-owned historical output metadata. */
+    fun lineFirstId(index: Int): Long = lineIds[index]
 
     /** Builds an absolute range from line-local UTF-16 offsets. */
     fun range(

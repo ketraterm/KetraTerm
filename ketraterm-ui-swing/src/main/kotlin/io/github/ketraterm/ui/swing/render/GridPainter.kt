@@ -20,6 +20,7 @@ import io.github.ketraterm.render.api.TerminalRenderBufferKind
 import io.github.ketraterm.render.cache.TerminalRenderCache
 import io.github.ketraterm.ui.swing.api.CellSelection
 import io.github.ketraterm.ui.swing.api.TerminalFontResolver
+import io.github.ketraterm.ui.swing.api.TerminalHyperlinkActions
 import io.github.ketraterm.ui.swing.render.cache.AwtColorCache
 import io.github.ketraterm.ui.swing.render.painter.*
 import io.github.ketraterm.ui.swing.search.TerminalSearchViewportHighlights
@@ -87,6 +88,7 @@ internal class GridPainter(
         hoveredPromptMarkerRow: Int = -1,
         hyperlinkIds: IntArray = cache.hyperlinkIds,
         hoveredHyperlinkId: Int = 0,
+        hyperlinkStyles: TerminalHyperlinkActions? = null,
         hyperlinkActivationHover: Boolean = false,
     ) {
         val palette = cache.palette
@@ -129,6 +131,19 @@ internal class GridPainter(
             while (row < rows) {
                 val bidi = cellGeometry.row(cache, row)
                 backgroundPainter.paintRow(g, cache, palette, metrics, row, bidi)
+                if (hyperlinkStyles != null) {
+                    paintHyperlinkBackgrounds(
+                        g,
+                        cache,
+                        metrics,
+                        row,
+                        hyperlinkIds,
+                        hyperlinkStyles,
+                        hoveredHyperlinkId,
+                        hyperlinkActivationHover,
+                        textBlinkVisible,
+                    )
+                }
                 shellIntegrationDecorationPainter.paint(
                     g = g,
                     settings = settings,
@@ -161,6 +176,7 @@ internal class GridPainter(
                     hoveredHyperlinkId = hoveredHyperlinkId,
                     hyperlinkActivationHover = hyperlinkActivationHover,
                     hyperlinkActivationForeground = settings.hyperlinkActivationForeground,
+                    hyperlinkStyles = hyperlinkStyles,
                 )
                 row++
             }
@@ -179,6 +195,44 @@ internal class GridPainter(
         } finally {
             g.translate(-paddingLeft.toDouble(), -(paddingTop.toDouble() + contentOriginY))
             g.clip = originalClip
+        }
+    }
+
+    private fun paintHyperlinkBackgrounds(
+        g: Graphics2D,
+        cache: TerminalRenderCache,
+        metrics: SwingMetrics,
+        row: Int,
+        ids: IntArray,
+        styles: TerminalHyperlinkActions,
+        hoveredId: Int,
+        active: Boolean,
+        blinkVisible: Boolean,
+    ) {
+        val offset = cache.rowOffset(row)
+        val bidi = cellGeometry.row(cache, row)
+        var column = 0
+        while (column < cache.columns) {
+            val id = hyperlinkIdForCell(ids[offset + column], cache.flags[offset + column])
+            val style = styles.styleOffset(id, id == hoveredId, active)
+            if (style < 0 ||
+                styles.flags(style) and TerminalHyperlinkActions.BACKGROUND == 0 ||
+                isTextHidden(cache.attrWords[offset + column], blinkVisible)
+            ) {
+                column++
+                continue
+            }
+            val start = column++
+            while (column < cache.columns &&
+                hyperlinkIdForCell(ids[offset + column], cache.flags[offset + column]) == id &&
+                !isTextHidden(cache.attrWords[offset + column], blinkVisible)
+            ) {
+                column++
+            }
+            g.color = colorCache.color(styles.background(style))
+            forEachVisualCellSpan(bidi, start, column) { first, end ->
+                g.fillRect(first * metrics.cellWidth, row * metrics.cellHeight, (end - first) * metrics.cellWidth, metrics.cellHeight)
+            }
         }
     }
 

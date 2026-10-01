@@ -40,12 +40,69 @@ internal class TerminalDecorationPainter(
     ) {
         if (style.textHidden) return
         paint(g, palette, style.attr, style.extraAttr, style.foreground, startColumn, endColumn, row, metrics)
-        if (style.hyperlinkId > 0 || style.hovered) {
+        if (style.hyperlinkUnderline != TerminalRenderUnderline.NONE) {
             // A terminal-authored underline owns its decoration and color. The activation
             // foreground still indicates hover without painting over that underline.
             if (TerminalRenderAttrs.underlineStyle(style.attr) == TerminalRenderUnderline.NONE) {
-                paintHyperlink(g, style.foreground, startColumn, endColumn, row, metrics, style.hovered)
+                paintHyperlinkStyle(
+                    g,
+                    style.hyperlinkUnderlineColor,
+                    startColumn,
+                    endColumn,
+                    row,
+                    metrics,
+                    style.hyperlinkUnderline,
+                    style.hyperlinkUnderlineThickness,
+                )
             }
+        }
+    }
+
+    private fun paintHyperlinkStyle(
+        g: Graphics2D,
+        color: Int,
+        start: Int,
+        end: Int,
+        row: Int,
+        metrics: SwingMetrics,
+        underline: Int,
+        thickness: Int,
+    ) {
+        if (start >= end) return
+        val x = start * metrics.cellWidth
+        val limit = end * metrics.cellWidth
+        val y = row * metrics.cellHeight + metrics.underlineY
+        val height = minOf(thickness, metrics.cellHeight - metrics.underlineY)
+        g.color = colorCache.color(color)
+        when (underline) {
+            TerminalRenderUnderline.DOTTED -> {
+                val period = thickness + 2
+                var pixel = x + (period - x % period) % period
+                while (pixel < limit) {
+                    g.fillRect(pixel, y, minOf(thickness, limit - pixel), height)
+                    pixel += period
+                }
+            }
+            TerminalRenderUnderline.CURLY -> {
+                var pixel = x
+                while (pixel < limit) {
+                    val waveY = minOf((row + 1) * metrics.cellHeight - height, y + if (pixel % 4 < 2) 0 else 1)
+                    g.fillRect(pixel, waveY, 1, height)
+                    pixel++
+                }
+            }
+            TerminalRenderUnderline.DASHED -> {
+                var pixel = x + (4 - x % 4) % 4
+                while (pixel < limit) {
+                    g.fillRect(pixel, y, minOf(2, limit - pixel), height)
+                    pixel += 4
+                }
+            }
+            TerminalRenderUnderline.DOUBLE -> {
+                g.fillRect(x, y, limit - x, 1)
+                g.fillRect(x, minOf((row + 1) * metrics.cellHeight - 1, y + 2), limit - x, 1)
+            }
+            else -> g.fillRect(x, y, limit - x, height)
         }
     }
 
@@ -106,26 +163,16 @@ internal class TerminalDecorationPainter(
         row: Int,
         metrics: SwingMetrics,
         hovered: Boolean,
-    ) {
-        if (startColumn >= endColumn) return
-
-        val x = startColumn * metrics.cellWidth
-        val width = (endColumn - startColumn) * metrics.cellWidth
-        val rowY = row * metrics.cellHeight
-        val y = rowY + metrics.underlineY
-        g.color = colorCache.color(color)
-        if (hovered) {
-            g.fillRect(x, y, width, minOf(HOVER_DECORATION_THICKNESS, metrics.cellHeight - metrics.underlineY))
-        } else {
-            // Anchor the pattern to the row, so text/style run boundaries cannot restart it.
-            var dotX = x + (DOT_PERIOD - x % DOT_PERIOD) % DOT_PERIOD
-            val endX = x + width
-            while (dotX < endX) {
-                g.fillRect(dotX, y, DECORATION_THICKNESS, DECORATION_THICKNESS)
-                dotX += DOT_PERIOD
-            }
-        }
-    }
+    ) = paintHyperlinkStyle(
+        g,
+        color,
+        startColumn,
+        endColumn,
+        row,
+        metrics,
+        if (hovered) TerminalRenderUnderline.SINGLE else TerminalRenderUnderline.DOTTED,
+        if (hovered) 2 else 1,
+    )
 
     private fun underlineColor(
         palette: TerminalColorPalette,
@@ -143,8 +190,6 @@ internal class TerminalDecorationPainter(
 
     private companion object {
         private const val DECORATION_THICKNESS = 1
-        private const val HOVER_DECORATION_THICKNESS = 2
         private const val DOUBLE_UNDERLINE_OFFSET = 2
-        private const val DOT_PERIOD = 3
     }
 }

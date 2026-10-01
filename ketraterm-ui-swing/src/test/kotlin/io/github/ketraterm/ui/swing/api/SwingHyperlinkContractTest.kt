@@ -23,6 +23,85 @@ import org.junit.jupiter.api.Test
 
 class SwingHyperlinkContractTest {
     @Test
+    fun `backward results cross batches and empty producer replay removes every old span`() {
+        val terminal = TerminalBuffers.create(width = 16, height = 3)
+        for (text in listOf("first", "second", "producer")) {
+            if (text != "first") {
+                terminal.carriageReturn()
+                terminal.newLine()
+            }
+            terminal.writeText(text)
+        }
+        val cache = TerminalRenderCache(16, 3).apply { updateFrom(terminal as TerminalRenderFrameReader) }
+        val index = TerminalHyperlinkIndex()
+        val context = SwingHyperlinkDetectionContext.ORDERED_CONTENT
+        index.update(cache, context)
+        val lines = index.pendingLines(context)
+        index.acceptResults(lines.take(2), emptyList(), context, null)
+        val source = SwingHyperlinkTextRange(SwingHyperlinkTextPosition(0, 1), SwingHyperlinkTextPosition(1, 3))
+        val dependency = SwingHyperlinkTextRange(SwingHyperlinkTextPosition(0, 0), SwingHyperlinkTextPosition(2, 9))
+        index.acceptResults(lines.takeLast(1), listOf(SwingHyperlink(source, dependency, { true })), context, null)
+        index.writeOverlay(cache) { _, _, _, _ -> }
+        val id = index.idsFor(cache)[1]
+        assertTrue(id < 0)
+        assertEquals(id, index.idsFor(cache)[cache.rowOffset(1)])
+        index.restartOrdered()
+        index.acceptResults(lines.take(2), emptyList(), context, null)
+        index.writeOverlay(cache) { _, _, _, _ -> }
+        assertEquals(id, index.idsFor(cache)[1], "An earlier replay batch must preserve results produced later")
+        index.acceptResults(lines.takeLast(1), emptyList(), context, null)
+        index.writeOverlay(cache) { _, _, _, _ -> }
+        assertEquals(0, index.idsFor(cache)[1])
+        assertEquals(0, index.idsFor(cache)[cache.rowOffset(1)])
+        assertNull(index.hyperlinkFor(id, cache))
+    }
+
+    @Test
+    fun `overlaps prefer visible then narrower then provider order with OSC8 first`() {
+        val terminal = TerminalBuffers.create(width = 16, height = 1)
+        terminal.writeText("abcdefgh")
+        val cache = TerminalRenderCache(16, 1).apply { updateFrom(terminal as TerminalRenderFrameReader) }
+        cache.hyperlinkIds[3] = 42
+        val index = TerminalHyperlinkIndex()
+        index.update(cache)
+        val lines = index.pendingLines()
+        val request = detectionRequest(lines)
+
+        fun link(
+            start: Int,
+            end: Int,
+            visible: Boolean,
+            provider: Int,
+            uri: String,
+        ) = SwingHyperlink(
+            request.range(0, start, 0, end),
+            request.range(0, 0, 0, 9),
+            { true },
+            uri,
+            SwingHyperlinkPresentation(isVisible = visible),
+            providerOrder = provider,
+        )
+        index.acceptResults(
+            lines,
+            listOf(
+                link(0, 8, false, 0, "implicit"),
+                link(1, 7, true, 0, "wide"),
+                link(2, 6, true, 2, "later"),
+                link(2, 6, true, 1, "narrow"),
+            ),
+            SwingHyperlinkDetectionContext.INDEPENDENT_LINE,
+            null,
+        )
+        index.writeOverlay(cache) { _, _, _, _ -> }
+        val ids = index.idsFor(cache)
+        assertEquals("implicit", index.hyperlinkFor(ids[0], cache)?.uri)
+        assertEquals("wide", index.hyperlinkFor(ids[1], cache)?.uri)
+        assertEquals("narrow", index.hyperlinkFor(ids[2], cache)?.uri)
+        assertEquals(42, ids[3])
+        assertEquals("narrow", index.hyperlinkFor(ids[4], cache)?.uri)
+    }
+
+    @Test
     fun `logical coordinates preserve UTF16 soft wrap anchors and owned input`() {
         val texts = arrayListOf("a\uD83D\uDE00b\n", "next\n")
         val first = longArrayOf(40L, 44L)

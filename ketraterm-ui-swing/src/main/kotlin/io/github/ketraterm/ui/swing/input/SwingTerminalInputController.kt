@@ -16,10 +16,21 @@
 package io.github.ketraterm.ui.swing.input
 
 import io.github.ketraterm.input.event.TerminalFocusEvent
-import java.awt.event.FocusAdapter
-import java.awt.event.FocusEvent
-import java.awt.event.KeyAdapter
-import java.awt.event.KeyEvent
+import java.awt.event.*
+
+internal val hyperlinkNavigationModifierMask =
+    if (System
+            .getProperty(
+                "os.name",
+            ).startsWith("Mac", ignoreCase = true)
+    ) {
+        InputEvent.META_DOWN_MASK
+    } else {
+        InputEvent.CTRL_DOWN_MASK
+    }
+
+/** One platform navigation modifier shared by keyboard feedback and mouse activation. */
+internal fun hyperlinkNavigationModifierDown(event: InputEvent): Boolean = event.modifiersEx and hyperlinkNavigationModifierMask != 0
 
 /**
  * Swing keyboard/focus routing for terminal input.
@@ -58,7 +69,7 @@ internal class SwingTerminalInputController(
                     return
                 }
 
-                host.updateHyperlinkActivationHover(event.isControlDown)
+                host.updateHyperlinkActivationHover(hyperlinkNavigationModifierDown(event))
                 host.resetCursorBlink()
 
                 val keyEvent = keyMapper.keyPressed(event) ?: return
@@ -68,7 +79,7 @@ internal class SwingTerminalInputController(
             }
 
             override fun keyReleased(event: KeyEvent) {
-                host.updateHyperlinkActivationHover(event.isControlDown)
+                host.updateHyperlinkActivationHover(hyperlinkNavigationModifierDown(event))
                 if (claimedKeyLifecycle.release(event)) {
                     event.consume()
                     return

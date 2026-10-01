@@ -30,6 +30,7 @@ import io.github.ketraterm.render.cache.TerminalRenderPublisher
 import io.github.ketraterm.session.TerminalSession
 import io.github.ketraterm.transport.TerminalConnector
 import io.github.ketraterm.transport.TerminalConnectorListener
+import io.github.ketraterm.ui.swing.input.hyperlinkNavigationModifierMask
 import io.github.ketraterm.ui.swing.settings.TerminalHyperlinkHandler
 import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.Test
@@ -49,7 +50,7 @@ class TerminalHyperlinkControllerTest {
         val cache = TerminalRenderCache(8, 2)
         val host = FakeHyperlinkHost(cache, null, SwingHostServices(), mapOf(-1 to { true }, -2 to { true }))
         val controller = TerminalHyperlinkController(host)
-        controller.handleMouseMoved(MouseEvent(JButton(), MouseEvent.MOUSE_MOVED, 0L, InputEvent.CTRL_DOWN_MASK, 15, 5, 0, false))
+        controller.handleMouseMoved(MouseEvent(JButton(), MouseEvent.MOUSE_MOVED, 0L, hyperlinkNavigationModifierMask, 15, 5, 0, false))
         assertEquals(0, controller.hoveredHyperlinkId)
 
         cache.hyperlinkIds.fill(-1, 1, 11)
@@ -251,8 +252,15 @@ class TerminalHyperlinkControllerTest {
         private val session: TerminalSession?,
         private val hostServices: SwingHostServices,
         private val discoveredActions: Map<Int, () -> Boolean> = emptyMap(),
+        private val activation: SwingHyperlinkActivation = SwingHyperlinkActivation.MODIFIER,
+        private val visible: Boolean = true,
     ) : TerminalHyperlinkHost {
         override var cursor: Cursor = Cursor.getDefaultCursor()
+
+        override fun hyperlinkActivation(hyperlinkId: Int) = activation
+
+        override fun isHyperlinkVisible(hyperlinkId: Int) = visible
+
         var repaints = 0
         val repaintSpans = mutableListOf<RepaintSpan>()
 
@@ -389,7 +397,7 @@ class TerminalHyperlinkControllerTest {
             row: Int,
             activationHover: Boolean = false,
         ) {
-            val modifiers = if (activationHover) InputEvent.CTRL_DOWN_MASK else 0
+            val modifiers = if (activationHover) hyperlinkNavigationModifierMask else 0
             controller.handleMouseMoved(
                 MouseEvent(
                     component,
@@ -442,15 +450,28 @@ class TerminalHyperlinkControllerTest {
                     component,
                     MouseEvent.MOUSE_PRESSED,
                     0L,
-                    InputEvent.BUTTON1_DOWN_MASK or InputEvent.CTRL_DOWN_MASK,
+                    InputEvent.BUTTON1_DOWN_MASK or hyperlinkNavigationModifierMask,
                     column * CELL_WIDTH + CELL_WIDTH / 2,
                     row * CELL_HEIGHT + CELL_HEIGHT / 2,
                     1,
                     false,
                     MouseEvent.BUTTON1,
                 )
-            val handled = controller.handleMousePressed(event)
-            assertEquals(handled, event.isConsumed)
+            controller.handleMousePressed(event)
+            val release =
+                MouseEvent(
+                    component,
+                    MouseEvent.MOUSE_RELEASED,
+                    0L,
+                    hyperlinkNavigationModifierMask,
+                    event.x,
+                    event.y,
+                    1,
+                    false,
+                    MouseEvent.BUTTON1,
+                )
+            val handled = controller.handleMouseReleased(release)
+            assertEquals(handled, release.isConsumed)
             return handled
         }
 
@@ -797,14 +818,27 @@ class TerminalHyperlinkControllerTest {
                 button,
                 MouseEvent.MOUSE_PRESSED,
                 System.currentTimeMillis(),
-                InputEvent.BUTTON1_DOWN_MASK or InputEvent.CTRL_DOWN_MASK,
+                InputEvent.BUTTON1_DOWN_MASK or hyperlinkNavigationModifierMask,
                 15,
                 25,
                 1,
                 false,
                 MouseEvent.BUTTON1,
             )
-        val consumed = controller.handleMousePressed(clickEvent)
+        assertTrue(controller.handleMousePressed(clickEvent))
+        val release =
+            MouseEvent(
+                button,
+                MouseEvent.MOUSE_RELEASED,
+                0L,
+                hyperlinkNavigationModifierMask,
+                clickEvent.x,
+                clickEvent.y,
+                1,
+                false,
+                MouseEvent.BUTTON1,
+            )
+        val consumed = controller.handleMouseReleased(release)
 
         assertTrue(consumed)
         assertEquals("https://example.com", openedUri.get())
@@ -838,17 +872,126 @@ class TerminalHyperlinkControllerTest {
                 button,
                 MouseEvent.MOUSE_PRESSED,
                 System.currentTimeMillis(),
-                InputEvent.BUTTON1_DOWN_MASK or InputEvent.CTRL_DOWN_MASK,
+                InputEvent.BUTTON1_DOWN_MASK or hyperlinkNavigationModifierMask,
                 15,
                 25,
                 1,
                 false,
                 MouseEvent.BUTTON1,
             )
-        val consumed = controller.handleMousePressed(clickEvent)
+        assertTrue(controller.handleMousePressed(clickEvent))
+        val release =
+            MouseEvent(
+                button,
+                MouseEvent.MOUSE_RELEASED,
+                0L,
+                hyperlinkNavigationModifierMask,
+                clickEvent.x,
+                clickEvent.y,
+                1,
+                false,
+                MouseEvent.BUTTON1,
+            )
+        val consumed = controller.handleMouseReleased(release)
 
         assertTrue(consumed)
         assertTrue(opened.get())
+    }
+
+    @Test
+    fun `direct link opens only on unchanged release and drag cancels activation`() {
+        val cache = TerminalRenderCache(4, 1)
+        cache.hyperlinkIds[0] = -1
+        cache.hyperlinkIds[1] = -2
+        val opened = ArrayList<Int>()
+        val host =
+            FakeHyperlinkHost(
+                cache,
+                null,
+                SwingHostServices(),
+                mapOf(-1 to { opened.add(-1) }, -2 to { opened.add(-2) }),
+                SwingHyperlinkActivation.DIRECT,
+            )
+        val controller = TerminalHyperlinkController(host)
+        val component = JButton()
+
+        fun mouse(
+            kind: Int,
+            column: Int = 0,
+        ) = MouseEvent(component, kind, 0L, 0, column * 10 + 1, 1, 1, false, MouseEvent.BUTTON1)
+        assertFalse(controller.handleMousePressed(mouse(MouseEvent.MOUSE_PRESSED)))
+        assertTrue(opened.isEmpty(), "Press must not navigate")
+        assertTrue(controller.handleMouseReleased(mouse(MouseEvent.MOUSE_RELEASED)))
+        assertEquals(listOf(-1), opened)
+        controller.handleMousePressed(mouse(MouseEvent.MOUSE_PRESSED))
+        controller.handleMouseDragged()
+        assertFalse(controller.handleMouseReleased(mouse(MouseEvent.MOUSE_RELEASED)))
+        controller.handleMousePressed(mouse(MouseEvent.MOUSE_PRESSED))
+        assertFalse(controller.handleMouseReleased(mouse(MouseEvent.MOUSE_RELEASED, 1)))
+        controller.handleMousePressed(mouse(MouseEvent.MOUSE_PRESSED))
+        cache.hyperlinkIds[0] = -2
+        assertFalse(controller.handleMouseReleased(mouse(MouseEvent.MOUSE_RELEASED)))
+        assertEquals(listOf(-1), opened)
+    }
+
+    @Test
+    fun `implicit link requires navigation modifier for cursor and release`() {
+        val cache = TerminalRenderCache(4, 1)
+        cache.hyperlinkIds[0] = -1
+        var opened = 0
+        val host =
+            FakeHyperlinkHost(
+                cache,
+                null,
+                SwingHostServices(),
+                mapOf(
+                    -1 to {
+                        opened++
+                        true
+                    },
+                ),
+                visible = false,
+            )
+        val controller = TerminalHyperlinkController(host)
+        val component = JButton()
+        controller.handleMouseMoved(MouseEvent(component, MouseEvent.MOUSE_MOVED, 0L, 0, 1, 1, 0, false))
+        assertEquals(Cursor.DEFAULT_CURSOR, host.cursor.type)
+        controller.updateHyperlinkActivationHover(true)
+        assertEquals(Cursor.HAND_CURSOR, host.cursor.type)
+        controller.updateHyperlinkActivationHover(false)
+        assertEquals(Cursor.DEFAULT_CURSOR, host.cursor.type)
+
+        fun mouse(
+            kind: Int,
+            modifiers: Int,
+        ) = MouseEvent(component, kind, 0L, modifiers, 1, 1, 1, false, MouseEvent.BUTTON1)
+        assertFalse(controller.handleMousePressed(mouse(MouseEvent.MOUSE_PRESSED, 0)))
+        assertFalse(controller.handleMouseReleased(mouse(MouseEvent.MOUSE_RELEASED, hyperlinkNavigationModifierMask)))
+        assertTrue(controller.handleMousePressed(mouse(MouseEvent.MOUSE_PRESSED, hyperlinkNavigationModifierMask)))
+        assertFalse(controller.handleMouseReleased(mouse(MouseEvent.MOUSE_RELEASED, 0)))
+        assertTrue(controller.handleMousePressed(mouse(MouseEvent.MOUSE_PRESSED, hyperlinkNavigationModifierMask)))
+        assertTrue(controller.handleMouseReleased(mouse(MouseEvent.MOUSE_RELEASED, hyperlinkNavigationModifierMask)))
+        assertEquals(1, opened)
+    }
+
+    @Test
+    fun `concealed cells cannot hover activate or expose a context target`() {
+        val cache = TerminalRenderCache(4, 1)
+        cache.hyperlinkIds.fill(-1)
+        cache.attrWords[0] =
+            io.github.ketraterm.render.api.TerminalRenderAttrs
+                .pack(invisible = true)
+        val host = FakeHyperlinkHost(cache, null, SwingHostServices(), mapOf(-1 to { error("Concealed link opened") }))
+        val controller = TerminalHyperlinkController(host)
+        val component = JButton()
+        val event = MouseEvent(component, MouseEvent.MOUSE_PRESSED, 0L, hyperlinkNavigationModifierMask, 1, 1, 1, false, MouseEvent.BUTTON1)
+        assertEquals(0, controller.hyperlinkIdAt(event))
+        assertFalse(controller.handleMousePressed(event))
+        controller.updatePointerPosition(1, 1)
+        assertEquals(0, controller.hoveredHyperlinkId)
+        controller.updatePointerPosition(11, 1)
+        assertEquals(-1, controller.hoveredHyperlinkId)
+        assertEquals(1, controller.segmentStartColumn(0), "Concealed cells must not enter the visible hover group")
     }
 
     private data class CapturedLinkSegment(

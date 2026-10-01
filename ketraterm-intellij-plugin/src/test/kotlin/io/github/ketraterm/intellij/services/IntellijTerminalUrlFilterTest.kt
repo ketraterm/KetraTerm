@@ -27,7 +27,7 @@ import io.github.ketraterm.ui.swing.api.SwingHyperlinkDetectionContext
  */
 class IntellijTerminalUrlFilterTest : BasePlatformTestCase() {
     fun testDetectorPreservesViewportContextForConsoleFilters() {
-        assertEquals(SwingHyperlinkDetectionContext.ORDERED_CONTENT, IntellijTerminalHyperlinkDetector(project).context)
+        assertEquals(SwingHyperlinkDetectionContext.INDEPENDENT_AND_ORDERED, IntellijTerminalHyperlinkDetector(project).context)
     }
 
     fun testUrlFilterReturnsAbsoluteResultItemOffsets() {

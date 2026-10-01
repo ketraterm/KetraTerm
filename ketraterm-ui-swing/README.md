@@ -148,21 +148,28 @@ val customServices = SwingHostServices(
 ## Hyperlink detector contract and migration
 
 `SwingHyperlinkDetector.detect` is suspending. The discovery owner serializes
-invocations, owns cancellation and rejects results from obsolete binding,
-source or provider epochs. Providers must propagate cancellation and discard
+invocations within each context, owns cancellation and rejects results from obsolete binding,
+source, provider or analysis epochs. Providers must propagate cancellation and discard
 tainted ordered state; the request-confined sink cannot escape into detached
 work. Returning normally is successful analysis, including an empty result.
 Throwing means failure or cancellation, not an empty result.
 
-The current IntelliJ batch uses coroutine `readActionBlocking`: stateful filters
-and sink writes cannot safely be retried automatically by `readAction`. This
-still blocks IDE write actions while the batch runs. Short read actions and safe
-ordered-state replay remain part of Stage 5 in the repair map.
+The IntelliJ adapter uses a cancellable `readAction` per line/provider. If a write
+interrupts an invocation, its mutated filter state is discarded and reconstructed
+through ordered replay. A read-action retry never invokes that same mutated filter
+again. Sink publication happens outside the read action.
 
 Choose `INDEPENDENT_LINE` for text-derived links whose logical lines can be
 analyzed independently, or `ORDERED_CONTENT` for console filters that consume
-source order and may highlight earlier lines. `configurationGeneration` is an
-equality-only invalidation counter for changed provider configuration.
+source order and may highlight earlier lines. `INDEPENDENT_AND_ORDERED` enables both
+lanes; such detectors must allow the two contexts to run concurrently. Each request
+selects one context. Slow console filters cannot hold up independent URLs/paths.
+`configurationGeneration` is an equality-only invalidation counter; emit
+`configurationChanges` when changes must reconcile without new terminal output.
+The binding owns that flow's subscription and cancellation.
+Implement `discardOrderedState` when a detector retains ordered source/provider
+state. The owner invokes it at binding/provider teardown only after the ordered
+call has exited, so cleanup cannot race a running filter.
 
 Requests own their strings and row arrays. Each logical line includes one
 trailing newline; soft wrapping joins physical rows while omitting wrap padding
@@ -208,7 +215,8 @@ within the same group does not scan its cells or request additional painting.
 Context menus capture the resolved action and optional complete URI when opened.
 They retain their target across output changes, eviction and rebinding. Detectors
 should provide `SwingHyperlink.uri` when their target can be copied; the existing
-host menu then exposes Copy Link. This adds no detector API migration.
+host menu then exposes Copy Link. The captured `providerAction` and original popup
+`triggerEvent` allow the plugin to preserve native provider menu actions.
 
 Discovery now uses one retained logical-line index for the binding, with separate
 primary/alternate state validated against each buffer's history-content generation.
@@ -244,10 +252,23 @@ Failures and interrupted provider reads retain unprocessed work and allow three
 delayed retries (100 ms, 500 ms, 2 s). Successful empty analysis is retained.
 Scroll/cursor frames cannot restart exhausted recovery. New content, provider/source
 invalidation or an explicit bind/show/focus reconciliation starts a fresh attempt.
-Unprocessed content remains asynchronous. Ordered provider
-continuation/replay and native styles/gestures follow
-their separate gates in the [repair map](../docs/terminal-feature-gap-map.md#uri-highlighting-staged-repair).
-The current ordered detector receives bounded preceding context with pending text
-(up to 64 preceding and 64 pending logical lines per request). Preserving provider
-execution state and reconstructing full contextual replay are
-Stage 5 work. Changelogs consolidate the completed user-facing repair.
+Unprocessed content remains asynchronous. Ordered requests continue in source order
+in batches of up to 64 logical lines. On `analysisEpoch` changes, rebuild provider
+state from the retained beginning; ordinary eviction only advances `firstRetainedRow`.
+Results can highlight earlier retained lines and must identify the producer through
+`consumedThrough`. Replaying a producer to an empty result retires its old spans.
+Unchanged occurrences before an edit preserve their identities/actions during replay.
+The request's `lineFirstId` associates output with historical host directory metadata.
+
+Prepared normal, hovered, active and followed styles are stored as primitive paint
+records. Terminal-authored underlines and concealment retain precedence. Native
+visible links activate directly; implicit links require Ctrl (Cmd on macOS). Both
+activate on release only while the pressed occurrence remains unchanged and no drag
+occurred. Modifier clicks preserve existing selection; direct links still permit
+selection dragging. Application mouse reporting retains precedence, with the existing
+Shift override. OSC 8 wins overlaps, then visible links, narrower ranges and stable
+provider order. Hover callbacks run at semantic transitions, outside painting.
+
+The [repair map](../docs/terminal-feature-gap-map.md#uri-highlighting-staged-repair)
+tracks remaining integration profiling and native desktop verification. Changelogs
+consolidate the completed user-facing repair.

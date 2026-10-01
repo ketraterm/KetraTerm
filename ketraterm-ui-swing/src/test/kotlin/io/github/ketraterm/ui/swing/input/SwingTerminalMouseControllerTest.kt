@@ -609,6 +609,10 @@ class SwingTerminalMouseControllerTest {
             hyperlinkMoveCount++
         }
 
+        override fun handleHyperlinkMouseReleased(event: MouseEvent): Boolean = false
+
+        override fun handleHyperlinkMouseDragged() = Unit
+
         override fun handleHyperlinkMouseExited() {
             hyperlinkExitCount++
         }

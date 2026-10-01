@@ -18,6 +18,7 @@ package io.github.ketraterm.ui.swing.api
 import io.github.ketraterm.render.api.TerminalRenderFrameReader
 import io.github.ketraterm.render.cache.TerminalRenderCache
 import kotlinx.coroutines.*
+import java.awt.event.MouseEvent
 
 internal interface TerminalHyperlinkDiscoveryHost {
     val renderCache: TerminalRenderCache
@@ -38,7 +39,7 @@ internal interface TerminalHyperlinkDiscoveryHost {
 }
 
 /**
- * EDT-owned, binding-lifetime discovery. One serialized worker drains coalesced content demand;
+ * EDT-owned, binding-lifetime discovery. Each context serially drains coalesced content demand;
  * prepared viewport changes only project the index. Failure recovery is bounded per demand.
  */
 internal class TerminalHyperlinkDiscoveryController(
@@ -47,10 +48,10 @@ internal class TerminalHyperlinkDiscoveryController(
     private val analysisDispatcher: CoroutineDispatcher = Dispatchers.Default,
 ) {
     private val index = TerminalHyperlinkIndex()
-    private var sourceScan: TerminalHyperlinkSourceScan? = null
-    private var analysisJob: Job? = null
-    private var recoveryJob: Job? = null
-    private var recoveryAttempt = 0
+    private val independent = AnalysisLane(SwingHyperlinkDetectionContext.INDEPENDENT_LINE)
+    private val ordered = AnalysisLane(SwingHyperlinkDetectionContext.ORDERED_CONTENT)
+    private val lanes = arrayOf(independent, ordered)
+    private var configurationJob: Job? = null
     private var bindingEpoch = 0L
     private var sourceEpoch = 0L
     private var providerEpoch = 0L
@@ -72,12 +73,18 @@ internal class TerminalHyperlinkDiscoveryController(
     fun reset() {
         enabled = false
         bindingEpoch++
-        recoveryJob?.cancel(CancellationException("Hyperlink binding replaced"))
-        recoveryJob = null
-        recoveryAttempt = 0
-        analysisJob?.cancel(CancellationException("Hyperlink binding replaced"))
-        // An uncooperative provider retains the serialization slot until it returns.
-        sourceScan = null
+        if (ordered.analysisJob == null) detector.discardOrderedState()
+        configurationJob?.cancel(CancellationException("Hyperlink binding replaced"))
+        configurationJob = null
+        for (lane in lanes) {
+            lane.recoveryJob?.cancel(CancellationException("Hyperlink binding replaced"))
+            lane.recoveryJob = null
+            lane.recoveryAttempt = 0
+            lane.recoveryExhausted = false
+            lane.analysisJob?.cancel(CancellationException("Hyperlink binding replaced"))
+            // An uncooperative provider retains the serialization slot until it returns.
+            lane.sourceScan = null
+        }
         index.clear()
         priorityTop = -1L
         previousLiveTop = -1L
@@ -93,22 +100,27 @@ internal class TerminalHyperlinkDiscoveryController(
         val cache = host.renderCache
         if (disposed || !cache.hasFrame) return
         var changed = !enabled || contentGeneration != cache.contentGeneration
+        var sourceReplaced = false
         if (detector !== host.hyperlinkDetector || providerGeneration != host.hyperlinkDetector.configurationGeneration) {
+            if (ordered.analysisJob == null) detector.discardOrderedState()
             providerEpoch++
             index.clear()
             detector = host.hyperlinkDetector
             providerGeneration = detector.configurationGeneration
             changed = true
-            analysisJob?.cancel(CancellationException("Hyperlink provider changed"))
+            configurationJob?.cancel(CancellationException("Hyperlink provider changed"))
+            configurationJob = null
+            lanes.forEach { it.analysisJob?.cancel(CancellationException("Hyperlink provider changed")) }
         }
         if (sourceGeneration != cache.historyContentGeneration || sourceColumns != cache.columns || sourceBuffer != cache.activeBuffer) {
             sourceEpoch++
+            sourceReplaced = true
             sourceGeneration = cache.historyContentGeneration
             sourceColumns = cache.columns
             sourceBuffer = cache.activeBuffer
             previousLiveTop = -1L
             changed = true
-            analysisJob?.cancel(CancellationException("Hyperlink source replaced"))
+            lanes.forEach { it.analysisJob?.cancel(CancellationException("Hyperlink source replaced")) }
         }
         enabled = detector !== SwingHyperlinkDetector.NONE
         contentGeneration = cache.contentGeneration
@@ -117,6 +129,11 @@ internal class TerminalHyperlinkDiscoveryController(
             return
         }
         val projectionChanged = index.update(cache, detector.context, captureVisible = host.hyperlinkSource == null)
+        if (sourceReplaced) index.restartOrdered()
+        if (configurationJob == null) {
+            val changes = detector.configurationChanges
+            configurationJob = scope.launch { changes.collect { scheduleForFrame() } }
+        }
         val source = host.hyperlinkSource
         if (changed && source != null && previousLiveTop >= 0L) index.invalidateUnobservedEdits(source, cache, previousLiveTop)
         previousLiveTop = cache.discardedCount + cache.historySize
@@ -129,20 +146,25 @@ internal class TerminalHyperlinkDiscoveryController(
     /** Reconciles a returning binding/show/focus without needing output or a scroll event. */
     fun reconcile() {
         scheduleForFrame()
-        if (enabled && (index.needsAnalysis || needsSourceScan())) requestAnalysis()
+        if (enabled && (lanes.any { index.hasPending(it.context) } || needsSourceScan())) requestAnalysis()
         host.hyperlinksChanged()
     }
 
     private fun requestAnalysis() {
         demandRevision++
-        recoveryAttempt = 0
-        recoveryJob?.cancel(CancellationException("Hyperlink demand superseded"))
-        recoveryJob = null
+        for (lane in lanes) {
+            lane.recoveryAttempt = 0
+            lane.recoveryExhausted = false
+            lane.recoveryJob?.cancel(CancellationException("Hyperlink demand superseded"))
+            lane.recoveryJob = null
+        }
         priorityTop = -1L
         startAnalysis()
     }
 
     fun hyperlinkIdsFor(cache: TerminalRenderCache): IntArray = index.idsFor(cache)
+
+    val styles: TerminalHyperlinkActions get() = index.actions
 
     fun hyperlinkIdAt(
         row: Int,
@@ -161,7 +183,34 @@ internal class TerminalHyperlinkDiscoveryController(
     fun openDiscoveredHyperlink(
         hyperlinkId: Int,
         cache: TerminalRenderCache,
-    ): Boolean = index.hyperlinkFor(hyperlinkId, cache)?.action?.open() == true
+        event: MouseEvent? = null,
+    ): Boolean {
+        val link = index.hyperlinkFor(hyperlinkId, cache) ?: return false
+        if (!(if (event == null) link.action.open() else link.action.open(event))) return false
+        markFollowed(hyperlinkId, cache)
+        return true
+    }
+
+    fun markFollowed(
+        id: Int,
+        cache: TerminalRenderCache,
+    ) {
+        val previous = index.actions.follow(id)
+        val ids = hyperlinkIdsFor(cache)
+        for (row in 0 until cache.rows) {
+            var column = 0
+            while (column < cache.columns) {
+                val cellId = ids[cache.rowOffset(row) + column]
+                if (cellId != id && (previous == 0 || cellId != previous)) {
+                    column++
+                    continue
+                }
+                val start = column++
+                while (column < cache.columns && ids[cache.rowOffset(row) + column] == cellId) column++
+                host.repaintHyperlinkSpan(row, start, row, column)
+            }
+        }
+    }
 
     fun discoveredHyperlink(
         hyperlinkId: Int,
@@ -171,12 +220,23 @@ internal class TerminalHyperlinkDiscoveryController(
     private fun needsSourceScan(): Boolean = host.hyperlinkSource != null && !index.isSourceAnalyzed(host.renderCache.contentGeneration)
 
     private fun startAnalysis() {
-        if (analysisJob != null ||
-            recoveryJob != null ||
+        for (lane in lanes) {
+            if (detector.context == lane.context || detector.context == SwingHyperlinkDetectionContext.INDEPENDENT_AND_ORDERED) {
+                startAnalysis(lane)
+            }
+        }
+    }
+
+    private fun startAnalysis(lane: AnalysisLane) {
+        val scansSource = lane === independent || detector.context == SwingHyperlinkDetectionContext.ORDERED_CONTENT
+        if (lane === ordered && !scansSource && needsSourceScan()) return
+        if (lane.analysisJob != null ||
+            lane.recoveryJob != null ||
+            lane.recoveryExhausted ||
             disposed ||
             !enabled ||
             !scope.isActive ||
-            (!index.needsAnalysis && !needsSourceScan())
+            (!index.hasPending(lane.context) && !(scansSource && needsSourceScan()))
         ) {
             return
         }
@@ -184,11 +244,15 @@ internal class TerminalHyperlinkDiscoveryController(
         val requestSourceEpoch = sourceEpoch
         val requestProviderEpoch = providerEpoch
         val requestDetector = detector
+        val requestContext = lane.context
+        val requestAnalysisEpoch = index.orderedEpoch
         val requestSource = host.hyperlinkSource
-        val scanner = sourceScan ?: TerminalHyperlinkSourceScan().also { sourceScan = it }
+        val scanner = lane.sourceScan ?: TerminalHyperlinkSourceScan().also { lane.sourceScan = it }
+        var entered = false
         // Assign the slot before an immediate dispatcher can complete the coroutine.
         val job =
             scope.launch(start = CoroutineStart.LAZY) {
+                entered = true
                 val requestRevision = demandRevision
                 var completed = false
                 var recover = false
@@ -196,7 +260,7 @@ internal class TerminalHyperlinkDiscoveryController(
                     if (!isCurrent(requestBindingEpoch, requestSourceEpoch, requestProviderEpoch)) return@launch
                     val cache = host.renderCache
                     val history = cache.historyContentGeneration
-                    if (requestSource != null && needsSourceScan()) {
+                    if (scansSource && requestSource != null && needsSourceScan()) {
                         val top = cache.discardedCount + cache.historySize - cache.scrollbackOffset
                         if (priorityTop != top) {
                             priorityTop = top
@@ -244,15 +308,27 @@ internal class TerminalHyperlinkDiscoveryController(
                         }
                     }
                     val top = cache.discardedCount + cache.historySize - cache.scrollbackOffset
-                    val lines = index.pendingLines(requestDetector.context, top, top + cache.rows - 1L)
+                    if (lane === ordered && needsSourceScan()) {
+                        completed = true
+                        return@launch
+                    }
+                    val lines = index.pendingLines(requestContext, top, top + cache.rows - 1L)
                     if (lines.isEmpty()) {
                         publishOverlay()
                         completed = true
                         return@launch
                     }
                     val request =
-                        detectionRequest(lines, requestDetector.context, requestBindingEpoch, requestSourceEpoch, requestProviderEpoch)
-                    val result = detect(requestDetector, request, lines)
+                        detectionRequest(
+                            lines,
+                            requestContext,
+                            requestBindingEpoch,
+                            requestSourceEpoch,
+                            requestProviderEpoch,
+                            requestAnalysisEpoch,
+                            index.firstRetainedRow,
+                        )
+                    val result = detect(requestDetector, request)
                     if (result == null) {
                         recover = true
                         return@launch
@@ -281,6 +357,10 @@ internal class TerminalHyperlinkDiscoveryController(
                             return@launch
                         }
                         validSources = validation?.validLines
+                        if (lane === ordered && !index.isSourceAnalyzed(checkNotNull(validation).contentGeneration)) {
+                            recover = true
+                            return@launch
+                        }
                         if (validSources?.any { !it } == true) {
                             index.invalidateSource(lines, validSources)
                             priorityTop = -1L
@@ -292,31 +372,47 @@ internal class TerminalHyperlinkDiscoveryController(
                         scheduleForFrame()
                         return@launch
                     }
-                    index.accept(lines, result, requestDetector.context, validSources)
+                    if (requestContext == SwingHyperlinkDetectionContext.ORDERED_CONTENT && requestAnalysisEpoch != index.orderedEpoch) {
+                        completed = true
+                        return@launch
+                    }
+                    index.acceptResults(lines, result, requestContext, validSources)
                     publishOverlay()
                     completed = !recover
                 } finally {
-                    analysisJob = null
+                    if (lane === ordered &&
+                        (!isCurrent(requestBindingEpoch, requestSourceEpoch, requestProviderEpoch) || !scope.isActive)
+                    ) {
+                        requestDetector.discardOrderedState()
+                    }
+                    if (!completed &&
+                        requestContext == SwingHyperlinkDetectionContext.ORDERED_CONTENT &&
+                        requestAnalysisEpoch == index.orderedEpoch
+                    ) {
+                        index.restartOrdered()
+                    }
+                    lane.analysisJob = null
                     if (!disposed && enabled && scope.isActive) {
                         if (requestRevision != demandRevision ||
                             !isCurrent(requestBindingEpoch, requestSourceEpoch, requestProviderEpoch)
                         ) {
                             startAnalysis()
                         } else if (completed) {
-                            recoveryAttempt = 0
+                            lane.recoveryAttempt = 0
                             startAnalysis()
                         } else if (recover) {
-                            scheduleRecovery()
+                            scheduleRecovery(lane)
                         }
                     }
                 }
             }
-        analysisJob = job
+        lane.analysisJob = job
         job.invokeOnCompletion {
+            if (!entered && lane === ordered) requestDetector.discardOrderedState()
             // Cancellation before dispatch never enters the body's finally block.
             scope.launch {
-                if (analysisJob === job) {
-                    analysisJob = null
+                if (lane.analysisJob === job) {
+                    lane.analysisJob = null
                     startAnalysis()
                 }
             }
@@ -328,12 +424,11 @@ internal class TerminalHyperlinkDiscoveryController(
     private suspend fun detect(
         detector: SwingHyperlinkDetector,
         request: SwingHyperlinkDetectionRequest,
-        lines: List<TerminalHyperlinkLineSnapshot>,
-    ): List<List<TerminalDetectedHyperlink>>? =
+    ): List<SwingHyperlink>? =
         withContext(analysisDispatcher) {
-            val sink = TerminalHyperlinkDetectionAccumulator(lines)
+            val results = ArrayList<SwingHyperlink>()
             try {
-                detector.detect(request, sink)
+                detector.detect(request) { results.add(it) }
             } catch (cancelled: CancellationException) {
                 // A provider read may be interrupted while the binding itself remains active.
                 currentCoroutineContext().ensureActive()
@@ -343,7 +438,7 @@ internal class TerminalHyperlinkDiscoveryController(
                 return@withContext null
             }
             ensureActive()
-            sink.links
+            results
         }
 
     private fun isCurrent(
@@ -352,22 +447,36 @@ internal class TerminalHyperlinkDiscoveryController(
         provider: Long,
     ): Boolean = !disposed && enabled && binding == bindingEpoch && source == sourceEpoch && provider == providerEpoch
 
-    private fun scheduleRecovery() {
-        if (recoveryJob != null || recoveryAttempt == RECOVERY_DELAYS.size) return
-        val waitMillis = RECOVERY_DELAYS[recoveryAttempt++]
+    private fun scheduleRecovery(lane: AnalysisLane) {
+        if (lane.recoveryJob != null) return
+        if (lane.recoveryAttempt == RECOVERY_DELAYS.size) {
+            lane.recoveryExhausted = true
+            return
+        }
+        val waitMillis = RECOVERY_DELAYS[lane.recoveryAttempt++]
         val job =
             scope.launch(start = CoroutineStart.LAZY) {
                 delay(waitMillis)
-                recoveryJob = null
+                lane.recoveryJob = null
                 startAnalysis()
             }
-        recoveryJob = job
+        lane.recoveryJob = job
         job.start()
     }
 
     private fun publishOverlay() {
         index.writeOverlay(host.renderCache, repaintSpan)
         host.hyperlinksChanged()
+    }
+
+    private class AnalysisLane(
+        val context: SwingHyperlinkDetectionContext,
+    ) {
+        var sourceScan: TerminalHyperlinkSourceScan? = null
+        var analysisJob: Job? = null
+        var recoveryJob: Job? = null
+        var recoveryAttempt = 0
+        var recoveryExhausted = false
     }
 
     private companion object {
@@ -382,6 +491,8 @@ internal fun detectionRequest(
     bindingEpoch: Long = 0L,
     sourceEpoch: Long = 0L,
     providerEpoch: Long = 0L,
+    analysisEpoch: Long = 0L,
+    firstRetainedRow: Long = 0L,
 ): SwingHyperlinkDetectionRequest =
     SwingHyperlinkDetectionRequest(
         lines.map { it.text },
@@ -391,6 +502,9 @@ internal fun detectionRequest(
         bindingEpoch,
         sourceEpoch,
         providerEpoch,
+        analysisEpoch,
+        firstRetainedRow,
+        LongArray(lines.size) { lines[it].firstLineId },
     )
 
 /** Resolves absolute logical coordinates against owned snapshots, outside the mutation lock. */

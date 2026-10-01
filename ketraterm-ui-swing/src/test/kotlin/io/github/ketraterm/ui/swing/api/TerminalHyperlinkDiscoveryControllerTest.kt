@@ -17,6 +17,7 @@ package io.github.ketraterm.ui.swing.api
 
 import io.github.ketraterm.render.api.*
 import io.github.ketraterm.render.cache.TerminalRenderCache
+import io.github.ketraterm.ui.swing.input.hyperlinkNavigationModifierMask
 import io.github.ketraterm.ui.swing.render.painter.TerminalTextRunStyle
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
@@ -261,7 +262,7 @@ class TerminalHyperlinkDiscoveryControllerTest {
         val activationForeground = 0xFF4DA3FF.toInt()
         try {
             SwingUtilities.invokeAndWait {
-                hover.handleMouseMoved(MouseEvent(source, MouseEvent.MOUSE_MOVED, 0L, MouseEvent.CTRL_DOWN_MASK, 4, 1, 0, false))
+                hover.handleMouseMoved(MouseEvent(source, MouseEvent.MOUSE_MOVED, 0L, hyperlinkNavigationModifierMask, 4, 1, 0, false))
                 assertEquals(0, hover.hoveredHyperlinkId)
                 controller.scheduleForFrame()
             }
@@ -313,7 +314,7 @@ class TerminalHyperlinkDiscoveryControllerTest {
                                 source,
                                 MouseEvent.MOUSE_PRESSED,
                                 0L,
-                                MouseEvent.CTRL_DOWN_MASK,
+                                hyperlinkNavigationModifierMask,
                                 4,
                                 row,
                                 1,
@@ -321,7 +322,20 @@ class TerminalHyperlinkDiscoveryControllerTest {
                                 MouseEvent.BUTTON1,
                             )
                         assertTrue(hover.handleMousePressed(click))
-                        assertTrue(click.isConsumed)
+                        val release =
+                            MouseEvent(
+                                source,
+                                MouseEvent.MOUSE_RELEASED,
+                                0L,
+                                hyperlinkNavigationModifierMask,
+                                4,
+                                row,
+                                1,
+                                false,
+                                MouseEvent.BUTTON1,
+                            )
+                        assertTrue(hover.handleMouseReleased(release))
+                        assertTrue(release.isConsumed)
                     }
                     assertEquals(
                         expectedSpans,

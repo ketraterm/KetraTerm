@@ -325,6 +325,46 @@ class SwingTerminal
                     override fun isHyperlinkResolvable(hyperlinkId: Int): Boolean = this@SwingTerminal.isHyperlinkResolvable(hyperlinkId)
 
                     override fun openHyperlink(hyperlinkId: Int): Boolean = this@SwingTerminal.openHyperlink(hyperlinkId)
+
+                    override fun openHyperlink(
+                        hyperlinkId: Int,
+                        event: MouseEvent,
+                    ): Boolean = this@SwingTerminal.openHyperlink(hyperlinkId, event)
+
+                    override fun hyperlinkActivation(hyperlinkId: Int): SwingHyperlinkActivation =
+                        hyperlinkDiscoveryController.discoveredHyperlink(hyperlinkId, renderCache)?.activation
+                            ?: SwingHyperlinkActivation.MODIFIER
+
+                    override fun hyperlinkAction(hyperlinkId: Int): SwingHyperlinkAction? =
+                        hyperlinkDiscoveryController.discoveredHyperlink(hyperlinkId, renderCache)?.action
+
+                    override fun isHyperlinkVisible(hyperlinkId: Int): Boolean =
+                        hyperlinkDiscoveryController.discoveredHyperlink(hyperlinkId, renderCache)?.presentation?.isVisible ?: true
+
+                    override fun enterHyperlink(
+                        action: SwingHyperlinkAction,
+                        row: Int,
+                        startColumn: Int,
+                        endColumn: Int,
+                    ) {
+                        val bidi = visualGeometry.bidiLayout.row(renderCache, row)
+                        var first = renderCache.columns
+                        var last = 0
+                        forEachVisualCellSpan(bidi, startColumn, endColumn) { start, end ->
+                            first = minOf(first, start)
+                            last = maxOf(last, end)
+                        }
+                        action.mouseEntered(
+                            this@SwingTerminal,
+                            SwingTerminalChrome.left(settings, renderCache.activeBuffer) + first * metrics.cellWidth,
+                            floor(
+                                SwingTerminalChrome.top(settings, renderCache.activeBuffer) + visualGeometry.contentOriginY +
+                                    row * metrics.cellHeight,
+                            ).toInt(),
+                            (last - first) * metrics.cellWidth,
+                            metrics.cellHeight,
+                        )
+                    }
                 },
             )
         private val searchController: TerminalSearchController =
@@ -443,6 +483,10 @@ class SwingTerminal
                         )
 
                     override fun handleHyperlinkMousePressed(event: MouseEvent): Boolean = hyperlinkController.handleMousePressed(event)
+
+                    override fun handleHyperlinkMouseReleased(event: MouseEvent): Boolean = hyperlinkController.handleMouseReleased(event)
+
+                    override fun handleHyperlinkMouseDragged() = hyperlinkController.handleMouseDragged()
 
                     override fun handleHyperlinkMouseMoved(event: MouseEvent) {
                         hyperlinkController.handleMouseMoved(event)
@@ -1041,6 +1085,7 @@ class SwingTerminal
                     hoveredPromptMarkerRow = hoveredPromptMarkerRow,
                     hyperlinkIds = hyperlinkDiscoveryController.hyperlinkIdsFor(renderCache),
                     hoveredHyperlinkId = hyperlinkController.hoveredHyperlinkId,
+                    hyperlinkStyles = hyperlinkDiscoveryController.styles,
                     hyperlinkActivationHover = hyperlinkController.hyperlinkActivationHover,
                 )
                 if (hostServices.scrollbarOverlayEnabled) {
@@ -1776,6 +1821,7 @@ class SwingTerminal
                     y = event.y,
                     forcedByShift = forcedByShift,
                     hyperlink = contextHyperlinkAt(event),
+                    triggerEvent = event,
                 )
             return hostServices.contextMenuHandler.handleContextMenu(request)
         }
@@ -1792,7 +1838,12 @@ class SwingTerminal
                     { handler.openHyperlink(uri) }
                 } else {
                     val action = detected?.action ?: return null
-                    action::open
+                    val activate: () -> Boolean = {
+                        action.open(event).also { opened ->
+                            if (opened) hyperlinkDiscoveryController.markFollowed(hyperlinkId, renderCache)
+                        }
+                    }
+                    activate
                 }
             return SwingTerminalContextHyperlink(
                 uri = uri,
@@ -1800,6 +1851,7 @@ class SwingTerminal
                 copyUriAction = {
                     uri != null && copyTextToClipboard(uri)
                 },
+                providerAction = detected?.action,
             )
         }
 
@@ -1809,13 +1861,16 @@ class SwingTerminal
             return hyperlinkDiscoveryController.isDiscoveredHyperlinkResolvable(hyperlinkId, renderCache)
         }
 
-        private fun openHyperlink(hyperlinkId: Int): Boolean {
+        private fun openHyperlink(
+            hyperlinkId: Int,
+            event: MouseEvent? = null,
+        ): Boolean {
             if (hyperlinkId == NO_HYPERLINK_ID) return false
             if (hyperlinkId > 0) {
                 val uri = session?.hyperlinkUri(hyperlinkId) ?: return false
                 return hostServices.hyperlinkHandler.openHyperlink(uri)
             }
-            return hyperlinkDiscoveryController.openDiscoveredHyperlink(hyperlinkId, renderCache)
+            return hyperlinkDiscoveryController.openDiscoveredHyperlink(hyperlinkId, renderCache, event)
         }
 
         private fun cellAt(

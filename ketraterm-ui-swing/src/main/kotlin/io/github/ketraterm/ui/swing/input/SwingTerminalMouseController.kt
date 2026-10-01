@@ -62,6 +62,7 @@ internal class SwingTerminalMouseController(
                 if (handleContextMenu(event)) return
                 if (!host.renderCache.hasFrame) return
                 if (handleMouseTracking(event, TerminalMouseEventType.RELEASE)) return
+                host.handleHyperlinkMouseReleased(event)
                 host.handleSelectionMouseReleased(event)
             }
 
@@ -74,6 +75,7 @@ internal class SwingTerminalMouseController(
     val mouseMotionListener =
         object : MouseMotionAdapter() {
             override fun mouseDragged(event: MouseEvent) {
+                host.handleHyperlinkMouseDragged()
                 if (!host.renderCache.hasFrame) return
                 if (handleMouseTracking(event, TerminalMouseEventType.MOTION)) return
                 host.handleSelectionMouseDragged(event)
@@ -85,7 +87,6 @@ internal class SwingTerminalMouseController(
                     return
                 }
                 if (handleMouseTracking(event, TerminalMouseEventType.MOTION)) {
-                    host.clearHyperlinkHover()
                     return
                 }
                 host.handleHyperlinkMouseMoved(event)
@@ -147,6 +148,7 @@ internal class SwingTerminalMouseController(
         if (!event.isShiftDown && host.mouseTrackingMode() != MouseTrackingMode.OFF) return false
         val handled = host.handleContextMenuMouseEvent(event, forcedByShift = event.isShiftDown)
         if (!handled) return false
+        host.handleHyperlinkMouseDragged()
         event.consume()
         return true
     }
@@ -156,6 +158,7 @@ internal class SwingTerminalMouseController(
         type: TerminalMouseEventType,
     ): Boolean {
         if (!isMouseTrackingIntercepted(event)) return false
+        host.clearHyperlinkHover()
 
         val wheelRotation = if (event is MouseWheelEvent) event.wheelRotation else 0
         if (event is MouseWheelEvent && wheelRotation == 0) {

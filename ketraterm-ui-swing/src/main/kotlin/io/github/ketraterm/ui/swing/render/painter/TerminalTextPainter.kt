@@ -19,6 +19,7 @@ import io.github.ketraterm.render.api.TerminalColorPalette
 import io.github.ketraterm.render.api.TerminalRenderCellFlags
 import io.github.ketraterm.render.cache.TerminalRenderCache
 import io.github.ketraterm.ui.swing.api.TerminalFontResolver
+import io.github.ketraterm.ui.swing.api.TerminalHyperlinkActions
 import io.github.ketraterm.ui.swing.render.*
 import io.github.ketraterm.ui.swing.render.cache.*
 import io.github.ketraterm.ui.swing.render.font.TerminalTextRunBuffer
@@ -91,6 +92,7 @@ internal class TerminalTextPainter(
         hoveredHyperlinkId: Int = NO_HYPERLINK_ID,
         hyperlinkActivationHover: Boolean = false,
         hyperlinkActivationForeground: Int = DEFAULT_HYPERLINK_ACTIVATION_FOREGROUND,
+        hyperlinkStyles: TerminalHyperlinkActions? = null,
     ) {
         runStyle.configureRow(
             textBlinkVisible = textBlinkVisible,
@@ -98,6 +100,7 @@ internal class TerminalTextPainter(
             hoveredHyperlinkId = hoveredHyperlinkId,
             hyperlinkActivationHover = hyperlinkActivationHover,
             hyperlinkActivationForeground = hyperlinkActivationForeground,
+            hyperlinkStyles = hyperlinkStyles,
         )
         val bidi = cellGeometry.row(cache, row)
         val flagsPlane = cache.flags
