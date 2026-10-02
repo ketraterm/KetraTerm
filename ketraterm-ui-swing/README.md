@@ -218,6 +218,9 @@ disconnected captions or runs hover separately even when the application reuses
 one ID/destination. Detected links keep their semantic occurrence across visible
 fragments. Moving within the selected region does not reconstruct it or request
 additional painting. Reflow and frame changes reproject current geometry.
+Hover callbacks are paired per detected occurrence, even when two results share
+one action instance. OSC 8 activation validates the pressed source row as well as
+its protocol ID, so scrolling or row replacement cannot retarget a held click.
 
 Context menus capture the resolved action and optional complete URI when opened.
 They retain their target across output changes, eviction and rebinding. Detectors
@@ -236,6 +239,15 @@ Every discovery request uses this source-backed path, including fixtures; an
 unbound terminal has no discovery source. The index alone validates result ranges
 and splits them into line segments. Independent-line readiness is separate from
 ordered progress: replaying an ordered dependency does not reanalyze unchanged URLs.
+
+Core frames expose `outputEndAbsoluteRow`, an exclusive absolute boundary that
+includes authored blank lines and excludes the unused live tail. It is independent
+of the viewport and follows content through scrolling and reflow. Discovery does
+not feed unused rows to ordered filters, so later output in those rows extends the
+existing chain. Cursor movement alone does not supply output. External render
+readers may leave the boundary unknown (`Long.MAX_VALUE`); discovery then includes
+all available rows conservatively. Editing an already-consumed logical line,
+including appending text to its unfinished tail, can still require ordered replay.
 
 Scrolling prepared content projects existing results synchronously into reusable
 ID and presentation-reference buffers without running detectors. The strict
@@ -287,6 +299,14 @@ Shift override. OSC 8 wins overlaps, then visible links, narrower ranges and sta
 provider order. Actions remain attached to retained occurrences independently of
 the viewport. Activation and hover callbacks run on the EDT; hover callbacks run
 at semantic transitions, outside painting.
+
+Hosts may set `SwingSettings.osc8HyperlinkPresentation` to a resolved
+`SwingHyperlinkPresentation`. OSC 8 and detected links use the same style-selection
+path, including backgrounds and visibility metadata. The default preserves the
+standalone dotted resting underline and solid hover underline; the IntelliJ host
+supplies native implicit-link styles. OSC 8 activation still requires Ctrl/Cmd.
+Settings reload prepares styles and reconciles stationary-pointer feedback outside
+painting.
 
 The [repair map](../docs/terminal-feature-gap-map.md#uri-highlighting-staged-repair)
 tracks remaining integration profiling and native desktop verification. Changelogs

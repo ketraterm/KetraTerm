@@ -45,7 +45,7 @@ internal class TerminalHyperlinkSourceScan {
         var valid = false
         reader.readRenderFrame { frame ->
             first = frame.discardedCount
-            last = first + frame.historySize + frame.rows - 1L
+            last = minOf(first + frame.historySize + frame.rows, frame.outputEndAbsoluteRow) - 1L
             generation = frame.contentGeneration
             valid = frame.activeBuffer == firstLine.activeBuffer &&
                 frame.columns == firstLine.columns &&
@@ -102,7 +102,7 @@ internal class TerminalHyperlinkSourceScan {
         reader.readRenderFrame { frame ->
             first = frame.discardedCount
             liveTop = first + frame.historySize
-            last = liveTop + frame.rows - 1L
+            last = minOf(liveTop + frame.rows, frame.outputEndAbsoluteRow) - 1L
             generation = frame.contentGeneration
             valid = frame.activeBuffer == expectedBuffer &&
                 frame.columns == expectedColumns &&

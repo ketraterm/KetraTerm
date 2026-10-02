@@ -92,6 +92,22 @@ interface TerminalRenderFrame {
         get() = contentGeneration
 
     /**
+     * Exclusive absolute row boundary of retained output in the active buffer,
+     * independent of the requested viewport. Rows before this boundary include
+     * admitted history, written text and explicitly authored blank lines; an
+     * untouched live tail is excluded. Cursor movement alone does not advance it.
+     * Changes advance [contentGeneration] and [frameGeneration], including an
+     * explicit line feed that authors a previously untouched blank row.
+     *
+     * The boundary may retreat after row replacement and is scoped to
+     * [historyContentGeneration]. It does not indicate that the final logical
+     * line is immutable or terminated. [Long.MAX_VALUE] means the reader does not
+     * expose this information; consumers conservatively use available source rows.
+     */
+    val outputEndAbsoluteRow: Long
+        get() = Long.MAX_VALUE
+
+    /**
      * Generation that changes when terminal-owned row mapping or shape changes.
      *
      * Resize, full reset, scrolling, buffer switches, and reflow should advance

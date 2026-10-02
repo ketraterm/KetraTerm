@@ -28,27 +28,31 @@ import io.github.ketraterm.ui.swing.settings.SwingPadding
 import io.github.ketraterm.ui.swing.settings.SwingSettings
 import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.Test
+import org.junit.jupiter.params.ParameterizedTest
+import org.junit.jupiter.params.provider.ValueSource
 import java.awt.Font
 import java.awt.RenderingHints
 import java.awt.image.BufferedImage
 
 class GridPainterTest {
-    @Test
-    fun `native hyperlink background respects concealment and selection precedence`() {
+    @ParameterizedTest
+    @ValueSource(booleans = [false, true])
+    fun `native hyperlink background respects concealment and selection precedence`(osc8: Boolean) {
         val image = BufferedImage(100, 40, BufferedImage.TYPE_INT_ARGB)
         val graphics = image.createGraphics()
+        val presentation = SwingHyperlinkPresentation(normal = SwingHyperlinkStyle(backgroundArgb = BLUE), isVisible = true)
         val settings =
             SwingSettings(
                 padding = SwingPadding(0, 0, 0, 0),
                 shellIntegrationDecorationGutterWidth = 0,
                 palette = TerminalColorPalette(defaultForeground = WHITE, defaultBackground = BLACK),
                 selectionBackground = RED,
+                osc8HyperlinkPresentation = if (osc8) presentation else null,
             )
         val metrics = SwingMetrics.from(graphics.getFontMetrics(settings.font))
         val cache = TerminalRenderCache(3, 1).apply { updateFrom(TextFrame("   ", false, palette = settings.palette)) }
-        val presentation = SwingHyperlinkPresentation(normal = SwingHyperlinkStyle(backgroundArgb = BLUE), isVisible = true)
         val presentations = Array<SwingHyperlinkPresentation?>(cache.columns) { presentation }
-        cache.hyperlinkIds.fill(-1)
+        cache.hyperlinkIds.fill(if (osc8) 7 else -1)
         cache.attrWords[1] = TerminalRenderAttrs.pack(invisible = true)
         try {
             GridPainter().paint(
@@ -60,7 +64,7 @@ class GridPainterTest {
                 image.height,
                 true,
                 selection = CellSelection(2, 0, 3, 0),
-                hyperlinkPresentations = presentations,
+                hyperlinkPresentations = if (osc8) null else presentations,
             )
             assertEquals(BLUE, image.getRGB(metrics.cellWidth / 2, 1))
             assertEquals(BLACK, image.getRGB(metrics.cellWidth + metrics.cellWidth / 2, 1))

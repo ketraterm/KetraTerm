@@ -23,6 +23,28 @@ import org.junit.jupiter.params.provider.ValueSource
 
 class TerminalRenderCacheTest {
     @Test
+    fun `output boundary defaults to unknown and survives cache and range copies`() {
+        val frame = MutableFrame(4, 5)
+        assertEquals(Long.MAX_VALUE, frame.outputEndAbsoluteRow)
+        val bounded =
+            object : TerminalRenderFrame by frame {
+                override val outputEndAbsoluteRow = 3L
+            }
+        val source = TerminalRenderCache(4, 5).apply { accept(bounded) }
+        val destination = TerminalRenderCache(4, 5).apply { updateFrom(source) }
+        assertEquals(3L, destination.outputEndAbsoluteRow)
+        val reader =
+            object : TerminalRenderFrameReader {
+                override fun readRenderFrame(consumer: TerminalRenderFrameConsumer) = consumer.accept(bounded)
+            }
+        val copy = TerminalRenderRangeCopy(maxRows = 1)
+        assertTrue(copy.read(reader, 1L, 1L))
+        assertEquals(3L, copy.cache.outputEndAbsoluteRow, "Slicing geometry must not alter the source's output boundary")
+        source.reset()
+        assertEquals(Long.MAX_VALUE, source.outputEndAbsoluteRow)
+    }
+
+    @Test
     fun `external history generation defaults conservatively and is copied between caches`() {
         val frame = MutableFrame(4, 1)
         frame.contentGeneration = 19L

@@ -23,6 +23,7 @@ import io.github.ketraterm.ui.swing.render.TestRenderFrame
 import io.github.ketraterm.ui.swing.render.hyperlinkHover
 import io.github.ketraterm.ui.swing.render.renderCache
 import io.github.ketraterm.ui.swing.render.styleFor
+import io.github.ketraterm.ui.swing.settings.SwingSettings
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.params.ParameterizedTest
 import org.junit.jupiter.params.provider.ValueSource
@@ -31,15 +32,18 @@ import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 class TerminalTextRunStyleTest {
-    @Test
-    fun `prepared provider styles follow normal hover active and followed state`() {
+    private val settings = SwingSettings()
+
+    @ParameterizedTest
+    @ValueSource(ints = [-1, 7])
+    fun `prepared styles follow normal hover active and followed state for both link sources`(id: Int) {
         val cache = renderCache(TestRenderFrame.text("link"))
         val colors = intArrayOf(0xff123456.toInt(), 0xff234567.toInt(), 0xff345678.toInt(), 0xff456789.toInt())
 
         fun style(index: Int) = SwingHyperlinkStyle(colors[index], colors[index], colors[index], TerminalRenderUnderline.CURLY)
         val presentation = SwingHyperlinkPresentation(style(0), style(1), style(2), style(3), true)
         val presentations = Array<SwingHyperlinkPresentation?>(cache.columns) { presentation }
-        val id = -1
+        val settings = settings.copy(osc8HyperlinkPresentation = presentation)
         cache.hyperlinkIds.fill(id)
         val run = TerminalTextRunStyle()
         var followed = 0
@@ -49,7 +53,7 @@ class TerminalTextRunStyleTest {
             hovered: Boolean,
             active: Boolean,
         ) {
-            run.configureRow(true, cache.hyperlinkIds, hyperlinkHover(if (hovered) id else 0, active), 0, presentations, followed)
+            run.configureRow(true, cache.hyperlinkIds, hyperlinkHover(if (hovered) id else 0, active), settings, presentations, followed)
             run.begin(cache, cache.palette, 0, 0)
             assertEquals(colors[index], run.foreground)
             assertEquals(colors[index], run.hyperlinkUnderlineColor)
@@ -64,6 +68,28 @@ class TerminalTextRunStyleTest {
         assertStyle(3, false, false)
         assertStyle(1, true, false)
         assertStyle(2, true, true)
+    }
+
+    @Test
+    fun `explicit OSC8 presentation can inherit terminal styling until activation`() {
+        val cache = renderCache(TestRenderFrame.text("link"))
+        cache.hyperlinkIds.fill(7)
+        val active = 0xff336699.toInt()
+        val settings =
+            settings.copy(
+                osc8HyperlinkPresentation = SwingHyperlinkPresentation(active = SwingHyperlinkStyle(foregroundArgb = active)),
+            )
+        val run = TerminalTextRunStyle()
+        for (hovered in listOf(false, true)) {
+            run.configureRow(true, cache.hyperlinkIds, hyperlinkHover(if (hovered) 7 else 0), settings)
+            run.begin(cache, cache.palette, 0, 0)
+            assertEquals(cache.palette.defaultForeground, run.foreground)
+            assertEquals(TerminalRenderUnderline.NONE, run.hyperlinkUnderline)
+        }
+        run.configureRow(true, cache.hyperlinkIds, hyperlinkHover(7, true), settings)
+        run.begin(cache, cache.palette, 0, 0)
+        assertEquals(active, run.foreground)
+        assertEquals(TerminalRenderUnderline.NONE, run.hyperlinkUnderline)
     }
 
     @Test
@@ -89,7 +115,14 @@ class TerminalTextRunStyleTest {
         ) {
             for (hovered in listOf(false, true)) {
                 for (active in listOf(false, true)) {
-                    run.configureRow(true, cache.hyperlinkIds, hyperlinkHover(if (hovered) id else 0, active), 0, presentations, followedId)
+                    run.configureRow(
+                        true,
+                        cache.hyperlinkIds,
+                        hyperlinkHover(if (hovered) id else 0, active),
+                        settings,
+                        presentations,
+                        followedId,
+                    )
                     run.begin(cache, cache.palette, 0, 0)
                     assertEquals(color, run.foreground)
                     assertEquals(color, run.hyperlinkUnderlineColor)
@@ -123,7 +156,7 @@ class TerminalTextRunStyleTest {
         cache.hyperlinkIds.fill(7)
         cache.flags[1] = cache.flags[1] or TerminalRenderCellFlags.WRAP_PADDING
         val style = TerminalTextRunStyle()
-        style.configureRow(true, cache.hyperlinkIds, hyperlinkHover(7, true), 0xFF4DA3FF.toInt())
+        style.configureRow(true, cache.hyperlinkIds, hyperlinkHover(7, true), settings)
         style.begin(cache, cache.palette, 0, 0)
         assertTrue(style.hovered)
         assertEquals(7, style.hyperlinkId)
@@ -144,7 +177,7 @@ class TerminalTextRunStyleTest {
             textBlinkVisible = true,
             hyperlinkIds = cache.hyperlinkIds,
             hyperlinkHover = hyperlinkHover(7, activationHover),
-            hyperlinkActivationForeground = activationForeground,
+            settings = settings.copy(hyperlinkActivationForeground = activationForeground),
         )
         style.begin(cache, cache.palette, 0, 0)
         val starts = mutableListOf(0)

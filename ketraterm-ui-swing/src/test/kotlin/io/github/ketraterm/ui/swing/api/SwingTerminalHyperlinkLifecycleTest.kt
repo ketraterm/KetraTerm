@@ -75,8 +75,9 @@ class SwingTerminalHyperlinkLifecycleTest {
         }
     }
 
-    @Test
-    fun `implicit detected link paints ordinary hover and modifier activation across its whole occurrence`() {
+    @ParameterizedTest
+    @ValueSource(booleans = [false, true])
+    fun `implicit link paints ordinary hover and modifier activation across its whole occurrence`(osc8: Boolean) {
         val hoverColor = 0xff668877.toInt()
         val activeColor = 0xffff00ff.toInt()
         val presentation =
@@ -85,8 +86,17 @@ class SwingTerminalHyperlinkLifecycleTest {
                 hovered = SwingHyperlinkStyle(underlineArgb = hoverColor, underlineStyle = TerminalRenderUnderline.SINGLE),
                 active = SwingHyperlinkStyle(underlineArgb = activeColor, underlineStyle = TerminalRenderUnderline.SINGLE),
             )
-        SwingTerminalHyperlinkLifecycleFixture(presentation = presentation, activation = SwingHyperlinkActivation.MODIFIER).use { fixture ->
+        SwingTerminalHyperlinkLifecycleFixture(
+            presentation = presentation,
+            activation = SwingHyperlinkActivation.MODIFIER,
+            osc8Presentation = if (osc8) presentation else null,
+        ).use { fixture ->
             fixture.awaitHyperlink()
+            if (osc8) {
+                fixture.replaceOutput(
+                    "\u001b]8;id=style;https://example.com/osc8\u0007${SwingTerminalHyperlinkLifecycleFixture.URL}\u001b]8;;\u0007",
+                )
+            }
             fixture.movePointer(400)
             val outside = fixture.firstRowUnderlinePixels()
             assertEquals(0, outside.count { it == activeColor })
@@ -112,6 +122,24 @@ class SwingTerminalHyperlinkLifecycleTest {
             )
             fixture.movePointer(400)
             assertArrayEquals(outside, fixture.firstRowUnderlinePixels(), "Leaving the link removes hover decoration")
+        }
+    }
+
+    @Test
+    fun `OSC8 settings refresh reconciles the stationary pointer without terminal output`() {
+        SwingTerminalHyperlinkLifecycleFixture().use { fixture ->
+            fixture.awaitHyperlink()
+            fixture.replaceOutput("\u001b]8;id=style;https://example.com/osc8\u0007OSC8 link\u001b]8;;\u0007")
+            fixture.movePointer(1)
+            assertEquals(Cursor.HAND_CURSOR, fixture.cursorType())
+            val implicit = SwingHyperlinkPresentation(normal = SwingHyperlinkStyle(underlineStyle = TerminalRenderUnderline.NONE))
+            fixture.reloadOsc8Presentation(implicit)
+            assertEquals(Cursor.DEFAULT_CURSOR, fixture.cursorType())
+            fixture.movePointer(1, modifiers = hyperlinkNavigationModifierMask)
+            assertEquals(Cursor.HAND_CURSOR, fixture.cursorType())
+            fixture.movePointer(1)
+            fixture.reloadOsc8Presentation(null)
+            assertEquals(Cursor.HAND_CURSOR, fixture.cursorType())
         }
     }
 

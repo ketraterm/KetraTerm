@@ -63,7 +63,7 @@ including the host's dark/light classification, without copying storage.
 
 Render frames distinguish stored content from its global presentation:
 
-- `contentGeneration` advances for retained cell or row-mapping changes. A
+- `contentGeneration` advances for retained cell, output-provenance or row-mapping changes. A
   reverse-video transition does not change stored text, attributes, or wrapping,
   so it preserves this generation and permits text-search result reuse.
 - `lineGeneration(row)` covers the rendered row, including global reverse-video
@@ -75,6 +75,15 @@ Render frames distinguish stored content from its global presentation:
   generation; callers compare for equality, including across counter overflow.
 - `structureGeneration` changes for terminal-owned shape or row-mapping changes.
   Reverse video preserves row identities and this generation.
+
+`outputEndAbsoluteRow` is the exclusive absolute end of authored output in the
+active buffer, independent of viewport position. It includes retained history,
+written cells and explicit blank linefeed sources, while excluding untouched live
+capacity. Cursor motion alone does not extend it. Same-row erasure preserves
+authored blanks; replacing rows clears their provenance. Reflow carries authored
+output without treating cursor-placement padding as new text. Changes to this
+boundary advance content and frame generations. The boundary can retreat and does
+not mean the final logical line is immutable.
 
 ## Writer contract
 

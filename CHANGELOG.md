@@ -6,6 +6,7 @@ Release notes for library consumers and embedders. Product-specific changes are 
 
 ### Improvements and fixes
 
+- Reworked hyperlink retention and discovery to preserve prepared links through scrolling and focus changes, keep ordered filters from consuming unused rows, and validate hover and activation against the displayed occurrence. Hosts can supply resolved OSC 8 styles through the shared presentation contract.
 - Stopped frame-triggered terminal resizing on buffer switches. Default alternate-screen padding now shares the primary horizontal inset equally and preserves vertical insets, so physical resizing retains the same grid dimensions in either buffer. Explicit alternate-padding overrides remain supported.
 - Made shell metadata updates independent of transport output. Swing observes the selected model, and workspace/product command learning uses exact semantic completion snapshots; observer registrations end with their view/tab lifetime.
 - Discarded stale shell suggestions when editing context changes or the session closes, including pending results and acceptance. Dismissing suggestions cancels provider work, and ineligible automatic requests leave explicit requests untouched.

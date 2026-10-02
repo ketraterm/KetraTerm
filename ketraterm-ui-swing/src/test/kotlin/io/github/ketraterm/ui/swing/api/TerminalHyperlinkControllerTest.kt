@@ -42,9 +42,67 @@ import java.awt.event.MouseEvent
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicReference
 import javax.swing.JButton
+import javax.swing.JComponent
 import javax.swing.SwingUtilities
 
 class TerminalHyperlinkControllerTest {
+    @Test
+    fun `shared action receives balanced callbacks when the detected occurrence changes`() {
+        SwingUtilities.invokeAndWait {
+            val cache = TerminalRenderCache(8, 2)
+            cache.hyperlinkIds.fill(-1, 0, 2)
+            cache.hyperlinkIds.fill(-1, 8, 10)
+            cache.hyperlinkIds.fill(-2, 4, 6)
+            val callbacks = ArrayList<String>()
+            val action =
+                object : SwingHyperlinkAction {
+                    override fun open() = true
+
+                    override fun mouseEntered(
+                        component: JComponent,
+                        x: Int,
+                        y: Int,
+                        width: Int,
+                        height: Int,
+                    ) {
+                        callbacks.add("enter:$x,$y,$width,$height")
+                    }
+
+                    override fun mouseExited() {
+                        callbacks.add("exit")
+                    }
+                }
+            val component = JButton()
+            val host =
+                object : TerminalHyperlinkHost by FakeHyperlinkHost(
+                    cache,
+                    null,
+                    SwingHostServices(),
+                    mapOf(-1 to { true }, -2 to { true }),
+                ) {
+                    override fun hyperlinkAction(hyperlinkId: Int) = action
+
+                    override fun enterHyperlink(
+                        action: SwingHyperlinkAction,
+                        row: Int,
+                        startColumn: Int,
+                        endColumn: Int,
+                    ) = action.mouseEntered(component, startColumn, row, endColumn - startColumn, 1)
+                }
+            val controller = TerminalHyperlinkController(host)
+            controller.updatePointerPosition(1, 1)
+            controller.updatePointerPosition(1, CELL_HEIGHT + 1)
+            controller.refreshHyperlinkHover()
+            controller.updateHyperlinkActivationHover(true)
+            assertEquals(listOf("enter:0,0,2,1"), callbacks, "Moving within one occurrence must not reenter its action")
+
+            controller.updatePointerPosition(4 * CELL_WIDTH + 1, 1)
+            assertEquals(listOf("enter:0,0,2,1", "exit", "enter:4,0,2,1"), callbacks)
+            controller.clearHyperlinkHover()
+            assertEquals(listOf("enter:0,0,2,1", "exit", "enter:4,0,2,1", "exit"), callbacks)
+        }
+    }
+
     @Test
     fun `stationary hover follows replaced spans and retains modifiers while detection is pending`() {
         val cache = TerminalRenderCache(8, 2)
@@ -215,34 +273,131 @@ class TerminalHyperlinkControllerTest {
             val uri = "https://example.com/shared"
             f.accept(osc8(uri, "AA", "shared") + "  " + osc8(uri, "BB", "shared"))
             f.refresh()
-            val component = JButton()
-            val press =
-                MouseEvent(
-                    component,
-                    MouseEvent.MOUSE_PRESSED,
-                    0L,
-                    hyperlinkNavigationModifierMask,
-                    CELL_WIDTH / 2,
-                    CELL_HEIGHT / 2,
-                    1,
-                    false,
-                    MouseEvent.BUTTON1,
-                )
-            val release =
-                MouseEvent(
-                    component,
-                    MouseEvent.MOUSE_RELEASED,
-                    0L,
-                    hyperlinkNavigationModifierMask,
-                    4 * CELL_WIDTH + CELL_WIDTH / 2,
-                    CELL_HEIGHT / 2,
-                    1,
-                    false,
-                    MouseEvent.BUTTON1,
-                )
-            assertTrue(f.controller.handleMousePressed(press))
-            assertFalse(f.controller.handleMouseReleased(release))
+            assertTrue(f.press())
+            assertFalse(f.release(column = 4))
             assertTrue(opened.isEmpty())
+        }
+    }
+
+    @Test
+    fun `output scrolling a separate same-id occurrence under a held pointer cancels activation`() {
+        SwingUtilities.invokeAndWait {
+            val opened = ArrayList<String>()
+            Osc8PipelineFixture(10, 3, hyperlinkHandler = TerminalHyperlinkHandler { opened.add(it) }).use { f ->
+                val uri = "https://example.com/shared"
+                f.accept(osc8(uri, "AA", "shared") + "\r\n\r\n" + osc8(uri, "BB", "shared"))
+                f.refresh()
+                assertTrue(f.press())
+                val pressedId = f.controller.hoveredHyperlinkId
+
+                f.accept("\r\n\r\n")
+                f.refresh()
+                f.controller.refreshHyperlinkHover()
+                assertEquals(pressedId, f.controller.hoveredHyperlinkId)
+                assertFalse(f.release())
+                assertTrue(opened.isEmpty())
+            }
+        }
+    }
+
+    @Test
+    fun `replacing a pressed source row with another same-id occurrence cancels activation`() {
+        SwingUtilities.invokeAndWait {
+            val opened = ArrayList<String>()
+            Osc8PipelineFixture(10, 3, hyperlinkHandler = TerminalHyperlinkHandler { opened.add(it) }).use { f ->
+                val uri = "https://example.com/shared"
+                f.accept(osc8(uri, "AA", "shared") + "\r\n\r\n" + osc8(uri, "BB", "shared"))
+                f.refresh()
+                val originalLineId = f.cache.lineIds[0]
+                assertTrue(f.press())
+
+                f.accept("\u001b[1;1H\u001b[2M")
+                f.refresh()
+                assertEquals(0, f.cache.historySize)
+                assertNotEquals(originalLineId, f.cache.lineIds[0])
+                assertFalse(f.release(), "Release must reconcile even without an intermediate hover refresh")
+                assertTrue(opened.isEmpty())
+            }
+        }
+    }
+
+    @Test
+    fun `unrelated output on the pressed line preserves OSC8 activation`() {
+        SwingUtilities.invokeAndWait {
+            val opened = ArrayList<String>()
+            Osc8PipelineFixture(16, 2, hyperlinkHandler = TerminalHyperlinkHandler { opened.add(it) }).use { f ->
+                val uri = "https://example.com/stable"
+                f.accept(osc8(uri, "AA"))
+                f.refresh()
+                assertTrue(f.press())
+
+                f.accept("\u001b[1;5Hprogress")
+                f.refresh()
+                f.controller.refreshHyperlinkHover()
+                assertTrue(f.release())
+                assertEquals(listOf(uri), opened)
+            }
+        }
+    }
+
+    @Test
+    fun `scrolling the same multiline occurrence preserves its pressed source cell`() {
+        SwingUtilities.invokeAndWait {
+            val opened = ArrayList<String>()
+            Osc8PipelineFixture(10, 3, hyperlinkHandler = TerminalHyperlinkHandler { opened.add(it) }).use { f ->
+                val uri = "https://example.com/multiline"
+                f.accept("plain\r\n" + osc8(uri, "AA\r\nBB"))
+                f.refresh()
+                assertTrue(f.press(row = 1))
+
+                f.accept("\r\n")
+                f.refresh()
+                f.controller.refreshHyperlinkHover()
+                assertEquals(2, f.controller.hoveredSegmentCount)
+                assertTrue(f.release(row = 1))
+                assertEquals(listOf(uri), opened)
+            }
+        }
+    }
+
+    @Test
+    fun `reflow cancels an OSC8 press even when the same destination remains under the pointer`() {
+        SwingUtilities.invokeAndWait {
+            val opened = ArrayList<String>()
+            Osc8PipelineFixture(6, 2, hyperlinkHandler = TerminalHyperlinkHandler { opened.add(it) }).use { f ->
+                f.accept(osc8("https://example.com/reflow", "abcdefg"))
+                f.refresh()
+                assertTrue(f.press())
+                val pressedId = f.controller.hoveredHyperlinkId
+
+                f.session.resize(columns = 3, rows = 3)
+                f.refresh()
+                f.controller.refreshHyperlinkHover()
+                assertEquals(pressedId, f.controller.hoveredHyperlinkId)
+                assertFalse(f.release())
+                assertTrue(opened.isEmpty())
+            }
+        }
+    }
+
+    @Test
+    fun `buffer switch cancels an OSC8 press with the same registered destination`() {
+        SwingUtilities.invokeAndWait {
+            val opened = ArrayList<String>()
+            Osc8PipelineFixture(10, 2, hyperlinkHandler = TerminalHyperlinkHandler { opened.add(it) }).use { f ->
+                val uri = "https://example.com/shared"
+                f.accept(osc8(uri, "AA", "shared"))
+                f.refresh()
+                assertTrue(f.press())
+                val pressedId = f.controller.hoveredHyperlinkId
+
+                f.accept("\u001b[?1049h" + osc8(uri, "BB", "shared"))
+                f.refresh()
+                f.controller.refreshHyperlinkHover()
+                assertEquals(pressedId, f.controller.hoveredHyperlinkId)
+                assertFalse(f.release())
+                assertTrue(opened.isEmpty())
+            }
         }
     }
 
@@ -455,6 +610,32 @@ class TerminalHyperlinkControllerTest {
         ) {
             cache.updateFrom(session, scrollbackOffset, viewportRows)
         }
+
+        fun press(
+            column: Int = 0,
+            row: Int = 0,
+        ): Boolean = controller.handleMousePressed(primaryButtonEvent(MouseEvent.MOUSE_PRESSED, column, row))
+
+        fun release(
+            column: Int = 0,
+            row: Int = 0,
+        ): Boolean = controller.handleMouseReleased(primaryButtonEvent(MouseEvent.MOUSE_RELEASED, column, row))
+
+        private fun primaryButtonEvent(
+            kind: Int,
+            column: Int,
+            row: Int,
+        ) = MouseEvent(
+            component,
+            kind,
+            0L,
+            hyperlinkNavigationModifierMask,
+            column * CELL_WIDTH + CELL_WIDTH / 2,
+            row * CELL_HEIGHT + CELL_HEIGHT / 2,
+            1,
+            false,
+            MouseEvent.BUTTON1,
+        )
 
         fun hover(
             column: Int,
@@ -1000,6 +1181,41 @@ class TerminalHyperlinkControllerTest {
         cache.hyperlinkIds[0] = -2
         assertFalse(controller.handleMouseReleased(mouse(MouseEvent.MOUSE_RELEASED)))
         assertEquals(listOf(-1), opened)
+    }
+
+    @Test
+    fun `button event modifiers reconcile implicit hover without prior key or move events`() {
+        SwingUtilities.invokeAndWait {
+            val cache = TerminalRenderCache(4, 1)
+            cache.hyperlinkIds[0] = -1
+            val host =
+                FakeHyperlinkHost(
+                    cache,
+                    null,
+                    SwingHostServices(),
+                    mapOf(-1 to { error("Released modifier must cancel navigation") }),
+                    visible = false,
+                )
+            val controller = TerminalHyperlinkController(host)
+            val component = JButton()
+            val press =
+                MouseEvent(component, MouseEvent.MOUSE_PRESSED, 0L, hyperlinkNavigationModifierMask, 1, 1, 1, false, MouseEvent.BUTTON1)
+            val release = MouseEvent(component, MouseEvent.MOUSE_RELEASED, 0L, 0, 1, 1, 1, false, MouseEvent.BUTTON1)
+
+            assertTrue(controller.handleMousePressed(press))
+            assertTrue(controller.hyperlinkActivationHover)
+            assertEquals(Cursor.HAND_CURSOR, host.cursor.type)
+            assertFalse(controller.handleMouseReleased(release))
+            assertFalse(controller.hyperlinkActivationHover)
+            assertEquals(Cursor.DEFAULT_CURSOR, host.cursor.type)
+
+            controller.updateHyperlinkActivationHover(true)
+            assertEquals(Cursor.HAND_CURSOR, host.cursor.type)
+            val unmodifiedPress = MouseEvent(component, MouseEvent.MOUSE_PRESSED, 0L, 0, 1, 1, 1, false, MouseEvent.BUTTON1)
+            assertFalse(controller.handleMousePressed(unmodifiedPress))
+            assertFalse(controller.hyperlinkActivationHover, "A rejected press must still replace stale modifier state")
+            assertEquals(Cursor.DEFAULT_CURSOR, host.cursor.type)
+        }
     }
 
     @Test

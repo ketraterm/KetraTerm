@@ -16,6 +16,7 @@
 package io.github.ketraterm.ui.swing.api
 
 import io.github.ketraterm.render.api.TerminalRenderAttrs
+import io.github.ketraterm.render.api.TerminalRenderBufferKind
 import io.github.ketraterm.render.cache.TerminalRenderCache
 import io.github.ketraterm.ui.swing.input.hyperlinkNavigationModifierDown
 import io.github.ketraterm.ui.swing.render.hyperlinkIdForCell
@@ -91,6 +92,12 @@ internal class TerminalHyperlinkController(
     private var pointerY = 0
     private var controlDown = false
     private var pressedHyperlinkId = 0
+    private var pressedAbsoluteRow = 0L
+    private var pressedColumn = 0
+    private var pressedLineId = 0L
+    private var pressedLineGeneration = 0L
+    private var pressedHistoryGeneration = 0L
+    private var pressedBuffer = TerminalRenderBufferKind.PRIMARY
     private var hoverAction: SwingHyperlinkAction? = null
 
     fun segmentRow(index: Int): Int = hover.row(index)
@@ -142,12 +149,24 @@ internal class TerminalHyperlinkController(
         ) {
             return false
         }
-        val hyperlinkId = hyperlinkIdAt(event)
+        controlDown = hyperlinkNavigationModifierDown(event)
+        updatePointerPosition(event.x, event.y)
+        val hyperlinkId = hoveredHyperlinkId
         if (hyperlinkId != NO_HYPERLINK_ID &&
-            canActivate(hyperlinkId, hyperlinkNavigationModifierDown(event))
+            canActivate(hyperlinkId, controlDown)
         ) {
-            updatePointerPosition(event.x, event.y)
             pressedHyperlinkId = hyperlinkId
+            if (hyperlinkId > 0) {
+                val cache = host.renderCache
+                val cell = host.cellAt(event.x, event.y)
+                val row = unpackCellRow(cell)
+                pressedAbsoluteRow = cache.discardedCount + cache.historySize - cache.scrollbackOffset + row
+                pressedColumn = unpackCellColumn(cell)
+                pressedLineId = cache.lineIds[row]
+                pressedLineGeneration = cache.lineGenerations[row]
+                pressedHistoryGeneration = cache.historyContentGeneration
+                pressedBuffer = cache.activeBuffer
+            }
         }
         // Direct links still allow a selection drag. Modifier clicks preserve an existing selection.
         return pressedHyperlinkId != 0 && hyperlinkNavigationModifierDown(event)
@@ -159,12 +178,12 @@ internal class TerminalHyperlinkController(
 
     fun handleMouseReleased(event: MouseEvent): Boolean {
         val pressed = pressedHyperlinkId
-        val releasedCell = host.cellAt(event.x, event.y)
         pressedHyperlinkId = 0
-        if (!SwingUtilities.isLeftMouseButton(event) ||
-            pressed == 0 ||
-            hyperlinkIdAt(event) != pressed ||
-            !hover.contains(unpackCellRow(releasedCell), unpackCellColumn(releasedCell)) ||
+        if (!SwingUtilities.isLeftMouseButton(event) || pressed == 0) return false
+        controlDown = hyperlinkNavigationModifierDown(event)
+        updatePointerPosition(event.x, event.y)
+        if (hoveredHyperlinkId != pressed ||
+            (pressed > 0 && !pressedOsc8OccurrenceIsHovered()) ||
             !canActivate(pressed, hyperlinkNavigationModifierDown(event)) ||
             !host.openHyperlink(pressed, event)
         ) {
@@ -172,6 +191,18 @@ internal class TerminalHyperlinkController(
         }
         event.consume()
         return true
+    }
+
+    /** A shared OSC 8 ID cannot identify which displayed occurrence received the press. */
+    private fun pressedOsc8OccurrenceIsHovered(): Boolean {
+        val cache = host.renderCache
+        if (cache.activeBuffer != pressedBuffer || cache.historyContentGeneration != pressedHistoryGeneration) return false
+        val row = pressedAbsoluteRow - (cache.discardedCount + cache.historySize - cache.scrollbackOffset)
+        return !(row !in 0 until cache.rows.toLong() || !hover.contains(row.toInt(), pressedColumn)) && if (pressedLineId != 0L) {
+            cache.lineIds[row.toInt()] == pressedLineId
+        } else {
+            cache.lineGenerations[row.toInt()] == pressedLineGeneration
+        }
     }
 
     private fun canActivate(
@@ -231,6 +262,7 @@ internal class TerminalHyperlinkController(
     }
 
     private fun applyHyperlinkHover(id: Int) {
+        val occurrenceChanged = id != hoveredHyperlinkId
         val activation = id != NO_HYPERLINK_ID && canActivate(id, controlDown)
         pendingHover.setIdentity(id, activation)
         if (!hover.sameAs(pendingHover)) {
@@ -241,7 +273,7 @@ internal class TerminalHyperlinkController(
             repaintSegments()
         }
         val action = if (id == 0) null else host.hyperlinkAction(id)
-        if (hoverAction !== action) {
+        if (occurrenceChanged || hoverAction !== action) {
             hoverAction?.mouseExited()
             hoverAction = action
             if (action != null && hoveredSegmentCount > 0) {

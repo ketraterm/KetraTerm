@@ -277,7 +277,7 @@ open class TerminalTextRenderingBenchmark {
             textBlinkVisible = hoverActive,
             hyperlinkIds = styleCache.hyperlinkIds,
             hyperlinkHover = hover,
-            hyperlinkActivationForeground = 0xFF4DA3FF.toInt(),
+            settings = settings,
         )
         runStyle.begin(styleCache, styleCache.palette, 0, 0)
         var matches = 0

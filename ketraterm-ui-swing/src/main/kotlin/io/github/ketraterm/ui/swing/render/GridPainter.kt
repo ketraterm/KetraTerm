@@ -132,7 +132,7 @@ internal class GridPainter(
             while (row < rows) {
                 val bidi = cellGeometry.row(cache, row)
                 backgroundPainter.paintRow(g, cache, palette, metrics, row, bidi)
-                if (hyperlinkPresentations != null) {
+                if (hyperlinkPresentations != null || settings.osc8HyperlinkPresentation != null) {
                     paintHyperlinkBackgrounds(
                         g,
                         cache,
@@ -140,6 +140,7 @@ internal class GridPainter(
                         row,
                         hyperlinkIds,
                         hyperlinkPresentations,
+                        settings.resolvedOsc8HyperlinkPresentation,
                         followedHyperlinkId,
                         hyperlinkHover,
                         textBlinkVisible,
@@ -175,7 +176,6 @@ internal class GridPainter(
                     textBlinkVisible = textBlinkVisible,
                     hyperlinkIds = hyperlinkIds,
                     hyperlinkHover = hyperlinkHover,
-                    hyperlinkActivationForeground = settings.hyperlinkActivationForeground,
                     hyperlinkPresentations = hyperlinkPresentations,
                     followedHyperlinkId = followedHyperlinkId,
                 )
@@ -205,7 +205,8 @@ internal class GridPainter(
         metrics: SwingMetrics,
         row: Int,
         ids: IntArray,
-        presentations: Array<SwingHyperlinkPresentation?>,
+        presentations: Array<SwingHyperlinkPresentation?>?,
+        osc8Presentation: SwingHyperlinkPresentation,
         followedHyperlinkId: Int,
         hover: TerminalHyperlinkHover?,
         blinkVisible: Boolean,
@@ -216,12 +217,15 @@ internal class GridPainter(
         while (column < cache.columns) {
             val id = hyperlinkIdForCell(ids[offset + column], cache.flags[offset + column])
             val hovered = hover?.isHovered(id, row, column) == true
-            val background =
-                if (id < 0) {
-                    presentations[offset + column]?.styleFor(hovered, hover?.activation == true, id == followedHyperlinkId)?.backgroundArgb
+            val presentation =
+                if (id > 0) {
+                    osc8Presentation
+                } else if (id < 0) {
+                    presentations?.get(offset + column)
                 } else {
                     null
                 }
+            val background = presentation?.styleFor(hovered, hover?.activation == true, id == followedHyperlinkId)?.backgroundArgb
             if (background == null || isTextHidden(cache.attrWords[offset + column], blinkVisible)) {
                 column++
                 continue

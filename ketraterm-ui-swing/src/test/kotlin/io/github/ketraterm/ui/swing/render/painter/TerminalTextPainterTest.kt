@@ -1918,6 +1918,7 @@ class TerminalTextPainterTest {
         ) {
             g.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, settings.textAntialiasing)
             g.setRenderingHint(RenderingHints.KEY_FRACTIONALMETRICS, settings.fractionalMetrics)
+            painter.updateSettings(settings.copy(hyperlinkActivationForeground = hyperlinkActivationForeground))
             painter.paintRow(
                 g = g,
                 cache = cache,
@@ -1928,7 +1929,6 @@ class TerminalTextPainterTest {
                 textBlinkVisible = textBlinkVisible,
                 hyperlinkIds = hyperlinkIds,
                 hyperlinkHover = hoverProjection ?: hyperlinkHover(hoveredHyperlinkId, hyperlinkActivationHover, row),
-                hyperlinkActivationForeground = hyperlinkActivationForeground,
             )
         }
     }

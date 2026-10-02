@@ -19,6 +19,7 @@ import com.intellij.execution.filters.*
 import com.intellij.openapi.actionSystem.ActionGroup
 import com.intellij.openapi.editor.colors.CodeInsightColors
 import com.intellij.openapi.editor.colors.EditorColorsManager
+import com.intellij.openapi.editor.colors.EditorColorsScheme
 import com.intellij.openapi.editor.markup.EffectType
 import com.intellij.openapi.editor.markup.TextAttributes
 import com.intellij.openapi.project.Project
@@ -38,25 +39,35 @@ import javax.swing.JComponent
 internal fun intellijHyperlinkPresentation(item: Filter.ResultItem): SwingHyperlinkPresentation {
     val scheme = EditorColorsManager.getInstance().globalScheme
     val linkAttributes = scheme.getAttributes(CodeInsightColors.HYPERLINK_ATTRIBUTES)
+    if (item.isInvisibleLink) return intellijImplicitHyperlinkPresentation(scheme, item.hoveredHyperlinkAttributes)
     val normal = item.highlightAttributes ?: linkAttributes
     val followed = item.followedHyperlinkAttributes ?: scheme.getAttributes(CodeInsightColors.FOLLOWED_HYPERLINK_ATTRIBUTES)
-    val implicit = SwingHyperlinkStyle(underlineStyle = TerminalRenderUnderline.NONE)
-    val hovered =
-        item.hoveredHyperlinkAttributes?.toSwingStyle()
-            ?: if (item.isInvisibleLink) {
-                SwingHyperlinkStyle(
-                    underlineArgb = ColorUtil.withAlpha(scheme.defaultForeground, if (JBColor.isBright()) 0.4 else 0.5).rgb,
-                    underlineStyle = TerminalRenderUnderline.SINGLE,
-                )
-            } else {
-                null
-            }
+    val hovered = item.hoveredHyperlinkAttributes?.toSwingStyle()
     return SwingHyperlinkPresentation(
-        normal = if (item.isInvisibleLink) implicit else normal.toSwingStyle(),
+        normal = normal.toSwingStyle(),
         hovered = hovered,
-        active = if (item.isInvisibleLink) linkAttributes.toSwingStyle() else hovered,
-        followed = if (item.isInvisibleLink) implicit else followed.toSwingStyle(),
-        isVisible = !item.isInvisibleLink,
+        active = hovered,
+        followed = followed.toSwingStyle(),
+        isVisible = true,
+    )
+}
+
+/** OSC 8 and implicit discovered paths share the IDE's theme-resolved hover/modifier policy. */
+internal fun intellijImplicitHyperlinkPresentation(
+    scheme: EditorColorsScheme = EditorColorsManager.getInstance().globalScheme,
+    hoveredAttributes: TextAttributes? = null,
+): SwingHyperlinkPresentation {
+    val resting = SwingHyperlinkStyle(underlineStyle = TerminalRenderUnderline.NONE)
+    return SwingHyperlinkPresentation(
+        normal = resting,
+        hovered =
+            hoveredAttributes?.toSwingStyle() ?: SwingHyperlinkStyle(
+                underlineArgb = ColorUtil.withAlpha(scheme.defaultForeground, if (JBColor.isBright()) 0.4 else 0.5).rgb,
+                underlineStyle = TerminalRenderUnderline.SINGLE,
+            ),
+        active = scheme.getAttributes(CodeInsightColors.HYPERLINK_ATTRIBUTES).toSwingStyle(),
+        followed = resting,
+        isVisible = false,
     )
 }
 

@@ -42,6 +42,7 @@ internal class SwingTerminalHyperlinkLifecycleFixture(
     private val gutterWidth: Int = 0,
     presentation: SwingHyperlinkPresentation = SwingHyperlinkPresentation(isVisible = true),
     activation: SwingHyperlinkActivation = SwingHyperlinkActivation.DIRECT,
+    osc8Presentation: SwingHyperlinkPresentation? = null,
 ) : AutoCloseable {
     private val worker = StandardTestDispatcher()
     private val uiTasks = LinkedBlockingQueue<Runnable>()
@@ -50,6 +51,7 @@ internal class SwingTerminalHyperlinkLifecycleFixture(
     private var menuRequest: SwingTerminalContextMenuRequest? = null
     private var copiedText: String? = null
     private var pointer: Point? = Point(gutterWidth + 1, 1)
+    private var osc8Presentation = osc8Presentation
     private val session =
         TerminalSession.create(
             terminal = TerminalBuffers.create(width = 40, height = 2, maxHistory = 10),
@@ -70,6 +72,7 @@ internal class SwingTerminalHyperlinkLifecycleFixture(
                         cursorBlinkMillis = 0,
                         shellIntegrationDecorationGutterWidth = gutterWidth,
                         smartSuggestionsEnabled = false,
+                        osc8HyperlinkPresentation = this.osc8Presentation,
                     )
                 },
                 hostServices =
@@ -154,6 +157,12 @@ internal class SwingTerminalHyperlinkLifecycleFixture(
     fun pointerOutside() = onEdt { pointer = null }
 
     fun cursorType(): Int = onEdt { terminal.cursor.type }
+
+    fun reloadOsc8Presentation(presentation: SwingHyperlinkPresentation?) =
+        onEdt {
+            osc8Presentation = presentation
+            terminal.reloadSettings()
+        }
 
     fun movePointer(
         x: Int,

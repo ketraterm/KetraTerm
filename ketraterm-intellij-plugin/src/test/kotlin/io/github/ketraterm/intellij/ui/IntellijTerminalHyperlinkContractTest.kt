@@ -24,6 +24,7 @@ import com.intellij.openapi.application.WriteAction
 import com.intellij.openapi.editor.LogicalPosition
 import com.intellij.openapi.editor.colors.CodeInsightColors
 import com.intellij.openapi.editor.colors.EditorColorsManager
+import com.intellij.openapi.editor.colors.EditorColorsScheme
 import com.intellij.openapi.editor.markup.EffectType
 import com.intellij.openapi.editor.markup.TextAttributes
 import com.intellij.openapi.fileEditor.FileEditorManager
@@ -59,6 +60,35 @@ import javax.swing.JComponent
 import javax.swing.JPanel
 
 class IntellijTerminalHyperlinkContractTest : BasePlatformTestCase() {
+    fun testOsc8UsesTheSamePreparedPresentationAsImplicitProviderLinks() {
+        val item = Filter.ResultItem(0, 4, HyperlinkInfo {}).also { it.isInvisibleLink = true }
+        val presentation = intellijImplicitHyperlinkPresentation()
+        assertEquals(intellijHyperlinkPresentation(item), presentation)
+        assertFalse(presentation.isVisible)
+        assertEquals(TerminalRenderUnderline.NONE, presentation.normal?.underlineStyle)
+        assertEquals(TerminalRenderUnderline.SINGLE, presentation.hovered?.underlineStyle)
+        assertEquals(1, presentation.hovered?.underlineThickness)
+        assertEquals(SwingHyperlinkActivation.MODIFIER, intellijHyperlinkActivation(item))
+    }
+
+    fun testImplicitThemeSnapshotsRemainImmutableAcrossThemeChanges() {
+        val scheme = EditorColorsManager.getInstance().globalScheme.clone() as EditorColorsScheme
+        val first = TextAttributes(Color.BLUE, Color.WHITE, Color.RED, EffectType.LINE_UNDERSCORE, 0)
+        scheme.setAttributes(CodeInsightColors.HYPERLINK_ATTRIBUTES, first)
+        val before = intellijImplicitHyperlinkPresentation(scheme)
+        scheme.setAttributes(
+            CodeInsightColors.HYPERLINK_ATTRIBUTES,
+            TextAttributes(Color.MAGENTA, null, Color.GREEN, EffectType.WAVE_UNDERSCORE, 0),
+        )
+        val after = intellijImplicitHyperlinkPresentation(scheme)
+        assertEquals(Color.BLUE.rgb, before.active?.foregroundArgb)
+        assertEquals(Color.RED.rgb, before.active?.underlineArgb)
+        assertEquals(TerminalRenderUnderline.SINGLE, before.active?.underlineStyle)
+        assertEquals(Color.MAGENTA.rgb, after.active?.foregroundArgb)
+        assertEquals(Color.GREEN.rgb, after.active?.underlineArgb)
+        assertEquals(TerminalRenderUnderline.CURLY, after.active?.underlineStyle)
+    }
+
     override fun createTempDirTestFixture(): TempDirTestFixture = TempDirTestFixtureImpl()
 
     fun testFileContentUpdatesPreserveConfigurationAndStructuralUpdatesInvalidateIt() {

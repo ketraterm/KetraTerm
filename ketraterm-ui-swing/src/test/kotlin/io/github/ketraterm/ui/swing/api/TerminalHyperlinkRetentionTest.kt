@@ -36,6 +36,71 @@ import javax.swing.SwingUtilities
 import kotlin.coroutines.CoroutineContext
 
 class TerminalHyperlinkRetentionTest {
+    @ParameterizedTest
+    @CsvSource("80,24", "160,48", "240,48")
+    fun `ordered appends consume each output line once through unused rows and history eviction`(
+        columns: Int,
+        rows: Int,
+    ) {
+        Fixture(columns, rows, 32, ordered = true).use { fixture ->
+            fixture.show()
+            fixture.settle()
+            assertTrue(fixture.detected.isEmpty(), "An unused screen must not be fed to console filters")
+            val expected = ArrayList<String>()
+            repeat(rows + 40) { index ->
+                val url = "https://example.invalid/$index"
+                expected.add("$url\n")
+                fixture.output(url)
+                fixture.show()
+                fixture.settle()
+                assertEquals(expected, fixture.detected, "Append $index must not replay earlier output")
+                assertTrue(fixture.openAt(minOf(index, rows - 1)))
+                assertEquals(url, fixture.opened.last())
+            }
+            assertEquals(1, fixture.analysisEpochs.distinct().size, "Appending and eviction preserve the ordered chain")
+        }
+    }
+
+    @Test
+    fun `ordered discovery preserves explicit blank lines and ignores unused linefeed destinations`() {
+        Fixture(80, 24, 100, ordered = true).use { fixture ->
+            repeat(2) {
+                fixture.terminal.newLine()
+                fixture.show()
+                fixture.settle()
+            }
+            assertEquals(listOf("\n", "\n"), fixture.detected)
+            fixture.terminal.writeText("https://example.invalid/after-empty-lines")
+            fixture.show()
+            fixture.settle()
+            assertEquals(listOf("\n", "\n", "https://example.invalid/after-empty-lines\n"), fixture.detected)
+            assertEquals(1, fixture.analysisEpochs.distinct().size)
+            assertTrue(fixture.openAt(2))
+        }
+    }
+
+    @Test
+    fun `clearing the live output tail retires its actions and fresh output remains analyzable`() {
+        Fixture(80, 24, 100, ordered = true).use { fixture ->
+            repeat(3) { fixture.output("https://example.invalid/$it") }
+            fixture.show()
+            fixture.settle()
+            val retired = fixture.idAt(2)
+            assertTrue(retired < 0)
+            fixture.terminal.eraseEntireScreen()
+            fixture.terminal.positionCursor(0, 0)
+            fixture.show()
+            assertFalse(fixture.resolvable(retired))
+            fixture.settle()
+            fixture.detected.clear()
+            fixture.terminal.writeText("https://example.invalid/fresh")
+            fixture.show()
+            fixture.settle()
+            assertEquals(listOf("https://example.invalid/fresh\n"), fixture.detected)
+            assertTrue(fixture.openAt(0))
+        }
+    }
+
     @Test
     fun `unchanged offscreen wrapped tail keeps its action through unrelated live output`() {
         Fixture(8, 4, 100).use { fixture ->
@@ -177,6 +242,29 @@ class TerminalHyperlinkRetentionTest {
             fixture.settle()
             assertTrue(fixture.openAt(0))
             assertEquals("https://example.invalid/new", fixture.opened.last())
+        }
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = [false, true])
+    fun `unpublished output tail clearing rejects suspended results`(ordered: Boolean) {
+        val release = CompletableDeferred<Unit>()
+        Fixture(80, 3, 100, ordered = ordered, beforeDetection = { release.await() }).use { fixture ->
+            fixture.output("https://example.invalid/removed")
+            fixture.show()
+            fixture.settle()
+            assertEquals(1, fixture.requestSizes.size)
+            fixture.terminal.eraseEntireScreen()
+            release.complete(Unit)
+            fixture.settle()
+            assertFalse(fixture.openAt(0), "A prepared result cannot restore a cleared source row")
+            fixture.show()
+            fixture.settle()
+            val requests = fixture.requestSizes.size
+            fixture.terminal.positionCursor(5, 2)
+            fixture.show()
+            fixture.settle()
+            assertEquals(requests, fixture.requestSizes.size, "An empty tail must settle without rediscovery")
         }
     }
 
@@ -570,6 +658,7 @@ class TerminalHyperlinkRetentionTest {
         val cache = TerminalRenderCache(columns, rows)
         val detected = ArrayList<String>()
         val requestSizes = ArrayList<Int>()
+        val analysisEpochs = ArrayList<Long>()
         val opened = ArrayList<String>()
         private val ui = StandardTestDispatcher()
         private val worker = QueuedDispatcher()
@@ -591,6 +680,7 @@ class TerminalHyperlinkRetentionTest {
                             override suspend fun detect(request: SwingHyperlinkDetectionRequest): List<SwingHyperlink> {
                                 assertFalse(SwingUtilities.isEventDispatchThread())
                                 requestSizes.add(request.lineCount)
+                                analysisEpochs.add(request.analysisEpoch)
                                 beforeDetection()
                                 val results = ArrayList<SwingHyperlink>()
                                 for (index in 0 until request.lineCount) {

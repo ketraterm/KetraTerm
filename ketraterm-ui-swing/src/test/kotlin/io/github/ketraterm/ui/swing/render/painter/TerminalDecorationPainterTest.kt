@@ -47,7 +47,12 @@ class TerminalDecorationPainterTest {
             val cache = renderCache(TestRenderFrame.text(" "))
             cache.hyperlinkIds[0] = id
             val style = TerminalTextRunStyle()
-            style.configureRow(true, cache.hyperlinkIds, hyperlinkHover(if (hovered) id else 0), TEST_BLUE)
+            style.configureRow(
+                true,
+                cache.hyperlinkIds,
+                hyperlinkHover(if (hovered) id else 0),
+                SwingSettings(hyperlinkActivationForeground = TEST_BLUE),
+            )
             style.begin(cache, cache.palette, 0, 0)
             fixture.painter.paintTextRun(fixture.g, cache.palette, style, 0, 1, 0, fixture.metrics)
             val expectedColor = if (id > 0 || hovered) cache.palette.defaultForeground else 0
@@ -80,7 +85,13 @@ class TerminalDecorationPainterTest {
                     underlineColorValue = 0x00FF00,
                 )
             val style = TerminalTextRunStyle()
-            style.configureRow(true, cache.hyperlinkIds, hyperlinkHover(id, true), TEST_BLUE, presentations)
+            style.configureRow(
+                true,
+                cache.hyperlinkIds,
+                hyperlinkHover(id, true),
+                SwingSettings(hyperlinkActivationForeground = TEST_BLUE, osc8HyperlinkPresentation = presentations[0]),
+                presentations,
+            )
             style.begin(cache, cache.palette, 0, 0)
             fixture.painter.paintTextRun(fixture.g, cache.palette, style, 0, 1, 0, fixture.metrics)
             assertEquals(TEST_GREEN, fixture.image.getRGB(1, fixture.metrics.underlineY))

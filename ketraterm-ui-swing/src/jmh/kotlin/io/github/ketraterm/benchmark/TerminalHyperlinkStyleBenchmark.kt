@@ -23,6 +23,7 @@ import io.github.ketraterm.ui.swing.api.SwingHyperlinkStyle
 import io.github.ketraterm.ui.swing.api.TerminalHyperlinkHover
 import io.github.ketraterm.ui.swing.render.painter.TerminalTextRunStyle
 import io.github.ketraterm.ui.swing.render.styleFor
+import io.github.ketraterm.ui.swing.settings.SwingSettings
 import org.openjdk.jmh.annotations.*
 import java.lang.management.ManagementFactory
 import java.util.concurrent.TimeUnit
@@ -41,6 +42,7 @@ open class TerminalHyperlinkStyleBenchmark {
     private lateinit var cache: TerminalRenderCache
     private lateinit var presentations: Array<SwingHyperlinkPresentation?>
     private val run = TerminalTextRunStyle()
+    private val settings = SwingSettings()
     private val hover = TerminalHyperlinkHover()
     private lateinit var allocationBean: ThreadMXBean
     private var threadId = 0L
@@ -77,7 +79,7 @@ open class TerminalHyperlinkStyleBenchmark {
         hover.reset(hovered, phase % 2 == 0)
         for (row in 0 until cache.rows) hover.add(row, 0, cache.columns)
         for (row in 0 until cache.rows) {
-            run.configureRow(true, cache.hyperlinkIds, hover, 0, presentations, followed, row)
+            run.configureRow(true, cache.hyperlinkIds, hover, settings, presentations, followed, row)
             val offset = cache.rowOffset(row)
             var column = 0
             while (column < cache.columns) {

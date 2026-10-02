@@ -52,6 +52,7 @@ internal class TerminalTextPainter(
     private val textRun = TerminalTextRunBuffer(INITIAL_TEXT_RUN_CAPACITY)
     private val asciiClipBounds = Rectangle()
     private val runStyle = TerminalTextRunStyle()
+    private var settings: SwingSettings? = null
     private val shapedTextRuns =
         TerminalShapedTextRunPainter(
             colorCache = colorCache,
@@ -65,6 +66,7 @@ internal class TerminalTextPainter(
      * Updates font-dependent caches for a settings snapshot.
      */
     fun updateSettings(settings: SwingSettings) {
+        this.settings = settings
         if (fontCache.update(settings.font, settings.fallbackFonts, settings.useSystemFallbackFonts)) {
             complexTextLayouts.clear()
             shapedTextRuns.clear()
@@ -91,7 +93,6 @@ internal class TerminalTextPainter(
         textBlinkVisible: Boolean = true,
         hyperlinkIds: IntArray = cache.hyperlinkIds,
         hyperlinkHover: TerminalHyperlinkHover? = null,
-        hyperlinkActivationForeground: Int = DEFAULT_HYPERLINK_ACTIVATION_FOREGROUND,
         hyperlinkPresentations: Array<SwingHyperlinkPresentation?>? = null,
         followedHyperlinkId: Int = 0,
     ) {
@@ -100,7 +101,7 @@ internal class TerminalTextPainter(
             hyperlinkIds = hyperlinkIds,
             hyperlinkHover = hyperlinkHover,
             row = row,
-            hyperlinkActivationForeground = hyperlinkActivationForeground,
+            settings = checkNotNull(settings),
             hyperlinkPresentations = hyperlinkPresentations,
             followedHyperlinkId = followedHyperlinkId,
         )
@@ -515,6 +516,5 @@ internal class TerminalTextPainter(
 
     private companion object {
         private const val INITIAL_TEXT_RUN_CAPACITY = 256
-        private const val DEFAULT_HYPERLINK_ACTIVATION_FOREGROUND = 0xFF4DA3FF.toInt()
     }
 }

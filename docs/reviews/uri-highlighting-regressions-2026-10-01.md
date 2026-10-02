@@ -156,27 +156,71 @@ Both canonical maps and public migration notes are updated. The existing staged
 agy fixture is preserved. Changes remain uncommitted; no changelog entry is added
 for this internal cleanup.
 
-## Remaining architectural limits
+## Output boundary and interaction corrections — 2026-10-02
 
-The ordered lane currently analyzes trailing unused screen rows. Later output
-into one of those rows looks like an earlier edit and can replay all retained
-history. Neither the render contract nor core line storage records a consumed
-hard-break/output frontier. An explicitly emitted empty line can have the same
-cells and stamps as an unused row; trimming blank text would discard meaningful
-filter input, and cursor-based guessing would create incorrect invalidations.
-This needs a deliberate source contract before claiming work proportional to
-changed content. The retained index and independent URL path do not require
-replacement to address it.
+The ordered lane previously analyzed trailing unused screen rows. Later output
+into those rows looked like an earlier edit and replayed retained history.
+Core now records whether a physical row contains authored output, including an
+explicit empty linefeed source. The primitive render contract exposes the exclusive
+absolute output boundary, independent of the viewport. Discovery stops there;
+cache and bounded range copies preserve it. Cursor movement does not mark output,
+and reflow preserves authored blanks without promoting cursor padding to output.
+External readers default to an unknown boundary and retain conservative behavior.
+Clearing/replacing the output tail retires its actions and dependencies.
 
-Explicit OSC 8 links still preserve application-authored underline styles.
-When an application already underlines a link, unmodified hover may only change
-the pointer; modifier hover provides foreground emphasis. Current JetBrains
+This does not make an unfinished logical line immutable: appending text to an
+already-consumed line still changes ordered input and may require replay. The
+correction prevents unused live rows from causing that replay; it does not replace
+the retained index or add another discovery pipeline.
+
+Hover callbacks now follow detected occurrence identity even when providers reuse
+one action instance. OSC 8 release checks the pressed source row, buffer and history
+generation as well as the hovered protocol ID. A different same-ID occurrence
+moving beneath a held pointer cannot inherit that click. Button-event modifiers
+also reconcile active styling without relying on a preceding move or key event.
+
+OSC 8 presentation is now host-resolved through `SwingSettings`, using the same
+prepared immutable style-selection path as detected links. The standalone default
+retains its dotted resting underline; the plugin supplies native implicit styles.
+Terminal-authored underlines and concealment retain precedence. JetBrains'
 [OSC 8 frontend source](https://github.com/JetBrains/intellij-community/blob/master/plugins/terminal/frontend/src/com/intellij/terminal/frontend/view/hyperlinks/FrontendOsc8HyperlinksProcessing.kt)
-sets these decorations to implicit links. KetraTerm's permanent dotted OSC 8
-underline therefore still differs from that implementation. This source path is
-newer than the installed 262.8665.258 SDK and was not verified in that runtime.
-The remaining correction belongs in host-resolved OSC 8 presentation through
-the existing settings/style boundary, not URI parsing or another discovery path.
+uses implicit decorations; native desktop behavior still needs visual verification.
+
+Verification for these corrections:
+
+- Core: 989 tests; render cache: 47; session: 254; Swing: 1,098; IntelliJ: 239.
+  These suites report no failures, errors or skips. Host reports 449 cases with
+  no failures/errors and 14 pre-existing `R06` streaming-placement skips; the new
+  byte-chunk output-boundary test passes.
+- Ordered append regressions cover 80×24, 160×48 and 240×48 grids through history
+  eviction, requiring each new logical line to reach the provider exactly once.
+  Explicit blank lines, cleared tails and suspended obsolete publication are
+  covered without sleeps or timing thresholds.
+- Button-event modifiers now cause the required activation repaint. The existing
+  frame-carry test was corrected to keep modifiers constant while asserting that
+  movement within a group does not repaint, then explicitly assert complete-group
+  repaint for each activation change. Grouping and navigation assertions remain.
+- Nine library export checks and both published Kotlin/Java consumer modes pass.
+  The scoped ABI check, root/plugin formatting, standalone compilation and JMH
+  caller compilation/packaging pass. No benchmark run or new allocation claim is
+  part of this correction.
+- Plugin project configuration verification completes with the existing explicit
+  coroutines dependency warning; this is not a full Plugin Verifier run. SDK tests
+  verify the implicit style adapter and immutable theme snapshots. Adopting that
+  presentation for OSC 8 does not establish complete native desktop parity.
+- Graphify refreshed with the same four partial-parser warnings recorded above.
+  The existing staged agy fixture is unchanged. No changes were staged or committed.
+
+```text
+.\gradlew.bat spotlessApply
+.\gradlew.bat :ketraterm-core:test :ketraterm-render-cache:test :ketraterm-host:test :ketraterm-session:test
+.\gradlew.bat :ketraterm-ui-swing:test :ketraterm-ui-swing:checkKotlinAbi :ketraterm-app:compileKotlin :ketraterm-benchmarks:jmhJar
+.\gradlew.bat :ketraterm-testkit:test --tests '*TerminalLibraryConsumerCompilationTest' :ketraterm-testkit:publishedConsumerTest
+.\gradlew.bat -p ketraterm-intellij-plugin spotlessApply test verifyPluginProjectConfiguration
+graphify update .
+```
+
+## Remaining verification limits
 
 Structural filesystem changes remain a conservative provider refresh. Targeted
 file dependencies and real provider latency require integration measurement.

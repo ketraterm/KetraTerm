@@ -86,7 +86,8 @@ internal class TerminalHyperlinkIndex {
     ): Long {
         val top = cache.discardedCount + cache.historySize - cache.scrollbackOffset
         var row = maxOf(top, fromRow)
-        while (row < top + cache.rows) {
+        val end = minOf(top + cache.rows, cache.outputEndAbsoluteRow)
+        while (row < end) {
             val line = lineAt(row)
             if (line == null || !line.sourceCurrent) return row
             row = line.snapshot.lastAbsoluteRow + 1L
@@ -241,9 +242,11 @@ internal class TerminalHyperlinkIndex {
             buffer.nextSourceRow = cache.discardedCount
         }
         evictBefore(cache.discardedCount)
+        removeOutputTail(cache.outputEndAbsoluteRow)
         val top = cache.discardedCount + cache.historySize - cache.scrollbackOffset
+        val outputRows = (cache.outputEndAbsoluteRow - top).coerceIn(0L, cache.rows.toLong()).toInt()
         var row = 0
-        while (row < cache.rows) {
+        while (row < outputRows) {
             val previous = lineAt(top + row)
             if (previous != null && previous.snapshot.matchesRow(cache, row, top + row)) {
                 row++
@@ -253,7 +256,7 @@ internal class TerminalHyperlinkIndex {
                 row = (previous.snapshot.firstAbsoluteRow - top).toInt()
             }
             var end = row + 1
-            while (end < cache.rows && cache.lineWrapped[end - 1]) end++
+            while (end < outputRows && cache.lineWrapped[end - 1]) end++
             // A clipped line must be rebuilt from the source, never from its visible suffix.
             val completeStart = previous?.snapshot?.firstAbsoluteRow == top + row
             val completeEnd = !cache.lineWrapped[end - 1]
@@ -279,6 +282,20 @@ internal class TerminalHyperlinkIndex {
         columns = cache.columns
         rows = cache.rows
         return true
+    }
+
+    /** A cleared/replaced live tail no longer supplies text or dependencies to either detector. */
+    private fun removeOutputTail(endAbsoluteRow: Long) {
+        var end = buffer.lines.size
+        while (end > buffer.head && buffer.lines[end - 1].snapshot.lastAbsoluteRow >= endAbsoluteRow) end--
+        if (end == buffer.lines.size) return
+        val firstRemoved = buffer.lines[end].snapshot.firstAbsoluteRow
+        for (index in end until buffer.lines.size) release(buffer.lines[index])
+        buffer.lines.subList(end, buffer.lines.size).clear()
+        invalidateDependencies(firstRemoved, Long.MAX_VALUE)
+        restartOrdered()
+        invalidateSourceScan()
+        buffer.nextSourceRow = minOf(buffer.nextSourceRow, firstRemoved)
     }
 
     fun ingest(
@@ -391,8 +408,10 @@ internal class TerminalHyperlinkIndex {
     fun independentValidationLines(requested: List<TerminalHyperlinkLineSnapshot>): List<TerminalHyperlinkLineSnapshot> =
         requested.map { snapshot ->
             val current = lineAt(snapshot.firstAbsoluteRow)
-            if (current != null && current.sourceCurrent &&
-                current.snapshot.firstAbsoluteRow == snapshot.firstAbsoluteRow && current.snapshot.firstLineId == snapshot.firstLineId
+            if (current != null &&
+                current.sourceCurrent &&
+                current.snapshot.firstAbsoluteRow == snapshot.firstAbsoluteRow &&
+                current.snapshot.firstLineId == snapshot.firstLineId
             ) {
                 current.snapshot
             } else {
@@ -557,8 +576,10 @@ internal class TerminalHyperlinkIndex {
         val last = snapshotAt(source.end.absoluteRow) ?: return
         val producer = requested[hyperlink.consumedThrough.absoluteRow] ?: return
         val dependencyLast = snapshotAt(dependency.end.absoluteRow) ?: return
-        if (source.start.offset >= first.text.length || source.end.offset > last.text.length ||
-            hyperlink.consumedThrough.offset > producer.text.length || dependency.end.offset > dependencyLast.text.length
+        if (source.start.offset >= first.text.length ||
+            source.end.offset > last.text.length ||
+            hyperlink.consumedThrough.offset > producer.text.length ||
+            dependency.end.offset > dependencyLast.text.length
         ) {
             return
         }

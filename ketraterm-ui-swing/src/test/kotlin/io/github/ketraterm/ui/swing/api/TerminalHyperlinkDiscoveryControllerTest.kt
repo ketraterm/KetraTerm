@@ -19,6 +19,7 @@ import io.github.ketraterm.render.api.*
 import io.github.ketraterm.render.cache.TerminalRenderCache
 import io.github.ketraterm.ui.swing.input.hyperlinkNavigationModifierMask
 import io.github.ketraterm.ui.swing.render.painter.TerminalTextRunStyle
+import io.github.ketraterm.ui.swing.settings.SwingSettings
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.SupervisorJob
@@ -324,8 +325,11 @@ class TerminalHyperlinkDiscoveryControllerTest {
                             CellSelection(0, firstRow + 2, 6, firstRow + 2),
                         )
                     for (row in firstRow..firstRow + 2) {
-                        hover.handleMouseMoved(MouseEvent(source, MouseEvent.MOUSE_MOVED, 0L, 0, 4, row, 0, false))
+                        hover.handleMouseMoved(
+                            MouseEvent(source, MouseEvent.MOUSE_MOVED, 0L, hyperlinkNavigationModifierMask, 4, row, 0, false),
+                        )
                         assertEquals(linkId, hover.hoveredHyperlinkId)
+                        assertTrue(hover.hyperlinkActivationHover)
                         assertEquals(firstRow, hover.segmentRow(0))
                         assertEquals(3, hover.segmentStartColumn(0))
                         assertEquals(firstRow + 2, hover.segmentRow(hover.hoveredSegmentCount - 1))
@@ -361,16 +365,20 @@ class TerminalHyperlinkDiscoveryControllerTest {
                     assertEquals(
                         expectedSpans,
                         repaints,
-                        "Moving between segments must not repaint separate row spans",
+                        "Moving between segments with unchanged activation must not repaint the group",
                     )
-                    hover.updateHyperlinkActivationHover(true)
+                    hover.updateHyperlinkActivationHover(false)
+                    assertFalse(hover.hyperlinkActivationHover)
                     assertEquals(expectedSpans + expectedSpans, repaints)
+                    hover.updateHyperlinkActivationHover(true)
+                    assertTrue(hover.hyperlinkActivationHover)
+                    assertEquals(expectedSpans + expectedSpans + expectedSpans, repaints)
                     for (row in firstRow..firstRow + 2) {
                         style.configureRow(
                             true,
                             ids,
                             hover.hover,
-                            activationForeground,
+                            SwingSettings(hyperlinkActivationForeground = activationForeground),
                             row = row,
                         )
                         for (column in 0 until cache.columns) {

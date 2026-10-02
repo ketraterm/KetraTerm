@@ -39,6 +39,21 @@ import org.junit.jupiter.params.provider.ValueSource
 @DisplayName("HostCommandAdapter")
 class HostCommandAdapterTest {
     @Test
+    fun `output boundary distinguishes hard blank lines from cursor motion across byte chunks`() {
+        val bytes = "\r\n\r\n\u001B[5;1H\u001B[H中".encodeToByteArray()
+        for (split in 0..bytes.size) {
+            val f = Fixture()
+            f.parser.accept(bytes, 0, split)
+            f.parser.accept(bytes, split, bytes.size - split)
+            f.end()
+            (f.terminal as TerminalRenderFrameReader).readRenderFrame { frame ->
+                assertEquals(2L, frame.outputEndAbsoluteRow, "split=$split")
+            }
+            assertEquals('中'.code, f.terminal.getCodepointAt(0, 0))
+        }
+    }
+
+    @Test
     fun `overflowed CSI cannot change pen modes cursor or responses across any byte split`() {
         val commands =
             listOf(
