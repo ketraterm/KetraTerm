@@ -304,9 +304,30 @@ Hosts may set `SwingSettings.osc8HyperlinkPresentation` to a resolved
 `SwingHyperlinkPresentation`. OSC 8 and detected links use the same style-selection
 path, including backgrounds and visibility metadata. The default preserves the
 standalone dotted resting underline and solid hover underline; the IntelliJ host
-supplies native implicit-link styles. OSC 8 activation still requires Ctrl/Cmd.
+supplies the same resting/hover underlines with IDE theme styling on activation. The hand cursor appears only when activation is eligible; OSC 8 defaults to Ctrl/Cmd.
 Settings reload prepares styles and reconciles stationary-pointer feedback outside
 painting.
+
+Hyperlink configuration uses the existing immutable DTOs:
+
+```kotlin
+val settings = SwingSettings(
+    osc8HyperlinkPresentation = myPresentation, // null retains the built-in styles
+    osc8HyperlinkActivation = SwingHyperlinkActivation.DIRECT,
+)
+val terminal = SwingTerminal(settingsProvider = { settings })
+```
+
+`SwingHyperlinkPresentation` supplies normal, hovered, active and followed styles;
+each `SwingHyperlinkStyle` contains resolved colors and underline decoration.
+OSC 8 activation accepts `DIRECT` (ordinary primary click) or `MODIFIER` (Ctrl/Cmd,
+the default). Detected links provide the same presentation and activation DTOs per
+`SwingHyperlink` result. The host's `SwingHostServices.hyperlinkHandler` handles OSC 8
+destinations; detected results carry their own actions. To change component settings,
+return a new immutable snapshot from `settingsProvider` and call `reloadSettings()`.
+The stationary cursor and active styling reconcile immediately. Cursor eligibility,
+release/drag rules, authored-underline precedence and mouse-reporting precedence are
+shared interaction rules, not separate configuration switches.
 
 The [repair map](../docs/terminal-feature-gap-map.md#uri-highlighting-staged-repair)
 tracks remaining integration profiling and native desktop verification. Changelogs

@@ -64,6 +64,11 @@ fun main() =
                                 rows = ROWS,
                                 padding = SwingPadding(),
                                 shellIntegrationDecorationGutterWidth = 0,
+                                osc8HyperlinkActivation = SwingHyperlinkActivation.DIRECT,
+                                osc8HyperlinkPresentation =
+                                    SwingHyperlinkPresentation(
+                                        normal = SwingHyperlinkStyle(underlineStyle = TerminalRenderUnderline.DOTTED),
+                                    ),
                             )
                         },
                         SwingHostServices(hyperlinkDetector = detector, scrollbarOverlayEnabled = false),

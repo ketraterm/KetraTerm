@@ -85,8 +85,8 @@ fun interface SwingTerminalHostKeyHandler {
  *
  * @property uiDispatcher scheduler for UI-thread component work.
  * @property clipboardHandler host clipboard adapter for copy and paste actions.
- * @property hyperlinkHandler host policy for explicit Ctrl-click hyperlink
- * activation.
+ * @property hyperlinkHandler host handler for terminal-authored hyperlink activation,
+ * following the gesture policy in Swing settings.
  * @property hyperlinkDetector host detector for links discovered from the
  * retained terminal content. Binding-owned detection runs outside paint and mouse
  * movement, continues while temporarily hidden, and invokes actions only after explicit activation.

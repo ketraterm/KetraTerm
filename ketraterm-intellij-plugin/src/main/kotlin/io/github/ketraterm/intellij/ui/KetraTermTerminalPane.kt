@@ -310,7 +310,7 @@ internal class KetraTermTerminalPane private constructor(
             val terminal =
                 SwingTerminal(
                     settingsProvider = {
-                        KetraTermIntellijSettings.current().copy(osc8HyperlinkPresentation = intellijImplicitHyperlinkPresentation())
+                        KetraTermIntellijSettings.current().copy(osc8HyperlinkPresentation = intellijOsc8HyperlinkPresentation())
                     },
                     hostServices =
                         SwingHostServices(

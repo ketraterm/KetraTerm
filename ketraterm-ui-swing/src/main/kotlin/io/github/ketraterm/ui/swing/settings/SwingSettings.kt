@@ -19,6 +19,7 @@ import io.github.ketraterm.input.policy.PasteControlPolicy
 import io.github.ketraterm.render.api.TerminalColorPalette
 import io.github.ketraterm.render.api.TerminalRenderCursorShape
 import io.github.ketraterm.render.api.TerminalRenderUnderline
+import io.github.ketraterm.ui.swing.api.SwingHyperlinkActivation
 import io.github.ketraterm.ui.swing.api.SwingHyperlinkPresentation
 import io.github.ketraterm.ui.swing.api.SwingHyperlinkStyle
 import kotlinx.collections.immutable.ImmutableList
@@ -55,11 +56,14 @@ import java.util.*
  * @property textAntialiasing text antialiasing hint used during painting.
  * @property fractionalMetrics fractional font metrics hint used during painting.
  * @property hyperlinkActivationForeground packed ARGB foreground used for the
- * default linked span currently under Ctrl/Cmd-hover.
+ * default linked span while hovered and eligible for activation.
  * @property osc8HyperlinkPresentation prepared host styles for terminal-authored OSC 8 links.
  * Null preserves the default dotted underline and activation color. Hosts resolve theme data
- * before constructing this snapshot. Visibility controls the ordinary hover cursor; activation
- * still requires Ctrl/Cmd. Terminal-authored underlines retain priority over link decorations.
+ * before constructing this snapshot. Terminal-authored underlines retain priority over link decorations.
+ * @property osc8HyperlinkActivation gesture policy for terminal-authored links. Defaults to
+ * Ctrl/Cmd activation; DIRECT allows an ordinary primary-button click. The hand cursor and
+ * active style follow eligibility, independently of visibility. Activation occurs on release
+ * without a selection drag. Detected links carry their own per-result activation policy.
  * @property selectionBackground packed ARGB overlay used for visible terminal
  * selection ranges.
  * @property searchMatchBackground packed ARGB overlay used for non-active
@@ -151,6 +155,7 @@ data class SwingSettings
         val acceptSelectedSuggestionWithEnter: Boolean = true,
         val scrollOnOutput: Boolean = true,
         val osc8HyperlinkPresentation: SwingHyperlinkPresentation? = null,
+        val osc8HyperlinkActivation: SwingHyperlinkActivation = SwingHyperlinkActivation.MODIFIER,
     ) {
         @get:JvmSynthetic
         internal val defaultHyperlinkPresentation =

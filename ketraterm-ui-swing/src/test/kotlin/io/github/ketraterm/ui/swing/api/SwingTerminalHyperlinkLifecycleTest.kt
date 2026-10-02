@@ -26,6 +26,29 @@ import java.awt.event.InputEvent
 import java.awt.event.KeyEvent
 
 class SwingTerminalHyperlinkLifecycleTest {
+    @Test
+    fun `OSC8 activation setting updates stationary feedback and actual click eligibility`() {
+        SwingTerminalHyperlinkLifecycleFixture().use { fixture ->
+            fixture.awaitHyperlink()
+            val uri = "https://example.com/configured"
+            fixture.replaceOutput("\u001b]8;;$uri\u0007OSC8 link\u001b]8;;\u0007")
+            fixture.movePointer(1)
+            assertEquals(Cursor.DEFAULT_CURSOR, fixture.cursorType())
+            fixture.clickLink()
+            assertTrue(fixture.openedTargets().isEmpty())
+            fixture.reloadOsc8Activation(SwingHyperlinkActivation.DIRECT)
+            assertEquals(Cursor.HAND_CURSOR, fixture.cursorType())
+            fixture.clickLink()
+            assertEquals(listOf(uri), fixture.openedTargets())
+            fixture.reloadOsc8Activation(SwingHyperlinkActivation.MODIFIER)
+            assertEquals(Cursor.DEFAULT_CURSOR, fixture.cursorType())
+            fixture.clickLink()
+            assertEquals(listOf(uri), fixture.openedTargets())
+            fixture.clickLink(hyperlinkNavigationModifierMask)
+            assertEquals(listOf(uri, uri), fixture.openedTargets())
+        }
+    }
+
     @ParameterizedTest
     @ValueSource(booleans = [false, true])
     fun `consecutive mouse moves within a prepared link preserve the hand cursor`(osc8: Boolean) {
@@ -39,7 +62,17 @@ class SwingTerminalHyperlinkLifecycleTest {
             for (modifiers in listOf(0, hyperlinkNavigationModifierMask)) {
                 for (x in 1..4) {
                     fixture.movePointer(x, modifiers = modifiers)
-                    assertEquals(Cursor.HAND_CURSOR, fixture.cursorType(), "Move $x within the same prepared occurrence")
+                    assertEquals(
+                        if (!osc8 ||
+                            modifiers != 0
+                        ) {
+                            Cursor.HAND_CURSOR
+                        } else {
+                            Cursor.DEFAULT_CURSOR
+                        },
+                        fixture.cursorType(),
+                        "Move $x within the same prepared occurrence",
+                    )
                 }
             }
             fixture.movePointer(400)
@@ -53,22 +86,23 @@ class SwingTerminalHyperlinkLifecycleTest {
         SwingTerminalHyperlinkLifecycleFixture().use { fixture ->
             fixture.awaitHyperlink()
             if (osc8) fixture.replaceOutput("\u001b]8;id=cursor;https://example.com/osc8\u0007OSC8 link\u001b]8;;\u0007")
-            fixture.movePointer(1)
+            val navigation = if (osc8) hyperlinkNavigationModifierMask else 0
+            fixture.movePointer(1, modifiers = navigation)
             assertEquals(Cursor.HAND_CURSOR, fixture.cursorType())
             fixture.setMouseReporting(true)
             assertEquals(Cursor.DEFAULT_CURSOR, fixture.cursorType(), "Mode changes suppress a stationary hyperlink")
             fixture.focus(false)
             fixture.focus(true)
             assertEquals(Cursor.DEFAULT_CURSOR, fixture.cursorType(), "Focus return respects application mouse reporting")
-            fixture.keyModifier(KeyEvent.VK_SHIFT, pressed = true, modifiers = InputEvent.SHIFT_DOWN_MASK)
+            fixture.keyModifier(KeyEvent.VK_SHIFT, pressed = true, modifiers = InputEvent.SHIFT_DOWN_MASK or navigation)
             assertEquals(Cursor.HAND_CURSOR, fixture.cursorType(), "Shift restores UI interaction without pointer motion")
-            fixture.movePointer(2, modifiers = InputEvent.SHIFT_DOWN_MASK)
+            fixture.movePointer(2, modifiers = InputEvent.SHIFT_DOWN_MASK or navigation)
             fixture.requestFrame()
             fixture.settle()
             assertEquals(Cursor.HAND_CURSOR, fixture.cursorType(), "Frames preserve the remembered Shift override")
-            fixture.keyModifier(KeyEvent.VK_SHIFT, pressed = false, modifiers = 0)
+            fixture.keyModifier(KeyEvent.VK_SHIFT, pressed = false, modifiers = navigation)
             assertEquals(Cursor.DEFAULT_CURSOR, fixture.cursorType())
-            fixture.movePointer(3)
+            fixture.movePointer(3, modifiers = navigation)
             assertEquals(Cursor.DEFAULT_CURSOR, fixture.cursorType())
             fixture.setMouseReporting(false)
             assertEquals(Cursor.HAND_CURSOR, fixture.cursorType(), "Disabling reporting restores the latest pointer position")
@@ -126,20 +160,22 @@ class SwingTerminalHyperlinkLifecycleTest {
     }
 
     @Test
-    fun `OSC8 settings refresh reconciles the stationary pointer without terminal output`() {
+    fun `OSC8 settings refresh changes decorations without enabling an unmodified hand cursor`() {
         SwingTerminalHyperlinkLifecycleFixture().use { fixture ->
             fixture.awaitHyperlink()
             fixture.replaceOutput("\u001b]8;id=style;https://example.com/osc8\u0007OSC8 link\u001b]8;;\u0007")
             fixture.movePointer(1)
-            assertEquals(Cursor.HAND_CURSOR, fixture.cursorType())
+            assertEquals(Cursor.DEFAULT_CURSOR, fixture.cursorType())
+            val resting = fixture.firstRowUnderlinePixels()
             val implicit = SwingHyperlinkPresentation(normal = SwingHyperlinkStyle(underlineStyle = TerminalRenderUnderline.NONE))
             fixture.reloadOsc8Presentation(implicit)
             assertEquals(Cursor.DEFAULT_CURSOR, fixture.cursorType())
+            assertFalse(resting.contentEquals(fixture.firstRowUnderlinePixels()))
             fixture.movePointer(1, modifiers = hyperlinkNavigationModifierMask)
             assertEquals(Cursor.HAND_CURSOR, fixture.cursorType())
             fixture.movePointer(1)
             fixture.reloadOsc8Presentation(null)
-            assertEquals(Cursor.HAND_CURSOR, fixture.cursorType())
+            assertEquals(Cursor.DEFAULT_CURSOR, fixture.cursorType())
         }
     }
 

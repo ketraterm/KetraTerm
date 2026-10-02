@@ -41,18 +41,29 @@ internal fun intellijHyperlinkPresentation(item: Filter.ResultItem): SwingHyperl
     val linkAttributes = scheme.getAttributes(CodeInsightColors.HYPERLINK_ATTRIBUTES)
     if (item.isInvisibleLink) return intellijImplicitHyperlinkPresentation(scheme, item.hoveredHyperlinkAttributes)
     val normal = item.highlightAttributes ?: linkAttributes
-    val followed = item.followedHyperlinkAttributes ?: scheme.getAttributes(CodeInsightColors.FOLLOWED_HYPERLINK_ATTRIBUTES)
     val hovered = item.hoveredHyperlinkAttributes?.toSwingStyle()
     return SwingHyperlinkPresentation(
         normal = normal.toSwingStyle(),
         hovered = hovered,
         active = hovered,
-        followed = followed.toSwingStyle(),
+        // The console's global followed style is a navigation marker, not a visited-URL style.
+        followed = item.followedHyperlinkAttributes?.toSwingStyle(),
         isVisible = true,
     )
 }
 
-/** OSC 8 and implicit discovered paths share the IDE's theme-resolved hover/modifier policy. */
+/** Terminal-authored links retain terminal colors until the IDE's activation style applies. */
+internal fun intellijOsc8HyperlinkPresentation(
+    scheme: EditorColorsScheme = EditorColorsManager.getInstance().globalScheme,
+): SwingHyperlinkPresentation =
+    SwingHyperlinkPresentation(
+        normal = SwingHyperlinkStyle(underlineStyle = TerminalRenderUnderline.DOTTED),
+        hovered = SwingHyperlinkStyle(underlineStyle = TerminalRenderUnderline.SINGLE, underlineThickness = 2),
+        active = scheme.getAttributes(CodeInsightColors.HYPERLINK_ATTRIBUTES).toSwingStyle(),
+        isVisible = true,
+    )
+
+/** Implicit discovered paths use the IDE's theme-resolved hover/modifier policy. */
 internal fun intellijImplicitHyperlinkPresentation(
     scheme: EditorColorsScheme = EditorColorsManager.getInstance().globalScheme,
     hoveredAttributes: TextAttributes? = null,

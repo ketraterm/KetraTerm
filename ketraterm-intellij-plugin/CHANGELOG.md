@@ -2,7 +2,7 @@
 
 ## [Unreleased]
 
-- Improved link responsiveness and hover feedback, with consistent IDE styling and navigation for links, files and folders.
+- Improved link responsiveness, underlines and hover feedback, with hand cursors only when links can be activated and IDE navigation for files and folders.
 - Improved cursor-position reporting in terminal apps using margins.
 - Fixed terminal apps failing to query the current cursor shape and blinking style.
 - Fixed unsupported terminal status queries reflecting supplied text and control characters into shell or application input.

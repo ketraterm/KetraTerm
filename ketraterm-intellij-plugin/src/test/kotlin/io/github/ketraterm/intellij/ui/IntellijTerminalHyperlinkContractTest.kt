@@ -60,7 +60,32 @@ import javax.swing.JComponent
 import javax.swing.JPanel
 
 class IntellijTerminalHyperlinkContractTest : BasePlatformTestCase() {
-    fun testOsc8UsesTheSamePreparedPresentationAsImplicitProviderLinks() {
+    fun testDiscoveredUrlDoesNotAcquirePersistentConsoleNavigationDecoration() {
+        val text = "https://example.com/resource\n"
+        val result = UrlFilter(project).applyFilter(text, text.length)
+        assertNotNull(result)
+        val item = result!!.resultItems.single()
+        val presentation = intellijHyperlinkPresentation(item)
+        assertEquals(SwingHyperlinkActivation.DIRECT, intellijHyperlinkActivation(item))
+        assertNotNull(presentation.normal)
+        // A missing followed style makes the shared renderer retain the normal appearance after navigation.
+        assertNull(presentation.followed)
+    }
+
+    fun testOsc8DecorationsPreserveTerminalColorsUntilNativeActivation() {
+        val presentation = intellijOsc8HyperlinkPresentation()
+        assertTrue(presentation.isVisible)
+        assertEquals(TerminalRenderUnderline.DOTTED, presentation.normal?.underlineStyle)
+        assertEquals(TerminalRenderUnderline.SINGLE, presentation.hovered?.underlineStyle)
+        assertEquals(2, presentation.hovered?.underlineThickness)
+        assertNull(presentation.normal?.foregroundArgb)
+        assertNull(presentation.hovered?.foregroundArgb)
+        assertNull(presentation.hovered?.underlineArgb)
+        assertEquals(intellijImplicitHyperlinkPresentation().active, presentation.active)
+        assertNull(presentation.followed)
+    }
+
+    fun testImplicitProviderLinksRetainSubtleHoverDecoration() {
         val item = Filter.ResultItem(0, 4, HyperlinkInfo {}).also { it.isInvisibleLink = true }
         val presentation = intellijImplicitHyperlinkPresentation()
         assertEquals(intellijHyperlinkPresentation(item), presentation)

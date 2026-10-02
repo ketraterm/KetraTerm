@@ -472,13 +472,10 @@ class TerminalHyperlinkControllerTest {
         private val hostServices: SwingHostServices,
         private val discoveredActions: Map<Int, () -> Boolean> = emptyMap(),
         private val activation: SwingHyperlinkActivation = SwingHyperlinkActivation.MODIFIER,
-        private val visible: Boolean = true,
     ) : TerminalHyperlinkHost {
         override var cursor: Cursor = Cursor.getDefaultCursor()
 
         override fun hyperlinkActivation(hyperlinkId: Int) = activation
-
-        override fun isHyperlinkVisible(hyperlinkId: Int) = visible
 
         var repaints = 0
         val repaintSpans = mutableListOf<RepaintSpan>()
@@ -745,7 +742,7 @@ class TerminalHyperlinkControllerTest {
     }
 
     @Test
-    fun `hover over cell with resolved hyperlink changes cursor to hand`() {
+    fun `resolved OSC8 hover uses hand cursor only with activation modifier`() {
         val cache =
             TerminalRenderCache(10, 10).apply {
                 hyperlinkIds[rowOffset(1) + 1] = 5
@@ -774,7 +771,11 @@ class TerminalHyperlinkControllerTest {
         assertEquals(1, controller.segmentStartColumn(0))
         assertEquals(1, controller.segmentRow(controller.hoveredSegmentCount - 1))
         assertEquals(2, controller.segmentEndColumn(controller.hoveredSegmentCount - 1))
+        assertEquals(Cursor.getDefaultCursor(), host.cursor)
+        controller.updateHyperlinkActivationHover(true)
         assertEquals(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR), host.cursor)
+        controller.updateHyperlinkActivationHover(false)
+        assertEquals(Cursor.getDefaultCursor(), host.cursor)
     }
 
     @Test
@@ -1194,7 +1195,6 @@ class TerminalHyperlinkControllerTest {
                     null,
                     SwingHostServices(),
                     mapOf(-1 to { error("Released modifier must cancel navigation") }),
-                    visible = false,
                 )
             val controller = TerminalHyperlinkController(host)
             val component = JButton()
@@ -1234,7 +1234,6 @@ class TerminalHyperlinkControllerTest {
                         true
                     },
                 ),
-                visible = false,
             )
         val controller = TerminalHyperlinkController(host)
         val component = JButton()

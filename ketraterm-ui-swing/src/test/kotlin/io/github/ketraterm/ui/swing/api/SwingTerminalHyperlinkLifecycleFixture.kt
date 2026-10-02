@@ -42,7 +42,7 @@ internal class SwingTerminalHyperlinkLifecycleFixture(
     private val gutterWidth: Int = 0,
     presentation: SwingHyperlinkPresentation = SwingHyperlinkPresentation(isVisible = true),
     activation: SwingHyperlinkActivation = SwingHyperlinkActivation.DIRECT,
-    osc8Presentation: SwingHyperlinkPresentation? = null,
+    private var osc8Presentation: SwingHyperlinkPresentation? = null,
 ) : AutoCloseable {
     private val worker = StandardTestDispatcher()
     private val uiTasks = LinkedBlockingQueue<Runnable>()
@@ -51,7 +51,7 @@ internal class SwingTerminalHyperlinkLifecycleFixture(
     private var menuRequest: SwingTerminalContextMenuRequest? = null
     private var copiedText: String? = null
     private var pointer: Point? = Point(gutterWidth + 1, 1)
-    private var osc8Presentation = osc8Presentation
+    private var osc8Activation = SwingHyperlinkActivation.MODIFIER
     private val session =
         TerminalSession.create(
             terminal = TerminalBuffers.create(width = 40, height = 2, maxHistory = 10),
@@ -73,6 +73,7 @@ internal class SwingTerminalHyperlinkLifecycleFixture(
                         shellIntegrationDecorationGutterWidth = gutterWidth,
                         smartSuggestionsEnabled = false,
                         osc8HyperlinkPresentation = this.osc8Presentation,
+                        osc8HyperlinkActivation = osc8Activation,
                     )
                 },
                 hostServices =
@@ -172,6 +173,19 @@ internal class SwingTerminalHyperlinkLifecycleFixture(
         pointer = Point(x, y)
         terminal.dispatchEvent(MouseEvent(terminal, MouseEvent.MOUSE_MOVED, 0L, modifiers, x, y, x, y, 0, false, MouseEvent.NOBUTTON))
     }
+
+    fun reloadOsc8Activation(activation: SwingHyperlinkActivation) =
+        onEdt {
+            osc8Activation = activation
+            terminal.reloadSettings()
+        }
+
+    fun clickLink(modifiers: Int = 0) =
+        onEdt {
+            for (eventId in intArrayOf(MouseEvent.MOUSE_PRESSED, MouseEvent.MOUSE_RELEASED)) {
+                terminal.dispatchEvent(MouseEvent(terminal, eventId, 0L, modifiers, 1, 1, 1, 1, 1, false, MouseEvent.BUTTON1))
+            }
+        }
 
     fun keyModifier(
         keyCode: Int,

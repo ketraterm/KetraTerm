@@ -331,18 +331,15 @@ class SwingTerminal
                     ): Boolean = this@SwingTerminal.openHyperlink(hyperlinkId, event)
 
                     override fun hyperlinkActivation(hyperlinkId: Int): SwingHyperlinkActivation =
-                        hyperlinkDiscoveryController.discoveredHyperlink(hyperlinkId, renderCache)?.activation
-                            ?: SwingHyperlinkActivation.MODIFIER
+                        if (hyperlinkId > 0) {
+                            settings.osc8HyperlinkActivation
+                        } else {
+                            hyperlinkDiscoveryController.discoveredHyperlink(hyperlinkId, renderCache)?.activation
+                                ?: SwingHyperlinkActivation.MODIFIER
+                        }
 
                     override fun hyperlinkAction(hyperlinkId: Int): SwingHyperlinkAction? =
                         hyperlinkDiscoveryController.discoveredHyperlink(hyperlinkId, renderCache)?.action
-
-                    override fun isHyperlinkVisible(hyperlinkId: Int): Boolean =
-                        if (hyperlinkId > 0) {
-                            settings.resolvedOsc8HyperlinkPresentation.isVisible
-                        } else {
-                            hyperlinkDiscoveryController.discoveredHyperlink(hyperlinkId, renderCache)?.presentation?.isVisible ?: true
-                        }
 
                     override fun enterHyperlink(
                         action: SwingHyperlinkAction,
@@ -1277,7 +1274,11 @@ class SwingTerminal
                 revalidate()
             }
             updateAutomaticSuggestionEligibilityOnEdt()
-            if (next.osc8HyperlinkPresentation != previous.osc8HyperlinkPresentation) reconcileHyperlinksOnEdt()
+            if (next.osc8HyperlinkPresentation != previous.osc8HyperlinkPresentation ||
+                next.osc8HyperlinkActivation != previous.osc8HyperlinkActivation
+            ) {
+                reconcileHyperlinksOnEdt()
+            }
             repaint()
         }
 

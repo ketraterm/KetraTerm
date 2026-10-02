@@ -58,8 +58,6 @@ internal interface TerminalHyperlinkHost {
 
     fun hyperlinkAction(hyperlinkId: Int): SwingHyperlinkAction? = null
 
-    fun isHyperlinkVisible(hyperlinkId: Int): Boolean = true
-
     fun enterHyperlink(
         action: SwingHyperlinkAction,
         row: Int,
@@ -198,11 +196,12 @@ internal class TerminalHyperlinkController(
         val cache = host.renderCache
         if (cache.activeBuffer != pressedBuffer || cache.historyContentGeneration != pressedHistoryGeneration) return false
         val row = pressedAbsoluteRow - (cache.discardedCount + cache.historySize - cache.scrollbackOffset)
-        return !(row !in 0 until cache.rows.toLong() || !hover.contains(row.toInt(), pressedColumn)) && if (pressedLineId != 0L) {
-            cache.lineIds[row.toInt()] == pressedLineId
-        } else {
-            cache.lineGenerations[row.toInt()] == pressedLineGeneration
-        }
+        return !(row !in 0 until cache.rows.toLong() || !hover.contains(row.toInt(), pressedColumn)) &&
+            if (pressedLineId != 0L) {
+                cache.lineIds[row.toInt()] == pressedLineId
+            } else {
+                cache.lineGenerations[row.toInt()] == pressedLineGeneration
+            }
     }
 
     private fun canActivate(
@@ -221,7 +220,7 @@ internal class TerminalHyperlinkController(
         val activation = hoveredHyperlinkId != NO_HYPERLINK_ID && canActivate(hoveredHyperlinkId, active)
         if (hoveredHyperlinkId == NO_HYPERLINK_ID || hyperlinkActivationHover == activation) return
         hover.activation = activation
-        updateCursor(hoveredHyperlinkId, activation)
+        updateCursor(activation)
         repaintSegments()
     }
 
@@ -288,14 +287,11 @@ internal class TerminalHyperlinkController(
                 }
             }
         }
-        updateCursor(id, activation)
+        updateCursor(activation)
     }
 
-    private fun updateCursor(
-        id: Int,
-        activation: Boolean,
-    ) {
-        val cursor = if (id != NO_HYPERLINK_ID && (host.isHyperlinkVisible(id) || activation)) HAND_CURSOR else DEFAULT_CURSOR
+    private fun updateCursor(activation: Boolean) {
+        val cursor = if (activation) HAND_CURSOR else DEFAULT_CURSOR
         if (host.cursor !== cursor) host.cursor = cursor
     }
 
