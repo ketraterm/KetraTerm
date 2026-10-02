@@ -20,13 +20,13 @@ package io.github.ketraterm.protocol.keyboard
  *
  * These are the optional second parameter in `CSI = flags ; mode u`.
  */
-object KittyKeyboardFlagApplicationMode {
+public object KittyKeyboardFlagApplicationMode {
     /** Replace the active flag word with the supplied flags. */
-    const val REPLACE: Int = 1
+    public const val REPLACE: Int = 1
 
     /** Set supplied bits and leave omitted bits unchanged. */
-    const val SET: Int = 2
+    public const val SET: Int = 2
 
     /** Clear supplied bits and leave omitted bits unchanged. */
-    const val CLEAR: Int = 3
+    public const val CLEAR: Int = 3
 }

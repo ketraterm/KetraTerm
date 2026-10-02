@@ -22,8 +22,14 @@ import io.github.ketraterm.parser.spi.TerminalCommandSink
  *
  * Implementations accept raw bytes from PTY/network/process output, preserve parser state across
  * arbitrary chunk boundaries, and emit semantic terminal operations to a [TerminalCommandSink].
+ *
+ * Factory-created parsers require serialized, non-reentrant calls, including reset and
+ * end-of-input. Sink callbacks run synchronously on the calling thread; supplied byte
+ * ranges are consumed before returning and may then be reused. Sink exceptions propagate
+ * to the caller; stop processing that stream after a failed callback rather than assuming
+ * parser and sink state remain aligned.
  */
-interface TerminalOutputParser {
+public interface TerminalOutputParser {
     /**
      * Feeds a chunk of bytes from the terminal host output stream to the parser.
      *
@@ -32,22 +38,23 @@ interface TerminalOutputParser {
      *
      * @param bytes The byte array containing raw terminal output.
      * @param offset The index of the first byte to process in [bytes].
-     * @param length The number of bytes to process.
+     * @param length The number of bytes to process; defaults to the remaining suffix.
      * @throws IllegalArgumentException if the slice is outside [bytes], including
      * integer-overflow ranges. Rejection leaves pending input and sink state unchanged.
      */
-    fun accept(
+    public fun accept(
         bytes: ByteArray,
         offset: Int = 0,
-        length: Int = bytes.size,
+        length: Int = bytes.size - offset,
     )
 
     /**
      * Feeds a single byte from the terminal host output stream to the parser.
      *
      * @param byteValue The byte value (in range 0..255) to process.
+     * @throws IllegalArgumentException if [byteValue] is outside `0..255`, before mutation.
      */
-    fun acceptByte(byteValue: Int)
+    public fun acceptByte(byteValue: Int)
 
     /**
      * Signals the end of the input stream.
@@ -55,11 +62,11 @@ interface TerminalOutputParser {
      * Flushes pending printable text, replacing an incomplete printable UTF-8
      * sequence. Unfinished OSC/DCS commands are discarded without metadata or query dispatch.
      */
-    fun endOfInput()
+    public fun endOfInput()
 
     /**
      * Resets the internal parser state, discarding any partially parsed sequences
      * or control signatures.
      */
-    fun reset()
+    public fun reset()
 }

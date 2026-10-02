@@ -27,7 +27,7 @@ package io.github.ketraterm.ui.swing.search
  * @property failure failure of the last pass, or null. A failed pass is not
  * reported as a successful empty search; changing the query retries it.
  */
-data class TerminalSearchState
+public data class TerminalSearchState
     @JvmOverloads
     constructor(
         val query: String,

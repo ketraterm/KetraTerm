@@ -20,7 +20,7 @@ import io.github.ketraterm.completion.commandline.TerminalCommandLineContext
 import io.github.ketraterm.completion.model.*
 
 /** Semantic position of the active completion token. */
-enum class TerminalCompletionActivePosition {
+public enum class TerminalCompletionActivePosition {
     /** Cursor is on a shell operator rather than a command token. */
     OPERATOR,
 
@@ -66,33 +66,33 @@ enum class TerminalCompletionActivePosition {
  * @property replacementEndOffset exclusive UTF-16 replacement end offset in the original request command line.
  * @property currentCommand deepest matched command specification in [commandPath], or `null` when no command spec was matched.
  */
-class TerminalCompletionContext
+public class TerminalCompletionContext
     internal constructor(
         internal val commandLineContext: TerminalCommandLineContext,
-        val activePosition: TerminalCompletionActivePosition,
-        val commandTokenIndex: Int = 0,
-        val command: TerminalCommandSpec? = null,
-        val commandPath: List<TerminalCommandSpec> = emptyList(),
-        val activeOption: TerminalOptionSpec? = null,
-        val activePositionalArgument: TerminalArgumentSpec? = null,
-        val usedOptionExclusiveGroupIds: Set<String> = emptySet(),
-        val optionsTerminated: Boolean = false,
-        val expectedPathKind: TerminalPathArgumentKind = TerminalPathArgumentKind.NONE,
-        val expectedHiddenPathPolicy: TerminalHiddenPathPolicy = TerminalHiddenPathPolicy.DEFAULT,
-        val expectedValueDomain: TerminalCompletionValueDomain = TerminalCompletionValueDomain.NONE,
-        val subcommandCandidateSource: TerminalCommandSpec? = null,
-        val staticValueCandidates: List<String> = emptyList(),
-        val activeTokenQuote: Char = NO_QUOTE,
+        public val activePosition: TerminalCompletionActivePosition,
+        public val commandTokenIndex: Int = 0,
+        public val command: TerminalCommandSpec? = null,
+        public val commandPath: List<TerminalCommandSpec> = emptyList(),
+        public val activeOption: TerminalOptionSpec? = null,
+        public val activePositionalArgument: TerminalArgumentSpec? = null,
+        public val usedOptionExclusiveGroupIds: Set<String> = emptySet(),
+        public val optionsTerminated: Boolean = false,
+        public val expectedPathKind: TerminalPathArgumentKind = TerminalPathArgumentKind.NONE,
+        public val expectedHiddenPathPolicy: TerminalHiddenPathPolicy = TerminalHiddenPathPolicy.DEFAULT,
+        public val expectedValueDomain: TerminalCompletionValueDomain = TerminalCompletionValueDomain.NONE,
+        public val subcommandCandidateSource: TerminalCommandSpec? = null,
+        public val staticValueCandidates: List<String> = emptyList(),
+        public val activeTokenQuote: Char = NO_QUOTE,
         internal val attachedOptionValue: AttachedOptionValue? = null,
     ) {
-        val activePrefix: String get() = attachedOptionValue?.prefix ?: commandLineContext.activePrefix
+        public val activePrefix: String get() = attachedOptionValue?.prefix ?: commandLineContext.activePrefix
 
-        val replacementStartOffset: Int
+        public val replacementStartOffset: Int
             get() = attachedOptionValue?.replacementStartOffset ?: commandLineContext.replacementStartOffset
 
-        val replacementEndOffset: Int get() = commandLineContext.replacementEndOffset
+        public val replacementEndOffset: Int get() = commandLineContext.replacementEndOffset
 
-        val currentCommand: TerminalCommandSpec? get() = commandPath.lastOrNull()
+        public val currentCommand: TerminalCommandSpec? get() = commandPath.lastOrNull()
 
         private companion object {
             private const val NO_QUOTE = '\u0000'

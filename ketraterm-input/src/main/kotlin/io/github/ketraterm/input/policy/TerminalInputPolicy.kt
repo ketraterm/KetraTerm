@@ -38,7 +38,7 @@ package io.github.ketraterm.input.policy
  * @property pasteLineEndingPolicy newline canonicalization for unbracketed
  * pasted text. Bracketed paste always preserves original line endings.
  */
-data class TerminalInputPolicy(
+public data class TerminalInputPolicy(
     val backspacePolicy: BackspacePolicy = BackspacePolicy.DELETE,
     val metaKeyPolicy: MetaKeyPolicy = MetaKeyPolicy.ESC_PREFIX,
     val unsupportedModifiedKeyPolicy: UnsupportedModifiedKeyPolicy =
@@ -54,7 +54,7 @@ data class TerminalInputPolicy(
 /**
  * Backspace byte selection.
  */
-enum class BackspacePolicy {
+public enum class BackspacePolicy {
     /** Send DEL, 0x7F. */
     DELETE,
 
@@ -68,7 +68,7 @@ enum class BackspacePolicy {
  * Special keys with xterm CSI modifier encodings may still encode Meta as
  * modifier parameter 9.
  */
-enum class MetaKeyPolicy {
+public enum class MetaKeyPolicy {
     /** Prefix the encoded key with ESC. */
     ESC_PREFIX,
 
@@ -82,7 +82,7 @@ enum class MetaKeyPolicy {
 /**
  * Handling for valid modified key events without a supported encoding.
  */
-enum class UnsupportedModifiedKeyPolicy {
+public enum class UnsupportedModifiedKeyPolicy {
     /** Emit no bytes. */
     SUPPRESS,
 
@@ -93,7 +93,7 @@ enum class UnsupportedModifiedKeyPolicy {
 /**
  * Policy for legacy mouse coordinates beyond the byte-safe range.
  */
-enum class MouseCoordinateLimitPolicy {
+public enum class MouseCoordinateLimitPolicy {
     /** Suppress events whose one-based coordinate is greater than 223. */
     SUPPRESS_OUT_OF_RANGE,
 
@@ -104,7 +104,7 @@ enum class MouseCoordinateLimitPolicy {
 /**
  * Policy for Return/Enter while ANSI Line Feed/New Line mode is active.
  */
-enum class EnterNewLineModePolicy {
+public enum class EnterNewLineModePolicy {
     /** Send DEC-compatible CR LF when LNM is active. */
     SEND_CR_LF,
 
@@ -122,7 +122,7 @@ enum class EnterNewLineModePolicy {
  * normal semantics. Unbracketed newline encoding is selected separately by
  * [PasteLineEndingPolicy].
  */
-enum class PasteControlPolicy {
+public enum class PasteControlPolicy {
     /** Preserve text, subject to bracketed-paste protection and host newline encoding. */
     PRESERVE,
 
@@ -136,7 +136,7 @@ enum class PasteControlPolicy {
  * Bracketed paste deliberately bypasses this transformation so the receiving
  * application receives the original clipboard line endings.
  */
-enum class PasteLineEndingPolicy {
+public enum class PasteLineEndingPolicy {
     /** Preserve clipboard line endings exactly. */
     PRESERVE,
 

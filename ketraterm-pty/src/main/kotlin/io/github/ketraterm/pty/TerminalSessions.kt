@@ -21,7 +21,7 @@ import java.io.IOException
 /**
  * Session factories for local terminal hosts.
  */
-object TerminalSessions {
+public object TerminalSessions {
     /**
      * Creates a local PTY process and an attached session without consuming output.
      *
@@ -36,7 +36,7 @@ object TerminalSessions {
     @JvmStatic
     @JvmOverloads
     @Throws(IOException::class)
-    fun createLocalPty(options: PtyOptions = PtyOptions()): TerminalSession = PtySessions.create(options)
+    public fun createLocalPty(options: PtyOptions = PtyOptions()): TerminalSession = PtySessions.create(options)
 
     /**
      * Starts a local PTY and returns the shared transport-neutral session type.
@@ -48,5 +48,5 @@ object TerminalSessions {
     @JvmStatic
     @JvmOverloads
     @Throws(IOException::class)
-    fun localPty(options: PtyOptions = PtyOptions()): TerminalSession = PtySessions.start(options)
+    public fun localPty(options: PtyOptions = PtyOptions()): TerminalSession = PtySessions.start(options)
 }

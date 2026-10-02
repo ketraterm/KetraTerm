@@ -1,0 +1,82 @@
+public final class io/github/ketraterm/render/cache/TerminalRenderCache : io/github/ketraterm/render/api/TerminalRenderFrameConsumer {
+	public fun <init> (II)V
+	public fun <init> (III)V
+	public fun accept (Lio/github/ketraterm/render/api/TerminalRenderFrame;)V
+	public final fun clusterLength (J)I
+	public final fun clusterOffset (J)I
+	public final fun clusterText (II)Ljava/lang/String;
+	public final fun getActiveBuffer ()Lio/github/ketraterm/render/api/TerminalRenderBufferKind;
+	public final fun getAttrWords ()[J
+	public final fun getClusterCodepoints ()[I
+	public final fun getClusterRefs ()[J
+	public final fun getCodeWords ()[I
+	public final fun getColumns ()I
+	public final fun getContentGeneration ()J
+	public final fun getCursor ()Lio/github/ketraterm/render/api/TerminalRenderCursor;
+	public final fun getCursorBlinking ()Z
+	public final fun getCursorChangedOnLastUpdate ()Z
+	public final fun getCursorColumn ()I
+	public final fun getCursorGeneration ()J
+	public final fun getCursorRow ()I
+	public final fun getCursorShape ()Lio/github/ketraterm/render/api/TerminalRenderCursorShape;
+	public final fun getCursorVisible ()Z
+	public final fun getDiscardedCount ()J
+	public final fun getExtraAttrWords ()[J
+	public final fun getFlags ()[I
+	public final fun getFrameGeneration ()J
+	public final fun getHasBlinkingText ()Z
+	public final fun getHasFrame ()Z
+	public final fun getHistoryContentGeneration ()J
+	public final fun getHistorySize ()I
+	public final fun getHyperlinkIds ()[I
+	public final fun getLineGenerations ()[J
+	public final fun getLineHasBlinkingText ()[Z
+	public final fun getLineIds ()[J
+	public final fun getLineWrapped ()[Z
+	public final fun getOutputEndAbsoluteRow ()J
+	public final fun getPalette ()Lio/github/ketraterm/render/api/TerminalColorPalette;
+	public final fun getRows ()I
+	public final fun getScrollbackOffset ()I
+	public final fun getShapeChangedOnLastUpdate ()Z
+	public final fun getStructureGeneration ()J
+	public final fun reset ()V
+	public final fun rowOffset (I)I
+	public final fun updateFrom (Lio/github/ketraterm/render/api/TerminalRenderFrameReader;)V
+	public final fun updateFrom (Lio/github/ketraterm/render/api/TerminalRenderFrameReader;I)V
+	public final fun updateFrom (Lio/github/ketraterm/render/api/TerminalRenderFrameReader;II)V
+	public final fun updateFrom (Lio/github/ketraterm/render/cache/TerminalRenderCache;)V
+	public final fun updateFromAbsoluteRange (Lio/github/ketraterm/render/api/TerminalRenderFrameReader;JJ)V
+}
+
+public final class io/github/ketraterm/render/cache/TerminalRenderPublisher {
+	public static final field BUFFER_COUNT I
+	public static final field Companion Lio/github/ketraterm/render/cache/TerminalRenderPublisher$Companion;
+	public static final field NO_FRONT I
+	public fun <init> (II)V
+	public final fun getBuffers ()[Lio/github/ketraterm/render/cache/TerminalRenderCache;
+	public final fun getFrontIndex ()I
+	public final fun getPublishLock ()Ljava/util/concurrent/locks/ReentrantLock;
+	public final fun getReaderCounts ()[I
+	public final fun readCurrent (Lkotlin/jvm/functions/Function1;)Ljava/lang/Object;
+	public final fun releaseFrontLease (I)V
+	public final fun updateAndPublish (Lio/github/ketraterm/render/api/TerminalRenderFrameReader;)V
+	public final fun updateAndPublish (Lio/github/ketraterm/render/api/TerminalRenderFrameReader;I)V
+	public final fun updateAndPublish (Lio/github/ketraterm/render/api/TerminalRenderFrameReader;II)V
+}
+
+public final class io/github/ketraterm/render/cache/TerminalRenderPublisher$Companion {
+}
+
+public final class io/github/ketraterm/render/cache/TerminalRenderRangeCopy {
+	public fun <init> ()V
+	public fun <init> (II)V
+	public synthetic fun <init> (IIILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun getCache ()Lio/github/ketraterm/render/cache/TerminalRenderCache;
+	public final fun getFirstAbsoluteRow ()J
+	public final fun getLastAbsoluteRow ()J
+	public final fun getMaxCells ()I
+	public final fun getMaxRows ()I
+	public final fun read (Lio/github/ketraterm/render/api/TerminalRenderFrameReader;JJLkotlin/jvm/functions/Function0;)Z
+	public static synthetic fun read$default (Lio/github/ketraterm/render/cache/TerminalRenderRangeCopy;Lio/github/ketraterm/render/api/TerminalRenderFrameReader;JJLkotlin/jvm/functions/Function0;ILjava/lang/Object;)Z
+}
+

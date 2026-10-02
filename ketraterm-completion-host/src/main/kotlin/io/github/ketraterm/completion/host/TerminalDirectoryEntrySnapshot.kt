@@ -22,16 +22,16 @@ import io.github.ketraterm.completion.api.TerminalFileEntry
  *
  * @param entries bounded direct entries captured by a scanner.
  */
-class TerminalDirectoryEntrySnapshot(
+public class TerminalDirectoryEntrySnapshot(
     entries: Collection<TerminalFileEntry>,
 ) {
     private val entries = entries.sortedWith(ENTRY_ORDER)
 
     /** Number of raw direct entries retained by this snapshot. */
-    val size: Int get() = entries.size
+    public val size: Int get() = entries.size
 
     /** Returns all case-insensitive prefix matches retained by this bounded snapshot. */
-    fun matching(prefix: String): List<TerminalFileEntry> {
+    public fun matching(prefix: String): List<TerminalFileEntry> {
         if (entries.isEmpty()) return emptyList()
         val matches = ArrayList<TerminalFileEntry>(entries.size)
         for (entry in entries) {

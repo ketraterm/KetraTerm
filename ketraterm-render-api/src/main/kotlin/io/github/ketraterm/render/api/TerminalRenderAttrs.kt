@@ -38,11 +38,11 @@ package io.github.ketraterm.render.api
  * RGB values are encoded as `0xRRGGBB`, indexed values as `0..255`, and default
  * color values as zero.
  */
-object TerminalRenderAttrs {
+public object TerminalRenderAttrs {
     /**
      * Default terminal render attributes.
      */
-    const val DEFAULT: Long = 0L
+    public const val DEFAULT: Long = 0L
 
     private const val FG_KIND_SHIFT = 0
     private const val FG_VALUE_SHIFT = 2
@@ -76,7 +76,7 @@ object TerminalRenderAttrs {
      * @return one of [TerminalRenderColorKind.DEFAULT],
      * [TerminalRenderColorKind.INDEXED], or [TerminalRenderColorKind.RGB].
      */
-    fun foregroundKind(word: Long): Int = ((word ushr FG_KIND_SHIFT) and COLOR_KIND_MASK).toInt()
+    public fun foregroundKind(word: Long): Int = ((word ushr FG_KIND_SHIFT) and COLOR_KIND_MASK).toInt()
 
     /**
      * Returns the foreground color value.
@@ -85,7 +85,7 @@ object TerminalRenderAttrs {
      * @return zero for default colors, `0..255` for indexed colors, or
      * `0xRRGGBB` for RGB colors.
      */
-    fun foregroundValue(word: Long): Int = ((word ushr FG_VALUE_SHIFT) and COLOR_VALUE_MASK).toInt()
+    public fun foregroundValue(word: Long): Int = ((word ushr FG_VALUE_SHIFT) and COLOR_VALUE_MASK).toInt()
 
     /**
      * Returns the background color kind.
@@ -94,7 +94,7 @@ object TerminalRenderAttrs {
      * @return one of [TerminalRenderColorKind.DEFAULT],
      * [TerminalRenderColorKind.INDEXED], or [TerminalRenderColorKind.RGB].
      */
-    fun backgroundKind(word: Long): Int = ((word ushr BG_KIND_SHIFT) and COLOR_KIND_MASK).toInt()
+    public fun backgroundKind(word: Long): Int = ((word ushr BG_KIND_SHIFT) and COLOR_KIND_MASK).toInt()
 
     /**
      * Returns the background color value.
@@ -103,7 +103,7 @@ object TerminalRenderAttrs {
      * @return zero for default colors, `0..255` for indexed colors, or
      * `0xRRGGBB` for RGB colors.
      */
-    fun backgroundValue(word: Long): Int = ((word ushr BG_VALUE_SHIFT) and COLOR_VALUE_MASK).toInt()
+    public fun backgroundValue(word: Long): Int = ((word ushr BG_VALUE_SHIFT) and COLOR_VALUE_MASK).toInt()
 
     /**
      * Returns whether bold intensity is enabled.
@@ -111,7 +111,7 @@ object TerminalRenderAttrs {
      * @param word public render attribute word.
      * @return `true` when bold is enabled.
      */
-    fun isBold(word: Long): Boolean = word and BOLD_MASK != 0L
+    public fun isBold(word: Long): Boolean = word and BOLD_MASK != 0L
 
     /**
      * Returns whether faint intensity is enabled.
@@ -119,7 +119,7 @@ object TerminalRenderAttrs {
      * @param word public render attribute word.
      * @return `true` when faint is enabled.
      */
-    fun isFaint(word: Long): Boolean = word and FAINT_MASK != 0L
+    public fun isFaint(word: Long): Boolean = word and FAINT_MASK != 0L
 
     /**
      * Returns whether italic style is enabled.
@@ -127,7 +127,7 @@ object TerminalRenderAttrs {
      * @param word public render attribute word.
      * @return `true` when italic is enabled.
      */
-    fun isItalic(word: Long): Boolean = word and ITALIC_MASK != 0L
+    public fun isItalic(word: Long): Boolean = word and ITALIC_MASK != 0L
 
     /**
      * Returns the underline style.
@@ -135,7 +135,7 @@ object TerminalRenderAttrs {
      * @param word public render attribute word.
      * @return one of the [TerminalRenderUnderline] style constants.
      */
-    fun underlineStyle(word: Long): Int = ((word ushr UNDERLINE_SHIFT) and UNDERLINE_MASK).toInt()
+    public fun underlineStyle(word: Long): Int = ((word ushr UNDERLINE_SHIFT) and UNDERLINE_MASK).toInt()
 
     /**
      * Returns whether blink style is enabled.
@@ -143,7 +143,7 @@ object TerminalRenderAttrs {
      * @param word public render attribute word.
      * @return `true` when blink is enabled.
      */
-    fun isBlink(word: Long): Boolean = word and BLINK_MASK != 0L
+    public fun isBlink(word: Long): Boolean = word and BLINK_MASK != 0L
 
     /**
      * Returns whether inverse video is enabled.
@@ -151,7 +151,7 @@ object TerminalRenderAttrs {
      * @param word public render attribute word.
      * @return `true` when inverse video is enabled.
      */
-    fun isInverse(word: Long): Boolean = word and INVERSE_MASK != 0L
+    public fun isInverse(word: Long): Boolean = word and INVERSE_MASK != 0L
 
     /**
      * Returns whether invisible text style is enabled.
@@ -159,7 +159,7 @@ object TerminalRenderAttrs {
      * @param word public render attribute word.
      * @return `true` when invisible text is enabled.
      */
-    fun isInvisible(word: Long): Boolean = word and INVISIBLE_MASK != 0L
+    public fun isInvisible(word: Long): Boolean = word and INVISIBLE_MASK != 0L
 
     /**
      * Returns whether strikethrough decoration is enabled.
@@ -167,7 +167,7 @@ object TerminalRenderAttrs {
      * @param word public render attribute word.
      * @return `true` when strikethrough is enabled.
      */
-    fun isStrikethrough(word: Long): Boolean = word and STRIKETHROUGH_MASK != 0L
+    public fun isStrikethrough(word: Long): Boolean = word and STRIKETHROUGH_MASK != 0L
 
     /**
      * Packs a public render attribute word.
@@ -189,7 +189,7 @@ object TerminalRenderAttrs {
      * @param strikethrough whether strikethrough decoration is enabled.
      * @return packed public render attribute word.
      */
-    fun pack(
+    public fun pack(
         foregroundKind: Int = TerminalRenderColorKind.DEFAULT,
         foregroundValue: Int = 0,
         backgroundKind: Int = TerminalRenderColorKind.DEFAULT,

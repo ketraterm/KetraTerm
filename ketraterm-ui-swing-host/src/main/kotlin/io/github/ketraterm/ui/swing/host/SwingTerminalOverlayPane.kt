@@ -33,7 +33,7 @@ import javax.swing.JPanel
  * @param overlay host-owned overlay chrome.
  * @param overlayInsets distance from the pane edges to the overlay bounds.
  */
-class SwingTerminalOverlayPane
+public class SwingTerminalOverlayPane
     @JvmOverloads
     constructor(
         private val content: JComponent,

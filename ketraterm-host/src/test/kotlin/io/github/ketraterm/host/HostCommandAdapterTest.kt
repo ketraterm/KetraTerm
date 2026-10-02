@@ -199,8 +199,7 @@ class HostCommandAdapterTest {
                             { assertTrue(f.terminal.getModeSnapshot().isOriginMode) },
                             { assertEquals('─'.code, f.terminal.getCodepointAt(9, 1)) },
                             { assertEquals("─", f.terminal.getLineAsString(2)) },
-                            { assertEquals(f.terminal.getPackedAttrAt(9, 1), f.terminal.getPackedAttrAt(0, 2)) },
-                            { assertEquals(f.terminal.getPackedExtendedAttrAt(9, 1), f.terminal.getPackedExtendedAttrAt(0, 2)) },
+                            { assertEquals(f.terminal.getAttrAt(9, 1), f.terminal.getAttrAt(0, 2)) },
                         )
                     }
                 }
@@ -287,7 +286,7 @@ class HostCommandAdapterTest {
             assertFalse(f.terminal.getModeSnapshot().isOriginMode)
             val plain = Fixture()
             plain.acceptAscii("A")
-            assertEquals(plain.terminal.getPackedAttrAt(0, 0), f.terminal.getPackedAttrAt(0, 0))
+            assertEquals(plain.terminal.getAttrAt(0, 0), f.terminal.getAttrAt(0, 0))
         }
 
         @ParameterizedTest

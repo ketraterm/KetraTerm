@@ -27,9 +27,9 @@ import javax.swing.KeyStroke
 import javax.swing.SwingUtilities
 
 /** Standard Swing message/choice dialogs. All operations and callbacks belong to the EDT. */
-object SwingMessageDialogs {
+public object SwingMessageDialogs {
     /** Shows a modal dialog and returns its option index, or null on dismissal. */
-    fun show(
+    public fun show(
         parent: Component,
         request: SwingDialogRequest,
     ): Int? {
@@ -49,7 +49,7 @@ object SwingMessageDialogs {
      * the owner. Completion happens once; closing the returned handle disposes
      * the dialog and reports dismissal.
      */
-    fun showModeless(
+    public fun showModeless(
         parent: Component,
         request: SwingDialogRequest,
         decide: (Int?) -> Unit,

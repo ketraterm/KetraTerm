@@ -50,21 +50,12 @@ internal class TerminalReaderImpl(
         return if (line.width == 0) TerminalConstants.EMPTY else line.getCodepoint(col)
     }
 
-    override fun getPackedAttrAt(
+    fun getPackedAttrAt(
         col: Int,
         row: Int,
     ): Long {
         if (!state.dimensions.isValidCol(col)) return state.pen.currentAttr
-        val line = getLine(row)
-        return if (line.width == 0) state.pen.currentAttr else line.getPackedAttr(col)
-    }
-
-    override fun getPackedExtendedAttrAt(
-        col: Int,
-        row: Int,
-    ): Long {
-        if (!state.dimensions.isValidCol(col)) return state.pen.currentExtendedAttr
-        val line = getLine(row)
-        return if (line.width == 0) state.pen.currentExtendedAttr else line.getPackedExtendedAttr(col)
+        if (!state.dimensions.isValidRow(row)) return state.pen.currentAttr
+        return state.ring[state.resolveRingIndex(row)].getPackedAttr(col)
     }
 }

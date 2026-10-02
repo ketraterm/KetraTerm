@@ -22,34 +22,34 @@ package io.github.ketraterm.render.api
  * Consumers should copy rows into caller-owned primitive arrays during the
  * enclosing [TerminalRenderFrameReader.readRenderFrame] callback.
  */
-interface TerminalRenderFrame {
+public interface TerminalRenderFrame {
     /**
      * Number of visible columns in each render row.
      */
-    val columns: Int
+    public val columns: Int
 
     /**
      * Number of visible render rows.
      */
-    val rows: Int
+    public val rows: Int
 
     /**
      * Number of retained off-screen history lines available in this frame.
      */
-    val historySize: Int
+    public val historySize: Int
         get() = 0
 
     /**
      * Clamped scrollback offset used by this frame, in lines from the live
      * bottom viewport. Zero means the frame is pinned to the newest output.
      */
-    val scrollbackOffset: Int
+    public val scrollbackOffset: Int
         get() = 0
 
     /**
      * Number of history lines discarded due to ring buffer capacity wrapping.
      */
-    val discardedCount: Long
+    public val discardedCount: Long
         get() = 0L
 
     /**
@@ -59,7 +59,7 @@ interface TerminalRenderFrame {
      * compare for equality or inequality rather than assuming the value remains
      * positive forever.
      */
-    val frameGeneration: Long
+    public val frameGeneration: Long
 
     /**
      * Generation for retained cell content and terminal-owned row mapping, including
@@ -73,7 +73,7 @@ interface TerminalRenderFrame {
      * Global presentation changes such as reverse video may preserve this value,
      * but must change [lineGeneration] for every row whose rendered attributes change.
      */
-    val contentGeneration: Long
+    public val contentGeneration: Long
         get() = frameGeneration
 
     /**
@@ -88,7 +88,7 @@ interface TerminalRenderFrame {
      * Readers without separate history tracking conservatively invalidate on
      * every [contentGeneration] change.
      */
-    val historyContentGeneration: Long
+    public val historyContentGeneration: Long
         get() = contentGeneration
 
     /**
@@ -104,7 +104,7 @@ interface TerminalRenderFrame {
      * line is immutable or terminated. [Long.MAX_VALUE] means the reader does not
      * expose this information; consumers conservatively use available source rows.
      */
-    val outputEndAbsoluteRow: Long
+    public val outputEndAbsoluteRow: Long
         get() = Long.MAX_VALUE
 
     /**
@@ -115,17 +115,17 @@ interface TerminalRenderFrame {
      * [scrollbackOffset]; render caches should include that value in their own
      * row-copy invalidation key.
      */
-    val structureGeneration: Long
+    public val structureGeneration: Long
 
     /**
      * Currently active terminal screen buffer.
      */
-    val activeBuffer: TerminalRenderBufferKind
+    public val activeBuffer: TerminalRenderBufferKind
 
     /**
      * Currently active resolved color palette.
      */
-    val palette: TerminalColorPalette
+    public val palette: TerminalColorPalette
         get() = TerminalColorPalette()
 
     /**
@@ -134,7 +134,7 @@ interface TerminalRenderFrame {
      * Prefer [copyCursor] in frame-copy hot paths so implementations can expose
      * cursor state without allocating this value object.
      */
-    val cursor: TerminalRenderCursor
+    public val cursor: TerminalRenderCursor
 
     /**
      * Returns the generation for visible [row].
@@ -145,7 +145,7 @@ interface TerminalRenderFrame {
      * @param row zero-based visible row index.
      * @return row visual generation.
      */
-    fun lineGeneration(row: Int): Long
+    public fun lineGeneration(row: Int): Long
 
     /**
      * Returns the stable logical line identity for visible [row].
@@ -159,7 +159,7 @@ interface TerminalRenderFrame {
      * @return stable logical line id, or `0` when the frame implementation does
      * not expose one.
      */
-    fun lineId(row: Int): Long = 0L
+    public fun lineId(row: Int): Long = 0L
 
     /**
      * Reports whether visible [row] soft-wraps into the next row.
@@ -167,7 +167,7 @@ interface TerminalRenderFrame {
      * @param row zero-based visible row index.
      * @return `true` when the row wraps into the following row.
      */
-    fun lineWrapped(row: Int): Boolean
+    public fun lineWrapped(row: Int): Boolean
 
     /**
      * Copies one visible row into caller-owned primitive arrays in logical terminal-column order.
@@ -198,7 +198,7 @@ interface TerminalRenderFrame {
      * @param clusterDataSink optional receiver for primitive cluster code points
      * on cluster cells.
      */
-    fun copyLine(
+    public fun copyLine(
         row: Int,
         codeWords: IntArray,
         codeOffset: Int = 0,
@@ -223,7 +223,7 @@ interface TerminalRenderFrame {
      *
      * @param sink primitive cursor receiver.
      */
-    fun copyCursor(sink: TerminalRenderCursorSink) {
+    public fun copyCursor(sink: TerminalRenderCursorSink) {
         val cursor = cursor
         sink.onCursor(
             column = cursor.column,

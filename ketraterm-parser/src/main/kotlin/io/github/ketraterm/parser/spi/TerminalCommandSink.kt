@@ -30,17 +30,17 @@ import io.github.ketraterm.protocol.ShellIntegrationEvent
  * - The sink/core owns grid physics, bounds clamping, wrapping, margins, storage, and mode persistence.
  * - The parser must not know terminal width, height, cursor bounds, or rendering details.
  */
-interface TerminalCommandSink {
+public interface TerminalCommandSink {
     /**
      * Actual active screen, observed synchronously on the parser's serialized command thread.
      * Must reflect effective transitions before [setDecMode] returns, including rejected or
      * repeated requests. Parser uses it for screen-local charset saves; do not shadow host state.
      * A sink without an alternate screen returns false.
      */
-    val isAlternateScreenActive: Boolean
+    public val isAlternateScreenActive: Boolean
 
     /** Requests one ANSI or DEC private mode status; host policy controls replies. */
-    fun requestModeStatus(
+    public fun requestModeStatus(
         mode: Int,
         decPrivate: Boolean,
     )
@@ -54,7 +54,7 @@ interface TerminalCommandSink {
      *
      * @param codepoint The Unicode codepoint to write.
      */
-    fun writeCodepoint(codepoint: Int)
+    public fun writeCodepoint(codepoint: Int)
 
     /**
      * Writes a pre-segmented multi-codepoint grapheme cluster to the grid.
@@ -65,7 +65,7 @@ interface TerminalCommandSink {
      * @param codepoints The array of Unicode codepoints forming the cluster.
      * @param length The number of valid codepoints in the array.
      */
-    fun writeCluster(
+    public fun writeCluster(
         codepoints: IntArray,
         length: Int,
     )
@@ -81,7 +81,7 @@ interface TerminalCommandSink {
      * @param codepoints Complete retained codepoints of the same grapheme.
      * @param length Number of valid codepoints in the array.
      */
-    fun updatePreviousCluster(
+    public fun updatePreviousCluster(
         codepoints: IntArray,
         length: Int,
     )
@@ -93,63 +93,63 @@ interface TerminalCommandSink {
     /**
      * Triggers the terminal bell/alert sound (BEL, `0x07`).
      */
-    fun bell()
+    public fun bell()
 
     /**
      * Moves the cursor one column to the left (BS, `0x08`).
      */
-    fun backspace()
+    public fun backspace()
 
     /**
      * Advances the cursor to the next tab stop (HT, `0x09`).
      */
-    fun tab()
+    public fun tab()
 
     /**
      * Executes a line feed (LF, `0x0A`), moving the cursor down one row.
      */
-    fun lineFeed()
+    public fun lineFeed()
 
     /**
      * Moves the cursor to the left margin on the current row (CR, `0x0D`).
      */
-    fun carriageReturn()
+    public fun carriageReturn()
 
     /**
      * Executes a reverse index (RI, `ESC M`), moving the cursor up one row.
      */
-    fun reverseIndex()
+    public fun reverseIndex()
 
     /**
      * Moves the cursor to the left margin on the next row (NEL, `ESC E`).
      */
-    fun nextLine()
+    public fun nextLine()
 
     /**
      * DECSTR soft terminal reset: CSI ! p.
      *
      * The parser identifies the sequence; the core owns the actual reset semantics.
      */
-    fun softReset()
+    public fun softReset()
 
     /**
      * RIS full terminal reset: ESC c.
      *
      * The parser identifies the sequence; the core owns the actual reset semantics.
      */
-    fun resetTerminal()
+    public fun resetTerminal()
 
     /**
      * DEC Screen Alignment Test (DECALN): ESC # 8.
      *
      * The parser identifies the sequence; the core owns the actual alignment test semantics.
      */
-    fun decaln()
+    public fun decaln()
 
     /**
      * Saves the current cursor position, SGR attributes, wrap state, and origin mode.
      */
-    fun saveCursor()
+    public fun saveCursor()
 
     /**
      * Resolves parameterless CSI s against the current horizontal-margin mode (DECLRMM).
@@ -159,19 +159,19 @@ interface TerminalCommandSink {
      * homing, and returns `false`. The parser saves its charset state only on `true`.
      * Mode ownership stays with the sink; implementations must not cache a second mode flag.
      */
-    fun saveCursorOrResetMargins(): Boolean
+    public fun saveCursorOrResetMargins(): Boolean
 
     /**
      * Restores the cursor position, SGR attributes, wrap state, and origin mode.
      */
-    fun restoreCursor()
+    public fun restoreCursor()
 
     /**
      * Sets the shape/style of the cursor.
      *
      * @param style The shape/style code.
      */
-    fun setCursorStyle(style: Int)
+    public fun setCursorStyle(style: Int)
 
     // -------------------------------------------------------------------------
     // Cursor navigation
@@ -182,56 +182,56 @@ interface TerminalCommandSink {
      *
      * @param n Number of rows to move up.
      */
-    fun cursorUp(n: Int)
+    public fun cursorUp(n: Int)
 
     /**
      * Moves the cursor down by [n] rows.
      *
      * @param n Number of rows to move down.
      */
-    fun cursorDown(n: Int)
+    public fun cursorDown(n: Int)
 
     /**
      * Moves the cursor forward (right) by [n] columns.
      *
      * @param n Number of columns to move forward.
      */
-    fun cursorForward(n: Int)
+    public fun cursorForward(n: Int)
 
     /**
      * Moves the cursor backward (left) by [n] columns.
      *
      * @param n Number of columns to move backward.
      */
-    fun cursorBackward(n: Int)
+    public fun cursorBackward(n: Int)
 
     /**
      * Moves the cursor down by [n] lines and positions it at the beginning of the line.
      *
      * @param n Number of lines to move down.
      */
-    fun cursorNextLine(n: Int)
+    public fun cursorNextLine(n: Int)
 
     /**
      * Moves the cursor up by [n] lines and positions it at the beginning of the line.
      *
      * @param n Number of lines to move up.
      */
-    fun cursorPreviousLine(n: Int)
+    public fun cursorPreviousLine(n: Int)
 
     /**
      * Moves the cursor forward (right) by [n] tab stops.
      *
      * @param n Number of tab stops to move forward.
      */
-    fun cursorForwardTabs(n: Int)
+    public fun cursorForwardTabs(n: Int)
 
     /**
      * Moves the cursor backward (left) by [n] tab stops.
      *
      * @param n Number of tab stops to move backward.
      */
-    fun cursorBackwardTabs(n: Int)
+    public fun cursorBackwardTabs(n: Int)
 
     /**
      * Column is parser-translated to zero-origin before handoff.
@@ -239,7 +239,7 @@ interface TerminalCommandSink {
      *
      * @param col The zero-based column index.
      */
-    fun setCursorColumn(col: Int)
+    public fun setCursorColumn(col: Int)
 
     /**
      * Row is parser-translated to zero-origin before handoff.
@@ -247,7 +247,7 @@ interface TerminalCommandSink {
      *
      * @param row The zero-based row index.
      */
-    fun setCursorRow(row: Int)
+    public fun setCursorRow(row: Int)
 
     /**
      * Row and column are parser-translated to zero-origin before handoff.
@@ -256,7 +256,7 @@ interface TerminalCommandSink {
      * @param row The zero-based row index.
      * @param col The zero-based column index.
      */
-    fun setCursorAbsolute(
+    public fun setCursorAbsolute(
         row: Int,
         col: Int,
     )
@@ -271,7 +271,7 @@ interface TerminalCommandSink {
      * @param top The zero-based top row index.
      * @param bottom The zero-based bottom row index, or -1 to use the bottom of the terminal.
      */
-    fun setScrollRegion(
+    public fun setScrollRegion(
         top: Int,
         bottom: Int,
     )
@@ -286,7 +286,7 @@ interface TerminalCommandSink {
      * @param left The zero-based left column index.
      * @param right The zero-based right column index, or -1 to use the right edge of the terminal.
      */
-    fun setLeftRightMargins(
+    public fun setLeftRightMargins(
         left: Int,
         right: Int,
     )
@@ -301,7 +301,7 @@ interface TerminalCommandSink {
      * @param mode The erase mode (0 = cursor to end, 1 = start to cursor, 2 = entire screen, 3 = screen and scrollback).
      * @param selective `true` if this is a selective erase (DECSED) that respects protection attributes.
      */
-    fun eraseInDisplay(
+    public fun eraseInDisplay(
         mode: Int,
         selective: Boolean,
     )
@@ -312,7 +312,7 @@ interface TerminalCommandSink {
      * @param mode The erase mode (0 = cursor to end, 1 = start to cursor, 2 = entire line).
      * @param selective `true` if this is a selective erase (DECSEL) that respects protection attributes.
      */
-    fun eraseInLine(
+    public fun eraseInLine(
         mode: Int,
         selective: Boolean,
     )
@@ -329,7 +329,7 @@ interface TerminalCommandSink {
      * @param right One-based right column.
      * @param selective `true` for DECSERA, which preserves selectively protected cells.
      */
-    fun eraseRectangle(
+    public fun eraseRectangle(
         top: Int,
         left: Int,
         bottom: Int,
@@ -349,7 +349,7 @@ interface TerminalCommandSink {
      * @param bottom One-based bottom row.
      * @param right One-based right column.
      */
-    fun fillRectangle(
+    public fun fillRectangle(
         codepoint: Int,
         top: Int,
         left: Int,
@@ -363,7 +363,7 @@ interface TerminalCommandSink {
      * Coordinates retain DEC's one-based inclusive representation so the core can apply active
      * origin-mode policy. Page numbers use DEC's one-based numbering; `0` denotes omission.
      */
-    fun copyRectangle(
+    public fun copyRectangle(
         sourceTop: Int,
         sourceLeft: Int,
         sourceBottom: Int,
@@ -382,7 +382,7 @@ interface TerminalCommandSink {
      * numbering; `0` denotes omission. The host/core response path owns page
      * capability policy and emits no bytes for unsupported requests.
      */
-    fun requestRectangleChecksum(
+    public fun requestRectangleChecksum(
         requestId: Int,
         page: Int,
         top: Int,
@@ -397,7 +397,7 @@ interface TerminalCommandSink {
      * `0` and `1` select the wrapped stream extent; `2` selects the exact rectangular extent.
      * Unsupported values must leave the current selection unchanged.
      */
-    fun setAttributeChangeExtent(extent: Int)
+    public fun setAttributeChangeExtent(extent: Int)
 
     /**
      * Applies VT420 DECCARA visual-attribute changes without changing characters or the pen.
@@ -406,7 +406,7 @@ interface TerminalCommandSink {
      * use [io.github.ketraterm.protocol.DecRectangleAttribute] bits; the parser has already
      * collapsed ordered SGR-like parameters into their final operations.
      */
-    fun changeRectangleAttributes(
+    public fun changeRectangleAttributes(
         top: Int,
         left: Int,
         bottom: Int,
@@ -421,7 +421,7 @@ interface TerminalCommandSink {
      * Coordinates retain DEC's one-based inclusive representation. [reverseMask] uses
      * [io.github.ketraterm.protocol.DecRectangleAttribute] bits.
      */
-    fun reverseRectangleAttributes(
+    public fun reverseRectangleAttributes(
         top: Int,
         left: Int,
         bottom: Int,
@@ -436,7 +436,7 @@ interface TerminalCommandSink {
      *
      * @param count Number of columns to insert; parser defaults omitted or zero values to one.
      */
-    fun insertColumns(count: Int)
+    public fun insertColumns(count: Int)
 
     /**
      * Deletes columns (DECDC) across every row of the active vertical scroll region.
@@ -445,56 +445,56 @@ interface TerminalCommandSink {
      *
      * @param count Number of columns to delete; parser defaults omitted or zero values to one.
      */
-    fun deleteColumns(count: Int)
+    public fun deleteColumns(count: Int)
 
     /**
      * Inserts [n] blank lines at the cursor row (IL).
      *
      * @param n Number of lines to insert.
      */
-    fun insertLines(n: Int)
+    public fun insertLines(n: Int)
 
     /**
      * Deletes [n] lines starting at the cursor row (DL).
      *
      * @param n Number of lines to delete.
      */
-    fun deleteLines(n: Int)
+    public fun deleteLines(n: Int)
 
     /**
      * Inserts [n] blank characters at the cursor position (ICH).
      *
      * @param n Number of characters to insert.
      */
-    fun insertCharacters(n: Int)
+    public fun insertCharacters(n: Int)
 
     /**
      * Deletes [n] characters starting at the cursor position (DCH).
      *
      * @param n Number of characters to delete.
      */
-    fun deleteCharacters(n: Int)
+    public fun deleteCharacters(n: Int)
 
     /**
      * Erases [n] characters starting at the cursor position (ECH).
      *
      * @param n Number of characters to erase.
      */
-    fun eraseCharacters(n: Int)
+    public fun eraseCharacters(n: Int)
 
     /**
      * Scrolls the active scroll region up by [n] lines (SU).
      *
      * @param n Number of lines to scroll up.
      */
-    fun scrollUp(n: Int)
+    public fun scrollUp(n: Int)
 
     /**
      * Scrolls the active scroll region down by [n] lines (SD).
      *
      * @param n Number of lines to scroll down.
      */
-    fun scrollDown(n: Int)
+    public fun scrollDown(n: Int)
 
     // -------------------------------------------------------------------------
     // Tab stops
@@ -503,17 +503,17 @@ interface TerminalCommandSink {
     /**
      * Sets a tab stop at the current cursor column (HTS).
      */
-    fun setTabStop()
+    public fun setTabStop()
 
     /**
      * Clears the tab stop at the current cursor column (TBC 0).
      */
-    fun clearTabStop()
+    public fun clearTabStop()
 
     /**
      * Clears all tab stops (TBC 3).
      */
-    fun clearAllTabStops()
+    public fun clearAllTabStops()
 
     // -------------------------------------------------------------------------
     // Modes
@@ -527,7 +527,7 @@ interface TerminalCommandSink {
      * @param mode The ANSI mode identifier.
      * @param enable `true` to enable the mode, `false` to disable.
      */
-    fun setAnsiMode(
+    public fun setAnsiMode(
         mode: Int,
         enable: Boolean,
     )
@@ -540,7 +540,7 @@ interface TerminalCommandSink {
      * @param mode The DEC private mode identifier.
      * @param enable `true` to enable the mode, `false` to disable.
      */
-    fun setDecMode(
+    public fun setDecMode(
         mode: Int,
         enable: Boolean,
     )
@@ -555,7 +555,7 @@ interface TerminalCommandSink {
      * @param resource The resource/modifier identifier.
      * @param value The value to assign to the key modifier option.
      */
-    fun setKeyModifierOption(
+    public fun setKeyModifierOption(
         resource: Int,
         value: Int,
     )
@@ -565,12 +565,12 @@ interface TerminalCommandSink {
      *
      * @param resource The resource/modifier identifier to reset.
      */
-    fun resetKeyModifierOption(resource: Int)
+    public fun resetKeyModifierOption(resource: Int)
 
     /**
      * Resets all supported xterm key modifier options, `CSI > m`.
      */
-    fun resetKeyModifierOptions()
+    public fun resetKeyModifierOptions()
 
     /**
      * Disables one xterm key modifier option, `CSI > Ps n`.
@@ -580,17 +580,17 @@ interface TerminalCommandSink {
      *
      * @param resource The resource/modifier identifier to disable.
      */
-    fun disableKeyModifierOption(resource: Int)
+    public fun disableKeyModifierOption(resource: Int)
 
     /**
      * Requests one xterm key modifier option, `CSI ? Pp m`.
      *
      * @param resource The resource/modifier identifier to report.
      */
-    fun requestKeyModifierOption(resource: Int)
+    public fun requestKeyModifierOption(resource: Int)
 
     /** Requests an xterm key-format resource (XTQFMTKEYS); the host owns response permission. */
-    fun requestKeyFormatOption(resource: Int)
+    public fun requestKeyFormatOption(resource: Int)
 
     /**
      * Xterm key format option set, `CSI > Pp ; Pv f`.
@@ -598,7 +598,7 @@ interface TerminalCommandSink {
      * @param resource The resource/format identifier.
      * @param value The value to assign to the key format option.
      */
-    fun setKeyFormatOption(
+    public fun setKeyFormatOption(
         resource: Int,
         value: Int,
     )
@@ -608,12 +608,12 @@ interface TerminalCommandSink {
      *
      * @param resource The resource/format identifier to reset.
      */
-    fun resetKeyFormatOption(resource: Int)
+    public fun resetKeyFormatOption(resource: Int)
 
     /**
      * Resets all supported xterm key format options, `CSI > f`.
      */
-    fun resetKeyFormatOptions()
+    public fun resetKeyFormatOptions()
 
     /**
      * Kitty keyboard progressive-enhancement flag application,
@@ -625,7 +625,7 @@ interface TerminalCommandSink {
      * @param flags Kitty keyboard progressive-enhancement flags.
      * @param applicationMode The application mode parameter (0 = replace, 1 = push, 2 = pop).
      */
-    fun applyKittyKeyboardFlags(
+    public fun applyKittyKeyboardFlags(
         flags: Int,
         applicationMode: Int,
     )
@@ -638,7 +638,7 @@ interface TerminalCommandSink {
      *
      * @param flags Kitty keyboard flags to push and activate.
      */
-    fun pushKittyKeyboardFlags(flags: Int)
+    public fun pushKittyKeyboardFlags(flags: Int)
 
     /**
      * Kitty keyboard stack pop, `CSI < count u`.
@@ -647,7 +647,7 @@ interface TerminalCommandSink {
      *
      * @param count Number of times to pop from the stack.
      */
-    fun popKittyKeyboardFlags(count: Int)
+    public fun popKittyKeyboardFlags(count: Int)
 
     // -------------------------------------------------------------------------
     // Terminal-to-host responses
@@ -659,7 +659,7 @@ interface TerminalCommandSink {
      * @param mode The DSR mode parameter (e.g. 5 for status, 6 for cursor position).
      * @param decPrivate `true` if this is a DEC private DSR (? prefix), `false` for standard ANSI.
      */
-    fun requestDeviceStatusReport(
+    public fun requestDeviceStatusReport(
         mode: Int,
         decPrivate: Boolean,
     )
@@ -675,7 +675,7 @@ interface TerminalCommandSink {
      * @param kind The device attributes query type (primary, secondary, or tertiary).
      * @param parameter The request parameter/subtype (usually 0).
      */
-    fun requestDeviceAttributes(
+    public fun requestDeviceAttributes(
         kind: Int,
         parameter: Int,
     )
@@ -684,7 +684,7 @@ interface TerminalCommandSink {
      * Requests the active Kitty keyboard progressive-enhancement flag report
      * for parameterless `CSI ? u`.
      */
-    fun requestKittyKeyboardFlags()
+    public fun requestKittyKeyboardFlags()
 
     /**
      * Safe xterm window report request.
@@ -694,7 +694,7 @@ interface TerminalCommandSink {
      *
      * @param mode The window report mode parameter (e.g. 14 for pixels, 18 for grid cells).
      */
-    fun requestWindowReport(mode: Int)
+    public fun requestWindowReport(mode: Int)
 
     /**
      * Requests that the host resize the terminal window to the specified grid dimensions.
@@ -702,7 +702,7 @@ interface TerminalCommandSink {
      * @param rows target row count.
      * @param columns target column count.
      */
-    fun resizeWindow(
+    public fun resizeWindow(
         rows: Int,
         columns: Int,
     )
@@ -713,7 +713,7 @@ interface TerminalCommandSink {
      * @param x The target x-coordinate on the screen.
      * @param y The target y-coordinate on the screen.
      */
-    fun moveWindow(
+    public fun moveWindow(
         x: Int,
         y: Int,
     )
@@ -721,29 +721,29 @@ interface TerminalCommandSink {
     /**
      * Minimizes (iconifies) the terminal window.
      */
-    fun minimizeWindow()
+    public fun minimizeWindow()
 
     /**
      * De-minimizes (restores/de-iconifies) the terminal window.
      */
-    fun deminimizeWindow()
+    public fun deminimizeWindow()
 
     /**
      * Raises the terminal window to the front of the window stack.
      */
-    fun raiseWindow()
+    public fun raiseWindow()
 
     /**
      * Lowers the terminal window to the bottom of the window stack.
      */
-    fun lowerWindow()
+    public fun lowerWindow()
 
     /**
      * Maximizes or restores the terminal window.
      *
      * @param maximize true to maximize, false to restore.
      */
-    fun setMaximized(maximize: Boolean)
+    public fun setMaximized(maximize: Boolean)
 
     /**
      * Xterm title stack push/pop scopes:
@@ -753,14 +753,14 @@ interface TerminalCommandSink {
      *
      * @param scope The title stack target scope (0, 1, or 2).
      */
-    fun pushTitleStack(scope: Int)
+    public fun pushTitleStack(scope: Int)
 
     /**
      * Pops the xterm title stack for the given scope.
      *
      * @param scope The title stack target scope (0, 1, or 2).
      */
-    fun popTitleStack(scope: Int)
+    public fun popTitleStack(scope: Int)
 
     // -------------------------------------------------------------------------
     // SGR / pen attributes
@@ -769,113 +769,113 @@ interface TerminalCommandSink {
     /**
      * Resets all active pen attributes to defaults (SGR 0).
      */
-    fun resetAttributes()
+    public fun resetAttributes()
 
     /**
      * Sets bold weight.
      *
      * @param enabled `true` to enable bold, `false` to disable.
      */
-    fun setBold(enabled: Boolean)
+    public fun setBold(enabled: Boolean)
 
     /**
      * Sets faint (dim) weight.
      *
      * @param enabled `true` to enable faint, `false` to disable.
      */
-    fun setFaint(enabled: Boolean)
+    public fun setFaint(enabled: Boolean)
 
     /**
      * Sets italic style.
      *
      * @param enabled `true` to enable italic, `false` to disable.
      */
-    fun setItalic(enabled: Boolean)
+    public fun setItalic(enabled: Boolean)
 
     /**
      * Sets underline style.
      *
      * @param style The underline style code (0 = none, 1 = single, 2 = double, etc.).
      */
-    fun setUnderlineStyle(style: Int)
+    public fun setUnderlineStyle(style: Int)
 
     /**
      * Sets blinking style.
      *
      * @param enabled `true` to enable blinking, `false` to disable.
      */
-    fun setBlink(enabled: Boolean)
+    public fun setBlink(enabled: Boolean)
 
     /**
      * Sets inverse (reverse-video) style.
      *
      * @param enabled `true` to enable inverse, `false` to disable.
      */
-    fun setInverse(enabled: Boolean)
+    public fun setInverse(enabled: Boolean)
 
     /**
      * Sets conceal style.
      *
      * @param enabled `true` to enable conceal, `false` to disable.
      */
-    fun setConceal(enabled: Boolean)
+    public fun setConceal(enabled: Boolean)
 
     /**
      * Sets strikethrough decoration.
      *
      * @param enabled `true` to enable strikethrough, `false` to disable.
      */
-    fun setStrikethrough(enabled: Boolean)
+    public fun setStrikethrough(enabled: Boolean)
 
     /**
      * Sets overline decoration.
      *
      * @param enabled `true` to enable overline, `false` to disable.
      */
-    fun setOverline(enabled: Boolean)
+    public fun setOverline(enabled: Boolean)
 
     /**
      * Sets selective erase protection (DECSCA).
      *
      * @param enabled `true` to protect cells from erasure, `false` to disable protection.
      */
-    fun setSelectiveEraseProtection(enabled: Boolean)
+    public fun setSelectiveEraseProtection(enabled: Boolean)
 
     /**
      * Resets foreground color to the default.
      */
-    fun setForegroundDefault()
+    public fun setForegroundDefault()
 
     /**
      * Resets background color to the default.
      */
-    fun setBackgroundDefault()
+    public fun setBackgroundDefault()
 
     /**
      * Resets underline color to the default.
      */
-    fun setUnderlineColorDefault()
+    public fun setUnderlineColorDefault()
 
     /**
      * Sets foreground indexed color.
      *
      * @param index Palette index (0..255).
      */
-    fun setForegroundIndexed(index: Int)
+    public fun setForegroundIndexed(index: Int)
 
     /**
      * Sets background indexed color.
      *
      * @param index Palette index (0..255).
      */
-    fun setBackgroundIndexed(index: Int)
+    public fun setBackgroundIndexed(index: Int)
 
     /**
      * Sets underline indexed color.
      *
      * @param index Palette index (0..255).
      */
-    fun setUnderlineColorIndexed(index: Int)
+    public fun setUnderlineColorIndexed(index: Int)
 
     /**
      * Sets foreground RGB color.
@@ -884,7 +884,7 @@ interface TerminalCommandSink {
      * @param green Green component (0..255).
      * @param blue Blue component (0..255).
      */
-    fun setForegroundRgb(
+    public fun setForegroundRgb(
         red: Int,
         green: Int,
         blue: Int,
@@ -897,7 +897,7 @@ interface TerminalCommandSink {
      * @param green Green component (0..255).
      * @param blue Blue component (0..255).
      */
-    fun setBackgroundRgb(
+    public fun setBackgroundRgb(
         red: Int,
         green: Int,
         blue: Int,
@@ -910,7 +910,7 @@ interface TerminalCommandSink {
      * @param green Green component (0..255).
      * @param blue Blue component (0..255).
      */
-    fun setUnderlineColorRgb(
+    public fun setUnderlineColorRgb(
         red: Int,
         green: Int,
         blue: Int,
@@ -925,21 +925,21 @@ interface TerminalCommandSink {
      *
      * @param title The new window title.
      */
-    fun setWindowTitle(title: String)
+    public fun setWindowTitle(title: String)
 
     /**
      * Sets the icon title.
      *
      * @param title The new icon title.
      */
-    fun setIconTitle(title: String)
+    public fun setIconTitle(title: String)
 
     /**
      * Sets both icon and window titles.
      *
      * @param title The new title.
      */
-    fun setIconAndWindowTitle(title: String)
+    public fun setIconAndWindowTitle(title: String)
 
     /**
      * Reports the shell's current working directory as an OSC 7 file URI.
@@ -949,7 +949,7 @@ interface TerminalCommandSink {
      *
      * @param uri raw current-working-directory URI from terminal output.
      */
-    fun setCurrentWorkingDirectoryUri(uri: String)
+    public fun setCurrentWorkingDirectoryUri(uri: String)
 
     /**
      * Starts an OSC 8 hyperlink context.
@@ -957,7 +957,7 @@ interface TerminalCommandSink {
      * @param uri Target URI.
      * @param id Optional hyperlink identifier.
      */
-    fun startHyperlink(
+    public fun startHyperlink(
         uri: String,
         id: String?,
     )
@@ -965,7 +965,7 @@ interface TerminalCommandSink {
     /**
      * Ends the active OSC 8 hyperlink context.
      */
-    fun endHyperlink()
+    public fun endHyperlink()
 
     /**
      * Reports an OSC 52 terminal clipboard request.
@@ -979,10 +979,10 @@ interface TerminalCommandSink {
      * @param encodedData base64 clipboard payload, `?` for read/query requests,
      * or an empty payload for clear/write-style requests.
      */
-    fun requestClipboard(
+    public fun requestClipboard(
         selection: String,
         encodedData: String,
-    ) = Unit
+    ): Unit = Unit
 
     /**
      * Sets a specific ANSI indexed color.
@@ -990,7 +990,7 @@ interface TerminalCommandSink {
      * @param index Color index (0..255).
      * @param color The packed ARGB color value.
      */
-    fun setPaletteColor(
+    public fun setPaletteColor(
         index: Int,
         color: Int,
     )
@@ -1000,7 +1000,7 @@ interface TerminalCommandSink {
      *
      * @param index Color index to query.
      */
-    fun queryPaletteColor(index: Int)
+    public fun queryPaletteColor(index: Int)
 
     /**
      * Sets a dynamic color (foreground, background, or cursor color).
@@ -1008,7 +1008,7 @@ interface TerminalCommandSink {
      * @param target Target color identifier (10 for foreground, 11 for background, 12 for cursor).
      * @param color The packed ARGB color value.
      */
-    fun setDynamicColor(
+    public fun setDynamicColor(
         target: Int,
         color: Int,
     )
@@ -1018,21 +1018,21 @@ interface TerminalCommandSink {
      *
      * @param target Target color identifier to query (10 for foreground, 11 for background, 12 for cursor).
      */
-    fun queryDynamicColor(target: Int)
+    public fun queryDynamicColor(target: Int)
 
     /**
      * Queries a status string (DECRQSS).
      *
      * @param query The status parameter query string.
      */
-    fun queryStatusString(query: String)
+    public fun queryStatusString(query: String)
 
     /**
      * Queries terminfo capabilities (XTGETTCAP).
      *
      * @param rawPayload Semicolon-separated capability names payload.
      */
-    fun queryTerminfo(rawPayload: String)
+    public fun queryTerminfo(rawPayload: String)
 
     /**
      * Emits a FinalTerm-style OSC 133 shell integration marker.
@@ -1042,7 +1042,7 @@ interface TerminalCommandSink {
      *
      * @param event typed shell integration marker event.
      */
-    fun shellIntegrationMarker(event: ShellIntegrationEvent)
+    public fun shellIntegrationMarker(event: ShellIntegrationEvent)
 
     /**
      * Requests a desktop notification.
@@ -1051,7 +1051,7 @@ interface TerminalCommandSink {
      * @param body notification body.
      * @param level notification severity level.
      */
-    fun showNotification(
+    public fun showNotification(
         title: String,
         body: String,
         level: NotificationLevel,

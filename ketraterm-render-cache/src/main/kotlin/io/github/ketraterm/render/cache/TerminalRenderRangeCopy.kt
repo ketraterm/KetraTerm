@@ -26,23 +26,23 @@ import io.github.ketraterm.render.api.*
  * permitted when wider than the cell budget. Cluster payloads copy with that row.
  * The cache and bounds remain owned by this instance until the next read.
  */
-class TerminalRenderRangeCopy(
-    val maxRows: Int = 64,
-    val maxCells: Int = 4096,
+public class TerminalRenderRangeCopy(
+    public val maxRows: Int = 64,
+    public val maxCells: Int = 4096,
 ) {
     init {
         require(maxRows > 0 && maxCells > 0)
     }
 
     /** Copied cells and source generations; use [firstAbsoluteRow] for the sliced row origin. */
-    val cache = TerminalRenderCache(1, 1, rowCapacityReserve = maxRows - 1)
+    public val cache: TerminalRenderCache = TerminalRenderCache(1, 1, rowCapacityReserve = maxRows - 1)
 
     /** First copied absolute row, or the requested/retained intersection start for an empty read. */
-    var firstAbsoluteRow: Long = 0L
+    public var firstAbsoluteRow: Long = 0L
         private set
 
     /** Inclusive last copied absolute row; smaller than [firstAbsoluteRow] for an empty read. */
-    var lastAbsoluteRow: Long = -1L
+    public var lastAbsoluteRow: Long = -1L
         private set
 
     /**
@@ -50,7 +50,7 @@ class TerminalRenderRangeCopy(
      * remains. The reader owns synchronization; [checkCancelled] must be cheap and
      * must not suspend or perform analysis while the reader's lock is held.
      */
-    fun read(
+    public fun read(
         reader: TerminalRenderFrameReader,
         startAbsoluteRow: Long,
         endAbsoluteRow: Long,

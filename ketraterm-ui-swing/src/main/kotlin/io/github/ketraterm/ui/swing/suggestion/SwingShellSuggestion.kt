@@ -53,7 +53,7 @@ import java.util.regex.Pattern
  * replacement offsets are unordered, or [matchedRanges] do not address
  * [displayText].
  */
-data class SwingShellSuggestion
+public data class SwingShellSuggestion
     @JvmOverloads
     constructor(
         val replacementText: String,
@@ -91,7 +91,7 @@ data class SwingShellSuggestion
  * Hosts should provide this from their semantic completion vocabulary rather
  * than making the popup infer visual meaning from source-label text.
  */
-enum class SwingShellSuggestionAccentRole {
+public enum class SwingShellSuggestionAccentRole {
     /** Command or subcommand completion. */
     COMMAND,
 
@@ -108,12 +108,12 @@ enum class SwingShellSuggestionAccentRole {
     OTHER,
     ;
 
-    companion object {
+    public companion object {
         /**
          * Derives a conservative visual category for generic providers that do
          * not expose a richer semantic completion vocabulary.
          */
-        fun from(
+        public fun from(
             kind: String,
             source: String,
         ): SwingShellSuggestionAccentRole =
@@ -146,7 +146,7 @@ enum class SwingShellSuggestionAccentRole {
  * @property deleteAfterCursorCount number of Delete key events needed before
  * any Backspace key events.
  */
-data class SwingShellSuggestionReplacement(
+public data class SwingShellSuggestionReplacement(
     val startOffset: Int,
     val endOffset: Int,
     val replacementText: String,
@@ -176,7 +176,7 @@ data class SwingShellSuggestionReplacement(
  * @param request command-line request that produced this suggestion.
  * @return validated replacement plan, or `null` when the request/range is invalid.
  */
-fun SwingShellSuggestion.replacementFor(request: SwingShellSuggestionRequest): SwingShellSuggestionReplacement? {
+public fun SwingShellSuggestion.replacementFor(request: SwingShellSuggestionRequest): SwingShellSuggestionReplacement? {
     if (!request.commandText.isUtf16Boundary(request.cursorOffset)) return null
     if (replacementStartOffset > request.cursorOffset) return null
     if (request.cursorOffset > replacementEndOffset) return null
@@ -207,7 +207,7 @@ fun SwingShellSuggestion.replacementFor(request: SwingShellSuggestionRequest): S
  * @param request command-line request that produced this suggestion.
  * @return resulting command text, or `null` when the request/range is invalid.
  */
-fun SwingShellSuggestion.commandTextAfterReplacement(request: SwingShellSuggestionRequest): String? {
+public fun SwingShellSuggestion.commandTextAfterReplacement(request: SwingShellSuggestionRequest): String? {
     val replacement = replacementFor(request) ?: return null
     return request.commandText.replaceRange(
         replacement.startOffset,
@@ -227,7 +227,7 @@ fun SwingShellSuggestion.commandTextAfterReplacement(request: SwingShellSuggesti
  * @property selectedSuggestion selected suggestion, or `null` when no
  * suggestion is selected.
  */
-data class SwingShellSuggestionState(
+public data class SwingShellSuggestionState(
     val visible: Boolean,
     val count: Int,
     val selectedIndex: Int,
@@ -235,12 +235,12 @@ data class SwingShellSuggestionState(
     val anchorRow: Int,
     val selectedSuggestion: SwingShellSuggestion?,
 ) {
-    companion object {
+    public companion object {
         /**
          * Empty state used when the popup is hidden.
          */
         @JvmField
-        val EMPTY: SwingShellSuggestionState =
+        public val EMPTY: SwingShellSuggestionState =
             SwingShellSuggestionState(
                 visible = false,
                 count = 0,
@@ -260,7 +260,7 @@ data class SwingShellSuggestionState(
  * @property anchorColumn terminal-grid column used as the popup anchor.
  * @property anchorRow terminal-grid row used as the popup anchor.
  */
-data class SwingShellSuggestionRequest(
+public data class SwingShellSuggestionRequest(
     val commandText: String,
     val cursorOffset: Int,
     val anchorColumn: Int,
@@ -274,7 +274,7 @@ data class SwingShellSuggestionRequest(
         require(anchorRow >= 0) { "anchorRow must be >= 0, was $anchorRow" }
     }
 
-    companion object {
+    public companion object {
         /**
          * Empty request used only while the popup is hidden.
          */
@@ -289,7 +289,7 @@ data class SwingShellSuggestionRequest(
 }
 
 /** Determines whether a provider request follows automatic observation or an explicit user action. */
-enum class SwingShellSuggestionTrigger {
+public enum class SwingShellSuggestionTrigger {
     /** Requires both smart suggestions and automatic popup to be enabled. */
     AUTOMATIC,
 
@@ -304,7 +304,7 @@ enum class SwingShellSuggestionTrigger {
  * @property index global rank of [suggestion] in the current ranked snapshot.
  * @property request command-line context that produced the accepted suggestion.
  */
-data class SwingShellSuggestionAcceptance(
+public data class SwingShellSuggestionAcceptance(
     val suggestion: SwingShellSuggestion,
     val index: Int,
     val request: SwingShellSuggestionRequest,
@@ -313,7 +313,7 @@ data class SwingShellSuggestionAcceptance(
 /**
  * Feedback kind emitted by the reusable suggestion popup.
  */
-enum class SwingShellSuggestionFeedbackKind {
+public enum class SwingShellSuggestionFeedbackKind {
     /**
      * The user accepted the selected suggestion.
      */
@@ -333,7 +333,7 @@ enum class SwingShellSuggestionFeedbackKind {
  * @property index index of [suggestion] in the displayed list.
  * @property request command-line context that produced the suggestion.
  */
-data class SwingShellSuggestionFeedback(
+public data class SwingShellSuggestionFeedback(
     val kind: SwingShellSuggestionFeedbackKind,
     val suggestion: SwingShellSuggestion,
     val index: Int,
@@ -343,7 +343,7 @@ data class SwingShellSuggestionFeedback(
 /**
  * Host provider for progressive shell-suggestion snapshots.
  */
-fun interface SwingShellSuggestionProvider {
+public fun interface SwingShellSuggestionProvider {
     /**
      * Returns a cold stream of suggestions for [request].
      *
@@ -354,14 +354,14 @@ fun interface SwingShellSuggestionProvider {
      * @param request command-line context.
      * @return cold stream of ordered suggestion snapshots, best first.
      */
-    fun suggestions(request: SwingShellSuggestionRequest): Flow<List<SwingShellSuggestion>>
+    public fun suggestions(request: SwingShellSuggestionRequest): Flow<List<SwingShellSuggestion>>
 
-    companion object {
+    public companion object {
         /**
          * Provider that returns no suggestions.
          */
         @JvmField
-        val NONE: SwingShellSuggestionProvider = SwingShellSuggestionProvider { flowOf(emptyList()) }
+        public val NONE: SwingShellSuggestionProvider = SwingShellSuggestionProvider { flowOf(emptyList()) }
     }
 }
 
@@ -372,9 +372,9 @@ fun interface SwingShellSuggestionProvider {
  * and invoked synchronously on the Swing Event Dispatch Thread after its active
  * provider collection is cancelled and its popup is hidden.
  */
-fun interface SwingShellSuggestionInvalidationListener {
+public fun interface SwingShellSuggestionInvalidationListener {
     /** Called on the Swing Event Dispatch Thread before command-affecting input is submitted. */
-    fun onShellSuggestionsInvalidated()
+    public fun onShellSuggestionsInvalidated()
 }
 
 /**
@@ -385,53 +385,53 @@ fun interface SwingShellSuggestionInvalidationListener {
  * synchronously on the Swing Event Dispatch Thread after ineligible component
  * work has been cancelled and hidden.
  */
-fun interface SwingShellSuggestionEligibilityListener {
+public fun interface SwingShellSuggestionEligibilityListener {
     /**
      * Reports the latest automatic-suggestion eligibility.
      *
      * @param eligible `true` only when automatic suggestions are enabled and
      * the terminal is displaying its live viewport.
      */
-    fun onAutomaticShellSuggestionEligibilityChanged(eligible: Boolean)
+    public fun onAutomaticShellSuggestionEligibilityChanged(eligible: Boolean)
 }
 
 /**
  * Host callback invoked for suggestion acceptance and explicit dismissal.
  */
-fun interface SwingShellSuggestionFeedbackHandler {
+public fun interface SwingShellSuggestionFeedbackHandler {
     /**
      * Handles one user feedback event.
      *
      * @param feedback selected suggestion and feedback kind.
      */
-    fun onSuggestionFeedback(feedback: SwingShellSuggestionFeedback)
+    public fun onSuggestionFeedback(feedback: SwingShellSuggestionFeedback)
 
-    companion object {
+    public companion object {
         /**
          * Feedback handler that ignores all popup feedback.
          */
         @JvmField
-        val NONE: SwingShellSuggestionFeedbackHandler = SwingShellSuggestionFeedbackHandler { }
+        public val NONE: SwingShellSuggestionFeedbackHandler = SwingShellSuggestionFeedbackHandler { }
     }
 }
 
 /**
  * Host callback invoked when the user accepts a shell suggestion.
  */
-fun interface SwingShellSuggestionHandler {
+public fun interface SwingShellSuggestionHandler {
     /**
      * Handles an accepted suggestion.
      *
      * @param acceptance accepted suggestion and the request that produced it.
      */
-    fun onSuggestionAccepted(acceptance: SwingShellSuggestionAcceptance)
+    public fun onSuggestionAccepted(acceptance: SwingShellSuggestionAcceptance)
 
-    companion object {
+    public companion object {
         /**
          * Handler that ignores accepted suggestions.
          */
         @JvmField
-        val NONE: SwingShellSuggestionHandler = SwingShellSuggestionHandler { }
+        public val NONE: SwingShellSuggestionHandler = SwingShellSuggestionHandler { }
 
         /**
          * Creates a standard command-line replacement suggestion handler.
@@ -444,7 +444,7 @@ fun interface SwingShellSuggestionHandler {
          * @return standard replacement suggestion handler.
          */
         @JvmStatic
-        fun createDefault(session: TerminalInputEncoder): SwingShellSuggestionHandler =
+        public fun createDefault(session: TerminalInputEncoder): SwingShellSuggestionHandler =
             SwingShellSuggestionHandler { acceptance ->
                 val request = acceptance.request
                 val replacement = acceptance.suggestion.replacementFor(request) ?: return@SwingShellSuggestionHandler

@@ -30,6 +30,64 @@ import kotlin.test.*
 
 class SwingSettingsTest {
     @ParameterizedTest
+    @ValueSource(floats = [Float.NaN, Float.NEGATIVE_INFINITY, Float.POSITIVE_INFINITY, -1f, 0f])
+    fun invalidLineHeightsAreRejectedBeforeRendering(lineHeight: Float) {
+        assertFailsWith<IllegalArgumentException> {
+            SwingSettings(lineHeight = lineHeight)
+        }
+    }
+
+    @ParameterizedTest
+    @ValueSource(floats = [0.5f, 1f, 2f])
+    fun finitePositiveLineHeightsAreAccepted(lineHeight: Float) {
+        assertEquals(lineHeight, SwingSettings(lineHeight = lineHeight).lineHeight)
+    }
+
+    @Test
+    fun renderingHintDefaultsAndSupportedAlternativesAreAccepted() {
+        val settings = SwingSettings()
+        val antialiasingValues =
+            listOf(
+                RenderingHints.VALUE_TEXT_ANTIALIAS_DEFAULT,
+                RenderingHints.VALUE_TEXT_ANTIALIAS_OFF,
+                RenderingHints.VALUE_TEXT_ANTIALIAS_ON,
+                RenderingHints.VALUE_TEXT_ANTIALIAS_GASP,
+                RenderingHints.VALUE_TEXT_ANTIALIAS_LCD_HRGB,
+                RenderingHints.VALUE_TEXT_ANTIALIAS_LCD_HBGR,
+                RenderingHints.VALUE_TEXT_ANTIALIAS_LCD_VRGB,
+                RenderingHints.VALUE_TEXT_ANTIALIAS_LCD_VBGR,
+            )
+        val fractionalValues =
+            listOf(
+                RenderingHints.VALUE_FRACTIONALMETRICS_DEFAULT,
+                RenderingHints.VALUE_FRACTIONALMETRICS_OFF,
+                RenderingHints.VALUE_FRACTIONALMETRICS_ON,
+            )
+        for (antialiasing in antialiasingValues) {
+            for (fractional in fractionalValues) {
+                val copy = settings.copy(textAntialiasing = antialiasing, fractionalMetrics = fractional)
+                assertSame(antialiasing, copy.textAntialiasing)
+                assertSame(fractional, copy.fractionalMetrics)
+            }
+        }
+    }
+
+    @Test
+    fun incompatibleRenderingHintsAreRejectedBeforeRendering() {
+        val settings = SwingSettings()
+        for (value in listOf("on", 1, Any(), RenderingHints.VALUE_RENDER_SPEED)) {
+            assertFailsWith<IllegalArgumentException> { settings.copy(textAntialiasing = value) }
+            assertFailsWith<IllegalArgumentException> { settings.copy(fractionalMetrics = value) }
+        }
+        assertFailsWith<IllegalArgumentException> {
+            settings.copy(textAntialiasing = RenderingHints.VALUE_FRACTIONALMETRICS_ON)
+        }
+        assertFailsWith<IllegalArgumentException> {
+            settings.copy(fractionalMetrics = RenderingHints.VALUE_TEXT_ANTIALIAS_ON)
+        }
+    }
+
+    @ParameterizedTest
     @ValueSource(ints = [0, 1, 3])
     fun unchangedFontSettingsRetainUnsupportedGlyphResolution(fallbackCount: Int) {
         val font = Font(Font.MONOSPACED, Font.PLAIN, 14)

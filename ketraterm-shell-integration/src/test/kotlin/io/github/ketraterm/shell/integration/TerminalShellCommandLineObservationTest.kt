@@ -49,7 +49,7 @@ class TerminalShellCommandLineObservationTest {
                 }
                 assertEquals(
                     "threexxxxx",
-                    fixture.session.terminal
+                    fixture.terminal
                         .getLineAsString(1)
                         .trimEnd(),
                 )

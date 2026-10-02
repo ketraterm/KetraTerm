@@ -23,18 +23,18 @@ package io.github.ketraterm.ui.swing.host
  * @param defaultOption initially selected action; defaults to the last option,
  * conventionally Cancel/Deny. This is independent of dismissing the dialog.
  */
-class SwingDialogRequest(
-    val title: String,
-    val message: String,
-    val severity: Severity,
+public class SwingDialogRequest(
+    public val title: String,
+    public val message: String,
+    public val severity: Severity,
     options: List<String> = listOf("OK"),
-    val defaultOption: Int = options.lastIndex,
+    public val defaultOption: Int = options.lastIndex,
 ) {
     /** Standard platform message icon. */
-    enum class Severity { INFORMATION, WARNING, ERROR }
+    public enum class Severity { INFORMATION, WARNING, ERROR }
 
     /** Button labels in result-index order. */
-    val options: List<String> = options.toList()
+    public val options: List<String> = options.toList()
 
     init {
         require(title.isNotBlank()) { "Dialog title must not be blank" }
@@ -44,7 +44,7 @@ class SwingDialogRequest(
     }
 
     /** Wrapped, escaped content for platform HTML labels; messages never supply markup. */
-    fun htmlMessage(): String =
+    public fun htmlMessage(): String =
         buildString {
             append("<html><body style='width: 340px'>")
             for (char in message) {

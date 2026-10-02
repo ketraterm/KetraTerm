@@ -129,8 +129,10 @@ class TerminalWindowResizeControllerTest {
                 window.geometry = null
                 updates.removeFirst().invoke()
                 assertTrue(window.bounds.isEmpty())
-                assertEquals(visible.width, session.terminal.width)
-                assertEquals(visible.height, session.terminal.height)
+                session.readRenderFrame { frame ->
+                    assertEquals(visible.width, frame.columns)
+                    assertEquals(visible.height, frame.rows)
+                }
             }
         }
     }
@@ -144,8 +146,10 @@ class TerminalWindowResizeControllerTest {
                 controller.clearTarget()
                 updates.removeFirst().invoke()
                 assertTrue(window.bounds.isEmpty())
-                assertEquals(132, session.terminal.width)
-                assertEquals(10, session.terminal.height)
+                session.readRenderFrame { frame ->
+                    assertEquals(132, frame.columns)
+                    assertEquals(10, frame.rows)
+                }
             }
         }
     }

@@ -29,7 +29,7 @@ package io.github.ketraterm.completion.model
  * @throws IllegalArgumentException if [value] or [displayText] is blank, or if
  * [scoreAdjustment] is outside [MIN_SCORE_ADJUSTMENT] through [MAX_SCORE_ADJUSTMENT].
  */
-data class TerminalCompletionDomainValue
+public data class TerminalCompletionDomainValue
     @JvmOverloads
     constructor(
         val value: String,
@@ -45,11 +45,11 @@ data class TerminalCompletionDomainValue
             }
         }
 
-        companion object {
+        public companion object {
             /** Minimum host relevance adjustment accepted by the shared engine. */
-            const val MIN_SCORE_ADJUSTMENT: Int = -1_000
+            public const val MIN_SCORE_ADJUSTMENT: Int = -1_000
 
             /** Maximum host relevance adjustment accepted by the shared engine. */
-            const val MAX_SCORE_ADJUSTMENT: Int = 1_000
+            public const val MAX_SCORE_ADJUSTMENT: Int = 1_000
         }
     }

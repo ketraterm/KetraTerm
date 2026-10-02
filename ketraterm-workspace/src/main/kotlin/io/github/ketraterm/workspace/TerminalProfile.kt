@@ -25,6 +25,9 @@ import java.nio.file.Path
  * Product shells such as the standalone app and IntelliJ plugin may choose
  * their own presentation, but should share this process vocabulary to avoid
  * divergent shell discovery behavior.
+ * Constructor, [copy], and destructuring signatures are part of the public ABI.
+ * Command and environment collections are borrowed read-only; callers must not
+ * mutate them while the profile is in use.
  *
  * @property id stable profile identifier.
  * @property displayName user-facing profile name.
@@ -38,7 +41,7 @@ import java.nio.file.Path
  * @property startupCommand optional command submitted once after shell readiness,
  * keeping the interactive shell available when the command completes.
  */
-data class TerminalProfile(
+public data class TerminalProfile(
     val id: String,
     val displayName: String,
     val command: List<String>,

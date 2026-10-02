@@ -21,21 +21,25 @@ package io.github.ketraterm.input.api
  * Implementations are responsible for reading the current input-facing mode
  * state at the appropriate event boundary and writing the resulting bytes to a
  * host output sink.
+ *
+ * The default factory implementation requires external serialization of calls and
+ * policy updates. Custom encoders document their own concurrency guarantees; a session
+ * serializes calls but cannot take ownership of a custom encoder's output sink.
  */
-interface TerminalInputEncoder {
+public interface TerminalInputEncoder {
     /**
      * Encodes one keyboard event.
      *
      * @param event non-printable key or printable Unicode scalar event.
      */
-    fun encodeKey(event: io.github.ketraterm.input.event.TerminalKeyEvent)
+    public fun encodeKey(event: io.github.ketraterm.input.event.TerminalKeyEvent)
 
     /**
      * Encodes one paste event.
      *
      * @param event pasted text event.
      */
-    fun encodePaste(event: io.github.ketraterm.input.event.TerminalPasteEvent)
+    public fun encodePaste(event: io.github.ketraterm.input.event.TerminalPasteEvent)
 
     /**
      * Encodes one logical text replacement around the active cursor.
@@ -47,7 +51,7 @@ interface TerminalInputEncoder {
      *
      * @param event deletion counts and replacement text.
      */
-    fun encodeTextReplacement(event: io.github.ketraterm.input.event.TerminalTextReplacementEvent) {
+    public fun encodeTextReplacement(event: io.github.ketraterm.input.event.TerminalTextReplacementEvent) {
         if (event.deleteAfterCursorCount > 0) {
             val deleteEvent =
                 io.github.ketraterm.input.event.TerminalKeyEvent.key(
@@ -79,19 +83,19 @@ interface TerminalInputEncoder {
      *
      * @param event terminal focus transition.
      */
-    fun encodeFocus(event: io.github.ketraterm.input.event.TerminalFocusEvent)
+    public fun encodeFocus(event: io.github.ketraterm.input.event.TerminalFocusEvent)
 
     /**
      * Encodes one mouse event.
      *
      * @param event zero-based cell-coordinate mouse event.
      */
-    fun encodeMouse(event: io.github.ketraterm.input.event.TerminalMouseEvent)
+    public fun encodeMouse(event: io.github.ketraterm.input.event.TerminalMouseEvent)
 
     /**
      * Updates the input policy dynamically.
      *
      * @param policy new input policy.
      */
-    fun setInputPolicy(policy: io.github.ketraterm.input.policy.TerminalInputPolicy) {}
+    public fun setInputPolicy(policy: io.github.ketraterm.input.policy.TerminalInputPolicy) {}
 }

@@ -22,13 +22,13 @@ package io.github.ketraterm.protocol.keyboard
  * protocol:
  * <https://sw.kovidgoyal.net/kitty/keyboard-protocol/>.
  */
-object KittyKeyboardEventType {
+public object KittyKeyboardEventType {
     /** Key press event, the default when no event type subfield is present. */
-    const val PRESS: Int = 1
+    public const val PRESS: Int = 1
 
     /** Key repeat event. */
-    const val REPEAT: Int = 2
+    public const val REPEAT: Int = 2
 
     /** Key release event. */
-    const val RELEASE: Int = 3
+    public const val RELEASE: Int = 3
 }

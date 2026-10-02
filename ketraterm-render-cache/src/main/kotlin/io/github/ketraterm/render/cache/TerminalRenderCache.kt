@@ -32,12 +32,17 @@ import io.github.ketraterm.render.api.*
  * count, for example while smooth-scroll overscan is active, without replacing
  * the primitive arrays in the frame-update hot path.
  *
+ * This cache is mutable and requires caller confinement or external serialization.
+ * Array properties expose cache-owned storage for allocation-free reading. Do not mutate
+ * their contents or retain them across updates/reset, which may reuse or replace storage.
+ * Caches borrowed from a publisher are read-only for the duration of its reader lease.
+ *
  * @param columns initial cache width in cells.
  * @param rows initial cache height in rows.
  * @param rowCapacityReserve spare rows retained whenever primitive storage is
  * allocated; must be non-negative.
  */
-class TerminalRenderCache(
+public class TerminalRenderCache(
     columns: Int,
     rows: Int,
     private val rowCapacityReserve: Int,
@@ -46,7 +51,7 @@ class TerminalRenderCache(
     private var sourceReader: TerminalRenderFrameReader? = null
 
     /** Whether this cache contains a successfully copied frame from its current source. */
-    var hasFrame: Boolean = false
+    public var hasFrame: Boolean = false
         private set
 
     /**
@@ -55,67 +60,67 @@ class TerminalRenderCache(
      * @param columns initial cache width in cells.
      * @param rows initial cache height in rows.
      */
-    constructor(columns: Int, rows: Int) : this(columns, rows, rowCapacityReserve = 0)
+    public constructor(columns: Int, rows: Int) : this(columns, rows, rowCapacityReserve = 0)
 
     /**
      * Cached visible width in cells.
      */
-    var columns: Int = columns
+    public var columns: Int = columns
         private set
 
     /**
      * Cached visible height in rows.
      */
-    var rows: Int = rows
+    public var rows: Int = rows
         private set
 
     /**
      * Retained history lines reported by the most recent frame.
      */
-    var historySize: Int = 0
+    public var historySize: Int = 0
         private set
 
     /**
      * Resolved scrollback offset copied by the most recent frame.
      */
-    var scrollbackOffset: Int = 0
+    public var scrollbackOffset: Int = 0
         private set
 
     /**
      * History lines discarded due to capacity wrapping since initialization.
      */
-    var discardedCount: Long = 0L
+    public var discardedCount: Long = 0L
         private set
 
     /**
      * Copied code words in row-major order. See [TerminalRenderFrame.copyLine].
      */
-    var codeWords: IntArray = IntArray(0)
+    public var codeWords: IntArray = IntArray(0)
         private set
 
     /**
      * Copied primary public render attribute words in row-major order.
      */
-    var attrWords: LongArray = LongArray(0)
+    public var attrWords: LongArray = LongArray(0)
         private set
 
     /**
      * Copied public render cell flags in row-major order.
      */
-    var flags: IntArray = IntArray(0)
+    public var flags: IntArray = IntArray(0)
         private set
 
     /**
      * Copied optional public extra-attribute words in row-major order.
      */
-    var extraAttrWords: LongArray = LongArray(0)
+    public var extraAttrWords: LongArray = LongArray(0)
         private set
 
     /**
      * Copied optional hyperlink identifiers in row-major order. Zero means no
      * hyperlink.
      */
-    var hyperlinkIds: IntArray = IntArray(0)
+    public var hyperlinkIds: IntArray = IntArray(0)
         private set
 
     /**
@@ -123,19 +128,19 @@ class TerminalRenderCache(
      * other values pack a codepoint offset in the high 32 bits and a codepoint
      * length in the low 32 bits.
      */
-    var clusterRefs: LongArray = LongArray(0)
+    public var clusterRefs: LongArray = LongArray(0)
         private set
 
     /**
      * Packed codepoint storage referenced by [clusterRefs].
      */
-    var clusterCodepoints: IntArray = IntArray(0)
+    public var clusterCodepoints: IntArray = IntArray(0)
         private set
 
     /**
      * Cached per-row render generations.
      */
-    var lineGenerations: LongArray = LongArray(0)
+    public var lineGenerations: LongArray = LongArray(0)
         private set
 
     /**
@@ -144,13 +149,13 @@ class TerminalRenderCache(
      * These ids are copied every frame and move with terminal content through
      * scroll and resize reflow. `0` means the source frame did not expose an id.
      */
-    var lineIds: LongArray = LongArray(0)
+    public var lineIds: LongArray = LongArray(0)
         private set
 
     /**
      * Cached per-row soft-wrap flags.
      */
-    var lineWrapped: BooleanArray = BooleanArray(0)
+    public var lineWrapped: BooleanArray = BooleanArray(0)
         private set
 
     /**
@@ -159,85 +164,85 @@ class TerminalRenderCache(
      * Renderers use this metadata to schedule blink-phase repaints without
      * scanning attribute words on timer ticks.
      */
-    var lineHasBlinkingText: BooleanArray = BooleanArray(0)
+    public var lineHasBlinkingText: BooleanArray = BooleanArray(0)
         private set
 
     /**
      * Whether any copied visible row contains SGR blinking text.
      */
-    var hasBlinkingText: Boolean = false
+    public var hasBlinkingText: Boolean = false
         private set
 
     /**
      * Last copied frame generation.
      */
-    var frameGeneration: Long = UNINITIALIZED_GENERATION
+    public var frameGeneration: Long = UNINITIALIZED_GENERATION
         private set
 
     /**
      * Last copied structure generation.
      */
-    var structureGeneration: Long = UNINITIALIZED_GENERATION
+    public var structureGeneration: Long = UNINITIALIZED_GENERATION
         private set
 
     /** Last copied [TerminalRenderFrame.contentGeneration], including a reader's conservative fallback. */
-    var contentGeneration: Long = UNINITIALIZED_GENERATION
+    public var contentGeneration: Long = UNINITIALIZED_GENERATION
         private set
 
     /** Last copied retained-history replacement/reflow generation. */
-    var historyContentGeneration: Long = UNINITIALIZED_GENERATION
+    public var historyContentGeneration: Long = UNINITIALIZED_GENERATION
         private set
 
     /** Last copied viewport-independent output boundary; [Long.MAX_VALUE] means unknown. */
-    var outputEndAbsoluteRow: Long = Long.MAX_VALUE
+    public var outputEndAbsoluteRow: Long = Long.MAX_VALUE
         private set
 
     /**
      * Last copied active buffer kind.
      */
-    var activeBuffer: TerminalRenderBufferKind = TerminalRenderBufferKind.PRIMARY
+    public var activeBuffer: TerminalRenderBufferKind = TerminalRenderBufferKind.PRIMARY
         private set
 
     /**
      * Last copied color palette.
      */
-    var palette: TerminalColorPalette = emptyPalette
+    public var palette: TerminalColorPalette = emptyPalette
         private set
 
     /**
      * Last copied cursor column.
      */
-    var cursorColumn: Int = 0
+    public var cursorColumn: Int = 0
         private set
 
     /**
      * Last copied cursor row.
      */
-    var cursorRow: Int = 0
+    public var cursorRow: Int = 0
         private set
 
     /**
      * Last copied cursor visibility.
      */
-    var cursorVisible: Boolean = false
+    public var cursorVisible: Boolean = false
         private set
 
     /**
      * Last copied cursor blinking mode.
      */
-    var cursorBlinking: Boolean = false
+    public var cursorBlinking: Boolean = false
         private set
 
     /**
      * Last copied cursor shape.
      */
-    var cursorShape: TerminalRenderCursorShape = TerminalRenderCursorShape.BLOCK
+    public var cursorShape: TerminalRenderCursorShape = TerminalRenderCursorShape.BLOCK
         private set
 
     /**
      * Last copied cursor generation.
      */
-    var cursorGeneration: Long = UNINITIALIZED_GENERATION
+    public var cursorGeneration: Long = UNINITIALIZED_GENERATION
         private set
 
     /**
@@ -246,7 +251,7 @@ class TerminalRenderCache(
      * Hot render paths should consume primitive cursor fields directly to avoid
      * allocating a value object on every frame.
      */
-    val cursor: TerminalRenderCursor?
+    public val cursor: TerminalRenderCursor?
         get() {
             if (!hasCursor) return null
             return TerminalRenderCursor(
@@ -266,13 +271,13 @@ class TerminalRenderCache(
      * replacing primitive storage. Consumers should still treat this as a
      * structural repaint signal because [columns] or [rows] changed.
      */
-    var shapeChangedOnLastUpdate: Boolean = false
+    public var shapeChangedOnLastUpdate: Boolean = false
         private set
 
     /**
      * Whether the most recent [updateFrom] call changed the cursor state.
      */
-    var cursorChangedOnLastUpdate: Boolean = false
+    public var cursorChangedOnLastUpdate: Boolean = false
         private set
 
     private var clusterCodepointCount: Int = 0
@@ -341,7 +346,7 @@ class TerminalRenderCache(
      * false until another frame is copied. Owners must reset when unbinding a source,
      * including owners that deliver frames directly through [accept].
      */
-    fun reset() {
+    public fun reset() {
         sourceReader = null
         codeWords.fill(0)
         attrWords.fill(TerminalRenderAttrs.DEFAULT)
@@ -374,7 +379,7 @@ class TerminalRenderCache(
      *
      * @param reader source of the short-lived render frame.
      */
-    fun updateFrom(reader: TerminalRenderFrameReader) {
+    public fun updateFrom(reader: TerminalRenderFrameReader) {
         updateFrom(reader, scrollbackOffset = 0)
     }
 
@@ -390,7 +395,7 @@ class TerminalRenderCache(
      * @param reader source of the short-lived render frame.
      * @param scrollbackOffset requested lines above the live bottom viewport.
      */
-    fun updateFrom(
+    public fun updateFrom(
         reader: TerminalRenderFrameReader,
         scrollbackOffset: Int,
     ) {
@@ -412,7 +417,7 @@ class TerminalRenderCache(
      * @param scrollbackOffset requested lines above the live bottom viewport.
      * @param viewportRows requested render rows, or zero for the reader default.
      */
-    fun updateFrom(
+    public fun updateFrom(
         reader: TerminalRenderFrameReader,
         scrollbackOffset: Int,
         viewportRows: Int,
@@ -432,7 +437,7 @@ class TerminalRenderCache(
      * replacement reader cannot reuse old cells. Bounds are resolved by the reader
      * inside its frame callback, using this cache as the consumer.
      */
-    fun updateFromAbsoluteRange(
+    public fun updateFromAbsoluteRange(
         reader: TerminalRenderFrameReader,
         startAbsoluteRow: Long,
         endAbsoluteRow: Long,
@@ -450,7 +455,7 @@ class TerminalRenderCache(
      *
      * @param source stable published cache to copy.
      */
-    fun updateFrom(source: TerminalRenderCache) {
+    public fun updateFrom(source: TerminalRenderCache) {
         require(source !== this) { "source cache must differ from destination cache" }
         hasFrame = false
 
@@ -846,7 +851,7 @@ class TerminalRenderCache(
      * @param column zero-based column index.
      * @return the string representing the grapheme cluster, or null if no cluster exists.
      */
-    fun clusterText(
+    public fun clusterText(
         row: Int,
         column: Int,
     ): String? {
@@ -861,7 +866,7 @@ class TerminalRenderCache(
      * @param row zero-based row index.
      * @return the flat index pointing to the start of the row.
      */
-    fun rowOffset(row: Int): Int = row * columns
+    public fun rowOffset(row: Int): Int = row * columns
 
     /**
      * Returns the codepoint offset encoded in [ref].
@@ -869,7 +874,7 @@ class TerminalRenderCache(
      * @param ref packed cluster reference.
      * @return the starting index of the cluster in [clusterCodepoints].
      */
-    fun clusterOffset(ref: Long): Int = (ref ushr 32).toInt()
+    public fun clusterOffset(ref: Long): Int = (ref ushr 32).toInt()
 
     /**
      * Returns the codepoint length encoded in [ref].
@@ -877,7 +882,7 @@ class TerminalRenderCache(
      * @param ref packed cluster reference.
      * @return the number of codepoints in the cluster.
      */
-    fun clusterLength(ref: Long): Int = (ref and 0xFFFF_FFFFL).toInt()
+    public fun clusterLength(ref: Long): Int = (ref and 0xFFFF_FFFFL).toInt()
 
     private companion object {
         private const val UNINITIALIZED_GENERATION = -1L

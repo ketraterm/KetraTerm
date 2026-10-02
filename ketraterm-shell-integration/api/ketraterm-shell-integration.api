@@ -1,0 +1,5 @@
+public final class io/github/ketraterm/shell/integration/OscShellIntegration : io/github/ketraterm/session/TerminalShellIntegrationFactory {
+	public static final field INSTANCE Lio/github/ketraterm/shell/integration/OscShellIntegration;
+	public fun create (Lio/github/ketraterm/session/TerminalShellIntegrationContext;)Lio/github/ketraterm/session/TerminalShellIntegration;
+}
+

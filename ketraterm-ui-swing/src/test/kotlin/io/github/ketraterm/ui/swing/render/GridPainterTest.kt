@@ -925,15 +925,23 @@ class GridPainterTest {
             ),
         )
         val state = TerminalShellIntegrationState()
-        state.observeLiveBottomRow(102)
         state.recordPromptStart(80)
         state.recordPromptStart(81)
         val decorations = TerminalShellIntegrationViewportDecorations()
 
         decorations.updateFrom(state, cache)
 
-        assertTrue(state.hasPromptStartAtLine(80))
-        assertTrue(state.hasPromptStartAtLine(81))
+        val promptStarts = BooleanArray(3)
+        state.copyViewport(
+            lineIds = longArrayOf(80, 81, 82),
+            rowCount = 3,
+            promptStarts = promptStarts,
+            commandStarts = BooleanArray(3),
+            commandEnds = BooleanArray(3),
+            commandRecordIds = IntArray(3),
+            commandLifecycleStates = IntArray(3),
+        )
+        assertArrayEquals(booleanArrayOf(true, true, false), promptStarts)
         assertTrue(decorations.hasPromptStartAt(1))
         assertTrue(decorations.hasPromptStartAt(0))
     }

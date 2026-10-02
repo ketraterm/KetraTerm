@@ -38,6 +38,8 @@ import java.util.*
  *
  * Hosts can replace this value and call
  * [io.github.ketraterm.ui.swing.api.SwingTerminal.reloadSettings] to rebuild metrics and repaint.
+ * Constructor, [copy], and destructuring signatures are part of the public ABI.
+ * Adding configuration must preserve those signatures for compiled consumers.
  *
  * @property font primary terminal font.
  * @property fallbackFonts ordered fonts used by the complex-text renderer when
@@ -53,8 +55,8 @@ import java.util.*
  * codepoints should occupy two terminal cells in core width policy.
  * @property cursorBlinkMillis cursor blink period in milliseconds. A value of
  * zero disables cursor blinking and keeps the cursor visible.
- * @property textAntialiasing text antialiasing hint used during painting.
- * @property fractionalMetrics fractional font metrics hint used during painting.
+ * @property textAntialiasing value accepted by [RenderingHints.KEY_TEXT_ANTIALIASING].
+ * @property fractionalMetrics value accepted by [RenderingHints.KEY_FRACTIONALMETRICS].
  * @property hyperlinkActivationForeground packed ARGB foreground used for the
  * default linked span while hovered and eligible for activation.
  * @property osc8HyperlinkPresentation prepared host styles for terminal-authored OSC 8 links.
@@ -103,7 +105,7 @@ import java.util.*
  * host-bound input emission.
  * @property cursorShape default cursor shape configured for the session.
  * @property scrollbackLines maximum scrollback lines retained by the terminal.
- * @property lineHeight vertical line height scaling factor.
+ * @property lineHeight finite positive vertical line height scaling factor.
  * @property shellRequestResizeWindow whether the terminal panel requests window resizing.
  * @property shellRequestWindowManipulation whether the terminal panel allows shell window manipulation.
  * @property smartSuggestionsEnabled master switch for all shell suggestion requests and presentation.
@@ -113,7 +115,7 @@ import java.util.*
  * accepts an already-selected shell suggestion. Enter remains terminal input
  * when the popup has no selection.
  */
-data class SwingSettings
+public data class SwingSettings
     @JvmOverloads
     constructor(
         val font: Font = defaultTerminalFont(),
@@ -192,8 +194,14 @@ data class SwingSettings
             require(scrollbackLines >= 0) {
                 "scrollbackLines must be >= 0, was $scrollbackLines"
             }
-            require(lineHeight > 0f) {
-                "lineHeight must be > 0, was $lineHeight"
+            require(lineHeight.isFinite() && lineHeight > 0f) {
+                "lineHeight must be finite and > 0, was $lineHeight"
+            }
+            require(RenderingHints.KEY_TEXT_ANTIALIASING.isCompatibleValue(textAntialiasing)) {
+                "textAntialiasing must be a compatible text antialiasing hint"
+            }
+            require(RenderingHints.KEY_FRACTIONALMETRICS.isCompatibleValue(fractionalMetrics)) {
+                "fractionalMetrics must be a compatible fractional metrics hint"
             }
             require(shellIntegrationPromptDotDiameter > 0) {
                 "shellIntegrationPromptDotDiameter must be > 0, was $shellIntegrationPromptDotDiameter"
@@ -206,7 +214,7 @@ data class SwingSettings
             }
         }
 
-        companion object {
+        public companion object {
             private fun balancedAlternatePadding(
                 padding: SwingPadding,
                 gutterWidth: Int,
@@ -241,7 +249,7 @@ data class SwingSettings
              * @return default terminal font.
              */
             @JvmStatic
-            fun defaultTerminalFont(): Font = resolvedDefaultTerminalFont
+            public fun defaultTerminalFont(): Font = resolvedDefaultTerminalFont
 
             /**
              * Returns conservative logical and common platform fonts for complex
@@ -254,7 +262,7 @@ data class SwingSettings
              * @return list of fallback fonts.
              */
             @JvmStatic
-            fun defaultFallbackFonts(): ImmutableList<Font> {
+            public fun defaultFallbackFonts(): ImmutableList<Font> {
                 val installedFamilies =
                     GraphicsEnvironment
                         .getLocalGraphicsEnvironment()
@@ -303,7 +311,7 @@ data class SwingSettings
              * @return default terminal color palette.
              */
             @JvmStatic
-            fun defaultPalette(): TerminalColorPalette = TerminalTheme.CAMPBELL.createPalette()
+            public fun defaultPalette(): TerminalColorPalette = TerminalTheme.CAMPBELL.createPalette()
 
             /**
              * Resolves the font family name. If the requested font family name is installed on the
@@ -315,7 +323,7 @@ data class SwingSettings
              * @return the resolved font family name.
              */
             @JvmStatic
-            fun resolveFontFamily(requestedFamily: String): String {
+            public fun resolveFontFamily(requestedFamily: String): String {
                 val installedFamilies =
                     GraphicsEnvironment
                         .getLocalGraphicsEnvironment()
@@ -332,7 +340,7 @@ data class SwingSettings
              * @return list of monospaced font family names.
              */
             @JvmStatic
-            fun getMonospaceFontFamilies(): List<String> = resolvedMonospaceFontFamilies
+            public fun getMonospaceFontFamilies(): List<String> = resolvedMonospaceFontFamilies
 
             private val curatedMonospaceFontFamilies =
                 arrayOf(
@@ -424,7 +432,7 @@ data class SwingSettings
 /**
  * Built-in terminal color themes with verified correct ANSI color mappings.
  */
-enum class TerminalTheme {
+public enum class TerminalTheme {
     CAMPBELL,
     ONE_DARK,
     NORD,
@@ -433,11 +441,11 @@ enum class TerminalTheme {
     ;
 
     /** Stable identifier used by host configuration files. */
-    val id: String get() = name.lowercase(Locale.ROOT).replace('_', '-')
+    public val id: String get() = name.lowercase(Locale.ROOT).replace('_', '-')
 
-    companion object {
+    public companion object {
         /** Resolves a persisted identifier or a legacy enum name, ignoring case. */
-        fun fromId(id: String): TerminalTheme? = entries.firstOrNull { it.id.equals(id.replace('_', '-'), ignoreCase = true) }
+        public fun fromId(id: String): TerminalTheme? = entries.firstOrNull { it.id.equals(id.replace('_', '-'), ignoreCase = true) }
     }
 
     /**
@@ -445,7 +453,7 @@ enum class TerminalTheme {
      *
      * @return terminal color palette instance.
      */
-    fun createPalette(): TerminalColorPalette =
+    public fun createPalette(): TerminalColorPalette =
         when (this) {
             CAMPBELL ->
                 TerminalColorPalette(
@@ -619,11 +627,11 @@ enum class TerminalTheme {
 /**
  * Provides immutable settings snapshots to [io.github.ketraterm.ui.swing.api.SwingTerminal].
  */
-fun interface SwingSettingsProvider {
+public fun interface SwingSettingsProvider {
     /**
      * Returns the current immutable settings snapshot.
      *
      * @return settings snapshot for metrics, colors, and painting hints.
      */
-    fun currentSettings(): SwingSettings
+    public fun currentSettings(): SwingSettings
 }

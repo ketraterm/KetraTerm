@@ -25,7 +25,7 @@ import kotlinx.coroutines.flow.Flow
  * host-backed sources may perform bounded suspending work inside the request
  * scope.
  */
-fun interface TerminalCompletionEngine {
+public fun interface TerminalCompletionEngine {
     /**
      * Returns a cold progressive stream of best-first rankings for [request].
      *
@@ -36,5 +36,5 @@ fun interface TerminalCompletionEngine {
      * @param request command-line completion context.
      * @return cold stream of ordered completion snapshots.
      */
-    fun completions(request: TerminalCompletionRequest): Flow<List<TerminalCompletionCandidate>>
+    public fun completions(request: TerminalCompletionRequest): Flow<List<TerminalCompletionCandidate>>
 }

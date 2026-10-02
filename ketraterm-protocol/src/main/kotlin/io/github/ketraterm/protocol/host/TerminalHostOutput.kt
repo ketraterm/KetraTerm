@@ -29,13 +29,13 @@ package io.github.ketraterm.protocol.host
  * writing to this sink. Concurrent calls from independent threads have no
  * ordering guarantee unless the implementation explicitly provides one.
  */
-interface TerminalHostOutput {
+public interface TerminalHostOutput {
     /**
      * Writes one unsigned byte value to the host input stream.
      *
      * @param byte byte value in the range `0..255`.
      */
-    fun writeByte(byte: Int)
+    public fun writeByte(byte: Int)
 
     /**
      * Writes a contiguous byte range to the host input stream.
@@ -48,7 +48,7 @@ interface TerminalHostOutput {
      * @param offset first byte index to write.
      * @param length number of bytes to write.
      */
-    fun writeBytes(
+    public fun writeBytes(
         bytes: ByteArray,
         offset: Int,
         length: Int,
@@ -62,12 +62,12 @@ interface TerminalHostOutput {
      *
      * @param text text whose characters must fit in the ASCII byte range.
      */
-    fun writeAscii(text: String)
+    public fun writeAscii(text: String)
 
     /**
      * Writes a Unicode string encoded as UTF-8 to the host input stream.
      *
      * @param text text to encode and write.
      */
-    fun writeUtf8(text: String)
+    public fun writeUtf8(text: String)
 }

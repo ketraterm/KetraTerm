@@ -23,7 +23,7 @@ package io.github.ketraterm.input.event
  * same physical key is released. A host that cannot distinguish a phase must
  * not infer one; it should report the event as [PRESS] or omit it.
  */
-enum class TerminalKeyEventType {
+public enum class TerminalKeyEventType {
     /** Initial physical key press. */
     PRESS,
 

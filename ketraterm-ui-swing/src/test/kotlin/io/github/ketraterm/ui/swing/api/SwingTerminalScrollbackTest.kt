@@ -297,7 +297,7 @@ class SwingTerminalScrollbackTest {
                 component.setSize(30, 100)
                 try {
                     component.bind(session)
-                    assertNull(session.renderPublisher.current(), "The worker has not published the initial viewport yet")
+                    assertNull(session.renderPublisher.readCurrent { true }, "The worker has not published the initial viewport yet")
                     dispatcher.scheduler.runCurrent()
                     assertEquals(5, component.viewportState().historySize, "Scrolling requires the published history bounds")
 

@@ -30,20 +30,20 @@ import javax.swing.SwingUtilities
  * hosts can route through the platform application dispatcher while preserving
  * EDT ownership of Swing component state.
  */
-fun interface TerminalUiDispatcher {
+public fun interface TerminalUiDispatcher {
     /**
      * Schedules [runnable] for execution on the UI thread.
      *
      * @param runnable work that mutates Swing component state.
      */
-    fun dispatch(runnable: Runnable)
+    public fun dispatch(runnable: Runnable)
 
-    companion object {
+    public companion object {
         /**
          * Dispatcher backed by Swing's standard event queue.
          */
         @JvmField
-        val SWING: TerminalUiDispatcher =
+        public val SWING: TerminalUiDispatcher =
             TerminalUiDispatcher { runnable ->
                 SwingUtilities.invokeLater(runnable)
             }
@@ -58,21 +58,21 @@ fun interface TerminalUiDispatcher {
  * and the terminal must not send it to the session. Returning `false` passes
  * the key through to terminal input handling.
  */
-fun interface SwingTerminalHostKeyHandler {
+public fun interface SwingTerminalHostKeyHandler {
     /**
      * Handles a key press before terminal input encoding.
      *
      * @param event Swing key event owned by the EDT.
      * @return `true` when the host handled and consumed the key.
      */
-    fun handleKeyPressed(event: KeyEvent): Boolean
+    public fun handleKeyPressed(event: KeyEvent): Boolean
 
-    companion object {
+    public companion object {
         /**
          * Handler that never claims keys.
          */
         @JvmField
-        val NONE: SwingTerminalHostKeyHandler = SwingTerminalHostKeyHandler { false }
+        public val NONE: SwingTerminalHostKeyHandler = SwingTerminalHostKeyHandler { false }
     }
 }
 
@@ -82,6 +82,8 @@ fun interface SwingTerminalHostKeyHandler {
  * These services are intentionally kept out of row painters. Rendering consumes
  * immutable settings and render-cache snapshots, while host integrations supply
  * scheduling, clipboard, and explicit hyperlink activation policy here.
+ * Constructor, [copy], and destructuring signatures are part of the public ABI.
+ * New host services must preserve those signatures for compiled consumers.
  *
  * @property uiDispatcher scheduler for UI-thread component work.
  * @property clipboardHandler host clipboard adapter for copy and paste actions.
@@ -114,7 +116,7 @@ fun interface SwingTerminalHostKeyHandler {
  * gesture; application mouse reporting takes precedence unless Shift is held.
  * @property fontResolver custom host font resolver policy.
  */
-data class SwingHostServices
+public data class SwingHostServices
     @JvmOverloads
     constructor(
         val uiDispatcher: TerminalUiDispatcher = SWING,

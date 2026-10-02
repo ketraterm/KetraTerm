@@ -16,9 +16,19 @@
 plugins {
     kotlin("jvm") apply false
 }
+
+fun sha256(file: File): String =
+    java.security.MessageDigest
+        .getInstance("SHA-256")
+        .digest(file.readBytes())
+        .joinToString("") { "%02x".format(it) }
+
 val metadataMode = providers.gradleProperty("metadataMode").get()
 require(metadataMode in setOf("gradle", "pom"))
+val runtimeKotlinVersion = providers.gradleProperty("runtimeKotlinVersion")
+val runtimeName = runtimeKotlinVersion.getOrElse("current")
 subprojects {
+    val consumerName = name
     apply(plugin = "org.jetbrains.kotlin.jvm")
     layout.buildDirectory.set(layout.projectDirectory.dir("build/$metadataMode"))
     configurations.configureEach { resolutionStrategy.cacheChangingModulesFor(0, "seconds") }
@@ -44,6 +54,15 @@ subprojects {
     extensions.configure<org.jetbrains.kotlin.gradle.dsl.KotlinJvmProjectExtension> { jvmToolchain(25) }
     // The only library dependency: missing exports must not be repaired by the fixture.
     dependencies { add("implementation", "io.github.ketraterm:ketraterm-$name:${providers.gradleProperty("libraryVersion").get()}") }
+    runtimeKotlinVersion.orNull?.let { version ->
+        configurations.named("runtimeClasspath") {
+            resolutionStrategy.force(
+                "org.jetbrains.kotlin:kotlin-stdlib:$version",
+                "org.jetbrains.kotlin:kotlin-stdlib-jdk7:$version",
+                "org.jetbrains.kotlin:kotlin-stdlib-jdk8:$version",
+            )
+        }
+    }
     val smoke =
         tasks.register<JavaExec>("smoke") {
             dependsOn("classes")
@@ -57,4 +76,88 @@ subprojects {
             )
         }
     tasks.named("check") { dependsOn(smoke) }
+
+    // Resolution has no dependency on classes: an upgrade must never recompile its old client.
+    tasks.register("prepareCompiledClientRuntime") {
+        val runtime = configurations.named("runtimeClasspath")
+        val destination = rootProject.layout.projectDirectory.file("upgrade-classpaths/$metadataMode/$runtimeName/$consumerName.txt")
+        inputs.files(runtime)
+        outputs.file(destination)
+        doLast {
+            destination.asFile.apply {
+                parentFile.mkdirs()
+                writeText(
+                    runtime
+                        .get()
+                        .files
+                        .sortedBy(File::getName)
+                        .joinToString("\n") { it.absolutePath } + "\n",
+                )
+            }
+        }
+    }
+
+    val baselineJar =
+        tasks.register<Jar>("compiledClientBaselineJar") {
+            dependsOn("classes")
+            from(project.extensions.getByType<SourceSetContainer>()["main"].output)
+            destinationDirectory.set(rootProject.layout.projectDirectory.dir("baseline"))
+            archiveFileName.set("$consumerName.jar")
+            isPreserveFileTimestamps = false
+            isReproducibleFileOrder = true
+        }
+    val baselineArtifacts =
+        configurations
+            .getByName("compileClasspath")
+            .incoming.artifacts.resolvedArtifacts
+    val baselineSources = fileTree("src/main")
+    val fixtureDirectory = projectDir
+    val provenanceDirectory = rootProject.layout.projectDirectory.dir("baseline")
+    val baselineRevision = providers.gradleProperty("baselineRevision")
+    val baselineLibraryVersion = providers.gradleProperty("libraryVersion")
+    val baselineKotlinVersion = providers.gradleProperty("kotlinVersion")
+    val baselineCompiler =
+        extensions.getByType<JavaToolchainService>().compilerFor {
+            languageVersion.set(JavaLanguageVersion.of(25))
+        }
+    tasks.register("recordCompiledClientBaseline") {
+        dependsOn(baselineJar)
+        doLast {
+            val jar =
+                baselineJar
+                    .get()
+                    .archiveFile
+                    .get()
+                    .asFile
+            val artifacts = baselineArtifacts.get()
+            val sources = baselineSources.files.sortedBy { it.relativeTo(fixtureDirectory).invariantSeparatorsPath }
+            val compiler = baselineCompiler.get()
+            provenanceDirectory.file("$consumerName.provenance").asFile.writeText(
+                buildString {
+                    appendLine("format=1")
+                    appendLine("basis=reviewed-working-tree")
+                    appendLine("baseRevision=${baselineRevision.get()}")
+                    appendLine("libraryVersion=${baselineLibraryVersion.get()}")
+                    appendLine("kotlinVersion=${baselineKotlinVersion.get()}")
+                    appendLine("jvmTarget=25")
+                    appendLine("jdkVersion=${compiler.metadata.javaRuntimeVersion}")
+                    appendLine("jdkVendor=${compiler.metadata.vendor}")
+                    appendLine("clientSha256=${sha256(jar)}")
+                    for (artifact in artifacts.sortedBy { it.id.componentIdentifier.displayName }) {
+                        appendLine("artifact=${artifact.id.componentIdentifier.displayName} sha256=${sha256(artifact.file)}")
+                    }
+                    for (source in sources) {
+                        appendLine("source=${source.relativeTo(fixtureDirectory).invariantSeparatorsPath} sha256=${sha256(source)}")
+                    }
+                },
+            )
+        }
+    }
+}
+
+tasks.register("prepareCompiledClientRuntime") {
+    dependsOn(subprojects.map { it.tasks.named("prepareCompiledClientRuntime") })
+}
+tasks.register("recordCompiledClientBaseline") {
+    dependsOn(subprojects.map { it.tasks.named("recordCompiledClientBaseline") })
 }

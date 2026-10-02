@@ -16,8 +16,16 @@
 package consumer
 
 import io.github.ketraterm.core.TerminalBuffers
+import io.github.ketraterm.host.TerminalClipboardPermission
+import io.github.ketraterm.host.TerminalClipboardReadAuditEvent
+import io.github.ketraterm.host.TerminalClipboardReadOutcome
+import io.github.ketraterm.host.TerminalClipboardReadRequest
+import io.github.ketraterm.protocol.TerminalClipboardSelection
 import io.github.ketraterm.render.api.TerminalRenderUnderline
 import io.github.ketraterm.session.TerminalSession
+import io.github.ketraterm.session.TerminalShellCommandLineSnapshot
+import io.github.ketraterm.session.TerminalShellIntegrationFactory
+import io.github.ketraterm.session.TerminalShellIntegrationState
 import io.github.ketraterm.transport.TerminalConnector
 import io.github.ketraterm.transport.TerminalConnectorListener
 import io.github.ketraterm.ui.swing.api.*
@@ -26,6 +34,7 @@ import io.github.ketraterm.ui.swing.settings.SwingSettings
 import io.github.ketraterm.ui.swing.settings.SwingSettingsProvider
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.onCompletion
 import kotlinx.coroutines.flow.onSubscription
@@ -50,9 +59,19 @@ private const val ROWS = 3
 fun main() =
     runBlocking {
         JavaConsumer.verify()
+        val selection = checkNotNull(TerminalClipboardSelection.parse("cp"))
+        JavaConsumer.verifyClipboardCallbacks(
+            TerminalClipboardReadRequest(selection, TerminalClipboardPermission.ALLOW, 16),
+            TerminalClipboardReadAuditEvent(selection, TerminalClipboardReadOutcome.SENT),
+        )
         val connector = ConsumerConnector()
         val detector = ConsumerHyperlinkDetector()
-        TerminalSession.create(TerminalBuffers.create(COLUMNS, ROWS), connector).use { session ->
+        val commandLine = MutableStateFlow<TerminalShellCommandLineSnapshot?>(TerminalShellCommandLineSnapshot("help", 4, 4, 0))
+        val shell = TerminalShellIntegrationFactory.host(TerminalShellIntegrationState(), commandLine)
+        TerminalSession.create(TerminalBuffers.create(COLUMNS, ROWS), connector, shellIntegration = shell).use { session ->
+            check(session.activeShellCommandLine() == commandLine.value)
+            commandLine.value = null
+            check(session.activeShellCommandLine() == null)
             session.start(COLUMNS, ROWS)
             withTimeout(20_000) { session.renderGeneration.first { it >= 0L } }
             val terminal =
@@ -76,11 +95,22 @@ fun main() =
                 }
             try {
                 onEdt {
+                    val original = SwingSettings()
+                    val updated = original.copy(cursorBlinkMillis = 0)
+                    val (font, fallbackFonts) = updated
+                    check(font == original.font && fallbackFonts == original.fallbackFonts)
+                    check(updated.cursorBlinkMillis == 0 && updated.padding == original.padding)
                     terminal.bind(session)
                     terminal.dispatchPointer(MouseEvent.MOUSE_MOVED)
                 }
                 // Entry acknowledges installation in the view, not merely completion of detection.
                 withTimeout(20_000) { detector.initialHover.await() }
+                checkNotNull(
+                    session.renderPublisher.readCurrent { frame ->
+                        check(frame.hasFrame && frame.columns == COLUMNS && frame.rows >= ROWS)
+                        for (column in URL.indices) check(frame.codeWords[column] == URL[column].code)
+                    },
+                )
                 onEdt {
                     check(terminal.cursor.type == Cursor.HAND_CURSOR)
                     terminal.dispatchPointer(MouseEvent.MOUSE_PRESSED, MouseEvent.BUTTON1)

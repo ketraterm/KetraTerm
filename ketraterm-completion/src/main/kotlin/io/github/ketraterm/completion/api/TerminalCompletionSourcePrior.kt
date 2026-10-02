@@ -23,19 +23,19 @@ package io.github.ketraterm.completion.api
  * values when composing the corresponding built-in sources so standalone and
  * IDE integrations start from the same policy before learned evidence applies.
  */
-object TerminalCompletionSourcePrior {
+public object TerminalCompletionSourcePrior {
     /** Prior for imported Gradle task candidates. */
-    const val GRADLE_TASK: Int = 15
+    public const val GRADLE_TASK: Int = 15
 
     /** Prior for Git branch, tag, and commit candidates captured from one repository. */
-    const val GIT_REFERENCE: Int = 15
+    public const val GIT_REFERENCE: Int = 15
 
     /** Prior for changed or untracked Git path candidates. */
-    const val GIT_STATUS_PATH: Int = 15
+    public const val GIT_STATUS_PATH: Int = 15
 
     /** Prior for direct children returned by the active directory provider. */
-    const val DIRECTORY_PATH: Int = 12
+    public const val DIRECTORY_PATH: Int = 12
 
     /** Prior for fuzzy paths from a bounded project index. */
-    const val PROJECT_FUZZY_PATH: Int = 10
+    public const val PROJECT_FUZZY_PATH: Int = 10
 }

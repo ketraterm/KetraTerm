@@ -51,7 +51,15 @@ session.start(columns = 80, rows = 24)
 session.requestRender(scrollbackOffset = 0)
 ```
 
-Collectors own their scopes. Closing the session emits `Closed` before its child jobs are cancelled, so current and late collectors can observe the terminal lifecycle result.
+Collectors own their scopes. The session retains `Closed` after cleanup and final
+frame publication. Current and late collectors can observe that result from
+caller-owned scopes independently of the cancelled session workers.
+
+The session keeps its mutable core private. Read through its synchronized frame
+and mode APIs; a retained constructor input belongs exclusively to the session
+until `state` reaches `Closed`. Custom parser assembly retains its host-adapter
+wiring, while the session owns its admission lock. Rendering consumers must hold
+a `readCurrent` lease for every access to a published cache and its arrays.
 
 ## Host-owned shell integration
 

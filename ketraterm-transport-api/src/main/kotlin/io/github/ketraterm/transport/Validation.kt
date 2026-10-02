@@ -24,7 +24,7 @@ package io.github.ketraterm.transport
  * @param length the number of bytes to validate.
  */
 @Suppress("NOTHING_TO_INLINE")
-inline fun ByteArray.checkBounds(
+public inline fun ByteArray.checkBounds(
     offset: Int,
     length: Int,
 ) {

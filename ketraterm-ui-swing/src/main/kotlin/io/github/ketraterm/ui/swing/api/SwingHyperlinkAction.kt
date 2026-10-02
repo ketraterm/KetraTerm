@@ -26,34 +26,34 @@ import javax.swing.JComponent
  * [open] follows the occurrence's [SwingHyperlinkActivation] policy or an explicit
  * context-menu request and may navigate through an IDE, browser, or file opener.
  */
-fun interface SwingHyperlinkAction {
+public fun interface SwingHyperlinkAction {
     /**
      * Opens the hyperlink target.
      *
      * @return `true` when the activation was handled.
      */
-    fun open(): Boolean
+    public fun open(): Boolean
 
     /** Opens from a captured gesture, preserving a host navigation popup's anchor. */
-    fun open(event: MouseEvent): Boolean = open()
+    public fun open(event: MouseEvent): Boolean = open()
 
     /** Optional provider hover callback. Bounds are component-local; invoked on entry, never in paint. */
-    fun mouseEntered(
+    public fun mouseEntered(
         component: JComponent,
         x: Int,
         y: Int,
         width: Int,
         height: Int,
-    ) = Unit
+    ): Unit = Unit
 
     /** Balances an entry when the pointer leaves, the occurrence changes, or the binding closes. */
-    fun mouseExited() = Unit
+    public fun mouseExited(): Unit = Unit
 
-    companion object {
+    public companion object {
         /**
          * Action that rejects activation.
          */
         @JvmField
-        val NONE: SwingHyperlinkAction = SwingHyperlinkAction { false }
+        public val NONE: SwingHyperlinkAction = SwingHyperlinkAction { false }
     }
 }

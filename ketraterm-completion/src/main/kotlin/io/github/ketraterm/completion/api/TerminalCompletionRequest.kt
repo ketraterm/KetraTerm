@@ -22,7 +22,7 @@ import io.github.ketraterm.completion.internal.isTerminalCompletionUtf16Boundary
  * Shell-specific quoting policy for replacement text produced by completion
  * sources.
  */
-enum class TerminalShellQuotingPolicy {
+public enum class TerminalShellQuotingPolicy {
     /**
      * Preserve only replacements that are safe without dialect-specific
      * escaping. Unsafe unquoted values are omitted instead of guessed.
@@ -44,7 +44,7 @@ enum class TerminalShellQuotingPolicy {
  * operator semantics. Hosts should derive it from authoritative shell profile
  * metadata rather than terminal text or process output.
  */
-enum class TerminalShellSyntax {
+public enum class TerminalShellSyntax {
     /**
      * Conservative whitespace-and-quote tokenization with no command operator
      * segmentation. Use for unknown shells and dialects without an implemented
@@ -71,20 +71,20 @@ enum class TerminalShellSyntax {
  * @property syntax lexical rules used to resolve the cursor's command segment.
  * @property quoting replacement escaping policy used by candidate sources.
  */
-data class TerminalShellCapabilities
+public data class TerminalShellCapabilities
     @JvmOverloads
     constructor(
         val syntax: TerminalShellSyntax = TerminalShellSyntax.PLAIN,
         val quoting: TerminalShellQuotingPolicy = TerminalShellQuotingPolicy.CONSERVATIVE,
     ) {
-        companion object {
+        public companion object {
             /** Conservative capabilities for unknown or unsupported shells. */
             @JvmField
-            val PLAIN: TerminalShellCapabilities = TerminalShellCapabilities()
+            public val PLAIN: TerminalShellCapabilities = TerminalShellCapabilities()
 
             /** Capabilities for the supported POSIX shell subset. */
             @JvmField
-            val POSIX: TerminalShellCapabilities =
+            public val POSIX: TerminalShellCapabilities =
                 TerminalShellCapabilities(
                     syntax = TerminalShellSyntax.POSIX,
                     quoting = TerminalShellQuotingPolicy.POSIX,
@@ -92,7 +92,7 @@ data class TerminalShellCapabilities
 
             /** Capabilities for PowerShell lexical and quoting rules. */
             @JvmField
-            val POWERSHELL: TerminalShellCapabilities =
+            public val POWERSHELL: TerminalShellCapabilities =
                 TerminalShellCapabilities(
                     syntax = TerminalShellSyntax.POWERSHELL,
                     quoting = TerminalShellQuotingPolicy.POWERSHELL,
@@ -116,7 +116,7 @@ data class TerminalShellCapabilities
  * @throws IllegalArgumentException if [cursorOffset] is outside [commandLine],
  * or splits a UTF-16 surrogate pair.
  */
-data class TerminalCompletionRequest
+public data class TerminalCompletionRequest
     @JvmOverloads
     constructor(
         val commandLine: String,

@@ -28,7 +28,7 @@ package io.github.ketraterm.host
  * @property maxLength maximum retained title length in UTF-16 code units.
  * Clamping never splits a valid surrogate pair.
  */
-data class TerminalTitlePolicy(
+public data class TerminalTitlePolicy(
     val permission: TerminalTitlePermission = TerminalTitlePermission.ALLOW,
     val overflowPolicy: TerminalTitleOverflowPolicy = TerminalTitleOverflowPolicy.CLAMP,
     val maxLength: Int = DEFAULT_MAX_LENGTH,
@@ -40,15 +40,15 @@ data class TerminalTitlePolicy(
     }
 
     /** Shared default maximum retained title length in UTF-16 code units. */
-    companion object {
-        const val DEFAULT_MAX_LENGTH: Int = 4096
+    public companion object {
+        public const val DEFAULT_MAX_LENGTH: Int = 4096
     }
 }
 
 /**
  * Permission for terminal-triggered title metadata updates.
  */
-enum class TerminalTitlePermission {
+public enum class TerminalTitlePermission {
     /** Ignore terminal title updates and title-stack restore effects. */
     DENY,
 
@@ -59,7 +59,7 @@ enum class TerminalTitlePermission {
 /**
  * Handling for terminal titles that exceed the configured maximum length.
  */
-enum class TerminalTitleOverflowPolicy {
+public enum class TerminalTitleOverflowPolicy {
     /**
      * Ignore the title update when the incoming title is longer than the
      * configured maximum.

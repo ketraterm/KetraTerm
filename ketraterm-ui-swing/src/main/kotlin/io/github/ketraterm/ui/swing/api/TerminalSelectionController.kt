@@ -217,8 +217,10 @@ internal class TerminalSelectionController(
         val caretRow = if (isForward) clampedEndRow else clampedStartRow
         val previous = viewportSelection
         if (previous != null &&
-            previous.anchorColumn == anchorColumn && previous.anchorRow == anchorRow &&
-            previous.caretColumn == caretColumn && previous.caretRow == caretRow &&
+            previous.anchorColumn == anchorColumn &&
+            previous.anchorRow == anchorRow &&
+            previous.caretColumn == caretColumn &&
+            previous.caretRow == caretRow &&
             previous.isBlock == selectionIsBlock
         ) {
             return previous

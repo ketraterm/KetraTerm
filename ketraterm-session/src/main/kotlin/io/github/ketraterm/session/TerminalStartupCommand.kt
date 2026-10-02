@@ -24,7 +24,7 @@ package io.github.ketraterm.session
  *
  * @property text exact command line, including intentional leading/trailing spaces.
  */
-data class TerminalStartupCommand(
+public data class TerminalStartupCommand(
     val text: String,
 ) {
     init {
@@ -33,11 +33,11 @@ data class TerminalStartupCommand(
         require(text.none(Char::isISOControl)) { "Startup command must be one line without control characters" }
     }
 
-    companion object {
+    public companion object {
         /** Maximum command length in UTF-16 code units. */
-        const val MAX_LENGTH: Int = 16_384
+        public const val MAX_LENGTH: Int = 16_384
 
         /** Returns no command for blank settings; otherwise validates and preserves [text]. */
-        fun fromText(text: String): TerminalStartupCommand? = text.takeUnless(String::isBlank)?.let(::TerminalStartupCommand)
+        public fun fromText(text: String): TerminalStartupCommand? = text.takeUnless(String::isBlank)?.let(::TerminalStartupCommand)
     }
 }

@@ -29,7 +29,7 @@ import io.github.ketraterm.core.model.UnderlineStyle
  * expected to decide grapheme-cluster boundaries and call either the scalar
  * fast path ([writeCodepoint]) or the explicit cluster ingress ([writeCluster]).
  */
-interface TerminalWriter {
+public interface TerminalWriter {
     /**
      * Writes one Unicode scalar value at the cursor position using the active
      * pen attributes, then advances the cursor.
@@ -45,7 +45,7 @@ interface TerminalWriter {
      * @throws IllegalArgumentException if [codepoint] is outside `0..0x10FFFF` or a surrogate.
      * Invalid input is rejected before any state mutation.
      */
-    fun writeCodepoint(codepoint: Int)
+    public fun writeCodepoint(codepoint: Int)
 
     /**
      * Writes [text] literally to the buffer using the active pen attributes.
@@ -60,7 +60,7 @@ interface TerminalWriter {
      *
      * @param text Text to write.
      */
-    fun writeText(text: String)
+    public fun writeText(text: String)
 
     /**
      * Writes one pre-segmented grapheme cluster to the grid.
@@ -78,7 +78,7 @@ interface TerminalWriter {
      * or any value in the used prefix is not a Unicode scalar. The entire prefix
      * is checked before mutation; unused array entries are ignored.
      */
-    fun writeCluster(
+    public fun writeCluster(
         codepoints: IntArray,
         length: Int = codepoints.size,
     )
@@ -107,7 +107,7 @@ interface TerminalWriter {
      * @throws IllegalArgumentException if [length] is outside `1..codepoints.size` or any
      * used entry is not a Unicode scalar, even without a target. Validation precedes mutation.
      */
-    fun updatePreviousCluster(
+    public fun updatePreviousCluster(
         codepoints: IntArray,
         length: Int = codepoints.size,
     )
@@ -118,7 +118,7 @@ interface TerminalWriter {
      * Moves the cursor down one row without resetting the column. Scrolls the
      * active scroll region up if the cursor is on the bottom margin.
      */
-    fun newLine()
+    public fun newLine()
 
     /**
      * Executes Reverse Index (RI, `ESC M`).
@@ -126,7 +126,7 @@ interface TerminalWriter {
      * Moves the cursor up one row without changing the column. Scrolls the
      * active scroll region down if the cursor is on the top margin.
      */
-    fun reverseLineFeed()
+    public fun reverseLineFeed()
 
     /**
      * Executes a carriage return (CR, `0x0D`).
@@ -134,7 +134,7 @@ interface TerminalWriter {
      * Moves the cursor to the active left boundary on the current row. With
      * DECLRMM off that is column 0; with DECLRMM on it is the left margin.
      */
-    fun carriageReturn()
+    public fun carriageReturn()
 
     /**
      * Sets the active vertical scroll region (DECSTBM, `CSI top ; bottom r`).
@@ -147,7 +147,7 @@ interface TerminalWriter {
      * @param top First row of the scroll region (1-based, inclusive).
      * @param bottom Last row of the scroll region (1-based, inclusive).
      */
-    fun setScrollRegion(
+    public fun setScrollRegion(
         top: Int,
         bottom: Int,
     )
@@ -162,13 +162,13 @@ interface TerminalWriter {
      * @param left Left margin column (1-based, inclusive).
      * @param right Right margin column (1-based, inclusive).
      */
-    fun setLeftRightMargins(
+    public fun setLeftRightMargins(
         left: Int,
         right: Int,
     )
 
     /** Resets the scroll region to the full viewport and homes the cursor. */
-    fun resetScrollRegion()
+    public fun resetScrollRegion()
 
     /**
      * Scrolls the active scroll region up by one line (SU, `CSI 1 S`).
@@ -177,7 +177,7 @@ interface TerminalWriter {
      * starting at the top of the viewport may admit its top line to scrollback;
      * partial-width scrolling never does. The cursor position is preserved.
      */
-    fun scrollUp()
+    public fun scrollUp()
 
     /**
      * Scrolls the active region up by [count] lines, capped at its height.
@@ -185,7 +185,7 @@ interface TerminalWriter {
      * the same horizontal-margin and history-admission rules as [scrollUp].
      * Work is bounded by the grid dimensions, not the supplied count.
      */
-    fun scrollUp(count: Int)
+    public fun scrollUp(count: Int)
 
     /**
      * Scrolls the active scroll region down by one line (SD, `CSI 1 T`).
@@ -194,7 +194,7 @@ interface TerminalWriter {
      * cells at the top of the region. Scrollback is not consumed. The cursor
      * position is preserved.
      */
-    fun scrollDown()
+    public fun scrollDown()
 
     /**
      * Scrolls the active region down by [count] lines, capped at its height.
@@ -202,7 +202,7 @@ interface TerminalWriter {
      * the same horizontal-margin rules as [scrollDown], without consuming history.
      * Work is bounded by the grid dimensions, not the supplied count.
      */
-    fun scrollDown(count: Int)
+    public fun scrollDown(count: Int)
 
     /**
      * Inserts [count] blank lines at the cursor row within the active scroll
@@ -213,7 +213,7 @@ interface TerminalWriter {
      *
      * @param count Number of blank lines to insert. Non-positive values are ignored.
      */
-    fun insertLines(count: Int)
+    public fun insertLines(count: Int)
 
     /**
      * Deletes [count] lines starting at the cursor row within the active scroll
@@ -224,7 +224,7 @@ interface TerminalWriter {
      *
      * @param count Number of lines to delete. Non-positive values are ignored.
      */
-    fun deleteLines(count: Int)
+    public fun deleteLines(count: Int)
 
     /**
      * Inserts [count] blank cells at the cursor column, shifting existing cells
@@ -232,7 +232,7 @@ interface TerminalWriter {
      *
      * @param count Number of blank cells to insert. Non-positive values are ignored.
      */
-    fun insertBlankCharacters(count: Int)
+    public fun insertBlankCharacters(count: Int)
 
     /**
      * Deletes [count] characters at the cursor column, shifting the remainder of
@@ -241,7 +241,7 @@ interface TerminalWriter {
      *
      * @param count Number of characters to delete. Non-positive values are ignored.
      */
-    fun deleteCharacters(count: Int)
+    public fun deleteCharacters(count: Int)
 
     /**
      * Erases [count] characters starting at the cursor column without shifting
@@ -253,40 +253,40 @@ interface TerminalWriter {
      *
      * @param count Number of characters to erase; `0` means `1`.
      */
-    fun eraseCharacters(count: Int)
+    public fun eraseCharacters(count: Int)
 
     /** Erases from the cursor to the end of the current line (EL 0, `CSI 0 K`). */
-    fun eraseLineToEnd()
+    public fun eraseLineToEnd()
 
     /** Erases from the start of the current line through the cursor (EL 1, `CSI 1 K`). */
-    fun eraseLineToCursor()
+    public fun eraseLineToCursor()
 
     /** Erases the entire current line without moving the cursor (EL 2, `CSI 2 K`). */
-    fun eraseCurrentLine()
+    public fun eraseCurrentLine()
 
     /** Selectively erases from the cursor to the end of the current line (DECSEL 0). */
-    fun selectiveEraseLineToEnd()
+    public fun selectiveEraseLineToEnd()
 
     /** Selectively erases from the start of the current line through the cursor (DECSEL 1). */
-    fun selectiveEraseLineToCursor()
+    public fun selectiveEraseLineToCursor()
 
     /** Selectively erases the entire current line without moving the cursor (DECSEL 2). */
-    fun selectiveEraseCurrentLine()
+    public fun selectiveEraseCurrentLine()
 
     /** Erases from the cursor to the end of the visible screen (ED 0, `CSI 0 J`). */
-    fun eraseScreenToEnd()
+    public fun eraseScreenToEnd()
 
     /** Erases from the start of the visible screen through the cursor (ED 1, `CSI 1 J`). */
-    fun eraseScreenToCursor()
+    public fun eraseScreenToCursor()
 
     /** Selectively erases from the cursor through the end of the visible screen (DECSED 0). */
-    fun selectiveEraseScreenToEnd()
+    public fun selectiveEraseScreenToEnd()
 
     /** Selectively erases from the start of the visible screen through the cursor (DECSED 1). */
-    fun selectiveEraseScreenToCursor()
+    public fun selectiveEraseScreenToCursor()
 
     /** Selectively erases the entire visible screen without moving the cursor (DECSED 2). */
-    fun selectiveEraseEntireScreen()
+    public fun selectiveEraseEntireScreen()
 
     /**
      * Erases a VT400 rectangular area (DECERA / DECSERA).
@@ -301,7 +301,7 @@ interface TerminalWriter {
      * @param right One-based right column, or `0` when omitted.
      * @param selective `true` for DECSERA, `false` for DECERA.
      */
-    fun eraseRectangle(
+    public fun eraseRectangle(
         top: Int,
         left: Int,
         bottom: Int,
@@ -322,7 +322,7 @@ interface TerminalWriter {
      * @param bottom One-based bottom row, or `0` when omitted.
      * @param right One-based right column, or `0` when omitted.
      */
-    fun fillRectangle(
+    public fun fillRectangle(
         codepoint: Int,
         top: Int,
         left: Int,
@@ -348,7 +348,7 @@ interface TerminalWriter {
      * @param destinationLeft One-based destination left column, or `0` when omitted.
      * @param destinationPage Destination page (`0` omitted or `1` for the active page).
      */
-    fun copyRectangle(
+    public fun copyRectangle(
         sourceTop: Int,
         sourceLeft: Int,
         sourceBottom: Int,
@@ -365,13 +365,13 @@ interface TerminalWriter {
      * @param extent `0` or `1` selects wrapped stream extent; `2` selects exact rectangle.
      * Unsupported values leave the current extent unchanged.
      */
-    fun setAttributeChangeExtent(extent: Int)
+    public fun setAttributeChangeExtent(extent: Int)
 
     /**
      * Changes DECCARA visual attributes without changing cell values, protection, hyperlinks, or
      * the current SGR pen. Masks use [io.github.ketraterm.protocol.DecRectangleAttribute] bits.
      */
-    fun changeRectangleAttributes(
+    public fun changeRectangleAttributes(
         top: Int,
         left: Int,
         bottom: Int,
@@ -385,7 +385,7 @@ interface TerminalWriter {
      * or the current SGR pen. [reverseMask] uses
      * [io.github.ketraterm.protocol.DecRectangleAttribute] bits.
      */
-    fun reverseRectangleAttributes(
+    public fun reverseRectangleAttributes(
         top: Int,
         left: Int,
         bottom: Int,
@@ -401,7 +401,7 @@ interface TerminalWriter {
      *
      * @param count Number of columns to insert. Non-positive values are ignored.
      */
-    fun insertColumns(count: Int)
+    public fun insertColumns(count: Int)
 
     /**
      * Deletes DECDC columns at the cursor column across the active vertical scroll region.
@@ -411,23 +411,23 @@ interface TerminalWriter {
      *
      * @param count Number of columns to delete. Non-positive values are ignored.
      */
-    fun deleteColumns(count: Int)
+    public fun deleteColumns(count: Int)
 
     /** Erases the entire visible screen without moving the cursor (ED 2, `CSI 2 J`). */
-    fun eraseEntireScreen()
+    public fun eraseEntireScreen()
 
     /**
      * Erases all scrollback history while preserving the visible viewport
      * (xterm/VTE ED 3, `CSI 3 J`).
      */
-    fun eraseScreenAndHistory()
+    public fun eraseScreenAndHistory()
 
     /**
      * Clears the visible screen and homes the cursor (equivalent to ED 2 + CUP).
      *
      * Scrollback history is preserved. This matches what the shell `clear` command sends.
      */
-    fun clearScreen()
+    public fun clearScreen()
 
     /**
      * Clears all visible content and scrollback history, resets the pen, homes the
@@ -437,7 +437,7 @@ interface TerminalWriter {
      * The scroll region is not affected. For a full terminal reset use
      * [TerminalBuffer.reset].
      */
-    fun clearAll()
+    public fun clearAll()
 
     /**
      * Executes the DEC Screen Alignment Test (DECALN, `ESC # 8`).
@@ -446,7 +446,7 @@ interface TerminalWriter {
      * and horizontal scrolling regions to the full viewport limits, homes the cursor to (0, 0), and
      * cancels any pending cursor wrap state.
      */
-    fun decaln()
+    public fun decaln()
 
     /**
      * Sets the active pen attributes used by all subsequent write and erase operations.
@@ -467,7 +467,7 @@ interface TerminalWriter {
      * @param underlineColor Underline colour code (0 = default/foreground,
      * 1..256 = indexed palette colors).
      */
-    fun setPenAttributes(
+    public fun setPenAttributes(
         fg: Int,
         bg: Int,
         bold: Boolean = false,
@@ -501,7 +501,7 @@ interface TerminalWriter {
      * @param inverse `true` to enable inverse/reverse-video.
      * @param conceal `true` to mark text as concealed/hidden.
      */
-    fun setPenColors(
+    public fun setPenColors(
         foreground: CellColor,
         background: CellColor,
         underlineColor: CellColor = CellColor.DEFAULT,
@@ -522,7 +522,7 @@ interface TerminalWriter {
      * Hyperlink and selective-erase protection are preserved. With all fields null this is a no-op.
      * Consumed synchronously; serialize with other terminal reads and writes. No cell is changed.
      */
-    fun updatePenColors(
+    public fun updatePenColors(
         foreground: CellColor? = null,
         background: CellColor? = null,
         underlineColor: CellColor? = null,
@@ -546,7 +546,7 @@ interface TerminalWriter {
      * @param hyperlinkId `0` for no active hyperlink, or a positive id owned by
      * the host/host layer.
      */
-    fun setHyperlinkId(hyperlinkId: Int)
+    public fun setHyperlinkId(hyperlinkId: Int)
 
     /**
      * Sets the xterm window title.
@@ -555,7 +555,7 @@ interface TerminalWriter {
      *
      * @param title The window title to set.
      */
-    fun setWindowTitle(title: String)
+    public fun setWindowTitle(title: String)
 
     /**
      * Sets the xterm icon title.
@@ -564,7 +564,7 @@ interface TerminalWriter {
      *
      * @param title The icon title to set.
      */
-    fun setIconTitle(title: String)
+    public fun setIconTitle(title: String)
 
     /**
      * Enables or disables selective-erase protection on future printed cells (DECSCA).
@@ -573,10 +573,10 @@ interface TerminalWriter {
      *
      * @param enabled `true` to enable selective-erase protection, `false` to disable.
      */
-    fun setSelectiveEraseProtection(enabled: Boolean)
+    public fun setSelectiveEraseProtection(enabled: Boolean)
 
     /**
      * Resets the active pen to the terminal default attributes (`SGR 0`, `CSI 0 m`).
      */
-    fun resetPen()
+    public fun resetPen()
 }

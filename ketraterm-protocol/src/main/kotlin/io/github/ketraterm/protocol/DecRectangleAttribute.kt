@@ -22,19 +22,19 @@ package io.github.ketraterm.protocol
  * blink, and negative image. They deliberately exclude color, protection, hyperlinks, and
  * modern SGR extensions because the DEC controls do not modify those properties.
  */
-object DecRectangleAttribute {
+public object DecRectangleAttribute {
     /** Selects bold (SGR `1`). */
-    const val BOLD: Int = 1
+    public const val BOLD: Int = 1
 
     /** Selects underline (SGR `4`). */
-    const val UNDERLINE: Int = 1 shl 1
+    public const val UNDERLINE: Int = 1 shl 1
 
     /** Selects blink (SGR `5`). */
-    const val BLINK: Int = 1 shl 2
+    public const val BLINK: Int = 1 shl 2
 
     /** Selects negative image / inverse video (SGR `7`). */
-    const val INVERSE: Int = 1 shl 3
+    public const val INVERSE: Int = 1 shl 3
 
     /** Selects every VT420 visual attribute handled by these operations. */
-    const val ALL: Int = BOLD or UNDERLINE or BLINK or INVERSE
+    public const val ALL: Int = BOLD or UNDERLINE or BLINK or INVERSE
 }

@@ -21,14 +21,21 @@ package io.github.ketraterm.core.api
  * Composes all role-specific interfaces into a single surface for host
  * applications and host tests.
  *
- * Coordinates are always zero-based when they are expressed directly as rows
- * and columns on this API. DEC/ANSI commands that are traditionally 1-based
- * should be translated by the parser before they reach the core.
+ * Cursor positions and cell/line reads use zero-based viewport coordinates.
+ * Margin and rectangular commands retain the DEC one-based conventions documented
+ * on each method, including zero for omitted rectangle parameters. The host adapter
+ * owns conversion from parser commands; the parser does not own grid coordinates.
  *
- * The parser should depend only on the narrower interfaces it actually needs;
- * this facade mainly exists for host host points and tests.
+ * Instances returned by [io.github.ketraterm.core.TerminalBuffers] require external
+ * serialization of mutations and grid/cursor/history reads. Atomic mode snapshots
+ * may be read independently as documented by [TerminalModeReader]. Borrowed line and render views are valid
+ * only while that serialization is held. Session-backed hosts access terminal state
+ * through their session boundary rather than concurrently mutating this buffer.
+ *
+ * Host adapters should depend on the narrower interfaces they need; this facade
+ * composes the complete core contract for direct embedders.
  */
-interface TerminalBuffer :
+public interface TerminalBuffer :
     TerminalWriter,
     TerminalCursor,
     TerminalModeController,
@@ -55,9 +62,11 @@ interface TerminalBuffer :
      *   re-anchor a scrollback viewport that was active at [oldScrollbackOffset] before
      *   the reflow. Both values describe the active buffer, with the offset clamped
      *   to its history. An active alternate screen returns zero for both values.
-     * @throws IllegalArgumentException if either dimension is <= 0.
+     * @throws IllegalArgumentException if either dimension is <= 0, or adding
+     * [newHeight] to the configured primary history capacity would overflow [Int].
+     * Invalid dimensions are rejected before allocation or state mutation.
      */
-    fun resize(
+    public fun resize(
         newWidth: Int,
         newHeight: Int,
         oldScrollbackOffset: Int = 0,
@@ -72,7 +81,7 @@ interface TerminalBuffer :
      * stops to the standard 8-column VT100 spacing. If the alternate buffer is
      * active, exits it first.
      */
-    fun reset()
+    public fun reset()
 
     /**
      * Performs a soft terminal reset (DECSTR, `CSI ! p`).
@@ -84,7 +93,7 @@ interface TerminalBuffer :
      * attributes, selective-erase write protection, and pending wrap. The saved
      * cursor slots are replaced with a home/default restore target.
      */
-    fun softReset()
+    public fun softReset()
 
     /**
      * Executes DECCOLM (`CSI ? 3 h` / `CSI ? 3 l`) as a core-owned macro command.
@@ -107,5 +116,5 @@ interface TerminalBuffer :
      *
      * @param newWidth The target width, either 80 or 132 columns.
      */
-    fun executeDeccolm(newWidth: Int)
+    public fun executeDeccolm(newWidth: Int)
 }

@@ -18,7 +18,7 @@ package io.github.ketraterm.render.api
 /**
  * Renderer-facing cursor shape.
  */
-enum class TerminalRenderCursorShape {
+public enum class TerminalRenderCursorShape {
     /**
      * Filled cell cursor.
      */

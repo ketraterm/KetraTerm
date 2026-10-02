@@ -21,20 +21,20 @@ package io.github.ketraterm.core.api
  * These toggles affect how subsequent cursor motion and printable writes behave.
  * They do not expose the underlying storage model to the parser.
  */
-interface TerminalModeController {
+public interface TerminalModeController {
     /**
      * Enables or disables Insert Replace Mode (IRM, `CSI 4 h` / `CSI 4 l`).
      *
      * @param enabled `true` to enable insert mode, `false` for replace mode.
      */
-    fun setInsertMode(enabled: Boolean)
+    public fun setInsertMode(enabled: Boolean)
 
     /**
      * Enables or disables DECAWM auto-wrap (`CSI ? 7 h` / `CSI ? 7 l`).
      *
      * @param enabled `true` to enable auto-wrap, `false` to disable.
      */
-    fun setAutoWrap(enabled: Boolean)
+    public fun setAutoWrap(enabled: Boolean)
 
     /**
      * Enables or disables Origin Mode (DECOM, `CSI ? 6 h` / `CSI ? 6 l`).
@@ -44,28 +44,28 @@ interface TerminalModeController {
      *
      * @param enabled `true` to enable origin mode, `false` to disable.
      */
-    fun setOriginMode(enabled: Boolean)
+    public fun setOriginMode(enabled: Boolean)
 
     /**
      * Toggles application cursor key mode (DECCKM, `CSI ? 1 h` / `CSI ? 1 l`).
      *
      * @param enabled `true` to enable application cursor keys, `false` to disable.
      */
-    fun setApplicationCursorKeys(enabled: Boolean)
+    public fun setApplicationCursorKeys(enabled: Boolean)
 
     /**
      * Toggles application keypad mode (DECNKM).
      *
      * @param enabled `true` to enable application keypad, `false` to disable.
      */
-    fun setApplicationKeypad(enabled: Boolean)
+    public fun setApplicationKeypad(enabled: Boolean)
 
     /**
      * Selects the Backspace wire byte through DECBKM (`CSI ? 67 h/l`).
      *
      * @param sendsBackspace `true` for BS (`0x08`), `false` for DEL (`0x7f`).
      */
-    fun setBackarrowKeyMode(sendsBackspace: Boolean)
+    public fun setBackarrowKeyMode(sendsBackspace: Boolean)
 
     /**
      * Enables or disables left/right margin mode (DECLRMM, `CSI ? 69 h` / `CSI ? 69 l`).
@@ -75,42 +75,42 @@ interface TerminalModeController {
      *
      * @param enabled `true` to enable left/right margin mode, `false` to disable.
      */
-    fun setLeftRightMarginMode(enabled: Boolean)
+    public fun setLeftRightMarginMode(enabled: Boolean)
 
     /**
      * Enables or disables New Line Mode (LNM, `CSI 20 h` / `CSI 20 l`).
      *
      * @param enabled `true` to enable new-line mode, `false` to disable.
      */
-    fun setNewLineMode(enabled: Boolean)
+    public fun setNewLineMode(enabled: Boolean)
 
     /**
      * Sets the active mouse tracking mode used by terminal-to-host reporting.
      *
      * @param mode The mouse tracking mode to set.
      */
-    fun setMouseTrackingMode(mode: io.github.ketraterm.protocol.MouseTrackingMode)
+    public fun setMouseTrackingMode(mode: io.github.ketraterm.protocol.MouseTrackingMode)
 
     /**
      * Sets the active mouse report encoding mode used by terminal-to-host reporting.
      *
      * @param mode The mouse encoding mode to set.
      */
-    fun setMouseEncodingMode(mode: io.github.ketraterm.protocol.MouseEncodingMode)
+    public fun setMouseEncodingMode(mode: io.github.ketraterm.protocol.MouseEncodingMode)
 
     /**
      * Enables or disables bracketed paste reporting (`CSI ? 2004 h` / `CSI ? 2004 l`).
      *
      * @param enabled `true` to enable bracketed paste, `false` to disable.
      */
-    fun setBracketedPasteEnabled(enabled: Boolean)
+    public fun setBracketedPasteEnabled(enabled: Boolean)
 
     /**
      * Enables or disables focus in/out reporting (`CSI ? 1004 h` / `CSI ? 1004 l`).
      *
      * @param enabled `true` to enable focus reporting, `false` to disable.
      */
-    fun setFocusReportingEnabled(enabled: Boolean)
+    public fun setFocusReportingEnabled(enabled: Boolean)
 
     /**
      * Sets the modify-other-keys reporting level.
@@ -119,7 +119,7 @@ interface TerminalModeController {
      * explicit disabled state and `0` is the reset/default state.
      * @throws IllegalArgumentException if [mode] is outside -1..3.
      */
-    fun setModifyOtherKeysMode(mode: Int)
+    public fun setModifyOtherKeysMode(mode: Int)
 
     /**
      * Sets one xterm modifier resource. Resource 0 retains the legacy-profile admission
@@ -127,32 +127,32 @@ interface TerminalModeController {
      * 0..3 for ordinary keys, 0..15 for resource 0, and 0..4 for other key classes.
      * @throws IllegalArgumentException for an unsupported resource or value.
      */
-    fun setKeyModifierOption(
+    public fun setKeyModifierOption(
         resource: Int,
         value: Int,
     )
 
     /** Restores one modifier resource's initial value; unknown resources are ignored. */
-    fun resetKeyModifierOption(resource: Int)
+    public fun resetKeyModifierOption(resource: Int)
 
     /** Restores all xterm modifier resources atomically, preserving format resources. */
-    fun resetKeyModifierOptions()
+    public fun resetKeyModifierOptions()
 
     /**
      * Selects format 0 (CSI 27) or 1 (CSI u) for one xterm resource. Resource 0 is
      * independent storage, as in xterm; it does not override per-class formats.
      * @throws IllegalArgumentException for an unsupported resource or value.
      */
-    fun setKeyFormatOption(
+    public fun setKeyFormatOption(
         resource: Int,
         value: Int,
     )
 
     /** Restores one format resource to 0; unknown resources are ignored. */
-    fun resetKeyFormatOption(resource: Int)
+    public fun resetKeyFormatOption(resource: Int)
 
     /** Restores all xterm format resources atomically, preserving modifier resources. */
-    fun resetKeyFormatOptions()
+    public fun resetKeyFormatOptions()
 
     /**
      * Sets the format-other-keys wire format used when modify-other-keys applies.
@@ -160,7 +160,7 @@ interface TerminalModeController {
      * @param mode 0 for the original xterm report or 1 for CSI-u.
      * @throws IllegalArgumentException if [mode] is outside 0..1.
      */
-    fun setFormatOtherKeysMode(mode: Int)
+    public fun setFormatOtherKeysMode(mode: Int)
 
     /**
      * Sets active Kitty keyboard progressive-enhancement flags.
@@ -171,7 +171,7 @@ interface TerminalModeController {
      *
      * @param flags Kitty keyboard progressive-enhancement flags.
      */
-    fun setKittyKeyboardFlags(flags: Int)
+    public fun setKittyKeyboardFlags(flags: Int)
 
     /**
      * Pushes the current Kitty keyboard progressive-enhancement flags to the stack,
@@ -179,14 +179,14 @@ interface TerminalModeController {
      *
      * @param flags Kitty keyboard flags to push and activate.
      */
-    fun pushKittyKeyboardFlags(flags: Int)
+    public fun pushKittyKeyboardFlags(flags: Int)
 
     /**
      * Pops the Kitty keyboard flags from the stack up to [count] times.
      *
      * @param count Number of times to pop from the stack.
      */
-    fun popKittyKeyboardFlags(count: Int)
+    public fun popKittyKeyboardFlags(count: Int)
 
     /**
      * Toggles reverse-video presentation state (DECSCNM, `CSI ? 5 h` / `CSI ? 5 l`).
@@ -195,7 +195,7 @@ interface TerminalModeController {
      *
      * @param enabled `true` to enable reverse-video mode, `false` to disable.
      */
-    fun setReverseVideo(enabled: Boolean)
+    public fun setReverseVideo(enabled: Boolean)
 
     /**
      * Toggles cursor visibility presentation state (DECTCEM, `CSI ? 25 h` / `CSI ? 25 l`).
@@ -204,28 +204,28 @@ interface TerminalModeController {
      *
      * @param enabled `true` to make the cursor visible, `false` to hide it.
      */
-    fun setCursorVisible(enabled: Boolean)
+    public fun setCursorVisible(enabled: Boolean)
 
     /**
      * Toggles cursor blink presentation state.
      *
      * @param enabled `true` to make the cursor blink, `false` to disable blinking.
      */
-    fun setCursorBlinking(enabled: Boolean)
+    public fun setCursorBlinking(enabled: Boolean)
 
     /**
      * Sets the cursor shape/style.
      *
      * @param shape The cursor shape to set.
      */
-    fun setCursorShape(shape: io.github.ketraterm.render.api.TerminalRenderCursorShape)
+    public fun setCursorShape(shape: io.github.ketraterm.render.api.TerminalRenderCursorShape)
 
     /**
      * Sets the default cursor shape/style restored on reset.
      *
      * @param shape The default cursor shape to restore.
      */
-    fun setDefaultCursorShape(shape: io.github.ketraterm.render.api.TerminalRenderCursorShape)
+    public fun setDefaultCursorShape(shape: io.github.ketraterm.render.api.TerminalRenderCursorShape)
 
     /**
      * Restores the configured default shape and enables cursor blinking.
@@ -233,7 +233,7 @@ interface TerminalModeController {
      * Cursor visibility, position, saved state, and screen contents are preserved.
      * Hosts still control whether a blink timer runs through their presentation settings.
      */
-    fun resetCursorStyle()
+    public fun resetCursorStyle()
 
     /**
      * Controls how East Asian Ambiguous codepoints are measured for future writes.
@@ -242,14 +242,14 @@ interface TerminalModeController {
      *
      * @param enabled `true` to treat East Asian ambiguous-width characters as double-width.
      */
-    fun setTreatAmbiguousAsWide(enabled: Boolean)
+    public fun setTreatAmbiguousAsWide(enabled: Boolean)
 
     /**
      * Toggles synchronized output mode (DECSET/DECRST `?2026`).
      *
      * @param enabled `true` to enable synchronized output, `false` to disable.
      */
-    fun setSynchronizedOutput(enabled: Boolean)
+    public fun setSynchronizedOutput(enabled: Boolean)
 
     /**
      * Switches to the alternate screen buffer without saving the primary
@@ -265,7 +265,7 @@ interface TerminalModeController {
      * @param clearBeforeEnter whether to clear the alternate grid, reset its
      * margins, home its cursor, and clear its saved-cursor slot before entry.
      */
-    fun enterAltBufferWithoutCursorSave(clearBeforeEnter: Boolean)
+    public fun enterAltBufferWithoutCursorSave(clearBeforeEnter: Boolean)
 
     /**
      * Returns to the primary screen buffer without restoring a saved cursor.
@@ -273,7 +273,7 @@ interface TerminalModeController {
      * This supports `CSI ? 47 l` and `CSI ? 1047 l`. Alternate buffer content
      * remains stored and may be reused by a later non-clearing entry.
      */
-    fun exitAltBufferWithoutCursorRestore()
+    public fun exitAltBufferWithoutCursorRestore()
 
     /**
      * Switches to the alternate screen buffer with cursor save (`CSI ? 1049 h`).
@@ -284,7 +284,7 @@ interface TerminalModeController {
      *
      * Re-entering the alternate buffer discards any previous alternate content.
      */
-    fun enterAltBuffer()
+    public fun enterAltBuffer()
 
     /**
      * Returns to the primary screen buffer with cursor restore (`CSI ? 1049 l`).
@@ -293,7 +293,7 @@ interface TerminalModeController {
      * saved when [enterAltBuffer] was called. Alternate buffer content is not
      * visible after the switch. Primary scrollback history is unaffected.
      */
-    fun exitAltBuffer()
+    public fun exitAltBuffer()
 
     /**
      * Sets the theme-configured color palette for the terminal session.
@@ -304,7 +304,7 @@ interface TerminalModeController {
      *
      * @param palette the theme color palette configuration.
      */
-    fun setThemePalette(palette: io.github.ketraterm.render.api.TerminalColorPalette)
+    public fun setThemePalette(palette: io.github.ketraterm.render.api.TerminalColorPalette)
 
     /**
      * Updates an individual color index in the active 256-color palette.
@@ -312,7 +312,7 @@ interface TerminalModeController {
      * @param index the color index in range `0..255`.
      * @param color the packed ARGB color value.
      */
-    fun setPaletteColor(
+    public fun setPaletteColor(
         index: Int,
         color: Int,
     )
@@ -323,7 +323,7 @@ interface TerminalModeController {
      * @param target the target code (10 for foreground, 11 for background, 12 for cursor).
      * @param color the packed ARGB color value.
      */
-    fun setDynamicColor(
+    public fun setDynamicColor(
         target: Int,
         color: Int,
     )
@@ -333,12 +333,12 @@ interface TerminalModeController {
      *
      * @param enabled `true` to enable urgent bell mode, `false` to disable.
      */
-    fun setBellIsUrgent(enabled: Boolean)
+    public fun setBellIsUrgent(enabled: Boolean)
 
     /**
      * Toggles pop on bell mode (?1043).
      *
      * @param enabled `true` to enable pop on bell mode, `false` to disable.
      */
-    fun setPopOnBell(enabled: Boolean)
+    public fun setPopOnBell(enabled: Boolean)
 }

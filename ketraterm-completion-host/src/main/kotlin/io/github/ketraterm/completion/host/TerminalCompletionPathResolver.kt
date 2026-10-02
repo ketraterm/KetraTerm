@@ -25,7 +25,7 @@ import java.nio.file.Path
  * @param homeDirectory explicit local home used for tilde expansion.
  * @param windows whether Windows drive and UNC syntax is accepted.
  */
-class TerminalCompletionPathResolver
+public class TerminalCompletionPathResolver
     @JvmOverloads
     constructor(
         private val homeDirectory: Path? = System.getProperty("user.home")?.takeIf(String::isNotBlank)?.let(Path::of),
@@ -37,7 +37,7 @@ class TerminalCompletionPathResolver
          * @param request lexical directory request produced by the completion engine.
          * @return local path, or `null` for malformed, remote, or unsupported input.
          */
-        fun resolve(request: TerminalDirectoryListingRequest): Path? {
+        public fun resolve(request: TerminalDirectoryListingRequest): Path? {
             val workingDirectory = TerminalLocalFileUriResolver.resolve(request.workingDirectoryUri) ?: return null
             val prefix = request.directoryPrefix
             return try {

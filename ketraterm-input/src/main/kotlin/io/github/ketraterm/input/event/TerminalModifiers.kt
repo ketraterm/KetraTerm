@@ -21,36 +21,36 @@ package io.github.ketraterm.input.event
  * These are internal encoder bits, not CSI modifier parameter values. CSI
  * encoding applies the `1 + modifiers` translation only at the wire boundary.
  */
-object TerminalModifiers {
+public object TerminalModifiers {
     /** No keyboard modifiers are active. */
-    const val NONE: Int = 0
+    public const val NONE: Int = 0
 
     /** Shift is active. */
-    const val SHIFT: Int = 1 shl 0
+    public const val SHIFT: Int = 1 shl 0
 
     /** Alt is active. */
-    const val ALT: Int = 1 shl 1
+    public const val ALT: Int = 1 shl 1
 
     /** Control is active. */
-    const val CTRL: Int = 1 shl 2
+    public const val CTRL: Int = 1 shl 2
 
     /** Super is active, such as Windows or Command. */
-    const val SUPER: Int = 1 shl 3
+    public const val SUPER: Int = 1 shl 3
 
     /** Hyper is active. */
-    const val HYPER: Int = 1 shl 4
+    public const val HYPER: Int = 1 shl 4
 
     /** Meta is active. */
-    const val META: Int = 1 shl 5
+    public const val META: Int = 1 shl 5
 
     /** Caps Lock is enabled. */
-    const val CAPS_LOCK: Int = 1 shl 6
+    public const val CAPS_LOCK: Int = 1 shl 6
 
     /** Num Lock is enabled. */
-    const val NUM_LOCK: Int = 1 shl 7
+    public const val NUM_LOCK: Int = 1 shl 7
 
     /** Mask containing every supported modifier bit. */
-    const val VALID_MASK: Int = SHIFT or ALT or CTRL or SUPER or HYPER or META or CAPS_LOCK or NUM_LOCK
+    public const val VALID_MASK: Int = SHIFT or ALT or CTRL or SUPER or HYPER or META or CAPS_LOCK or NUM_LOCK
 
     /**
      * Returns true when Shift is present in [modifiers].
@@ -58,7 +58,7 @@ object TerminalModifiers {
      * @param modifiers active modifier bitmask.
      * @return true if Shift is active, false otherwise.
      */
-    fun hasShift(modifiers: Int): Boolean = (modifiers and SHIFT) != 0
+    public fun hasShift(modifiers: Int): Boolean = (modifiers and SHIFT) != 0
 
     /**
      * Returns true when Alt is present in [modifiers].
@@ -66,7 +66,7 @@ object TerminalModifiers {
      * @param modifiers active modifier bitmask.
      * @return true if Alt is active, false otherwise.
      */
-    fun hasAlt(modifiers: Int): Boolean = (modifiers and ALT) != 0
+    public fun hasAlt(modifiers: Int): Boolean = (modifiers and ALT) != 0
 
     /**
      * Returns true when Control is present in [modifiers].
@@ -74,7 +74,7 @@ object TerminalModifiers {
      * @param modifiers active modifier bitmask.
      * @return true if Control is active, false otherwise.
      */
-    fun hasCtrl(modifiers: Int): Boolean = (modifiers and CTRL) != 0
+    public fun hasCtrl(modifiers: Int): Boolean = (modifiers and CTRL) != 0
 
     /**
      * Returns true when Meta is present in [modifiers].
@@ -82,19 +82,19 @@ object TerminalModifiers {
      * @param modifiers active modifier bitmask.
      * @return true if Meta is active, false otherwise.
      */
-    fun hasMeta(modifiers: Int): Boolean = (modifiers and META) != 0
+    public fun hasMeta(modifiers: Int): Boolean = (modifiers and META) != 0
 
     /** Returns true when Super is present in [modifiers]. */
-    fun hasSuper(modifiers: Int): Boolean = (modifiers and SUPER) != 0
+    public fun hasSuper(modifiers: Int): Boolean = (modifiers and SUPER) != 0
 
     /** Returns true when Hyper is present in [modifiers]. */
-    fun hasHyper(modifiers: Int): Boolean = (modifiers and HYPER) != 0
+    public fun hasHyper(modifiers: Int): Boolean = (modifiers and HYPER) != 0
 
     /** Returns true when Caps Lock is present in [modifiers]. */
-    fun hasCapsLock(modifiers: Int): Boolean = (modifiers and CAPS_LOCK) != 0
+    public fun hasCapsLock(modifiers: Int): Boolean = (modifiers and CAPS_LOCK) != 0
 
     /** Returns true when Num Lock is present in [modifiers]. */
-    fun hasNumLock(modifiers: Int): Boolean = (modifiers and NUM_LOCK) != 0
+    public fun hasNumLock(modifiers: Int): Boolean = (modifiers and NUM_LOCK) != 0
 
     /**
      * Returns true when [modifiers] contains only supported modifier bits.
@@ -102,7 +102,7 @@ object TerminalModifiers {
      * @param modifiers active modifier bitmask.
      * @return true if valid, false otherwise.
      */
-    fun isValid(modifiers: Int): Boolean = (modifiers and VALID_MASK.inv()) == 0
+    public fun isValid(modifiers: Int): Boolean = (modifiers and VALID_MASK.inv()) == 0
 
     /**
      * Converts internal modifier bits to an xterm-style CSI modifier parameter.
@@ -114,7 +114,7 @@ object TerminalModifiers {
      * @throws IllegalArgumentException when [modifiers] contains unsupported
      * bits.
      */
-    fun toCsiModifierParam(modifiers: Int): Int {
+    public fun toCsiModifierParam(modifiers: Int): Int {
         require(isValid(modifiers)) { "invalid modifier bitmask: $modifiers" }
         var legacyModifiers = modifiers and (SHIFT or ALT or CTRL)
         if ((modifiers and (SUPER or HYPER or META)) != 0) {
@@ -129,7 +129,7 @@ object TerminalModifiers {
      * @param modifiers active modifier bitmask.
      * @return Kitty's one-based modifier parameter.
      */
-    fun toKittyCsiModifierParam(modifiers: Int): Int {
+    public fun toKittyCsiModifierParam(modifiers: Int): Int {
         require(isValid(modifiers)) { "invalid modifier bitmask: $modifiers" }
         return 1 + modifiers
     }

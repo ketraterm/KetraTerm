@@ -26,7 +26,7 @@ package io.github.ketraterm.session
  * @property historySize retained history rows after resize.
  * @property discardedCount discarded-row counter belonging to the resized history.
  */
-data class TerminalViewportResizeResult(
+public data class TerminalViewportResizeResult(
     val scrollbackOffset: Int,
     val historySize: Int,
     val discardedCount: Long,

@@ -23,31 +23,31 @@ package io.github.ketraterm.completion.api
  * are Unicode-scalar boundaries that do not split surrogate pairs. The empty
  * instance is shared; non-empty factories defensively copy caller-owned arrays.
  */
-class TerminalCompletionMatchRanges private constructor(
+public class TerminalCompletionMatchRanges private constructor(
     private val packedOffsets: IntArray,
 ) {
     private val contentHashCode = packedOffsets.contentHashCode()
 
     /** Number of `[start, end)` ranges. */
-    val rangeCount: Int
+    public val rangeCount: Int
         get() = packedOffsets.size ushr 1
 
     /** Returns whether no display fragment is matched. */
-    fun isEmpty(): Boolean = packedOffsets.isEmpty()
+    public fun isEmpty(): Boolean = packedOffsets.isEmpty()
 
     /**
      * Returns the inclusive UTF-16 start offset of range [index].
      *
      * @throws IndexOutOfBoundsException if [index] is outside `0 until rangeCount`.
      */
-    fun startOffset(index: Int): Int = packedOffsets[checkedPackedIndex(index)]
+    public fun startOffset(index: Int): Int = packedOffsets[checkedPackedIndex(index)]
 
     /**
      * Returns the exclusive UTF-16 end offset of range [index].
      *
      * @throws IndexOutOfBoundsException if [index] is outside `0 until rangeCount`.
      */
-    fun endOffset(index: Int): Int = packedOffsets[checkedPackedIndex(index) + 1]
+    public fun endOffset(index: Int): Int = packedOffsets[checkedPackedIndex(index) + 1]
 
     /**
      * Returns an independent packed `[start0, end0, ...]` array.
@@ -55,7 +55,7 @@ class TerminalCompletionMatchRanges private constructor(
      * This is an explicit interoperability copy; painting and ranking code should
      * prefer indexed access to avoid allocation.
      */
-    fun copyPackedOffsets(): IntArray = packedOffsets.copyOf()
+    public fun copyPackedOffsets(): IntArray = packedOffsets.copyOf()
 
     internal fun requireValidFor(displayText: String) {
         validate(displayText, packedOffsets)
@@ -75,10 +75,10 @@ class TerminalCompletionMatchRanges private constructor(
         return index shl 1
     }
 
-    companion object {
+    public companion object {
         /** Shared immutable empty range set. */
         @JvmField
-        val EMPTY: TerminalCompletionMatchRanges = TerminalCompletionMatchRanges(IntArray(0))
+        public val EMPTY: TerminalCompletionMatchRanges = TerminalCompletionMatchRanges(IntArray(0))
 
         /**
          * Creates immutable ranges for [displayText] from packed UTF-16 [offsets].
@@ -90,7 +90,7 @@ class TerminalCompletionMatchRanges private constructor(
          * unordered, overlapping, outside [displayText], or split a surrogate pair.
          */
         @JvmStatic
-        fun fromPackedOffsets(
+        public fun fromPackedOffsets(
             displayText: String,
             offsets: IntArray,
         ): TerminalCompletionMatchRanges {

@@ -22,7 +22,7 @@ package io.github.ketraterm.core.api
  * bytes to the active connector. Implementations must synchronously copy bytes
  * into [dst] before returning.
  */
-interface TerminalHostResponseReader {
+public interface TerminalHostResponseReader {
     /**
      * Reads up to [length] queued response bytes into [dst].
      *
@@ -33,7 +33,7 @@ interface TerminalHostResponseReader {
      * @throws IllegalArgumentException if the slice is outside [dst], including
      * integer-overflow ranges. Rejection preserves queued bytes and [dst].
      */
-    fun readResponseBytes(
+    public fun readResponseBytes(
         dst: ByteArray,
         offset: Int = 0,
         length: Int = dst.size - offset,

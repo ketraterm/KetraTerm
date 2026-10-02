@@ -32,7 +32,7 @@ package io.github.ketraterm.session
  * @property cursorRow zero-based live terminal-grid cursor row to use as a popup
  * anchor.
  */
-data class TerminalShellCommandLineSnapshot(
+public data class TerminalShellCommandLineSnapshot(
     val commandText: String,
     val cursorOffset: Int,
     val cursorColumn: Int,

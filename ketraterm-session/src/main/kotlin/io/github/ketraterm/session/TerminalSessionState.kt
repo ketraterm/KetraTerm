@@ -22,12 +22,12 @@ package io.github.ketraterm.session
  * [Closed]. Closing before startup transitions directly from [Created] to
  * [Closed].
  */
-sealed interface TerminalSessionState {
+public sealed interface TerminalSessionState {
     /** The session has been created but its connector has not started. */
-    data object Created : TerminalSessionState
+    public data object Created : TerminalSessionState
 
     /** The connector has started and the session accepts terminal input. */
-    data object Running : TerminalSessionState
+    public data object Running : TerminalSessionState
 
     /**
      * Shutdown cleanup and final render publication have been attempted. With
@@ -36,7 +36,7 @@ sealed interface TerminalSessionState {
      *
      * @property event immutable metadata describing why the session closed.
      */
-    data class Closed(
+    public data class Closed(
         val event: TerminalSessionCloseEvent,
     ) : TerminalSessionState
 }

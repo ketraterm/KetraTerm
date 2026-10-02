@@ -18,32 +18,32 @@ package io.github.ketraterm.core.api
 /**
  * Zero-allocation, read-only terminal behavior state required by input encoders.
  */
-interface TerminalInputState {
+public interface TerminalInputState {
     /**
      * Returns one coherent snapshot of all input-readable terminal mode bits.
      *
      * @return A packed 64-bit word containing the state of all input-facing terminal modes.
      */
-    fun getInputModeBits(): Long
+    public fun getInputModeBits(): Long
 
     /**
      * Helper methods for decoding packed input mode snapshots.
      */
-    companion object {
+    public companion object {
         /**
          * Reads an XTMODKEYS resource from the same snapshot as all other input modes.
          * Returns -1 for explicit disable and -2 for an unsupported resource identifier.
          * Cursor/function resources default to 2; all other resources default to 0.
          */
         @JvmStatic
-        fun keyModifierOption(
+        public fun keyModifierOption(
             bits: Long,
             resource: Int,
         ): Int = XtermKeyResourceBits.modifier(bits, resource)
 
         /** Reads an XTFMTKEYS format (0 or 1), or -2 for an unsupported resource. */
         @JvmStatic
-        fun keyFormatOption(
+        public fun keyFormatOption(
             bits: Long,
             resource: Int,
         ): Int = XtermKeyResourceBits.format(bits, resource)
@@ -53,7 +53,7 @@ interface TerminalInputState {
          * override takes precedence over the host's current configured default.
          */
         @JvmStatic
-        fun backarrowSendsBackspace(
+        public fun backarrowSendsBackspace(
             bits: Long,
             defaultSendsBackspace: Boolean,
         ): Boolean = if (isBackarrowKeyModeExplicit(bits)) isBackarrowKeySendsBackspace(bits) else defaultSendsBackspace
@@ -65,7 +65,7 @@ interface TerminalInputState {
          * @return `true` if application cursor keys mode (DECCKM) is enabled, `false` otherwise.
          */
         @JvmStatic
-        fun isApplicationCursorKeys(bits: Long): Boolean = TerminalModeBits.hasFlag(bits, TerminalModeBits.APPLICATION_CURSOR_KEYS)
+        public fun isApplicationCursorKeys(bits: Long): Boolean = TerminalModeBits.hasFlag(bits, TerminalModeBits.APPLICATION_CURSOR_KEYS)
 
         /**
          * Returns true when application keypad mode is enabled in [bits].
@@ -74,7 +74,7 @@ interface TerminalInputState {
          * @return `true` if application keypad mode (DECNKM) is enabled, `false` otherwise.
          */
         @JvmStatic
-        fun isApplicationKeypad(bits: Long): Boolean = TerminalModeBits.hasFlag(bits, TerminalModeBits.APPLICATION_KEYPAD)
+        public fun isApplicationKeypad(bits: Long): Boolean = TerminalModeBits.hasFlag(bits, TerminalModeBits.APPLICATION_KEYPAD)
 
         /**
          * Returns whether DECBKM has explicitly overridden the input profile's
@@ -84,7 +84,8 @@ interface TerminalInputState {
          * @return `true` after DECSET or DECRST 67, until a terminal reset.
          */
         @JvmStatic
-        fun isBackarrowKeyModeExplicit(bits: Long): Boolean = TerminalModeBits.hasFlag(bits, TerminalModeBits.BACKARROW_KEY_MODE_EXPLICIT)
+        public fun isBackarrowKeyModeExplicit(bits: Long): Boolean =
+            TerminalModeBits.hasFlag(bits, TerminalModeBits.BACKARROW_KEY_MODE_EXPLICIT)
 
         /**
          * Returns the explicit DECBKM wire selection from [bits].
@@ -93,7 +94,7 @@ interface TerminalInputState {
          * @return `true` for BS and `false` for DEL.
          */
         @JvmStatic
-        fun isBackarrowKeySendsBackspace(bits: Long): Boolean =
+        public fun isBackarrowKeySendsBackspace(bits: Long): Boolean =
             TerminalModeBits.hasFlag(bits, TerminalModeBits.BACKARROW_KEY_SENDS_BACKSPACE)
 
         /**
@@ -103,7 +104,7 @@ interface TerminalInputState {
          * @return `true` if new-line mode (LNM) is enabled, `false` otherwise.
          */
         @JvmStatic
-        fun isNewLineMode(bits: Long): Boolean = TerminalModeBits.hasFlag(bits, TerminalModeBits.NEW_LINE_MODE)
+        public fun isNewLineMode(bits: Long): Boolean = TerminalModeBits.hasFlag(bits, TerminalModeBits.NEW_LINE_MODE)
 
         /**
          * Returns true when bracketed paste mode is enabled in [bits].
@@ -112,7 +113,7 @@ interface TerminalInputState {
          * @return `true` if bracketed paste mode (?2004) is enabled, `false` otherwise.
          */
         @JvmStatic
-        fun isBracketedPasteEnabled(bits: Long): Boolean = TerminalModeBits.hasFlag(bits, TerminalModeBits.BRACKETED_PASTE)
+        public fun isBracketedPasteEnabled(bits: Long): Boolean = TerminalModeBits.hasFlag(bits, TerminalModeBits.BRACKETED_PASTE)
 
         /**
          * Returns true when focus reporting mode is enabled in [bits].
@@ -121,7 +122,7 @@ interface TerminalInputState {
          * @return `true` if focus reporting mode (?1004) is enabled, `false` otherwise.
          */
         @JvmStatic
-        fun isFocusReportingEnabled(bits: Long): Boolean = TerminalModeBits.hasFlag(bits, TerminalModeBits.FOCUS_REPORTING)
+        public fun isFocusReportingEnabled(bits: Long): Boolean = TerminalModeBits.hasFlag(bits, TerminalModeBits.FOCUS_REPORTING)
 
         /**
          * Returns the packed mouse tracking mode ordinal from [bits].
@@ -130,7 +131,7 @@ interface TerminalInputState {
          * @return The ordinal integer of the active [io.github.ketraterm.protocol.MouseTrackingMode].
          */
         @JvmStatic
-        fun mouseTrackingMode(bits: Long): Int =
+        public fun mouseTrackingMode(bits: Long): Int =
             TerminalModeBits.packedValue(
                 bits,
                 TerminalModeBits.MOUSE_TRACKING_MASK,
@@ -144,7 +145,7 @@ interface TerminalInputState {
          * @return The ordinal integer of the active [io.github.ketraterm.protocol.MouseEncodingMode].
          */
         @JvmStatic
-        fun mouseEncodingMode(bits: Long): Int =
+        public fun mouseEncodingMode(bits: Long): Int =
             TerminalModeBits.packedValue(
                 bits,
                 TerminalModeBits.MOUSE_ENCODING_MASK,
@@ -158,7 +159,7 @@ interface TerminalInputState {
          * @return The active modify-other-keys mode level (typically 0, 1, or 2).
          */
         @JvmStatic
-        fun modifyOtherKeysMode(bits: Long): Int {
+        public fun modifyOtherKeysMode(bits: Long): Int {
             val packed =
                 TerminalModeBits.packedValue(
                     bits,
@@ -175,7 +176,7 @@ interface TerminalInputState {
          * @return The active format-other-keys mode level.
          */
         @JvmStatic
-        fun formatOtherKeysMode(bits: Long): Int =
+        public fun formatOtherKeysMode(bits: Long): Int =
             TerminalModeBits.packedValue(
                 bits,
                 TerminalModeBits.FORMAT_OTHER_KEYS_MASK,
@@ -189,7 +190,7 @@ interface TerminalInputState {
          * @return The active Kitty keyboard progressive-enhancement flag bitmask.
          */
         @JvmStatic
-        fun kittyKeyboardFlags(bits: Long): Int =
+        public fun kittyKeyboardFlags(bits: Long): Int =
             TerminalModeBits.packedValue(
                 bits,
                 TerminalModeBits.KITTY_KEYBOARD_FLAGS_MASK,

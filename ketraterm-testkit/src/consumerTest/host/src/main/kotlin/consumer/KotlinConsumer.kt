@@ -16,14 +16,35 @@
 package consumer
 
 import io.github.ketraterm.core.TerminalBuffers
+import io.github.ketraterm.core.api.TerminalModeBits
 import io.github.ketraterm.host.HostCommandAdapter
+import io.github.ketraterm.host.HostControlPolicy
+import io.github.ketraterm.host.HostPolicy
 import io.github.ketraterm.parser.api.TerminalParsers
 
 fun main() {
     JavaConsumer.verify()
+    val policy = HostPolicy(maxHyperlinkEntries = 8).copy(notificationPolicy = HostControlPolicy.DENY)
+    check(policy.maxHyperlinkEntries == 8 && policy.notificationPolicy == HostControlPolicy.DENY)
     val buffer = TerminalBuffers.create(12, 2, 0)
-    val parser = TerminalParsers.create(HostCommandAdapter(buffer))
-    parser.accept("Kotlin".encodeToByteArray())
+    val parser = TerminalParsers.create(HostCommandAdapter(buffer, hostPolicy = policy))
+    parser.accept("Kotlin\u001b[?7l\u001b[?2004h\u001b[?1004h".encodeToByteArray())
     parser.endOfInput()
     check(buffer.getLineAsString(0).trimEnd() == "Kotlin")
+    val modes = buffer.getInputModeBits()
+    check(!TerminalModeBits.hasFlag(modes, TerminalModeBits.AUTO_WRAP))
+    check(TerminalModeBits.hasFlag(modes, TerminalModeBits.BRACKETED_PASTE))
+    check(TerminalModeBits.hasFlag(modes, TerminalModeBits.FOCUS_REPORTING))
+    // Inlined constants must retain their meaning when the client is not recompiled.
+    for (
+    (name, value) in
+    listOf(
+        "AUTO_WRAP" to TerminalModeBits.AUTO_WRAP,
+        "CURSOR_VISIBLE" to TerminalModeBits.CURSOR_VISIBLE,
+        "BRACKETED_PASTE" to TerminalModeBits.BRACKETED_PASTE,
+        "FOCUS_REPORTING" to TerminalModeBits.FOCUS_REPORTING,
+    )
+    ) {
+        check(TerminalModeBits::class.java.getField(name).getLong(null) == value) { "Inlined mode value changed: $name" }
+    }
 }

@@ -40,7 +40,7 @@ package io.github.ketraterm.ui.swing.api
  * cache in pixels, or zero before the bound session publishes its first frame.
  * @property cellHeightPixels fixed terminal row height in pixels.
  */
-data class TerminalViewportState(
+public data class TerminalViewportState(
     val historySize: Int,
     val scrollbackOffset: Double,
     val renderOffset: Int,
@@ -83,7 +83,7 @@ data class TerminalViewportState(
  * component's internal viewport state changes. Implementations should keep work
  * lightweight and defer expensive host updates outside this callback.
  */
-fun interface TerminalViewportListener {
+public fun interface TerminalViewportListener {
     /**
      * Reports the latest terminal-native viewport coordinates.
      *
@@ -94,7 +94,7 @@ fun interface TerminalViewportListener {
      * @param visibleRows rows visible in the Swing component.
      * @param requestedRows render-cache rows requested, including overscan.
      */
-    fun viewportChanged(
+    public fun viewportChanged(
         historySize: Int,
         scrollbackOffset: Double,
         renderOffset: Int,
@@ -108,7 +108,7 @@ fun interface TerminalViewportListener {
      * Implementations that only need the historical row-based contract can keep
      * overriding [viewportChanged].
      */
-    fun viewportStateChanged(state: TerminalViewportState) {
+    public fun viewportStateChanged(state: TerminalViewportState) {
         viewportChanged(
             historySize = state.historySize,
             scrollbackOffset = state.scrollbackOffset,
@@ -118,12 +118,12 @@ fun interface TerminalViewportListener {
         )
     }
 
-    companion object {
+    public companion object {
         /**
          * Listener used when no host scrollbar adapter is installed.
          */
         @JvmField
-        val NONE: TerminalViewportListener =
+        public val NONE: TerminalViewportListener =
             TerminalViewportListener { _, _, _, _, _ -> }
     }
 }

@@ -21,11 +21,11 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.flow
 
 /** Creates one shell producer before a session starts consuming output. */
-fun interface TerminalShellIntegrationFactory {
+public fun interface TerminalShellIntegrationFactory {
     /** Construction must not start output, subscribe to host events, or create background work. */
-    fun create(context: TerminalShellIntegrationContext): TerminalShellIntegration
+    public fun create(context: TerminalShellIntegrationContext): TerminalShellIntegration
 
-    companion object {
+    public companion object {
         /**
          * Selects a host-owned shell model without installing any protocol recorder.
          *
@@ -47,7 +47,7 @@ fun interface TerminalShellIntegrationFactory {
          */
         @JvmStatic
         @JvmOverloads
-        fun host(
+        public fun host(
             state: TerminalShellIntegrationState,
             commandLine: StateFlow<TerminalShellCommandLineSnapshot?> =
                 MutableStateFlow<TerminalShellCommandLineSnapshot?>(

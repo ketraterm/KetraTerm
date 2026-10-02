@@ -38,7 +38,7 @@ import io.github.ketraterm.ui.swing.render.TerminalBidiLayout
  * @property caretRow zero-based moving row.
  * @property isBlock whether the selection is a rectangular block selection.
  */
-data class CellSelection(
+public data class CellSelection(
     val anchorColumn: Int,
     val anchorRow: Int,
     val caretColumn: Int,
@@ -70,7 +70,7 @@ data class CellSelection(
      * selections. Block bounds require a row's visual mapping for this adjustment.
      * @return packed half-open range, or [NO_RANGE].
      */
-    fun packedColumnRange(
+    internal fun packedColumnRange(
         row: Int,
         columns: Int,
         cache: TerminalRenderCache? = null,
@@ -167,11 +167,11 @@ data class CellSelection(
     private val isForward: Boolean
         get() = caretRow > anchorRow || caretRow == anchorRow && caretColumn >= anchorColumn
 
-    companion object {
+    internal companion object {
         /**
          * Sentinel returned when a row is not selected.
          */
-        const val NO_RANGE: Long = -1L
+        internal const val NO_RANGE: Long = -1L
 
         /**
          * Packs a half-open column range.
@@ -180,7 +180,7 @@ data class CellSelection(
          * @param endColumn the ending column index (exclusive).
          * @return packed column range as a [Long].
          */
-        fun packRange(
+        internal fun packRange(
             startColumn: Int,
             endColumn: Int,
         ): Long = (startColumn.toLong() shl 32) or (endColumn.toLong() and 0xffff_ffffL)
@@ -191,7 +191,7 @@ data class CellSelection(
          * @param range packed column range [Long].
          * @return start column index.
          */
-        fun rangeStart(range: Long): Int = (range ushr 32).toInt()
+        internal fun rangeStart(range: Long): Int = (range ushr 32).toInt()
 
         /**
          * Extracts the end-exclusive column from a packed range.
@@ -199,6 +199,6 @@ data class CellSelection(
          * @param range packed column range [Long].
          * @return end-exclusive column index.
          */
-        fun rangeEnd(range: Long): Int = range.toInt()
+        internal fun rangeEnd(range: Long): Int = range.toInt()
     }
 }

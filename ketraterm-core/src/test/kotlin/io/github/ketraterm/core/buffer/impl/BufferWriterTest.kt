@@ -103,8 +103,7 @@ class BufferWriterTest {
                     for (row in 0 until 5) {
                         for (col in 0 until 8) {
                             assertEquals(expected.getCodepointAt(col, row), actual.getCodepointAt(col, row), context)
-                            assertEquals(expected.getPackedAttrAt(col, row), actual.getPackedAttrAt(col, row), context)
-                            assertEquals(expected.getPackedExtendedAttrAt(col, row), actual.getPackedExtendedAttrAt(col, row), context)
+                            assertEquals(expected.getAttrAt(col, row), actual.getAttrAt(col, row), context)
                         }
                     }
                     var discarded = -1L

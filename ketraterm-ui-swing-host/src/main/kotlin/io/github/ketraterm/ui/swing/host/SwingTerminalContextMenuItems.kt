@@ -26,7 +26,7 @@ import javax.swing.JPopupMenu
  * opt in when they want KetraTerm's default action vocabulary, and can append
  * host-specific tab, pane, or IDE actions afterwards.
  */
-object SwingTerminalContextMenuItems {
+public object SwingTerminalContextMenuItems {
     /**
      * Appends link-aware and generic terminal actions to [menu].
      *
@@ -35,7 +35,7 @@ object SwingTerminalContextMenuItems {
      * @param openSearch host-owned search UI action.
      * @return `true` when at least one item was added.
      */
-    fun addTerminalActions(
+    public fun addTerminalActions(
         menu: JPopupMenu,
         request: SwingTerminalContextMenuRequest,
         openSearch: () -> Unit,

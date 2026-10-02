@@ -21,7 +21,7 @@ package io.github.ketraterm.protocol
  * These values describe shell lifecycle boundaries only. They do not imply
  * command history storage, prompt rendering, row anchoring, or UI decorations.
  */
-enum class ShellIntegrationMarker {
+public enum class ShellIntegrationMarker {
     /**
      * The shell is about to print a prompt (`OSC 133 ; A ST`).
      */
@@ -49,7 +49,7 @@ enum class ShellIntegrationMarker {
  * @property marker shell lifecycle marker.
  * @property exitCode optional process exit status for [ShellIntegrationMarker.COMMAND_FINISHED].
  */
-data class ShellIntegrationEvent(
+public data class ShellIntegrationEvent(
     val marker: ShellIntegrationMarker,
     val exitCode: Int? = null,
 )

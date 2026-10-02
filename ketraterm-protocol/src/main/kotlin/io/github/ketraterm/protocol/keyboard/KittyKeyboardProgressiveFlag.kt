@@ -22,24 +22,24 @@ package io.github.ketraterm.protocol.keyboard
  * protocol:
  * <https://sw.kovidgoyal.net/kitty/keyboard-protocol/>.
  */
-object KittyKeyboardProgressiveFlag {
+public object KittyKeyboardProgressiveFlag {
     /** Disambiguate legacy escape-code collisions. */
-    const val DISAMBIGUATE_ESCAPE_CODES: Int = 1
+    public const val DISAMBIGUATE_ESCAPE_CODES: Int = 1
 
     /** Include press/repeat/release event-type information. */
-    const val REPORT_EVENT_TYPES: Int = 1 shl 1
+    public const val REPORT_EVENT_TYPES: Int = 1 shl 1
 
     /** Include alternate key values for shortcut matching. */
-    const val REPORT_ALTERNATE_KEYS: Int = 1 shl 2
+    public const val REPORT_ALTERNATE_KEYS: Int = 1 shl 2
 
     /** Report text-producing keys as CSI-u escape codes. */
-    const val REPORT_ALL_KEYS_AS_ESCAPE_CODES: Int = 1 shl 3
+    public const val REPORT_ALL_KEYS_AS_ESCAPE_CODES: Int = 1 shl 3
 
     /** Include associated text as codepoints. */
-    const val REPORT_ASSOCIATED_TEXT: Int = 1 shl 4
+    public const val REPORT_ASSOCIATED_TEXT: Int = 1 shl 4
 
     /** Mask containing every progressive flag implemented by the input encoder. */
-    const val ENCODER_SUPPORTED_MASK: Int =
+    public const val ENCODER_SUPPORTED_MASK: Int =
         DISAMBIGUATE_ESCAPE_CODES or
             REPORT_EVENT_TYPES or
             REPORT_ALTERNATE_KEYS or
@@ -54,6 +54,6 @@ object KittyKeyboardProgressiveFlag {
      * through the integration boundary. This constant must not be used to
      * claim that every encoder feature is available from every host toolkit.
      */
-    const val DEFAULT_HOST_SUPPORTED_MASK: Int =
+    public const val DEFAULT_HOST_SUPPORTED_MASK: Int =
         DISAMBIGUATE_ESCAPE_CODES or REPORT_ALL_KEYS_AS_ESCAPE_CODES
 }

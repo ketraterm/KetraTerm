@@ -24,13 +24,13 @@ import java.awt.Font
  * font lookup, caching, and fallback resolution strategies (e.g. leveraging
  * the IDE's internal font cascading/linking utilities or OS-native services).
  */
-interface TerminalFontResolver {
+public interface TerminalFontResolver {
     /**
      * Resolves a fallback font that can display the given [codePoint] with the requested
      * [style] and [size2D] size.
      * Returns null if no fallback font could be resolved.
      */
-    fun resolveFallbackFont(
+    public fun resolveFallbackFont(
         codePoint: Int,
         style: Int,
         size2D: Float,
@@ -41,7 +41,7 @@ interface TerminalFontResolver {
      * [style] and [size2D] size.
      * Returns null if no fallback font could be resolved.
      */
-    fun resolveFallbackFont(
+    public fun resolveFallbackFont(
         text: String,
         style: Int,
         size2D: Float,

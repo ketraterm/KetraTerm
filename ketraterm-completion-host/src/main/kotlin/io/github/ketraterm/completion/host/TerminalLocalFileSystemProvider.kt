@@ -20,7 +20,7 @@ import io.github.ketraterm.completion.api.TerminalFileEntry
 import io.github.ketraterm.completion.api.TerminalFileSystemProvider
 
 /** Direct suspending local-filesystem provider used by path completion. */
-class TerminalLocalFileSystemProvider
+public class TerminalLocalFileSystemProvider
     @JvmOverloads
     constructor(
         private val resolver: TerminalCompletionPathResolver = TerminalCompletionPathResolver(),

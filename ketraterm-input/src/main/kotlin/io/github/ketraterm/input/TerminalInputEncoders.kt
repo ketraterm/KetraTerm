@@ -21,9 +21,14 @@ import io.github.ketraterm.protocol.host.TerminalHostOutput
 /**
  * Factory for creating terminal input encoder instances.
  */
-object TerminalInputEncoders {
+public object TerminalInputEncoders {
     /**
      * Creates a terminal input encoder.
+     *
+     * The returned encoder owns reusable scratch storage and is not thread-safe. Serialize
+     * encoding and policy updates with mode reads and all other producers of [output].
+     * Output ranges are borrowed only during each synchronous sink call; sink failures
+     * propagate and may leave a partially written input operation.
      *
      * @param inputState read-only core mode state used for input decisions.
      * @param output host-bound byte sink.
@@ -32,7 +37,7 @@ object TerminalInputEncoders {
      */
     @JvmStatic
     @JvmOverloads
-    fun create(
+    public fun create(
         inputState: TerminalInputState,
         output: TerminalHostOutput,
         policy: io.github.ketraterm.input.policy.TerminalInputPolicy =

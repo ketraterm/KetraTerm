@@ -31,29 +31,29 @@ import javax.swing.JComponent
  * @property viewportStartIndex absolute rank of the first visible suggestion.
  * @property totalSuggestionCount total suggestions retained by the controller.
  */
-class SwingShellSuggestionViewSnapshot private constructor(
+public class SwingShellSuggestionViewSnapshot private constructor(
     visibleSuggestions: List<SwingShellSuggestion>,
-    val selectedIndex: Int,
-    val viewportStartIndex: Int,
-    val totalSuggestionCount: Int,
+    public val selectedIndex: Int,
+    public val viewportStartIndex: Int,
+    public val totalSuggestionCount: Int,
 ) {
     /** Defensively copied visible suggestion window. */
-    val visibleSuggestions: List<SwingShellSuggestion> = visibleSuggestions.toList()
+    public val visibleSuggestions: List<SwingShellSuggestion> = visibleSuggestions.toList()
 
     /** Whether ranked suggestions precede this viewport. */
-    val hasSuggestionsBefore: Boolean
+    public val hasSuggestionsBefore: Boolean
         get() = viewportStartIndex > 0
 
     /** Whether ranked suggestions follow this viewport. */
-    val hasSuggestionsAfter: Boolean
+    public val hasSuggestionsAfter: Boolean
         get() = viewportStartIndex + visibleSuggestions.size < totalSuggestionCount
 
     /** Absolute rank of the selected suggestion, or `-1` when none is selected. */
-    val absoluteSelectedIndex: Int
+    public val absoluteSelectedIndex: Int
         get() = if (selectedIndex < 0) -1 else viewportStartIndex + selectedIndex
 
     /** Selected visible suggestion, or `null` when the viewport is passive. */
-    val selectedSuggestion: SwingShellSuggestion?
+    public val selectedSuggestion: SwingShellSuggestion?
         get() = visibleSuggestions.getOrNull(selectedIndex)
 
     init {
@@ -101,13 +101,13 @@ class SwingShellSuggestionViewSnapshot private constructor(
             "viewportStartIndex=$viewportStartIndex, " +
             "totalSuggestionCount=$totalSuggestionCount)"
 
-    companion object {
+    public companion object {
         /** Maximum number of completion rows rendered at once by any host view. */
-        const val MAX_VISIBLE_SUGGESTIONS: Int = 8
+        public const val MAX_VISIBLE_SUGGESTIONS: Int = 8
 
         /** Shared empty hidden-view snapshot. */
         @JvmField
-        val EMPTY: SwingShellSuggestionViewSnapshot =
+        public val EMPTY: SwingShellSuggestionViewSnapshot =
             SwingShellSuggestionViewSnapshot(
                 visibleSuggestions = emptyList(),
                 selectedIndex = NO_SELECTION,
@@ -125,7 +125,7 @@ class SwingShellSuggestionViewSnapshot private constructor(
          * @return a defensive immutable viewport snapshot.
          */
         @JvmStatic
-        fun create(
+        public fun create(
             visibleSuggestions: List<SwingShellSuggestion>,
             selectedIndex: Int,
             viewportStartIndex: Int,
@@ -151,11 +151,11 @@ class SwingShellSuggestionViewSnapshot private constructor(
  * Implementations must update Swing component state only on the Event Dispatch
  * Thread and must not invoke completion providers or mutate command lines.
  */
-interface SwingShellSuggestionView {
+public interface SwingShellSuggestionView {
     /**
      * Component embedded and positioned by the owning Swing terminal.
      */
-    val component: JComponent
+    public val component: JComponent
 
     /**
      * Replaces the complete immutable visual viewport on the Swing Event
@@ -167,7 +167,7 @@ interface SwingShellSuggestionView {
      *
      * @param snapshot authoritative bounded presentation state.
      */
-    fun update(snapshot: SwingShellSuggestionViewSnapshot)
+    public fun update(snapshot: SwingShellSuggestionViewSnapshot)
 
     /**
      * Releases host-specific presentation resources.
@@ -175,7 +175,7 @@ interface SwingShellSuggestionView {
      * The default implementation is resource-free. Hosts that own platform
      * editors, popups, listeners, or disposable scopes must release them here.
      */
-    fun close() = Unit
+    public fun close(): Unit = Unit
 }
 
 /**
@@ -184,20 +184,20 @@ interface SwingShellSuggestionView {
  * Selection and acceptance remain controller semantics; the view reports only
  * the item index under the relevant pointer gesture.
  */
-interface SwingShellSuggestionViewListener {
+public interface SwingShellSuggestionViewListener {
     /**
      * Reports that the pointer moved over an item.
      *
      * @param index zero-based index in the current visual snapshot.
      */
-    fun onSuggestionHovered(index: Int)
+    public fun onSuggestionHovered(index: Int)
 
     /**
      * Reports an explicit primary-button click on an item.
      *
      * @param index zero-based index in the current visual snapshot.
      */
-    fun onSuggestionClicked(index: Int)
+    public fun onSuggestionClicked(index: Int)
 
     /**
      * Requests relative keyboard-style navigation after a pointer-wheel gesture.
@@ -205,7 +205,7 @@ interface SwingShellSuggestionViewListener {
      * @param delta negative for earlier suggestions and positive for later
      * suggestions. A zero delta is ignored.
      */
-    fun onSuggestionScrollRequested(delta: Int) = Unit
+    public fun onSuggestionScrollRequested(delta: Int): Unit = Unit
 }
 
 /**
@@ -214,21 +214,21 @@ interface SwingShellSuggestionViewListener {
  * Standalone hosts normally use [DEFAULT]. Platform hosts can supply a native
  * Swing implementation without replacing completion behavior.
  */
-fun interface SwingShellSuggestionViewFactory {
+public fun interface SwingShellSuggestionViewFactory {
     /**
      * Creates a view that reports pointer interaction to [listener].
      *
      * @param listener controller-owned interaction callback.
      * @return a new view owned by one terminal component.
      */
-    fun create(listener: SwingShellSuggestionViewListener): SwingShellSuggestionView
+    public fun create(listener: SwingShellSuggestionViewListener): SwingShellSuggestionView
 
-    companion object {
+    public companion object {
         /**
          * Factory for KetraTerm's adaptive standalone suggestion surface.
          */
         @JvmField
-        val DEFAULT: SwingShellSuggestionViewFactory =
+        public val DEFAULT: SwingShellSuggestionViewFactory =
             SwingShellSuggestionViewFactory { listener -> SwingCompletionPopupView(listener) }
     }
 }

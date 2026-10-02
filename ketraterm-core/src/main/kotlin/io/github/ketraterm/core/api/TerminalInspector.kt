@@ -20,18 +20,19 @@ import io.github.ketraterm.core.model.CellAttributes
 /**
  * Allocating inspection contract for the terminal buffer.
  *
- * Intended for tests and debugging only. Every method here allocates — do
- * not use on a hot rendering path. Production code should use [TerminalReader].
+ * Intended for tests and debugging. These convenience methods may allocate;
+ * renderers consume [io.github.ketraterm.render.api.TerminalRenderFrame] copies
+ * instead of performing allocating inspection in a hot rendering path.
  */
-interface TerminalInspector {
+public interface TerminalInspector {
     /**
-     * Returns the attributes at a screen position as an unpacked [Attributes] object.
+     * Returns the attributes at a screen position as an unpacked [CellAttributes] object.
      *
      * @param col Column index (0-based).
      * @param row Row index (0-based).
      * @return Unpacked attributes, or `null` if the position is out of bounds.
      */
-    fun getAttrAt(
+    public fun getAttrAt(
         col: Int,
         row: Int,
     ): CellAttributes?
@@ -43,14 +44,14 @@ interface TerminalInspector {
      * @param row Visible row index (0-based).
      * @return The row text, or an empty string if the row is blank or out of bounds.
      */
-    fun getLineAsString(row: Int): String
+    public fun getLineAsString(row: Int): String
 
     /**
      * Returns the visible screen as a newline-joined string, top to bottom.
      *
      * @return The text content of the entire visible screen.
      */
-    fun getScreenAsString(): String
+    public fun getScreenAsString(): String
 
     /**
      * Returns scrollback history followed by the visible screen as a
@@ -58,5 +59,5 @@ interface TerminalInspector {
      *
      * @return The text content of both history and the visible screen.
      */
-    fun getAllAsString(): String
+    public fun getAllAsString(): String
 }

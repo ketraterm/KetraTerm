@@ -16,7 +16,7 @@
 package io.github.ketraterm.protocol
 
 /** Mouse tracking selection toggled by DECSET private modes. */
-enum class MouseTrackingMode {
+public enum class MouseTrackingMode {
     /** Mouse tracking is disabled. */
     OFF,
 
@@ -34,7 +34,7 @@ enum class MouseTrackingMode {
 }
 
 /** Mouse report encoding selected by xterm private modes. */
-enum class MouseEncodingMode {
+public enum class MouseEncodingMode {
     /** Standard X11 byte-value encoding. */
     DEFAULT,
 

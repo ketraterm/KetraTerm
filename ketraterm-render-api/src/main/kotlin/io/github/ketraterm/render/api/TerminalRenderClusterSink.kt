@@ -18,7 +18,7 @@ package io.github.ketraterm.render.api
 /**
  * Receives grapheme cluster text while a row is copied.
  */
-fun interface TerminalRenderClusterSink {
+public fun interface TerminalRenderClusterSink {
     /**
      * Called during `copyLine()` for a [TerminalRenderCellFlags.CLUSTER] cell.
      *
@@ -30,7 +30,7 @@ fun interface TerminalRenderClusterSink {
      * @param column zero-based logical column of the cluster-leading cell in the copied row.
      * @param text full Unicode grapheme cluster text.
      */
-    fun onCluster(
+    public fun onCluster(
         column: Int,
         text: String,
     )
@@ -44,7 +44,7 @@ fun interface TerminalRenderClusterSink {
  * receivers that retain it must copy the primitive range into their own
  * storage before returning.
  */
-fun interface TerminalRenderClusterDataSink {
+public fun interface TerminalRenderClusterDataSink {
     /**
      * Called during `copyLine()` for a [TerminalRenderCellFlags.CLUSTER] cell.
      *
@@ -53,7 +53,7 @@ fun interface TerminalRenderClusterDataSink {
      * @param offset zero-based buffer index of the cluster's first code point in [codepoints].
      * @param length number of code points in the cluster.
      */
-    fun onCluster(
+    public fun onCluster(
         column: Int,
         codepoints: IntArray,
         offset: Int,

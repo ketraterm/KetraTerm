@@ -16,11 +16,14 @@
 package io.github.ketraterm.session
 
 import io.github.ketraterm.core.TerminalBuffers
+import io.github.ketraterm.core.api.TerminalBuffer
+import io.github.ketraterm.core.api.TerminalInputState
 import io.github.ketraterm.input.event.*
 import io.github.ketraterm.input.policy.EnterNewLineModePolicy
 import io.github.ketraterm.input.policy.PasteControlPolicy
 import io.github.ketraterm.input.policy.PasteLineEndingPolicy
 import io.github.ketraterm.input.policy.TerminalInputPolicy
+import io.github.ketraterm.protocol.mouse.MouseTrackingMode
 import io.github.ketraterm.testkit.MockConnector
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import org.junit.jupiter.api.Assertions.*
@@ -69,11 +72,12 @@ class TerminalSessionHeadlessTest {
     @Test
     fun `host printable bytes mutate headless core state`() {
         val connector = MockConnector()
-        val session = createStartedSession(connector)
+        val terminal = TerminalBuffers.create(width = 10, height = 3)
+        val session = createStartedSession(connector, terminal = terminal)
 
         connector.feedFromHost("hello".ascii())
 
-        assertEquals("hello", session.terminal.getLineAsString(0))
+        assertEquals("hello", terminal.getLineAsString(0))
         assertEquals("", connector.writtenBytes.asciiText())
         session.close()
     }
@@ -148,13 +152,14 @@ class TerminalSessionHeadlessTest {
     @Test
     fun `local close stops host bytes and UI input from mutating the headless session`() {
         val connector = MockConnector()
-        val session = createStartedSession(connector)
+        val terminal = TerminalBuffers.create(width = 10, height = 3)
+        val session = createStartedSession(connector, terminal = terminal)
 
         session.close()
         session.onBytes("A\u001B[5n".ascii(), 0, 5)
         session.encodeKey(TerminalKeyEvent.codepoint('b'.code))
 
-        assertEquals("", session.terminal.getLineAsString(0))
+        assertEquals("", terminal.getLineAsString(0))
         assertEquals("", connector.writtenBytes.asciiText())
         assertEquals(1, connector.closeCount)
     }
@@ -162,13 +167,14 @@ class TerminalSessionHeadlessTest {
     @Test
     fun `remote close stops input and disposes transport without changing the remote result`() {
         val connector = MockConnector()
-        val session = createStartedSession(connector)
+        val terminal = TerminalBuffers.create(width = 10, height = 3)
+        val session = createStartedSession(connector, terminal = terminal)
 
         connector.simulateClosed(0)
         session.onBytes("A\u001B[5n".ascii(), 0, 5)
         session.encodeKey(TerminalKeyEvent.codepoint('b'.code))
 
-        assertEquals("", session.terminal.getLineAsString(0))
+        assertEquals("", terminal.getLineAsString(0))
         assertEquals("", connector.writtenBytes.asciiText())
         assertEquals(1, connector.closeCount)
         assertEquals(0, session.exitCode)
@@ -178,7 +184,8 @@ class TerminalSessionHeadlessTest {
     @Test
     fun `invalid resize is rejected before connector resize`() {
         val connector = MockConnector()
-        val session = createStartedSession(connector)
+        val terminal = TerminalBuffers.create(width = 10, height = 3)
+        val session = createStartedSession(connector, terminal = terminal)
 
         assertThrows(IllegalArgumentException::class.java) {
             session.resize(columns = 0, rows = 3)
@@ -187,8 +194,8 @@ class TerminalSessionHeadlessTest {
             session.resizeViewport(columns = 10, rows = 0)
         }
 
-        assertEquals(10, session.terminal.width)
-        assertEquals(3, session.terminal.height)
+        assertEquals(10, terminal.width)
+        assertEquals(3, terminal.height)
         assertEquals(listOf(10 to 3), connector.resizeCalls)
         session.close()
     }
@@ -198,11 +205,66 @@ class TerminalSessionHeadlessTest {
         columns: Int = 10,
         rows: Int = 3,
         inputPolicy: TerminalInputPolicy = TerminalInputPolicy(),
+        terminal: TerminalBuffer = TerminalBuffers.create(width = columns, height = rows),
     ): TerminalSession {
-        val terminal = TerminalBuffers.create(width = columns, height = rows)
         val session = TerminalSession.create(terminal, connector, inputPolicy = inputPolicy, ioDispatcher = UnconfinedTestDispatcher())
         session.start(columns, rows)
         return session
+    }
+
+    @Test
+    fun `host minimization updates subsequent window state reports`() {
+        val connector = MockConnector()
+        val session = createStartedSession(connector)
+        try {
+            connector.feedFromHost("\u001B[11t".ascii())
+            session.setWindowMinimized(true)
+            connector.feedFromHost("\u001B[11t".ascii())
+            session.setWindowMinimized(false)
+            connector.feedFromHost("\u001B[11t".ascii())
+
+            assertEquals("\u001B[1t\u001B[2t\u001B[1t", connector.writtenBytes.asciiText())
+        } finally {
+            session.close()
+        }
+    }
+
+    @Test
+    fun `session mode snapshots remain detached across output and closure`() {
+        val connector = MockConnector()
+        val session = createStartedSession(connector)
+        try {
+            val initial = session.modeSnapshot
+            val initialInput = session.getInputModeBits()
+            connector.feedFromHost("\u001B[?1042;1000;2004h".ascii())
+            val changed = session.modeSnapshot
+            val changedInput = session.getInputModeBits()
+
+            assertFalse(initial.isBellIsUrgent)
+            assertTrue(changed.isBellIsUrgent)
+            assertFalse(TerminalInputState.isBracketedPasteEnabled(initialInput))
+            assertTrue(TerminalInputState.isBracketedPasteEnabled(changedInput))
+            assertEquals(MouseTrackingMode.NONE, TerminalInputState.mouseTrackingMode(initialInput))
+            assertEquals(MouseTrackingMode.NORMAL, TerminalInputState.mouseTrackingMode(changedInput))
+            session.close()
+            assertEquals(changed, session.modeSnapshot)
+            assertEquals(changedInput, session.getInputModeBits())
+        } finally {
+            session.close()
+        }
+    }
+
+    @Test
+    fun `standard session rejects a buffer without render frame access before starting the connector`() {
+        val connector = MockConnector()
+        val terminal = TerminalBuffers.create(width = 10, height = 3)
+        val nonRenderingBuffer = object : TerminalBuffer by terminal {}
+
+        assertThrows(IllegalArgumentException::class.java) {
+            TerminalSession.create(nonRenderingBuffer, connector)
+        }
+        assertEquals(0, connector.startCount)
+        assertTrue(connector.resizeCalls.isEmpty())
     }
 
     private fun String.ascii(): ByteArray = toByteArray(StandardCharsets.US_ASCII)

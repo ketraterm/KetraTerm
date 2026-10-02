@@ -20,10 +20,10 @@ package io.github.ketraterm.protocol
  *
  * Toggled via CSI Pn h (SM) and CSI Pn l (RM).
  */
-object AnsiMode {
+public object AnsiMode {
     /** Keyboard Action / Insertion Mode (KAM / IRM). */
-    const val INSERT: Int = 4
+    public const val INSERT: Int = 4
 
     /** Line Feed / New Line Mode (LFM / LNM). */
-    const val NEW_LINE: Int = 20
+    public const val NEW_LINE: Int = 20
 }

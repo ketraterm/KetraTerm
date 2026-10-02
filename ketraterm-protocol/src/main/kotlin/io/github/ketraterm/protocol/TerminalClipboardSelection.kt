@@ -21,12 +21,12 @@ package io.github.ketraterm.protocol
  * selectors remain distinct even when a host cannot supply them.
  */
 @JvmInline
-value class TerminalClipboardSelection private constructor(
-    val value: String,
+public value class TerminalClipboardSelection private constructor(
+    public val value: String,
 ) {
-    companion object {
+    public companion object {
         /** Returns null for an unknown selector. No unchecked text can enter a reply. */
-        fun parse(value: String): TerminalClipboardSelection? {
+        public fun parse(value: String): TerminalClipboardSelection? {
             if (value.isEmpty()) return TerminalClipboardSelection("c")
             var seen = 0
             val selectors = StringBuilder(ALPHABET.length)

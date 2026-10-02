@@ -20,7 +20,7 @@ import java.util.*
 /**
  * Severity level of a desktop notification.
  */
-enum class NotificationLevel {
+public enum class NotificationLevel {
     /** Standard information notification. */
     INFO,
 
@@ -34,7 +34,7 @@ enum class NotificationLevel {
     NONE,
     ;
 
-    companion object {
+    public companion object {
         /**
          * Resolves the notification level from a string.
          * Falls back to null if unresolved or blank.
@@ -43,7 +43,7 @@ enum class NotificationLevel {
          * @return resolved [NotificationLevel], or null if unresolved or blank.
          */
         @JvmStatic
-        fun parseOrNull(value: String): NotificationLevel? {
+        public fun parseOrNull(value: String): NotificationLevel? {
             val cleaned = value.trim().uppercase(Locale.ROOT)
             return entries.firstOrNull { it.name == cleaned }
         }

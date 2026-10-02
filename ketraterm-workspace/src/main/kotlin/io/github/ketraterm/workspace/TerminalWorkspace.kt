@@ -43,7 +43,7 @@ import java.util.concurrent.atomic.AtomicInteger
  * tool-window contents. This class does not know about UI widgets, painting,
  * input events, or platform actions.
  */
-class TerminalWorkspace internal constructor(
+public class TerminalWorkspace internal constructor(
     private val listener: TerminalWorkspaceListener,
     private val sessionFactory: TerminalWorkspaceSessionFactory,
     workerDispatcher: CoroutineDispatcher = Dispatchers.Default,
@@ -53,7 +53,7 @@ class TerminalWorkspace internal constructor(
      *
      * @param listener host-neutral workspace event listener.
      */
-    constructor(listener: TerminalWorkspaceListener = TerminalWorkspaceListener.NONE) : this(
+    public constructor(listener: TerminalWorkspaceListener = TerminalWorkspaceListener.NONE) : this(
         listener = listener,
         sessionFactory = LocalPtyWorkspaceSessionFactory,
     )
@@ -80,14 +80,14 @@ class TerminalWorkspace internal constructor(
      *
      * @return a list containing all currently open [TerminalWorkspaceTab]s.
      */
-    fun tabSnapshot(): List<TerminalWorkspaceTab> = synchronized(stateLock) { tabs.toList() }
+    public fun tabSnapshot(): List<TerminalWorkspaceTab> = synchronized(stateLock) { tabs.toList() }
 
     /**
      * Returns the currently selected tab, or `null` when no tabs are open.
      *
      * @return the selected [TerminalWorkspaceTab], or null if none.
      */
-    fun selectedTab(): TerminalWorkspaceTab? = synchronized(stateLock) { selectedTabId?.let(::tabByIdLocked) }
+    public fun selectedTab(): TerminalWorkspaceTab? = synchronized(stateLock) { selectedTabId?.let(::tabByIdLocked) }
 
     /**
      * Opens a new local PTY-backed tab. Publishes it through
@@ -99,7 +99,7 @@ class TerminalWorkspace internal constructor(
      * @param options initial session dimensions and terminal policy.
      * @return opened workspace tab.
      */
-    fun openTab(
+    public fun openTab(
         profile: TerminalProfile,
         options: TerminalWorkspaceOpenOptions,
     ): TerminalWorkspaceTab {
@@ -202,7 +202,7 @@ class TerminalWorkspace internal constructor(
      *
      * @param id tab id.
      */
-    fun selectTab(id: String) {
+    public fun selectTab(id: String) {
         synchronized(stateLock) {
             require(tabByIdLocked(id) != null) { "unknown terminal tab id: $id" }
             selectedTabId = id
@@ -217,7 +217,7 @@ class TerminalWorkspace internal constructor(
      *
      * @param id tab id.
      */
-    fun closeTab(id: String) {
+    public fun closeTab(id: String) {
         val result =
             synchronized(stateLock) {
                 val index = tabs.indexOfFirst { it.id == id }
@@ -245,7 +245,7 @@ class TerminalWorkspace internal constructor(
      * @param palette terminal color palette.
      * @param treatAmbiguousAsWide width policy for future writes.
      */
-    fun applySettings(
+    public fun applySettings(
         palette: TerminalColorPalette,
         treatAmbiguousAsWide: Boolean,
     ) {
@@ -489,6 +489,8 @@ private object LocalPtyWorkspaceSessionFactory : TerminalWorkspaceSessionFactory
 /**
  * Initial terminal options for a workspace tab.
  *
+ * Constructor, [copy], and destructuring signatures are part of the public ABI.
+ *
  * @property columns initial terminal width in cells.
  * @property rows initial terminal height in rows.
  * @property treatAmbiguousAsWide width policy for future writes.
@@ -501,7 +503,7 @@ private object LocalPtyWorkspaceSessionFactory : TerminalWorkspaceSessionFactory
  * @property showForegroundProcessName whether detected processes provide automatic title fallbacks.
  * @property modeReportCapabilities implemented host actions from TerminalHostModeCapability.
  */
-data class TerminalWorkspaceOpenOptions(
+public data class TerminalWorkspaceOpenOptions(
     val columns: Int,
     val rows: Int,
     val treatAmbiguousAsWide: Boolean,
@@ -529,11 +531,11 @@ data class TerminalWorkspaceOpenOptions(
  *   `null` before one is reported.
  * @property session running terminal session.
  */
-class TerminalWorkspaceTab internal constructor(
-    val id: String,
-    val profile: TerminalProfile,
+public class TerminalWorkspaceTab internal constructor(
+    public val id: String,
+    public val profile: TerminalProfile,
     title: String,
-    val session: TerminalSession,
+    public val session: TerminalSession,
     private val onColorChanged: (TerminalWorkspaceTab, String?) -> Unit,
     private val onTitleChanged: (TerminalWorkspaceTab, String) -> Unit,
     private val onCurrentWorkingDirectoryChanged: (TerminalWorkspaceTab, String) -> Unit,
@@ -553,14 +555,14 @@ class TerminalWorkspaceTab internal constructor(
     /**
      * Current host-visible title for this tab.
      */
-    val title: String
+    public val title: String
         get() = synchronized(titleLock) { titleLocked() }
 
     private fun titleLocked(): String =
         customTitle ?: if (applicationTitleActive) dynamicTitle else foregroundProcessTitle ?: directoryTitle ?: dynamicTitle
 
     /** Enables process-title tracking; disabling immediately restores the existing title fallback. */
-    var showForegroundProcessName: Boolean
+    public var showForegroundProcessName: Boolean
         get() = processTitleEnabled.value
         set(enabled) {
             val changedTitle =
@@ -595,13 +597,13 @@ class TerminalWorkspaceTab internal constructor(
      * a directory is observed. Model publications update it synchronously until
      * the session closes; the tab then retains its last observed value.
      */
-    val currentWorkingDirectoryUri: String?
+    public val currentWorkingDirectoryUri: String?
         get() = currentWorkingDirectory
 
     /**
      * Optional user title, taking precedence over application, process, and directory titles.
      */
-    var customTitle: String? = null
+    public var customTitle: String? = null
         get() = synchronized(titleLock) { field }
         set(value) {
             val changedTitle =
@@ -635,7 +637,7 @@ class TerminalWorkspaceTab internal constructor(
     /**
      * Optional custom color representation for this tab (e.g. hex string "#3b82f6").
      */
-    var color: String? = null
+    public var color: String? = null
         set(value) {
             if (field != value) {
                 field = value
@@ -698,7 +700,7 @@ class TerminalWorkspaceTab internal constructor(
 /**
  * Host-neutral workspace events.
  */
-interface TerminalWorkspaceListener {
+public interface TerminalWorkspaceListener {
     /**
      * Effective palette change for an attached tab. The immutable value may be
      * retained. Metadata callbacks run synchronously under the session mutation
@@ -706,30 +708,30 @@ interface TerminalWorkspaceListener {
      * terminal mutation. There is no initial replay; read the session's palette
      * for current state. Events before tab attachment or after removal are ignored.
      */
-    fun paletteChanged(
+    public fun paletteChanged(
         tab: TerminalWorkspaceTab,
         palette: TerminalColorPalette,
-    ) = Unit
+    ): Unit = Unit
 
     /** New accepted OSC 8 registry entry for an attached tab; no browser action is implied. */
-    fun hyperlinkRegistered(
+    public fun hyperlinkRegistered(
         tab: TerminalWorkspaceTab,
         hyperlinkId: Int,
         uri: String,
         id: String?,
-    ) = Unit
+    ): Unit = Unit
 
     /** An evicted OSC 8 identity is no longer resolvable in this tab's session. */
-    fun hyperlinkRemoved(
+    public fun hyperlinkRemoved(
         tab: TerminalWorkspaceTab,
         hyperlinkId: Int,
-    ) = Unit
+    ): Unit = Unit
 
     /** Hard reset cleared this tab's nonempty OSC 8 registry. */
-    fun hyperlinksCleared(tab: TerminalWorkspaceTab) = Unit
+    public fun hyperlinksCleared(tab: TerminalWorkspaceTab): Unit = Unit
 
     /** The user typed before shell readiness, so the configured startup command was not submitted. */
-    fun startupCommandCancelled(tab: TerminalWorkspaceTab) = Unit
+    public fun startupCommandCancelled(tab: TerminalWorkspaceTab): Unit = Unit
 
     /**
      * Called after a tab is registered and selected, before its session starts.
@@ -738,7 +740,7 @@ interface TerminalWorkspaceListener {
      *
      * @param tab opened tab.
      */
-    fun tabOpened(tab: TerminalWorkspaceTab) = Unit
+    public fun tabOpened(tab: TerminalWorkspaceTab): Unit = Unit
 
     /**
      * Called when a tab color changes.
@@ -746,31 +748,31 @@ interface TerminalWorkspaceListener {
      * @param tab tab whose color changed.
      * @param color new color representation (e.g. hex string) or null if reset.
      */
-    fun colorChanged(
+    public fun colorChanged(
         tab: TerminalWorkspaceTab,
         color: String?,
-    ) = Unit
+    ): Unit = Unit
 
     /**
      * Called after workspace selection changes.
      *
      * @param tabId selected tab id.
      */
-    fun tabSelected(tabId: String) = Unit
+    public fun tabSelected(tabId: String): Unit = Unit
 
     /**
      * Called after a tab is closed.
      *
      * @param tabId closed tab id.
      */
-    fun tabClosed(tabId: String) = Unit
+    public fun tabClosed(tabId: String): Unit = Unit
 
     /**
      * Called when a tab emits a terminal bell event.
      *
      * @param tab tab that emitted the bell.
      */
-    fun bell(tab: TerminalWorkspaceTab) = Unit
+    public fun bell(tab: TerminalWorkspaceTab): Unit = Unit
 
     /**
      * Called when a tab requests a window/grid resize.
@@ -779,22 +781,22 @@ interface TerminalWorkspaceListener {
      * @param rows target row count.
      * @param columns target column count.
      */
-    fun resizeWindow(
+    public fun resizeWindow(
         tab: TerminalWorkspaceTab,
         rows: Int,
         columns: Int,
-    ) = Unit
+    ): Unit = Unit
 
     /**
      * Receives a logical column switch for an open tab. Hosts may schedule an
      * optional window resize without changing the session grid.
      * See [io.github.ketraterm.host.HostEventSink.columnModeChanged].
      */
-    fun columnModeChanged(
+    public fun columnModeChanged(
         tab: TerminalWorkspaceTab,
         rows: Int,
         columns: Int,
-    ) = Unit
+    ): Unit = Unit
 
     /**
      * Called when the shell requests moving the terminal window.
@@ -803,39 +805,39 @@ interface TerminalWorkspaceListener {
      * @param x target x position on screen.
      * @param y target y position on screen.
      */
-    fun moveWindow(
+    public fun moveWindow(
         tab: TerminalWorkspaceTab,
         x: Int,
         y: Int,
-    ) = Unit
+    ): Unit = Unit
 
     /**
      * Called when the shell requests minimizing the terminal window.
      *
      * @param tab tab that received the request.
      */
-    fun minimizeWindow(tab: TerminalWorkspaceTab) = Unit
+    public fun minimizeWindow(tab: TerminalWorkspaceTab): Unit = Unit
 
     /**
      * Called when the shell requests deminimizing (restoring) the terminal window.
      *
      * @param tab tab that received the request.
      */
-    fun deminimizeWindow(tab: TerminalWorkspaceTab) = Unit
+    public fun deminimizeWindow(tab: TerminalWorkspaceTab): Unit = Unit
 
     /**
      * Called when the shell requests raising the terminal window.
      *
      * @param tab tab that received the request.
      */
-    fun raiseWindow(tab: TerminalWorkspaceTab) = Unit
+    public fun raiseWindow(tab: TerminalWorkspaceTab): Unit = Unit
 
     /**
      * Called when the shell requests lowering the terminal window.
      *
      * @param tab tab that received the request.
      */
-    fun lowerWindow(tab: TerminalWorkspaceTab) = Unit
+    public fun lowerWindow(tab: TerminalWorkspaceTab): Unit = Unit
 
     /**
      * Called when the shell requests maximizing or restoring the terminal window.
@@ -843,10 +845,10 @@ interface TerminalWorkspaceListener {
      * @param tab tab that received the request.
      * @param maximize true to maximize, false to restore.
      */
-    fun setMaximized(
+    public fun setMaximized(
         tab: TerminalWorkspaceTab,
         maximize: Boolean,
-    ) = Unit
+    ): Unit = Unit
 
     /**
      * Called when a tab receives an OSC 133 shell integration marker.
@@ -854,10 +856,10 @@ interface TerminalWorkspaceListener {
      * @param tab tab that received the marker.
      * @param event typed marker event.
      */
-    fun shellIntegrationMarker(
+    public fun shellIntegrationMarker(
         tab: TerminalWorkspaceTab,
         event: ShellIntegrationEvent,
-    ) = Unit
+    ): Unit = Unit
 
     /**
      * Called synchronously for each completion published by the selected shell model.
@@ -866,10 +868,10 @@ interface TerminalWorkspaceListener {
      * The callback runs on the producer thread and must not block. Registration
      * ends when the tab or session closes; an already dispatched callback may finish.
      */
-    fun commandFinished(
+    public fun commandFinished(
         tab: TerminalWorkspaceTab,
         metadata: TerminalShellIntegrationCommandMetadata,
-    ) = Unit
+    ): Unit = Unit
 
     /**
      * Called when a tab title changes.
@@ -880,10 +882,10 @@ interface TerminalWorkspaceListener {
      * @param tab tab whose title changed.
      * @param title new title.
      */
-    fun titleChanged(
+    public fun titleChanged(
         tab: TerminalWorkspaceTab,
         title: String,
-    ) = Unit
+    ): Unit = Unit
 
     /**
      * Called after a tab observes a new current-working-directory URI in its shell model.
@@ -895,10 +897,10 @@ interface TerminalWorkspaceListener {
      * @param tab tab whose working directory changed.
      * @param uri absolute `file://` URI reported by the shell.
      */
-    fun currentWorkingDirectoryChanged(
+    public fun currentWorkingDirectoryChanged(
         tab: TerminalWorkspaceTab,
         uri: String,
-    ) = Unit
+    ): Unit = Unit
 
     /**
      * Called when the PTY event bridge reports a listener failure.
@@ -906,10 +908,10 @@ interface TerminalWorkspaceListener {
      * @param tab tab associated with the failure.
      * @param exception failure raised by the listener bridge.
      */
-    fun listenerFailed(
+    public fun listenerFailed(
         tab: TerminalWorkspaceTab,
         exception: Exception,
-    ) = Unit
+    ): Unit = Unit
 
     /**
      * Called when the tab's terminal session closes because the process exited
@@ -924,11 +926,11 @@ interface TerminalWorkspaceListener {
      * unknown.
      * @param failure transport failure, or null for a normal process exit.
      */
-    fun sessionClosed(
+    public fun sessionClosed(
         tab: TerminalWorkspaceTab,
         exitCode: Int?,
         failure: Throwable?,
-    ) = Unit
+    ): Unit = Unit
 
     /**
      * Called when a tab requests a desktop notification.
@@ -938,12 +940,12 @@ interface TerminalWorkspaceListener {
      * @param body notification message body.
      * @param level notification severity level.
      */
-    fun showNotification(
+    public fun showNotification(
         tab: TerminalWorkspaceTab,
         title: String,
         body: String,
         level: NotificationLevel,
-    ) = Unit
+    ): Unit = Unit
 
     /**
      * Called when a tab receives an OSC 52 clipboard write request that was
@@ -955,10 +957,10 @@ interface TerminalWorkspaceListener {
      * @param tab tab that received the request.
      * @param event decoded clipboard write request.
      */
-    fun terminalClipboardWrite(
+    public fun terminalClipboardWrite(
         tab: TerminalWorkspaceTab,
         event: TerminalClipboardWriteEvent,
-    ) = Unit
+    ): Unit = Unit
 
     /**
      * Called when a tab receives an OSC 52 clipboard write request that requires
@@ -970,10 +972,10 @@ interface TerminalWorkspaceListener {
      * @param tab tab that received the request.
      * @param event decoded clipboard prompt request.
      */
-    fun terminalClipboardPrompt(
+    public fun terminalClipboardPrompt(
         tab: TerminalWorkspaceTab,
         event: TerminalClipboardPromptEvent,
-    ) = Unit
+    ): Unit = Unit
 
     /**
      * Resolves a read for its owning [tab], independently of the selected tab.
@@ -986,15 +988,15 @@ interface TerminalWorkspaceListener {
      * are audited without details; they are not delivered to [listenerFailed].
      * The default reports unavailable data without accessing a clipboard.
      */
-    suspend fun readClipboard(
+    public suspend fun readClipboard(
         tab: TerminalWorkspaceTab,
         request: TerminalClipboardReadRequest,
     ): TerminalClipboardReadResult = TerminalClipboardReadResult.Unavailable
 
-    companion object {
+    public companion object {
         /**
          * Listener implementation that ignores every event.
          */
-        val NONE: TerminalWorkspaceListener = object : TerminalWorkspaceListener {}
+        public val NONE: TerminalWorkspaceListener = object : TerminalWorkspaceListener {}
     }
 }

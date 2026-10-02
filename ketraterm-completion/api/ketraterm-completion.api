@@ -1,0 +1,575 @@
+public final class io/github/ketraterm/completion/api/TerminalCompletionActivePosition : java/lang/Enum {
+	public static final field COMMAND Lio/github/ketraterm/completion/api/TerminalCompletionActivePosition;
+	public static final field OPERATOR Lio/github/ketraterm/completion/api/TerminalCompletionActivePosition;
+	public static final field OPTION_NAME Lio/github/ketraterm/completion/api/TerminalCompletionActivePosition;
+	public static final field OPTION_VALUE Lio/github/ketraterm/completion/api/TerminalCompletionActivePosition;
+	public static final field POSITIONAL_ARGUMENT Lio/github/ketraterm/completion/api/TerminalCompletionActivePosition;
+	public static final field SUBCOMMAND Lio/github/ketraterm/completion/api/TerminalCompletionActivePosition;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public static fun valueOf (Ljava/lang/String;)Lio/github/ketraterm/completion/api/TerminalCompletionActivePosition;
+	public static fun values ()[Lio/github/ketraterm/completion/api/TerminalCompletionActivePosition;
+}
+
+public final class io/github/ketraterm/completion/api/TerminalCompletionCandidate {
+	public fun <init> (Ljava/lang/String;IILjava/lang/String;Lio/github/ketraterm/completion/api/TerminalCompletionCandidateKind;)V
+	public fun <init> (Ljava/lang/String;IILjava/lang/String;Lio/github/ketraterm/completion/api/TerminalCompletionCandidateKind;Ljava/lang/String;)V
+	public fun <init> (Ljava/lang/String;IILjava/lang/String;Lio/github/ketraterm/completion/api/TerminalCompletionCandidateKind;Ljava/lang/String;Ljava/lang/String;)V
+	public fun <init> (Ljava/lang/String;IILjava/lang/String;Lio/github/ketraterm/completion/api/TerminalCompletionCandidateKind;Ljava/lang/String;Ljava/lang/String;I)V
+	public fun <init> (Ljava/lang/String;IILjava/lang/String;Lio/github/ketraterm/completion/api/TerminalCompletionCandidateKind;Ljava/lang/String;Ljava/lang/String;ILio/github/ketraterm/completion/model/TerminalCompletionValueDomain;)V
+	public fun <init> (Ljava/lang/String;IILjava/lang/String;Lio/github/ketraterm/completion/api/TerminalCompletionCandidateKind;Ljava/lang/String;Ljava/lang/String;ILio/github/ketraterm/completion/model/TerminalCompletionValueDomain;Lio/github/ketraterm/completion/api/TerminalCompletionMatchRanges;)V
+	public synthetic fun <init> (Ljava/lang/String;IILjava/lang/String;Lio/github/ketraterm/completion/api/TerminalCompletionCandidateKind;Ljava/lang/String;Ljava/lang/String;ILio/github/ketraterm/completion/model/TerminalCompletionValueDomain;Lio/github/ketraterm/completion/api/TerminalCompletionMatchRanges;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component10 ()Lio/github/ketraterm/completion/api/TerminalCompletionMatchRanges;
+	public final fun component2 ()I
+	public final fun component3 ()I
+	public final fun component4 ()Ljava/lang/String;
+	public final fun component5 ()Lio/github/ketraterm/completion/api/TerminalCompletionCandidateKind;
+	public final fun component6 ()Ljava/lang/String;
+	public final fun component7 ()Ljava/lang/String;
+	public final fun component8 ()I
+	public final fun component9 ()Lio/github/ketraterm/completion/model/TerminalCompletionValueDomain;
+	public final fun copy (Ljava/lang/String;IILjava/lang/String;Lio/github/ketraterm/completion/api/TerminalCompletionCandidateKind;Ljava/lang/String;Ljava/lang/String;ILio/github/ketraterm/completion/model/TerminalCompletionValueDomain;Lio/github/ketraterm/completion/api/TerminalCompletionMatchRanges;)Lio/github/ketraterm/completion/api/TerminalCompletionCandidate;
+	public static synthetic fun copy$default (Lio/github/ketraterm/completion/api/TerminalCompletionCandidate;Ljava/lang/String;IILjava/lang/String;Lio/github/ketraterm/completion/api/TerminalCompletionCandidateKind;Ljava/lang/String;Ljava/lang/String;ILio/github/ketraterm/completion/model/TerminalCompletionValueDomain;Lio/github/ketraterm/completion/api/TerminalCompletionMatchRanges;ILjava/lang/Object;)Lio/github/ketraterm/completion/api/TerminalCompletionCandidate;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getDetail ()Ljava/lang/String;
+	public final fun getDisplayText ()Ljava/lang/String;
+	public final fun getKind ()Lio/github/ketraterm/completion/api/TerminalCompletionCandidateKind;
+	public final fun getMatchedRanges ()Lio/github/ketraterm/completion/api/TerminalCompletionMatchRanges;
+	public final fun getReplacementEndOffset ()I
+	public final fun getReplacementStartOffset ()I
+	public final fun getReplacementText ()Ljava/lang/String;
+	public final fun getScore ()I
+	public final fun getSource ()Ljava/lang/String;
+	public final fun getValueDomain ()Lio/github/ketraterm/completion/model/TerminalCompletionValueDomain;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class io/github/ketraterm/completion/api/TerminalCompletionCandidateKind : java/lang/Enum {
+	public static final field ARGUMENT Lio/github/ketraterm/completion/api/TerminalCompletionCandidateKind;
+	public static final field COMMAND Lio/github/ketraterm/completion/api/TerminalCompletionCandidateKind;
+	public static final field OPTION Lio/github/ketraterm/completion/api/TerminalCompletionCandidateKind;
+	public static final field PATH Lio/github/ketraterm/completion/api/TerminalCompletionCandidateKind;
+	public static final field SUBCOMMAND Lio/github/ketraterm/completion/api/TerminalCompletionCandidateKind;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public static fun valueOf (Ljava/lang/String;)Lio/github/ketraterm/completion/api/TerminalCompletionCandidateKind;
+	public static fun values ()[Lio/github/ketraterm/completion/api/TerminalCompletionCandidateKind;
+}
+
+public final class io/github/ketraterm/completion/api/TerminalCompletionContext {
+	public final fun getActiveOption ()Lio/github/ketraterm/completion/model/TerminalOptionSpec;
+	public final fun getActivePosition ()Lio/github/ketraterm/completion/api/TerminalCompletionActivePosition;
+	public final fun getActivePositionalArgument ()Lio/github/ketraterm/completion/model/TerminalArgumentSpec;
+	public final fun getActivePrefix ()Ljava/lang/String;
+	public final fun getActiveTokenQuote ()C
+	public final fun getCommand ()Lio/github/ketraterm/completion/model/TerminalCommandSpec;
+	public final fun getCommandPath ()Ljava/util/List;
+	public final fun getCommandTokenIndex ()I
+	public final fun getCurrentCommand ()Lio/github/ketraterm/completion/model/TerminalCommandSpec;
+	public final fun getExpectedHiddenPathPolicy ()Lio/github/ketraterm/completion/model/TerminalHiddenPathPolicy;
+	public final fun getExpectedPathKind ()Lio/github/ketraterm/completion/model/TerminalPathArgumentKind;
+	public final fun getExpectedValueDomain ()Lio/github/ketraterm/completion/model/TerminalCompletionValueDomain;
+	public final fun getOptionsTerminated ()Z
+	public final fun getReplacementEndOffset ()I
+	public final fun getReplacementStartOffset ()I
+	public final fun getStaticValueCandidates ()Ljava/util/List;
+	public final fun getSubcommandCandidateSource ()Lio/github/ketraterm/completion/model/TerminalCommandSpec;
+	public final fun getUsedOptionExclusiveGroupIds ()Ljava/util/Set;
+}
+
+public abstract interface class io/github/ketraterm/completion/api/TerminalCompletionEngine {
+	public abstract fun completions (Lio/github/ketraterm/completion/api/TerminalCompletionRequest;)Lkotlinx/coroutines/flow/Flow;
+}
+
+public final class io/github/ketraterm/completion/api/TerminalCompletionEngines {
+	public static final field INSTANCE Lio/github/ketraterm/completion/api/TerminalCompletionEngines;
+	public static final fun fromSources (Ljava/util/List;)Lio/github/ketraterm/completion/api/TerminalCompletionEngine;
+	public static final fun fromSources (Ljava/util/List;Ljava/util/List;)Lio/github/ketraterm/completion/api/TerminalCompletionEngine;
+	public static final fun fromSources (Ljava/util/List;Ljava/util/List;Lio/github/ketraterm/completion/api/TerminalCompletionLearningStore;)Lio/github/ketraterm/completion/api/TerminalCompletionEngine;
+	public static final fun fromSources (Ljava/util/List;Ljava/util/List;Lio/github/ketraterm/completion/api/TerminalCompletionLearningStore;Lio/github/ketraterm/completion/api/TerminalCompletionSourceFailureHandler;)Lio/github/ketraterm/completion/api/TerminalCompletionEngine;
+	public static synthetic fun fromSources$default (Ljava/util/List;Ljava/util/List;Lio/github/ketraterm/completion/api/TerminalCompletionLearningStore;Lio/github/ketraterm/completion/api/TerminalCompletionSourceFailureHandler;ILjava/lang/Object;)Lio/github/ketraterm/completion/api/TerminalCompletionEngine;
+}
+
+public final class io/github/ketraterm/completion/api/TerminalCompletionLearningStore {
+	public fun <init> ()V
+	public fun <init> (I)V
+	public synthetic fun <init> (IILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun clear ()V
+	public final fun mergeSnapshot (Lio/github/ketraterm/completion/model/TerminalCompletionLearningSnapshot;)V
+	public final fun recordCommandResult (Ljava/lang/String;ZLjava/lang/String;Ljava/lang/String;J)Z
+	public final fun recordSuggestionFeedback (Ljava/lang/String;Lio/github/ketraterm/completion/model/TerminalCompletionFeedbackKind;Ljava/lang/String;Ljava/lang/String;J)Z
+	public final fun snapshot ()Lio/github/ketraterm/completion/model/TerminalCompletionLearningSnapshot;
+}
+
+public final class io/github/ketraterm/completion/api/TerminalCompletionMatchRanges {
+	public static final field Companion Lio/github/ketraterm/completion/api/TerminalCompletionMatchRanges$Companion;
+	public static final field EMPTY Lio/github/ketraterm/completion/api/TerminalCompletionMatchRanges;
+	public final fun copyPackedOffsets ()[I
+	public final fun endOffset (I)I
+	public fun equals (Ljava/lang/Object;)Z
+	public static final fun fromPackedOffsets (Ljava/lang/String;[I)Lio/github/ketraterm/completion/api/TerminalCompletionMatchRanges;
+	public final fun getRangeCount ()I
+	public fun hashCode ()I
+	public final fun isEmpty ()Z
+	public final fun startOffset (I)I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class io/github/ketraterm/completion/api/TerminalCompletionMatchRanges$Companion {
+	public final fun fromPackedOffsets (Ljava/lang/String;[I)Lio/github/ketraterm/completion/api/TerminalCompletionMatchRanges;
+}
+
+public final class io/github/ketraterm/completion/api/TerminalCompletionReplayPolicy {
+	public static final field INSTANCE Lio/github/ketraterm/completion/api/TerminalCompletionReplayPolicy;
+	public final fun allowsPlaintext (Ljava/lang/String;)Z
+}
+
+public final class io/github/ketraterm/completion/api/TerminalCompletionRequest {
+	public fun <init> (Ljava/lang/String;I)V
+	public fun <init> (Ljava/lang/String;ILjava/lang/String;)V
+	public fun <init> (Ljava/lang/String;ILjava/lang/String;Ljava/lang/String;)V
+	public fun <init> (Ljava/lang/String;ILjava/lang/String;Ljava/lang/String;Lio/github/ketraterm/completion/api/TerminalShellCapabilities;)V
+	public synthetic fun <init> (Ljava/lang/String;ILjava/lang/String;Ljava/lang/String;Lio/github/ketraterm/completion/api/TerminalShellCapabilities;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component2 ()I
+	public final fun component3 ()Ljava/lang/String;
+	public final fun component4 ()Ljava/lang/String;
+	public final fun component5 ()Lio/github/ketraterm/completion/api/TerminalShellCapabilities;
+	public final fun copy (Ljava/lang/String;ILjava/lang/String;Ljava/lang/String;Lio/github/ketraterm/completion/api/TerminalShellCapabilities;)Lio/github/ketraterm/completion/api/TerminalCompletionRequest;
+	public static synthetic fun copy$default (Lio/github/ketraterm/completion/api/TerminalCompletionRequest;Ljava/lang/String;ILjava/lang/String;Ljava/lang/String;Lio/github/ketraterm/completion/api/TerminalShellCapabilities;ILjava/lang/Object;)Lio/github/ketraterm/completion/api/TerminalCompletionRequest;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getCommandLine ()Ljava/lang/String;
+	public final fun getCursorOffset ()I
+	public final fun getProfileId ()Ljava/lang/String;
+	public final fun getShellCapabilities ()Lio/github/ketraterm/completion/api/TerminalShellCapabilities;
+	public final fun getWorkingDirectoryUri ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public abstract interface class io/github/ketraterm/completion/api/TerminalCompletionSource {
+	public abstract fun complete (Lio/github/ketraterm/completion/api/TerminalCompletionRequest;Lio/github/ketraterm/completion/api/TerminalCompletionContext;ILkotlin/coroutines/Continuation;)Ljava/lang/Object;
+}
+
+public final class io/github/ketraterm/completion/api/TerminalCompletionSourceEntry {
+	public fun <init> (Lio/github/ketraterm/completion/api/TerminalCompletionSource;)V
+	public fun <init> (Lio/github/ketraterm/completion/api/TerminalCompletionSource;I)V
+	public synthetic fun <init> (Lio/github/ketraterm/completion/api/TerminalCompletionSource;IILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Lio/github/ketraterm/completion/api/TerminalCompletionSource;
+	public final fun component2 ()I
+	public final fun copy (Lio/github/ketraterm/completion/api/TerminalCompletionSource;I)Lio/github/ketraterm/completion/api/TerminalCompletionSourceEntry;
+	public static synthetic fun copy$default (Lio/github/ketraterm/completion/api/TerminalCompletionSourceEntry;Lio/github/ketraterm/completion/api/TerminalCompletionSource;IILjava/lang/Object;)Lio/github/ketraterm/completion/api/TerminalCompletionSourceEntry;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getPriority ()I
+	public final fun getSource ()Lio/github/ketraterm/completion/api/TerminalCompletionSource;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public abstract interface class io/github/ketraterm/completion/api/TerminalCompletionSourceFailureHandler {
+	public static final field Companion Lio/github/ketraterm/completion/api/TerminalCompletionSourceFailureHandler$Companion;
+	public static final field SYSTEM_LOGGER Lio/github/ketraterm/completion/api/TerminalCompletionSourceFailureHandler;
+	public abstract fun sourceFailed (ILio/github/ketraterm/completion/api/TerminalCompletionSourceEntry;Ljava/lang/Throwable;)V
+}
+
+public final class io/github/ketraterm/completion/api/TerminalCompletionSourceFailureHandler$Companion {
+}
+
+public final class io/github/ketraterm/completion/api/TerminalCompletionSourcePrior {
+	public static final field DIRECTORY_PATH I
+	public static final field GIT_REFERENCE I
+	public static final field GIT_STATUS_PATH I
+	public static final field GRADLE_TASK I
+	public static final field INSTANCE Lio/github/ketraterm/completion/api/TerminalCompletionSourcePrior;
+	public static final field PROJECT_FUZZY_PATH I
+}
+
+public final class io/github/ketraterm/completion/api/TerminalCompletionSources {
+	public static final field INSTANCE Lio/github/ketraterm/completion/api/TerminalCompletionSources;
+	public static final fun fuzzyPath (Ljava/lang/String;Lio/github/ketraterm/completion/api/TerminalFuzzyPathProvider;)Lio/github/ketraterm/completion/api/TerminalCompletionSource;
+	public static final fun fuzzyPath (Ljava/lang/String;Lio/github/ketraterm/completion/api/TerminalFuzzyPathProvider;Z)Lio/github/ketraterm/completion/api/TerminalCompletionSource;
+	public static final fun fuzzyPath (Ljava/lang/String;Lio/github/ketraterm/completion/api/TerminalFuzzyPathProvider;ZLjava/util/Set;)Lio/github/ketraterm/completion/api/TerminalCompletionSource;
+	public static synthetic fun fuzzyPath$default (Ljava/lang/String;Lio/github/ketraterm/completion/api/TerminalFuzzyPathProvider;ZLjava/util/Set;ILjava/lang/Object;)Lio/github/ketraterm/completion/api/TerminalCompletionSource;
+	public static final fun gradleTask (Ljava/lang/String;Lkotlin/jvm/functions/Function3;)Lio/github/ketraterm/completion/api/TerminalCompletionSource;
+	public static final fun path (Lio/github/ketraterm/completion/api/TerminalFileSystemProvider;)Lio/github/ketraterm/completion/api/TerminalCompletionSource;
+	public static final fun valueDomain (Lio/github/ketraterm/completion/model/TerminalCompletionValueDomain;Ljava/lang/String;Lkotlin/jvm/functions/Function3;)Lio/github/ketraterm/completion/api/TerminalCompletionSource;
+	public static final fun valueDomain (Lio/github/ketraterm/completion/model/TerminalCompletionValueDomain;Ljava/lang/String;Lkotlin/jvm/functions/Function3;Ljava/util/Set;)Lio/github/ketraterm/completion/api/TerminalCompletionSource;
+	public static synthetic fun valueDomain$default (Lio/github/ketraterm/completion/model/TerminalCompletionValueDomain;Ljava/lang/String;Lkotlin/jvm/functions/Function3;Ljava/util/Set;ILjava/lang/Object;)Lio/github/ketraterm/completion/api/TerminalCompletionSource;
+	public static final fun valueDomainCandidates (Lio/github/ketraterm/completion/api/TerminalCompletionRequest;Lio/github/ketraterm/completion/api/TerminalCompletionContext;Lio/github/ketraterm/completion/model/TerminalCompletionValueDomain;Ljava/lang/String;Ljava/util/List;I)Ljava/util/List;
+}
+
+public final class io/github/ketraterm/completion/api/TerminalDirectoryListingRequest {
+	public fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component2 ()Ljava/lang/String;
+	public final fun component3 ()Ljava/lang/String;
+	public final fun copy (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)Lio/github/ketraterm/completion/api/TerminalDirectoryListingRequest;
+	public static synthetic fun copy$default (Lio/github/ketraterm/completion/api/TerminalDirectoryListingRequest;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;ILjava/lang/Object;)Lio/github/ketraterm/completion/api/TerminalDirectoryListingRequest;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getDirectoryPrefix ()Ljava/lang/String;
+	public final fun getEntryNamePrefix ()Ljava/lang/String;
+	public final fun getWorkingDirectoryUri ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class io/github/ketraterm/completion/api/TerminalFileEntry {
+	public fun <init> (Ljava/lang/String;Z)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component2 ()Z
+	public final fun copy (Ljava/lang/String;Z)Lio/github/ketraterm/completion/api/TerminalFileEntry;
+	public static synthetic fun copy$default (Lio/github/ketraterm/completion/api/TerminalFileEntry;Ljava/lang/String;ZILjava/lang/Object;)Lio/github/ketraterm/completion/api/TerminalFileEntry;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getName ()Ljava/lang/String;
+	public fun hashCode ()I
+	public final fun isDirectory ()Z
+	public fun toString ()Ljava/lang/String;
+}
+
+public abstract interface class io/github/ketraterm/completion/api/TerminalFileSystemProvider {
+	public abstract fun listDirectory (Lio/github/ketraterm/completion/api/TerminalDirectoryListingRequest;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+}
+
+public final class io/github/ketraterm/completion/api/TerminalFuzzyPathEntry {
+	public fun <init> (Ljava/lang/String;ZLjava/lang/String;)V
+	public synthetic fun <init> (Ljava/lang/String;ZLjava/lang/String;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component2 ()Z
+	public final fun component3 ()Ljava/lang/String;
+	public final fun copy (Ljava/lang/String;ZLjava/lang/String;)Lio/github/ketraterm/completion/api/TerminalFuzzyPathEntry;
+	public static synthetic fun copy$default (Lio/github/ketraterm/completion/api/TerminalFuzzyPathEntry;Ljava/lang/String;ZLjava/lang/String;ILjava/lang/Object;)Lio/github/ketraterm/completion/api/TerminalFuzzyPathEntry;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getDetail ()Ljava/lang/String;
+	public final fun getPath ()Ljava/lang/String;
+	public fun hashCode ()I
+	public final fun isDirectory ()Z
+	public fun toString ()Ljava/lang/String;
+}
+
+public abstract interface class io/github/ketraterm/completion/api/TerminalFuzzyPathProvider {
+	public abstract fun entries (Lio/github/ketraterm/completion/api/TerminalCompletionRequest;Lio/github/ketraterm/completion/api/TerminalCompletionContext;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+}
+
+public final class io/github/ketraterm/completion/api/TerminalGradleTask {
+	public fun <init> (Ljava/lang/String;)V
+	public fun <init> (Ljava/lang/String;Ljava/lang/String;)V
+	public fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)V
+	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component2 ()Ljava/lang/String;
+	public final fun component3 ()Ljava/lang/String;
+	public final fun copy (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)Lio/github/ketraterm/completion/api/TerminalGradleTask;
+	public static synthetic fun copy$default (Lio/github/ketraterm/completion/api/TerminalGradleTask;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;ILjava/lang/Object;)Lio/github/ketraterm/completion/api/TerminalGradleTask;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getDescription ()Ljava/lang/String;
+	public final fun getPath ()Ljava/lang/String;
+	public final fun getProjectDirectory ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class io/github/ketraterm/completion/api/TerminalShellCapabilities {
+	public static final field Companion Lio/github/ketraterm/completion/api/TerminalShellCapabilities$Companion;
+	public static final field PLAIN Lio/github/ketraterm/completion/api/TerminalShellCapabilities;
+	public static final field POSIX Lio/github/ketraterm/completion/api/TerminalShellCapabilities;
+	public static final field POWERSHELL Lio/github/ketraterm/completion/api/TerminalShellCapabilities;
+	public fun <init> ()V
+	public fun <init> (Lio/github/ketraterm/completion/api/TerminalShellSyntax;)V
+	public fun <init> (Lio/github/ketraterm/completion/api/TerminalShellSyntax;Lio/github/ketraterm/completion/api/TerminalShellQuotingPolicy;)V
+	public synthetic fun <init> (Lio/github/ketraterm/completion/api/TerminalShellSyntax;Lio/github/ketraterm/completion/api/TerminalShellQuotingPolicy;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Lio/github/ketraterm/completion/api/TerminalShellSyntax;
+	public final fun component2 ()Lio/github/ketraterm/completion/api/TerminalShellQuotingPolicy;
+	public final fun copy (Lio/github/ketraterm/completion/api/TerminalShellSyntax;Lio/github/ketraterm/completion/api/TerminalShellQuotingPolicy;)Lio/github/ketraterm/completion/api/TerminalShellCapabilities;
+	public static synthetic fun copy$default (Lio/github/ketraterm/completion/api/TerminalShellCapabilities;Lio/github/ketraterm/completion/api/TerminalShellSyntax;Lio/github/ketraterm/completion/api/TerminalShellQuotingPolicy;ILjava/lang/Object;)Lio/github/ketraterm/completion/api/TerminalShellCapabilities;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getQuoting ()Lio/github/ketraterm/completion/api/TerminalShellQuotingPolicy;
+	public final fun getSyntax ()Lio/github/ketraterm/completion/api/TerminalShellSyntax;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class io/github/ketraterm/completion/api/TerminalShellCapabilities$Companion {
+}
+
+public final class io/github/ketraterm/completion/api/TerminalShellQuotingPolicy : java/lang/Enum {
+	public static final field CONSERVATIVE Lio/github/ketraterm/completion/api/TerminalShellQuotingPolicy;
+	public static final field POSIX Lio/github/ketraterm/completion/api/TerminalShellQuotingPolicy;
+	public static final field POWERSHELL Lio/github/ketraterm/completion/api/TerminalShellQuotingPolicy;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public static fun valueOf (Ljava/lang/String;)Lio/github/ketraterm/completion/api/TerminalShellQuotingPolicy;
+	public static fun values ()[Lio/github/ketraterm/completion/api/TerminalShellQuotingPolicy;
+}
+
+public final class io/github/ketraterm/completion/api/TerminalShellSyntax : java/lang/Enum {
+	public static final field PLAIN Lio/github/ketraterm/completion/api/TerminalShellSyntax;
+	public static final field POSIX Lio/github/ketraterm/completion/api/TerminalShellSyntax;
+	public static final field POWERSHELL Lio/github/ketraterm/completion/api/TerminalShellSyntax;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public static fun valueOf (Ljava/lang/String;)Lio/github/ketraterm/completion/api/TerminalShellSyntax;
+	public static fun values ()[Lio/github/ketraterm/completion/api/TerminalShellSyntax;
+}
+
+public final class io/github/ketraterm/completion/model/TerminalArgumentSpec {
+	public fun <init> ()V
+	public fun <init> (Ljava/lang/String;)V
+	public fun <init> (Ljava/lang/String;Ljava/lang/String;)V
+	public fun <init> (Ljava/lang/String;Ljava/lang/String;Z)V
+	public fun <init> (Ljava/lang/String;Ljava/lang/String;ZZ)V
+	public fun <init> (Ljava/lang/String;Ljava/lang/String;ZZLio/github/ketraterm/completion/model/TerminalPathArgumentKind;)V
+	public fun <init> (Ljava/lang/String;Ljava/lang/String;ZZLio/github/ketraterm/completion/model/TerminalPathArgumentKind;Ljava/util/List;)V
+	public fun <init> (Ljava/lang/String;Ljava/lang/String;ZZLio/github/ketraterm/completion/model/TerminalPathArgumentKind;Ljava/util/List;Lio/github/ketraterm/completion/model/TerminalCompletionValueDomain;)V
+	public fun <init> (Ljava/lang/String;Ljava/lang/String;ZZLio/github/ketraterm/completion/model/TerminalPathArgumentKind;Ljava/util/List;Lio/github/ketraterm/completion/model/TerminalCompletionValueDomain;Lio/github/ketraterm/completion/model/TerminalHiddenPathPolicy;)V
+	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;ZZLio/github/ketraterm/completion/model/TerminalPathArgumentKind;Ljava/util/List;Lio/github/ketraterm/completion/model/TerminalCompletionValueDomain;Lio/github/ketraterm/completion/model/TerminalHiddenPathPolicy;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component2 ()Ljava/lang/String;
+	public final fun component3 ()Z
+	public final fun component4 ()Z
+	public final fun component5 ()Lio/github/ketraterm/completion/model/TerminalPathArgumentKind;
+	public final fun component6 ()Ljava/util/List;
+	public final fun component7 ()Lio/github/ketraterm/completion/model/TerminalCompletionValueDomain;
+	public final fun component8 ()Lio/github/ketraterm/completion/model/TerminalHiddenPathPolicy;
+	public final fun copy (Ljava/lang/String;Ljava/lang/String;ZZLio/github/ketraterm/completion/model/TerminalPathArgumentKind;Ljava/util/List;Lio/github/ketraterm/completion/model/TerminalCompletionValueDomain;Lio/github/ketraterm/completion/model/TerminalHiddenPathPolicy;)Lio/github/ketraterm/completion/model/TerminalArgumentSpec;
+	public static synthetic fun copy$default (Lio/github/ketraterm/completion/model/TerminalArgumentSpec;Ljava/lang/String;Ljava/lang/String;ZZLio/github/ketraterm/completion/model/TerminalPathArgumentKind;Ljava/util/List;Lio/github/ketraterm/completion/model/TerminalCompletionValueDomain;Lio/github/ketraterm/completion/model/TerminalHiddenPathPolicy;ILjava/lang/Object;)Lio/github/ketraterm/completion/model/TerminalArgumentSpec;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getDescription ()Ljava/lang/String;
+	public final fun getHiddenPathPolicy ()Lio/github/ketraterm/completion/model/TerminalHiddenPathPolicy;
+	public final fun getName ()Ljava/lang/String;
+	public final fun getPathKind ()Lio/github/ketraterm/completion/model/TerminalPathArgumentKind;
+	public final fun getValueCandidates ()Ljava/util/List;
+	public final fun getValueDomain ()Lio/github/ketraterm/completion/model/TerminalCompletionValueDomain;
+	public fun hashCode ()I
+	public final fun isOptional ()Z
+	public final fun isVariadic ()Z
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class io/github/ketraterm/completion/model/TerminalCommandReplay {
+	public fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)V
+	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component2 ()Ljava/lang/String;
+	public final fun component3 ()Ljava/lang/String;
+	public final fun component4 ()Ljava/lang/String;
+	public final fun copy (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)Lio/github/ketraterm/completion/model/TerminalCommandReplay;
+	public static synthetic fun copy$default (Lio/github/ketraterm/completion/model/TerminalCommandReplay;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;ILjava/lang/Object;)Lio/github/ketraterm/completion/model/TerminalCommandReplay;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getCommandLine ()Ljava/lang/String;
+	public final fun getIdentityDigest ()Ljava/lang/String;
+	public final fun getProfileId ()Ljava/lang/String;
+	public final fun getWorkingDirectoryUri ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class io/github/ketraterm/completion/model/TerminalCommandSpec {
+	public fun <init> (Ljava/lang/String;)V
+	public fun <init> (Ljava/lang/String;Ljava/lang/String;)V
+	public fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/util/List;)V
+	public fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/util/List;Ljava/util/List;)V
+	public fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/util/List;Ljava/util/List;Ljava/util/List;)V
+	public fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/util/List;Ljava/util/List;Ljava/util/List;Ljava/util/List;)V
+	public fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/util/List;Ljava/util/List;Ljava/util/List;Ljava/util/List;Lio/github/ketraterm/completion/model/TerminalPathArgumentKind;)V
+	public fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/util/List;Ljava/util/List;Ljava/util/List;Ljava/util/List;Lio/github/ketraterm/completion/model/TerminalPathArgumentKind;Lio/github/ketraterm/completion/model/TerminalCompletionValueDomain;)V
+	public fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/util/List;Ljava/util/List;Ljava/util/List;Ljava/util/List;Lio/github/ketraterm/completion/model/TerminalPathArgumentKind;Lio/github/ketraterm/completion/model/TerminalCompletionValueDomain;Lio/github/ketraterm/completion/model/TerminalHiddenPathPolicy;)V
+	public fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/util/List;Ljava/util/List;Ljava/util/List;Ljava/util/List;Lio/github/ketraterm/completion/model/TerminalPathArgumentKind;Lio/github/ketraterm/completion/model/TerminalCompletionValueDomain;Lio/github/ketraterm/completion/model/TerminalHiddenPathPolicy;Z)V
+	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/util/List;Ljava/util/List;Ljava/util/List;Ljava/util/List;Lio/github/ketraterm/completion/model/TerminalPathArgumentKind;Lio/github/ketraterm/completion/model/TerminalCompletionValueDomain;Lio/github/ketraterm/completion/model/TerminalHiddenPathPolicy;ZILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component10 ()Z
+	public final fun component2 ()Ljava/lang/String;
+	public final fun component3 ()Ljava/util/List;
+	public final fun component4 ()Ljava/util/List;
+	public final fun component5 ()Ljava/util/List;
+	public final fun component6 ()Ljava/util/List;
+	public final fun component7 ()Lio/github/ketraterm/completion/model/TerminalPathArgumentKind;
+	public final fun component8 ()Lio/github/ketraterm/completion/model/TerminalCompletionValueDomain;
+	public final fun component9 ()Lio/github/ketraterm/completion/model/TerminalHiddenPathPolicy;
+	public final fun copy (Ljava/lang/String;Ljava/lang/String;Ljava/util/List;Ljava/util/List;Ljava/util/List;Ljava/util/List;Lio/github/ketraterm/completion/model/TerminalPathArgumentKind;Lio/github/ketraterm/completion/model/TerminalCompletionValueDomain;Lio/github/ketraterm/completion/model/TerminalHiddenPathPolicy;Z)Lio/github/ketraterm/completion/model/TerminalCommandSpec;
+	public static synthetic fun copy$default (Lio/github/ketraterm/completion/model/TerminalCommandSpec;Ljava/lang/String;Ljava/lang/String;Ljava/util/List;Ljava/util/List;Ljava/util/List;Ljava/util/List;Lio/github/ketraterm/completion/model/TerminalPathArgumentKind;Lio/github/ketraterm/completion/model/TerminalCompletionValueDomain;Lio/github/ketraterm/completion/model/TerminalHiddenPathPolicy;ZILjava/lang/Object;)Lio/github/ketraterm/completion/model/TerminalCommandSpec;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getAliases ()Ljava/util/List;
+	public final fun getDescription ()Ljava/lang/String;
+	public final fun getName ()Ljava/lang/String;
+	public final fun getOptions ()Ljava/util/List;
+	public final fun getPositionalArgumentHiddenPathPolicy ()Lio/github/ketraterm/completion/model/TerminalHiddenPathPolicy;
+	public final fun getPositionalArgumentPathKind ()Lio/github/ketraterm/completion/model/TerminalPathArgumentKind;
+	public final fun getPositionalArgumentValueDomain ()Lio/github/ketraterm/completion/model/TerminalCompletionValueDomain;
+	public final fun getPositionalArguments ()Ljava/util/List;
+	public final fun getRepeatableSubcommands ()Z
+	public final fun getSubcommands ()Ljava/util/List;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class io/github/ketraterm/completion/model/TerminalCommandSpecs {
+	public static final field INSTANCE Lio/github/ketraterm/completion/model/TerminalCommandSpecs;
+	public static final fun defaults ()Ljava/util/List;
+}
+
+public final class io/github/ketraterm/completion/model/TerminalCompletionDomainValue {
+	public static final field Companion Lio/github/ketraterm/completion/model/TerminalCompletionDomainValue$Companion;
+	public static final field MAX_SCORE_ADJUSTMENT I
+	public static final field MIN_SCORE_ADJUSTMENT I
+	public fun <init> (Ljava/lang/String;)V
+	public fun <init> (Ljava/lang/String;Ljava/lang/String;)V
+	public fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)V
+	public fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;I)V
+	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;IILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component2 ()Ljava/lang/String;
+	public final fun component3 ()Ljava/lang/String;
+	public final fun component4 ()I
+	public final fun copy (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;I)Lio/github/ketraterm/completion/model/TerminalCompletionDomainValue;
+	public static synthetic fun copy$default (Lio/github/ketraterm/completion/model/TerminalCompletionDomainValue;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;IILjava/lang/Object;)Lio/github/ketraterm/completion/model/TerminalCompletionDomainValue;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getDetail ()Ljava/lang/String;
+	public final fun getDisplayText ()Ljava/lang/String;
+	public final fun getScoreAdjustment ()I
+	public final fun getValue ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class io/github/ketraterm/completion/model/TerminalCompletionDomainValue$Companion {
+}
+
+public final class io/github/ketraterm/completion/model/TerminalCompletionFeedbackKind : java/lang/Enum {
+	public static final field ACCEPTED Lio/github/ketraterm/completion/model/TerminalCompletionFeedbackKind;
+	public static final field DISMISSED Lio/github/ketraterm/completion/model/TerminalCompletionFeedbackKind;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public static fun valueOf (Ljava/lang/String;)Lio/github/ketraterm/completion/model/TerminalCompletionFeedbackKind;
+	public static fun values ()[Lio/github/ketraterm/completion/model/TerminalCompletionFeedbackKind;
+}
+
+public final class io/github/ketraterm/completion/model/TerminalCompletionLearningSnapshot {
+	public static final field Companion Lio/github/ketraterm/completion/model/TerminalCompletionLearningSnapshot$Companion;
+	public static final field EMPTY Lio/github/ketraterm/completion/model/TerminalCompletionLearningSnapshot;
+	public fun <init> ()V
+	public fun <init> (Ljava/util/List;)V
+	public fun <init> (Ljava/util/List;Ljava/util/List;)V
+	public synthetic fun <init> (Ljava/util/List;Ljava/util/List;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Ljava/util/List;
+	public final fun component2 ()Ljava/util/List;
+	public final fun copy (Ljava/util/List;Ljava/util/List;)Lio/github/ketraterm/completion/model/TerminalCompletionLearningSnapshot;
+	public static synthetic fun copy$default (Lio/github/ketraterm/completion/model/TerminalCompletionLearningSnapshot;Ljava/util/List;Ljava/util/List;ILjava/lang/Object;)Lio/github/ketraterm/completion/model/TerminalCompletionLearningSnapshot;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getRankingStats ()Ljava/util/List;
+	public final fun getReplayCommands ()Ljava/util/List;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class io/github/ketraterm/completion/model/TerminalCompletionLearningSnapshot$Companion {
+}
+
+public final class io/github/ketraterm/completion/model/TerminalCompletionRankingStats {
+	public fun <init> (Ljava/lang/String;)V
+	public fun <init> (Ljava/lang/String;Ljava/lang/String;)V
+	public fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)V
+	public fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;I)V
+	public fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;II)V
+	public fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;III)V
+	public fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;IIII)V
+	public fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;IIIII)V
+	public fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;IIIIIJ)V
+	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;IIIIIJILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component2 ()Ljava/lang/String;
+	public final fun component3 ()Ljava/lang/String;
+	public final fun component4 ()I
+	public final fun component5 ()I
+	public final fun component6 ()I
+	public final fun component7 ()I
+	public final fun component8 ()I
+	public final fun component9 ()J
+	public final fun copy (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;IIIIIJ)Lio/github/ketraterm/completion/model/TerminalCompletionRankingStats;
+	public static synthetic fun copy$default (Lio/github/ketraterm/completion/model/TerminalCompletionRankingStats;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;IIIIIJILjava/lang/Object;)Lio/github/ketraterm/completion/model/TerminalCompletionRankingStats;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getAcceptedCount ()I
+	public final fun getDismissedCount ()I
+	public final fun getFailureCount ()I
+	public final fun getIdentityDigest ()Ljava/lang/String;
+	public final fun getLastUsedEpochMillis ()J
+	public final fun getProfileId ()Ljava/lang/String;
+	public final fun getSuccessCount ()I
+	public final fun getUseCount ()I
+	public final fun getWorkingDirectoryUri ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class io/github/ketraterm/completion/model/TerminalCompletionValueDomain {
+	public static final field AWS_PROFILE Lio/github/ketraterm/completion/model/TerminalCompletionValueDomain;
+	public static final field AWS_REGION Lio/github/ketraterm/completion/model/TerminalCompletionValueDomain;
+	public static final field Companion Lio/github/ketraterm/completion/model/TerminalCompletionValueDomain$Companion;
+	public static final field DOCKER_CONTEXT Lio/github/ketraterm/completion/model/TerminalCompletionValueDomain;
+	public static final field GIT_BRANCH Lio/github/ketraterm/completion/model/TerminalCompletionValueDomain;
+	public static final field GIT_COMMIT Lio/github/ketraterm/completion/model/TerminalCompletionValueDomain;
+	public static final field KUBERNETES_CONTEXT Lio/github/ketraterm/completion/model/TerminalCompletionValueDomain;
+	public static final field KUBERNETES_NAMESPACE Lio/github/ketraterm/completion/model/TerminalCompletionValueDomain;
+	public static final field NONE Lio/github/ketraterm/completion/model/TerminalCompletionValueDomain;
+	public static final field NPM_SCRIPT Lio/github/ketraterm/completion/model/TerminalCompletionValueDomain;
+	public fun <init> (Ljava/lang/String;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun copy (Ljava/lang/String;)Lio/github/ketraterm/completion/model/TerminalCompletionValueDomain;
+	public static synthetic fun copy$default (Lio/github/ketraterm/completion/model/TerminalCompletionValueDomain;Ljava/lang/String;ILjava/lang/Object;)Lio/github/ketraterm/completion/model/TerminalCompletionValueDomain;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getId ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class io/github/ketraterm/completion/model/TerminalCompletionValueDomain$Companion {
+}
+
+public final class io/github/ketraterm/completion/model/TerminalHiddenPathPolicy : java/lang/Enum {
+	public static final field DEFAULT Lio/github/ketraterm/completion/model/TerminalHiddenPathPolicy;
+	public static final field EXCLUDE Lio/github/ketraterm/completion/model/TerminalHiddenPathPolicy;
+	public static final field INCLUDE Lio/github/ketraterm/completion/model/TerminalHiddenPathPolicy;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public static fun valueOf (Ljava/lang/String;)Lio/github/ketraterm/completion/model/TerminalHiddenPathPolicy;
+	public static fun values ()[Lio/github/ketraterm/completion/model/TerminalHiddenPathPolicy;
+}
+
+public final class io/github/ketraterm/completion/model/TerminalOptionSpec {
+	public fun <init> (Ljava/util/List;)V
+	public fun <init> (Ljava/util/List;Ljava/lang/String;)V
+	public fun <init> (Ljava/util/List;Ljava/lang/String;Z)V
+	public fun <init> (Ljava/util/List;Ljava/lang/String;ZLio/github/ketraterm/completion/model/TerminalPathArgumentKind;)V
+	public fun <init> (Ljava/util/List;Ljava/lang/String;ZLio/github/ketraterm/completion/model/TerminalPathArgumentKind;Ljava/util/List;)V
+	public fun <init> (Ljava/util/List;Ljava/lang/String;ZLio/github/ketraterm/completion/model/TerminalPathArgumentKind;Ljava/util/List;Lio/github/ketraterm/completion/model/TerminalCompletionValueDomain;)V
+	public fun <init> (Ljava/util/List;Ljava/lang/String;ZLio/github/ketraterm/completion/model/TerminalPathArgumentKind;Ljava/util/List;Lio/github/ketraterm/completion/model/TerminalCompletionValueDomain;Lio/github/ketraterm/completion/model/TerminalHiddenPathPolicy;)V
+	public fun <init> (Ljava/util/List;Ljava/lang/String;ZLio/github/ketraterm/completion/model/TerminalPathArgumentKind;Ljava/util/List;Lio/github/ketraterm/completion/model/TerminalCompletionValueDomain;Lio/github/ketraterm/completion/model/TerminalHiddenPathPolicy;Ljava/util/List;)V
+	public synthetic fun <init> (Ljava/util/List;Ljava/lang/String;ZLio/github/ketraterm/completion/model/TerminalPathArgumentKind;Ljava/util/List;Lio/github/ketraterm/completion/model/TerminalCompletionValueDomain;Lio/github/ketraterm/completion/model/TerminalHiddenPathPolicy;Ljava/util/List;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Ljava/util/List;
+	public final fun component2 ()Ljava/lang/String;
+	public final fun component3 ()Z
+	public final fun component4 ()Lio/github/ketraterm/completion/model/TerminalPathArgumentKind;
+	public final fun component5 ()Ljava/util/List;
+	public final fun component6 ()Lio/github/ketraterm/completion/model/TerminalCompletionValueDomain;
+	public final fun component7 ()Lio/github/ketraterm/completion/model/TerminalHiddenPathPolicy;
+	public final fun component8 ()Ljava/util/List;
+	public final fun copy (Ljava/util/List;Ljava/lang/String;ZLio/github/ketraterm/completion/model/TerminalPathArgumentKind;Ljava/util/List;Lio/github/ketraterm/completion/model/TerminalCompletionValueDomain;Lio/github/ketraterm/completion/model/TerminalHiddenPathPolicy;Ljava/util/List;)Lio/github/ketraterm/completion/model/TerminalOptionSpec;
+	public static synthetic fun copy$default (Lio/github/ketraterm/completion/model/TerminalOptionSpec;Ljava/util/List;Ljava/lang/String;ZLio/github/ketraterm/completion/model/TerminalPathArgumentKind;Ljava/util/List;Lio/github/ketraterm/completion/model/TerminalCompletionValueDomain;Lio/github/ketraterm/completion/model/TerminalHiddenPathPolicy;Ljava/util/List;ILjava/lang/Object;)Lio/github/ketraterm/completion/model/TerminalOptionSpec;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getDescription ()Ljava/lang/String;
+	public final fun getExclusiveGroupIds ()Ljava/util/List;
+	public final fun getNames ()Ljava/util/List;
+	public final fun getRequiresValue ()Z
+	public final fun getValueCandidates ()Ljava/util/List;
+	public final fun getValueDomain ()Lio/github/ketraterm/completion/model/TerminalCompletionValueDomain;
+	public final fun getValueHiddenPathPolicy ()Lio/github/ketraterm/completion/model/TerminalHiddenPathPolicy;
+	public final fun getValuePathKind ()Lio/github/ketraterm/completion/model/TerminalPathArgumentKind;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class io/github/ketraterm/completion/model/TerminalPathArgumentKind : java/lang/Enum {
+	public static final field DIRECTORY Lio/github/ketraterm/completion/model/TerminalPathArgumentKind;
+	public static final field FILE Lio/github/ketraterm/completion/model/TerminalPathArgumentKind;
+	public static final field FILE_OR_DIRECTORY Lio/github/ketraterm/completion/model/TerminalPathArgumentKind;
+	public static final field NONE Lio/github/ketraterm/completion/model/TerminalPathArgumentKind;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public static fun valueOf (Ljava/lang/String;)Lio/github/ketraterm/completion/model/TerminalPathArgumentKind;
+	public static fun values ()[Lio/github/ketraterm/completion/model/TerminalPathArgumentKind;
+}
+

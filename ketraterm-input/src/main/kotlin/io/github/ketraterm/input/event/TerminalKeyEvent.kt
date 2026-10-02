@@ -39,7 +39,7 @@ package io.github.ketraterm.input.event
  * @property modifiers active keyboard modifiers using [TerminalModifiers] bits.
  * @property type physical lifecycle phase as reported by the host adapter.
  */
-data class TerminalKeyEvent(
+public data class TerminalKeyEvent(
     val key: TerminalKey? = null,
     val codepoint: Int = NO_CODEPOINT,
     val unshiftedCodepoint: Int = NO_CODEPOINT,
@@ -110,12 +110,12 @@ data class TerminalKeyEvent(
     /**
      * Factory methods and sentinel values for [TerminalKeyEvent].
      */
-    companion object {
+    public companion object {
         /** Sentinel used when a key event does not carry a printable codepoint. */
-        const val NO_CODEPOINT: Int = -1
+        public const val NO_CODEPOINT: Int = -1
 
         /** Kitty key code used when text has no known physical key identity. */
-        const val TEXT_ONLY_CODEPOINT: Int = 0
+        public const val TEXT_ONLY_CODEPOINT: Int = 0
 
         /**
          * Creates a non-printable key event.
@@ -125,7 +125,7 @@ data class TerminalKeyEvent(
          * @param type physical lifecycle phase reported by the host.
          * @return a new [TerminalKeyEvent] instance.
          */
-        fun key(
+        public fun key(
             key: TerminalKey,
             modifiers: Int = TerminalModifiers.NONE,
             type: TerminalKeyEventType = TerminalKeyEventType.PRESS,
@@ -153,7 +153,7 @@ data class TerminalKeyEvent(
          * @param type physical lifecycle phase reported by the host.
          * @return a new [TerminalKeyEvent] instance.
          */
-        fun codepoint(
+        public fun codepoint(
             codepoint: Int,
             modifiers: Int = TerminalModifiers.NONE,
             unshiftedCodepoint: Int = NO_CODEPOINT,
@@ -185,7 +185,7 @@ data class TerminalKeyEvent(
          * @param type physical lifecycle phase reported by the host.
          * @return a normalized text-only key event.
          */
-        fun text(
+        public fun text(
             associatedText: String,
             modifiers: Int = TerminalModifiers.NONE,
             type: TerminalKeyEventType = TerminalKeyEventType.PRESS,

@@ -86,7 +86,7 @@ open class TerminalLargeInputBenchmark {
         parser.accept(bytes, 0, bytes.size)
         publisher.updateAndPublish(renderReader)
         blackhole.consume(bytes.size)
-        blackhole.consume(publisher.current()?.frameGeneration)
+        publisher.readCurrent { blackhole.consume(it.frameGeneration) }
     }
 }
 
@@ -123,10 +123,9 @@ open class TerminalRenderPublishBenchmark {
     @Benchmark
     open fun publishViewportFromLargeScrollback(blackhole: Blackhole) {
         publisher.updateAndPublish(renderReader, scrollbackOffset)
-        val cache = publisher.current()
-        blackhole.consume(cache?.scrollbackOffset)
-        val generations = cache?.lineGenerations
-        if (generations != null) {
+        publisher.readCurrent { cache ->
+            blackhole.consume(cache.scrollbackOffset)
+            val generations = cache.lineGenerations
             var checksum = 0L
             var row = 0
             while (row < generations.size) {

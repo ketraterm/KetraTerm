@@ -22,7 +22,7 @@ package io.github.ketraterm.completion.api
  * Different source child coroutines may report concurrently while the merged
  * engine continues collecting the remaining sources.
  */
-fun interface TerminalCompletionSourceFailureHandler {
+public fun interface TerminalCompletionSourceFailureHandler {
     /**
      * Reports one failed source evaluation.
      *
@@ -30,16 +30,16 @@ fun interface TerminalCompletionSourceFailureHandler {
      * @param source failed source registration.
      * @param failure non-cancellation failure thrown by the source.
      */
-    fun sourceFailed(
+    public fun sourceFailed(
         sourceIndex: Int,
         source: TerminalCompletionSourceEntry,
         failure: Throwable,
     )
 
-    companion object {
+    public companion object {
         /** Default handler that writes failures through the JDK system logger. */
         @JvmField
-        val SYSTEM_LOGGER: TerminalCompletionSourceFailureHandler =
+        public val SYSTEM_LOGGER: TerminalCompletionSourceFailureHandler =
             TerminalCompletionSourceFailureHandler { sourceIndex, source, failure ->
                 System
                     .getLogger("io.github.ketraterm.completion")

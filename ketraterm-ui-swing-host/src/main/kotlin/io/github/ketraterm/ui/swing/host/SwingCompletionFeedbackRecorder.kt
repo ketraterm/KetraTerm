@@ -31,7 +31,7 @@ import io.github.ketraterm.ui.swing.suggestion.commandTextAfterReplacement
  * @param recordSuggestionFeedback host-owned exact-feedback sink.
  * @param clockEpochMillis host wall-clock supplier.
  */
-class SwingCompletionFeedbackRecorder(
+public class SwingCompletionFeedbackRecorder(
     private val recordSuggestionFeedback: (
         commandLine: String,
         feedback: TerminalCompletionFeedbackKind,
@@ -42,14 +42,14 @@ class SwingCompletionFeedbackRecorder(
     private val clockEpochMillis: () -> Long = System::currentTimeMillis,
 ) {
     /** Creates a handler that records feedback against each suggestion's immutable request context. */
-    fun createHandler(): SwingShellSuggestionFeedbackHandler = SwingShellSuggestionFeedbackHandler(::record)
+    public fun createHandler(): SwingShellSuggestionFeedbackHandler = SwingShellSuggestionFeedbackHandler(::record)
 
     /**
      * Validates and records one accepted or dismissed suggestion.
      *
      * @param feedback Swing popup feedback event.
      */
-    fun record(feedback: SwingShellSuggestionFeedback) {
+    public fun record(feedback: SwingShellSuggestionFeedback) {
         val context = feedback.suggestion.interactionContext as? SwingCompletionContext ?: return
         val commandLine =
             feedback.suggestion

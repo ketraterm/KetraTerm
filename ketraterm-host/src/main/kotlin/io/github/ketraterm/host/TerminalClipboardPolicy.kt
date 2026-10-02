@@ -36,7 +36,7 @@ package io.github.ketraterm.host
  * @property maxDecodedBytes maximum raw UTF-8 clipboard payload size for reads
  * and writes. Session output storage also bounds the complete encoded reply.
  */
-data class TerminalClipboardPolicy(
+public data class TerminalClipboardPolicy(
     val writePermission: TerminalClipboardPermission = TerminalClipboardPermission.DENY,
     val readPermission: TerminalClipboardPermission = TerminalClipboardPermission.DENY,
     val maxDecodedBytes: Int = DEFAULT_MAX_DECODED_BYTES,
@@ -47,19 +47,19 @@ data class TerminalClipboardPolicy(
         }
     }
 
-    companion object {
+    public companion object {
         /**
          * Default maximum raw UTF-8 OSC 52 payload size. Production sessions derive
          * their temporary encoded collection budget from this policy for eligible writes.
          */
-        const val DEFAULT_MAX_DECODED_BYTES: Int = 1 * 1024 * 1024
+        public const val DEFAULT_MAX_DECODED_BYTES: Int = 1 * 1024 * 1024
     }
 }
 
 /**
  * Permission decision mode for a terminal clipboard operation family.
  */
-enum class TerminalClipboardPermission {
+public enum class TerminalClipboardPermission {
     /**
      * Reject the operation without prompting.
      */
@@ -79,7 +79,7 @@ enum class TerminalClipboardPermission {
 /**
  * OSC 52 operation class.
  */
-enum class TerminalClipboardOperation {
+public enum class TerminalClipboardOperation {
     /** Clipboard write or clear-style request. */
     WRITE,
 
@@ -90,7 +90,7 @@ enum class TerminalClipboardOperation {
 /**
  * Adapter decision for a terminal clipboard request.
  */
-enum class TerminalClipboardDecision {
+public enum class TerminalClipboardDecision {
     /** Request was rejected by configured policy. */
     DENIED_BY_POLICY,
 
@@ -124,7 +124,7 @@ enum class TerminalClipboardDecision {
  * @property maxDecodedBytes configured decoded payload size limit.
  * @property decision adapter policy decision.
  */
-data class TerminalClipboardAuditEvent(
+public data class TerminalClipboardAuditEvent(
     val operation: TerminalClipboardOperation,
     val selection: String,
     val encodedLength: Int,
@@ -145,7 +145,7 @@ data class TerminalClipboardAuditEvent(
  * @property text decoded clipboard text to write.
  * @property audit content-free audit metadata for the same request.
  */
-data class TerminalClipboardWriteEvent(
+public data class TerminalClipboardWriteEvent(
     val selection: String,
     val text: String,
     val audit: TerminalClipboardAuditEvent,
@@ -164,7 +164,7 @@ data class TerminalClipboardWriteEvent(
  * @property text decoded clipboard text to write if the user approves.
  * @property audit content-free audit metadata for the same request.
  */
-data class TerminalClipboardPromptEvent(
+public data class TerminalClipboardPromptEvent(
     val selection: String,
     val text: String,
     val audit: TerminalClipboardAuditEvent,

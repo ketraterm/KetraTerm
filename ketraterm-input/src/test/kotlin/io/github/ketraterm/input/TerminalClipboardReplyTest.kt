@@ -25,6 +25,23 @@ class TerminalClipboardReplyTest {
     private val selection = checkNotNull(TerminalClipboardSelection.parse("c"))
 
     @Test
+    fun `string selection preparation normalizes selectors and rejects control injection`() {
+        for ((selectors, expected) in listOf("" to "c", "ccp0cp" to "cp0")) {
+            val output = Output()
+            checkNotNull(TerminalClipboardReply.prepare(selectors, "a", 1, 32)).use { reply ->
+                reply.writeTo(output)
+                assertEquals("\u001b]52;$expected;YQ==\u001b\\", output.bytes.toString(Charsets.US_ASCII))
+            }
+        }
+        for (selectors in listOf("x", "c;", "c\u001b\\", "c\u0007")) {
+            assertNull(TerminalClipboardReply.prepare(selectors, "a", 1, 32))
+        }
+        assertThrows(IllegalArgumentException::class.java) {
+            TerminalClipboardReply.prepare("x", "", -1, 32)
+        }
+    }
+
+    @Test
     fun `reply preserves text and uses padded Base64 and seven bit ST`() {
         val cases =
             listOf(

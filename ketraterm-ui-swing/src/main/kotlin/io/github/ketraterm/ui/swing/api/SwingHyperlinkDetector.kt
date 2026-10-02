@@ -28,9 +28,9 @@ import kotlinx.coroutines.flow.emptyFlow
  * cancellation, discard any tainted ordered state, and never touch Swing state.
  * [configurationGeneration] changes when provider configuration becomes stale.
  */
-fun interface SwingHyperlinkDetector {
+public fun interface SwingHyperlinkDetector {
     /** Fixed dependency discipline for this detector instance. */
-    val context: SwingHyperlinkDetectionContext get() = SwingHyperlinkDetectionContext.INDEPENDENT_LINE
+    public val context: SwingHyperlinkDetectionContext get() = SwingHyperlinkDetectionContext.INDEPENDENT_LINE
 
     /**
      * Equality-only configuration generation. Publish changed configuration and a distinct generation
@@ -41,21 +41,21 @@ fun interface SwingHyperlinkDetector {
      * is ready. A different detector instance retires previous results immediately; use instance replacement
      * when old actions must not remain usable.
      */
-    val configurationGeneration: Long get() = 0L
+    public val configurationGeneration: Long get() = 0L
 
     /**
      * Reconciliation notifications for provider/index/theme changes without terminal output.
      * The binding owns collection and cancellation. Publish [configurationGeneration] before emitting;
      * this signal alone does not invalidate results when the generation and detector instance are unchanged.
      */
-    val configurationChanges: Flow<Unit> get() = emptyFlow()
+    public val configurationChanges: Flow<Unit> get() = emptyFlow()
 
     /**
      * Releases retained ordered source/provider state at a binding or provider boundary.
      * The owner calls this only after the ordered invocation has finished (including cancellation
      * before dispatch). It must be nonblocking, may run on any thread, and must not touch independent state.
      */
-    fun discardOrderedState() = Unit
+    public fun discardOrderedState(): Unit = Unit
 
     /**
      * Returns one request's completed results. An empty list means successful detection
@@ -64,16 +64,16 @@ fun interface SwingHyperlinkDetector {
      * Unknown/out-of-bounds source coordinates are ignored by the owner.
      * Ordered state is valid only within the request's binding/source/provider/analysis epochs.
      */
-    suspend fun detect(request: SwingHyperlinkDetectionRequest): List<SwingHyperlink>
+    public suspend fun detect(request: SwingHyperlinkDetectionRequest): List<SwingHyperlink>
 
-    companion object {
+    public companion object {
         /** Successful detector with no results. */
-        @JvmField val NONE = SwingHyperlinkDetector { emptyList() }
+        @JvmField public val NONE: SwingHyperlinkDetector = SwingHyperlinkDetector { emptyList() }
     }
 }
 
 /** Text dependency and ordering required by a detector. */
-enum class SwingHyperlinkDetectionContext {
+public enum class SwingHyperlinkDetectionContext {
     /** Each logical line is independent; requests may omit unchanged lines. */
     INDEPENDENT_LINE,
 
@@ -98,18 +98,18 @@ enum class SwingHyperlinkDetectionContext {
  * Binding epochs separate resets/rebindings; source epochs separate replacement,
  * reflow and buffer changes; provider epochs separate configuration/instance changes.
  */
-class SwingHyperlinkDetectionRequest(
+public class SwingHyperlinkDetectionRequest(
     lineTexts: List<String>,
     firstAbsoluteRows: LongArray,
     lastAbsoluteRows: LongArray = firstAbsoluteRows,
-    val context: SwingHyperlinkDetectionContext = SwingHyperlinkDetectionContext.INDEPENDENT_LINE,
-    val bindingEpoch: Long = 0L,
-    val sourceEpoch: Long = 0L,
-    val providerEpoch: Long = 0L,
+    public val context: SwingHyperlinkDetectionContext = SwingHyperlinkDetectionContext.INDEPENDENT_LINE,
+    public val bindingEpoch: Long = 0L,
+    public val sourceEpoch: Long = 0L,
+    public val providerEpoch: Long = 0L,
     /** Changes when earlier content requires ordered state reconstruction. */
-    val analysisEpoch: Long = 0L,
+    public val analysisEpoch: Long = 0L,
     /** Absolute retained boundary; eviction alone does not restart ordered provider state. */
-    val firstRetainedRow: Long = 0L,
+    public val firstRetainedRow: Long = 0L,
     firstLineIds: LongArray = firstAbsoluteRows,
 ) {
     private val lines = lineTexts.toTypedArray()
@@ -129,22 +129,22 @@ class SwingHyperlinkDetectionRequest(
     }
 
     /** Number of logical lines in this batch. */
-    val lineCount: Int get() = lines.size
+    public val lineCount: Int get() = lines.size
 
     /** Logical text, including the trailing newline. */
-    fun lineText(index: Int): String = lines[index]
+    public fun lineText(index: Int): String = lines[index]
 
     /** First physical row of the logical line, in this source epoch's absolute coordinates. */
-    fun lineFirstAbsoluteRow(index: Int): Long = firstRows[index]
+    public fun lineFirstAbsoluteRow(index: Int): Long = firstRows[index]
 
     /** Last physical row of that same logical line, inclusive. */
-    fun lineLastAbsoluteRow(index: Int): Long = lastRows[index]
+    public fun lineLastAbsoluteRow(index: Int): Long = lastRows[index]
 
     /** Stable source line identity for host-owned historical output metadata. */
-    fun lineFirstId(index: Int): Long = lineIds[index]
+    public fun lineFirstId(index: Int): Long = lineIds[index]
 
     /** Builds an absolute range from line-local UTF-16 offsets. */
-    fun range(
+    public fun range(
         startLine: Int,
         startOffset: Int,
         endLine: Int,
@@ -162,7 +162,7 @@ class SwingHyperlinkDetectionRequest(
      * dependency only when the action is genuinely independent of surrounding text.
      * The retained owner validates source/validation offsets against its snapshots.
      */
-    fun hyperlink(
+    public fun hyperlink(
         lineIndex: Int,
         startOffset: Int,
         endOffset: Int,

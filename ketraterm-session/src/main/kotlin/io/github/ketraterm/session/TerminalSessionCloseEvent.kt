@@ -26,7 +26,7 @@ package io.github.ketraterm.session
  * @property locallyRequested true when application code initiated closure via
  *   [TerminalSession.close].
  */
-data class TerminalSessionCloseEvent(
+public data class TerminalSessionCloseEvent(
     val exitCode: Int?,
     val failure: Throwable?,
     val locallyRequested: Boolean,

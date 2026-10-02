@@ -35,7 +35,7 @@ import kotlin.math.roundToInt
  *
  * @param scrollbar host-owned vertical scrollbar.
  */
-class SwingScrollbarAdapter(
+public class SwingScrollbarAdapter(
     private val scrollbar: JScrollBar,
 ) : TerminalViewportListener {
     private var viewportScroller: SwingScrollbarScroller? = null
@@ -56,7 +56,7 @@ class SwingScrollbarAdapter(
      *
      * @param viewportScroller shared row-scrolling destination.
      */
-    fun attach(viewportScroller: SwingScrollbarScroller) {
+    public fun attach(viewportScroller: SwingScrollbarScroller) {
         this.viewportScroller = viewportScroller
     }
 
@@ -141,7 +141,7 @@ class SwingScrollbarAdapter(
 }
 
 /** Destination for scrollbar positions mapped to terminal rows. */
-fun interface SwingScrollbarScroller {
+public fun interface SwingScrollbarScroller {
     /**
      * Moves the viewport to [scrollbackOffset] terminal rows above live output.
      *
@@ -152,7 +152,7 @@ fun interface SwingScrollbarScroller {
      * @param scrollbackOffset non-negative integer scrollback offset.
      * @param valueIsAdjusting whether the scrollbar thumb is actively held.
      */
-    fun scrollFromScrollbar(
+    public fun scrollFromScrollbar(
         scrollbackOffset: Int,
         valueIsAdjusting: Boolean,
     )

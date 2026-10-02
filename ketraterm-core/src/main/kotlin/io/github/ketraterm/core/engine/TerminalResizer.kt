@@ -41,6 +41,21 @@ import io.github.ketraterm.core.store.ClusterStore
  * screen. Such a line must be reconstructed and reflowed as one unit.
  */
 internal object TerminalResizer {
+    /** For a positive [width], keeps spare capacity when representable or starts with one complete physical row. */
+    internal fun initialLogicalLineCapacity(width: Int): Int = if (width <= Int.MAX_VALUE / 10) width * 10 else width
+
+    /** Doubles positive capacity until it covers [requiredCapacity], saturating before integer overflow. */
+    internal fun expandedLogicalLineCapacity(
+        currentCapacity: Int,
+        requiredCapacity: Int,
+    ): Int {
+        var capacity = currentCapacity.coerceAtLeast(1)
+        while (capacity < requiredCapacity) {
+            capacity = if (capacity <= Int.MAX_VALUE / 2) capacity * 2 else Int.MAX_VALUE
+        }
+        return capacity
+    }
+
     /**
      * Resizes a specific [ScreenBuffer], reflowing all its content and safely
      * copying surviving grapheme clusters to a new memory arena.
@@ -70,7 +85,7 @@ internal object TerminalResizer {
             }
 
         var clusterBuf = IntArray(16)
-        val builder = LogicalLineBuilder(oldWidth * 10)
+        val builder = LogicalLineBuilder(initialLogicalLineCapacity(oldWidth))
 
         val oldLiveScreenTop =
             (buffer.ring.size - oldHeight).coerceAtLeast(0)
@@ -655,11 +670,7 @@ private class LogicalLineBuilder(
     private fun ensureCapacity(required: Int) {
         if (required <= codepoints.size) return
 
-        var newCapacity = codepoints.size.coerceAtLeast(1)
-
-        while (newCapacity < required) {
-            newCapacity *= 2
-        }
+        val newCapacity = TerminalResizer.expandedLogicalLineCapacity(codepoints.size, required)
 
         codepoints = codepoints.copyOf(newCapacity)
         attrs = attrs.copyOf(newCapacity)

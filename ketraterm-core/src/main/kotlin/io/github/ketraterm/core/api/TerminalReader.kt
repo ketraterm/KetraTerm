@@ -23,39 +23,41 @@ import io.github.ketraterm.render.api.TerminalColorPalette
  * Exposes viewport-relative state plus random-access helpers for the currently
  * active screen buffer. Out-of-bounds probes never throw; they return stable
  * sentinel values so renderers can remain branch-light.
+ * Serialize reads with terminal mutations; returned [TerminalLine] views borrow
+ * live storage and must not escape that serialization.
  */
-interface TerminalReader {
+public interface TerminalReader {
     /**
      * Current immutable effective palette, including application color overrides.
      * Reading retains the existing object without allocating or reading a render
      * frame. Synchronize with terminal mutations before reading; a retained palette
      * remains safe to use after releasing that synchronization.
      */
-    val palette: TerminalColorPalette
+    public val palette: TerminalColorPalette
 
     /** Actual active screen. Read synchronously under the same serialization as terminal mutations. */
-    val isAlternateScreenActive: Boolean
+    public val isAlternateScreenActive: Boolean
 
     /** Current viewport width in cells. */
-    val width: Int
+    public val width: Int
 
     /** Current viewport height in rows. */
-    val height: Int
+    public val height: Int
 
     /** Active xterm window title. */
-    val windowTitle: String
+    public val windowTitle: String
 
     /** Active xterm icon title. */
-    val iconTitle: String
+    public val iconTitle: String
 
     /** Active cursor column in zero-based viewport coordinates. */
-    val cursorCol: Int
+    public val cursorCol: Int
 
     /** Active cursor row in zero-based viewport coordinates. */
-    val cursorRow: Int
+    public val cursorRow: Int
 
     /** Number of retained off-screen history lines in the active buffer. */
-    val historySize: Int
+    public val historySize: Int
 
     /**
      * Returns the visible line at [row], or a shared void line when [row] is out of bounds.
@@ -63,7 +65,7 @@ interface TerminalReader {
      * @param row Zero-based row index.
      * @return The [TerminalLine] at the specified row, or a dummy blank line if out of bounds.
      */
-    fun getLine(row: Int): TerminalLine
+    public fun getLine(row: Int): TerminalLine
 
     /**
      * Returns the display/base codepoint at `[col, row]`.
@@ -77,41 +79,8 @@ interface TerminalReader {
      * @param row Row index (0-based).
      * @return The codepoint at the specified coordinate, or a sentinel/spacer value.
      */
-    fun getCodepointAt(
+    public fun getCodepointAt(
         col: Int,
         row: Int,
     ): Int
-
-    /**
-     * Returns the primary packed cell attribute word at `[col, row]`.
-     *
-     * Out-of-bounds column probes return the active primary pen word. This
-     * mirrors the terminal's current erase/write attribute for off-grid queries.
-     * Decode this value together with [getPackedExtendedAttrAt] via
-     * [io.github.ketraterm.core.codec.AttributeCodec].
-     *
-     * @param col Column index (0-based).
-     * @param row Row index (0-based).
-     * @return Primary packed attribute word for the cell or active pen.
-     */
-    fun getPackedAttrAt(
-        col: Int,
-        row: Int,
-    ): Long
-
-    /**
-     * Returns the extended packed cell attribute word at `[col, row]`.
-     *
-     * Out-of-bounds column probes return the active extended pen word. Decode
-     * this value together with [getPackedAttrAt] via
-     * [io.github.ketraterm.core.codec.AttributeCodec].
-     *
-     * @param col Column index (0-based).
-     * @param row Row index (0-based).
-     * @return Extended packed attribute word for the cell or active pen.
-     */
-    fun getPackedExtendedAttrAt(
-        col: Int,
-        row: Int,
-    ): Long
 }

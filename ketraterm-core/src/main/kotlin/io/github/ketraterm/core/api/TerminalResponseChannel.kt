@@ -22,16 +22,16 @@ package io.github.ketraterm.core.api
  * input side. Parser/host code should use the request methods; core owns
  * response contents that depend on core state such as cursor position.
  */
-interface TerminalResponseChannel : TerminalHostResponseReader {
+public interface TerminalResponseChannel : TerminalHostResponseReader {
     /**
      * The number of queued response bytes currently waiting to be read.
      */
-    val pendingResponseBytes: Int
+    public val pendingResponseBytes: Int
 
     /**
      * Discards all queued response bytes from this channel.
      */
-    fun clearResponseBytes()
+    public fun clearResponseBytes()
 
     /**
      * Enqueues one ANSI or DEC private DECRPM reply (`CSI [?] mode;status $ y`).
@@ -47,7 +47,7 @@ interface TerminalResponseChannel : TerminalHostResponseReader {
      * @param defaultBackarrowSendsBackspace current host default for legacy Backspace
      * before an explicit DECBKM override; false selects DEL, true selects BS.
      */
-    fun requestModeStatus(
+    public fun requestModeStatus(
         mode: Int,
         decPrivate: Boolean,
         hostCapabilities: Int = 0,
@@ -71,7 +71,7 @@ interface TerminalResponseChannel : TerminalHostResponseReader {
      * @param mode The DSR mode parameter.
      * @param decPrivate `true` if this is a DEC private DSR (? prefix), `false` for standard ANSI.
      */
-    fun requestDeviceStatusReport(
+    public fun requestDeviceStatusReport(
         mode: Int,
         decPrivate: Boolean,
     )
@@ -85,7 +85,7 @@ interface TerminalResponseChannel : TerminalHostResponseReader {
      * @param kind The device attributes query type (primary, secondary, or tertiary).
      * @param parameter The request parameter/subtype (usually 0).
      */
-    fun requestDeviceAttributes(
+    public fun requestDeviceAttributes(
         kind: Int,
         parameter: Int,
     )
@@ -95,7 +95,7 @@ interface TerminalResponseChannel : TerminalHostResponseReader {
      * parameterless `CSI ? u` query response. Core reports only flags retained
      * by its supported-mode mask.
      */
-    fun requestKittyKeyboardFlags()
+    public fun requestKittyKeyboardFlags()
 
     /**
      * Enqueues an allowlisted xterm key-modifier option response.
@@ -106,14 +106,14 @@ interface TerminalResponseChannel : TerminalHostResponseReader {
      *
      * @param resource The queried xterm key-modifier resource identifier.
      */
-    fun requestKeyModifierOption(resource: Int)
+    public fun requestKeyModifierOption(resource: Int)
 
     /**
      * Enqueues an allowlisted XTQFMTKEYS reply using the active format resource.
      * Unknown and reserved resources stay silent; this protocol defines no failure reply.
      * Host adapters must enforce terminal-response policy before calling this API.
      */
-    fun requestKeyFormatOption(resource: Int)
+    public fun requestKeyFormatOption(resource: Int)
 
     /**
      * Enqueues a VT420 DECRQCRA response for an active-page rectangular area.
@@ -131,7 +131,7 @@ interface TerminalResponseChannel : TerminalHostResponseReader {
      * @param bottom One-based bottom row, or `0` when omitted.
      * @param right One-based right column, or `0` when omitted.
      */
-    fun requestRectangleChecksum(
+    public fun requestRectangleChecksum(
         requestId: Int,
         page: Int,
         top: Int,
@@ -146,7 +146,7 @@ interface TerminalResponseChannel : TerminalHostResponseReader {
      * @param width Width in pixels.
      * @param height Height in pixels.
      */
-    fun setWindowSizePixels(
+    public fun setWindowSizePixels(
         width: Int,
         height: Int,
     )
@@ -156,28 +156,28 @@ interface TerminalResponseChannel : TerminalHostResponseReader {
      *
      * @param minimized `true` if minimized, `false` otherwise.
      */
-    fun setWindowMinimized(minimized: Boolean)
+    public fun setWindowMinimized(minimized: Boolean)
 
     /**
      * Enqueues a window report response.
      *
      * @param mode The window report mode (e.g. [WINDOW_REPORT_PIXELS] or [WINDOW_REPORT_GRID_CELLS]).
      */
-    fun requestWindowReport(mode: Int)
+    public fun requestWindowReport(mode: Int)
 
     /**
      * Enqueues the color query response for a specific 256-color palette index.
      *
      * @param index the color index to query.
      */
-    fun queryPaletteColor(index: Int)
+    public fun queryPaletteColor(index: Int)
 
     /**
      * Enqueues the color query response for a dynamic target (10, 11, or 12).
      *
      * @param target the target code (10 for foreground, 11 for background, 12 for cursor).
      */
-    fun queryDynamicColor(target: Int)
+    public fun queryDynamicColor(target: Int)
 
     /**
      * Enqueues the response for a DCS DECRQSS request.
@@ -191,7 +191,7 @@ interface TerminalResponseChannel : TerminalHostResponseReader {
      *
      * @param query the decoded selector, matched without normalization.
      */
-    fun queryStatusString(query: String)
+    public fun queryStatusString(query: String)
 
     /**
      * Enqueues the response for a DCS XTGETTCAP request.
@@ -201,16 +201,16 @@ interface TerminalResponseChannel : TerminalHostResponseReader {
      *
      * @param rawPayload the raw payload containing semicolon-separated hex capability names.
      */
-    fun queryTerminfo(rawPayload: String)
+    public fun queryTerminfo(rawPayload: String)
 
-    companion object {
-        const val DEVICE_ATTRIBUTES_PRIMARY: Int = 0
-        const val DEVICE_ATTRIBUTES_SECONDARY: Int = 1
-        const val DEVICE_ATTRIBUTES_TERTIARY: Int = 2
+    public companion object {
+        public const val DEVICE_ATTRIBUTES_PRIMARY: Int = 0
+        public const val DEVICE_ATTRIBUTES_SECONDARY: Int = 1
+        public const val DEVICE_ATTRIBUTES_TERTIARY: Int = 2
 
-        const val WINDOW_REPORT_STATE: Int = 11
-        const val WINDOW_REPORT_PIXELS: Int = 14
-        const val WINDOW_REPORT_GRID_CELLS: Int = 18
-        const val WINDOW_REPORT_SCREEN_SIZE: Int = 19
+        public const val WINDOW_REPORT_STATE: Int = 11
+        public const val WINDOW_REPORT_PIXELS: Int = 14
+        public const val WINDOW_REPORT_GRID_CELLS: Int = 18
+        public const val WINDOW_REPORT_SCREEN_SIZE: Int = 19
     }
 }

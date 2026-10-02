@@ -290,10 +290,11 @@ class TerminalSessionOutboundTest {
         val text = "x".repeat(40000)
         val expected = "a\u001b[200~" + text + "\u001b[201~" + "\u001b[0n".repeat(800) + "\u001b[?67;1\$y\u0008z"
         val connector = BlockingConnector(expected.length)
+        val terminal = TerminalBuffers.create(10, 3)
         Executors.newSingleThreadExecutor().asCoroutineDispatcher().use { io ->
             val session =
                 TerminalSession.create(
-                    TerminalBuffers.create(10, 3),
+                    terminal,
                     connector,
                     workerDispatcher = StandardTestDispatcher(),
                     ioDispatcher = io,
@@ -313,7 +314,7 @@ class TerminalSessionOutboundTest {
                         session.encodeKey(TerminalKeyEvent.key(TerminalKey.BACKSPACE))
                         session.encodeKey(TerminalKeyEvent.codepoint('z'.code))
                     }.use { it.awaitCompletion() }
-                    assertEquals("hello", session.terminal.getLineAsString(0))
+                    assertEquals("hello", terminal.getLineAsString(0))
                     assertEquals(1L, connector.release.count)
                     connector.release.countDown()
                     connector.completed.awaitEvent()
@@ -366,10 +367,11 @@ class TerminalSessionOutboundTest {
         val text = "x".repeat(40000)
         val expected = "\u001b[200~" + text + "\u001b[201~\u001b[0ntailz"
         val connector = BlockingConnector(expected.length)
+        val terminal = TerminalBuffers.create(10, 3)
         Executors.newSingleThreadExecutor().asCoroutineDispatcher().use { io ->
             val session =
                 TerminalSession.create(
-                    TerminalBuffers.create(10, 3),
+                    terminal,
                     connector,
                     workerDispatcher = StandardTestDispatcher(),
                     ioDispatcher = io,
@@ -386,7 +388,7 @@ class TerminalSessionOutboundTest {
                         session.encodePaste(TerminalPasteEvent("\u0001tail"))
                         session.encodeKey(TerminalKeyEvent.codepoint('z'.code))
                     }.use { it.awaitCompletion() }
-                    assertEquals("hello", session.terminal.getLineAsString(0))
+                    assertEquals("hello", terminal.getLineAsString(0))
                     assertEquals(1L, connector.release.count)
                     connector.release.countDown()
                     connector.completed.awaitEvent()

@@ -22,7 +22,7 @@ import io.github.ketraterm.protocol.TerminalClipboardSelection
  * [permission] and [maxDecodedBytes] describe admission, not a permanent grant.
  * Session execution rechecks policy before access and before committing output.
  */
-data class TerminalClipboardReadRequest(
+public data class TerminalClipboardReadRequest(
     val selection: TerminalClipboardSelection,
     val permission: TerminalClipboardPermission,
     val maxDecodedBytes: Int,
@@ -30,10 +30,13 @@ data class TerminalClipboardReadRequest(
     init {
         require(maxDecodedBytes >= 0) { "Clipboard byte limit must be non-negative" }
     }
+
+    /** Validated, normalized selectors for Java hosts that cannot consume the inline type. */
+    val selectionValue: String get() = selection.value
 }
 
 /** Content-free execution result, distinct from the adapter's admission audit. */
-enum class TerminalClipboardReadOutcome {
+public enum class TerminalClipboardReadOutcome {
     /** Valid text, including empty text, was written as a complete reply. */
     SENT,
 
@@ -60,7 +63,10 @@ enum class TerminalClipboardReadOutcome {
 }
 
 /** Contains no clipboard data or provider exception details. */
-data class TerminalClipboardReadAuditEvent(
+public data class TerminalClipboardReadAuditEvent(
     val selection: TerminalClipboardSelection,
     val outcome: TerminalClipboardReadOutcome,
-)
+) {
+    /** Validated, normalized selectors for Java audit consumers. */
+    val selectionValue: String get() = selection.value
+}

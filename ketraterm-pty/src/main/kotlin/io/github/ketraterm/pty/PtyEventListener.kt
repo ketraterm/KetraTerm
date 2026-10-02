@@ -36,36 +36,36 @@ import io.github.ketraterm.session.TerminalSession
  * operation with the separate threading and failure contract documented below.
  */
 @Suppress("UNUSED_PARAMETER")
-interface PtyEventListener {
+public interface PtyEventListener {
     /** Effective palette change; [palette] is immutable and may be retained. */
-    fun paletteChanged(
+    public fun paletteChanged(
         session: TerminalSession,
         palette: TerminalColorPalette,
-    ) = Unit
+    ): Unit = Unit
 
     /** New accepted OSC 8 registry entry; see [io.github.ketraterm.host.HostEventSink.hyperlinkRegistered]. */
-    fun hyperlinkRegistered(
+    public fun hyperlinkRegistered(
         session: TerminalSession,
         hyperlinkId: Int,
         uri: String,
         id: String?,
-    ) = Unit
+    ): Unit = Unit
 
     /** An evicted OSC 8 identity is no longer resolvable. */
-    fun hyperlinkRemoved(
+    public fun hyperlinkRemoved(
         session: TerminalSession,
         hyperlinkId: Int,
-    ) = Unit
+    ): Unit = Unit
 
     /** Hard reset cleared a nonempty OSC 8 registry. */
-    fun hyperlinksCleared(session: TerminalSession) = Unit
+    public fun hyperlinksCleared(session: TerminalSession): Unit = Unit
 
     /**
      * Called when BEL is received from the terminal process.
      *
      * @param session session that received the event.
      */
-    fun bell(session: TerminalSession)
+    public fun bell(session: TerminalSession)
 
     /**
      * Called after the OSC icon title changes.
@@ -73,7 +73,7 @@ interface PtyEventListener {
      * @param session session that received the event.
      * @param title new icon title.
      */
-    fun iconTitleChanged(
+    public fun iconTitleChanged(
         session: TerminalSession,
         title: String,
     )
@@ -84,7 +84,7 @@ interface PtyEventListener {
      * @param session session that received the event.
      * @param title new window title.
      */
-    fun windowTitleChanged(
+    public fun windowTitleChanged(
         session: TerminalSession,
         title: String,
     )
@@ -95,10 +95,10 @@ interface PtyEventListener {
      * @param session session that received the event.
      * @param uri absolute `file://` URI reported by the shell.
      */
-    fun currentWorkingDirectoryChanged(
+    public fun currentWorkingDirectoryChanged(
         session: TerminalSession,
         uri: String,
-    ) = Unit
+    ): Unit = Unit
 
     /**
      * Called when another listener callback throws.
@@ -109,7 +109,7 @@ interface PtyEventListener {
      * @param session session whose listener callback failed.
      * @param exception exception thrown by another listener callback.
      */
-    fun listenerFailed(
+    public fun listenerFailed(
         session: TerminalSession,
         exception: Exception,
     )
@@ -121,7 +121,7 @@ interface PtyEventListener {
      * @param rows target row count.
      * @param columns target column count.
      */
-    fun resizeWindow(
+    public fun resizeWindow(
         session: TerminalSession,
         rows: Int,
         columns: Int,
@@ -132,11 +132,11 @@ interface PtyEventListener {
      * Hosts may schedule a window resize according to their own layout policy.
      * See [io.github.ketraterm.host.HostEventSink.columnModeChanged].
      */
-    fun columnModeChanged(
+    public fun columnModeChanged(
         session: TerminalSession,
         rows: Int,
         columns: Int,
-    ) = Unit
+    ): Unit = Unit
 
     /**
      * Called when the shell requests moving the window.
@@ -145,39 +145,39 @@ interface PtyEventListener {
      * @param x target x position in pixels.
      * @param y target y position in pixels.
      */
-    fun moveWindow(
+    public fun moveWindow(
         session: TerminalSession,
         x: Int,
         y: Int,
-    ) = Unit
+    ): Unit = Unit
 
     /**
      * Called when the shell requests minimizing the window.
      *
      * @param session session that received the event.
      */
-    fun minimizeWindow(session: TerminalSession) = Unit
+    public fun minimizeWindow(session: TerminalSession): Unit = Unit
 
     /**
      * Called when the shell requests deminimizing (restoring) the window.
      *
      * @param session session that received the event.
      */
-    fun deminimizeWindow(session: TerminalSession) = Unit
+    public fun deminimizeWindow(session: TerminalSession): Unit = Unit
 
     /**
      * Called when the shell requests raising the window.
      *
      * @param session session that received the event.
      */
-    fun raiseWindow(session: TerminalSession) = Unit
+    public fun raiseWindow(session: TerminalSession): Unit = Unit
 
     /**
      * Called when the shell requests lowering the window.
      *
      * @param session session that received the event.
      */
-    fun lowerWindow(session: TerminalSession) = Unit
+    public fun lowerWindow(session: TerminalSession): Unit = Unit
 
     /**
      * Called when the shell requests maximizing or restoring the window.
@@ -185,10 +185,10 @@ interface PtyEventListener {
      * @param session session that received the event.
      * @param maximize true to maximize, false to restore.
      */
-    fun setMaximized(
+    public fun setMaximized(
         session: TerminalSession,
         maximize: Boolean,
-    ) = Unit
+    ): Unit = Unit
 
     /**
      * Called when an OSC 133 shell integration marker is received.
@@ -196,10 +196,10 @@ interface PtyEventListener {
      * @param session session that received the event.
      * @param event typed marker event.
      */
-    fun shellIntegrationMarker(
+    public fun shellIntegrationMarker(
         session: TerminalSession,
         event: ShellIntegrationEvent,
-    ) = Unit
+    ): Unit = Unit
 
     /**
      * Called when the shell requests a desktop notification.
@@ -209,12 +209,12 @@ interface PtyEventListener {
      * @param body notification body.
      * @param level notification severity level.
      */
-    fun showNotification(
+    public fun showNotification(
         session: TerminalSession,
         title: String,
         body: String,
         level: NotificationLevel,
-    ) = Unit
+    ): Unit = Unit
 
     /**
      * Called when OSC 52 clipboard write policy permits a decoded text payload.
@@ -225,10 +225,10 @@ interface PtyEventListener {
      * @param session session that received the request.
      * @param event decoded clipboard write request.
      */
-    fun terminalClipboardWrite(
+    public fun terminalClipboardWrite(
         session: TerminalSession,
         event: TerminalClipboardWriteEvent,
-    ) = Unit
+    ): Unit = Unit
 
     /**
      * Called when OSC 52 clipboard write policy requires a product-host prompt.
@@ -240,10 +240,10 @@ interface PtyEventListener {
      * @param session session that received the request.
      * @param event decoded clipboard prompt request.
      */
-    fun terminalClipboardPrompt(
+    public fun terminalClipboardPrompt(
         session: TerminalSession,
         event: TerminalClipboardPromptEvent,
-    ) = Unit
+    ): Unit = Unit
 
     /**
      * Resolves a clipboard read for the requesting [session].
@@ -255,17 +255,17 @@ interface PtyEventListener {
      * content-free read audit, never [listenerFailed], which may log details.
      * Hosts without a read provider explicitly report unavailable data.
      */
-    suspend fun readClipboard(
+    public suspend fun readClipboard(
         session: TerminalSession,
         request: TerminalClipboardReadRequest,
     ): TerminalClipboardReadResult = TerminalClipboardReadResult.Unavailable
 
-    companion object {
+    public companion object {
         /**
          * Listener used when the host does not need PTY callbacks.
          */
         @JvmField
-        val NONE: PtyEventListener =
+        public val NONE: PtyEventListener =
             object : PtyEventListener {
                 override fun bell(session: TerminalSession) = Unit
 

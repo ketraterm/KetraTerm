@@ -37,7 +37,7 @@ import io.github.ketraterm.completion.stats.isRecordableStatsEvent
  * @param capacity maximum distinct exact-command rows retained.
  * @throws IllegalArgumentException if [capacity] is not positive.
  */
-class TerminalCompletionLearningStore
+public class TerminalCompletionLearningStore
     @JvmOverloads
     constructor(
         capacity: Int = DEFAULT_CAPACITY,
@@ -62,7 +62,7 @@ class TerminalCompletionLearningStore
          *
          * @param snapshot aggregate events not already represented by this store.
          */
-        fun mergeSnapshot(snapshot: TerminalCompletionLearningSnapshot) {
+        public fun mergeSnapshot(snapshot: TerminalCompletionLearningSnapshot) {
             if (snapshot.rankingStats.isEmpty() && snapshot.replayCommands.isEmpty()) return
             val sanitizedSnapshot =
                 snapshot.copy(
@@ -82,7 +82,7 @@ class TerminalCompletionLearningStore
          *
          * @return identity-stable snapshot until the retained rows change.
          */
-        fun snapshot(): TerminalCompletionLearningSnapshot {
+        public fun snapshot(): TerminalCompletionLearningSnapshot {
             if (!snapshotDirty) return publishedSnapshot
             return synchronized(lock) {
                 if (snapshotDirty) {
@@ -95,7 +95,7 @@ class TerminalCompletionLearningStore
         }
 
         /** Removes all retained ranking evidence and replay commands. */
-        fun clear() {
+        public fun clear() {
             synchronized(lock) {
                 learningStats.clear()
                 publishedSnapshot = TerminalCompletionLearningSnapshot.EMPTY
@@ -119,7 +119,7 @@ class TerminalCompletionLearningStore
          * @param usedAtEpochMillis host timestamp for the execution event.
          * @return `true` if the retained exact-command rows changed.
          */
-        fun recordCommandResult(
+        public fun recordCommandResult(
             commandLine: String,
             successful: Boolean,
             profileId: String?,
@@ -157,7 +157,7 @@ class TerminalCompletionLearningStore
          * @param feedbackAtEpochMillis host timestamp for the feedback event.
          * @return `true` if the retained exact-command rows changed.
          */
-        fun recordSuggestionFeedback(
+        public fun recordSuggestionFeedback(
             commandLine: String,
             feedback: TerminalCompletionFeedbackKind,
             profileId: String?,

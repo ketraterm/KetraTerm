@@ -26,7 +26,7 @@ package io.github.ketraterm.render.api
  * consumers. Use a new reader for unrelated terminal content, or explicitly reset
  * consumer caches before replacing the content behind an existing reader.
  */
-interface TerminalRenderFrameReader {
+public interface TerminalRenderFrameReader {
     /**
      * Invokes [consumer] with a render frame view whose lifetime is limited to
      * this call.
@@ -36,7 +36,7 @@ interface TerminalRenderFrameReader {
      *
      * @param consumer receiver that copies any render data it needs.
      */
-    fun readRenderFrame(consumer: TerminalRenderFrameConsumer)
+    public fun readRenderFrame(consumer: TerminalRenderFrameConsumer)
 
     /**
      * Invokes [consumer] with a render frame for a caller-owned scrollback
@@ -53,7 +53,7 @@ interface TerminalRenderFrameReader {
      * @param scrollbackOffset requested lines above the live bottom viewport.
      * @param consumer receiver that copies any render data it needs.
      */
-    fun readRenderFrame(
+    public fun readRenderFrame(
         scrollbackOffset: Int,
         consumer: TerminalRenderFrameConsumer,
     ) {
@@ -74,7 +74,7 @@ interface TerminalRenderFrameReader {
      * @param viewportRows requested number of rows in the render viewport.
      * @param consumer receiver that copies any render data it needs.
      */
-    fun readRenderFrame(
+    public fun readRenderFrame(
         scrollbackOffset: Int,
         viewportRows: Int,
         consumer: TerminalRenderFrameConsumer,
@@ -104,7 +104,7 @@ interface TerminalRenderFrameReader {
      * @param endAbsoluteRow inclusive last requested absolute row.
      * @param consumer receiver that copies any render data it needs.
      */
-    fun readRenderFrameForAbsoluteRange(
+    public fun readRenderFrameForAbsoluteRange(
         startAbsoluteRow: Long,
         endAbsoluteRow: Long,
         consumer: TerminalRenderFrameConsumer,

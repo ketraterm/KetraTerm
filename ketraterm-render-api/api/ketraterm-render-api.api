@@ -1,0 +1,190 @@
+public final class io/github/ketraterm/render/api/TerminalColorPalette {
+	public static final field Companion Lio/github/ketraterm/render/api/TerminalColorPalette$Companion;
+	public fun <init> ()V
+	public fun <init> (IIIIII[IZZ)V
+	public synthetic fun <init> (IIIIII[IZZILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun background (J)I
+	public final fun copy (IIIIII[IZZ)Lio/github/ketraterm/render/api/TerminalColorPalette;
+	public static synthetic fun copy$default (Lio/github/ketraterm/render/api/TerminalColorPalette;IIIIII[IZZILjava/lang/Object;)Lio/github/ketraterm/render/api/TerminalColorPalette;
+	public final fun copyIndexedColorsInto ([II)V
+	public static synthetic fun copyIndexedColorsInto$default (Lio/github/ketraterm/render/api/TerminalColorPalette;[IIILjava/lang/Object;)V
+	public static final fun defaultIndexedColors ()[I
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun foreground (J)I
+	public final fun getBoldAsBright ()Z
+	public final fun getCursorBackground ()I
+	public final fun getCursorForeground ()I
+	public final fun getDefaultBackground ()I
+	public final fun getDefaultForeground ()I
+	public final fun getSelectionBackground ()I
+	public final fun getSelectionForeground ()I
+	public fun hashCode ()I
+	public final fun indexedColor (I)I
+	public final fun isDark ()Z
+	public final fun toIndexedColorsArray ()[I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class io/github/ketraterm/render/api/TerminalColorPalette$Companion {
+	public final fun defaultIndexedColors ()[I
+}
+
+public final class io/github/ketraterm/render/api/TerminalRenderAttrs {
+	public static final field DEFAULT J
+	public static final field INSTANCE Lio/github/ketraterm/render/api/TerminalRenderAttrs;
+	public final fun backgroundKind (J)I
+	public final fun backgroundValue (J)I
+	public final fun foregroundKind (J)I
+	public final fun foregroundValue (J)I
+	public final fun isBlink (J)Z
+	public final fun isBold (J)Z
+	public final fun isFaint (J)Z
+	public final fun isInverse (J)Z
+	public final fun isInvisible (J)Z
+	public final fun isItalic (J)Z
+	public final fun isStrikethrough (J)Z
+	public final fun pack (IIIIZZZIZZZZ)J
+	public static synthetic fun pack$default (Lio/github/ketraterm/render/api/TerminalRenderAttrs;IIIIZZZIZZZZILjava/lang/Object;)J
+	public final fun underlineStyle (J)I
+}
+
+public final class io/github/ketraterm/render/api/TerminalRenderBufferKind : java/lang/Enum {
+	public static final field ALTERNATE Lio/github/ketraterm/render/api/TerminalRenderBufferKind;
+	public static final field PRIMARY Lio/github/ketraterm/render/api/TerminalRenderBufferKind;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public static fun valueOf (Ljava/lang/String;)Lio/github/ketraterm/render/api/TerminalRenderBufferKind;
+	public static fun values ()[Lio/github/ketraterm/render/api/TerminalRenderBufferKind;
+}
+
+public final class io/github/ketraterm/render/api/TerminalRenderCellFlags {
+	public static final field CLUSTER I
+	public static final field CODEPOINT I
+	public static final field EMPTY I
+	public static final field INSTANCE Lio/github/ketraterm/render/api/TerminalRenderCellFlags;
+	public static final field WIDE_LEADING I
+	public static final field WIDE_TRAILING I
+	public static final field WRAP_PADDING I
+	public final fun isValidCombination (I)Z
+}
+
+public abstract interface class io/github/ketraterm/render/api/TerminalRenderClusterDataSink {
+	public abstract fun onCluster (I[III)V
+}
+
+public abstract interface class io/github/ketraterm/render/api/TerminalRenderClusterSink {
+	public abstract fun onCluster (ILjava/lang/String;)V
+}
+
+public final class io/github/ketraterm/render/api/TerminalRenderColorKind {
+	public static final field DEFAULT I
+	public static final field INDEXED I
+	public static final field INSTANCE Lio/github/ketraterm/render/api/TerminalRenderColorKind;
+	public static final field RGB I
+}
+
+public final class io/github/ketraterm/render/api/TerminalRenderCursor {
+	public fun <init> (IIZZLio/github/ketraterm/render/api/TerminalRenderCursorShape;J)V
+	public final fun component1 ()I
+	public final fun component2 ()I
+	public final fun component3 ()Z
+	public final fun component4 ()Z
+	public final fun component5 ()Lio/github/ketraterm/render/api/TerminalRenderCursorShape;
+	public final fun component6 ()J
+	public final fun copy (IIZZLio/github/ketraterm/render/api/TerminalRenderCursorShape;J)Lio/github/ketraterm/render/api/TerminalRenderCursor;
+	public static synthetic fun copy$default (Lio/github/ketraterm/render/api/TerminalRenderCursor;IIZZLio/github/ketraterm/render/api/TerminalRenderCursorShape;JILjava/lang/Object;)Lio/github/ketraterm/render/api/TerminalRenderCursor;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getBlinking ()Z
+	public final fun getColumn ()I
+	public final fun getGeneration ()J
+	public final fun getRow ()I
+	public final fun getShape ()Lio/github/ketraterm/render/api/TerminalRenderCursorShape;
+	public final fun getVisible ()Z
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class io/github/ketraterm/render/api/TerminalRenderCursorShape : java/lang/Enum {
+	public static final field BAR Lio/github/ketraterm/render/api/TerminalRenderCursorShape;
+	public static final field BLOCK Lio/github/ketraterm/render/api/TerminalRenderCursorShape;
+	public static final field UNDERLINE Lio/github/ketraterm/render/api/TerminalRenderCursorShape;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public static fun valueOf (Ljava/lang/String;)Lio/github/ketraterm/render/api/TerminalRenderCursorShape;
+	public static fun values ()[Lio/github/ketraterm/render/api/TerminalRenderCursorShape;
+}
+
+public abstract interface class io/github/ketraterm/render/api/TerminalRenderCursorSink {
+	public abstract fun onCursor (IIZZLio/github/ketraterm/render/api/TerminalRenderCursorShape;J)V
+}
+
+public final class io/github/ketraterm/render/api/TerminalRenderExtraAttrs {
+	public static final field DEFAULT J
+	public static final field INSTANCE Lio/github/ketraterm/render/api/TerminalRenderExtraAttrs;
+	public final fun isOverline (J)Z
+	public final fun pack (IIZ)J
+	public static synthetic fun pack$default (Lio/github/ketraterm/render/api/TerminalRenderExtraAttrs;IIZILjava/lang/Object;)J
+	public final fun underlineColorKind (J)I
+	public final fun underlineColorValue (J)I
+}
+
+public abstract interface class io/github/ketraterm/render/api/TerminalRenderFrame {
+	public fun copyCursor (Lio/github/ketraterm/render/api/TerminalRenderCursorSink;)V
+	public abstract fun copyLine (I[II[JI[II[JI[IILio/github/ketraterm/render/api/TerminalRenderClusterSink;Lio/github/ketraterm/render/api/TerminalRenderClusterDataSink;)V
+	public static synthetic fun copyLine$default (Lio/github/ketraterm/render/api/TerminalRenderFrame;I[II[JI[II[JI[IILio/github/ketraterm/render/api/TerminalRenderClusterSink;Lio/github/ketraterm/render/api/TerminalRenderClusterDataSink;ILjava/lang/Object;)V
+	public abstract fun getActiveBuffer ()Lio/github/ketraterm/render/api/TerminalRenderBufferKind;
+	public abstract fun getColumns ()I
+	public fun getContentGeneration ()J
+	public abstract fun getCursor ()Lio/github/ketraterm/render/api/TerminalRenderCursor;
+	public fun getDiscardedCount ()J
+	public abstract fun getFrameGeneration ()J
+	public fun getHistoryContentGeneration ()J
+	public fun getHistorySize ()I
+	public fun getOutputEndAbsoluteRow ()J
+	public fun getPalette ()Lio/github/ketraterm/render/api/TerminalColorPalette;
+	public abstract fun getRows ()I
+	public fun getScrollbackOffset ()I
+	public abstract fun getStructureGeneration ()J
+	public abstract fun lineGeneration (I)J
+	public fun lineId (I)J
+	public abstract fun lineWrapped (I)Z
+}
+
+public final class io/github/ketraterm/render/api/TerminalRenderFrame$DefaultImpls {
+	public static fun copyCursor (Lio/github/ketraterm/render/api/TerminalRenderFrame;Lio/github/ketraterm/render/api/TerminalRenderCursorSink;)V
+	public static synthetic fun copyLine$default (Lio/github/ketraterm/render/api/TerminalRenderFrame;I[II[JI[II[JI[IILio/github/ketraterm/render/api/TerminalRenderClusterSink;Lio/github/ketraterm/render/api/TerminalRenderClusterDataSink;ILjava/lang/Object;)V
+	public static fun getContentGeneration (Lio/github/ketraterm/render/api/TerminalRenderFrame;)J
+	public static fun getDiscardedCount (Lio/github/ketraterm/render/api/TerminalRenderFrame;)J
+	public static fun getHistoryContentGeneration (Lio/github/ketraterm/render/api/TerminalRenderFrame;)J
+	public static fun getHistorySize (Lio/github/ketraterm/render/api/TerminalRenderFrame;)I
+	public static fun getOutputEndAbsoluteRow (Lio/github/ketraterm/render/api/TerminalRenderFrame;)J
+	public static fun getPalette (Lio/github/ketraterm/render/api/TerminalRenderFrame;)Lio/github/ketraterm/render/api/TerminalColorPalette;
+	public static fun getScrollbackOffset (Lio/github/ketraterm/render/api/TerminalRenderFrame;)I
+	public static fun lineId (Lio/github/ketraterm/render/api/TerminalRenderFrame;I)J
+}
+
+public abstract interface class io/github/ketraterm/render/api/TerminalRenderFrameConsumer {
+	public abstract fun accept (Lio/github/ketraterm/render/api/TerminalRenderFrame;)V
+}
+
+public abstract interface class io/github/ketraterm/render/api/TerminalRenderFrameReader {
+	public fun readRenderFrame (IILio/github/ketraterm/render/api/TerminalRenderFrameConsumer;)V
+	public fun readRenderFrame (ILio/github/ketraterm/render/api/TerminalRenderFrameConsumer;)V
+	public abstract fun readRenderFrame (Lio/github/ketraterm/render/api/TerminalRenderFrameConsumer;)V
+	public fun readRenderFrameForAbsoluteRange (JJLio/github/ketraterm/render/api/TerminalRenderFrameConsumer;)V
+}
+
+public final class io/github/ketraterm/render/api/TerminalRenderFrameReader$DefaultImpls {
+	public static fun readRenderFrame (Lio/github/ketraterm/render/api/TerminalRenderFrameReader;IILio/github/ketraterm/render/api/TerminalRenderFrameConsumer;)V
+	public static fun readRenderFrame (Lio/github/ketraterm/render/api/TerminalRenderFrameReader;ILio/github/ketraterm/render/api/TerminalRenderFrameConsumer;)V
+	public static fun readRenderFrameForAbsoluteRange (Lio/github/ketraterm/render/api/TerminalRenderFrameReader;JJLio/github/ketraterm/render/api/TerminalRenderFrameConsumer;)V
+}
+
+public final class io/github/ketraterm/render/api/TerminalRenderUnderline {
+	public static final field CURLY I
+	public static final field DASHED I
+	public static final field DOTTED I
+	public static final field DOUBLE I
+	public static final field INSTANCE Lio/github/ketraterm/render/api/TerminalRenderUnderline;
+	public static final field NONE I
+	public static final field SINGLE I
+}
+
