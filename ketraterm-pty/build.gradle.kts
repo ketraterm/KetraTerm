@@ -31,7 +31,7 @@ dependencies {
     api(project(":ketraterm-session"))
     implementation(project(":ketraterm-transport-api"))
     api("org.jetbrains.pty4j:pty4j:0.13.13")
-    implementation("net.java.dev.jna:jna:5.14.0")
+    implementation("net.java.dev.jna:jna:5.19.1")
 
     testImplementation(kotlin("test"))
     testImplementation(project(":ketraterm-shell-integration"))
