@@ -349,13 +349,14 @@ class TerminalShellCommandLineSourceTest {
     fun `startup submission without a selected integration is rejected before assembly`() =
         runTest {
             val connector = MockConnector()
-            // Deliberately lacks a render reader: argument validation must precede assembly.
-            val terminal = object : TerminalBuffer by TerminalBuffers.create(30, 3) {}
+            val renderReader = TerminalBuffers.create(30, 3)
+            val terminal = object : TerminalBuffer by renderReader {}
             val dispatcher = StandardTestDispatcher(testScheduler)
             val failure =
                 assertThrows(IllegalArgumentException::class.java) {
                     TerminalSession.create(
                         terminal = terminal,
+                        renderReader = renderReader,
                         connector = connector,
                         startupCommand = TerminalStartupCommand("echo startup"),
                         workerDispatcher = dispatcher,

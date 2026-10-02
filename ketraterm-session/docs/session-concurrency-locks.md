@@ -34,7 +34,7 @@ A slow connector backpressures bulk encoding on the I/O worker. Producers can co
 
 ## Acceptance and lifecycle
 
-Input methods return after admission, not transport completion. For ordinary input this includes encoding/copying; for paste and replacement it includes source retention and mode/policy capture. Startup `SUBMITTED` also means queue acceptance. The connector contract is unchanged: each `write` synchronously consumes or copies the supplied bytes. Embedders supplying a custom input encoder retain synchronous invocation and own its output sink; `TerminalSession.create` wires the standard shared writer.
+Input methods return after admission, not transport completion. For ordinary input this includes encoding/copying; for paste and replacement it includes source retention and mode/policy capture. Startup `SUBMITTED` also means queue acceptance. Each connector `write` synchronously consumes or copies the supplied bytes. Custom encoder factories receive the same session-owned output paths and create independent admission and bulk instances; their calls and policy updates are serialized per instance, while the two instances may run concurrently. Rejected policy updates leave the session policy and reported Backarrow default unchanged.
 
 `state` retains `Created`, `Running`, or `Closed`. Budget exhaustion and native write failure use `Closed.event.failure`, close the connector, discard pending output, and cancel session children. A failed transport write may already have sent a prefix; no bytes are retried.
 

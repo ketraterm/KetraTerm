@@ -37,8 +37,7 @@ import io.github.ketraterm.core.state.TerminalState
  */
 internal class DefaultTerminalBuffer private constructor(
     private val components: Components,
-) : TerminalBuffer,
-    io.github.ketraterm.render.api.TerminalRenderFrameReader,
+) : TerminalRenderBuffer,
     TerminalReader by TerminalReaderImpl(components.state),
     TerminalWriter by BufferWriter(components.state, components.mutationEngine, components.cursorEngine),
     TerminalCursor by TerminalCursorImpl(components.state, components.cursorEngine),

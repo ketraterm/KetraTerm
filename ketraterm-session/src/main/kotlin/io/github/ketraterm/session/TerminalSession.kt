@@ -15,18 +15,17 @@
  */
 package io.github.ketraterm.session
 
-import io.github.ketraterm.core.api.TerminalBuffer
-import io.github.ketraterm.core.api.TerminalHostResponseReader
-import io.github.ketraterm.core.api.TerminalInputState
-import io.github.ketraterm.core.api.TerminalModeSnapshot
+import io.github.ketraterm.core.api.*
 import io.github.ketraterm.host.*
 import io.github.ketraterm.input.TerminalInputEncoders
 import io.github.ketraterm.input.api.TerminalInputEncoder
+import io.github.ketraterm.input.api.TerminalInputEncoderFactory
 import io.github.ketraterm.input.event.*
 import io.github.ketraterm.input.policy.BackspacePolicy
 import io.github.ketraterm.input.policy.PasteControlPolicy
 import io.github.ketraterm.input.policy.TerminalInputPolicy
 import io.github.ketraterm.parser.api.TerminalOutputParser
+import io.github.ketraterm.parser.api.TerminalOutputParserFactory
 import io.github.ketraterm.parser.api.TerminalParsers
 import io.github.ketraterm.protocol.NotificationLevel
 import io.github.ketraterm.protocol.ShellIntegrationEvent
@@ -60,7 +59,8 @@ import kotlin.time.TimeSource
  * UTF-16/deletion units, including active work. One writer preserves order.
  * Returning from input methods means acceptance, not transport completion. Queue
  * exhaustion or transport failure closes the session with [failure]; closing a
- * session discards pending output. A supplied [inputEncoder] owns its output sink.
+ * session discards pending output. Custom encoders bind to session-owned mode
+ * sources and output sinks through [TerminalInputEncoderFactory].
  *
  * A session publishes one active render viewport. Independently scrolling
  * views of the same session are unsupported: each new viewport request replaces
@@ -92,7 +92,7 @@ public class TerminalSession private constructor(
     private val responseReader: TerminalHostResponseReader,
     private val connector: TerminalConnector,
     private val parser: TerminalOutputParser,
-    inputEncoder: TerminalInputEncoder? = null,
+    private val inputEncoderFactory: TerminalInputEncoderFactory? = null,
     private val hyperlinkResolver: TerminalHyperlinkResolver = TerminalHyperlinkResolver.NONE,
     private val outboundWriteLock: Any = Any(),
     private val hostCommandAdapter: HostCommandAdapter? = null,
@@ -115,9 +115,9 @@ public class TerminalSession private constructor(
      *
      * [terminal], [renderReader], [responseReader], and [parser] must operate on
      * the same core state; adapters around that state are permitted. The session
-     * owns their exclusive runtime access and closes the parser and connector.
-     * [renderPublisher] must have no other writer. A custom [inputEncoder] retains
-     * ownership of its output sink and must preserve the connector's write order.
+     * owns their exclusive runtime access, finalizes parser EOF, and closes the connector.
+     * [renderPublisher] must have no other writer. [inputEncoderFactory] creates
+     * separate admission and streaming encoders bound to session-owned output.
      * A supplied [hostCommandAdapter] must be the adapter used by [parser]; it
      * receives session host-policy, theme-palette, and Backarrow-default changes.
      * Custom parsers supplied without this adapter own their host-policy updates
@@ -130,7 +130,7 @@ public class TerminalSession private constructor(
         responseReader: TerminalHostResponseReader,
         connector: TerminalConnector,
         parser: TerminalOutputParser,
-        inputEncoder: TerminalInputEncoder? = null,
+        inputEncoderFactory: TerminalInputEncoderFactory? = null,
         hyperlinkResolver: TerminalHyperlinkResolver = TerminalHyperlinkResolver.NONE,
         hostCommandAdapter: HostCommandAdapter? = null,
         inputPolicy: TerminalInputPolicy = TerminalInputPolicy(),
@@ -143,7 +143,7 @@ public class TerminalSession private constructor(
         responseReader,
         connector,
         parser,
-        inputEncoder,
+        inputEncoderFactory,
         hyperlinkResolver,
         Any(),
         hostCommandAdapter,
@@ -183,23 +183,30 @@ public class TerminalSession private constructor(
                 CoroutineName("terminal-session-${SESSION_COUNTER.getAndIncrement()}"),
         )
     private val outboundWriter = OutboundWriter(connector, outboundWriteLock)
-    private val ownsInputEncoder = inputEncoder == null
     private val inputEncoder =
-        inputEncoder ?: TerminalInputEncoders.create(
-            terminal,
+        createInputEncoder(
+            object : TerminalInputState {
+                override fun getInputModeBits(): Long {
+                    check(Thread.holdsLock(outboundWriteLock)) { "Modes are available only during input encoding" }
+                    return terminal.getInputModeBits()
+                }
+            },
             object : SessionTerminalHostOutput() {
                 override fun writeBytes(
                     bytes: ByteArray,
                     offset: Int,
                     length: Int,
-                ) = outboundWriter.append(bytes, offset, length)
+                ) {
+                    check(Thread.holdsLock(outboundWriteLock)) { "Output is available only during input encoding" }
+                    outboundWriter.append(bytes, offset, length)
+                }
             },
             inputPolicy,
         )
 
     // Only the outbound worker uses this mode word, encoder, and its scratch.
     private var bulkInputModeBits = 0L
-    private val streamingOutput by lazy(LazyThreadSafetyMode.NONE) {
+    private val streamingOutput =
         object : SessionTerminalHostOutput() {
             override fun writeBytes(
                 bytes: ByteArray,
@@ -207,20 +214,32 @@ public class TerminalSession private constructor(
                 length: Int,
             ) {
                 if (isSessionClosed()) throw CancellationException("Terminal session closed")
+                check(connectorStarted) { "Output is unavailable before session start" }
                 sessionJob.ensureActive()
                 connector.write(bytes, offset, length)
             }
         }
-    }
     private var clipboardReads: ClipboardReadHandler? = null
-    private val bulkInputEncoder by lazy(LazyThreadSafetyMode.NONE) {
-        TerminalInputEncoders.create(
+    private val bulkInputEncoder =
+        createInputEncoder(
             object : TerminalInputState {
-                override fun getInputModeBits(): Long = bulkInputModeBits
+                override fun getInputModeBits(): Long {
+                    check(connectorStarted) { "Modes are unavailable before session start" }
+                    return bulkInputModeBits
+                }
             },
             streamingOutput,
-        )
-    }
+            inputPolicy,
+        ).also {
+            require(it !== inputEncoder) { "inputEncoderFactory must create independent encoder instances" }
+        }
+
+    private fun createInputEncoder(
+        modes: TerminalInputState,
+        output: io.github.ketraterm.protocol.host.TerminalHostOutput,
+        policy: TerminalInputPolicy,
+    ): TerminalInputEncoder = inputEncoderFactory?.create(modes, output, policy) ?: TerminalInputEncoders.create(modes, output, policy)
+
     private val mutableState = MutableStateFlow<TerminalSessionState>(TerminalSessionState.Created)
     private val mutableRenderGeneration = runtime.renderGeneration
 
@@ -562,13 +581,14 @@ public class TerminalSession private constructor(
      * Serializes with outbound encoding and publishes the Backarrow default for
      * mode queries. This monitor protects encoding and admission only; a blocked
      * connector never holds it.
+     * Encoder rejection propagates without changing the session policy or mode-report default.
      *
      * @param policy new input policy.
      */
     override fun setInputPolicy(policy: TerminalInputPolicy) {
         synchronized(outboundWriteLock) {
-            inputPolicy = policy
             inputEncoder.setInputPolicy(policy)
+            inputPolicy = policy
             hostCommandAdapter?.setDefaultBackarrowSendsBackspace(
                 policy.backspacePolicy == BackspacePolicy.BACKSPACE,
             )
@@ -587,8 +607,8 @@ public class TerminalSession private constructor(
     public fun setPasteControlPolicy(policy: PasteControlPolicy) {
         synchronized(outboundWriteLock) {
             val next = inputPolicy.copy(pasteControlPolicy = policy)
-            inputPolicy = next
             inputEncoder.setInputPolicy(next)
+            inputPolicy = next
         }
     }
 
@@ -617,7 +637,7 @@ public class TerminalSession private constructor(
     /**
      * Accepts a paste for background encoding and writing unless closed.
      * Captures modes and policy at admission; retains the immutable source text
-     * within the session bulk budget. A supplied encoder remains synchronous.
+     * within the session bulk budget. Custom encoders use the same writer path.
      *
      * Input before [start] is ignored.
      */
@@ -648,13 +668,6 @@ public class TerminalSession private constructor(
         cancelStartup: Boolean,
         crossinline encode: TerminalInputEncoder.() -> Unit,
     ) {
-        if (!ownsInputEncoder) {
-            withInputLock {
-                if (cancelStartup) startupSubmission?.cancel(TerminalStartupCommandStatus.CANCELLED_BY_INPUT)
-                encode()
-            }
-            return
-        }
         try {
             synchronized(outboundWriteLock) {
                 if (!isAcceptingInput()) return
@@ -1059,10 +1072,60 @@ public class TerminalSession private constructor(
         private fun unpackViewportRows(request: Long): Int = request.toInt()
 
         /**
-         * Creates a production session with the standard parser, host
-         * sink, and default input encoder.
+         * Assembles a production session from a buffer exposing core and render roles.
          *
-         * @param terminal render-capable core buffer transferred to the session's exclusive runtime ownership.
+         * Uses the same services and customization factories as the separate-reader
+         * overload. Ownership transfers only after successful construction.
+         * Custom factories must not perform I/O or start jobs during construction.
+         */
+        @JvmStatic
+        @JvmOverloads
+        public fun create(
+            terminal: TerminalRenderBuffer,
+            connector: TerminalConnector,
+            hostEvents: HostEventSink = HostEventSink.NONE,
+            hostPolicy: HostPolicy = HostPolicy(),
+            inputPolicy: TerminalInputPolicy = TerminalInputPolicy(),
+            kittyKeyboardSupportedFlags: Int = KittyKeyboardProgressiveFlag.DEFAULT_HOST_SUPPORTED_MASK,
+            workerDispatcher: CoroutineDispatcher = Dispatchers.Default,
+            startupCommand: TerminalStartupCommand? = null,
+            ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
+            modeReportCapabilities: Int = 0,
+            clipboardReader: TerminalClipboardReader? = null,
+            clipboardReadTimeSource: TimeSource = TimeSource.Monotonic,
+            shellIntegration: TerminalShellIntegrationFactory? = null,
+            inputEncoderFactory: TerminalInputEncoderFactory? = null,
+            parserFactory: TerminalOutputParserFactory? = null,
+        ): TerminalSession =
+            create(
+                terminal = terminal,
+                renderReader = terminal,
+                connector = connector,
+                hostEvents = hostEvents,
+                hostPolicy = hostPolicy,
+                inputPolicy = inputPolicy,
+                kittyKeyboardSupportedFlags = kittyKeyboardSupportedFlags,
+                workerDispatcher = workerDispatcher,
+                startupCommand = startupCommand,
+                ioDispatcher = ioDispatcher,
+                modeReportCapabilities = modeReportCapabilities,
+                clipboardReader = clipboardReader,
+                clipboardReadTimeSource = clipboardReadTimeSource,
+                shellIntegration = shellIntegration,
+                inputEncoderFactory = inputEncoderFactory,
+                parserFactory = parserFactory,
+            )
+
+        /**
+         * Assembles core and render collaborators with session-owned host services.
+         *
+         * Dimensions are validated before factory calls or connector ownership
+         * transfer. The collaborators must describe the same terminal state; equal
+         * dimensions alone cannot establish that relationship. Factory failures
+         * leave the connector with its caller and start no session workers.
+         *
+         * @param terminal core buffer transferred to the session's exclusive runtime ownership.
+         * @param renderReader render projection of the same core state.
          * @param connector transport connector transferred to the session; closed on every terminal lifecycle path.
          * @param hostEvents metadata events target.
          * @param hostPolicy safety policy.
@@ -1080,14 +1143,18 @@ public class TerminalSession private constructor(
          *   Deterministic tests should share its time domain with the worker dispatcher's delay scheduler.
          *   This does not change the fixed read timeout or other session timers.
          * @param shellIntegration sole shell metadata producer; null leaves shell features unavailable.
+         * @param inputEncoderFactory creates independent admission and bulk encoders bound to session-owned output.
+         * @param parserFactory customizes parsing using the assembled host sink and its live clipboard budget.
          * @throws IllegalArgumentException when [startupCommand] is supplied without [shellIntegration].
-         * @throws IllegalArgumentException when [terminal] does not implement [TerminalRenderFrameReader].
+         * @throws IllegalArgumentException when the initial render frame is absent or has incompatible dimensions,
+         * or the input factory reuses one encoder instance.
          * @return standard production terminal session.
          */
         @JvmStatic
         @JvmOverloads
         public fun create(
             terminal: TerminalBuffer,
+            renderReader: TerminalRenderFrameReader,
             connector: TerminalConnector,
             hostEvents: HostEventSink = HostEventSink.NONE,
             hostPolicy: HostPolicy = HostPolicy(),
@@ -1100,15 +1167,21 @@ public class TerminalSession private constructor(
             clipboardReader: TerminalClipboardReader? = null,
             clipboardReadTimeSource: TimeSource = TimeSource.Monotonic,
             shellIntegration: TerminalShellIntegrationFactory? = null,
+            inputEncoderFactory: TerminalInputEncoderFactory? = null,
+            parserFactory: TerminalOutputParserFactory? = null,
         ): TerminalSession {
             require(startupCommand == null || shellIntegration != null) {
                 "startupCommand requires a shell integration that supplies prompt readiness"
             }
             val outboundWriteLock = Any()
-            val renderReader =
-                requireNotNull(terminal as? TerminalRenderFrameReader) {
-                    "terminal must implement TerminalRenderFrameReader"
+            var suppliedFrame = false
+            renderReader.readRenderFrame { frame ->
+                require(frame.columns == terminal.width && frame.rows == terminal.height) {
+                    "renderReader dimensions must match terminal dimensions"
                 }
+                suppliedFrame = true
+            }
+            require(suppliedFrame) { "renderReader must supply an initial frame" }
             val renderPublisher = TerminalRenderPublisher(terminal.width, terminal.height)
             val runtime = SessionRuntime(renderReader, renderPublisher, shellIntegration)
             val recordingHostEvents =
@@ -1126,7 +1199,9 @@ public class TerminalSession private constructor(
                     modeReportCapabilities = modeReportCapabilities,
                     defaultBackarrowSendsBackspace = inputPolicy.backspacePolicy == BackspacePolicy.BACKSPACE,
                 )
-            val parser = TerminalParsers.create(sink, clipboardWriteLimitBytes = sink::clipboardWriteLimitBytes)
+            val parser =
+                parserFactory?.create(sink, sink::clipboardWriteLimitBytes)
+                    ?: TerminalParsers.create(sink, clipboardWriteLimitBytes = sink::clipboardWriteLimitBytes)
 
             val session =
                 TerminalSession(
@@ -1135,6 +1210,7 @@ public class TerminalSession private constructor(
                     responseReader = terminal,
                     connector = connector,
                     parser = parser,
+                    inputEncoderFactory = inputEncoderFactory,
                     hyperlinkResolver = TerminalHyperlinkResolver(sink::hyperlinkUri),
                     outboundWriteLock = outboundWriteLock,
                     hostCommandAdapter = sink,

@@ -17,9 +17,11 @@ package io.github.ketraterm.session
 
 import io.github.ketraterm.core.TerminalBuffers
 import io.github.ketraterm.core.api.TerminalBuffer
+import io.github.ketraterm.core.api.TerminalRenderBuffer
 import io.github.ketraterm.host.*
 import io.github.ketraterm.input.api.TerminalInputEncoder
 import io.github.ketraterm.input.event.*
+import io.github.ketraterm.input.policy.TerminalInputPolicy
 import io.github.ketraterm.parser.api.TerminalOutputParser
 import io.github.ketraterm.parser.api.TerminalParsers
 import io.github.ketraterm.protocol.keyboard.KittyKeyboardProgressiveFlag
@@ -1330,7 +1332,7 @@ class TerminalSessionTest {
                 responseReader = terminal,
                 connector = connector,
                 parser = parser,
-                inputEncoder = NoOpInputEncoder,
+                inputEncoderFactory = noOpInputEncoderFactory,
                 ioDispatcher = UnconfinedTestDispatcher(),
             )
 
@@ -1369,7 +1371,7 @@ class TerminalSessionTest {
                 responseReader = terminal,
                 connector = connector,
                 parser = RecordingParser(),
-                inputEncoder = NoOpInputEncoder,
+                inputEncoderFactory = noOpInputEncoderFactory,
                 hyperlinkResolver =
                     { id ->
                         if (id == 42) "https://example.com" else null
@@ -1397,7 +1399,7 @@ class TerminalSessionTest {
                 responseReader = terminal,
                 connector = connector,
                 parser = RecordingParser(),
-                inputEncoder = NoOpInputEncoder,
+                inputEncoderFactory = noOpInputEncoderFactory,
                 ioDispatcher = UnconfinedTestDispatcher(),
             )
 
@@ -1423,7 +1425,7 @@ class TerminalSessionTest {
                     responseReader = terminal,
                     connector = connector,
                     parser = RecordingParser(),
-                    inputEncoder = NoOpInputEncoder,
+                    inputEncoderFactory = noOpInputEncoderFactory,
                     workerDispatcher = StandardTestDispatcher(testScheduler),
                     ioDispatcher = UnconfinedTestDispatcher(),
                 )
@@ -1518,7 +1520,7 @@ class TerminalSessionTest {
                     responseReader = terminal,
                     connector = connector,
                     parser = RecordingParser(),
-                    inputEncoder = NoOpInputEncoder,
+                    inputEncoderFactory = noOpInputEncoderFactory,
                     workerDispatcher = StandardTestDispatcher(testScheduler),
                     ioDispatcher = UnconfinedTestDispatcher(),
                 )
@@ -1549,7 +1551,7 @@ class TerminalSessionTest {
                     responseReader = terminal,
                     connector = connector,
                     parser = RecordingParser(),
-                    inputEncoder = NoOpInputEncoder,
+                    inputEncoderFactory = noOpInputEncoderFactory,
                     workerDispatcher = dispatcher,
                     ioDispatcher = UnconfinedTestDispatcher(),
                 )
@@ -1591,7 +1593,7 @@ class TerminalSessionTest {
                     responseReader = terminal,
                     connector = connector,
                     parser = RecordingParser(),
-                    inputEncoder = NoOpInputEncoder,
+                    inputEncoderFactory = noOpInputEncoderFactory,
                     workerDispatcher = dispatcher,
                     ioDispatcher = UnconfinedTestDispatcher(),
                 )
@@ -1624,7 +1626,7 @@ class TerminalSessionTest {
                     responseReader = terminal,
                     connector = connector,
                     parser = RecordingParser(),
-                    inputEncoder = NoOpInputEncoder,
+                    inputEncoderFactory = noOpInputEncoderFactory,
                     workerDispatcher = StandardTestDispatcher(testScheduler),
                     ioDispatcher = UnconfinedTestDispatcher(),
                 )
@@ -1661,7 +1663,7 @@ class TerminalSessionTest {
                     responseReader = terminal,
                     connector = connector,
                     parser = RecordingParser(),
-                    inputEncoder = NoOpInputEncoder,
+                    inputEncoderFactory = noOpInputEncoderFactory,
                     workerDispatcher = StandardTestDispatcher(testScheduler),
                     ioDispatcher = UnconfinedTestDispatcher(),
                 )
@@ -1699,7 +1701,7 @@ class TerminalSessionTest {
                     responseReader = terminal,
                     connector = connector,
                     parser = RecordingParser(),
-                    inputEncoder = NoOpInputEncoder,
+                    inputEncoderFactory = noOpInputEncoderFactory,
                     workerDispatcher = StandardTestDispatcher(testScheduler),
                     ioDispatcher = UnconfinedTestDispatcher(),
                 )
@@ -1755,7 +1757,7 @@ class TerminalSessionTest {
                 responseReader = terminal,
                 connector = connector,
                 parser = parser,
-                inputEncoder = NoOpInputEncoder,
+                inputEncoderFactory = noOpInputEncoderFactory,
                 workerDispatcher = StandardTestDispatcher(),
                 ioDispatcher = UnconfinedTestDispatcher(),
             )
@@ -1857,7 +1859,7 @@ class TerminalSessionTest {
                 responseReader = terminal,
                 connector = connector,
                 parser = parser,
-                inputEncoder = NoOpInputEncoder,
+                inputEncoderFactory = noOpInputEncoderFactory,
                 workerDispatcher = StandardTestDispatcher(),
                 ioDispatcher = UnconfinedTestDispatcher(),
             )
@@ -1920,7 +1922,7 @@ class TerminalSessionTest {
                 responseReader = terminal,
                 connector = connector,
                 parser = parser,
-                inputEncoder = NoOpInputEncoder,
+                inputEncoderFactory = noOpInputEncoderFactory,
                 workerDispatcher = StandardTestDispatcher(),
                 ioDispatcher = UnconfinedTestDispatcher(),
             )
@@ -1971,7 +1973,7 @@ class TerminalSessionTest {
         rows: Int = 3,
         hostEvents: HostEventSink = HostEventSink.NONE,
         hostPolicy: HostPolicy = HostPolicy(),
-        terminal: TerminalBuffer = TerminalBuffers.create(width = columns, height = rows),
+        terminal: TerminalRenderBuffer = TerminalBuffers.create(width = columns, height = rows),
     ): TerminalSession {
         val session =
             TerminalSession.create(
@@ -2174,13 +2176,18 @@ class TerminalSessionTest {
         ) = Unit
     }
 
-    private object NoOpInputEncoder : TerminalInputEncoder {
-        override fun encodeKey(event: TerminalKeyEvent) = Unit
+    private val noOpInputEncoderFactory =
+        io.github.ketraterm.input.api.TerminalInputEncoderFactory { _, _, _ ->
+            object : TerminalInputEncoder {
+                override fun encodeKey(event: TerminalKeyEvent) = Unit
 
-        override fun encodePaste(event: TerminalPasteEvent) = Unit
+                override fun encodePaste(event: TerminalPasteEvent) = Unit
 
-        override fun encodeFocus(event: TerminalFocusEvent) = Unit
+                override fun encodeFocus(event: TerminalFocusEvent) = Unit
 
-        override fun encodeMouse(event: TerminalMouseEvent) = Unit
-    }
+                override fun encodeMouse(event: TerminalMouseEvent) = Unit
+
+                override fun setInputPolicy(policy: TerminalInputPolicy) = Unit
+            }
+        }
 }

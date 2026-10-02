@@ -250,15 +250,12 @@ The [IntelliJ embedding audit](reviews/intellij-embedding-audit-2026-09-27.md) d
 
 The [2026-10-02 API design review](reviews/terminal-api-design-review-2026-10-02.md)
 extends G01 with usability, extension and stable-major evolution findings, identified
-as A01–A12. The initial compatibility baseline remains complete; these decisions
-and reproduced defects remain open before the final API freeze. E04's independent
+as A01–A12. The initial compatibility baseline remains complete; the remaining
+decisions and reproduced defects below are open before the final API freeze. E04's independent
 renderer proposal remains outside scope.
 
-- `TODO(session/input)`: A01 — resolve already-bound custom encoder injection. Only the default encoder joins session-owned queued output; custom encoding must have a usable ordering and policy-update contract, or leave the public assembly API. Standard session encoding is unaffected.
 - `TODO(policy)`: A02 — choose stable construction/evolution shapes for growing configuration and host-service values. Retain useful immutable value semantics and verify actual additions against old Kotlin default/copy and Java callers; do not append data-class properties and treat a new snapshot as compatibility proof.
 - `TODO(ui)`: A03 — expose authoritative EDT cell-to-component geometry for independently owned IDE popups. Decide whether automatic suggestion coordination must also target host-owned presenters; the existing view factory replaces an embedded component only. No renderer extraction is required.
-- `TODO(core/session)`: A04 — make the standard buffer/session render-capability requirement explicit in types or assembly arguments, preserving separate roles for custom implementations and ownership rejection before transport transfer.
-- `TODO(session/parser)`: A05 — decide whether parser substitution can retain normal clipboard, startup and resize coordination. If supported, supply the normally assembled services to parser creation; otherwise document the advanced assembly boundary explicitly.
 - `TODO(policy)`: A06 — distinguish external implementer contracts from library-produced views and retain concrete Kotlin/Java SPI implementations. New semantic families need explicit compatible capability/unsupported behavior, not new abstract methods or silent no-ops on old contracts.
 - `TODO(render/policy)`: A07 — settle how public inline render leasing commits publisher bookkeeping before freeze. Either retain the representation deliberately or move bookkeeping behind measured non-inline operations; verify old compiled readers under concurrency and callback failure.
 - `TODO(ui/host/profile)`: A10 — document completion-context callback threading and choose the provider failure-reporting boundary for IDE diagnostics. Preserve cancellation, stale-result isolation and cleanup; wrappers remain a viable explicit host-owned policy.

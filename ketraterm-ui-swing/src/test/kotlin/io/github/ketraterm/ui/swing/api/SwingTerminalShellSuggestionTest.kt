@@ -989,6 +989,8 @@ class SwingTerminalShellSuggestionTest {
     }
 
     private class RecordingInputEncoder : TerminalInputEncoder {
+        override fun setInputPolicy(policy: io.github.ketraterm.input.policy.TerminalInputPolicy) = Unit
+
         val keys = ArrayList<TerminalKeyEvent>()
         val pastes = ArrayList<TerminalPasteEvent>()
         val replacements = ArrayList<TerminalTextReplacementEvent>()

@@ -6,6 +6,10 @@ It uses coroutines for lifecycle orchestration, synchronized-output timeout hand
 
 OSC 52 reads use an optional session-bound suspending provider. Session owns the deadline, permission revalidation, one active request, and a bounded owned reply; product hosts supply consent and native access. Missing providers return an empty reply when terminal responses are permitted.
 
+`TerminalBuffers.create` returns `TerminalRenderBuffer`, combining core and render capabilities. Hosts with separate collaborators use `TerminalSession.create(terminal, renderReader, connector)`; both must describe the same state. Initial render dimensions are checked before connector ownership transfers.
+
+Customization belongs in normal assembly: `inputEncoderFactory` creates independent admission and bulk encoders using session-supplied modes, ordered output, and policy. Both instances must honor policy updates. `parserFactory` receives the assembled command sink and its live clipboard-write budget, preserving clipboard reads, startup, shell events, and resize coordination. Factories create fresh instances without I/O or jobs; failed construction leaves the connector with its caller. The low-level constructor retains caller-owned parser mapping.
+
 ## Runtime model
 
 - `TerminalSession.state` retains `Created`, `Running`, or `Closed(TerminalSessionCloseEvent)`.

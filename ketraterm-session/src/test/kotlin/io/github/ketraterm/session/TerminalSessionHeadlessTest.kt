@@ -18,6 +18,7 @@ package io.github.ketraterm.session
 import io.github.ketraterm.core.TerminalBuffers
 import io.github.ketraterm.core.api.TerminalBuffer
 import io.github.ketraterm.core.api.TerminalInputState
+import io.github.ketraterm.core.api.TerminalRenderBuffer
 import io.github.ketraterm.input.event.*
 import io.github.ketraterm.input.policy.EnterNewLineModePolicy
 import io.github.ketraterm.input.policy.PasteControlPolicy
@@ -205,7 +206,7 @@ class TerminalSessionHeadlessTest {
         columns: Int = 10,
         rows: Int = 3,
         inputPolicy: TerminalInputPolicy = TerminalInputPolicy(),
-        terminal: TerminalBuffer = TerminalBuffers.create(width = columns, height = rows),
+        terminal: TerminalRenderBuffer = TerminalBuffers.create(width = columns, height = rows),
     ): TerminalSession {
         val session = TerminalSession.create(terminal, connector, inputPolicy = inputPolicy, ioDispatcher = UnconfinedTestDispatcher())
         session.start(columns, rows)
@@ -255,13 +256,13 @@ class TerminalSessionHeadlessTest {
     }
 
     @Test
-    fun `standard session rejects a buffer without render frame access before starting the connector`() {
+    fun `separate render reader preserves a delegated core buffer`() {
         val connector = MockConnector()
         val terminal = TerminalBuffers.create(width = 10, height = 3)
         val nonRenderingBuffer = object : TerminalBuffer by terminal {}
 
-        assertThrows(IllegalArgumentException::class.java) {
-            TerminalSession.create(nonRenderingBuffer, connector)
+        TerminalSession.create(nonRenderingBuffer, terminal, connector).use { session ->
+            session.readRenderFrame { frame -> assertEquals(10, frame.columns) }
         }
         assertEquals(0, connector.startCount)
         assertTrue(connector.resizeCalls.isEmpty())

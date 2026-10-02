@@ -15,6 +15,14 @@
  */
 package consumer;
 
+import io.github.ketraterm.core.TerminalBuffers;
+import io.github.ketraterm.input.TerminalInputEncoders;
+import io.github.ketraterm.input.api.TerminalInputEncoderFactory;
+import io.github.ketraterm.parser.api.TerminalOutputParserFactory;
+import io.github.ketraterm.parser.api.TerminalParsers;
+import io.github.ketraterm.render.api.TerminalRenderFrameReader;
+import io.github.ketraterm.session.TerminalSession;
+import io.github.ketraterm.transport.TerminalConnector;
 import io.github.ketraterm.host.TerminalClipboardReadRequest;
 import io.github.ketraterm.host.TerminalClipboardReadAuditEvent;
 import io.github.ketraterm.input.TerminalClipboardReply;
@@ -32,6 +40,24 @@ import java.util.concurrent.atomic.AtomicInteger;
 import javax.swing.SwingUtilities;
 
 public final class JavaConsumer {
+    public static TerminalInputEncoderFactory inputEncoderFactory() {
+        return TerminalInputEncoders::create;
+    }
+
+    public static TerminalOutputParserFactory parserFactory() {
+        return TerminalParsers::create;
+    }
+
+    public static void verifySessionConstruction(TerminalConnector connector) {
+        var buffer = TerminalBuffers.create(80, 3);
+        TerminalRenderFrameReader reader = buffer;
+        try (var session = TerminalSession.create(buffer, reader, connector)) {
+            session.readRenderFrame(frame -> {
+                if (frame.getColumns() != 80 || frame.getRows() != 3) throw new AssertionError("Java render capability");
+            });
+        }
+    }
+
     public static void verify() throws Exception {
         verifyClipboardReply();
         try (var metadata = SwingTerminal.class.getResourceAsStream("/META-INF/io.github.ketraterm_ketraterm-ui-swing.kotlin_module")) {

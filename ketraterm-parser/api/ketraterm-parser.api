@@ -10,6 +10,10 @@ public final class io/github/ketraterm/parser/api/TerminalOutputParser$DefaultIm
 	public static synthetic fun accept$default (Lio/github/ketraterm/parser/api/TerminalOutputParser;[BIIILjava/lang/Object;)V
 }
 
+public abstract interface class io/github/ketraterm/parser/api/TerminalOutputParserFactory {
+	public abstract fun create (Lio/github/ketraterm/parser/spi/TerminalCommandSink;Lkotlin/jvm/functions/Function0;)Lio/github/ketraterm/parser/api/TerminalOutputParser;
+}
+
 public final class io/github/ketraterm/parser/api/TerminalParsers {
 	public static final field INSTANCE Lio/github/ketraterm/parser/api/TerminalParsers;
 	public static final fun create (Lio/github/ketraterm/parser/spi/TerminalCommandSink;)Lio/github/ketraterm/parser/api/TerminalOutputParser;

@@ -18,6 +18,8 @@ package io.github.ketraterm.session
 import io.github.ketraterm.core.TerminalBuffers
 import io.github.ketraterm.host.*
 import io.github.ketraterm.input.event.TerminalKeyEvent
+import io.github.ketraterm.parser.api.TerminalOutputParserFactory
+import io.github.ketraterm.parser.api.TerminalParsers
 import io.github.ketraterm.testkit.MockConnector
 import kotlinx.coroutines.*
 import kotlinx.coroutines.test.*
@@ -31,8 +33,9 @@ import kotlin.time.TimeSource
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class TerminalSessionClipboardReadTest {
-    @Test
-    fun `UTF-8 byte limit applies to complete replies and rejected reads release the next query`() =
+    @ParameterizedTest
+    @ValueSource(booleans = [false, true])
+    fun `UTF-8 byte limit applies to complete replies and rejected reads release the next query`(customParser: Boolean) =
         runTest {
             val cases =
                 listOf(
@@ -43,7 +46,15 @@ class TerminalSessionClipboardReadTest {
                     "ok" to "b2s=",
                 )
             var reads = 0
-            Fixture(this, limit = 6, reader = TerminalClipboardReader { TerminalClipboardReadResult.Text(cases[reads++].first) }).use { f ->
+            Fixture(
+                this,
+                customParser = customParser,
+                limit = 6,
+                reader =
+                    TerminalClipboardReader {
+                        TerminalClipboardReadResult.Text(cases[reads++].first)
+                    },
+            ).use { f ->
                 val expected = StringBuilder()
                 for ((text, base64) in cases) {
                     f.query()
@@ -102,8 +113,9 @@ class TerminalSessionClipboardReadTest {
             }
         }
 
-    @Test
-    fun `real OSC queries preserve normalized selectors and accept every byte split`() =
+    @ParameterizedTest
+    @ValueSource(booleans = [false, true])
+    fun `real OSC queries preserve normalized selectors and accept every byte split`(customParser: Boolean) =
         runTest {
             for (query in listOf("\u001b]52;ppccsp;?\u0007", "\u001b]52;;?\u001b\\")) {
                 val bytes = query.toByteArray()
@@ -111,6 +123,7 @@ class TerminalSessionClipboardReadTest {
                     val requests = mutableListOf<TerminalClipboardReadRequest>()
                     Fixture(
                         this,
+                        customParser = customParser,
                         reader =
                             TerminalClipboardReader {
                                 requests += it
@@ -130,8 +143,9 @@ class TerminalSessionClipboardReadTest {
             }
         }
 
-    @Test
-    fun `permissions and invalid selectors gate native access and all failure replies`() =
+    @ParameterizedTest
+    @ValueSource(booleans = [false, true])
+    fun `permissions and invalid selectors gate native access and all failure replies`(customParser: Boolean) =
         runTest {
             for (response in HostControlPolicy.entries) {
                 for (permission in TerminalClipboardPermission.entries) {
@@ -140,6 +154,7 @@ class TerminalSessionClipboardReadTest {
                         this,
                         permission,
                         response,
+                        customParser = customParser,
                         reader =
                             TerminalClipboardReader {
                                 reads++
@@ -160,7 +175,11 @@ class TerminalSessionClipboardReadTest {
                     }
                 }
             }
-            Fixture(this, reader = TerminalClipboardReader { fail("Malformed query reached provider") }).use { f ->
+            Fixture(
+                this,
+                customParser = customParser,
+                reader = TerminalClipboardReader { fail("Malformed query reached provider") },
+            ).use { f ->
                 f.connector.feedFromHost("\u001b]52;cx;?\u0007".toByteArray())
                 runCurrent()
                 assertEquals("", f.output())
@@ -274,13 +293,15 @@ class TerminalSessionClipboardReadTest {
             }
         }
 
-    @Test
-    fun `deadline retires data while cancelled native work continues to occupy the slot`() =
+    @ParameterizedTest
+    @ValueSource(booleans = [false, true])
+    fun `deadline retires data while cancelled native work continues to occupy the slot`(customParser: Boolean) =
         runTest {
             val releaseNative = CompletableDeferred<Unit>()
             var reads = 0
             Fixture(
                 this,
+                customParser = customParser,
                 reader =
                     TerminalClipboardReader {
                         reads++
@@ -426,6 +447,7 @@ class TerminalSessionClipboardReadTest {
         reader: TerminalClipboardReader? = null,
         ioDispatcher: CoroutineDispatcher = StandardTestDispatcher(scope.testScheduler),
         timeSource: TimeSource = scope.testScheduler.timeSource,
+        customParser: Boolean = false,
     ) : AutoCloseable {
         val connector = MockConnector()
         val admissions = mutableListOf<TerminalClipboardAuditEvent>()
@@ -456,6 +478,7 @@ class TerminalSessionClipboardReadTest {
                     ioDispatcher = ioDispatcher,
                     clipboardReader = reader,
                     clipboardReadTimeSource = timeSource,
+                    parserFactory = if (customParser) TerminalOutputParserFactory(TerminalParsers::create) else null,
                 ).also { it.start(10, 3) }
 
         fun query() = connector.feedFromHost("\u001b]52;c;?\u0007".toByteArray())

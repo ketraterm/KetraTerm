@@ -38,6 +38,8 @@ The core does not own:
 
 ## Public API surfaces
 
+`TerminalBuffers.create` returns `TerminalRenderBuffer`, which combines `TerminalBuffer` and `TerminalRenderFrameReader` for the same state. Headless implementations may expose `TerminalBuffer` alone; rendering remains a separate role. Neither interface adds synchronization.
+
 `TerminalBuffer` composes these narrower contracts:
 
 - `TerminalWriter`

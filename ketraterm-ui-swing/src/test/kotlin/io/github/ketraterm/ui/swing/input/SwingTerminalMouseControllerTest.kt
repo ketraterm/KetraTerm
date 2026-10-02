@@ -507,6 +507,8 @@ class SwingTerminalMouseControllerTest {
         )
 
     private class RecordingInputEncoder : TerminalInputEncoder {
+        override fun setInputPolicy(policy: io.github.ketraterm.input.policy.TerminalInputPolicy) = Unit
+
         val encodedKeys = ArrayList<TerminalKeyEvent>()
 
         override fun encodeKey(event: TerminalKeyEvent) {

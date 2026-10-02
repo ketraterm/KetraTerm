@@ -23,8 +23,8 @@ package io.github.ketraterm.input.api
  * host output sink.
  *
  * The default factory implementation requires external serialization of calls and
- * policy updates. Custom encoders document their own concurrency guarantees; a session
- * serializes calls but cannot take ownership of a custom encoder's output sink.
+ * policy updates. Sessions bind custom encoders through [TerminalInputEncoderFactory]
+ * to session-owned mode state and ordered output, and serialize each instance's calls.
  */
 public interface TerminalInputEncoder {
     /**
@@ -95,7 +95,10 @@ public interface TerminalInputEncoder {
     /**
      * Updates the input policy dynamically.
      *
+     * Implementations must apply the policy before returning. A session serializes
+     * this call with encoding; an unsupported update must fail before changing state.
+     *
      * @param policy new input policy.
      */
-    public fun setInputPolicy(policy: io.github.ketraterm.input.policy.TerminalInputPolicy) {}
+    public fun setInputPolicy(policy: io.github.ketraterm.input.policy.TerminalInputPolicy)
 }

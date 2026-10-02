@@ -16,6 +16,8 @@
 package io.github.ketraterm.session
 
 import io.github.ketraterm.core.TerminalBuffers
+import io.github.ketraterm.input.TerminalInputEncoders
+import io.github.ketraterm.input.api.TerminalInputEncoderFactory
 import io.github.ketraterm.input.event.TerminalKey
 import io.github.ketraterm.input.event.TerminalKeyEvent
 import io.github.ketraterm.input.event.TerminalPasteEvent
@@ -43,8 +45,9 @@ import java.util.concurrent.TimeUnit
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class TerminalSessionOutboundTest {
-    @Test
-    fun `queued replacements retain modes policy and Unicode transformations at admission`() =
+    @ParameterizedTest
+    @ValueSource(booleans = [false, true])
+    fun `queued replacements retain modes policy and Unicode transformations at admission`(customEncoder: Boolean) =
         runTest {
             val connector = MockConnector()
             val dispatcher = StandardTestDispatcher(testScheduler)
@@ -53,6 +56,7 @@ class TerminalSessionOutboundTest {
                 .create(
                     TerminalBuffers.create(10, 3),
                     connector,
+                    inputEncoderFactory = if (customEncoder) TerminalInputEncoderFactory(TerminalInputEncoders::create) else null,
                     inputPolicy = policy,
                     workerDispatcher = dispatcher,
                     ioDispatcher = dispatcher,
@@ -80,8 +84,9 @@ class TerminalSessionOutboundTest {
                 }
         }
 
-    @Test
-    fun `paste larger than the byte queue streams before later input and replies`() =
+    @ParameterizedTest
+    @ValueSource(booleans = [false, true])
+    fun `paste larger than the byte queue streams before later input and replies`(customEncoder: Boolean) =
         runTest {
             val text = "x".repeat(OutboundWriter.MAX_QUEUED_BYTES + 1)
             val expected = ("\u001b[200~" + text + "\u001b[201~z\u001b[0n").toByteArray()
@@ -106,6 +111,7 @@ class TerminalSessionOutboundTest {
                 .create(
                     TerminalBuffers.create(10, 3),
                     connector,
+                    inputEncoderFactory = if (customEncoder) TerminalInputEncoderFactory(TerminalInputEncoders::create) else null,
                     workerDispatcher = dispatcher,
                     ioDispatcher = dispatcher,
                 ).use { session ->
@@ -228,8 +234,9 @@ class TerminalSessionOutboundTest {
                 }
         }
 
-    @Test
-    fun `partial transport failure closes once and discards remaining output`() =
+    @ParameterizedTest
+    @ValueSource(booleans = [false, true])
+    fun `partial transport failure closes once and discards remaining output`(customEncoder: Boolean) =
         runTest {
             val delegate = MockConnector()
             val failure = IOException("partial write")
@@ -249,6 +256,7 @@ class TerminalSessionOutboundTest {
                 TerminalSession.create(
                     TerminalBuffers.create(10, 3),
                     connector,
+                    inputEncoderFactory = if (customEncoder) TerminalInputEncoderFactory(TerminalInputEncoders::create) else null,
                     workerDispatcher = dispatcher,
                     ioDispatcher = dispatcher,
                 )
@@ -265,8 +273,9 @@ class TerminalSessionOutboundTest {
             assertEquals(1, delegate.closeCount)
         }
 
-    @Test
-    fun `close discards output that has not started`() =
+    @ParameterizedTest
+    @ValueSource(booleans = [false, true])
+    fun `close discards output that has not started`(customEncoder: Boolean) =
         runTest {
             val connector = MockConnector()
             val dispatcher = StandardTestDispatcher(testScheduler)
@@ -274,6 +283,7 @@ class TerminalSessionOutboundTest {
                 TerminalSession.create(
                     TerminalBuffers.create(10, 3),
                     connector,
+                    inputEncoderFactory = if (customEncoder) TerminalInputEncoderFactory(TerminalInputEncoders::create) else null,
                     workerDispatcher = dispatcher,
                     ioDispatcher = dispatcher,
                 )
@@ -285,8 +295,9 @@ class TerminalSessionOutboundTest {
             assertEquals(1, connector.closeCount)
         }
 
-    @Test
-    fun `blocked transport permits input parser and policy work and preserves operation order`() {
+    @ParameterizedTest
+    @ValueSource(booleans = [false, true])
+    fun `blocked transport permits input parser and policy work and preserves operation order`(customEncoder: Boolean) {
         val text = "x".repeat(40000)
         val expected = "a\u001b[200~" + text + "\u001b[201~" + "\u001b[0n".repeat(800) + "\u001b[?67;1\$y\u0008z"
         val connector = BlockingConnector(expected.length)
@@ -296,6 +307,7 @@ class TerminalSessionOutboundTest {
                 TerminalSession.create(
                     terminal,
                     connector,
+                    inputEncoderFactory = if (customEncoder) TerminalInputEncoderFactory(TerminalInputEncoders::create) else null,
                     workerDispatcher = StandardTestDispatcher(),
                     ioDispatcher = io,
                 )
@@ -362,8 +374,9 @@ class TerminalSessionOutboundTest {
         }
     }
 
-    @Test
-    fun `active bulk write permits producers and preserves its captured framing`() {
+    @ParameterizedTest
+    @ValueSource(booleans = [false, true])
+    fun `active bulk write permits producers and preserves its captured framing`(customEncoder: Boolean) {
         val text = "x".repeat(40000)
         val expected = "\u001b[200~" + text + "\u001b[201~\u001b[0ntailz"
         val connector = BlockingConnector(expected.length)
@@ -373,6 +386,7 @@ class TerminalSessionOutboundTest {
                 TerminalSession.create(
                     terminal,
                     connector,
+                    inputEncoderFactory = if (customEncoder) TerminalInputEncoderFactory(TerminalInputEncoders::create) else null,
                     workerDispatcher = StandardTestDispatcher(),
                     ioDispatcher = io,
                 )
@@ -401,8 +415,9 @@ class TerminalSessionOutboundTest {
         }
     }
 
-    @Test
-    fun `close stops active bulk encoding and discards following operations`() {
+    @ParameterizedTest
+    @ValueSource(booleans = [false, true])
+    fun `close stops active bulk encoding and discards following operations`(customEncoder: Boolean) {
         val connector = BlockingConnector(1)
         val executor = Executors.newSingleThreadExecutor()
         executor.asCoroutineDispatcher().use { io ->
@@ -410,6 +425,7 @@ class TerminalSessionOutboundTest {
                 TerminalSession.create(
                     TerminalBuffers.create(10, 3),
                     connector,
+                    inputEncoderFactory = if (customEncoder) TerminalInputEncoderFactory(TerminalInputEncoders::create) else null,
                     workerDispatcher = StandardTestDispatcher(),
                     ioDispatcher = io,
                 )

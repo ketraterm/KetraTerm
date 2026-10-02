@@ -6,6 +6,7 @@ Release notes for library consumers and embedders. Product-specific changes are 
 
 ### Improvements and fixes
 
+- Bound custom session encoders to ordered output and preserved session services with parser factories. Made render capabilities explicit; consumers must recompile for the revised construction signatures.
 - Made suggestion and dialog lists unmodifiable from Java and rejected overflowing projection ranges before mutation.
 - Preserve application cursor shapes in unfocused Swing terminals: blocks become thin hollow outlines, while bars and underlines remain steady. Device-aligned beams and underlines keep thickness consistent across panes at fractional display scales. Focus restores application blinking; cursor visibility, wide-cell ownership, bidi placement, and blinking-text behavior are preserved.
 - Reworked hyperlink retention and discovery to preserve prepared links through scrolling and focus changes, keep ordered filters from consuming unused rows, and validate hover and activation against the displayed occurrence. Hosts can configure OSC 8 styles and direct or modifier activation through immutable Swing settings; link cursors reflect activation eligibility.

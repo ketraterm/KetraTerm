@@ -43,6 +43,8 @@ External UI code should construct normalized events and call the encoder from
 the serialized terminal event loop. It should not reach into specialized
 implementation encoders.
 
+`TerminalInputEncoderFactory` binds custom encoders to a host-supplied mode source, output, and initial policy. Sessions create independent admission and bulk instances; each instance's calls are serialized, and instances may run concurrently. `setInputPolicy` is required: apply an update before returning, or reject it before changing encoder state. Only encoding calls may read the supplied modes or write output.
+
 ## Event Contract
 
 For every event:

@@ -1,8 +1,8 @@
 public final class io/github/ketraterm/core/TerminalBuffers {
 	public static final field INSTANCE Lio/github/ketraterm/core/TerminalBuffers;
-	public static final fun create (II)Lio/github/ketraterm/core/api/TerminalBuffer;
-	public static final fun create (III)Lio/github/ketraterm/core/api/TerminalBuffer;
-	public static synthetic fun create$default (IIIILjava/lang/Object;)Lio/github/ketraterm/core/api/TerminalBuffer;
+	public static final fun create (II)Lio/github/ketraterm/core/api/TerminalRenderBuffer;
+	public static final fun create (III)Lio/github/ketraterm/core/api/TerminalRenderBuffer;
+	public static synthetic fun create$default (IIIILjava/lang/Object;)Lio/github/ketraterm/core/api/TerminalRenderBuffer;
 }
 
 public abstract interface class io/github/ketraterm/core/api/TerminalBuffer : io/github/ketraterm/core/api/TerminalCursor, io/github/ketraterm/core/api/TerminalInspector, io/github/ketraterm/core/api/TerminalModeController, io/github/ketraterm/core/api/TerminalModeReader, io/github/ketraterm/core/api/TerminalReader, io/github/ketraterm/core/api/TerminalResponseChannel, io/github/ketraterm/core/api/TerminalWriter {
@@ -278,6 +278,16 @@ public abstract interface class io/github/ketraterm/core/api/TerminalReader {
 	public abstract fun getWidth ()I
 	public abstract fun getWindowTitle ()Ljava/lang/String;
 	public abstract fun isAlternateScreenActive ()Z
+}
+
+public abstract interface class io/github/ketraterm/core/api/TerminalRenderBuffer : io/github/ketraterm/core/api/TerminalBuffer, io/github/ketraterm/render/api/TerminalRenderFrameReader {
+}
+
+public final class io/github/ketraterm/core/api/TerminalRenderBuffer$DefaultImpls {
+	public static fun getInputModeBits (Lio/github/ketraterm/core/api/TerminalRenderBuffer;)J
+	public static fun readRenderFrame (Lio/github/ketraterm/core/api/TerminalRenderBuffer;IILio/github/ketraterm/render/api/TerminalRenderFrameConsumer;)V
+	public static fun readRenderFrame (Lio/github/ketraterm/core/api/TerminalRenderBuffer;ILio/github/ketraterm/render/api/TerminalRenderFrameConsumer;)V
+	public static fun readRenderFrameForAbsoluteRange (Lio/github/ketraterm/core/api/TerminalRenderBuffer;JJLio/github/ketraterm/render/api/TerminalRenderFrameConsumer;)V
 }
 
 public abstract interface class io/github/ketraterm/core/api/TerminalResponseChannel : io/github/ketraterm/core/api/TerminalHostResponseReader {

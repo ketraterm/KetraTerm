@@ -16,6 +16,8 @@
 package consumer
 
 import io.github.ketraterm.core.TerminalBuffers
+import io.github.ketraterm.core.api.TerminalBuffer
+import io.github.ketraterm.core.api.TerminalRenderBuffer
 import io.github.ketraterm.host.TerminalClipboardPermission
 import io.github.ketraterm.host.TerminalClipboardReadAuditEvent
 import io.github.ketraterm.host.TerminalClipboardReadOutcome
@@ -59,6 +61,7 @@ private const val ROWS = 3
 fun main() =
     runBlocking {
         JavaConsumer.verify()
+        JavaConsumer.verifySessionConstruction(ConsumerConnector())
         val selection = checkNotNull(TerminalClipboardSelection.parse("cp"))
         JavaConsumer.verifyClipboardCallbacks(
             TerminalClipboardReadRequest(selection, TerminalClipboardPermission.ALLOW, 16),
@@ -68,7 +71,19 @@ fun main() =
         val detector = ConsumerHyperlinkDetector()
         val commandLine = MutableStateFlow<TerminalShellCommandLineSnapshot?>(TerminalShellCommandLineSnapshot("help", 4, 4, 0))
         val shell = TerminalShellIntegrationFactory.host(TerminalShellIntegrationState(), commandLine)
-        TerminalSession.create(TerminalBuffers.create(COLUMNS, ROWS), connector, shellIntegration = shell).use { session ->
+        val backing = TerminalBuffers.create(COLUMNS, ROWS)
+        val renderBuffer: TerminalRenderBuffer = object : TerminalRenderBuffer by backing {}
+        val coreOnly: TerminalBuffer = object : TerminalBuffer by renderBuffer {}
+        val assembledSession =
+            TerminalSession.create(
+                coreOnly,
+                renderBuffer,
+                connector,
+                shellIntegration = shell,
+                inputEncoderFactory = JavaConsumer.inputEncoderFactory(),
+                parserFactory = JavaConsumer.parserFactory(),
+            )
+        assembledSession.use { session ->
             check(session.activeShellCommandLine() == commandLine.value)
             commandLine.value = null
             check(session.activeShellCommandLine() == null)
