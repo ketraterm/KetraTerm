@@ -4,6 +4,9 @@ KetraTerm's published JVM libraries are intended for Kotlin and Java hosts.
 The tracked API snapshots are a reviewed development baseline, not a claim that
 earlier 0.x releases were binary compatible. Starting at 1.0, releases within
 one major version preserve supported source, binary and behavioral contracts.
+The [API design review](reviews/terminal-api-design-review-2026-10-02.md) tracks
+the remaining construction, extension and evolution decisions before selecting
+that stable public shape; the current baseline does not freeze those decisions.
 
 ## Supported boundary
 
