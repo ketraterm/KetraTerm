@@ -597,6 +597,8 @@ public class TerminalShellIntegrationState(
      * @param destination destination `Long` columns.
      * @param destinationOffset first destination slot.
      * @return true when a complete output range was copied.
+     * @throws IllegalArgumentException if the destination slice is invalid,
+     *   before writing any slots, even when the record has no selectable output.
      */
     public fun copyCommandOutputRange(
         recordId: Int,
@@ -604,7 +606,7 @@ public class TerminalShellIntegrationState(
         destinationOffset: Int = 0,
     ): Boolean {
         require(destinationOffset >= 0) { "destinationOffset must be >= 0, was $destinationOffset" }
-        require(destinationOffset + TerminalShellIntegrationCommandOutputRange.REQUIRED_LONGS <= destination.size) {
+        require(TerminalShellIntegrationCommandOutputRange.REQUIRED_LONGS <= destination.size - destinationOffset) {
             "destination is too small for offset=$destinationOffset size=${destination.size}"
         }
         if (recordId == TerminalShellIntegrationCommandRecord.NONE) return false
@@ -642,6 +644,8 @@ public class TerminalShellIntegrationState(
      * @param destination destination `Long` columns.
      * @param destinationOffset first destination slot.
      * @return true when a complete command block was copied.
+     * @throws IllegalArgumentException if the destination slice is invalid,
+     *   before writing any slots, even when the record has no selectable block.
      */
     public fun copyCommandBlockRange(
         recordId: Int,
@@ -649,7 +653,7 @@ public class TerminalShellIntegrationState(
         destinationOffset: Int = 0,
     ): Boolean {
         require(destinationOffset >= 0) { "destinationOffset must be >= 0, was $destinationOffset" }
-        require(destinationOffset + TerminalShellIntegrationCommandBlockRange.REQUIRED_LONGS <= destination.size) {
+        require(TerminalShellIntegrationCommandBlockRange.REQUIRED_LONGS <= destination.size - destinationOffset) {
             "destination is too small for offset=$destinationOffset size=${destination.size}"
         }
         if (recordId == TerminalShellIntegrationCommandRecord.NONE) return false
@@ -809,6 +813,9 @@ public class TerminalShellIntegrationState(
      * @param destinationOffset first destination index in all destination arrays.
      * @param maxRecords maximum number of destination records to clear and copy.
      * @return number of actual records copied.
+     * @throws IllegalArgumentException if the offset, count, or any destination
+     *   slice is invalid, before clearing or writing any destination. Zero-count
+     *   slices may start at the end of every destination array.
      */
     public fun copyRecords(
         recordIds: IntArray,
@@ -823,25 +830,25 @@ public class TerminalShellIntegrationState(
     ): Int {
         require(destinationOffset >= 0) { "destinationOffset must be >= 0, was $destinationOffset" }
         require(maxRecords >= 0) { "maxRecords must be >= 0, was $maxRecords" }
-        require(destinationOffset + maxRecords <= recordIds.size) {
+        require(maxRecords <= recordIds.size - destinationOffset) {
             "recordIds is too small for offset=$destinationOffset maxRecords=$maxRecords size=${recordIds.size}"
         }
-        require(destinationOffset + maxRecords <= lifecycleStates.size) {
+        require(maxRecords <= lifecycleStates.size - destinationOffset) {
             "lifecycleStates is too small for offset=$destinationOffset maxRecords=$maxRecords size=${lifecycleStates.size}"
         }
-        require(destinationOffset + maxRecords <= promptStartLineIds.size) {
+        require(maxRecords <= promptStartLineIds.size - destinationOffset) {
             "promptStartLineIds is too small for offset=$destinationOffset maxRecords=$maxRecords size=${promptStartLineIds.size}"
         }
-        require(destinationOffset + maxRecords <= promptEndLineIds.size) {
+        require(maxRecords <= promptEndLineIds.size - destinationOffset) {
             "promptEndLineIds is too small for offset=$destinationOffset maxRecords=$maxRecords size=${promptEndLineIds.size}"
         }
-        require(destinationOffset + maxRecords <= commandStartLineIds.size) {
+        require(maxRecords <= commandStartLineIds.size - destinationOffset) {
             "commandStartLineIds is too small for offset=$destinationOffset maxRecords=$maxRecords size=${commandStartLineIds.size}"
         }
-        require(destinationOffset + maxRecords <= commandEndLineIds.size) {
+        require(maxRecords <= commandEndLineIds.size - destinationOffset) {
             "commandEndLineIds is too small for offset=$destinationOffset maxRecords=$maxRecords size=${commandEndLineIds.size}"
         }
-        require(destinationOffset + maxRecords <= exitCodes.size) {
+        require(maxRecords <= exitCodes.size - destinationOffset) {
             "exitCodes is too small for offset=$destinationOffset maxRecords=$maxRecords size=${exitCodes.size}"
         }
 
@@ -894,6 +901,9 @@ public class TerminalShellIntegrationState(
      *   a projected command record.
      * @param failedCommandRails optional destination flags for failed-command output rows.
      * @param destinationOffset first destination index in all destination arrays.
+     * @throws IllegalArgumentException if the offset, row count, or any array
+     *   slice is invalid, before clearing or writing any destination. Zero-row
+     *   slices may start at the end of every destination array.
      */
     public fun copyViewport(
         lineIds: LongArray,
@@ -911,22 +921,22 @@ public class TerminalShellIntegrationState(
             "lineIds is too small for rowCount=$rowCount size=${lineIds.size}"
         }
         require(destinationOffset >= 0) { "destinationOffset must be >= 0, was $destinationOffset" }
-        require(destinationOffset + rowCount <= promptStarts.size) {
+        require(rowCount <= promptStarts.size - destinationOffset) {
             "promptStarts is too small for offset=$destinationOffset rowCount=$rowCount size=${promptStarts.size}"
         }
-        require(destinationOffset + rowCount <= commandStarts.size) {
+        require(rowCount <= commandStarts.size - destinationOffset) {
             "commandStarts is too small for offset=$destinationOffset rowCount=$rowCount size=${commandStarts.size}"
         }
-        require(destinationOffset + rowCount <= commandEnds.size) {
+        require(rowCount <= commandEnds.size - destinationOffset) {
             "commandEnds is too small for offset=$destinationOffset rowCount=$rowCount size=${commandEnds.size}"
         }
-        require(destinationOffset + rowCount <= commandRecordIds.size) {
+        require(rowCount <= commandRecordIds.size - destinationOffset) {
             "commandRecordIds is too small for offset=$destinationOffset rowCount=$rowCount size=${commandRecordIds.size}"
         }
-        require(destinationOffset + rowCount <= commandLifecycleStates.size) {
+        require(rowCount <= commandLifecycleStates.size - destinationOffset) {
             "commandLifecycleStates is too small for offset=$destinationOffset rowCount=$rowCount size=${commandLifecycleStates.size}"
         }
-        require(failedCommandRails == null || destinationOffset + rowCount <= failedCommandRails.size) {
+        require(failedCommandRails == null || rowCount <= failedCommandRails.size - destinationOffset) {
             "failedCommandRails is too small for offset=$destinationOffset rowCount=$rowCount size=${failedCommandRails?.size}"
         }
 

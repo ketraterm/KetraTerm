@@ -15,6 +15,8 @@
  */
 package io.github.ketraterm.ui.swing.host
 
+import java.util.*
+
 /**
  * Plain-text content and choices for a standard product dialog. Both presenters
  * return the chosen option index, or null for Escape, window close or disposal.
@@ -33,8 +35,8 @@ public class SwingDialogRequest(
     /** Standard platform message icon. */
     public enum class Severity { INFORMATION, WARNING, ERROR }
 
-    /** Button labels in result-index order. */
-    public val options: List<String> = options.toList()
+    /** Defensively copied button labels in result-index order; Java mutation attempts throw [UnsupportedOperationException]. */
+    public val options: List<String> = Collections.unmodifiableList(options.toList())
 
     init {
         require(title.isNotBlank()) { "Dialog title must not be blank" }
