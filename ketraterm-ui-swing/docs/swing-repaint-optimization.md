@@ -25,7 +25,10 @@ does not invalidate unchanged row permutations or replace column scratch.
   damaged rows are combined into one repaint region. Comparing search
   projections examines viewport segments, without traversing retained history.
 * **Cursor:** Cursor changes repaint both old and new visual cell bounds, unless
-  those rows are already covered by row damage.
+  those rows are already covered by row damage. Focus changes repaint only the
+  current visual cursor bounds. Inactive blocks become thin hollow outlines;
+  bars and underlines keep their shape. Inactive cursors skip cursor-only blink
+  damage; the shared timer continues to invalidate SGR blinking text.
 * **Full surface:** Shape, buffer, and viewport mapping changes require a full
   repaint. Callers may also force one for changes such as terminal chrome.
 

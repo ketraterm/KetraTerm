@@ -25,6 +25,7 @@ import io.github.ketraterm.ui.swing.settings.SwingMetrics
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.params.ParameterizedTest
 import org.junit.jupiter.params.provider.CsvSource
+import org.junit.jupiter.params.provider.EnumSource
 import org.junit.jupiter.params.provider.ValueSource
 import java.awt.RenderingHints
 import java.awt.image.BufferedImage
@@ -84,6 +85,37 @@ class TerminalBidiRenderingTest {
         val image = paint(selection = CellSelection(0, 0, 1, 0))
         assertEquals(TEST_BLUE, image.getRGB(1, 1))
         assertTrue(image.getRGB(metrics.cellWidth * 2 + 1, 1) != TEST_RED)
+    }
+
+    @ParameterizedTest
+    @EnumSource(TerminalRenderCursorShape::class)
+    fun `unfocused cursor preserves its shape rtl geometry and selected text`(shape: TerminalRenderCursorShape) {
+        val selection = CellSelection(0, 0, 1, 0)
+        val baseline = paint(selection = selection)
+        val image =
+            paint(
+                cursor = TerminalRenderCursor(0, 0, true, true, shape, 1),
+                selection = selection,
+                terminalFocused = false,
+                cursorBlinkVisible = false,
+            )
+        val start = 2 * metrics.cellWidth
+        for (y in 0 until image.height) {
+            for (x in 0 until image.width) {
+                val cursorPixel =
+                    x >= start &&
+                        when (shape) {
+                            TerminalRenderCursorShape.BLOCK -> x == start || x == image.width - 1 || y == 0 || y == image.height - 1
+                            TerminalRenderCursorShape.BAR -> x < start + metrics.cursorStrokeWidth
+                            TerminalRenderCursorShape.UNDERLINE -> y >= image.height - metrics.cursorStrokeWidth
+                        }
+                assertEquals(
+                    if (cursorPixel) settings.palette.cursorBackground else baseline.getRGB(x, y),
+                    image.getRGB(x, y),
+                    "Pixel ($x, $y)",
+                )
+            }
+        }
     }
 
     @Test
@@ -170,6 +202,8 @@ class TerminalBidiRenderingTest {
         selection: CellSelection? = null,
         highlights: TerminalSearchViewportHighlights? = null,
         textAntialiasing: Any = settings.textAntialiasing,
+        terminalFocused: Boolean = true,
+        cursorBlinkVisible: Boolean = true,
     ): BufferedImage {
         val cache =
             renderCache(
@@ -208,7 +242,8 @@ class TerminalBidiRenderingTest {
                 metrics,
                 image.width,
                 image.height,
-                cursorBlinkVisible = true,
+                cursorBlinkVisible = cursorBlinkVisible,
+                terminalFocused = terminalFocused,
                 selection = selection,
                 searchHighlights = highlights,
             )

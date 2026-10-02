@@ -35,12 +35,16 @@ import kotlinx.coroutines.test.StandardTestDispatcher
 import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
+import org.junit.jupiter.params.ParameterizedTest
+import org.junit.jupiter.params.provider.EnumSource
 import java.awt.event.FocusEvent
 import java.awt.event.KeyEvent
+import java.awt.image.BufferedImage
 import javax.swing.JComponent
 import javax.swing.JFrame
 import javax.swing.RepaintManager
 import javax.swing.SwingUtilities
+import kotlin.test.assertEquals
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class SwingTerminalCursorBlinkTest {
@@ -104,30 +108,101 @@ class SwingTerminalCursorBlinkTest {
         }
     }
 
-    @Test
-    fun `cursor presentation follows terminal focus`() {
-        val component = SwingTerminal()
+    @ParameterizedTest
+    @EnumSource(TerminalRenderCursorShape::class)
+    fun `focus transitions restore latest application cursor and preserve hidden cursors`(shape: TerminalRenderCursorShape) {
+        val terminal = TerminalBuffers.create(width = 3, height = 1, maxHistory = 1)
+        val session =
+            TerminalSession(
+                terminal = terminal,
+                renderPublisher = TerminalRenderPublisher(3, 1),
+                renderReader = terminal as TerminalRenderFrameReader,
+                responseReader = terminal,
+                connector = NoOpConnector,
+                parser = NoOpParser,
+                inputEncoder = NoOpInputEncoder,
+                workerDispatcher = dispatcher,
+            )
+        session.use {
+            SwingUtilities.invokeAndWait {
+                val settings =
+                    SwingSettings(
+                        cursorBlinkMillis = 0,
+                        cursorShape = TerminalRenderCursorShape.BAR,
+                        padding = SwingPadding(),
+                        shellIntegrationDecorationGutterWidth = 0,
+                    )
+                val component = SwingTerminal(settingsProvider = { settings })
+                component.size = component.preferredGridSize(3, 1)
+                val cellWidth = component.width / 3
+                val cellHeight = component.height
 
-        SwingUtilities.invokeAndWait {
-            component.cursorBlinkVisible = true
-        }
-        assertFalse(component.cursorPresentationEnabled)
+                fun paint(): BufferedImage {
+                    val image = BufferedImage(component.width, component.height, BufferedImage.TYPE_INT_ARGB)
+                    val graphics = image.createGraphics()
+                    try {
+                        component.paint(graphics)
+                    } finally {
+                        graphics.dispose()
+                    }
+                    return image
+                }
 
-        SwingUtilities.invokeAndWait {
-            val focusEvent = FocusEvent(component, FocusEvent.FOCUS_GAINED)
-            for (listener in component.focusListeners) {
-                listener.focusGained(focusEvent)
+                fun focus(gained: Boolean) {
+                    val event = FocusEvent(component, if (gained) FocusEvent.FOCUS_GAINED else FocusEvent.FOCUS_LOST, true)
+                    for (listener in component.focusListeners) {
+                        if (gained) listener.focusGained(event) else listener.focusLost(event)
+                    }
+                }
+
+                fun publish() {
+                    session.requestRender(scrollbackOffset = 0)
+                    dispatcher.scheduler.runCurrent()
+                }
+                try {
+                    component.bind(session)
+                    publish()
+                    assertEquals(settings.palette.cursorBackground, paint().getRGB(0, 0))
+                    assertEquals(settings.palette.defaultBackground, paint().getRGB(cellWidth / 2, cellHeight / 2))
+
+                    focus(true)
+                    component.cursorBlinkVisible = false
+                    focus(false)
+                    assertEquals(settings.palette.cursorBackground, paint().getRGB(0, 0))
+
+                    terminal.positionCursor(1, 0)
+                    terminal.setCursorShape(shape)
+                    terminal.setCursorBlinking(true)
+                    publish()
+                    component.cursorBlinkVisible = false
+                    assertEquals(settings.palette.defaultBackground, paint().getRGB(0, 0))
+                    val cursorY = if (shape == TerminalRenderCursorShape.UNDERLINE) cellHeight - 1 else 0
+                    assertEquals(settings.palette.cursorBackground, paint().getRGB(cellWidth, cursorY))
+                    assertEquals(settings.palette.defaultBackground, paint().getRGB(cellWidth + cellWidth / 2, cellHeight / 2))
+
+                    focus(true)
+                    assertTrue(component.cursorBlinkVisible)
+                    val focused = paint()
+                    assertEquals(settings.palette.cursorBackground, focused.getRGB(cellWidth, cursorY))
+                    val interiorColor =
+                        when (shape) {
+                            TerminalRenderCursorShape.BLOCK -> settings.palette.cursorBackground
+                            TerminalRenderCursorShape.BAR, TerminalRenderCursorShape.UNDERLINE -> settings.palette.defaultBackground
+                        }
+                    assertEquals(interiorColor, focused.getRGB(cellWidth + cellWidth / 2, cellHeight / 2))
+
+                    terminal.setCursorVisible(false)
+                    publish()
+                    for (gained in listOf(false, true)) {
+                        focus(gained)
+                        assertEquals(settings.palette.defaultBackground, paint().getRGB(cellWidth, cursorY))
+                    }
+                    assertFalse(component.cursorTimer.isRunning)
+                } finally {
+                    component.dispose()
+                }
             }
         }
-        assertTrue(component.cursorPresentationEnabled)
-
-        SwingUtilities.invokeAndWait {
-            val focusEvent = FocusEvent(component, FocusEvent.FOCUS_LOST)
-            for (listener in component.focusListeners) {
-                listener.focusLost(focusEvent)
-            }
-        }
-        assertFalse(component.cursorPresentationEnabled)
     }
 
     @Test

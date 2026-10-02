@@ -23,16 +23,26 @@ import io.github.ketraterm.ui.swing.render.cache.AwtColorCache
 import io.github.ketraterm.ui.swing.render.visualCellRangeSpan
 import io.github.ketraterm.ui.swing.render.visualCellRangeStart
 import io.github.ketraterm.ui.swing.settings.SwingMetrics
+import java.awt.BasicStroke
 import java.awt.Graphics2D
 import java.awt.font.FontRenderContext
+import java.awt.geom.Rectangle2D
+import kotlin.math.roundToInt
 
 /**
- * Paints terminal cursor shapes and block-cursor foreground text.
+ * Paints application cursor shapes, replacing inactive blocks with steady outlines.
+ * Inactive bars and underlines retain their shape without blinking.
+ * Inactive outlines preserve the row's existing text, background, and overlays.
  */
 internal class TerminalCursorPainter(
     private val colorCache: AwtColorCache,
     private val textPainter: TerminalTextPainter,
 ) {
+    private val cursorBounds = Rectangle2D.Double()
+
+    // A device hairline stays uniformly thin even at fractional display scales.
+    private val outlineStroke = BasicStroke(0f)
+
     /**
      * Paints the current cursor from [cache].
      */
@@ -44,10 +54,10 @@ internal class TerminalCursorPainter(
         cursorBlinkVisible: Boolean,
         textBlinkVisible: Boolean,
         fontRenderContext: FontRenderContext,
-        cursorVisible: Boolean = true,
+        terminalFocused: Boolean = true,
         bidi: TerminalBidiLayout.Row? = null,
     ) {
-        if (!cursorVisible || !cache.cursorVisible || (cache.cursorBlinking && !cursorBlinkVisible)) return
+        if (!cache.cursorVisible || (terminalFocused && cache.cursorBlinking && !cursorBlinkVisible)) return
         if (cache.cursorColumn !in 0 until cache.columns || cache.cursorRow !in 0 until cache.rows) return
 
         val cursorIndex = cache.rowOffset(cache.cursorRow) + cache.cursorColumn
@@ -60,34 +70,72 @@ internal class TerminalCursorPainter(
         val width = columnSpan * metrics.cellWidth
         g.color = colorCache.color(palette.cursorBackground)
 
-        when (cache.cursorShape) {
-            TerminalRenderCursorShape.BLOCK -> g.fillRect(x, y, width, metrics.cellHeight)
-            TerminalRenderCursorShape.UNDERLINE -> {
-                g.fillRect(
-                    x,
-                    y + metrics.cellHeight - metrics.cursorStrokeWidth,
-                    width,
-                    metrics.cursorStrokeWidth,
-                )
+        if (!terminalFocused && cache.cursorShape == TerminalRenderCursorShape.BLOCK) {
+            if (width == 1 || metrics.cellHeight == 1) {
+                g.fillRect(x, y, width, metrics.cellHeight)
+                return
             }
-            TerminalRenderCursorShape.BAR -> {
-                g.fillRect(x, y, metrics.cursorStrokeWidth, metrics.cellHeight)
+            // Inset the stroke center so its outer edge stays inside the cursor's repaint bounds.
+            cursorBounds.setRect(x + 0.5, y + 0.5, width - 1.0, metrics.cellHeight - 1.0)
+            val previousStroke = g.stroke
+            g.stroke = outlineStroke
+            try {
+                g.draw(cursorBounds)
+            } finally {
+                g.stroke = previousStroke
             }
+            return
         }
 
-        if (cache.cursorShape == TerminalRenderCursorShape.BLOCK) {
-            textPainter.paintCellForeground(
-                g = g,
-                cache = cache,
-                metrics = metrics,
-                column = startColumn,
-                row = cache.cursorRow,
-                columnSpan = columnSpan,
-                visualColumn = visualColumn,
-                foreground = palette.cursorForeground,
-                fontRenderContext = fontRenderContext,
-                textBlinkVisible = textBlinkVisible,
-            )
+        if (cache.cursorShape != TerminalRenderCursorShape.BLOCK) {
+            val transform = g.transform
+            val scaleX = transform.scaleX
+            val scaleY = transform.scaleY
+            if (transform.shearX == 0.0 && transform.shearY == 0.0 && scaleX > 0.0 && scaleY > 0.0) {
+                // Round thickness independently of position so split panes cannot gain or lose a pixel.
+                val left = (x * scaleX + transform.translateX).roundToInt()
+                val right = ((x + width) * scaleX + transform.translateX).roundToInt()
+                val top = (y * scaleY + transform.translateY).roundToInt()
+                val bottom = ((y + metrics.cellHeight) * scaleY + transform.translateY).roundToInt()
+                val bar = cache.cursorShape == TerminalRenderCursorShape.BAR
+                val cellWidth = maxOf(1, right - left)
+                val cellHeight = maxOf(1, bottom - top)
+                val strokeScale = if (bar) scaleX else scaleY
+                val strokeLimit = if (bar) cellWidth else cellHeight
+                val thickness = (metrics.cursorStrokeWidth * strokeScale).roundToInt().coerceIn(1, strokeLimit)
+                val deviceWidth = if (bar) thickness else cellWidth
+                val deviceHeight = if (bar) cellHeight else thickness
+                val deviceTop = if (bar) top else bottom - deviceHeight
+                cursorBounds.setRect(
+                    (left - transform.translateX) / scaleX,
+                    (deviceTop - transform.translateY) / scaleY,
+                    deviceWidth / scaleX,
+                    deviceHeight / scaleY,
+                )
+                g.fill(cursorBounds)
+            } else {
+                // Rotated or reflected hosts retain Java2D's ordinary transformed rectangle semantics.
+                if (cache.cursorShape == TerminalRenderCursorShape.BAR) {
+                    g.fillRect(x, y, metrics.cursorStrokeWidth, metrics.cellHeight)
+                } else {
+                    g.fillRect(x, y + metrics.cellHeight - metrics.cursorStrokeWidth, width, metrics.cursorStrokeWidth)
+                }
+            }
+            return
         }
+
+        g.fillRect(x, y, width, metrics.cellHeight)
+        textPainter.paintCellForeground(
+            g = g,
+            cache = cache,
+            metrics = metrics,
+            column = startColumn,
+            row = cache.cursorRow,
+            columnSpan = columnSpan,
+            visualColumn = visualColumn,
+            foreground = palette.cursorForeground,
+            fontRenderContext = fontRenderContext,
+            textBlinkVisible = textBlinkVisible,
+        )
     }
 }
