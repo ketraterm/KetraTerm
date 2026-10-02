@@ -329,10 +329,6 @@ The stationary cursor and active styling reconcile immediately. Cursor eligibili
 release/drag rules, authored-underline precedence and mouse-reporting precedence are
 shared interaction rules, not separate configuration switches.
 
-The [repair map](../docs/terminal-feature-gap-map.md#uri-highlighting-staged-repair)
-tracks remaining integration profiling and native desktop verification. Changelogs
-consolidate the completed user-facing repair.
-
 ## Consumer and ABI verification
 
 The [published consumer fixtures](../ketraterm-testkit/src/consumerTest/README.md)

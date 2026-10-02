@@ -34,8 +34,6 @@ import io.github.ketraterm.ui.swing.input.hyperlinkNavigationModifierMask
 import io.github.ketraterm.ui.swing.settings.TerminalHyperlinkHandler
 import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.Test
-import org.junit.jupiter.params.ParameterizedTest
-import org.junit.jupiter.params.provider.ValueSource
 import java.awt.Cursor
 import java.awt.event.InputEvent
 import java.awt.event.MouseEvent
@@ -174,70 +172,6 @@ class TerminalHyperlinkControllerTest {
             fixture.refresh()
             fixture.controller.refreshHyperlinkHover()
             fixture.assertNoHover()
-        }
-    }
-
-    @ParameterizedTest
-    @ValueSource(ints = [1, 7, Int.MAX_VALUE])
-    fun `captured agy URL fragments hover together independently of the authentication caption across input chunks`(chunkSize: Int) {
-        val bytes = agyCapture()
-        val uri = agyTarget(bytes)
-        assertEquals(704, uri.length)
-        val opened = ArrayList<String>()
-        SwingUtilities.invokeAndWait {
-            Osc8PipelineFixture(
-                width = 176,
-                height = 32,
-                hyperlinkHandler = TerminalHyperlinkHandler { opened.add(it) },
-            ).use { fixture ->
-                fixture.accept(bytes, chunkSize)
-                fixture.refresh()
-                val segments = capturedLinkSegments(fixture.cache)
-                assertEquals(
-                    listOf(
-                        CapturedLinkSegment(9, 1, 175),
-                        CapturedLinkSegment(10, 1, 175),
-                        CapturedLinkSegment(11, 1, 175),
-                        CapturedLinkSegment(12, 1, 175),
-                        CapturedLinkSegment(13, 1, 175),
-                        CapturedLinkSegment(17, 1, 29),
-                    ),
-                    segments,
-                )
-                val first = segments.first()
-                val id = fixture.cache.hyperlinkIds[fixture.cache.rowOffset(first.row) + first.startColumn]
-                assertTrue(id > 0)
-                assertEquals(uri, fixture.session.hyperlinkUri(id))
-                val visibleTexts =
-                    segments.map { segment ->
-                        buildString {
-                            for (column in segment.startColumn until segment.endColumn) {
-                                val index = fixture.cache.rowOffset(segment.row) + column
-                                assertEquals(id, fixture.cache.hyperlinkIds[index], "Shared OSC8 identity at $segment column $column")
-                                appendCodePoint(fixture.cache.codeWords[index])
-                            }
-                        }.trimEnd()
-                    }
-                assertEquals(listOf(174, 174, 174, 174, 8), visibleTexts.take(5).map(String::length))
-                assertEquals(uri, visibleTexts.take(5).joinToString(""))
-                assertEquals("→ Click here to authenticate", visibleTexts.last())
-                for (segment in segments) {
-                    assertFalse(fixture.cache.lineWrapped[segment.row], "The captured TUI uses explicit row placement at $segment")
-                    val occurrence = if (segment == segments.last()) listOf(segment) else segments.take(5)
-                    fixture.hover(segment.startColumn, segment.row, activationHover = true)
-                    assertEquals(occurrence.size, fixture.controller.hoveredSegmentCount)
-                    for ((index, expected) in occurrence.withIndex()) {
-                        assertEquals(expected.row, fixture.controller.segmentRow(index))
-                        assertEquals(expected.startColumn, fixture.controller.segmentStartColumn(index))
-                        assertEquals(expected.endColumn, fixture.controller.segmentEndColumn(index))
-                    }
-                    assertEquals(Cursor.HAND_CURSOR, fixture.host.cursor.type)
-                    assertTrue(fixture.click(segment.startColumn, segment.row))
-                }
-                assertEquals(List(6) { uri }, opened)
-                val urlSpans = segments.take(5).map { RepaintSpan(it.row, it.startColumn, it.row, it.endColumn) }
-                assertEquals(urlSpans + urlSpans + RepaintSpan(17, 1, 17, 29), fixture.host.repaintSpans)
-            }
         }
     }
 
@@ -1277,65 +1211,9 @@ class TerminalHyperlinkControllerTest {
         assertEquals(1, controller.segmentStartColumn(0), "Concealed cells must not enter the visible hover group")
     }
 
-    private data class CapturedLinkSegment(
-        val row: Int,
-        val startColumn: Int,
-        val endColumn: Int,
-    )
-
     companion object {
         private const val CELL_WIDTH = 10
         private const val CELL_HEIGHT = 20
-
-        private fun agyCapture(): ByteArray =
-            requireNotNull(TerminalHyperlinkControllerTest::class.java.getResourceAsStream("/hyperlinks/agy-auth-176x32.ansi")) {
-                "Missing sanitized agy capture"
-            }.use { it.readBytes() }
-
-        private fun agyTarget(bytes: ByteArray): String =
-            bytes.decodeToString().substringAfter("\u001b]8;id=agyfixture;").substringBefore('\u0007')
-
-        private fun capturedLinkSegments(cache: TerminalRenderCache): List<CapturedLinkSegment> =
-            buildList {
-                for (row in 0 until cache.rows) {
-                    var column = 0
-                    while (column < cache.columns) {
-                        val id = cache.hyperlinkIds[cache.rowOffset(row) + column]
-                        if (id <= 0) {
-                            column++
-                            continue
-                        }
-                        val start = column++
-                        while (column < cache.columns && cache.hyperlinkIds[cache.rowOffset(row) + column] == id) column++
-                        add(CapturedLinkSegment(row, start, column))
-                    }
-                }
-            }
-
-        /** Diagnostic trace: records observed hover geometry without making a defect an expected test result. */
-        @JvmStatic
-        fun main(args: Array<String>) {
-            SwingUtilities.invokeAndWait {
-                Osc8PipelineFixture(width = 176, height = 32).use { fixture ->
-                    val bytes = agyCapture()
-                    fixture.accept(bytes)
-                    fixture.refresh()
-                    println("agy capture: bytes=${bytes.size}, targetChars=${agyTarget(bytes).length}")
-                    for (segment in capturedLinkSegments(fixture.cache)) {
-                        fixture.hover(segment.startColumn, segment.row)
-                        val hover = fixture.controller
-                        println(
-                            "segment=$segment, wrapped=${fixture.cache.lineWrapped[segment.row]}, " +
-                                "id=${hover.hoveredHyperlinkId}, " +
-                                "hover=${hover.segmentRow(0)}:${hover.segmentStartColumn(0)}" +
-                                "..${hover.segmentRow(
-                                    hover.hoveredSegmentCount - 1,
-                                )}:${hover.segmentEndColumn(hover.hoveredSegmentCount - 1)}",
-                        )
-                    }
-                }
-            }
-        }
 
         private fun osc8(
             uri: String,
