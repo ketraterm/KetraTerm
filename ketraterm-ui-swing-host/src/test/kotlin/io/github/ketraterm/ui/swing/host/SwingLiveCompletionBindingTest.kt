@@ -36,6 +36,86 @@ import kotlin.time.Duration.Companion.milliseconds
 @OptIn(ExperimentalCoroutinesApi::class)
 class SwingLiveCompletionBindingTest {
     @Test
+    fun `host popup failure during close still removes observers and pending debounce`() =
+        onEdtTest {
+            val target = RecordingTarget()
+            val failure = IllegalStateException("host popup hide failed")
+            val popup =
+                object : SwingShellSuggestionTarget {
+                    override fun requestSuggestions(snapshot: TerminalShellCommandLineSnapshot) {
+                        error("Closed binding requested suggestions")
+                    }
+
+                    override fun hideSuggestions(): Unit = throw failure
+                }
+            val binding = binding(backgroundScope)
+            binding.attach(target, popup)
+            binding.scheduleRefresh()
+            runCurrent()
+            assertSame(failure, assertFailsWith<IllegalStateException> { binding.close() })
+            assertEquals(1, target.removeFocusListenerCount)
+            advanceTimeBy(100.milliseconds)
+            runCurrent()
+            binding.close()
+            assertTrue(target.requests.isEmpty())
+        }
+
+    @Test
+    fun `host popup receives automatic requests while terminal owns focus and eligibility`() =
+        onEdtTest {
+            val revisions = MutableStateFlow(-1L)
+            var active = snapshot("git s")
+            val terminal = RecordingTarget()
+            val popupRequests = mutableListOf<TerminalShellCommandLineSnapshot>()
+            var hides = 0
+            val popup =
+                object : SwingShellSuggestionTarget {
+                    override fun requestSuggestions(snapshot: TerminalShellCommandLineSnapshot) {
+                        popupRequests += snapshot
+                    }
+
+                    override fun hideSuggestions() {
+                        hides++
+                    }
+                }
+            val binding = binding(backgroundScope, revisions, { active })
+            binding.attach(terminal, popup)
+            runCurrent()
+            revisions.value = 1
+            runCurrent()
+            advanceTimeBy(75.milliseconds)
+            runCurrent()
+            assertEquals(listOf(active), popupRequests)
+            assertTrue(terminal.requests.isEmpty())
+            val initialHides = hides
+            terminal.loseFocus()
+            assertEquals(initialHides + 1, hides)
+            active = snapshot("git st")
+            revisions.value = 2
+            runCurrent()
+            advanceTimeBy(75.milliseconds)
+            runCurrent()
+            assertEquals(1, popupRequests.size)
+            terminal.gainFocus()
+            runCurrent()
+            advanceTimeBy(75.milliseconds)
+            runCurrent()
+            assertEquals(listOf(snapshot("git s"), active), popupRequests)
+            val beforeDisabled = hides
+            terminal.setAutomaticSuggestionEligible(false)
+            assertEquals(beforeDisabled + 1, hides)
+            val disabledHides = hides
+            binding.close()
+            assertEquals(disabledHides + 1, hides)
+            revisions.value = 3
+            runCurrent()
+            advanceTimeBy(100.milliseconds)
+            runCurrent()
+            assertEquals(2, popupRequests.size)
+            assertEquals(1, terminal.removeFocusListenerCount)
+        }
+
+    @Test
     fun `host shell state drives standard live completion without terminal output`() =
         onEdtTest {
             val source = MutableStateFlow<TerminalShellCommandLineSnapshot?>(null)

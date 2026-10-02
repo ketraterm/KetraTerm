@@ -17,8 +17,11 @@ package io.github.ketraterm.benchmark
 
 import io.github.ketraterm.render.cache.TerminalRenderCache
 import io.github.ketraterm.ui.swing.render.TerminalBidiLayout
+import io.github.ketraterm.ui.swing.render.TerminalVisualViewportGeometry
 import io.github.ketraterm.ui.swing.render.forEachVisualCellSpan
+import io.github.ketraterm.ui.swing.settings.SwingMetrics
 import org.openjdk.jmh.annotations.*
+import java.awt.Rectangle
 import java.util.concurrent.TimeUnit
 
 /** Measures retained bidi lookups and overscan transitions on a worker-owned cache. */
@@ -35,6 +38,9 @@ open class TerminalBidiBenchmark {
     private lateinit var frames: Array<TerminalRenderBenchmarkFrame>
     private lateinit var cache: TerminalRenderCache
     private lateinit var layout: TerminalBidiLayout
+    private lateinit var geometry: TerminalVisualViewportGeometry
+    private val cellBounds = Rectangle()
+    private val metrics = SwingMetrics(8, 16, 12, 13, 8, 0, 1)
     private var nextFrame = 0
 
     @Setup
@@ -52,6 +58,9 @@ open class TerminalBidiBenchmark {
         cache.accept(frames[1])
         for (row in 0 until cache.rows) layout.row(cache, row)
         cache.accept(frames[0])
+        geometry = TerminalVisualViewportGeometry()
+        geometry.updateLayout(metrics, cache.rows, 384)
+        geometry.copyCellBounds(cache, metrics, 3, 0, 0, 0, 640, 384, cellBounds)
     }
 
     @Benchmark
@@ -60,6 +69,13 @@ open class TerminalBidiBenchmark {
         var checksum = row?.logicalColumn(3) ?: 3
         forEachVisualCellSpan(row, 1, 4) { start, end -> checksum += end - start }
         return checksum
+    }
+
+    /** Isolates warmed terminal geometry; excludes AWT painting, event dispatch and popup creation. */
+    @Benchmark
+    open fun cachedCellBounds(): Int {
+        geometry.copyCellBounds(cache, metrics, 3, 0, 0, 0, 640, 384, cellBounds)
+        return cellBounds.x + cellBounds.height
     }
 
     /** Includes accepting the frame; compare with [copyOverscanFrame] to separate that work. */

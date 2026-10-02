@@ -34,6 +34,7 @@ import io.github.ketraterm.ui.swing.api.TerminalUiDispatcher;
 import io.github.ketraterm.ui.swing.settings.SwingSettings;
 import io.github.ketraterm.ui.swing.settings.TerminalClipboardHandler;
 import java.awt.event.MouseEvent;
+import java.awt.Rectangle;
 import java.io.ByteArrayOutputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -78,6 +79,14 @@ public final class JavaConsumer {
             new SwingTerminal().dispose();
             var terminal = new SwingTerminal(SwingSettings::new, services);
             try {
+                terminal.setShellSuggestionFailureHandler((request, failure) -> {
+                    if (!SwingUtilities.isEventDispatchThread()) throw new AssertionError("Diagnostics must run on EDT");
+                });
+                var bounds = new Rectangle(1, 2, 3, 4);
+                if (terminal.copyCellBounds(0, 0, bounds) || !bounds.isEmpty()) {
+                    throw new AssertionError("Unbound geometry must clear caller bounds");
+                }
+                terminal.setShellSuggestionFailureHandler(null);
                 if (!services.getHyperlinkHandler().openHyperlink("https://example.test/java")) {
                     throw new AssertionError("Host navigation callback was not invoked");
                 }

@@ -43,6 +43,7 @@ class TerminalLibraryConsumerCompilationTest {
         "completion,io.github.ketraterm.completion.api.TerminalCompletionCandidateKind",
         "completion-host,io.github.ketraterm.completion.host.TerminalBoundedDirectoryScanner",
         "ui-swing,io.github.ketraterm.ui.swing.api.SwingTerminal",
+        "ui-swing-host,io.github.ketraterm.ui.swing.host.SwingShellSuggestionTarget",
         "pty,io.github.ketraterm.pty.PtyConnector",
     )
     fun `isolated consumer classpaths contain the requested library and Kotlin runtime`(
@@ -55,6 +56,35 @@ class TerminalLibraryConsumerCompilationTest {
             final class Consumer {
                 Class<?> libraryType() { return $publicType.class; }
                 Object runtimeValue() { return kotlin.Unit.INSTANCE; }
+            }
+            """.trimIndent(),
+        )
+    }
+
+    @Test
+    fun `Swing host exports native popup coordination and independently callable provider to Java`() {
+        assertCompiles(
+            "ui-swing-host",
+            """
+            import io.github.ketraterm.completion.api.TerminalCompletionEngine;
+            import io.github.ketraterm.session.TerminalShellCommandLineSnapshot;
+            import io.github.ketraterm.ui.swing.api.SwingTerminal;
+            import io.github.ketraterm.ui.swing.host.*;
+            import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionRequest;
+            import kotlin.jvm.functions.Function0;
+
+            final class Consumer {
+                static final class Popup implements SwingShellSuggestionTarget {
+                    @Override public void requestSuggestions(TerminalShellCommandLineSnapshot snapshot) {}
+                    @Override public void hideSuggestions() {}
+                }
+                void wire(SwingLiveCompletionBinding binding, SwingTerminal terminal,
+                          TerminalCompletionEngine engine, Function0<SwingCompletionContext> context) {
+                    binding.attach(terminal, new Popup());
+                    var provider = new SwingCompletionSuggestionProvider(engine, context);
+                    provider.suggestions(new SwingShellSuggestionRequest("git", 3, 3, 0));
+                    terminal.copyCellBounds(3, 0, new java.awt.Rectangle());
+                }
             }
             """.trimIndent(),
         )

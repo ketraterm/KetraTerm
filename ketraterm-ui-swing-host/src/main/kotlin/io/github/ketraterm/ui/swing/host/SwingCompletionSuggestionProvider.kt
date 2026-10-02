@@ -33,7 +33,10 @@ import java.util.*
  *
  * @param engine pure progressive completion engine. This adapter does not select
  * a dispatcher; the owning suggestion caller controls its coroutine context.
- * @param contextProvider supplier for current host-owned request metadata.
+ * @param contextProvider supplier for an immutable, thread-safe snapshot of current
+ * host-owned metadata. It runs synchronously when suggestions is called, in the
+ * caller's context; SwingTerminal calls it on a background dispatcher. Do not read
+ * Swing/IDE UI state here. Publish that state to thread-safe storage from its owner.
  */
 public class SwingCompletionSuggestionProvider(
     private val engine: TerminalCompletionEngine,

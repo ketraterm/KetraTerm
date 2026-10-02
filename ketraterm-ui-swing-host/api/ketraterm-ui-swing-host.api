@@ -119,6 +119,7 @@ public final class io/github/ketraterm/ui/swing/host/SwingLiveCompletionBinding 
 	public fun <init> (Lio/github/ketraterm/session/TerminalSession;Lkotlinx/coroutines/CoroutineScope;Lkotlin/jvm/functions/Function0;Lkotlin/jvm/functions/Function0;Lio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionFeedbackHandler;)V
 	public synthetic fun <init> (Lio/github/ketraterm/session/TerminalSession;Lkotlinx/coroutines/CoroutineScope;Lkotlin/jvm/functions/Function0;Lkotlin/jvm/functions/Function0;Lio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionFeedbackHandler;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun attach (Lio/github/ketraterm/ui/swing/api/SwingTerminal;)V
+	public final fun attach (Lio/github/ketraterm/ui/swing/api/SwingTerminal;Lio/github/ketraterm/ui/swing/host/SwingShellSuggestionTarget;)V
 	public final fun cancelAndHide ()V
 	public fun close ()V
 	public final fun detach ()V
@@ -130,6 +131,11 @@ public final class io/github/ketraterm/ui/swing/host/SwingMessageDialogs {
 	public static final field INSTANCE Lio/github/ketraterm/ui/swing/host/SwingMessageDialogs;
 	public final fun show (Ljava/awt/Component;Lio/github/ketraterm/ui/swing/host/SwingDialogRequest;)Ljava/lang/Integer;
 	public final fun showModeless (Ljava/awt/Component;Lio/github/ketraterm/ui/swing/host/SwingDialogRequest;Lkotlin/jvm/functions/Function1;)Ljava/lang/AutoCloseable;
+}
+
+public abstract interface class io/github/ketraterm/ui/swing/host/SwingShellSuggestionTarget {
+	public abstract fun hideSuggestions ()V
+	public abstract fun requestSuggestions (Lio/github/ketraterm/session/TerminalShellCommandLineSnapshot;)V
 }
 
 public final class io/github/ketraterm/ui/swing/host/SwingTerminalContextMenuItems {

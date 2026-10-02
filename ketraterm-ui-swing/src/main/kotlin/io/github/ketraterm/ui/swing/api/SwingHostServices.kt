@@ -83,7 +83,8 @@ public fun interface SwingTerminalHostKeyHandler {
  * immutable settings and render-cache snapshots, while host integrations supply
  * scheduling, clipboard, and explicit hyperlink activation policy here.
  * Constructor, [copy], and destructuring signatures are part of the public ABI.
- * New host services must preserve those signatures for compiled consumers.
+ * The construction shape is fixed; view-lifetime services such as suggestion
+ * diagnostics are installed through additive EDT methods on [SwingTerminal].
  *
  * @property uiDispatcher scheduler for UI-thread component work.
  * @property clipboardHandler host clipboard adapter for copy and paste actions.

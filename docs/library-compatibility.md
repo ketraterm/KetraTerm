@@ -80,6 +80,11 @@ requires a separate compatibility decision.
   component and generated default-call shapes. Adding a defaulted primary
   constructor property is a binary change. Add a separate API only when a real
   requirement warrants it; do not introduce builders in anticipation of one.
+  `SwingSettings` and `SwingHostServices` keep their fixed immutable construction
+  shapes. View-lifetime additions, including suggestion diagnostics, use narrow
+  EDT attachment methods; native popup coordination uses an additive binding
+  overload. Existing compiled clients exercise the unchanged shapes without
+  replacing their retained binaries.
 - Preserve old overloads and Kotlin default-call entry points. `@JvmOverloads`
   serves Java overloads; it does not make changes to Kotlin default arguments
   binary compatible.

@@ -122,6 +122,7 @@ public class SwingTerminal
             CoroutineScope(componentJob + uiCoroutineDispatcher + CoroutineName("swing-terminal"))
         private var bindingJob: Job? = null
         private var suggestionJob: Job? = null
+        private var suggestionFailureHandler: SwingShellSuggestionFailureHandler = SwingShellSuggestionFailureHandler.LOGGING
         private var activeSuggestionContext: SessionSuggestionContext? = null
         private var activeSuggestionIsAutomatic: Boolean = false
         private val suggestionInvalidationListeners = CopyOnWriteArraySet<SwingShellSuggestionInvalidationListener>()
@@ -135,6 +136,7 @@ public class SwingTerminal
             get() = componentJob.isActive
 
         private val visualGeometry = TerminalVisualViewportGeometry()
+        private val suggestionAnchorBounds = Rectangle()
         private val painter = GridPainter(hostServices.fontResolver, visualGeometry.bidiLayout)
         private val visualBellController =
             TerminalVisualBellController {
@@ -1062,16 +1064,34 @@ public class SwingTerminal
                 } else {
                     state.anchorColumn
                 }
-            val anchorX = paddingLeft + anchorColumn * metrics.cellWidth
+            val hasCellBounds = copyCellBounds(state.anchorColumn, state.anchorRow, suggestionAnchorBounds)
+            // Explicit host context also works without a frame; keep its grid-coordinate fallback.
+            val anchorX =
+                if (hasCellBounds) {
+                    suggestionAnchorBounds.x
+                } else {
+                    (paddingLeft.toLong() + anchorColumn.toLong() * metrics.cellWidth)
+                        .coerceIn(Int.MIN_VALUE.toLong(), Int.MAX_VALUE.toLong())
+                        .toInt()
+                }
             val bottomLimit = height - paddingBottom
             val anchorTop =
-                floor(paddingTop + contentOriginY + state.anchorRow * metrics.cellHeight)
-                    .toInt()
-                    .coerceIn(paddingTop, bottomLimit)
+                if (hasCellBounds) {
+                    suggestionAnchorBounds.y
+                } else {
+                    floor(
+                        paddingTop + contentOriginY + state.anchorRow.toDouble() * metrics.cellHeight,
+                    ).toInt()
+                        .coerceIn(paddingTop, bottomLimit)
+                }
             val anchorBottom =
-                ceil(paddingTop + contentOriginY + (state.anchorRow + 1) * metrics.cellHeight)
-                    .toInt()
-                    .coerceIn(paddingTop, bottomLimit)
+                if (hasCellBounds) {
+                    suggestionAnchorBounds.y + suggestionAnchorBounds.height
+                } else {
+                    ceil(paddingTop + contentOriginY + (state.anchorRow.toDouble() + 1.0) * metrics.cellHeight)
+                        .toInt()
+                        .coerceIn(paddingTop, bottomLimit)
+                }
             val spaceAbove = anchorTop - paddingTop
             val spaceBelow = bottomLimit - anchorBottom
             val placeBelow = preferred.height <= spaceBelow || spaceBelow >= spaceAbove
@@ -1230,6 +1250,7 @@ public class SwingTerminal
             suggestionJob = null
             suggestionInvalidationListeners.clear()
             suggestionEligibilityListeners.clear()
+            suggestionFailureHandler = SwingShellSuggestionFailureHandler.LOGGING
             shellSuggestionController?.close()
             componentScope.cancel(CancellationException("Swing terminal disposed"))
         }
@@ -1306,6 +1327,61 @@ public class SwingTerminal
             }
             if (!renderCache.hasFrame) return null
             return selectionController.getViewportSelection(renderCache)
+        }
+
+        /**
+         * Copies a displayed cell's visible bounds into caller-owned storage on the EDT.
+         *
+         * Coordinates are zero-based logical columns and rows of the displayed frame,
+         * before bidi permutation. The result uses component-local Swing pixels and
+         * includes the active buffer's padding, prompt gutter, and fractional scrolling.
+         * Partially visible cells return clipped bounds. Invalid coordinates, unavailable
+         * frames, unbound/disposed views, and cells outside the content viewport return
+         * `false` and clear [destination]. This performs no refresh or transport work.
+         * Hosts convert these bounds to screen coordinates when positioning native popups.
+         * Each leading/trailing half of wide text describes one physical grid cell.
+         *
+         * @throws IllegalStateException when called outside the EDT.
+         */
+        public fun copyCellBounds(
+            column: Int,
+            row: Int,
+            destination: Rectangle,
+        ): Boolean {
+            check(SwingUtilities.isEventDispatchThread()) { "cell bounds must be read on the EDT" }
+            if (disposed || session == null) {
+                destination.setBounds(0, 0, 0, 0)
+                return false
+            }
+            val buffer = renderCache.activeBuffer
+            return visualGeometry.copyCellBounds(
+                renderCache,
+                metrics,
+                column,
+                row,
+                SwingTerminalChrome.left(settings, buffer),
+                SwingTerminalChrome.top(settings, buffer),
+                width - SwingTerminalChrome.right(settings, buffer),
+                height - SwingTerminalChrome.bottom(settings, buffer),
+                destination,
+            )
+        }
+
+        /**
+         * Selects provider diagnostics for this view on the EDT; null restores logging.
+         *
+         * Reports each current provider failure once, after cancelling its work and
+         * hiding suggestions. Cancellation and obsolete requests are excluded.
+         * The callback runs on the EDT and may start a new request. Disposal releases
+         * it; rebinding retains the view-owned handler. Callback failures are logged,
+         * while callback cancellation propagates.
+         *
+         * @throws IllegalStateException when called outside the EDT or after disposal.
+         */
+        public fun setShellSuggestionFailureHandler(handler: SwingShellSuggestionFailureHandler?) {
+            check(SwingUtilities.isEventDispatchThread()) { "suggestion diagnostics must be configured on the EDT" }
+            check(!disposed) { "Swing terminal is disposed" }
+            suggestionFailureHandler = handler ?: SwingShellSuggestionFailureHandler.LOGGING
         }
 
         /**
@@ -1793,11 +1869,28 @@ public class SwingTerminal
                             activeSuggestionContext = null
                         }
                     } catch (cancellation: CancellationException) {
+                        if (suggestionJob === coroutineContext[Job]) {
+                            cancelAndHideShellSuggestionsOnEdt("Shell suggestion provider cancelled")
+                        }
                         throw cancellation
                     } catch (exception: Exception) {
                         this@launch.ensureActive()
-                        System.err.println("Shell suggestion provider failed: ${exception.message}")
+                        if (context != null && !context.isCurrent(session)) {
+                            cancelAndHideShellSuggestionsOnEdt("Active shell command changed")
+                            return@launch
+                        }
                         cancelAndHideShellSuggestionsOnEdt("Shell suggestion provider failed")
+                        try {
+                            suggestionFailureHandler.onSuggestionFailure(request, exception)
+                        } catch (cancellation: CancellationException) {
+                            throw cancellation
+                        } catch (callbackFailure: Exception) {
+                            System.getLogger(SwingTerminal::class.java.name).log(
+                                System.Logger.Level.WARNING,
+                                "Shell suggestion failure handler failed",
+                                callbackFailure,
+                            )
+                        }
                     }
                 }
             suggestionJob = requestJob

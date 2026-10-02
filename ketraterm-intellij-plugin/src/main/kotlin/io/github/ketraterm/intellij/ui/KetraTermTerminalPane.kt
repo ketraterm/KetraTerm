@@ -20,6 +20,8 @@ import com.intellij.openapi.actionSystem.ActionUpdateThread
 import com.intellij.openapi.actionSystem.DefaultActionGroup
 import com.intellij.openapi.actionSystem.Separator
 import com.intellij.openapi.application.ApplicationManager
+import com.intellij.openapi.diagnostic.ControlFlowException
+import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.project.DumbAwareAction
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.ui.Messages
@@ -32,6 +34,7 @@ import io.github.ketraterm.ui.swing.host.*
 import io.github.ketraterm.ui.swing.settings.TerminalClipboardHandler
 import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionHandler
 import io.github.ketraterm.workspace.TerminalWorkspaceTab
+import kotlinx.coroutines.CancellationException
 import java.awt.Adjustable
 import java.awt.BorderLayout
 import javax.swing.JPanel
@@ -290,6 +293,17 @@ internal class KetraTermTerminalPane private constructor(
     }
 
     companion object {
+        private val LOG = Logger.getInstance(KetraTermTerminalPane::class.java)
+
+        internal fun reportShellSuggestionFailure(failure: Exception) {
+            if (failure is CancellationException) throw failure
+            // Translate platform control flow at the coroutine boundary; it is not an operational failure.
+            if (failure is ControlFlowException) {
+                throw CancellationException("IDE shell suggestions cancelled").apply { initCause(failure) }
+            }
+            LOG.warn("Shell suggestion provider failed", failure)
+        }
+
         /**
          * Creates and binds a pane for [tab].
          *
@@ -342,7 +356,11 @@ internal class KetraTermTerminalPane private constructor(
                                     paneRef[0]?.showContextMenu(request) == true
                                 },
                         ),
-                )
+                ).apply {
+                    setShellSuggestionFailureHandler { _, failure ->
+                        reportShellSuggestionFailure(failure)
+                    }
+                }
             scrollbarAdapter.attach(terminal)
             terminal.bind(tab.session)
 

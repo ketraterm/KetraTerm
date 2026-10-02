@@ -62,6 +62,7 @@ public class SwingLiveCompletionBinding
         private val minimumNonWhitespaceCharacters: Int = DEFAULT_MINIMUM_NON_WHITESPACE_CHARACTERS,
     ) : AutoCloseable {
         private var target: SwingLiveCompletionTarget? = null
+        private var suggestionTarget: SwingShellSuggestionTarget? = null
         private var observationJob: Job? = null
         private var invalidatedRevision: Long? = null
         private val refreshes = MutableStateFlow<Long?>(null)
@@ -99,6 +100,8 @@ public class SwingLiveCompletionBinding
                 } else {
                     refreshes.value = null
                     lastRequest = null
+                    // The embedded controller handles eligibility itself, including explicit requests.
+                    if (suggestionTarget !== target) suggestionTarget?.hideSuggestions()
                 }
             }
 
@@ -151,11 +154,30 @@ public class SwingLiveCompletionBinding
             attach(SwingTerminalLiveCompletionTarget(terminal))
         }
 
-        internal fun attach(target: SwingLiveCompletionTarget) {
+        /**
+         * Observes [terminal] while routing automatic requests to a host-owned popup/controller.
+         *
+         * Close this binding before rebinding or disposing the terminal. The host
+         * retains target resources and explicit-request orchestration; this binding
+         * cancels automatic work through [suggestionTarget] on invalidation or close.
+         * Configure the target's feedback through [suggestionFeedbackHandler].
+         */
+        public fun attach(
+            terminal: SwingTerminal,
+            suggestionTarget: SwingShellSuggestionTarget,
+        ) {
+            attach(SwingTerminalLiveCompletionTarget(terminal), suggestionTarget)
+        }
+
+        internal fun attach(
+            target: SwingLiveCompletionTarget,
+            suggestionTarget: SwingShellSuggestionTarget = target,
+        ) {
             check(SwingUtilities.isEventDispatchThread()) { "live completion must be attached on the EDT" }
             check(!closed) { "live completion binding is closed" }
             check(this.target == null) { "live completion binding is already attached" }
             this.target = target
+            this.suggestionTarget = suggestionTarget
             var focusListenerAttached = false
             try {
                 target.addFocusListener(focusListener)
@@ -184,6 +206,7 @@ public class SwingLiveCompletionBinding
                 runCatching { target.removeInvalidationListener(invalidationListener) }
                 runCatching { target.removeEligibilityListener(eligibilityListener) }
                 this.target = null
+                this.suggestionTarget = null
                 throw failure
             }
         }
@@ -209,21 +232,24 @@ public class SwingLiveCompletionBinding
             val snapshot = activeCommandLine()
             if (snapshot == null || !shouldRequest(snapshot)) {
                 lastRequest = null
-                target?.hideSuggestions()
+                suggestionTarget?.hideSuggestions()
                 return
             }
             val request = RequestKey(snapshot, rankingContextKey())
             if (request == lastRequest) return
             lastRequest = request
-            target?.requestSuggestions(snapshot)
+            suggestionTarget?.requestSuggestions(snapshot)
         }
 
         /** Stops observation, removes focus wiring, and hides suggestions. */
         override fun close() {
             check(SwingUtilities.isEventDispatchThread()) { "live completion must be closed on the EDT" }
             if (closed) return
-            cancelAndHideInternal()
-            detach()
+            try {
+                cancelAndHideInternal()
+            } finally {
+                detach()
+            }
         }
 
         /** Stops automatic observation without dismissing an explicit completion request. */
@@ -239,6 +265,7 @@ public class SwingLiveCompletionBinding
             target?.removeInvalidationListener(invalidationListener)
             target?.removeEligibilityListener(eligibilityListener)
             target = null
+            suggestionTarget = null
         }
 
         private fun onEdt(action: () -> Unit) {
@@ -260,7 +287,7 @@ public class SwingLiveCompletionBinding
         private fun cancelAndHideInternal() {
             refreshes.value = null
             lastRequest = null
-            target?.hideSuggestions()
+            suggestionTarget?.hideSuggestions()
         }
 
         private fun shouldRequest(snapshot: TerminalShellCommandLineSnapshot): Boolean {
@@ -300,11 +327,7 @@ public class SwingLiveCompletionBinding
         }
     }
 
-internal interface SwingLiveCompletionTarget {
-    fun requestSuggestions(snapshot: TerminalShellCommandLineSnapshot)
-
-    fun hideSuggestions()
-
+internal interface SwingLiveCompletionTarget : SwingShellSuggestionTarget {
     fun addFocusListener(listener: FocusListener)
 
     fun removeFocusListener(listener: FocusListener)

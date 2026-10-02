@@ -44,6 +44,7 @@ import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
 import kotlinx.coroutines.yield
 import java.awt.Cursor
+import java.awt.Rectangle
 import java.awt.event.MouseEvent
 import java.io.ByteArrayOutputStream
 import java.util.concurrent.Callable
@@ -127,6 +128,8 @@ fun main() =
                     },
                 )
                 onEdt {
+                    val bounds = Rectangle()
+                    check(terminal.copyCellBounds(0, 0, bounds) && bounds.width > 0 && bounds.height > 0)
                     check(terminal.cursor.type == Cursor.HAND_CURSOR)
                     terminal.dispatchPointer(MouseEvent.MOUSE_PRESSED, MouseEvent.BUTTON1)
                     terminal.dispatchPointer(MouseEvent.MOUSE_RELEASED, MouseEvent.BUTTON1)

@@ -77,6 +77,34 @@ The cursor uses the existing shared cursor/text blink timer. Inactive cursors ig
 
 For context kept outside the session, call `requestShellSuggestions(commandText, cursorOffset, anchorColumn, anchorRow, trigger = SwingShellSuggestionTrigger.EXPLICIT)`. The default trigger remains automatic. Both methods use the same cancellable provider pipeline and require the master suggestion setting; explicit requests remain available when automatic popups are disabled. With directly supplied context, the host must replace the request or call `hideShellSuggestions()` when its editor state changes. `showShellSuggestions()` remains available when the host owns provider collection itself.
 
+Choose controller and presentation ownership independently:
+
+| Controller | Presentation | Automatic coordination |
+| --- | --- | --- |
+| Reusable Swing controller | Embedded `SwingShellSuggestionView` | Optional `SwingLiveCompletionBinding.attach(terminal)` |
+| Host controller | Host-owned native popup | Optional `attach(terminal, SwingShellSuggestionTarget)` |
+| Host controller | Host-owned results UI | Host orchestration using `SwingCompletionSuggestionProvider` or the completion engine directly |
+
+The coordinator lives in optional `ketraterm-ui-swing-host`. Its request/hide port
+leaves provider collection, selection, acceptance and popup lifetime with the host;
+it supplies focus, eligibility, debounce and invalidation. Close the binding before
+rebinding or disposing the terminal, then release host popup resources separately.
+Detach stops observation while leaving explicit presentation to the host.
+
+On the EDT, `copyCellBounds(column, row, destination)` copies the current frame's
+zero-based logical cell into a caller-owned `Rectangle`, using component-local
+pixels, active padding/gutter, bidi mapping and fractional scrolling. Bounds are
+clipped to visible content; unavailable or invalid cells clear the rectangle and
+return false. Hosts perform the component-to-screen conversion for native popups.
+Wide leading and trailing cells each describe one physical grid cell.
+
+Install view-owned diagnostics with `setShellSuggestionFailureHandler` on the
+EDT. Current provider failures are reported once after cleanup; cancellation and
+obsolete requests are excluded. Null restores logging, rebinding retains the
+handler, and disposal releases it. Completion context suppliers execute in the
+caller's context, normally off the EDT; publish immutable host metadata to
+thread-safe storage instead of reading UI state from those suppliers.
+
 ---
 
 ## Sub-Documentation

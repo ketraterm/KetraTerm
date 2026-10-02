@@ -254,11 +254,8 @@ as A01–A12. The initial compatibility baseline remains complete; the remaining
 decisions and reproduced defects below are open before the final API freeze. E04's independent
 renderer proposal remains outside scope.
 
-- `TODO(policy)`: A02 — choose stable construction/evolution shapes for growing configuration and host-service values. Retain useful immutable value semantics and verify actual additions against old Kotlin default/copy and Java callers; do not append data-class properties and treat a new snapshot as compatibility proof.
-- `TODO(ui)`: A03 — expose authoritative EDT cell-to-component geometry for independently owned IDE popups. Decide whether automatic suggestion coordination must also target host-owned presenters; the existing view factory replaces an embedded component only. No renderer extraction is required.
 - `TODO(policy)`: A06 — distinguish external implementer contracts from library-produced views and retain concrete Kotlin/Java SPI implementations. New semantic families need explicit compatible capability/unsupported behavior, not new abstract methods or silent no-ops on old contracts.
 - `TODO(render/policy)`: A07 — settle how public inline render leasing commits publisher bookkeeping before freeze. Either retain the representation deliberately or move bookkeeping behind measured non-inline operations; verify old compiled readers under concurrency and callback failure.
-- `TODO(ui/host/profile)`: A10 — document completion-context callback threading and choose the provider failure-reporting boundary for IDE diagnostics. Preserve cancellation, stale-result isolation and cleanup; wrappers remain a viable explicit host-owned policy.
 - `TODO(core/policy)`: A11 — choose the direct line-cluster copy contract: truthful capacity discovery or an explicit complete-read path through existing frame sinks. Correct the allocate-once guidance when cluster length has no fixed API bound.
 - `TODO(policy)`: A12 — extend representative compatibility execution with the concrete host combinations and implementers selected by this review. Minimum-compiler execution and retained optional-library clients are verification improvements, not evidence of current linkage failures.
 

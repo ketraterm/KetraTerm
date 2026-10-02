@@ -261,6 +261,7 @@ public final class io/github/ketraterm/ui/swing/api/SwingTerminal : javax/swing/
 	public final fun clearSearch ()V
 	public final fun commandOutputText (I)Ljava/lang/String;
 	public final fun commandRecordAt (II)I
+	public final fun copyCellBounds (IILjava/awt/Rectangle;)Z
 	public final fun copyCommandOutputToClipboard (I)Z
 	public final fun copyCommandTextToClipboard (I)Z
 	public final fun copySelectionToClipboard ()Z
@@ -300,6 +301,7 @@ public final class io/github/ketraterm/ui/swing/api/SwingTerminal : javax/swing/
 	public final fun selectNextSearchResult ()V
 	public final fun selectPreviousSearchResult ()V
 	public final fun setSearchCaseSensitive (Z)V
+	public final fun setShellSuggestionFailureHandler (Lio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionFailureHandler;)V
 	public final fun showShellSuggestions (Lio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionRequest;Ljava/util/List;)V
 	public final fun showShellSuggestions (Lio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionRequest;Ljava/util/List;I)V
 	public static synthetic fun showShellSuggestions$default (Lio/github/ketraterm/ui/swing/api/SwingTerminal;Lio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionRequest;Ljava/util/List;IILjava/lang/Object;)V
@@ -725,6 +727,15 @@ public final class io/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionA
 
 public abstract interface class io/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionEligibilityListener {
 	public abstract fun onAutomaticShellSuggestionEligibilityChanged (Z)V
+}
+
+public abstract interface class io/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionFailureHandler {
+	public static final field Companion Lio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionFailureHandler$Companion;
+	public static final field LOGGING Lio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionFailureHandler;
+	public abstract fun onSuggestionFailure (Lio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionRequest;Ljava/lang/Exception;)V
+}
+
+public final class io/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionFailureHandler$Companion {
 }
 
 public final class io/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionFeedback {

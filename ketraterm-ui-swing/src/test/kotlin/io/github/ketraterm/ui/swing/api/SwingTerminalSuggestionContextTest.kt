@@ -38,12 +38,130 @@ import java.util.concurrent.TimeUnit
 import javax.swing.JPanel
 import javax.swing.SwingUtilities
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 import kotlin.time.Duration.Companion.milliseconds
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class SwingTerminalSuggestionContextTest {
+    @Test
+    fun `failure diagnostics reject off EDT and disposed configuration`() {
+        Fixture().use { fixture ->
+            assertFailsWith<IllegalStateException> { fixture.terminal.setShellSuggestionFailureHandler(null) }
+            onEdt {
+                fixture.terminal.setShellSuggestionFailureHandler(null)
+                fixture.terminal.dispose()
+                assertFailsWith<IllegalStateException> { fixture.terminal.setShellSuggestionFailureHandler(null) }
+            }
+        }
+    }
+
+    @Test
+    fun `obsolete session provider failure is excluded from diagnostics`() {
+        val release = CompletableDeferred<Unit>()
+        val finished = CompletableDeferred<Unit>()
+        val reports = mutableListOf<Exception>()
+        try {
+            Fixture(provider = { request ->
+                flow {
+                    emit(listOf(suggestion(request)))
+                    try {
+                        withContext(NonCancellable) {
+                            release.await()
+                            error("obsolete provider failure")
+                        }
+                    } finally {
+                        finished.complete(Unit)
+                    }
+                }
+            }).use { fixture ->
+                onEdt {
+                    fixture.terminal.setShellSuggestionFailureHandler { _, failure -> reports += failure }
+                    fixture.terminal.requestActiveShellSuggestions()
+                }
+                fixture.view.awaitVisible()
+                fixture.awaitObservation(active = true)
+                onEdt {
+                    release.complete(Unit)
+                    finished.awaitCompletion()
+                    fixture.source.value = null
+                }
+                fixture.view.awaitHidden()
+                fixture.awaitObservation(active = false)
+                onEdt {
+                    assertTrue(reports.isEmpty())
+                    assertFalse(fixture.terminal.currentShellSuggestionState().visible)
+                }
+            }
+        } finally {
+            release.complete(Unit)
+        }
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = [false, true])
+    fun `provider failures report once on EDT after cleanup and permit reentrant requests`(constructionFailure: Boolean) {
+        val failure = IllegalStateException("provider failure")
+        val reported = CompletableDeferred<Unit>()
+        val reports = mutableListOf<Exception>()
+        Fixture(provider = { request ->
+            if (request.commandText == "bad") {
+                if (constructionFailure) throw failure
+                flow { throw failure }
+            } else {
+                flowOf(listOf(suggestion(request)))
+            }
+        }).use { fixture ->
+            onEdt {
+                fixture.terminal.setShellSuggestionFailureHandler { request, error ->
+                    assertTrue(SwingUtilities.isEventDispatchThread())
+                    assertEquals("bad", request.commandText)
+                    assertFalse(fixture.terminal.currentShellSuggestionState().visible)
+                    reports += error
+                    fixture.request(request("good"), SwingShellSuggestionTrigger.EXPLICIT)
+                    reported.complete(Unit)
+                }
+                fixture.request(request("bad"), SwingShellSuggestionTrigger.EXPLICIT)
+            }
+            reported.awaitCompletion()
+            fixture.view.awaitVisible()
+            onEdt {
+                assertEquals(1, reports.size)
+                // Coroutine stack-trace recovery may copy an exception and retain its original as the cause.
+                assertTrue(reports.single() === failure || reports.single().cause === failure)
+                assertTrue(fixture.terminal.currentShellSuggestionState().visible)
+            }
+        }
+    }
+
+    @Test
+    fun `provider cancellation is excluded from diagnostics and clears partial results`() {
+        val finish = CompletableDeferred<Unit>()
+        val cancelled = CompletableDeferred<Unit>()
+        Fixture(provider = { request ->
+            flow {
+                try {
+                    emit(listOf(suggestion(request)))
+                    finish.await()
+                    throw CancellationException("provider cancelled")
+                } finally {
+                    cancelled.complete(Unit)
+                }
+            }
+        }).use { fixture ->
+            onEdt {
+                fixture.terminal.setShellSuggestionFailureHandler { _, _ -> error("Cancellation was reported") }
+                fixture.request(request(), SwingShellSuggestionTrigger.EXPLICIT)
+            }
+            fixture.view.awaitVisible()
+            finish.complete(Unit)
+            cancelled.awaitCompletion()
+            fixture.view.awaitHidden()
+            onEdt { assertFalse(fixture.terminal.currentShellSuggestionState().visible) }
+        }
+    }
+
     @Test
     fun `explicit supplied context uses provider and acceptance without a bound session or automatic popup`() {
         Fixture(bind = false).use { fixture ->

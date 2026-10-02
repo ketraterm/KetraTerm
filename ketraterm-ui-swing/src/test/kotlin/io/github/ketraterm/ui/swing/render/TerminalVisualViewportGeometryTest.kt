@@ -19,11 +19,67 @@ import io.github.ketraterm.render.api.*
 import io.github.ketraterm.render.cache.TerminalRenderCache
 import io.github.ketraterm.session.TerminalShellIntegrationState
 import io.github.ketraterm.ui.swing.settings.SwingMetrics
+import java.awt.Rectangle
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 class TerminalVisualViewportGeometryTest {
+    @Test
+    fun `cell bounds follow visual bidi order and fractional viewport clipping`() {
+        val cells = Array(2) { Array(3) { TestCell(codeWord = 0x05D0 + it, flags = TerminalRenderCellFlags.CODEPOINT) } }
+        val cache = renderCache(TestRenderFrame(cells))
+        val layout = TerminalVisualViewportGeometry()
+        layout.updateLayout(METRICS, 2, 26)
+        layout.updateContentOrigin(-0.5)
+        val bounds = Rectangle()
+
+        assertTrue(layout.copyCellBounds(cache, METRICS, 0, 0, 10, 4, 34, 30, bounds))
+        assertEquals(Rectangle(26, 4, 8, 16), bounds)
+        assertTrue(layout.copyCellBounds(cache, METRICS, 2, 1, 10, 4, 34, 30, bounds))
+        assertEquals(Rectangle(10, 19, 8, 11), bounds)
+        layout.updateContentOrigin(-32.0)
+        assertFalse(layout.copyCellBounds(cache, METRICS, 0, 1, 10, 4, 34, 30, bounds))
+        assertEquals(Rectangle(), bounds)
+    }
+
+    @Test
+    fun `wide leading and trailing cells each expose one physical grid cell`() {
+        val cache =
+            renderCache(
+                TestRenderFrame(
+                    arrayOf(
+                        arrayOf(
+                            TestCell(codeWord = 0x4E00, flags = TerminalRenderCellFlags.CODEPOINT or TerminalRenderCellFlags.WIDE_LEADING),
+                            TestCell(flags = TerminalRenderCellFlags.WIDE_TRAILING),
+                        ),
+                    ),
+                ),
+            )
+        val layout = TerminalVisualViewportGeometry()
+        val bounds = Rectangle()
+        assertTrue(layout.copyCellBounds(cache, METRICS, 0, 0, 0, 0, 16, 16, bounds))
+        assertEquals(Rectangle(0, 0, 8, 16), bounds)
+        assertTrue(layout.copyCellBounds(cache, METRICS, 1, 0, 0, 0, 16, 16, bounds))
+        assertEquals(Rectangle(8, 0, 8, 16), bounds)
+    }
+
+    @Test
+    fun `cell projection near integer bounds clips without overflow`() {
+        val cache = TerminalRenderCache(3, 1)
+        val layout = TerminalVisualViewportGeometry()
+        val bounds = Rectangle(1, 2, 3, 4)
+        assertFalse(layout.copyCellBounds(cache, METRICS, 0, 0, 0, 0, 24, 16, bounds))
+        assertEquals(Rectangle(), bounds)
+        cache.updateFrom(TextRowsFrame(longArrayOf(1)))
+        val left = Int.MAX_VALUE - 4
+        assertTrue(layout.copyCellBounds(cache, METRICS, 0, 0, left, 0, Int.MAX_VALUE, 16, bounds))
+        assertEquals(Rectangle(left, 0, 4, 16), bounds)
+        assertFalse(layout.copyCellBounds(cache, METRICS, 1, 0, left, 0, Int.MAX_VALUE, 16, bounds))
+        assertEquals(Rectangle(), bounds)
+    }
+
     @Test
     fun `command gutter guides do not change fixed row pitch or visible height`() {
         val cache = TerminalRenderCache(columns = 3, rows = 3)

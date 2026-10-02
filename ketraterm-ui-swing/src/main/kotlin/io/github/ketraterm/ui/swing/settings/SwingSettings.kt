@@ -39,7 +39,8 @@ import java.util.*
  * Hosts can replace this value and call
  * [io.github.ketraterm.ui.swing.api.SwingTerminal.reloadSettings] to rebuild metrics and repaint.
  * Constructor, [copy], and destructuring signatures are part of the public ABI.
- * Adding configuration must preserve those signatures for compiled consumers.
+ * The snapshot shape is fixed; view-lifetime integrations use additive EDT APIs
+ * on [io.github.ketraterm.ui.swing.api.SwingTerminal].
  *
  * @property font primary terminal font.
  * @property fallbackFonts ordered fonts used by the complex-text renderer when
