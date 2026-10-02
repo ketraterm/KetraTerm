@@ -19,6 +19,8 @@ import io.github.ketraterm.session.TerminalSession
 import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
+import org.junit.jupiter.params.ParameterizedTest
+import org.junit.jupiter.params.provider.ValueSource
 import java.awt.Canvas
 import java.awt.event.FocusEvent
 import java.awt.event.InputEvent
@@ -202,16 +204,28 @@ class SwingTerminalInputControllerTest {
 
     @Nested
     inner class HyperlinkHover {
-        @Test
-        fun `key press and release publish control activation state`() {
+        @ParameterizedTest
+        @ValueSource(ints = [KeyEvent.VK_CONTROL, KeyEvent.VK_META])
+        fun `key press and release activate hyperlinks only for the platform navigation modifier`(keyCode: Int) {
             val host = RecordingInputHost()
             val controller = SwingTerminalInputController(host)
-            val releaseEvent = keyReleased(keyCode = KeyEvent.VK_CONTROL, modifiers = 0)
+            val releaseEvent = keyReleased(keyCode = keyCode, modifiers = 0)
+            val modifiers = if (keyCode == KeyEvent.VK_META) InputEvent.META_DOWN_MASK else InputEvent.CTRL_DOWN_MASK
+            val navigationKey =
+                if (System
+                        .getProperty(
+                            "os.name",
+                        ).startsWith("Mac", ignoreCase = true)
+                ) {
+                    KeyEvent.VK_META
+                } else {
+                    KeyEvent.VK_CONTROL
+                }
 
-            controller.keyListener.keyPressed(keyPressed(keyCode = KeyEvent.VK_CONTROL, modifiers = InputEvent.CTRL_DOWN_MASK))
+            controller.keyListener.keyPressed(keyPressed(keyCode = keyCode, modifiers = modifiers))
             controller.keyListener.keyReleased(releaseEvent)
 
-            assertEquals(listOf(true, false), host.hyperlinkHoverUpdates)
+            assertEquals(listOf(keyCode == navigationKey, false), host.hyperlinkHoverUpdates)
             assertTrue(releaseEvent.isConsumed)
         }
     }
