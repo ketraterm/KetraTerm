@@ -16,11 +16,10 @@
 package io.github.ketraterm.ui.swing.host
 
 import io.github.ketraterm.core.TerminalBuffers
-import io.github.ketraterm.session.TerminalSession
-import io.github.ketraterm.session.TerminalShellCommandLineSnapshot
-import io.github.ketraterm.session.TerminalShellIntegrationFactory
-import io.github.ketraterm.session.TerminalShellIntegrationState
+import io.github.ketraterm.session.*
 import io.github.ketraterm.testkit.MockConnector
+import io.github.ketraterm.ui.swing.api.SwingTerminal
+import io.github.ketraterm.ui.swing.settings.SwingSettings
 import io.github.ketraterm.ui.swing.suggestion.*
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -35,6 +34,132 @@ import kotlin.time.Duration.Companion.milliseconds
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class SwingLiveCompletionBindingTest {
+    @Test
+    fun `remote session closure cancels an outstanding host popup request without another shell edit`() =
+        runTest {
+            val dispatcher = StandardTestDispatcher(testScheduler)
+            val fixture = withContext(Dispatchers.Swing) { NativePopupFixture(backgroundScope, dispatcher) }
+            try {
+                settleSwingBinding()
+                assertEquals(1, fixture.source.subscriptionCount.value)
+                val command = snapshot("git st")
+                fixture.source.value = command
+                settleSwingBinding()
+                withContext(Dispatchers.Swing) { fixture.binding.cancelAndHide() }
+                settleSwingBinding()
+                val requestJob =
+                    withContext(Dispatchers.Swing) {
+                        fixture.binding.refreshNow()
+                        val request = assertNotNull(fixture.popup.requestJob)
+                        assertTrue(fixture.popup.visible)
+                        assertTrue(request.isActive)
+                        fixture.connector.simulateClosed(exitCode = 0)
+                        request
+                    }
+                settleSwingBinding()
+
+                withContext(Dispatchers.Swing) {
+                    val closed = assertIs<TerminalSessionState.Closed>(fixture.session.state.value)
+                    assertFalse(closed.event.locallyRequested)
+                    assertEquals(0, closed.event.exitCode)
+                    assertEquals(command, fixture.source.value)
+                    assertTrue(fixture.terminal.isFocusOwner())
+                    assertNull(fixture.session.activeShellCommandLine())
+                    assertFalse(fixture.popup.visible, "Session closure must dismiss the host-owned automatic popup")
+                    assertTrue(requestJob.isCancelled, "Session closure must cancel the host-owned automatic request")
+                }
+            } finally {
+                withContext(Dispatchers.Swing) { fixture.close() }
+            }
+        }
+
+    @Test
+    fun `remote session failure cancels an outstanding host popup request without another shell edit`() =
+        runTest {
+            val dispatcher = StandardTestDispatcher(testScheduler)
+            val fixture = withContext(Dispatchers.Swing) { NativePopupFixture(backgroundScope, dispatcher) }
+            try {
+                settleSwingBinding()
+                assertEquals(1, fixture.source.subscriptionCount.value)
+                val command = snapshot("git st")
+                fixture.source.value = command
+                settleSwingBinding()
+                withContext(Dispatchers.Swing) { fixture.binding.cancelAndHide() }
+                settleSwingBinding()
+                val failure = IllegalStateException("remote connector failure")
+                val requestJob =
+                    withContext(Dispatchers.Swing) {
+                        fixture.binding.refreshNow()
+                        val request = assertNotNull(fixture.popup.requestJob)
+                        assertTrue(fixture.popup.visible)
+                        assertTrue(request.isActive)
+                        fixture.connector.simulateCrash(failure)
+                        request
+                    }
+                settleSwingBinding()
+
+                withContext(Dispatchers.Swing) {
+                    val closed = assertIs<TerminalSessionState.Closed>(fixture.session.state.value)
+                    assertFalse(closed.event.locallyRequested)
+                    assertSame(failure, closed.event.failure)
+                    assertEquals(command, fixture.source.value)
+                    assertTrue(fixture.terminal.isFocusOwner())
+                    assertNull(fixture.session.activeShellCommandLine())
+                    assertFalse(fixture.popup.visible, "Session failure must dismiss the host-owned automatic popup")
+                    assertTrue(requestJob.isCancelled, "Session failure must cancel the host-owned automatic request")
+                }
+            } finally {
+                withContext(Dispatchers.Swing) { fixture.close() }
+            }
+        }
+
+    @Test
+    fun `terminal input invalidation propagates host popup failure`() =
+        verifyTargetFailurePropagation(cancellation = false, eligibility = false)
+
+    @Test
+    fun `terminal input invalidation propagates host popup cancellation`() =
+        verifyTargetFailurePropagation(cancellation = true, eligibility = false)
+
+    @Test
+    fun `terminal eligibility invalidation propagates host popup failure`() =
+        verifyTargetFailurePropagation(cancellation = false, eligibility = true)
+
+    @Test
+    fun `terminal eligibility invalidation propagates host popup cancellation`() =
+        verifyTargetFailurePropagation(cancellation = true, eligibility = true)
+
+    private fun verifyTargetFailurePropagation(
+        cancellation: Boolean,
+        eligibility: Boolean,
+    ) = runTest {
+        val failure =
+            if (cancellation) {
+                CancellationException(
+                    "host popup cancelled",
+                )
+            } else {
+                IllegalStateException("host popup hide failed")
+            }
+        val dispatcher = StandardTestDispatcher(testScheduler)
+        val fixture = withContext(Dispatchers.Swing) { TerminalCallbackFixture(backgroundScope, dispatcher) }
+        try {
+            settleSwingBinding()
+            withContext(Dispatchers.Swing) {
+                fixture.popup.failure = failure
+                if (eligibility) {
+                    assertTrue(fixture.terminal.isAutomaticShellSuggestionEligible())
+                    fixture.settings = fixture.settings.copy(smartSuggestionsEnabled = false)
+                    assertSame(failure, assertFails { fixture.terminal.reloadSettings() })
+                } else {
+                    assertSame(failure, assertFails { fixture.terminal.clearScreen() })
+                }
+            }
+        } finally {
+            withContext(Dispatchers.Swing) { fixture.close() }
+        }
+    }
+
     @Test
     fun `host popup failure during close still removes observers and pending debounce`() =
         onEdtTest {
@@ -606,6 +731,12 @@ class SwingLiveCompletionBindingTest {
         SwingUtilities.invokeAndWait { runTest { block() } }
     }
 
+    private suspend fun TestScope.settleSwingBinding() {
+        withContext(Dispatchers.Swing) { }
+        runCurrent()
+        withContext(Dispatchers.Swing) { }
+    }
+
     private fun binding(
         scope: CoroutineScope,
         revisions: MutableStateFlow<Long> = MutableStateFlow(-1L),
@@ -642,6 +773,110 @@ class SwingLiveCompletionBindingTest {
             index = 0,
             request = request,
         )
+    }
+
+    private class NativePopupFixture(
+        scope: CoroutineScope,
+        dispatcher: CoroutineDispatcher,
+    ) : AutoCloseable {
+        val source = MutableStateFlow<TerminalShellCommandLineSnapshot?>(null)
+        val connector = MockConnector()
+        val session =
+            TerminalSession.create(
+                TerminalBuffers.create(30, 4),
+                connector,
+                workerDispatcher = dispatcher,
+                ioDispatcher = dispatcher,
+                shellIntegration = TerminalShellIntegrationFactory.host(TerminalShellIntegrationState(), source),
+            )
+        val terminal = RecordingTarget()
+        val popup = RecordingPopup(scope.coroutineContext[Job])
+        val binding = SwingLiveCompletionBinding(session, scope, suggestionsEnabled = { true })
+
+        init {
+            session.start(30, 4)
+            binding.attach(terminal, popup)
+        }
+
+        override fun close() {
+            try {
+                binding.close()
+            } finally {
+                session.close()
+            }
+        }
+    }
+
+    private class TerminalCallbackFixture(
+        scope: CoroutineScope,
+        dispatcher: CoroutineDispatcher,
+    ) : AutoCloseable {
+        var settings = SwingSettings(smartSuggestionsEnabled = true, cursorBlinkMillis = 0, useSystemFallbackFonts = false)
+        val connector = MockConnector()
+        val session =
+            TerminalSession.create(
+                TerminalBuffers.create(30, 4),
+                connector,
+                workerDispatcher = dispatcher,
+                ioDispatcher = dispatcher,
+            )
+        val terminal = SwingTerminal(settingsProvider = { settings })
+        val popup = ThrowingPopup()
+        val binding = SwingLiveCompletionBinding(session, scope, suggestionsEnabled = { true })
+
+        init {
+            session.start(30, 4)
+            terminal.bind(session)
+            binding.attach(terminal, popup)
+        }
+
+        override fun close() {
+            popup.failure = null
+            try {
+                binding.close()
+            } finally {
+                terminal.dispose()
+                session.close()
+            }
+        }
+    }
+
+    private class ThrowingPopup : SwingShellSuggestionTarget {
+        var failure: Exception? = null
+
+        override fun requestSuggestions(snapshot: TerminalShellCommandLineSnapshot) = Unit
+
+        override fun hideSuggestions() {
+            assertTrue(SwingUtilities.isEventDispatchThread())
+            failure?.let { throw it }
+        }
+    }
+
+    private class RecordingPopup(
+        private val parentJob: Job?,
+    ) : SwingShellSuggestionTarget {
+        val requests = ArrayList<TerminalShellCommandLineSnapshot>()
+        var requestJob: Job? = null
+            private set
+        var visible = false
+            private set
+        var hideCount = 0
+            private set
+
+        override fun requestSuggestions(snapshot: TerminalShellCommandLineSnapshot) {
+            assertTrue(SwingUtilities.isEventDispatchThread())
+            requestJob?.cancel()
+            requestJob = Job(parentJob)
+            requests += snapshot
+            visible = true
+        }
+
+        override fun hideSuggestions() {
+            assertTrue(SwingUtilities.isEventDispatchThread())
+            requestJob?.cancel()
+            visible = false
+            hideCount++
+        }
     }
 
     private class RecordingTarget(

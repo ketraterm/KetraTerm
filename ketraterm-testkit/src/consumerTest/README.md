@@ -81,8 +81,13 @@ current reader, pins frames across publication, throws from callbacks and proves
 that all earlier leases release before their buffer can be recycled. Optional
 clients execute bounded directory access, persistence hydration/final flush,
 OSC metadata, profile defaults/copy and the supported completion host combinations.
-The original five jars remain unchanged; these eight clients establish additional
-pre-freeze baselines with their own source/artifact hashes.
+Compared with the original five client/provenance pairs at `e37f5d7f`, parser,
+completion and PTY client bytes remain identical, with refreshed provenance.
+Construction commit `025ccb1a` deliberately replaced host and Swing clients after
+incompatible core/session construction changes. These eight additional clients
+establish extension baselines with their own source/artifact hashes. The 52 cases
+verify upgrades from these declared baselines, not compatibility with the original
+host and Swing callers. See the [migration and baseline decision](../../../docs/library-compatibility.md#verification-and-baseline-changes).
 
 Only an intentional compatibility-boundary review should replace these clients:
 

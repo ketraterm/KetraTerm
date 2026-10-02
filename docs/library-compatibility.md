@@ -5,8 +5,9 @@ The tracked API snapshots are a reviewed development baseline, not a claim that
 earlier 0.x releases were binary compatible. Starting at 1.0, releases within
 one major version preserve supported source, binary and behavioral contracts.
 The [API design review](reviews/terminal-api-design-review-2026-10-02.md) preserves
-the historical evidence for the pre-freeze design decisions. This development
-baseline does not promise compatibility with earlier 0.x shapes.
+the historical evidence. The [final review](reviews/terminal-api-final-review-2026-10-03.md)
+records the resulting contracts and the intentional development baseline changes.
+This baseline does not promise compatibility with earlier 0.x shapes.
 
 ## Supported boundary
 
@@ -124,6 +125,28 @@ requires a separate compatibility decision.
   removal or error-level deprecation belongs in a new major release.
 
 ## Verification and baseline changes
+
+The construction changes deliberately replace earlier development signatures:
+
+- `TerminalBuffers.create` now returns `TerminalRenderBuffer`. Recompile callers;
+  JVM descriptors include return types even when the new type extends the old one.
+- Custom session construction takes `TerminalInputEncoderFactory` instead of an
+  encoder bound to another output. The factory creates independent admission and
+  bulk encoders using the session-supplied output, mode state and policy. Standard
+  assembly accepts a combined render buffer or explicit core/reader collaborators;
+  custom parser assembly uses `TerminalOutputParserFactory`. Recompile callers of
+  changed constructors and Kotlin default-call methods.
+- `TerminalInputEncoder.setInputPolicy` is required. External encoders must apply
+  the policy synchronously or reject it; inheriting the earlier no-op is unsupported.
+
+The original five client/provenance pairs remain available in Git at `e37f5d7f`.
+Construction commit `025ccb1a` replaced the host and Swing clients for these
+intentional breaks. Parser, completion and PTY client bytes remain identical,
+although their provenance was refreshed. Eight additional clients establish
+separate extension baselines. The current 52 positive upgrade cases verify these
+declared baselines; they do not demonstrate compatibility with the original host
+and Swing clients. This review accepts the current snapshots and retained clients
+as a development baseline, subject to the open behavioral gaps in the final review.
 
 Published modules use strict explicit API mode and Kotlin's built-in ABI
 validator over the actual Maven publication jars, with no package allowlist.

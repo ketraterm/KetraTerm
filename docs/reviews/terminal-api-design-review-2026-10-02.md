@@ -5,6 +5,10 @@ the initial G01 compatibility work. This review adds tests and documentation;
 it does not change production APIs. Open work is tracked in the
 [gap map](../terminal-feature-gap-map.md#final-api-design).
 
+The [2026-10-03 final review](terminal-api-final-review-2026-10-03.md) verifies
+the implemented fixes and records their development baseline decision. Findings
+and failing-test results below describe the original reviewed revision.
+
 The module direction is sound for the requested IntelliJ embedding. The
 remaining work concerns public contract shape, ease of composition, and a few
 reproduced validation/value defects. Keep the development compatibility baseline;

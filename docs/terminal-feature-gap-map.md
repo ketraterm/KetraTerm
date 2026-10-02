@@ -245,14 +245,20 @@ The [IntelliJ embedding audit](reviews/intellij-embedding-audit-2026-09-27.md) d
 ## API and Product Verification
 
 - `DONE(policy)`: R08 public dependency exports are corrected in parser, host and completion; isolated API-variant and published Kotlin/Java consumer coverage also exercises Swing host services, suspending hyperlink detection and EDT binding/disposal. Each published consumer declares one library dependency and runs in Gradle-metadata and POM-only modes. The test CI matrix runs `:ketraterm-testkit:publishedConsumerTest`; release signing and remote delivery are outside this check.
-- `DONE(policy)`: G01 reviews public pipeline and embedding contracts, ownership, coordinates, configuration/default-call shapes and encoded/inline behavior. All 17 host/runtime publications have strict explicit API mode, unfiltered Maven ABI snapshots and CI checks. Thirteen retained Kotlin/Java clients provide 52 upgrades across both metadata modes and stdlib 2.4.0/2.4.20, with two deliberate linkage-failure controls. Source consumers continuously check both Kotlin compilers. Concrete external implementations, optional host combinations and concurrent old/new render leases are covered; original client binaries remain unchanged. The [compatibility contract](library-compatibility.md), [feature map](terminal-feature-map.md#7-embedding--swing-ui) and [consumer fixtures](../ketraterm-testkit/src/consumerTest/README.md) define the reviewed boundary and representative coverage. This is a development baseline, not a guarantee for earlier 0.x releases.
+- `DONE(policy)`: G01 reviews public pipeline and embedding contracts, ownership, coordinates, configuration/default-call shapes and encoded/inline behavior. All 17 host/runtime publications have strict explicit API mode, unfiltered Maven ABI snapshots and CI checks. Thirteen retained Kotlin/Java clients provide 52 upgrades across both metadata modes and stdlib 2.4.0/2.4.20, with two deliberate linkage-failure controls. Source consumers continuously check both Kotlin compilers. Concrete external implementations, optional host combinations and concurrent old/new render leases are covered. The host and Swing clients were deliberately replaced for incompatible development construction changes; this gate verifies the declared baselines, not the original five clients as a set. The [compatibility contract](library-compatibility.md), [feature map](terminal-feature-map.md#7-embedding--swing-ui) and [consumer fixtures](../ketraterm-testkit/src/consumerTest/README.md) define the reviewed boundary and representative coverage. This is a development baseline, not a guarantee for earlier 0.x releases.
 
 ### Final API Design
 
 The [2026-10-02 API design review](reviews/terminal-api-design-review-2026-10-02.md)
-findings are resolved by the construction, presentation and extension contracts,
-with verification recorded under G01. The review retains the historical evidence.
-E04's independent renderer proposal remains outside scope.
+findings A01–A12 are resolved by the construction, presentation and extension
+contracts, with verification recorded under G01. The
+[2026-10-03 final review](reviews/terminal-api-final-review-2026-10-03.md) accepts
+the development baseline and records the remaining native-target behavior below.
+Both reviews retain their historical evidence. E04's independent renderer proposal
+remains outside scope.
+
+- `TODO(ui)`: A13 — optional live-completion coordination must cancel automatic target work and hide its popup when the session closes or fails, without requiring another shell edit or focus change. The native target currently observes only edit revisions; session shutdown stops that tracker without triggering the binding. Correct regressions cover outstanding requests on remote closure and failure. Keep target resources host-owned; observe lifecycle at the shared binding boundary.
+- `TODO(ui)`: A14 — native suggestion-target failures must follow their documented propagation contract. Input-invalidation and eligibility callbacks currently discard target exceptions through ignored `runCatching`; direct operations and observation jobs propagate them. Preserve cancellation and make callback failures observable consistently, without assigning popup ownership to Swing.
 
 ### Release Verification
 
