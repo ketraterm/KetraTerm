@@ -23,6 +23,7 @@ import io.github.ketraterm.ui.swing.settings.SwingSettings
 import io.github.ketraterm.ui.swing.suggestion.*
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.swing.Swing
 import kotlinx.coroutines.test.*
 import java.awt.event.FocusEvent
@@ -114,6 +115,121 @@ class SwingLiveCompletionBindingTest {
         }
 
     @Test
+    fun `local session closure cancels host work and removes coordination`() =
+        runTest {
+            val fixture = withContext(Dispatchers.Swing) { NativePopupFixture(backgroundScope, StandardTestDispatcher(testScheduler)) }
+            try {
+                fixture.source.value = snapshot("git st")
+                settleSwingBinding()
+                val request =
+                    withContext(Dispatchers.Swing) {
+                        fixture.binding.refreshNow()
+                        assertNotNull(fixture.popup.requestJob).also {
+                            assertTrue(it.isActive)
+                            fixture.session.close()
+                        }
+                    }
+                settleSwingBinding()
+                withContext(Dispatchers.Swing) {
+                    assertTrue(assertIs<TerminalSessionState.Closed>(fixture.session.state.value).event.locallyRequested)
+                    assertFalse(fixture.popup.visible)
+                    assertTrue(request.isCancelled)
+                    assertEquals(1, fixture.terminal.removeFocusListenerCount)
+                    val requests = fixture.popup.requests.size
+                    fixture.terminal.gainFocus()
+                    fixture.binding.refreshNow()
+                    assertEquals(requests, fixture.popup.requests.size)
+                    assertTrue(checkNotNull(backgroundScope.coroutineContext[Job]).isActive)
+                }
+                assertEquals(0, fixture.source.subscriptionCount.value)
+            } finally {
+                withContext(Dispatchers.Swing) { fixture.close() }
+            }
+        }
+
+    @Test
+    fun `already closed session detaches even when observation starts immediately`() =
+        onEdtTest {
+            val states = MutableStateFlow<TerminalSessionState>(TerminalSessionState.Closed(TerminalSessionCloseEvent(null, null, true)))
+            val revisions = MutableStateFlow(-1L)
+            val target = RecordingTarget()
+            val binding = binding(backgroundScope, revisions, sessionState = states)
+            try {
+                binding.attach(target)
+                binding.refreshNow()
+                runCurrent()
+                assertEquals(1, target.removeFocusListenerCount)
+                assertEquals(1, target.hideCount)
+                assertTrue(target.requests.isEmpty())
+                assertEquals(0, states.subscriptionCount.value)
+                assertEquals(0, revisions.subscriptionCount.value)
+                assertTrue(checkNotNull(backgroundScope.coroutineContext[Job]).isActive)
+            } finally {
+                binding.close()
+            }
+        }
+
+    @Test
+    fun `termination cancels pending debounce and rejects later refreshes`() =
+        onEdtTest {
+            val states = MutableStateFlow<TerminalSessionState>(TerminalSessionState.Running)
+            val revisions = MutableStateFlow(-1L)
+            val target = RecordingTarget()
+            val binding = binding(backgroundScope, revisions, sessionState = states, edtDispatcher = StandardTestDispatcher(testScheduler))
+            try {
+                binding.attach(target)
+                binding.scheduleRefresh()
+                runCurrent()
+                states.value = TerminalSessionState.Closed(TerminalSessionCloseEvent(0, null, false))
+                binding.scheduleRefresh()
+                binding.refreshNow()
+                revisions.value = 1
+                target.gainFocus()
+                advanceTimeBy(100.milliseconds)
+                runCurrent()
+                assertTrue(target.requests.isEmpty())
+                assertEquals(1, target.removeFocusListenerCount)
+                assertEquals(0, states.subscriptionCount.value)
+                assertEquals(0, revisions.subscriptionCount.value)
+            } finally {
+                binding.close()
+            }
+        }
+
+    @Test
+    fun `termination hide failure reaches observation scope after detaching`() =
+        onEdtTest {
+            val failures = ArrayList<Throwable>()
+            val owner =
+                CoroutineScope(
+                    backgroundScope.coroutineContext + SupervisorJob() + CoroutineExceptionHandler { _, failure -> failures += failure },
+                )
+            val states = MutableStateFlow<TerminalSessionState>(TerminalSessionState.Running)
+            val revisions = MutableStateFlow(-1L)
+            val target = RecordingTarget()
+            val popup = ThrowingPopup()
+            val binding = binding(owner, revisions, sessionState = states)
+            try {
+                binding.attach(target, popup)
+                runCurrent()
+                val failure = IllegalStateException("termination hide failed")
+                popup.failure = failure
+                states.value = TerminalSessionState.Closed(TerminalSessionCloseEvent(null, null, true))
+                runCurrent()
+                assertEquals(1, failures.size)
+                assertSame(failure, failures.single())
+                assertEquals(1, target.removeFocusListenerCount)
+                assertEquals(0, states.subscriptionCount.value)
+                assertEquals(0, revisions.subscriptionCount.value)
+                assertTrue(checkNotNull(owner.coroutineContext[Job]).isActive)
+            } finally {
+                popup.failure = null
+                binding.close()
+                owner.cancel()
+            }
+        }
+
+    @Test
     fun `terminal input invalidation propagates host popup failure`() =
         verifyTargetFailurePropagation(cancellation = false, eligibility = false)
 
@@ -146,6 +262,12 @@ class SwingLiveCompletionBindingTest {
         try {
             settleSwingBinding()
             withContext(Dispatchers.Swing) {
+                var laterListenerCalled = false
+                if (eligibility) {
+                    fixture.terminal.addShellSuggestionEligibilityListener { laterListenerCalled = true }
+                } else {
+                    fixture.terminal.addShellSuggestionInvalidationListener { laterListenerCalled = true }
+                }
                 fixture.popup.failure = failure
                 if (eligibility) {
                     assertTrue(fixture.terminal.isAutomaticShellSuggestionEligible())
@@ -154,7 +276,20 @@ class SwingLiveCompletionBindingTest {
                 } else {
                     assertSame(failure, assertFails { fixture.terminal.clearScreen() })
                 }
+                assertFalse(laterListenerCalled, "Failure must stop the invoking notification")
+                fixture.popup.failure = null
+                if (eligibility) {
+                    assertFalse(fixture.terminal.isAutomaticShellSuggestionEligible())
+                    fixture.settings = fixture.settings.copy(smartSuggestionsEnabled = true)
+                    fixture.terminal.reloadSettings()
+                    assertTrue(fixture.terminal.isAutomaticShellSuggestionEligible())
+                } else {
+                    assertTrue(fixture.terminal.clearScreen())
+                }
+                assertTrue(laterListenerCalled, "Later operations must recover after the host failure")
             }
+            settleSwingBinding()
+            assertContentEquals(if (eligibility) byteArrayOf() else byteArrayOf(0x0C), fixture.connector.writtenBytes)
         } finally {
             withContext(Dispatchers.Swing) { fixture.close() }
         }
@@ -743,6 +878,8 @@ class SwingLiveCompletionBindingTest {
         activeCommandLine: () -> TerminalShellCommandLineSnapshot? = { snapshot("git s") },
         feedbackHandler: SwingShellSuggestionFeedbackHandler = SwingShellSuggestionFeedbackHandler.NONE,
         minimumNonWhitespaceCharacters: Int = 2,
+        sessionState: StateFlow<TerminalSessionState>? = null,
+        edtDispatcher: CoroutineDispatcher = UnconfinedTestDispatcher(scope.coroutineContext[TestCoroutineScheduler]),
     ): SwingLiveCompletionBinding =
         SwingLiveCompletionBinding(
             activeCommandLine = activeCommandLine,
@@ -751,8 +888,9 @@ class SwingLiveCompletionBindingTest {
             rankingContextKey = { "file:///workspace" },
             feedbackHandler = feedbackHandler,
             observationScope = scope,
-            edtDispatcher = UnconfinedTestDispatcher(scope.coroutineContext[TestCoroutineScheduler]),
+            edtDispatcher = edtDispatcher,
             minimumNonWhitespaceCharacters = minimumNonWhitespaceCharacters,
+            sessionState = sessionState,
         )
 
     private fun snapshot(command: String): TerminalShellCommandLineSnapshot =

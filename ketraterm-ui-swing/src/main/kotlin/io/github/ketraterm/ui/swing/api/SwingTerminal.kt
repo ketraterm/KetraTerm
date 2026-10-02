@@ -1928,7 +1928,7 @@ public class SwingTerminal
         private fun invalidateShellSuggestionsOnEdt() {
             cancelAndHideShellSuggestionsOnEdt("Shell suggestions invalidated by input")
             suggestionInvalidationListeners.forEach { listener ->
-                runCatching(listener::onShellSuggestionsInvalidated)
+                listener.onShellSuggestionsInvalidated()
             }
         }
 
@@ -2160,7 +2160,7 @@ public class SwingTerminal
             val eligible = !disposed && settings.smartSuggestionsEnabled && liveViewport && settings.shellSuggestionsEnabled
             if (automaticSuggestionEligible.getAndSet(eligible) == eligible) return
             suggestionEligibilityListeners.forEach { listener ->
-                runCatching { listener.onAutomaticShellSuggestionEligibilityChanged(eligible) }
+                listener.onAutomaticShellSuggestionEligibilityChanged(eligible)
             }
         }
 

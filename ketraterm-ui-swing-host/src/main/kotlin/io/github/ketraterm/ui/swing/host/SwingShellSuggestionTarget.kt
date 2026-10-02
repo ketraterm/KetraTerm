@@ -21,7 +21,8 @@ import io.github.ketraterm.session.TerminalShellCommandLineSnapshot
  * Host-owned request and presentation lifecycle for optional automatic completion.
  *
  * Calls run on the EDT. The target owns provider collection, selection, acceptance,
- * and its popup; the live binding owns focus, eligibility, debounce, and invalidation.
+ * and its popup; the live binding owns focus, eligibility, debounce, invalidation,
+ * and session-termination observation.
  * Check the current session snapshot before accepting a result. Native popups obtain
  * component-local anchors through SwingTerminal.copyCellBounds. Target exceptions
  * propagate to the calling operation or observation scope; close still detaches

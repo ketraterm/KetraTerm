@@ -16,6 +16,7 @@
 package io.github.ketraterm.ui.swing.host
 
 import io.github.ketraterm.session.TerminalSession
+import io.github.ketraterm.session.TerminalSessionState
 import io.github.ketraterm.session.TerminalShellCommandLineSnapshot
 import io.github.ketraterm.ui.swing.api.SwingTerminal
 import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionEligibilityListener
@@ -26,6 +27,7 @@ import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.debounce
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.swing.Swing
 import java.awt.event.FocusAdapter
 import java.awt.event.FocusEvent
@@ -37,7 +39,8 @@ import javax.swing.SwingUtilities
  *
  * The binding observes dedicated shell-edit revisions, applies the shared debounce policy,
  * adapts shell snapshots to Swing requests, hides suggestions when focus leaves
- * the terminal, and invalidates request deduplication after user feedback. It
+ * the terminal, and invalidates request deduplication after user feedback. Session
+ * termination closes the binding and cancels target work on the EDT. It
  * owns only its observation job; completion providers, enablement, ranking
  * context, and feedback persistence remain host supplied.
  *
@@ -60,6 +63,7 @@ public class SwingLiveCompletionBinding
         private val edtDispatcher: CoroutineDispatcher = Dispatchers.Swing,
         private val debounceMillis: Int = DEFAULT_DEBOUNCE_MILLIS,
         private val minimumNonWhitespaceCharacters: Int = DEFAULT_MINIMUM_NON_WHITESPACE_CHARACTERS,
+        private val sessionState: StateFlow<TerminalSessionState>? = null,
     ) : AutoCloseable {
         private var target: SwingLiveCompletionTarget? = null
         private var suggestionTarget: SwingShellSuggestionTarget? = null
@@ -140,6 +144,7 @@ public class SwingLiveCompletionBinding
             rankingContextKey = rankingContextKey,
             feedbackHandler = feedbackHandler,
             observationScope = coroutineScope,
+            sessionState = session.state,
         )
 
         /**
@@ -159,7 +164,8 @@ public class SwingLiveCompletionBinding
          *
          * Close this binding before rebinding or disposing the terminal. The host
          * retains target resources and explicit-request orchestration; this binding
-         * cancels automatic work through [suggestionTarget] on invalidation or close.
+         * cancels automatic work through [suggestionTarget] on invalidation, session
+         * termination, or close.
          * Configure the target's feedback through [suggestionFeedbackHandler].
          */
         public fun attach(
@@ -184,8 +190,9 @@ public class SwingLiveCompletionBinding
                 focusListenerAttached = true
                 target.addInvalidationListener(invalidationListener)
                 target.addEligibilityListener(eligibilityListener)
+                // Install the job before an already-closed session can synchronously detach it.
                 observationJob =
-                    observationScope.launch(edtDispatcher + CoroutineName("swing-live-completion")) {
+                    observationScope.launch(edtDispatcher + CoroutineName("swing-live-completion"), start = CoroutineStart.LAZY) {
                         launch {
                             refreshes
                                 .debounce { if (it == null) 0L else debounceMillis.toLong() }
@@ -193,12 +200,19 @@ public class SwingLiveCompletionBinding
                                     if (revision != null && revision == refreshes.value) refreshNow()
                                 }
                         }
+                        sessionState?.let { states ->
+                            launch {
+                                states.first { it is TerminalSessionState.Closed }
+                                close()
+                            }
+                        }
                         shellCommandLineRevisions.collect { revision ->
                             if (revision >= 0L) {
                                 onShellCommandLineRevisionOnEdt(revision)
                             }
                         }
                     }
+                observationJob?.start()
             } catch (failure: Throwable) {
                 observationJob?.cancel()
                 observationJob = null
@@ -311,6 +325,7 @@ public class SwingLiveCompletionBinding
 
         private fun isEligibleOnEdt(): Boolean =
             !closed &&
+                sessionState?.value !is TerminalSessionState.Closed &&
                 target?.isFocusOwner() == true &&
                 target?.isAutomaticSuggestionEligible() == true &&
                 suggestionsEnabled()

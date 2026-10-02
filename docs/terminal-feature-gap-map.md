@@ -250,15 +250,13 @@ The [IntelliJ embedding audit](reviews/intellij-embedding-audit-2026-09-27.md) d
 ### Final API Design
 
 The [2026-10-02 API design review](reviews/terminal-api-design-review-2026-10-02.md)
-findings A01–A12 are resolved by the construction, presentation and extension
-contracts, with verification recorded under G01. The
-[2026-10-03 final review](reviews/terminal-api-final-review-2026-10-03.md) accepts
-the development baseline and records the remaining native-target behavior below.
+and [2026-10-03 final review](reviews/terminal-api-final-review-2026-10-03.md)
+findings are resolved by the construction, presentation, extension and lifecycle
+contracts, with verification recorded under G01. Native coordination now observes
+session termination; callback failures and cancellation propagate. All six final-review
+regressions pass, with closure-boundary, detachment and recovery coverage.
 Both reviews retain their historical evidence. E04's independent renderer proposal
 remains outside scope.
-
-- `TODO(ui)`: A13 — optional live-completion coordination must cancel automatic target work and hide its popup when the session closes or fails, without requiring another shell edit or focus change. The native target currently observes only edit revisions; session shutdown stops that tracker without triggering the binding. Correct regressions cover outstanding requests on remote closure and failure. Keep target resources host-owned; observe lifecycle at the shared binding boundary.
-- `TODO(ui)`: A14 — native suggestion-target failures must follow their documented propagation contract. Input-invalidation and eligibility callbacks currently discard target exceptions through ignored `runCatching`; direct operations and observation jobs propagate them. Preserve cancellation and make callback failures observable consistently, without assigning popup ownership to Swing.
 
 ### Release Verification
 
