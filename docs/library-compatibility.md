@@ -4,9 +4,9 @@ KetraTerm's published JVM libraries are intended for Kotlin and Java hosts.
 The tracked API snapshots are a reviewed development baseline, not a claim that
 earlier 0.x releases were binary compatible. Starting at 1.0, releases within
 one major version preserve supported source, binary and behavioral contracts.
-The [API design review](reviews/terminal-api-design-review-2026-10-02.md) tracks
-the remaining construction, extension and evolution decisions before selecting
-that stable public shape; the current baseline does not freeze those decisions.
+The [API design review](reviews/terminal-api-design-review-2026-10-02.md) preserves
+the historical evidence for the pre-freeze design decisions. This development
+baseline does not promise compatibility with earlier 0.x shapes.
 
 ## Supported boundary
 
@@ -51,6 +51,15 @@ Swing component operations require the EDT; disposing a view does not close its
 host-owned session. Host shell producers and supplied dispatchers remain owned
 by the host.
 
+`TerminalCommandSink`, core role interfaces, `TerminalRenderFrameReader`,
+`TerminalRenderFrame`, and host callback interfaces support external implementations.
+Their required semantic members are implementer commitments. `TerminalLine` is a
+borrowed view that an independent core may implement; render caches and published
+snapshots are library-produced consumer views, not mutable extension hooks.
+Direct line-cluster copies require known sufficient capacity. Complete reads of
+arbitrary directly written clusters use the existing frame cluster sink, which
+provides the length and borrowed range without a capacity guess.
+
 The initial review deliberately narrows earlier development APIs: raw packed
 core attributes belong to core implementation, and published caches must be read
 through `readCurrent` leases. Inspect semantic attributes or public render words
@@ -93,11 +102,20 @@ requires a separate compatibility decision.
   check, including the configured JVM default-method mode.
   New enum or sealed variants can also break exhaustive Kotlin `when` consumers;
   assess their source and runtime behavior before calling an addition compatible.
+  Introduce an actual new semantic family through a focused optional capability
+  rather than adding required members to old contracts. Capability absence must
+  preserve truthful unsupported behavior, including protocol failure replies when
+  permitted; response-family denial suppresses those replies too. Default no-ops
+  are limited to genuinely optional observer/host hooks.
 - Public inline bodies and `const` values are copied into consumers. Preserve
   numeric mode bits, enum ordering where ordinals are encoded, packed render
   words and their meanings; a signature comparison alone cannot detect drift.
   Publisher changes must also honor the lease algorithm embedded in previously
   compiled readers, not just retain their `@PublishedApi` helper signatures.
+  Current inline callbacks delegate acquisition/release bookkeeping to non-inline
+  operations. The original lock, three-buffer indices, counts, arrays, and release
+  operation remain committed for retained inline readers; this is not permission
+  to replace their representation without a compatibility decision.
 - Keep public dependency types available to isolated consumers through generated
   Maven metadata. Resolve each KetraTerm dependency from the same release;
   independently mixing library versions is not covered.

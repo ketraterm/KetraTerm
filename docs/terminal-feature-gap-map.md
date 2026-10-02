@@ -245,19 +245,14 @@ The [IntelliJ embedding audit](reviews/intellij-embedding-audit-2026-09-27.md) d
 ## API and Product Verification
 
 - `DONE(policy)`: R08 public dependency exports are corrected in parser, host and completion; isolated API-variant and published Kotlin/Java consumer coverage also exercises Swing host services, suspending hyperlink detection and EDT binding/disposal. Each published consumer declares one library dependency and runs in Gradle-metadata and POM-only modes. The test CI matrix runs `:ketraterm-testkit:publishedConsumerTest`; release signing and remote delivery are outside this check.
-- `DONE(policy)`: G01 reviews the public pipeline and embedding boundaries, ownership/lifetimes, coordinates, configuration/default-call shapes and encoded/inline behavior. All 17 explicitly selected host/runtime libraries have strict explicit API mode, unfiltered Maven-publication ABI snapshots and CI checks. The visibility review removes direct session-core/admission-lock access, public opaque core words, unleased publisher access, selection packing and unused shell/search-bar hooks; local input/configuration/projection helpers remain internal. Required host contracts and inline linkage remain supported. Five retained Kotlin/Java clients provide 20 upgrade cases across both metadata modes and stdlib 2.4.0/2.4.20, with two deliberate linkage-failure controls; isolated source consumers also pass with Kotlin compilers 2.4.0 and 2.4.20. Java clipboard access, PTY dependency exports, serialized session window/mode access, suffix defaults and embedding validation defects were corrected. The [compatibility contract](library-compatibility.md) defines module roles, minimum versions and evolution/deprecation rules; the [feature map](terminal-feature-map.md#7-embedding--swing-ui) and [consumer fixtures](../ketraterm-testkit/src/consumerTest/README.md) state coverage and limits. This is an initial development baseline, not a retrospective guarantee for earlier 0.x releases.
+- `DONE(policy)`: G01 reviews public pipeline and embedding contracts, ownership, coordinates, configuration/default-call shapes and encoded/inline behavior. All 17 host/runtime publications have strict explicit API mode, unfiltered Maven ABI snapshots and CI checks. Thirteen retained Kotlin/Java clients provide 52 upgrades across both metadata modes and stdlib 2.4.0/2.4.20, with two deliberate linkage-failure controls. Source consumers continuously check both Kotlin compilers. Concrete external implementations, optional host combinations and concurrent old/new render leases are covered; original client binaries remain unchanged. The [compatibility contract](library-compatibility.md), [feature map](terminal-feature-map.md#7-embedding--swing-ui) and [consumer fixtures](../ketraterm-testkit/src/consumerTest/README.md) define the reviewed boundary and representative coverage. This is a development baseline, not a guarantee for earlier 0.x releases.
+
 ### Final API Design
 
 The [2026-10-02 API design review](reviews/terminal-api-design-review-2026-10-02.md)
-extends G01 with usability, extension and stable-major evolution findings, identified
-as A01–A12. The initial compatibility baseline remains complete; the remaining
-decisions and reproduced defects below are open before the final API freeze. E04's independent
-renderer proposal remains outside scope.
-
-- `TODO(policy)`: A06 — distinguish external implementer contracts from library-produced views and retain concrete Kotlin/Java SPI implementations. New semantic families need explicit compatible capability/unsupported behavior, not new abstract methods or silent no-ops on old contracts.
-- `TODO(render/policy)`: A07 — settle how public inline render leasing commits publisher bookkeeping before freeze. Either retain the representation deliberately or move bookkeeping behind measured non-inline operations; verify old compiled readers under concurrency and callback failure.
-- `TODO(core/policy)`: A11 — choose the direct line-cluster copy contract: truthful capacity discovery or an explicit complete-read path through existing frame sinks. Correct the allocate-once guidance when cluster length has no fixed API bound.
-- `TODO(policy)`: A12 — extend representative compatibility execution with the concrete host combinations and implementers selected by this review. Minimum-compiler execution and retained optional-library clients are verification improvements, not evidence of current linkage failures.
+findings are resolved by the construction, presentation and extension contracts,
+with verification recorded under G01. The review retains the historical evidence.
+E04's independent renderer proposal remains outside scope.
 
 ### Release Verification
 

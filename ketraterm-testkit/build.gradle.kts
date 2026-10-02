@@ -298,6 +298,9 @@ val preparePublishedConsumers =
 fun JavaExec.configureConsumerBuild(
     metadata: String,
     verificationTask: String,
+    kotlinCompilerVersion: String =
+        org.jetbrains.kotlin.gradle.plugin
+            .getKotlinPluginVersion(logger),
 ) {
     dependsOn(preparePublishedConsumers, rootProject.tasks.named("prepareLibraryConsumerRepository"))
     javaLauncher.set(javaToolchains.launcherFor { languageVersion.set(JavaLanguageVersion.of(25)) })
@@ -310,7 +313,7 @@ fun JavaExec.configureConsumerBuild(
         "--console=plain",
         "--no-daemon",
         "--max-workers=2",
-        "-PkotlinVersion=${org.jetbrains.kotlin.gradle.plugin.getKotlinPluginVersion(logger)}",
+        "-PkotlinVersion=$kotlinCompilerVersion",
         "-PlibraryVersion=${project.version}",
         "-PlibraryRepository=${rootProject.layout.buildDirectory.dir("library-consumer-repository").get().asFile.toURI()}",
         "-PmetadataMode=$metadata",
@@ -319,14 +322,21 @@ fun JavaExec.configureConsumerBuild(
 }
 
 val verifyPublishedConsumers =
-    listOf("gradle", "pom").map { metadata ->
-        tasks.register<JavaExec>("verify${metadata.replaceFirstChar(Char::uppercaseChar)}PublishedConsumers") {
-            group = "verification"
-            description = "Compiles and runs isolated Kotlin/Java consumers using $metadata publication metadata."
-            configureConsumerBuild(metadata, "check")
+    listOf("gradle", "pom").flatMap { metadata ->
+        listOf(false, true).map { minimumCompiler ->
+            val compilerSuffix = if (minimumCompiler) "MinimumKotlin" else ""
+            tasks.register<JavaExec>("verify${metadata.replaceFirstChar(Char::uppercaseChar)}${compilerSuffix}PublishedConsumers") {
+                group = "verification"
+                description = "Compiles and runs isolated Kotlin/Java consumers using $metadata publication metadata."
+                if (minimumCompiler) {
+                    configureConsumerBuild(metadata, "check", "2.4.0")
+                } else {
+                    configureConsumerBuild(metadata, "check")
+                }
+            }
         }
     }
-verifyPublishedConsumers[1].configure { mustRunAfter(verifyPublishedConsumers[0]) }
+verifyPublishedConsumers.zipWithNext { previous, next -> next.configure { mustRunAfter(previous) } }
 
 val prepareCompiledClientRuntimes =
     listOf("gradle", "pom").flatMap { metadata ->

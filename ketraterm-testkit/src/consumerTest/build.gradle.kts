@@ -30,7 +30,7 @@ val runtimeName = runtimeKotlinVersion.getOrElse("current")
 subprojects {
     val consumerName = name
     apply(plugin = "org.jetbrains.kotlin.jvm")
-    layout.buildDirectory.set(layout.projectDirectory.dir("build/$metadataMode"))
+    layout.buildDirectory.set(layout.projectDirectory.dir("build/$metadataMode/${providers.gradleProperty("kotlinVersion").get()}"))
     configurations.configureEach { resolutionStrategy.cacheChangingModulesFor(0, "seconds") }
     repositories {
         exclusiveContent {
@@ -53,7 +53,8 @@ subprojects {
     }
     extensions.configure<org.jetbrains.kotlin.gradle.dsl.KotlinJvmProjectExtension> { jvmToolchain(25) }
     // The only library dependency: missing exports must not be repaired by the fixture.
-    dependencies { add("implementation", "io.github.ketraterm:ketraterm-$name:${providers.gradleProperty("libraryVersion").get()}") }
+    val libraryName = if (name == "host-spi") "host" else name
+    dependencies { add("implementation", "io.github.ketraterm:ketraterm-$libraryName:${providers.gradleProperty("libraryVersion").get()}") }
     runtimeKotlinVersion.orNull?.let { version ->
         configurations.named("runtimeClasspath") {
             resolutionStrategy.force(
@@ -68,7 +69,7 @@ subprojects {
             dependsOn("classes")
             classpath = project.extensions.getByType<SourceSetContainer>()["main"].runtimeClasspath
             mainClass.set("consumer.KotlinConsumerKt")
-            if (project.name == "ui-swing") systemProperty("java.awt.headless", "true")
+            if (project.name in setOf("ui-swing", "ui-swing-host")) systemProperty("java.awt.headless", "true")
             javaLauncher.set(
                 project.extensions.getByType<JavaToolchainService>().launcherFor {
                     languageVersion.set(JavaLanguageVersion.of(25))

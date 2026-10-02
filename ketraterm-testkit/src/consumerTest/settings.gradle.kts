@@ -22,3 +22,4 @@ plugins {
 }
 rootProject.name = "published-library-consumers"
 include("parser", "host", "completion", "ui-swing", "pty")
+include("core", "host-spi", "render-cache", "completion-host", "completion-persistence", "shell-integration", "ui-swing-host", "workspace")

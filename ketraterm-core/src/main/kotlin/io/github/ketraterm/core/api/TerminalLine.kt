@@ -56,8 +56,14 @@ public interface TerminalLine {
      * Copies all codepoints of the grapheme cluster at [col] into [dest] and
      * returns the number of codepoints written.
      *
-     * **Zero-allocation contract:** the renderer allocates `dest` once at startup
-     * and reuses it across all frames. This method never allocates.
+     * The copy itself does not allocate. The caller owns capacity and may reuse
+     * [dest] while it remains large enough; no fixed public cluster-length bound
+     * makes one startup allocation sufficient for every directly written cluster.
+     * For complete reads without a capacity guess, use
+     * [io.github.ketraterm.render.api.TerminalRenderFrame.copyLine] with a
+     * [io.github.ketraterm.render.api.TerminalRenderClusterDataSink]. Its callback
+     * supplies the full length and a borrowed primitive range to copy before returning.
+     * Keep the owning terminal serialized for either read path.
      *
      * Returns `0` for non-cluster cells; callers should check [isCluster] first
      * or treat a return value of `0` as "use [getCodepoint] instead".
@@ -66,6 +72,7 @@ public interface TerminalLine {
      * @param dest Destination array. Must have capacity >= actual cluster length;
      * there is no fixed public upper bound guaranteed by this API.
      * @return Number of codepoints written, or 0 if the cell is not a cluster.
+     * @throws IndexOutOfBoundsException when a core-owned cluster exceeds [dest]'s capacity.
      */
     public fun readCluster(
         col: Int,

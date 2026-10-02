@@ -30,9 +30,11 @@ import kotlin.concurrent.withLock
  * Writer and UI never touch the same buffer simultaneously when UI consumers
  * access the front buffer through [readCurrent].
  *
- * The public inline reader avoids a callback allocation. Its [PublishedApi] lease
- * helpers are binary compatibility commitments because compiled Kotlin callers link
- * to them directly; they are not host extension points.
+ * The public inline reader avoids a callback allocation; non-inline operations own
+ * lease acquisition and release. [PublishedApi] declarations are binary compatibility
+ * commitments, not host extension points. Earlier compiled readers acquire leases
+ * directly through the retained lock, indices, arrays and counts; writers and new
+ * readers must continue to cooperate with that algorithm.
  *
  * @param columns initial cache width in cells.
  * @param rows initial cache height in rows.
@@ -139,20 +141,14 @@ public class TerminalRenderPublisher(
      *
      * The callback should only copy or paint from the cache and must not call
      * back into this publisher. Returning `null` means no frame has been
-     * published yet.
+     * published yet, or the callback itself returns `null`. Callback failures and
+     * non-local returns release the lease before propagating to the caller.
      *
      * @param block reader invoked with the current front buffer.
      * @return [block]'s result, or `null` when no frame is available.
      */
     public inline fun <T> readCurrent(block: (TerminalRenderCache) -> T): T? {
-        val index =
-            publishLock.withLock {
-                val i = frontIndex
-                if (i != NO_FRONT) {
-                    readerCounts[i]++
-                }
-                i
-            }
+        val index = acquireFrontLease()
 
         if (index == NO_FRONT) return null
 
@@ -162,6 +158,15 @@ public class TerminalRenderPublisher(
             releaseFrontLease(index)
         }
     }
+
+    /** Shares acquisition bookkeeping between current calls while honoring older inline readers. */
+    @PublishedApi
+    internal fun acquireFrontLease(): Int =
+        publishLock.withLock {
+            val index = frontIndex
+            if (index != NO_FRONT) readerCounts[index]++
+            index
+        }
 
     private fun acquireWritableIndex(): Int {
         publishLock.withLock {

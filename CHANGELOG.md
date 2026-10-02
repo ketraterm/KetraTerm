@@ -6,6 +6,7 @@ Release notes for library consumers and embedders. Product-specific changes are 
 
 ### Improvements and fixes
 
+- Expanded concrete implementation and retained-client compatibility checks; clarified complete cluster reads and isolated render-lease acquisition.
 - Added native completion popup anchoring, optional host controller coordination, and provider diagnostics while preserving existing Swing configuration signatures.
 
 - Bound custom session encoders to ordered output and preserved session services with parser factories. Made render capabilities explicit; consumers must recompile for the revised construction signatures.

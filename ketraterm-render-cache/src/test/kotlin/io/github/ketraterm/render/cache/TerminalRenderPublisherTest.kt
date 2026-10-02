@@ -25,6 +25,30 @@ import kotlin.concurrent.thread
 
 class TerminalRenderPublisherTest {
     @Test
+    fun `empty publication does not invoke the reader`() {
+        val publisher = TerminalRenderPublisher(1, 1)
+        assertNull(publisher.readCurrent<Unit> { fail("No frame has been published") })
+    }
+
+    @Test
+    fun `non-local return and callback failure release all reader leases`() {
+        val publisher = TerminalRenderPublisher(3, 1)
+        publisher.updateAndPublish(MockFrame(3, 1, "abc"))
+
+        fun firstCodepoint(): Int {
+            publisher.readCurrent { return it.codeWords[0] }
+            return 0
+        }
+        assertEquals('a'.code, firstCodepoint())
+        val failure = IllegalStateException("Reader failed")
+        assertSame(failure, assertThrows(IllegalStateException::class.java) { publisher.readCurrent { throw failure } })
+        // This is the ownership invariant, including the buffer no longer selected as front.
+        assertTrue(publisher.readerCounts.all { it == 0 })
+        publisher.updateAndPublish(MockFrame(3, 1, "def"))
+        assertEquals("def", publisher.readCurrent { it.rowText(0) })
+    }
+
+    @Test
     fun `writer buffers can be reused by different worker threads`() {
         val publisher = TerminalRenderPublisher(3, 1)
         val texts = listOf("abc", "def", "ghi", "jkl", "mno", "pqr")

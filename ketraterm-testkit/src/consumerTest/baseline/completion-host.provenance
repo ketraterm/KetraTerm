@@ -1,0 +1,16 @@
+format=1
+basis=reviewed-working-tree
+baseRevision=4a31f5bb36b31d0b3035f8862dcdc4438e6156d0
+libraryVersion=0.3.0-SNAPSHOT
+kotlinVersion=2.4.20
+jvmTarget=25
+jdkVersion=25.0.3+9-LTS
+jdkVendor=Eclipse Temurin
+clientSha256=a3c40ee8cf58dc0028ebc5d3f03f10f4e624b03390435dc22d515ab227c20056
+artifact=io.github.ketraterm:ketraterm-completion-host:0.3.0-SNAPSHOT sha256=a37cc4a7ec77091825364100278473891baac8901f48bb7db331d34e0389d804
+artifact=io.github.ketraterm:ketraterm-completion:0.3.0-SNAPSHOT sha256=b64f9141a38290e318e09fcbb35d65794ed393c788b82bebecaf5a1325626ac5
+artifact=org.jetbrains.kotlin:kotlin-stdlib:2.4.20 sha256=2226de463d309d4a5500a481320b3dea515a6981dcae1def531fbc158884e25f
+artifact=org.jetbrains.kotlinx:kotlinx-coroutines-core-jvm:1.10.2 sha256=5ca175b38df331fd64155b35cd8cae1251fa9ee369709b36d42e0a288ccce3fd
+artifact=org.jetbrains:annotations:23.0.0 sha256=7b0f19724082cbfcbc66e5abea2b9bc92cf08a1ea11e191933ed43801eb3cd05
+source=src/main/java/consumer/JavaConsumer.java sha256=da962f7ef0fd6a950af72b68b77f3e6c30bf833ef5780d6163dd46a521218754
+source=src/main/kotlin/consumer/KotlinConsumer.kt sha256=a85ca2aa94172c744ba96987735e6710b1c96e767b30802454c3ffe386394ced

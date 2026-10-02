@@ -291,7 +291,7 @@ operations and invalid fill values are ignored.
 
 ## Reader contract
 
-`TerminalReader` and `TerminalLineApi` provide safe, allocation-light access to
+`TerminalReader` and `TerminalLine` provide safe, allocation-light access to
 stored state.
 
 Guaranteed behavior:
@@ -303,7 +303,11 @@ Guaranteed behavior:
 - blank cells read as `0`
 - wide spacers read as `-1`
 - cluster cells return the leading/base codepoint through `getCodepointAt`
-- full cluster contents are available through `readCluster`
+- `readCluster` copies complete clusters into caller-owned arrays of known sufficient
+  capacity; directly written clusters have no fixed public length bound
+- for complete reads without guessing capacity, `TerminalRenderFrame.copyLine` and
+  its primitive cluster sink supply the full length and a borrowed range; copy it
+  before the callback returns, under the same terminal serialization
 
 Not guaranteed:
 

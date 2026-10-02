@@ -7,8 +7,10 @@ Run from the repository root with JDK 25:
 ```
 
 This verification is also part of `:ketraterm-testkit:check` and the test CI
-matrix. Each external project declares just one KetraTerm dependency: parser,
-host, completion, ui-swing or pty. Kotlin and Java sources compile and execute
+matrix. Thirteen external projects cover all 17 publications through one declared
+KetraTerm dependency per project, including direct core/render and optional
+completion-host/persistence, shell-integration, Swing-host and workspace roots.
+Kotlin and Java sources compile and execute
 public APIs; the smoke programs verify parsed/grid text, collected completion
 results, Swing host integration and packaged Kotlin metadata.
 
@@ -33,12 +35,13 @@ their transitive KetraTerm artifacts. Release signing,
 remote publishing, Maven Local and source-project substitution are not used.
 Sources and documentation variants are outside this runtime-consumer check.
 
-The fixture is copied into testkit's build directory and run twice, with
-separate compiler outputs: Gradle module metadata, then POM-only resolution
+The fixture is copied into testkit's build directory and run with both Kotlin
+2.4.0 and the current compiler, each using separate outputs for Gradle module
+metadata and POM-only resolution
 with Gradle metadata redirection disabled. KetraTerm coordinates resolve
 exclusively from the staged repository; third-party dependencies resolve from
-Maven Central. The repository's Gradle wrapper, Kotlin plugin version and JDK
-25 toolchain are reused.
+Maven Central. The repository's Gradle wrapper and JDK 25 toolchain are reused;
+the current-compiler cases track the root Kotlin plugin version.
 
 Existing `TerminalLibraryConsumerCompilationTest` regressions separately check
 Java compilation against exported project API variants without the fixture's
@@ -50,10 +53,10 @@ Kotlin plugin or testkit classpath.
 ./gradlew :ketraterm-testkit:compiledClientUpgradeTest
 ```
 
-This check is included in `publishedConsumerTest`. It runs the five tracked
+This check is included in `publishedConsumerTest`. It runs the thirteen tracked
 `baseline/*.jar` clients against the current staged runtime publications in
 both metadata modes, using Maven stdlib 2.4.20 and 2.4.0, the latter matching
-IDEA 2026.2's boot runtime version (20 executions). This does not run the IDE's
+IDEA 2026.2's boot runtime version (52 executions). This does not run the IDE's
 packaged `util-8.jar`. Each classpath must resolve exactly the expected
 stdlib version. An isolated Java launcher checks the actually loaded Kotlin
 version and its code-source jar before invoking the retained main; no testkit
@@ -70,6 +73,16 @@ values with current public fields and their observable semantics. Controls remov
 the parser artifact and shadow its factory with a class missing the old method;
 they require `NoClassDefFoundError` and `NoSuchMethodError`, respectively. Process deadlines
 bound hangs; no timing-based assertions are used.
+
+Concrete Kotlin/Java parser sinks, core readers, host observers and render
+frames/readers exercise required operations and inherited defaults. The render
+client retains the original inline lease body, mixes it with Java calls to the
+current reader, pins frames across publication, throws from callbacks and proves
+that all earlier leases release before their buffer can be recycled. Optional
+clients execute bounded directory access, persistence hydration/final flush,
+OSC metadata, profile defaults/copy and the supported completion host combinations.
+The original five jars remain unchanged; these eight clients establish additional
+pre-freeze baselines with their own source/artifact hashes.
 
 Only an intentional compatibility-boundary review should replace these clients:
 
@@ -88,8 +101,8 @@ including reviewed uncommitted changes. Review the source, provenance,
 and ABI differences together; run `spotlessApply`, `publishedConsumerTest` and
 the repository's ABI check before accepting an intentional update. Ordinary
 verification must never re-record this baseline to hide an upgrade failure.
-The source hashes identify recording inputs; Git history retains the original
-fixture sources when current source-consumer checks evolve independently.
+The source hashes identify recording inputs; current source-consumer fixtures
+may evolve independently of the retained binaries.
 
 The small jars retain compiled Kotlin/Java callers, including public inline
 bodies; library classes resolve from the current publications. They cover

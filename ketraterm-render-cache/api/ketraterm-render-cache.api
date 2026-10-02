@@ -53,6 +53,7 @@ public final class io/github/ketraterm/render/cache/TerminalRenderPublisher {
 	public static final field Companion Lio/github/ketraterm/render/cache/TerminalRenderPublisher$Companion;
 	public static final field NO_FRONT I
 	public fun <init> (II)V
+	public final fun acquireFrontLease ()I
 	public final fun getBuffers ()[Lio/github/ketraterm/render/cache/TerminalRenderCache;
 	public final fun getFrontIndex ()I
 	public final fun getPublishLock ()Ljava/util/concurrent/locks/ReentrantLock;
