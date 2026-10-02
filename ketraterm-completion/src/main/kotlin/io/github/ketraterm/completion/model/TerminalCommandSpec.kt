@@ -42,7 +42,7 @@ package io.github.ketraterm.completion.model
  * `build` being nested below `clean`.
  * @throws IllegalArgumentException if [name] or any alias is blank.
  */
-data class TerminalCommandSpec
+public data class TerminalCommandSpec
     @JvmOverloads
     constructor(
         val name: String,
@@ -76,7 +76,7 @@ data class TerminalCommandSpec
  * @property hiddenPathPolicy hidden-entry policy used when [pathKind] accepts a path.
  * @throws IllegalArgumentException if [valueCandidates] contains a blank value.
  */
-data class TerminalArgumentSpec
+public data class TerminalArgumentSpec
     @JvmOverloads
     constructor(
         val name: String = "",
@@ -114,7 +114,7 @@ data class TerminalArgumentSpec
  * @throws IllegalArgumentException if names are empty, or names, values, or
  * exclusive-group identifiers contain blank entries.
  */
-data class TerminalOptionSpec
+public data class TerminalOptionSpec
     @JvmOverloads
     constructor(
         val names: List<String>,
@@ -138,7 +138,7 @@ data class TerminalOptionSpec
  * File-system path category accepted by a command positional argument or option
  * value.
  */
-enum class TerminalPathArgumentKind {
+public enum class TerminalPathArgumentKind {
     /** The argument has no known path semantics. */
     NONE,
 
@@ -155,7 +155,7 @@ enum class TerminalPathArgumentKind {
 /**
  * Policy for hidden filesystem entries exposed by one path-taking argument.
  */
-enum class TerminalHiddenPathPolicy {
+public enum class TerminalHiddenPathPolicy {
     /** Hide dot-prefixed entries for an empty prefix, but show them after `.` is typed. */
     DEFAULT,
 
@@ -178,7 +178,7 @@ enum class TerminalHiddenPathPolicy {
  * @property id stable lowercase domain id.
  * @throws IllegalArgumentException if [id] is blank or contains uppercase characters.
  */
-data class TerminalCompletionValueDomain(
+public data class TerminalCompletionValueDomain(
     val id: String,
 ) {
     init {
@@ -186,41 +186,41 @@ data class TerminalCompletionValueDomain(
         require(id == id.lowercase()) { "id must be lowercase, was $id" }
     }
 
-    companion object {
+    public companion object {
         /** No known dynamic value domain. */
         @JvmField
-        val NONE: TerminalCompletionValueDomain = TerminalCompletionValueDomain("none")
+        public val NONE: TerminalCompletionValueDomain = TerminalCompletionValueDomain("none")
 
         /** Git branch or ref name. */
         @JvmField
-        val GIT_BRANCH: TerminalCompletionValueDomain = TerminalCompletionValueDomain("git.branch")
+        public val GIT_BRANCH: TerminalCompletionValueDomain = TerminalCompletionValueDomain("git.branch")
 
         /** Git commit object identifier. */
         @JvmField
-        val GIT_COMMIT: TerminalCompletionValueDomain = TerminalCompletionValueDomain("git.commit")
+        public val GIT_COMMIT: TerminalCompletionValueDomain = TerminalCompletionValueDomain("git.commit")
 
         /** Docker CLI context name. */
         @JvmField
-        val DOCKER_CONTEXT: TerminalCompletionValueDomain = TerminalCompletionValueDomain("docker.context")
+        public val DOCKER_CONTEXT: TerminalCompletionValueDomain = TerminalCompletionValueDomain("docker.context")
 
         /** Kubernetes namespace name. */
         @JvmField
-        val KUBERNETES_NAMESPACE: TerminalCompletionValueDomain = TerminalCompletionValueDomain("kubernetes.namespace")
+        public val KUBERNETES_NAMESPACE: TerminalCompletionValueDomain = TerminalCompletionValueDomain("kubernetes.namespace")
 
         /** Kubernetes kubeconfig context name. */
         @JvmField
-        val KUBERNETES_CONTEXT: TerminalCompletionValueDomain = TerminalCompletionValueDomain("kubernetes.context")
+        public val KUBERNETES_CONTEXT: TerminalCompletionValueDomain = TerminalCompletionValueDomain("kubernetes.context")
 
         /** npm package script name. */
         @JvmField
-        val NPM_SCRIPT: TerminalCompletionValueDomain = TerminalCompletionValueDomain("npm.script")
+        public val NPM_SCRIPT: TerminalCompletionValueDomain = TerminalCompletionValueDomain("npm.script")
 
         /** AWS CLI profile name. */
         @JvmField
-        val AWS_PROFILE: TerminalCompletionValueDomain = TerminalCompletionValueDomain("aws.profile")
+        public val AWS_PROFILE: TerminalCompletionValueDomain = TerminalCompletionValueDomain("aws.profile")
 
         /** AWS region name. */
         @JvmField
-        val AWS_REGION: TerminalCompletionValueDomain = TerminalCompletionValueDomain("aws.region")
+        public val AWS_REGION: TerminalCompletionValueDomain = TerminalCompletionValueDomain("aws.region")
     }
 }

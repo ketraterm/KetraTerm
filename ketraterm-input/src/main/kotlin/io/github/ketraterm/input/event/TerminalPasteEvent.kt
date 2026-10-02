@@ -20,6 +20,6 @@ package io.github.ketraterm.input.event
  *
  * @property text pasted text before any future host paste policy is applied.
  */
-data class TerminalPasteEvent(
+public data class TerminalPasteEvent(
     val text: String,
 )

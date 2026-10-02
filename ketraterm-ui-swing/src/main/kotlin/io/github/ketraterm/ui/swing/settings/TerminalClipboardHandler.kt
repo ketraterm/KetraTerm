@@ -27,13 +27,13 @@ import java.awt.datatransfer.StringSelection
  * component in an environment with its own clipboard, permission prompts, or
  * test doubles.
  */
-interface TerminalClipboardHandler {
+public interface TerminalClipboardHandler {
     /**
      * Writes [text] to the host clipboard.
      *
      * @param text selected terminal text.
      */
-    fun copyText(text: String)
+    public fun copyText(text: String)
 
     /**
      * Reads plain text from the host clipboard, or returns `null` when no text
@@ -41,21 +41,21 @@ interface TerminalClipboardHandler {
      *
      * @return clipboard text, or `null`.
      */
-    fun readText(): String?
+    public fun readText(): String?
 
     /**
      * Reads the native primary selection, or returns `null` when unsupported or
      * without text. An empty string is available text. Never substitutes the
      * ordinary clipboard. Like [readText], this operation may block in native code.
      */
-    fun readPrimarySelectionText(): String? = null
+    public fun readPrimarySelectionText(): String? = null
 
-    companion object {
+    public companion object {
         /**
          * Clipboard handler backed by AWT's system clipboard.
          */
         @JvmField
-        val SYSTEM: TerminalClipboardHandler = SystemTerminalClipboardHandler
+        public val SYSTEM: TerminalClipboardHandler = SystemTerminalClipboardHandler
     }
 }
 

@@ -24,17 +24,17 @@ import java.util.*
  * Serialize [writeTo] with all other terminal output, then [close] to clear the
  * owned Base64 buffer. Closing and writing must not run concurrently.
  */
-class TerminalClipboardReply private constructor(
+public class TerminalClipboardReply private constructor(
     private val selection: TerminalClipboardSelection,
     private val payload: ByteArray,
 ) : AutoCloseable {
     private var closed = false
 
     /** Complete wire size, including the OSC introducer, selectors and ST. */
-    val byteCount: Int = selection.value.length + ENVELOPE_BYTES + payload.size
+    public val byteCount: Int = selection.value.length + ENVELOPE_BYTES + payload.size
 
     /** Writes one complete response using bounded borrowed byte ranges. */
-    fun writeTo(output: TerminalHostOutput) {
+    public fun writeTo(output: TerminalHostOutput) {
         check(!closed) { "Clipboard reply is closed" }
         output.writeAscii("\u001b]52;")
         output.writeAscii(selection.value)
@@ -53,13 +53,32 @@ class TerminalClipboardReply private constructor(
         closed = true
     }
 
-    companion object {
+    public companion object {
+        /**
+         * Java-friendly preparation from OSC 52 selector text. Unknown selectors return
+         * null; valid selectors are normalized before the typed preparation performs the
+         * text and byte-budget checks. No unchecked selector can enter a response.
+         *
+         * @throws IllegalArgumentException if either byte budget is negative.
+         */
+        @JvmStatic
+        public fun prepare(
+            selection: String,
+            text: String,
+            maxDecodedBytes: Int,
+            maxWireBytes: Int,
+        ): TerminalClipboardReply? {
+            require(maxDecodedBytes >= 0 && maxWireBytes >= 0)
+            val selectors = TerminalClipboardSelection.parse(selection) ?: return null
+            return prepare(selectors, text, maxDecodedBytes, maxWireBytes)
+        }
+
         /**
          * Validates scalar UTF-16 and both byte budgets before allocating UTF-8
          * or Base64 storage. Null means malformed text or a size/overflow limit.
          * Text is preserved exactly; paste policy and terminal modes do not apply.
          */
-        fun prepare(
+        public fun prepare(
             selection: TerminalClipboardSelection,
             text: String,
             maxDecodedBytes: Int,

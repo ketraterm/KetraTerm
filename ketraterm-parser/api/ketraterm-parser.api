@@ -1,0 +1,141 @@
+public abstract interface class io/github/ketraterm/parser/api/TerminalOutputParser {
+	public abstract fun accept ([BII)V
+	public static synthetic fun accept$default (Lio/github/ketraterm/parser/api/TerminalOutputParser;[BIIILjava/lang/Object;)V
+	public abstract fun acceptByte (I)V
+	public abstract fun endOfInput ()V
+	public abstract fun reset ()V
+}
+
+public final class io/github/ketraterm/parser/api/TerminalOutputParser$DefaultImpls {
+	public static synthetic fun accept$default (Lio/github/ketraterm/parser/api/TerminalOutputParser;[BIIILjava/lang/Object;)V
+}
+
+public final class io/github/ketraterm/parser/api/TerminalParsers {
+	public static final field INSTANCE Lio/github/ketraterm/parser/api/TerminalParsers;
+	public static final fun create (Lio/github/ketraterm/parser/spi/TerminalCommandSink;)Lio/github/ketraterm/parser/api/TerminalOutputParser;
+	public static final fun create (Lio/github/ketraterm/parser/spi/TerminalCommandSink;Lkotlin/jvm/functions/Function0;)Lio/github/ketraterm/parser/api/TerminalOutputParser;
+	public static synthetic fun create$default (Lio/github/ketraterm/parser/spi/TerminalCommandSink;Lkotlin/jvm/functions/Function0;ILjava/lang/Object;)Lio/github/ketraterm/parser/api/TerminalOutputParser;
+}
+
+public abstract interface class io/github/ketraterm/parser/spi/TerminalCommandSink {
+	public abstract fun applyKittyKeyboardFlags (II)V
+	public abstract fun backspace ()V
+	public abstract fun bell ()V
+	public abstract fun carriageReturn ()V
+	public abstract fun changeRectangleAttributes (IIIIII)V
+	public abstract fun clearAllTabStops ()V
+	public abstract fun clearTabStop ()V
+	public abstract fun copyRectangle (IIIIIIII)V
+	public abstract fun cursorBackward (I)V
+	public abstract fun cursorBackwardTabs (I)V
+	public abstract fun cursorDown (I)V
+	public abstract fun cursorForward (I)V
+	public abstract fun cursorForwardTabs (I)V
+	public abstract fun cursorNextLine (I)V
+	public abstract fun cursorPreviousLine (I)V
+	public abstract fun cursorUp (I)V
+	public abstract fun decaln ()V
+	public abstract fun deleteCharacters (I)V
+	public abstract fun deleteColumns (I)V
+	public abstract fun deleteLines (I)V
+	public abstract fun deminimizeWindow ()V
+	public abstract fun disableKeyModifierOption (I)V
+	public abstract fun endHyperlink ()V
+	public abstract fun eraseCharacters (I)V
+	public abstract fun eraseInDisplay (IZ)V
+	public abstract fun eraseInLine (IZ)V
+	public abstract fun eraseRectangle (IIIIZ)V
+	public abstract fun fillRectangle (IIIII)V
+	public abstract fun insertCharacters (I)V
+	public abstract fun insertColumns (I)V
+	public abstract fun insertLines (I)V
+	public abstract fun isAlternateScreenActive ()Z
+	public abstract fun lineFeed ()V
+	public abstract fun lowerWindow ()V
+	public abstract fun minimizeWindow ()V
+	public abstract fun moveWindow (II)V
+	public abstract fun nextLine ()V
+	public abstract fun popKittyKeyboardFlags (I)V
+	public abstract fun popTitleStack (I)V
+	public abstract fun pushKittyKeyboardFlags (I)V
+	public abstract fun pushTitleStack (I)V
+	public abstract fun queryDynamicColor (I)V
+	public abstract fun queryPaletteColor (I)V
+	public abstract fun queryStatusString (Ljava/lang/String;)V
+	public abstract fun queryTerminfo (Ljava/lang/String;)V
+	public abstract fun raiseWindow ()V
+	public fun requestClipboard (Ljava/lang/String;Ljava/lang/String;)V
+	public abstract fun requestDeviceAttributes (II)V
+	public abstract fun requestDeviceStatusReport (IZ)V
+	public abstract fun requestKeyFormatOption (I)V
+	public abstract fun requestKeyModifierOption (I)V
+	public abstract fun requestKittyKeyboardFlags ()V
+	public abstract fun requestModeStatus (IZ)V
+	public abstract fun requestRectangleChecksum (IIIIII)V
+	public abstract fun requestWindowReport (I)V
+	public abstract fun resetAttributes ()V
+	public abstract fun resetKeyFormatOption (I)V
+	public abstract fun resetKeyFormatOptions ()V
+	public abstract fun resetKeyModifierOption (I)V
+	public abstract fun resetKeyModifierOptions ()V
+	public abstract fun resetTerminal ()V
+	public abstract fun resizeWindow (II)V
+	public abstract fun restoreCursor ()V
+	public abstract fun reverseIndex ()V
+	public abstract fun reverseRectangleAttributes (IIIII)V
+	public abstract fun saveCursor ()V
+	public abstract fun saveCursorOrResetMargins ()Z
+	public abstract fun scrollDown (I)V
+	public abstract fun scrollUp (I)V
+	public abstract fun setAnsiMode (IZ)V
+	public abstract fun setAttributeChangeExtent (I)V
+	public abstract fun setBackgroundDefault ()V
+	public abstract fun setBackgroundIndexed (I)V
+	public abstract fun setBackgroundRgb (III)V
+	public abstract fun setBlink (Z)V
+	public abstract fun setBold (Z)V
+	public abstract fun setConceal (Z)V
+	public abstract fun setCurrentWorkingDirectoryUri (Ljava/lang/String;)V
+	public abstract fun setCursorAbsolute (II)V
+	public abstract fun setCursorColumn (I)V
+	public abstract fun setCursorRow (I)V
+	public abstract fun setCursorStyle (I)V
+	public abstract fun setDecMode (IZ)V
+	public abstract fun setDynamicColor (II)V
+	public abstract fun setFaint (Z)V
+	public abstract fun setForegroundDefault ()V
+	public abstract fun setForegroundIndexed (I)V
+	public abstract fun setForegroundRgb (III)V
+	public abstract fun setIconAndWindowTitle (Ljava/lang/String;)V
+	public abstract fun setIconTitle (Ljava/lang/String;)V
+	public abstract fun setInverse (Z)V
+	public abstract fun setItalic (Z)V
+	public abstract fun setKeyFormatOption (II)V
+	public abstract fun setKeyModifierOption (II)V
+	public abstract fun setLeftRightMargins (II)V
+	public abstract fun setMaximized (Z)V
+	public abstract fun setOverline (Z)V
+	public abstract fun setPaletteColor (II)V
+	public abstract fun setScrollRegion (II)V
+	public abstract fun setSelectiveEraseProtection (Z)V
+	public abstract fun setStrikethrough (Z)V
+	public abstract fun setTabStop ()V
+	public abstract fun setUnderlineColorDefault ()V
+	public abstract fun setUnderlineColorIndexed (I)V
+	public abstract fun setUnderlineColorRgb (III)V
+	public abstract fun setUnderlineStyle (I)V
+	public abstract fun setWindowTitle (Ljava/lang/String;)V
+	public abstract fun shellIntegrationMarker (Lio/github/ketraterm/protocol/ShellIntegrationEvent;)V
+	public abstract fun showNotification (Ljava/lang/String;Ljava/lang/String;Lio/github/ketraterm/protocol/NotificationLevel;)V
+	public abstract fun softReset ()V
+	public abstract fun startHyperlink (Ljava/lang/String;Ljava/lang/String;)V
+	public abstract fun tab ()V
+	public abstract fun updatePreviousCluster ([II)V
+	public abstract fun writeCluster ([II)V
+	public abstract fun writeCodepoint (I)V
+}
+
+public final class io/github/ketraterm/parser/spi/TerminalCommandSink$DefaultImpls {
+	public static fun requestClipboard (Lio/github/ketraterm/parser/spi/TerminalCommandSink;Ljava/lang/String;Ljava/lang/String;)V
+}
+

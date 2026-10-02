@@ -21,7 +21,7 @@ package io.github.ketraterm.core.api
  * Consumed by the ANSI parser for all cursor positioning, save/restore,
  * and tab stop commands.
  */
-interface TerminalCursor {
+public interface TerminalCursor {
     /**
      * Moves the cursor to an absolute position (CUP / HVP, `CSI row ; col H`).
      *
@@ -37,7 +37,7 @@ interface TerminalCursor {
      * @param col Target column (0-based).
      * @param row Target row (0-based).
      */
-    fun positionCursor(
+    public fun positionCursor(
         col: Int,
         row: Int,
     )
@@ -50,7 +50,7 @@ interface TerminalCursor {
      *
      * @param n Number of rows. Must be >= 1.
      */
-    fun cursorUp(n: Int = 1)
+    public fun cursorUp(n: Int = 1)
 
     /**
      * Moves the cursor down by [n] rows (CUD, `CSI n B`).
@@ -60,7 +60,7 @@ interface TerminalCursor {
      *
      * @param n Number of rows. Must be >= 1.
      */
-    fun cursorDown(n: Int = 1)
+    public fun cursorDown(n: Int = 1)
 
     /**
      * Moves the cursor left by [n] columns (CUB, `CSI n D`).
@@ -70,7 +70,7 @@ interface TerminalCursor {
      *
      * @param n Number of columns. Non-positive values are no-ops.
      */
-    fun cursorLeft(n: Int = 1)
+    public fun cursorLeft(n: Int = 1)
 
     /**
      * Moves the cursor right by [n] columns (CUF, `CSI n C`).
@@ -80,7 +80,7 @@ interface TerminalCursor {
      *
      * @param n Number of columns. Non-positive values are no-ops.
      */
-    fun cursorRight(n: Int = 1)
+    public fun cursorRight(n: Int = 1)
 
     /**
      * Saves the core-owned cursor state (DECSC, `ESC 7`).
@@ -98,7 +98,7 @@ interface TerminalCursor {
      * This core does not model parser-owned charset designation or shift state
      * (`G0..G3`, `SO`, `SI`), so DECSC does not capture charset state here.
      */
-    fun saveCursor()
+    public fun saveCursor()
 
     /**
      * Restores the core-owned state saved by [saveCursor] (DECRC, `ESC 8`).
@@ -117,14 +117,14 @@ interface TerminalCursor {
      * Charset designation and shift state remain outside this contract because
      * they belong to the parser layer, not to `:terminal-core`.
      */
-    fun restoreCursor()
+    public fun restoreCursor()
 
     /**
      * Resets the cursor to the home position `(col=0, row=0)`.
      *
      * Pen attributes are not affected.
      */
-    fun resetCursor()
+    public fun resetCursor()
 
     // Tab stops
 
@@ -134,7 +134,7 @@ interface TerminalCursor {
      * The stop persists until cleared by [clearTabStop], [clearAllTabStops],
      * or a hard reset. As a non-printing control, HTS cancels any pending wrap.
      */
-    fun setTabStop()
+    public fun setTabStop()
 
     /**
      * Clears the tab stop at the current cursor column (TBC 0, `CSI 0 g`).
@@ -142,7 +142,7 @@ interface TerminalCursor {
      * No-op if no stop exists at the current column. As a non-printing control,
      * TBC 0 cancels any pending wrap.
      */
-    fun clearTabStop()
+    public fun clearTabStop()
 
     /**
      * Clears all tab stops (TBC 3, `CSI 3 g`).
@@ -151,7 +151,7 @@ interface TerminalCursor {
      * margin until stops are re-established. As a non-printing control, TBC 3
      * cancels any pending wrap.
      */
-    fun clearAllTabStops()
+    public fun clearAllTabStops()
 
     /**
      * Advances the cursor to the next tab stop (HT, `0x09`).
@@ -160,7 +160,7 @@ interface TerminalCursor {
      * With DECLRMM off, that boundary is `width - 1`; with DECLRMM on, it is
      * the active horizontal right margin. HT never triggers a line wrap.
      */
-    fun horizontalTab()
+    public fun horizontalTab()
 
     /**
      * Advances the cursor forward by [count] tab stops (CHT, `CSI Ps I`).
@@ -172,7 +172,7 @@ interface TerminalCursor {
      *
      * @param count Number of tab stops to advance.
      */
-    fun cursorForwardTab(count: Int = 1)
+    public fun cursorForwardTab(count: Int = 1)
 
     /**
      * Moves the cursor backward by [count] tab stops (CBT, `CSI Ps Z`).
@@ -184,5 +184,5 @@ interface TerminalCursor {
      *
      * @param count Number of tab stops to move backward.
      */
-    fun cursorBackwardTab(count: Int = 1)
+    public fun cursorBackwardTab(count: Int = 1)
 }

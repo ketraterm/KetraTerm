@@ -1,0 +1,199 @@
+public final class io/github/ketraterm/ui/swing/host/SwingClipboardPrompts {
+	public static final field INSTANCE Lio/github/ketraterm/ui/swing/host/SwingClipboardPrompts;
+	public static final field TITLE Ljava/lang/String;
+	public final fun readQuestion (Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;
+	public static synthetic fun readQuestion$default (Lio/github/ketraterm/ui/swing/host/SwingClipboardPrompts;Ljava/lang/String;Ljava/lang/String;ILjava/lang/Object;)Ljava/lang/String;
+	public final fun writeConfirmation (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)Lio/github/ketraterm/ui/swing/host/SwingDialogRequest;
+	public static synthetic fun writeConfirmation$default (Lio/github/ketraterm/ui/swing/host/SwingClipboardPrompts;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;ILjava/lang/Object;)Lio/github/ketraterm/ui/swing/host/SwingDialogRequest;
+	public final fun writeQuestion (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;
+	public static synthetic fun writeQuestion$default (Lio/github/ketraterm/ui/swing/host/SwingClipboardPrompts;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;ILjava/lang/Object;)Ljava/lang/String;
+}
+
+public final class io/github/ketraterm/ui/swing/host/SwingClipboardReadPrompt : java/lang/AutoCloseable {
+	public fun <init> (Lkotlin/jvm/functions/Function2;)V
+	public fun close ()V
+	public final fun dismiss ()Z
+	public final fun isBlocked ()Z
+	public final fun request (Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+}
+
+public final class io/github/ketraterm/ui/swing/host/SwingClipboardReadPrompt$Decision : java/lang/Enum {
+	public static final field ALLOW_ONCE Lio/github/ketraterm/ui/swing/host/SwingClipboardReadPrompt$Decision;
+	public static final field BLOCK Lio/github/ketraterm/ui/swing/host/SwingClipboardReadPrompt$Decision;
+	public static final field DENY Lio/github/ketraterm/ui/swing/host/SwingClipboardReadPrompt$Decision;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public final fun getLabel ()Ljava/lang/String;
+	public static fun valueOf (Ljava/lang/String;)Lio/github/ketraterm/ui/swing/host/SwingClipboardReadPrompt$Decision;
+	public static fun values ()[Lio/github/ketraterm/ui/swing/host/SwingClipboardReadPrompt$Decision;
+}
+
+public final class io/github/ketraterm/ui/swing/host/SwingClipboardReader {
+	public fun <init> ()V
+	public fun <init> (Lkotlinx/coroutines/CoroutineDispatcher;)V
+	public synthetic fun <init> (Lkotlinx/coroutines/CoroutineDispatcher;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun read (Lio/github/ketraterm/host/TerminalClipboardReadRequest;Lio/github/ketraterm/ui/swing/host/SwingClipboardReadPrompt;Ljava/lang/String;Lio/github/ketraterm/ui/swing/settings/TerminalClipboardHandler;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+}
+
+public final class io/github/ketraterm/ui/swing/host/SwingCompletionBinding : java/lang/AutoCloseable {
+	public fun <init> (Lio/github/ketraterm/session/TerminalSession;Lkotlin/jvm/functions/Function0;)V
+	public synthetic fun <init> (Lio/github/ketraterm/session/TerminalSession;Lkotlin/jvm/functions/Function0;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun attach (Lio/github/ketraterm/ui/swing/api/SwingTerminal;)V
+	public fun close ()V
+	public final fun getFeedbackHandler ()Lio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionFeedbackHandler;
+	public final fun getProvider ()Lio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionProvider;
+	public final fun isEnabled ()Z
+	public final fun update (Lio/github/ketraterm/ui/swing/host/SwingCompletionResources;Z)V
+}
+
+public final class io/github/ketraterm/ui/swing/host/SwingCompletionContext {
+	public static final field Companion Lio/github/ketraterm/ui/swing/host/SwingCompletionContext$Companion;
+	public static final field EMPTY Lio/github/ketraterm/ui/swing/host/SwingCompletionContext;
+	public fun <init> ()V
+	public fun <init> (Ljava/lang/String;)V
+	public fun <init> (Ljava/lang/String;Ljava/lang/String;)V
+	public fun <init> (Ljava/lang/String;Ljava/lang/String;Lio/github/ketraterm/completion/api/TerminalShellCapabilities;)V
+	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;Lio/github/ketraterm/completion/api/TerminalShellCapabilities;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component2 ()Ljava/lang/String;
+	public final fun component3 ()Lio/github/ketraterm/completion/api/TerminalShellCapabilities;
+	public final fun copy (Ljava/lang/String;Ljava/lang/String;Lio/github/ketraterm/completion/api/TerminalShellCapabilities;)Lio/github/ketraterm/ui/swing/host/SwingCompletionContext;
+	public static synthetic fun copy$default (Lio/github/ketraterm/ui/swing/host/SwingCompletionContext;Ljava/lang/String;Ljava/lang/String;Lio/github/ketraterm/completion/api/TerminalShellCapabilities;ILjava/lang/Object;)Lio/github/ketraterm/ui/swing/host/SwingCompletionContext;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getProfileId ()Ljava/lang/String;
+	public final fun getShellCapabilities ()Lio/github/ketraterm/completion/api/TerminalShellCapabilities;
+	public final fun getWorkingDirectoryUri ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class io/github/ketraterm/ui/swing/host/SwingCompletionContext$Companion {
+}
+
+public final class io/github/ketraterm/ui/swing/host/SwingCompletionFeedbackRecorder {
+	public fun <init> (Lkotlin/jvm/functions/Function5;Lkotlin/jvm/functions/Function0;)V
+	public synthetic fun <init> (Lkotlin/jvm/functions/Function5;Lkotlin/jvm/functions/Function0;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun createHandler ()Lio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionFeedbackHandler;
+	public final fun record (Lio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionFeedback;)V
+}
+
+public final class io/github/ketraterm/ui/swing/host/SwingCompletionResources {
+	public fun <init> (Lio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionProvider;Lio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionFeedbackHandler;)V
+	public final fun component1 ()Lio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionProvider;
+	public final fun component2 ()Lio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionFeedbackHandler;
+	public final fun copy (Lio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionProvider;Lio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionFeedbackHandler;)Lio/github/ketraterm/ui/swing/host/SwingCompletionResources;
+	public static synthetic fun copy$default (Lio/github/ketraterm/ui/swing/host/SwingCompletionResources;Lio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionProvider;Lio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionFeedbackHandler;ILjava/lang/Object;)Lio/github/ketraterm/ui/swing/host/SwingCompletionResources;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getFeedbackHandler ()Lio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionFeedbackHandler;
+	public final fun getProvider ()Lio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionProvider;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class io/github/ketraterm/ui/swing/host/SwingCompletionSuggestionProvider : io/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionProvider {
+	public fun <init> (Lio/github/ketraterm/completion/api/TerminalCompletionEngine;Lkotlin/jvm/functions/Function0;)V
+	public synthetic fun <init> (Lio/github/ketraterm/completion/api/TerminalCompletionEngine;Lkotlin/jvm/functions/Function0;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun suggestions (Lio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionRequest;)Lkotlinx/coroutines/flow/Flow;
+}
+
+public final class io/github/ketraterm/ui/swing/host/SwingDialogRequest {
+	public fun <init> (Ljava/lang/String;Ljava/lang/String;Lio/github/ketraterm/ui/swing/host/SwingDialogRequest$Severity;Ljava/util/List;I)V
+	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;Lio/github/ketraterm/ui/swing/host/SwingDialogRequest$Severity;Ljava/util/List;IILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun getDefaultOption ()I
+	public final fun getMessage ()Ljava/lang/String;
+	public final fun getOptions ()Ljava/util/List;
+	public final fun getSeverity ()Lio/github/ketraterm/ui/swing/host/SwingDialogRequest$Severity;
+	public final fun getTitle ()Ljava/lang/String;
+	public final fun htmlMessage ()Ljava/lang/String;
+}
+
+public final class io/github/ketraterm/ui/swing/host/SwingDialogRequest$Severity : java/lang/Enum {
+	public static final field ERROR Lio/github/ketraterm/ui/swing/host/SwingDialogRequest$Severity;
+	public static final field INFORMATION Lio/github/ketraterm/ui/swing/host/SwingDialogRequest$Severity;
+	public static final field WARNING Lio/github/ketraterm/ui/swing/host/SwingDialogRequest$Severity;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public static fun valueOf (Ljava/lang/String;)Lio/github/ketraterm/ui/swing/host/SwingDialogRequest$Severity;
+	public static fun values ()[Lio/github/ketraterm/ui/swing/host/SwingDialogRequest$Severity;
+}
+
+public final class io/github/ketraterm/ui/swing/host/SwingLiveCompletionBinding : java/lang/AutoCloseable {
+	public fun <init> (Lio/github/ketraterm/session/TerminalSession;Lkotlinx/coroutines/CoroutineScope;Lkotlin/jvm/functions/Function0;Lkotlin/jvm/functions/Function0;Lio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionFeedbackHandler;)V
+	public synthetic fun <init> (Lio/github/ketraterm/session/TerminalSession;Lkotlinx/coroutines/CoroutineScope;Lkotlin/jvm/functions/Function0;Lkotlin/jvm/functions/Function0;Lio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionFeedbackHandler;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun attach (Lio/github/ketraterm/ui/swing/api/SwingTerminal;)V
+	public final fun cancelAndHide ()V
+	public fun close ()V
+	public final fun detach ()V
+	public final fun getSuggestionFeedbackHandler ()Lio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionFeedbackHandler;
+	public final fun scheduleRefresh ()V
+}
+
+public final class io/github/ketraterm/ui/swing/host/SwingMessageDialogs {
+	public static final field INSTANCE Lio/github/ketraterm/ui/swing/host/SwingMessageDialogs;
+	public final fun show (Ljava/awt/Component;Lio/github/ketraterm/ui/swing/host/SwingDialogRequest;)Ljava/lang/Integer;
+	public final fun showModeless (Ljava/awt/Component;Lio/github/ketraterm/ui/swing/host/SwingDialogRequest;Lkotlin/jvm/functions/Function1;)Ljava/lang/AutoCloseable;
+}
+
+public final class io/github/ketraterm/ui/swing/host/SwingTerminalContextMenuItems {
+	public static final field INSTANCE Lio/github/ketraterm/ui/swing/host/SwingTerminalContextMenuItems;
+	public final fun addTerminalActions (Ljavax/swing/JPopupMenu;Lio/github/ketraterm/ui/swing/api/SwingTerminalContextMenuRequest;Lkotlin/jvm/functions/Function0;)Z
+}
+
+public final class io/github/ketraterm/ui/swing/host/SwingTerminalHostAction : java/lang/Enum {
+	public static final field CLEAR_SCREEN Lio/github/ketraterm/ui/swing/host/SwingTerminalHostAction;
+	public static final field COPY_SELECTION Lio/github/ketraterm/ui/swing/host/SwingTerminalHostAction;
+	public static final field OPEN_SEARCH Lio/github/ketraterm/ui/swing/host/SwingTerminalHostAction;
+	public static final field PASTE_CLIPBOARD Lio/github/ketraterm/ui/swing/host/SwingTerminalHostAction;
+	public static final field REQUEST_SUGGESTIONS Lio/github/ketraterm/ui/swing/host/SwingTerminalHostAction;
+	public static final field SCROLL_PAGE_DOWN Lio/github/ketraterm/ui/swing/host/SwingTerminalHostAction;
+	public static final field SCROLL_PAGE_UP Lio/github/ketraterm/ui/swing/host/SwingTerminalHostAction;
+	public static final field SELECT_ALL Lio/github/ketraterm/ui/swing/host/SwingTerminalHostAction;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public static fun valueOf (Ljava/lang/String;)Lio/github/ketraterm/ui/swing/host/SwingTerminalHostAction;
+	public static fun values ()[Lio/github/ketraterm/ui/swing/host/SwingTerminalHostAction;
+}
+
+public final class io/github/ketraterm/ui/swing/host/SwingTerminalHostShortcut {
+	public fun <init> (II)V
+	public final fun component1 ()I
+	public final fun component2 ()I
+	public final fun copy (II)Lio/github/ketraterm/ui/swing/host/SwingTerminalHostShortcut;
+	public static synthetic fun copy$default (Lio/github/ketraterm/ui/swing/host/SwingTerminalHostShortcut;IIILjava/lang/Object;)Lio/github/ketraterm/ui/swing/host/SwingTerminalHostShortcut;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getKeyCode ()I
+	public final fun getModifiers ()I
+	public fun hashCode ()I
+	public final fun keyStroke ()Ljavax/swing/KeyStroke;
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class io/github/ketraterm/ui/swing/host/SwingTerminalHostShortcutMap {
+	public static final field Companion Lio/github/ketraterm/ui/swing/host/SwingTerminalHostShortcutMap$Companion;
+	public final fun actionFor (II)Lio/github/ketraterm/ui/swing/host/SwingTerminalHostAction;
+	public final fun forEachShortcut (Lkotlin/jvm/functions/Function2;)V
+	public static final fun platformDefault ()Lio/github/ketraterm/ui/swing/host/SwingTerminalHostShortcutMap;
+	public final fun shortcut (Lio/github/ketraterm/ui/swing/host/SwingTerminalHostAction;)Lio/github/ketraterm/ui/swing/host/SwingTerminalHostShortcut;
+}
+
+public final class io/github/ketraterm/ui/swing/host/SwingTerminalHostShortcutMap$Companion {
+	public final fun platformDefault ()Lio/github/ketraterm/ui/swing/host/SwingTerminalHostShortcutMap;
+}
+
+public final class io/github/ketraterm/ui/swing/host/SwingTerminalOverlayPane : javax/swing/JPanel {
+	public fun <init> (Ljavax/swing/JComponent;Ljavax/swing/JComponent;)V
+	public fun <init> (Ljavax/swing/JComponent;Ljavax/swing/JComponent;Ljava/awt/Insets;)V
+	public synthetic fun <init> (Ljavax/swing/JComponent;Ljavax/swing/JComponent;Ljava/awt/Insets;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun doLayout ()V
+	public fun getMaximumSize ()Ljava/awt/Dimension;
+	public fun getMinimumSize ()Ljava/awt/Dimension;
+	public fun getPreferredSize ()Ljava/awt/Dimension;
+	public fun isOptimizedDrawingEnabled ()Z
+}
+
+public final class io/github/ketraterm/ui/swing/host/SwingTerminalSearchBar {
+	public fun <init> (Lio/github/ketraterm/ui/swing/api/SwingTerminal;)V
+	public final fun close ()V
+	public final fun getComponent ()Ljavax/swing/JComponent;
+	public final fun isOpen ()Z
+	public final fun open ()V
+	public final fun refreshColors ()V
+}
+

@@ -1,0 +1,402 @@
+public final class io/github/ketraterm/input/TerminalClipboardReply : java/lang/AutoCloseable {
+	public static final field Companion Lio/github/ketraterm/input/TerminalClipboardReply$Companion;
+	public fun close ()V
+	public final fun getByteCount ()I
+	public static final fun prepare (Ljava/lang/String;Ljava/lang/String;II)Lio/github/ketraterm/input/TerminalClipboardReply;
+	public final fun writeTo (Lio/github/ketraterm/protocol/host/TerminalHostOutput;)V
+}
+
+public final class io/github/ketraterm/input/TerminalClipboardReply$Companion {
+	public final fun prepare (Ljava/lang/String;Ljava/lang/String;II)Lio/github/ketraterm/input/TerminalClipboardReply;
+	public final fun prepare-ou9BDLw (Ljava/lang/String;Ljava/lang/String;II)Lio/github/ketraterm/input/TerminalClipboardReply;
+}
+
+public final class io/github/ketraterm/input/TerminalInputEncoders {
+	public static final field INSTANCE Lio/github/ketraterm/input/TerminalInputEncoders;
+	public static final fun create (Lio/github/ketraterm/core/api/TerminalInputState;Lio/github/ketraterm/protocol/host/TerminalHostOutput;)Lio/github/ketraterm/input/api/TerminalInputEncoder;
+	public static final fun create (Lio/github/ketraterm/core/api/TerminalInputState;Lio/github/ketraterm/protocol/host/TerminalHostOutput;Lio/github/ketraterm/input/policy/TerminalInputPolicy;)Lio/github/ketraterm/input/api/TerminalInputEncoder;
+	public static synthetic fun create$default (Lio/github/ketraterm/core/api/TerminalInputState;Lio/github/ketraterm/protocol/host/TerminalHostOutput;Lio/github/ketraterm/input/policy/TerminalInputPolicy;ILjava/lang/Object;)Lio/github/ketraterm/input/api/TerminalInputEncoder;
+}
+
+public abstract interface class io/github/ketraterm/input/api/TerminalInputEncoder {
+	public abstract fun encodeFocus (Lio/github/ketraterm/input/event/TerminalFocusEvent;)V
+	public abstract fun encodeKey (Lio/github/ketraterm/input/event/TerminalKeyEvent;)V
+	public abstract fun encodeMouse (Lio/github/ketraterm/input/event/TerminalMouseEvent;)V
+	public abstract fun encodePaste (Lio/github/ketraterm/input/event/TerminalPasteEvent;)V
+	public fun encodeTextReplacement (Lio/github/ketraterm/input/event/TerminalTextReplacementEvent;)V
+	public fun setInputPolicy (Lio/github/ketraterm/input/policy/TerminalInputPolicy;)V
+}
+
+public final class io/github/ketraterm/input/api/TerminalInputEncoder$DefaultImpls {
+	public static fun encodeTextReplacement (Lio/github/ketraterm/input/api/TerminalInputEncoder;Lio/github/ketraterm/input/event/TerminalTextReplacementEvent;)V
+	public static fun setInputPolicy (Lio/github/ketraterm/input/api/TerminalInputEncoder;Lio/github/ketraterm/input/policy/TerminalInputPolicy;)V
+}
+
+public final class io/github/ketraterm/input/event/TerminalFocusEvent {
+	public fun <init> (Z)V
+	public final fun component1 ()Z
+	public final fun copy (Z)Lio/github/ketraterm/input/event/TerminalFocusEvent;
+	public static synthetic fun copy$default (Lio/github/ketraterm/input/event/TerminalFocusEvent;ZILjava/lang/Object;)Lio/github/ketraterm/input/event/TerminalFocusEvent;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getFocused ()Z
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class io/github/ketraterm/input/event/TerminalKey : java/lang/Enum {
+	public static final field BACKSPACE Lio/github/ketraterm/input/event/TerminalKey;
+	public static final field CAPS_LOCK Lio/github/ketraterm/input/event/TerminalKey;
+	public static final field DELETE Lio/github/ketraterm/input/event/TerminalKey;
+	public static final field DOWN Lio/github/ketraterm/input/event/TerminalKey;
+	public static final field END Lio/github/ketraterm/input/event/TerminalKey;
+	public static final field ENTER Lio/github/ketraterm/input/event/TerminalKey;
+	public static final field ESCAPE Lio/github/ketraterm/input/event/TerminalKey;
+	public static final field F1 Lio/github/ketraterm/input/event/TerminalKey;
+	public static final field F10 Lio/github/ketraterm/input/event/TerminalKey;
+	public static final field F11 Lio/github/ketraterm/input/event/TerminalKey;
+	public static final field F12 Lio/github/ketraterm/input/event/TerminalKey;
+	public static final field F13 Lio/github/ketraterm/input/event/TerminalKey;
+	public static final field F14 Lio/github/ketraterm/input/event/TerminalKey;
+	public static final field F15 Lio/github/ketraterm/input/event/TerminalKey;
+	public static final field F16 Lio/github/ketraterm/input/event/TerminalKey;
+	public static final field F17 Lio/github/ketraterm/input/event/TerminalKey;
+	public static final field F18 Lio/github/ketraterm/input/event/TerminalKey;
+	public static final field F19 Lio/github/ketraterm/input/event/TerminalKey;
+	public static final field F2 Lio/github/ketraterm/input/event/TerminalKey;
+	public static final field F20 Lio/github/ketraterm/input/event/TerminalKey;
+	public static final field F21 Lio/github/ketraterm/input/event/TerminalKey;
+	public static final field F22 Lio/github/ketraterm/input/event/TerminalKey;
+	public static final field F23 Lio/github/ketraterm/input/event/TerminalKey;
+	public static final field F24 Lio/github/ketraterm/input/event/TerminalKey;
+	public static final field F25 Lio/github/ketraterm/input/event/TerminalKey;
+	public static final field F26 Lio/github/ketraterm/input/event/TerminalKey;
+	public static final field F27 Lio/github/ketraterm/input/event/TerminalKey;
+	public static final field F28 Lio/github/ketraterm/input/event/TerminalKey;
+	public static final field F29 Lio/github/ketraterm/input/event/TerminalKey;
+	public static final field F3 Lio/github/ketraterm/input/event/TerminalKey;
+	public static final field F30 Lio/github/ketraterm/input/event/TerminalKey;
+	public static final field F31 Lio/github/ketraterm/input/event/TerminalKey;
+	public static final field F32 Lio/github/ketraterm/input/event/TerminalKey;
+	public static final field F33 Lio/github/ketraterm/input/event/TerminalKey;
+	public static final field F34 Lio/github/ketraterm/input/event/TerminalKey;
+	public static final field F35 Lio/github/ketraterm/input/event/TerminalKey;
+	public static final field F4 Lio/github/ketraterm/input/event/TerminalKey;
+	public static final field F5 Lio/github/ketraterm/input/event/TerminalKey;
+	public static final field F6 Lio/github/ketraterm/input/event/TerminalKey;
+	public static final field F7 Lio/github/ketraterm/input/event/TerminalKey;
+	public static final field F8 Lio/github/ketraterm/input/event/TerminalKey;
+	public static final field F9 Lio/github/ketraterm/input/event/TerminalKey;
+	public static final field HOME Lio/github/ketraterm/input/event/TerminalKey;
+	public static final field INSERT Lio/github/ketraterm/input/event/TerminalKey;
+	public static final field ISO_LEVEL3_SHIFT Lio/github/ketraterm/input/event/TerminalKey;
+	public static final field ISO_LEVEL5_SHIFT Lio/github/ketraterm/input/event/TerminalKey;
+	public static final field LEFT Lio/github/ketraterm/input/event/TerminalKey;
+	public static final field LEFT_ALT Lio/github/ketraterm/input/event/TerminalKey;
+	public static final field LEFT_CONTROL Lio/github/ketraterm/input/event/TerminalKey;
+	public static final field LEFT_HYPER Lio/github/ketraterm/input/event/TerminalKey;
+	public static final field LEFT_META Lio/github/ketraterm/input/event/TerminalKey;
+	public static final field LEFT_SHIFT Lio/github/ketraterm/input/event/TerminalKey;
+	public static final field LEFT_SUPER Lio/github/ketraterm/input/event/TerminalKey;
+	public static final field MEDIA_FAST_FORWARD Lio/github/ketraterm/input/event/TerminalKey;
+	public static final field MEDIA_PAUSE Lio/github/ketraterm/input/event/TerminalKey;
+	public static final field MEDIA_PLAY Lio/github/ketraterm/input/event/TerminalKey;
+	public static final field MEDIA_PLAY_PAUSE Lio/github/ketraterm/input/event/TerminalKey;
+	public static final field MEDIA_RECORD Lio/github/ketraterm/input/event/TerminalKey;
+	public static final field MEDIA_REVERSE Lio/github/ketraterm/input/event/TerminalKey;
+	public static final field MEDIA_REWIND Lio/github/ketraterm/input/event/TerminalKey;
+	public static final field MEDIA_STOP Lio/github/ketraterm/input/event/TerminalKey;
+	public static final field MEDIA_TRACK_NEXT Lio/github/ketraterm/input/event/TerminalKey;
+	public static final field MEDIA_TRACK_PREVIOUS Lio/github/ketraterm/input/event/TerminalKey;
+	public static final field MENU Lio/github/ketraterm/input/event/TerminalKey;
+	public static final field NUMPAD_0 Lio/github/ketraterm/input/event/TerminalKey;
+	public static final field NUMPAD_1 Lio/github/ketraterm/input/event/TerminalKey;
+	public static final field NUMPAD_2 Lio/github/ketraterm/input/event/TerminalKey;
+	public static final field NUMPAD_3 Lio/github/ketraterm/input/event/TerminalKey;
+	public static final field NUMPAD_4 Lio/github/ketraterm/input/event/TerminalKey;
+	public static final field NUMPAD_5 Lio/github/ketraterm/input/event/TerminalKey;
+	public static final field NUMPAD_6 Lio/github/ketraterm/input/event/TerminalKey;
+	public static final field NUMPAD_7 Lio/github/ketraterm/input/event/TerminalKey;
+	public static final field NUMPAD_8 Lio/github/ketraterm/input/event/TerminalKey;
+	public static final field NUMPAD_9 Lio/github/ketraterm/input/event/TerminalKey;
+	public static final field NUMPAD_ADD Lio/github/ketraterm/input/event/TerminalKey;
+	public static final field NUMPAD_BEGIN Lio/github/ketraterm/input/event/TerminalKey;
+	public static final field NUMPAD_COMMA Lio/github/ketraterm/input/event/TerminalKey;
+	public static final field NUMPAD_DECIMAL Lio/github/ketraterm/input/event/TerminalKey;
+	public static final field NUMPAD_DELETE Lio/github/ketraterm/input/event/TerminalKey;
+	public static final field NUMPAD_DIVIDE Lio/github/ketraterm/input/event/TerminalKey;
+	public static final field NUMPAD_DOWN Lio/github/ketraterm/input/event/TerminalKey;
+	public static final field NUMPAD_END Lio/github/ketraterm/input/event/TerminalKey;
+	public static final field NUMPAD_ENTER Lio/github/ketraterm/input/event/TerminalKey;
+	public static final field NUMPAD_EQUALS Lio/github/ketraterm/input/event/TerminalKey;
+	public static final field NUMPAD_HOME Lio/github/ketraterm/input/event/TerminalKey;
+	public static final field NUMPAD_INSERT Lio/github/ketraterm/input/event/TerminalKey;
+	public static final field NUMPAD_LEFT Lio/github/ketraterm/input/event/TerminalKey;
+	public static final field NUMPAD_MULTIPLY Lio/github/ketraterm/input/event/TerminalKey;
+	public static final field NUMPAD_PAGE_DOWN Lio/github/ketraterm/input/event/TerminalKey;
+	public static final field NUMPAD_PAGE_UP Lio/github/ketraterm/input/event/TerminalKey;
+	public static final field NUMPAD_RIGHT Lio/github/ketraterm/input/event/TerminalKey;
+	public static final field NUMPAD_SEPARATOR Lio/github/ketraterm/input/event/TerminalKey;
+	public static final field NUMPAD_SPACE Lio/github/ketraterm/input/event/TerminalKey;
+	public static final field NUMPAD_SUBTRACT Lio/github/ketraterm/input/event/TerminalKey;
+	public static final field NUMPAD_TAB Lio/github/ketraterm/input/event/TerminalKey;
+	public static final field NUMPAD_UP Lio/github/ketraterm/input/event/TerminalKey;
+	public static final field NUM_LOCK Lio/github/ketraterm/input/event/TerminalKey;
+	public static final field PAGE_DOWN Lio/github/ketraterm/input/event/TerminalKey;
+	public static final field PAGE_UP Lio/github/ketraterm/input/event/TerminalKey;
+	public static final field PAUSE Lio/github/ketraterm/input/event/TerminalKey;
+	public static final field PF1 Lio/github/ketraterm/input/event/TerminalKey;
+	public static final field PF2 Lio/github/ketraterm/input/event/TerminalKey;
+	public static final field PF3 Lio/github/ketraterm/input/event/TerminalKey;
+	public static final field PF4 Lio/github/ketraterm/input/event/TerminalKey;
+	public static final field PRINT_SCREEN Lio/github/ketraterm/input/event/TerminalKey;
+	public static final field RIGHT Lio/github/ketraterm/input/event/TerminalKey;
+	public static final field RIGHT_ALT Lio/github/ketraterm/input/event/TerminalKey;
+	public static final field RIGHT_CONTROL Lio/github/ketraterm/input/event/TerminalKey;
+	public static final field RIGHT_HYPER Lio/github/ketraterm/input/event/TerminalKey;
+	public static final field RIGHT_META Lio/github/ketraterm/input/event/TerminalKey;
+	public static final field RIGHT_SHIFT Lio/github/ketraterm/input/event/TerminalKey;
+	public static final field RIGHT_SUPER Lio/github/ketraterm/input/event/TerminalKey;
+	public static final field SCROLL_LOCK Lio/github/ketraterm/input/event/TerminalKey;
+	public static final field TAB Lio/github/ketraterm/input/event/TerminalKey;
+	public static final field UP Lio/github/ketraterm/input/event/TerminalKey;
+	public static final field VOLUME_DOWN Lio/github/ketraterm/input/event/TerminalKey;
+	public static final field VOLUME_MUTE Lio/github/ketraterm/input/event/TerminalKey;
+	public static final field VOLUME_UP Lio/github/ketraterm/input/event/TerminalKey;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public static fun valueOf (Ljava/lang/String;)Lio/github/ketraterm/input/event/TerminalKey;
+	public static fun values ()[Lio/github/ketraterm/input/event/TerminalKey;
+}
+
+public final class io/github/ketraterm/input/event/TerminalKeyEvent {
+	public static final field Companion Lio/github/ketraterm/input/event/TerminalKeyEvent$Companion;
+	public static final field NO_CODEPOINT I
+	public static final field TEXT_ONLY_CODEPOINT I
+	public fun <init> ()V
+	public fun <init> (Lio/github/ketraterm/input/event/TerminalKey;IIIILjava/lang/String;ILio/github/ketraterm/input/event/TerminalKeyEventType;)V
+	public synthetic fun <init> (Lio/github/ketraterm/input/event/TerminalKey;IIIILjava/lang/String;ILio/github/ketraterm/input/event/TerminalKeyEventType;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Lio/github/ketraterm/input/event/TerminalKey;
+	public final fun component2 ()I
+	public final fun component3 ()I
+	public final fun component4 ()I
+	public final fun component5 ()I
+	public final fun component6 ()Ljava/lang/String;
+	public final fun component7 ()I
+	public final fun component8 ()Lio/github/ketraterm/input/event/TerminalKeyEventType;
+	public final fun copy (Lio/github/ketraterm/input/event/TerminalKey;IIIILjava/lang/String;ILio/github/ketraterm/input/event/TerminalKeyEventType;)Lio/github/ketraterm/input/event/TerminalKeyEvent;
+	public static synthetic fun copy$default (Lio/github/ketraterm/input/event/TerminalKeyEvent;Lio/github/ketraterm/input/event/TerminalKey;IIIILjava/lang/String;ILio/github/ketraterm/input/event/TerminalKeyEventType;ILjava/lang/Object;)Lio/github/ketraterm/input/event/TerminalKeyEvent;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getAssociatedText ()Ljava/lang/String;
+	public final fun getBaseLayoutCodepoint ()I
+	public final fun getCodepoint ()I
+	public final fun getKey ()Lio/github/ketraterm/input/event/TerminalKey;
+	public final fun getModifiers ()I
+	public final fun getShiftedCodepoint ()I
+	public final fun getType ()Lio/github/ketraterm/input/event/TerminalKeyEventType;
+	public final fun getUnshiftedCodepoint ()I
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class io/github/ketraterm/input/event/TerminalKeyEvent$Companion {
+	public final fun codepoint (IIIIILjava/lang/String;Lio/github/ketraterm/input/event/TerminalKeyEventType;)Lio/github/ketraterm/input/event/TerminalKeyEvent;
+	public static synthetic fun codepoint$default (Lio/github/ketraterm/input/event/TerminalKeyEvent$Companion;IIIIILjava/lang/String;Lio/github/ketraterm/input/event/TerminalKeyEventType;ILjava/lang/Object;)Lio/github/ketraterm/input/event/TerminalKeyEvent;
+	public final fun key (Lio/github/ketraterm/input/event/TerminalKey;ILio/github/ketraterm/input/event/TerminalKeyEventType;)Lio/github/ketraterm/input/event/TerminalKeyEvent;
+	public static synthetic fun key$default (Lio/github/ketraterm/input/event/TerminalKeyEvent$Companion;Lio/github/ketraterm/input/event/TerminalKey;ILio/github/ketraterm/input/event/TerminalKeyEventType;ILjava/lang/Object;)Lio/github/ketraterm/input/event/TerminalKeyEvent;
+	public final fun text (Ljava/lang/String;ILio/github/ketraterm/input/event/TerminalKeyEventType;)Lio/github/ketraterm/input/event/TerminalKeyEvent;
+	public static synthetic fun text$default (Lio/github/ketraterm/input/event/TerminalKeyEvent$Companion;Ljava/lang/String;ILio/github/ketraterm/input/event/TerminalKeyEventType;ILjava/lang/Object;)Lio/github/ketraterm/input/event/TerminalKeyEvent;
+}
+
+public final class io/github/ketraterm/input/event/TerminalKeyEventType : java/lang/Enum {
+	public static final field PRESS Lio/github/ketraterm/input/event/TerminalKeyEventType;
+	public static final field RELEASE Lio/github/ketraterm/input/event/TerminalKeyEventType;
+	public static final field REPEAT Lio/github/ketraterm/input/event/TerminalKeyEventType;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public static fun valueOf (Ljava/lang/String;)Lio/github/ketraterm/input/event/TerminalKeyEventType;
+	public static fun values ()[Lio/github/ketraterm/input/event/TerminalKeyEventType;
+}
+
+public final class io/github/ketraterm/input/event/TerminalModifiers {
+	public static final field ALT I
+	public static final field CAPS_LOCK I
+	public static final field CTRL I
+	public static final field HYPER I
+	public static final field INSTANCE Lio/github/ketraterm/input/event/TerminalModifiers;
+	public static final field META I
+	public static final field NONE I
+	public static final field NUM_LOCK I
+	public static final field SHIFT I
+	public static final field SUPER I
+	public static final field VALID_MASK I
+	public final fun hasAlt (I)Z
+	public final fun hasCapsLock (I)Z
+	public final fun hasCtrl (I)Z
+	public final fun hasHyper (I)Z
+	public final fun hasMeta (I)Z
+	public final fun hasNumLock (I)Z
+	public final fun hasShift (I)Z
+	public final fun hasSuper (I)Z
+	public final fun isValid (I)Z
+	public final fun toCsiModifierParam (I)I
+	public final fun toKittyCsiModifierParam (I)I
+}
+
+public final class io/github/ketraterm/input/event/TerminalMouseButton : java/lang/Enum {
+	public static final field LEFT Lio/github/ketraterm/input/event/TerminalMouseButton;
+	public static final field MIDDLE Lio/github/ketraterm/input/event/TerminalMouseButton;
+	public static final field NONE Lio/github/ketraterm/input/event/TerminalMouseButton;
+	public static final field RIGHT Lio/github/ketraterm/input/event/TerminalMouseButton;
+	public static final field WHEEL_DOWN Lio/github/ketraterm/input/event/TerminalMouseButton;
+	public static final field WHEEL_LEFT Lio/github/ketraterm/input/event/TerminalMouseButton;
+	public static final field WHEEL_RIGHT Lio/github/ketraterm/input/event/TerminalMouseButton;
+	public static final field WHEEL_UP Lio/github/ketraterm/input/event/TerminalMouseButton;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public static fun valueOf (Ljava/lang/String;)Lio/github/ketraterm/input/event/TerminalMouseButton;
+	public static fun values ()[Lio/github/ketraterm/input/event/TerminalMouseButton;
+}
+
+public final class io/github/ketraterm/input/event/TerminalMouseEvent {
+	public fun <init> (IILio/github/ketraterm/input/event/TerminalMouseButton;Lio/github/ketraterm/input/event/TerminalMouseEventType;III)V
+	public synthetic fun <init> (IILio/github/ketraterm/input/event/TerminalMouseButton;Lio/github/ketraterm/input/event/TerminalMouseEventType;IIIILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()I
+	public final fun component2 ()I
+	public final fun component3 ()Lio/github/ketraterm/input/event/TerminalMouseButton;
+	public final fun component4 ()Lio/github/ketraterm/input/event/TerminalMouseEventType;
+	public final fun component5 ()I
+	public final fun component6 ()I
+	public final fun component7 ()I
+	public final fun copy (IILio/github/ketraterm/input/event/TerminalMouseButton;Lio/github/ketraterm/input/event/TerminalMouseEventType;III)Lio/github/ketraterm/input/event/TerminalMouseEvent;
+	public static synthetic fun copy$default (Lio/github/ketraterm/input/event/TerminalMouseEvent;IILio/github/ketraterm/input/event/TerminalMouseButton;Lio/github/ketraterm/input/event/TerminalMouseEventType;IIIILjava/lang/Object;)Lio/github/ketraterm/input/event/TerminalMouseEvent;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getButton ()Lio/github/ketraterm/input/event/TerminalMouseButton;
+	public final fun getColumn ()I
+	public final fun getModifiers ()I
+	public final fun getPixelX ()I
+	public final fun getPixelY ()I
+	public final fun getRow ()I
+	public final fun getType ()Lio/github/ketraterm/input/event/TerminalMouseEventType;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class io/github/ketraterm/input/event/TerminalMouseEventType : java/lang/Enum {
+	public static final field MOTION Lio/github/ketraterm/input/event/TerminalMouseEventType;
+	public static final field PRESS Lio/github/ketraterm/input/event/TerminalMouseEventType;
+	public static final field RELEASE Lio/github/ketraterm/input/event/TerminalMouseEventType;
+	public static final field WHEEL Lio/github/ketraterm/input/event/TerminalMouseEventType;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public static fun valueOf (Ljava/lang/String;)Lio/github/ketraterm/input/event/TerminalMouseEventType;
+	public static fun values ()[Lio/github/ketraterm/input/event/TerminalMouseEventType;
+}
+
+public final class io/github/ketraterm/input/event/TerminalPasteEvent {
+	public fun <init> (Ljava/lang/String;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun copy (Ljava/lang/String;)Lio/github/ketraterm/input/event/TerminalPasteEvent;
+	public static synthetic fun copy$default (Lio/github/ketraterm/input/event/TerminalPasteEvent;Ljava/lang/String;ILjava/lang/Object;)Lio/github/ketraterm/input/event/TerminalPasteEvent;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getText ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class io/github/ketraterm/input/event/TerminalTextReplacementEvent {
+	public fun <init> (IILjava/lang/String;)V
+	public final fun component1 ()I
+	public final fun component2 ()I
+	public final fun component3 ()Ljava/lang/String;
+	public final fun copy (IILjava/lang/String;)Lio/github/ketraterm/input/event/TerminalTextReplacementEvent;
+	public static synthetic fun copy$default (Lio/github/ketraterm/input/event/TerminalTextReplacementEvent;IILjava/lang/String;ILjava/lang/Object;)Lio/github/ketraterm/input/event/TerminalTextReplacementEvent;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getDeleteAfterCursorCount ()I
+	public final fun getDeleteBeforeCursorCount ()I
+	public final fun getReplacementText ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class io/github/ketraterm/input/policy/BackspacePolicy : java/lang/Enum {
+	public static final field BACKSPACE Lio/github/ketraterm/input/policy/BackspacePolicy;
+	public static final field DELETE Lio/github/ketraterm/input/policy/BackspacePolicy;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public static fun valueOf (Ljava/lang/String;)Lio/github/ketraterm/input/policy/BackspacePolicy;
+	public static fun values ()[Lio/github/ketraterm/input/policy/BackspacePolicy;
+}
+
+public final class io/github/ketraterm/input/policy/EnterNewLineModePolicy : java/lang/Enum {
+	public static final field SEND_CR Lio/github/ketraterm/input/policy/EnterNewLineModePolicy;
+	public static final field SEND_CR_LF Lio/github/ketraterm/input/policy/EnterNewLineModePolicy;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public static fun valueOf (Ljava/lang/String;)Lio/github/ketraterm/input/policy/EnterNewLineModePolicy;
+	public static fun values ()[Lio/github/ketraterm/input/policy/EnterNewLineModePolicy;
+}
+
+public final class io/github/ketraterm/input/policy/MetaKeyPolicy : java/lang/Enum {
+	public static final field ESC_PREFIX Lio/github/ketraterm/input/policy/MetaKeyPolicy;
+	public static final field IGNORE_META Lio/github/ketraterm/input/policy/MetaKeyPolicy;
+	public static final field SUPPRESS_EVENT Lio/github/ketraterm/input/policy/MetaKeyPolicy;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public static fun valueOf (Ljava/lang/String;)Lio/github/ketraterm/input/policy/MetaKeyPolicy;
+	public static fun values ()[Lio/github/ketraterm/input/policy/MetaKeyPolicy;
+}
+
+public final class io/github/ketraterm/input/policy/MouseCoordinateLimitPolicy : java/lang/Enum {
+	public static final field CLAMP_TO_MAX Lio/github/ketraterm/input/policy/MouseCoordinateLimitPolicy;
+	public static final field SUPPRESS_OUT_OF_RANGE Lio/github/ketraterm/input/policy/MouseCoordinateLimitPolicy;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public static fun valueOf (Ljava/lang/String;)Lio/github/ketraterm/input/policy/MouseCoordinateLimitPolicy;
+	public static fun values ()[Lio/github/ketraterm/input/policy/MouseCoordinateLimitPolicy;
+}
+
+public final class io/github/ketraterm/input/policy/PasteControlPolicy : java/lang/Enum {
+	public static final field PRESERVE Lio/github/ketraterm/input/policy/PasteControlPolicy;
+	public static final field STRIP_C0_EXCEPT_TAB_CR_LF Lio/github/ketraterm/input/policy/PasteControlPolicy;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public static fun valueOf (Ljava/lang/String;)Lio/github/ketraterm/input/policy/PasteControlPolicy;
+	public static fun values ()[Lio/github/ketraterm/input/policy/PasteControlPolicy;
+}
+
+public final class io/github/ketraterm/input/policy/PasteLineEndingPolicy : java/lang/Enum {
+	public static final field CARRIAGE_RETURN Lio/github/ketraterm/input/policy/PasteLineEndingPolicy;
+	public static final field CARRIAGE_RETURN_AND_LINE_FEED Lio/github/ketraterm/input/policy/PasteLineEndingPolicy;
+	public static final field LINE_FEED Lio/github/ketraterm/input/policy/PasteLineEndingPolicy;
+	public static final field PRESERVE Lio/github/ketraterm/input/policy/PasteLineEndingPolicy;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public static fun valueOf (Ljava/lang/String;)Lio/github/ketraterm/input/policy/PasteLineEndingPolicy;
+	public static fun values ()[Lio/github/ketraterm/input/policy/PasteLineEndingPolicy;
+}
+
+public final class io/github/ketraterm/input/policy/TerminalInputPolicy {
+	public fun <init> ()V
+	public fun <init> (Lio/github/ketraterm/input/policy/BackspacePolicy;Lio/github/ketraterm/input/policy/MetaKeyPolicy;Lio/github/ketraterm/input/policy/UnsupportedModifiedKeyPolicy;ZLio/github/ketraterm/input/policy/EnterNewLineModePolicy;Lio/github/ketraterm/input/policy/MouseCoordinateLimitPolicy;Lio/github/ketraterm/input/policy/PasteControlPolicy;Lio/github/ketraterm/input/policy/PasteLineEndingPolicy;)V
+	public synthetic fun <init> (Lio/github/ketraterm/input/policy/BackspacePolicy;Lio/github/ketraterm/input/policy/MetaKeyPolicy;Lio/github/ketraterm/input/policy/UnsupportedModifiedKeyPolicy;ZLio/github/ketraterm/input/policy/EnterNewLineModePolicy;Lio/github/ketraterm/input/policy/MouseCoordinateLimitPolicy;Lio/github/ketraterm/input/policy/PasteControlPolicy;Lio/github/ketraterm/input/policy/PasteLineEndingPolicy;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Lio/github/ketraterm/input/policy/BackspacePolicy;
+	public final fun component2 ()Lio/github/ketraterm/input/policy/MetaKeyPolicy;
+	public final fun component3 ()Lio/github/ketraterm/input/policy/UnsupportedModifiedKeyPolicy;
+	public final fun component4 ()Z
+	public final fun component5 ()Lio/github/ketraterm/input/policy/EnterNewLineModePolicy;
+	public final fun component6 ()Lio/github/ketraterm/input/policy/MouseCoordinateLimitPolicy;
+	public final fun component7 ()Lio/github/ketraterm/input/policy/PasteControlPolicy;
+	public final fun component8 ()Lio/github/ketraterm/input/policy/PasteLineEndingPolicy;
+	public final fun copy (Lio/github/ketraterm/input/policy/BackspacePolicy;Lio/github/ketraterm/input/policy/MetaKeyPolicy;Lio/github/ketraterm/input/policy/UnsupportedModifiedKeyPolicy;ZLio/github/ketraterm/input/policy/EnterNewLineModePolicy;Lio/github/ketraterm/input/policy/MouseCoordinateLimitPolicy;Lio/github/ketraterm/input/policy/PasteControlPolicy;Lio/github/ketraterm/input/policy/PasteLineEndingPolicy;)Lio/github/ketraterm/input/policy/TerminalInputPolicy;
+	public static synthetic fun copy$default (Lio/github/ketraterm/input/policy/TerminalInputPolicy;Lio/github/ketraterm/input/policy/BackspacePolicy;Lio/github/ketraterm/input/policy/MetaKeyPolicy;Lio/github/ketraterm/input/policy/UnsupportedModifiedKeyPolicy;ZLio/github/ketraterm/input/policy/EnterNewLineModePolicy;Lio/github/ketraterm/input/policy/MouseCoordinateLimitPolicy;Lio/github/ketraterm/input/policy/PasteControlPolicy;Lio/github/ketraterm/input/policy/PasteLineEndingPolicy;ILjava/lang/Object;)Lio/github/ketraterm/input/policy/TerminalInputPolicy;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getAltSendsEscapePrefix ()Z
+	public final fun getBackspacePolicy ()Lio/github/ketraterm/input/policy/BackspacePolicy;
+	public final fun getEnterNewLineModePolicy ()Lio/github/ketraterm/input/policy/EnterNewLineModePolicy;
+	public final fun getMetaKeyPolicy ()Lio/github/ketraterm/input/policy/MetaKeyPolicy;
+	public final fun getMouseCoordinateLimitPolicy ()Lio/github/ketraterm/input/policy/MouseCoordinateLimitPolicy;
+	public final fun getPasteControlPolicy ()Lio/github/ketraterm/input/policy/PasteControlPolicy;
+	public final fun getPasteLineEndingPolicy ()Lio/github/ketraterm/input/policy/PasteLineEndingPolicy;
+	public final fun getUnsupportedModifiedKeyPolicy ()Lio/github/ketraterm/input/policy/UnsupportedModifiedKeyPolicy;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class io/github/ketraterm/input/policy/UnsupportedModifiedKeyPolicy : java/lang/Enum {
+	public static final field EMIT_UNMODIFIED Lio/github/ketraterm/input/policy/UnsupportedModifiedKeyPolicy;
+	public static final field SUPPRESS Lio/github/ketraterm/input/policy/UnsupportedModifiedKeyPolicy;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public static fun valueOf (Ljava/lang/String;)Lio/github/ketraterm/input/policy/UnsupportedModifiedKeyPolicy;
+	public static fun values ()[Lio/github/ketraterm/input/policy/UnsupportedModifiedKeyPolicy;
+}
+

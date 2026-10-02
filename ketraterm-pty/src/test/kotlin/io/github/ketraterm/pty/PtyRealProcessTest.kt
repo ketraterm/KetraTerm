@@ -23,7 +23,6 @@ import io.github.ketraterm.input.event.TerminalKey
 import io.github.ketraterm.input.event.TerminalKeyEvent
 import io.github.ketraterm.input.event.TerminalPasteEvent
 import io.github.ketraterm.render.api.TerminalRenderCursorShape
-import io.github.ketraterm.render.api.TerminalRenderFrameReader
 import io.github.ketraterm.session.TerminalClipboardReadResult
 import io.github.ketraterm.session.TerminalSession
 import io.github.ketraterm.session.TerminalSessionState
@@ -89,7 +88,7 @@ class PtyRealProcessTest {
                 withTimeout(30.seconds) { session.state.first { it is TerminalSessionState.Closed } }
                 // The child exits successfully only after comparing every reply and its
                 // following status response. No assertion depends on final screen flushing.
-                assertEquals(0, session.exitCode, session.terminal.getAllAsString())
+                assertEquals(0, session.exitCode, session.retainedText())
                 assertEquals(if (deny) 0 else 8, reads.get())
                 assertNull(session.failure)
             } finally {
@@ -120,7 +119,7 @@ class PtyRealProcessTest {
                 outputScript = if (isWindows()) "[Console]::Out.Write('hello')" else "printf 'hello'",
             )
 
-        assertTrue(session.terminal.getAllAsString().contains("hello"))
+        assertTrue(session.retainedText().contains("hello"))
         releaseAndAwaitExit(session)
         assertEquals(0, session.exitCode)
     }
@@ -132,8 +131,10 @@ class PtyRealProcessTest {
         session.resize(columns = 100, rows = 30)
         session.close()
 
-        assertEquals(100, session.terminal.width)
-        assertEquals(30, session.terminal.height)
+        session.readRenderFrame { frame ->
+            assertEquals(100, frame.columns)
+            assertEquals(30, frame.rows)
+        }
     }
 
     @Test
@@ -146,8 +147,10 @@ class PtyRealProcessTest {
         }
         session.close()
 
-        assertEquals(101, session.terminal.width)
-        assertEquals(31, session.terminal.height)
+        session.readRenderFrame { frame ->
+            assertEquals(101, frame.columns)
+            assertEquals(31, frame.rows)
+        }
     }
 
     @Test
@@ -184,7 +187,7 @@ class PtyRealProcessTest {
                 readBufferSize = 257,
             )
 
-        assertEquals(expectedCount, session.terminal.getAllAsString().count { it == 'x' })
+        assertEquals(expectedCount, session.retainedText().count { it == 'x' })
         releaseAndAwaitExit(session)
         assertEquals(0, session.exitCode)
     }
@@ -207,7 +210,7 @@ class PtyRealProcessTest {
             )
         try {
             releaseAndAwaitExit(session)
-            val text = session.terminal.getAllAsString()
+            val text = session.retainedText()
             assertAll(
                 { assertEquals(0, session.exitCode) },
                 { assertNull(session.failure) },
@@ -233,8 +236,9 @@ class PtyRealProcessTest {
             )
 
         // CR returns to column zero: C overwrites B on the same row.
-        assertEquals("A", session.terminal.getLineAsString(0))
-        assertEquals("C", session.terminal.getLineAsString(1))
+        val lines = session.retainedText().lines()
+        assertEquals("A", lines[0])
+        assertEquals("C", lines[1])
         releaseAndAwaitExit(session)
         assertEquals(0, session.exitCode)
     }
@@ -252,7 +256,7 @@ class PtyRealProcessTest {
                 readBufferSize = 1,
             )
 
-        val primaryText = session.terminal.getAllAsString()
+        val primaryText = session.retainedText()
         assertAll(
             { assertTrue(primaryText.contains("prompt> done")) },
             { assertTrue(primaryText.contains("after")) },
@@ -276,7 +280,7 @@ class PtyRealProcessTest {
                     },
                 readBufferSize = 1,
             )
-        (session.terminal as TerminalRenderFrameReader).readRenderFrame { frame ->
+        session.readRenderFrame { frame ->
             assertEquals(TerminalRenderCursorShape.BAR, frame.cursor.shape)
             assertTrue(frame.cursor.blinking)
             assertTrue(frame.cursor.visible)
@@ -297,9 +301,9 @@ class PtyRealProcessTest {
                 readBufferSize = 1,
             )
 
-        assertTrue(session.terminal.getModeSnapshot().isBracketedPasteEnabled)
+        assertTrue(session.modeSnapshot.isBracketedPasteEnabled)
         session.encodePaste(TerminalPasteEvent("first\nsecond"))
-        assertTrue(session.terminal.getModeSnapshot().isBracketedPasteEnabled)
+        assertTrue(session.modeSnapshot.isBracketedPasteEnabled)
         session.close()
     }
 

@@ -22,7 +22,7 @@ import java.nio.file.Path
 import java.nio.file.Paths
 
 /** Safe resolver for authoritative local `file` working-directory URIs. */
-object TerminalLocalFileUriResolver {
+public object TerminalLocalFileUriResolver {
     /**
      * Resolves [value] without reinterpreting remote file authorities locally.
      *
@@ -33,7 +33,7 @@ object TerminalLocalFileUriResolver {
      * @return normalized absolute local path, or `null` when unsupported.
      */
     @JvmStatic
-    fun resolve(value: String?): Path? {
+    public fun resolve(value: String?): Path? {
         if (value == null) return null
         return try {
             val uri = URI(value)

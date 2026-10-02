@@ -41,7 +41,7 @@ package io.github.ketraterm.core.model
  * @property selectiveEraseProtected Whether DEC selective erase skips the cell.
  * @property hyperlinkId OSC 8 hyperlink handle; `0` means no hyperlink.
  */
-data class CellAttributes(
+public data class CellAttributes(
     val foreground: CellColor = CellColor.DEFAULT,
     val background: CellColor = CellColor.DEFAULT,
     val underlineColor: CellColor = CellColor.DEFAULT,
@@ -68,7 +68,7 @@ data class CellAttributes(
  * [value] is unused for [CellColorKind.DEFAULT], is `0..255` for
  * [CellColorKind.INDEXED], and is `0xRRGGBB` for [CellColorKind.RGB].
  */
-data class CellColor(
+public data class CellColor(
     val kind: CellColorKind,
     val value: Int = 0,
 ) {
@@ -89,9 +89,9 @@ data class CellColor(
         }
     }
 
-    companion object {
+    public companion object {
         /** Terminal default color descriptor. */
-        val DEFAULT = CellColor(CellColorKind.DEFAULT)
+        public val DEFAULT: CellColor = CellColor(CellColorKind.DEFAULT)
 
         private val INDEXED_COLORS =
             Array(256) { index ->
@@ -104,7 +104,7 @@ data class CellColor(
          * @param index Palette index in `0..255`.
          * @return Indexed color descriptor.
          */
-        fun indexed(index: Int): CellColor {
+        public fun indexed(index: Int): CellColor {
             require(index in 0..255) { "indexed color value must be in 0..255, was $index" }
             return INDEXED_COLORS[index]
         }
@@ -117,7 +117,7 @@ data class CellColor(
          * @param blue Blue channel in `0..255`.
          * @return RGB color descriptor.
          */
-        fun rgb(
+        public fun rgb(
             red: Int,
             green: Int,
             blue: Int,
@@ -134,12 +134,12 @@ data class CellColor(
          * @param rgb Packed RGB value in `0x000000..0xFFFFFF`.
          * @return RGB color descriptor.
          */
-        fun rgb(rgb: Int): CellColor = CellColor(CellColorKind.RGB, rgb)
+        public fun rgb(rgb: Int): CellColor = CellColor(CellColorKind.RGB, rgb)
     }
 }
 
 /** Kind tag for [CellColor]. */
-enum class CellColorKind {
+public enum class CellColorKind {
     /** Terminal default color. */
     DEFAULT,
 
@@ -155,8 +155,8 @@ enum class CellColorKind {
  *
  * [sgrCode] is the value used by colon SGR underline forms such as `CSI 4:3 m`.
  */
-enum class UnderlineStyle(
-    val sgrCode: Int,
+public enum class UnderlineStyle(
+    public val sgrCode: Int,
 ) {
     /** No underline. */
     NONE(0),
@@ -177,14 +177,14 @@ enum class UnderlineStyle(
     DASHED(5),
     ;
 
-    companion object {
+    public companion object {
         /**
          * Returns the underline style for an SGR underline-style code.
          *
          * @param code SGR underline-style code.
          * @return Matching style, or `null` when [code] is unsupported.
          */
-        fun fromSgrCode(code: Int): UnderlineStyle? =
+        public fun fromSgrCode(code: Int): UnderlineStyle? =
             when (code) {
                 NONE.sgrCode -> NONE
                 SINGLE.sgrCode -> SINGLE

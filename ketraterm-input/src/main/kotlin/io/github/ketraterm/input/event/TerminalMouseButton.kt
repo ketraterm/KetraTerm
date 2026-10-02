@@ -18,7 +18,7 @@ package io.github.ketraterm.input.event
 /**
  * Platform-neutral mouse button vocabulary for terminal input reporting.
  */
-enum class TerminalMouseButton {
+public enum class TerminalMouseButton {
     /** Primary pointer button. */
     LEFT,
 
@@ -52,7 +52,7 @@ enum class TerminalMouseButton {
  *
  * @return true if this is a wheel button, false otherwise.
  */
-fun TerminalMouseButton.isWheel(): Boolean =
+internal fun TerminalMouseButton.isWheel(): Boolean =
     this == TerminalMouseButton.WHEEL_UP ||
         this == TerminalMouseButton.WHEEL_DOWN ||
         this == TerminalMouseButton.WHEEL_LEFT ||

@@ -19,7 +19,7 @@ package io.github.ketraterm.completion.api
  * Suspending completion source contract for one provider such as static
  * command specs, path completion, or IDE context.
  */
-fun interface TerminalCompletionSource {
+public fun interface TerminalCompletionSource {
     /**
      * Returns candidates produced by this source for [request] and [context].
      *
@@ -32,7 +32,7 @@ fun interface TerminalCompletionSource {
      * @param limit maximum candidates this source may return.
      * @return ordered candidates from this source.
      */
-    suspend fun complete(
+    public suspend fun complete(
         request: TerminalCompletionRequest,
         context: TerminalCompletionContext,
         limit: Int,
@@ -46,7 +46,7 @@ fun interface TerminalCompletionSource {
  * @property priority small cold-start prior added to this source's reciprocal-rank
  * contribution. The merged engine clamps values to `[-20, 20]`.
  */
-data class TerminalCompletionSourceEntry
+public data class TerminalCompletionSourceEntry
     @JvmOverloads
     constructor(
         val source: TerminalCompletionSource,

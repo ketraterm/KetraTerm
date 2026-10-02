@@ -16,15 +16,15 @@
 package io.github.ketraterm.core.api
 
 /**
- * A read-only, EPHEMERAL view of a single physical terminal line.
- * * DANGER - TEMPORAL COUPLING:
- * The UI Renderer MUST NOT store or hold references to this object outside the
- * immediate execution scope of the current render frame. The backing memory
- * may mutate at any time if background output arrives.
+ * Read-only borrowed view of one physical terminal line.
+ *
+ * Read only while the owning terminal is serialized against mutation and do not
+ * retain the view after releasing that serialization. Mutations may replace or reuse
+ * its backing storage. Renderer-owned copies use the public render frame contract.
  */
-interface TerminalLine {
+public interface TerminalLine {
     /** Number of columns in this line. */
-    val width: Int
+    public val width: Int
 
     /**
      * Returns the **base (first) codepoint** for the cell at [col].
@@ -32,54 +32,25 @@ interface TerminalLine {
      * - For plain cells this is the full Unicode scalar value.
      * - For cluster cells this is the leading codepoint of the grapheme sequence.
      *   Simple renderers that map one cell to one glyph can use this value directly.
-     * - Returns [io.github.ketraterm.core.model.TerminalConstants.EMPTY] (0) for blank cells.
-     * - Returns [io.github.ketraterm.core.model.TerminalConstants.WIDE_CHAR_SPACER] (-1)
+     * - Returns `0` for blank cells.
+     * - Returns `-1`
      *   for the right half of a 2-cell wide character; renderers should skip such cells.
      *
      * @param col Column index (0-based).
      * @return The base Unicode codepoint at the specified column, or a spacer/empty sentinel.
      */
-    fun getCodepoint(col: Int): Int
-
-    /**
-     * Returns the primary packed attribute word for the cell at [col].
-     *
-     * The primary word stores foreground/background colors plus the most common
-     * SGR flags. Renderers should read it together with [getPackedExtendedAttr]
-     * and decode both words with [io.github.ketraterm.core.codec.AttributeCodec].
-     *
-     * This method is intended for render loops and performs no allocation.
-     *
-     * @param col Column index (0-based).
-     * @return Primary packed attribute word for the cell.
-     */
-    fun getPackedAttr(col: Int): Long
-
-    /**
-     * Returns the extended packed attribute word for the cell at [col].
-     *
-     * The extended word stores underline color/style, decoration flags, conceal,
-     * and the numeric hyperlink id. Renderers should read it together with
-     * [getPackedAttr] and decode both words with [io.github.ketraterm.core.codec.AttributeCodec].
-     *
-     * This method is intended for render loops and performs no allocation.
-     *
-     * @param col Column index (0-based).
-     * @return Extended packed attribute word for the cell.
-     */
-    fun getPackedExtendedAttr(col: Int): Long
+    public fun getCodepoint(col: Int): Int
 
     /**
      * Returns `true` if the cell at [col] holds a multi-codepoint grapheme cluster
      * requiring a call to [readCluster] for full rendering.
      *
-     * Defaults to `false` so that [io.github.ketraterm.core.model.VoidLine] and simple
-     * stub implementations need not override it.
+     * Defaults to `false` for implementations without cluster storage.
      *
      * @param col Column index (0-based).
      * @return `true` if the cell holds a grapheme cluster, `false` otherwise.
      */
-    fun isCluster(col: Int): Boolean = false
+    public fun isCluster(col: Int): Boolean = false
 
     /**
      * Copies all codepoints of the grapheme cluster at [col] into [dest] and
@@ -96,7 +67,7 @@ interface TerminalLine {
      * there is no fixed public upper bound guaranteed by this API.
      * @return Number of codepoints written, or 0 if the cell is not a cluster.
      */
-    fun readCluster(
+    public fun readCluster(
         col: Int,
         dest: IntArray,
     ): Int = 0

@@ -20,7 +20,7 @@ import io.github.ketraterm.completion.model.TerminalCompletionValueDomain
 import io.github.ketraterm.completion.source.*
 
 /** Factories for dependency-free, host-composable completion sources. */
-object TerminalCompletionSources {
+public object TerminalCompletionSources {
     /**
      * Creates a path autocomplete source backed by a host-provided file system lister.
      *
@@ -28,7 +28,7 @@ object TerminalCompletionSources {
      * @return path completion source.
      */
     @JvmStatic
-    fun path(fileSystemProvider: TerminalFileSystemProvider): TerminalCompletionSource = PathCompletionSource(fileSystemProvider)
+    public fun path(fileSystemProvider: TerminalFileSystemProvider): TerminalCompletionSource = PathCompletionSource(fileSystemProvider)
 
     /**
      * Creates a source backed by a query-aware host fuzzy-path provider.
@@ -50,7 +50,7 @@ object TerminalCompletionSources {
      */
     @JvmStatic
     @JvmOverloads
-    fun fuzzyPath(
+    public fun fuzzyPath(
         sourceId: String,
         entriesProvider: TerminalFuzzyPathProvider,
         requiresNonEmptyPrefix: Boolean = true,
@@ -82,7 +82,7 @@ object TerminalCompletionSources {
      * @throws IllegalArgumentException if [sourceId] is blank.
      */
     @JvmStatic
-    fun gradleTask(
+    public fun gradleTask(
         sourceId: String,
         tasksProvider: suspend (TerminalCompletionRequest, TerminalCompletionContext) -> List<TerminalGradleTask>,
     ): TerminalCompletionSource =
@@ -112,7 +112,7 @@ object TerminalCompletionSources {
      */
     @JvmStatic
     @JvmOverloads
-    fun valueDomain(
+    public fun valueDomain(
         domain: TerminalCompletionValueDomain,
         sourceId: String,
         valuesProvider: suspend (TerminalCompletionRequest, TerminalCompletionContext) -> List<TerminalCompletionDomainValue>,
@@ -142,7 +142,7 @@ object TerminalCompletionSources {
      * @return projected candidates, or an empty list for an ineligible context.
      */
     @JvmStatic
-    fun valueDomainCandidates(
+    public fun valueDomainCandidates(
         request: TerminalCompletionRequest,
         context: TerminalCompletionContext,
         domain: TerminalCompletionValueDomain,

@@ -41,7 +41,9 @@ class TerminalLibraryConsumerCompilationTest {
         "host,io.github.ketraterm.host.HostPolicy",
         "parser,io.github.ketraterm.parser.api.TerminalOutputParser",
         "completion,io.github.ketraterm.completion.api.TerminalCompletionCandidateKind",
+        "completion-host,io.github.ketraterm.completion.host.TerminalBoundedDirectoryScanner",
         "ui-swing,io.github.ketraterm.ui.swing.api.SwingTerminal",
+        "pty,io.github.ketraterm.pty.PtyConnector",
     )
     fun `isolated consumer classpaths contain the requested library and Kotlin runtime`(
         module: String,
@@ -53,6 +55,28 @@ class TerminalLibraryConsumerCompilationTest {
             final class Consumer {
                 Class<?> libraryType() { return $publicType.class; }
                 Object runtimeValue() { return kotlin.Unit.INSTANCE; }
+            }
+            """.trimIndent(),
+        )
+    }
+
+    @Test
+    fun `completion host exports Java scanner configuration overloads`() {
+        assertCompiles(
+            "completion-host",
+            """
+            import io.github.ketraterm.completion.host.TerminalBoundedDirectoryScanner;
+            import kotlinx.coroutines.Dispatchers;
+
+            final class Consumer {
+                TerminalBoundedDirectoryScanner[] scanners() {
+                    return new TerminalBoundedDirectoryScanner[] {
+                        new TerminalBoundedDirectoryScanner(),
+                        new TerminalBoundedDirectoryScanner(100),
+                        new TerminalBoundedDirectoryScanner(100, 1_000_000L),
+                        new TerminalBoundedDirectoryScanner(100, 1_000_000L, Dispatchers.getIO())
+                    };
+                }
             }
             """.trimIndent(),
         )
@@ -150,6 +174,23 @@ class TerminalLibraryConsumerCompilationTest {
 
                 Flow<Unit> changes(SwingHyperlinkDetector detector) {
                     return detector.getConfigurationChanges();
+                }
+            }
+            """.trimIndent(),
+        )
+    }
+
+    @Test
+    fun `PTY dependency exports the native process type in its public connector constructor`() {
+        assertCompiles(
+            "pty",
+            """
+            import com.pty4j.PtyProcess;
+            import io.github.ketraterm.pty.PtyConnector;
+
+            final class Consumer {
+                PtyConnector connector(PtyProcess process) {
+                    return new PtyConnector(process, 4096, "reader", "watcher");
                 }
             }
             """.trimIndent(),

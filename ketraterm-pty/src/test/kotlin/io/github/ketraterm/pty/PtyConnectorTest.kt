@@ -15,6 +15,7 @@
  */
 package io.github.ketraterm.pty
 
+import io.github.ketraterm.transport.TerminalConnector
 import io.github.ketraterm.transport.TerminalConnectorListener
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Assertions.*
@@ -134,6 +135,32 @@ class PtyConnectorTest {
         connector.write("a".ascii())
 
         assertEquals("", output.text())
+    }
+
+    @ParameterizedTest
+    @ValueSource(ints = [0, 1, 5])
+    fun `connector contract default length writes the remaining byte range`(offset: Int) {
+        val output = RecordingOutputStream()
+        val connector: TerminalConnector = createConnector(TestProcess(input = BlockingInputStream(), output = output))
+        val bytes = "01234".ascii()
+
+        connector.write(bytes, offset = offset)
+
+        assertEquals("01234".substring(offset), output.text())
+    }
+
+    @ParameterizedTest
+    @ValueSource(ints = [-1, 6, Int.MIN_VALUE, Int.MAX_VALUE])
+    fun `connector contract rejects invalid default slice before writing`(offset: Int) {
+        val output = RecordingOutputStream()
+        val connector: TerminalConnector = createConnector(TestProcess(input = BlockingInputStream(), output = output))
+
+        assertThrows(IllegalArgumentException::class.java) {
+            connector.write("01234".ascii(), offset = offset)
+        }
+
+        assertEquals("", output.text())
+        assertEquals(0, output.flushes)
     }
 
     @Test

@@ -126,6 +126,36 @@ class TerminalParserTest {
     @DisplayName("API validation")
     inner class ApiValidation {
         @Test
+        fun `omitted slice length consumes the remaining suffix and accepts an empty end slice`() {
+            val f = TerminalParserFixture()
+            val bytes = "prefix\u001b[31mX".encodeToByteArray()
+
+            f.parser.accept(bytes, offset = 6)
+            f.parser.accept(bytes, offset = bytes.size)
+            f.endOfInput()
+
+            assertEquals(listOf("setForegroundIndexed:1", "writeCodepoint:88"), f.sink.events)
+        }
+
+        @Test
+        fun `invalid offset with omitted length preserves a pending command`() {
+            for (offset in listOf(-1, 5, Int.MIN_VALUE, Int.MAX_VALUE)) {
+                val f = TerminalParserFixture()
+                f.acceptAscii("\u001b[3")
+                val bytes = "_1mX".encodeToByteArray()
+
+                assertThrows(IllegalArgumentException::class.java) {
+                    f.parser.accept(bytes, offset = offset)
+                }
+                assertTrue(f.sink.events.isEmpty())
+
+                f.parser.accept(bytes, offset = 1)
+                f.endOfInput()
+                assertEquals(listOf("setForegroundIndexed:1", "writeCodepoint:88"), f.sink.events, "offset=$offset")
+            }
+        }
+
+        @Test
         fun `rejected slice preserves an incomplete UTF8 scalar at every byte boundary`() {
             val bytes = "😀".encodeToByteArray()
             for (split in 1 until bytes.size) {

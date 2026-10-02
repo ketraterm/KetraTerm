@@ -25,7 +25,7 @@ import java.awt.event.MouseEvent
  * to the PTY while DEC mouse reporting is active; Shift-right-click forces
  * this hook so users can temporarily bypass application mouse handling.
  */
-fun interface SwingTerminalContextMenuHandler {
+public fun interface SwingTerminalContextMenuHandler {
     /**
      * Shows or handles a terminal context-menu request.
      *
@@ -34,14 +34,14 @@ fun interface SwingTerminalContextMenuHandler {
      * @param request context-menu request and terminal actions.
      * @return `true` when the host showed or handled a menu.
      */
-    fun handleContextMenu(request: SwingTerminalContextMenuRequest): Boolean
+    public fun handleContextMenu(request: SwingTerminalContextMenuRequest): Boolean
 
-    companion object {
+    public companion object {
         /**
          * Handler that never shows a context menu.
          */
         @JvmField
-        val NONE: SwingTerminalContextMenuHandler = SwingTerminalContextMenuHandler { false }
+        public val NONE: SwingTerminalContextMenuHandler = SwingTerminalContextMenuHandler { false }
     }
 }
 
@@ -58,40 +58,40 @@ fun interface SwingTerminalContextMenuHandler {
  * application mouse reporting was active.
  * @property hyperlink hyperlink under the pointer, or `null`.
  */
-class SwingTerminalContextMenuRequest internal constructor(
-    val terminal: SwingTerminal,
-    val x: Int,
-    val y: Int,
-    val forcedByShift: Boolean,
-    val hyperlink: SwingTerminalContextHyperlink?,
+public class SwingTerminalContextMenuRequest internal constructor(
+    public val terminal: SwingTerminal,
+    public val x: Int,
+    public val y: Int,
+    public val forcedByShift: Boolean,
+    public val hyperlink: SwingTerminalContextHyperlink?,
     /** Original popup gesture, for host-owned provider actions. */
-    val triggerEvent: MouseEvent,
+    public val triggerEvent: MouseEvent,
 ) {
     /**
      * Returns whether the terminal currently has selected text.
      */
-    fun hasSelection(): Boolean = terminal.currentSelection() != null
+    public fun hasSelection(): Boolean = terminal.currentSelection() != null
 
     /**
      * Copies the current terminal selection to the host clipboard.
      *
      * @return `true` when text was copied.
      */
-    fun copySelection(): Boolean = terminal.copySelectionToClipboard()
+    public fun copySelection(): Boolean = terminal.copySelectionToClipboard()
 
     /**
      * Pastes host clipboard text into the terminal session.
      *
      * @return `true` when text was pasted.
      */
-    fun pasteClipboard(): Boolean = terminal.pasteClipboardText()
+    public fun pasteClipboard(): Boolean = terminal.pasteClipboardText()
 
     /**
      * Selects all retained terminal text.
      *
      * @return `true` when a selection was created.
      */
-    fun selectAll(): Boolean = terminal.selectAll()
+    public fun selectAll(): Boolean = terminal.selectAll()
 
     /**
      * Requests a foreground-program screen clear/redraw.
@@ -101,7 +101,7 @@ class SwingTerminalContextMenuRequest internal constructor(
      *
      * @return `true` when a bound session accepted the input request.
      */
-    fun clearScreen(): Boolean = terminal.clearScreen()
+    public fun clearScreen(): Boolean = terminal.clearScreen()
 }
 
 /**
@@ -113,24 +113,24 @@ class SwingTerminalContextMenuRequest internal constructor(
  * @property uri complete OSC 8 or host-discovered URI when available. Navigation
  * actions without a copyable URI expose only [open] and leave this value `null`.
  */
-class SwingTerminalContextHyperlink internal constructor(
-    val uri: String?,
+public class SwingTerminalContextHyperlink internal constructor(
+    public val uri: String?,
     private val openAction: () -> Boolean,
     private val copyUriAction: () -> Boolean,
     /** Captured host action metadata; opaque to shared UI. */
-    val providerAction: SwingHyperlinkAction? = null,
+    public val providerAction: SwingHyperlinkAction? = null,
 ) {
     /**
      * Opens the hyperlink target.
      *
      * @return `true` when activation was handled.
      */
-    fun open(): Boolean = openAction()
+    public fun open(): Boolean = openAction()
 
     /**
      * Copies [uri] to the host clipboard when a resolved URI is available.
      *
      * @return `true` when a URI was copied.
      */
-    fun copyUri(): Boolean = copyUriAction()
+    public fun copyUri(): Boolean = copyUriAction()
 }

@@ -1,0 +1,341 @@
+public final class io/github/ketraterm/protocol/AnsiMode {
+	public static final field INSERT I
+	public static final field INSTANCE Lio/github/ketraterm/protocol/AnsiMode;
+	public static final field NEW_LINE I
+}
+
+public final class io/github/ketraterm/protocol/ControlCode {
+	public static final field ACK I
+	public static final field APC I
+	public static final field BEL I
+	public static final field BPH I
+	public static final field BS I
+	public static final field CAN I
+	public static final field CCH I
+	public static final field CR I
+	public static final field CSI I
+	public static final field DC1 I
+	public static final field DC2 I
+	public static final field DC3 I
+	public static final field DC4 I
+	public static final field DCS I
+	public static final field DEL I
+	public static final field DLE I
+	public static final field EM I
+	public static final field ENQ I
+	public static final field EOT I
+	public static final field EPA I
+	public static final field ESA I
+	public static final field ESC I
+	public static final field ETB I
+	public static final field ETX I
+	public static final field FF I
+	public static final field FS I
+	public static final field GS I
+	public static final field HOP I
+	public static final field HT I
+	public static final field HTJ I
+	public static final field HTS I
+	public static final field IND I
+	public static final field INSTANCE Lio/github/ketraterm/protocol/ControlCode;
+	public static final field LF I
+	public static final field MW I
+	public static final field NAK I
+	public static final field NBH I
+	public static final field NEL I
+	public static final field NUL I
+	public static final field OSC I
+	public static final field PAD I
+	public static final field PLD I
+	public static final field PLU I
+	public static final field PM I
+	public static final field PU1 I
+	public static final field PU2 I
+	public static final field RI I
+	public static final field RS I
+	public static final field SCI I
+	public static final field SGCI I
+	public static final field SI I
+	public static final field SO I
+	public static final field SOH I
+	public static final field SOS I
+	public static final field SPA I
+	public static final field SS2 I
+	public static final field SS3 I
+	public static final field SSA I
+	public static final field ST I
+	public static final field STS I
+	public static final field STX I
+	public static final field SUB I
+	public static final field SYN I
+	public static final field US I
+	public static final field VT I
+	public static final field VTS I
+}
+
+public final class io/github/ketraterm/protocol/DecPrivateMode {
+	public static final field ALT_SCREEN I
+	public static final field ALT_SCREEN_BUFFER I
+	public static final field ALT_SCREEN_SAVE_CURSOR I
+	public static final field APPLICATION_CURSOR_KEYS I
+	public static final field APPLICATION_KEYPAD I
+	public static final field AUTO_WRAP I
+	public static final field BACKARROW_KEY I
+	public static final field BELL_IS_URGENT I
+	public static final field BRACKETED_PASTE I
+	public static final field CURSOR_BLINK I
+	public static final field CURSOR_VISIBLE I
+	public static final field DECCOLM I
+	public static final field FOCUS_REPORTING I
+	public static final field INSTANCE Lio/github/ketraterm/protocol/DecPrivateMode;
+	public static final field LEFT_RIGHT_MARGIN I
+	public static final field MOUSE_ANY_EVENT I
+	public static final field MOUSE_BUTTON_EVENT I
+	public static final field MOUSE_NORMAL I
+	public static final field MOUSE_SGR I
+	public static final field MOUSE_SGR_PIXELS I
+	public static final field MOUSE_URXVT I
+	public static final field MOUSE_UTF8 I
+	public static final field MOUSE_X10 I
+	public static final field ORIGIN I
+	public static final field POP_ON_BELL I
+	public static final field REVERSE_VIDEO I
+	public static final field SAVE_RESTORE_CURSOR I
+	public static final field SYNCHRONIZED_OUTPUT I
+}
+
+public final class io/github/ketraterm/protocol/DecRectangleAttribute {
+	public static final field ALL I
+	public static final field BLINK I
+	public static final field BOLD I
+	public static final field INSTANCE Lio/github/ketraterm/protocol/DecRectangleAttribute;
+	public static final field INVERSE I
+	public static final field UNDERLINE I
+}
+
+public final class io/github/ketraterm/protocol/MouseEncodingMode : java/lang/Enum {
+	public static final field DEFAULT Lio/github/ketraterm/protocol/MouseEncodingMode;
+	public static final field SGR Lio/github/ketraterm/protocol/MouseEncodingMode;
+	public static final field SGR_PIXELS Lio/github/ketraterm/protocol/MouseEncodingMode;
+	public static final field URXVT Lio/github/ketraterm/protocol/MouseEncodingMode;
+	public static final field UTF8 Lio/github/ketraterm/protocol/MouseEncodingMode;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public static fun valueOf (Ljava/lang/String;)Lio/github/ketraterm/protocol/MouseEncodingMode;
+	public static fun values ()[Lio/github/ketraterm/protocol/MouseEncodingMode;
+}
+
+public final class io/github/ketraterm/protocol/MouseTrackingMode : java/lang/Enum {
+	public static final field ANY_EVENT Lio/github/ketraterm/protocol/MouseTrackingMode;
+	public static final field BUTTON_EVENT Lio/github/ketraterm/protocol/MouseTrackingMode;
+	public static final field NORMAL Lio/github/ketraterm/protocol/MouseTrackingMode;
+	public static final field OFF Lio/github/ketraterm/protocol/MouseTrackingMode;
+	public static final field X10 Lio/github/ketraterm/protocol/MouseTrackingMode;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public static fun valueOf (Ljava/lang/String;)Lio/github/ketraterm/protocol/MouseTrackingMode;
+	public static fun values ()[Lio/github/ketraterm/protocol/MouseTrackingMode;
+}
+
+public final class io/github/ketraterm/protocol/NotificationLevel : java/lang/Enum {
+	public static final field Companion Lio/github/ketraterm/protocol/NotificationLevel$Companion;
+	public static final field ERROR Lio/github/ketraterm/protocol/NotificationLevel;
+	public static final field INFO Lio/github/ketraterm/protocol/NotificationLevel;
+	public static final field NONE Lio/github/ketraterm/protocol/NotificationLevel;
+	public static final field WARNING Lio/github/ketraterm/protocol/NotificationLevel;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public static final fun parseOrNull (Ljava/lang/String;)Lio/github/ketraterm/protocol/NotificationLevel;
+	public static fun valueOf (Ljava/lang/String;)Lio/github/ketraterm/protocol/NotificationLevel;
+	public static fun values ()[Lio/github/ketraterm/protocol/NotificationLevel;
+}
+
+public final class io/github/ketraterm/protocol/NotificationLevel$Companion {
+	public final fun parseOrNull (Ljava/lang/String;)Lio/github/ketraterm/protocol/NotificationLevel;
+}
+
+public final class io/github/ketraterm/protocol/ShellIntegrationEvent {
+	public fun <init> (Lio/github/ketraterm/protocol/ShellIntegrationMarker;Ljava/lang/Integer;)V
+	public synthetic fun <init> (Lio/github/ketraterm/protocol/ShellIntegrationMarker;Ljava/lang/Integer;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Lio/github/ketraterm/protocol/ShellIntegrationMarker;
+	public final fun component2 ()Ljava/lang/Integer;
+	public final fun copy (Lio/github/ketraterm/protocol/ShellIntegrationMarker;Ljava/lang/Integer;)Lio/github/ketraterm/protocol/ShellIntegrationEvent;
+	public static synthetic fun copy$default (Lio/github/ketraterm/protocol/ShellIntegrationEvent;Lio/github/ketraterm/protocol/ShellIntegrationMarker;Ljava/lang/Integer;ILjava/lang/Object;)Lio/github/ketraterm/protocol/ShellIntegrationEvent;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getExitCode ()Ljava/lang/Integer;
+	public final fun getMarker ()Lio/github/ketraterm/protocol/ShellIntegrationMarker;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class io/github/ketraterm/protocol/ShellIntegrationMarker : java/lang/Enum {
+	public static final field COMMAND_FINISHED Lio/github/ketraterm/protocol/ShellIntegrationMarker;
+	public static final field COMMAND_START Lio/github/ketraterm/protocol/ShellIntegrationMarker;
+	public static final field PROMPT_END Lio/github/ketraterm/protocol/ShellIntegrationMarker;
+	public static final field PROMPT_START Lio/github/ketraterm/protocol/ShellIntegrationMarker;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public static fun valueOf (Ljava/lang/String;)Lio/github/ketraterm/protocol/ShellIntegrationMarker;
+	public static fun values ()[Lio/github/ketraterm/protocol/ShellIntegrationMarker;
+}
+
+public final class io/github/ketraterm/protocol/TerminalCapabilityIdentity {
+	public static final field COLOR_TERM_TRUECOLOR Ljava/lang/String;
+	public static final field INSTANCE Lio/github/ketraterm/protocol/TerminalCapabilityIdentity;
+	public static final field KITTY_KEYBOARD_QUERY_RESPONSE_SUPPORTED Z
+	public static final field KITTY_KEYBOARD_SUPPORTED_FLAGS I
+	public static final field PRIMARY_DA_132_COLUMNS I
+	public static final field PRIMARY_DA_ANSI_COLOR I
+	public static final field PRIMARY_DA_RECTANGULAR_EDITING I
+	public static final field PRIMARY_DA_SELECTIVE_ERASE I
+	public static final field PRIMARY_DA_TERMINAL_CLASS I
+	public static final field SECONDARY_DA_OPTIONS I
+	public static final field SECONDARY_DA_TERMINAL_ID I
+	public static final field SECONDARY_DA_VERSION I
+	public static final field TERMINFO_COLOR_COUNT Ljava/lang/String;
+	public static final field TERMINFO_TRUECOLOR_SUPPORTED Z
+	public static final field TERM_NAME Ljava/lang/String;
+	public static final field TERTIARY_DA_SUPPORTED Z
+}
+
+public final class io/github/ketraterm/protocol/TerminalClipboardSelection {
+	public static final field Companion Lio/github/ketraterm/protocol/TerminalClipboardSelection$Companion;
+	public static final synthetic fun box-impl (Ljava/lang/String;)Lio/github/ketraterm/protocol/TerminalClipboardSelection;
+	public fun equals (Ljava/lang/Object;)Z
+	public static fun equals-impl (Ljava/lang/String;Ljava/lang/Object;)Z
+	public static final fun equals-impl0 (Ljava/lang/String;Ljava/lang/String;)Z
+	public final fun getValue ()Ljava/lang/String;
+	public fun hashCode ()I
+	public static fun hashCode-impl (Ljava/lang/String;)I
+	public fun toString ()Ljava/lang/String;
+	public static fun toString-impl (Ljava/lang/String;)Ljava/lang/String;
+	public final synthetic fun unbox-impl ()Ljava/lang/String;
+}
+
+public final class io/github/ketraterm/protocol/TerminalClipboardSelection$Companion {
+	public final fun parse-7BjVm3Y (Ljava/lang/String;)Ljava/lang/String;
+}
+
+public final class io/github/ketraterm/protocol/TerminalHostModeCapability {
+	public static final field ALL I
+	public static final field INSTANCE Lio/github/ketraterm/protocol/TerminalHostModeCapability;
+	public static final field POP_ON_BELL I
+	public static final field URGENT_BELL I
+}
+
+public final class io/github/ketraterm/protocol/TerminalModeStatus {
+	public static final field INSTANCE Lio/github/ketraterm/protocol/TerminalModeStatus;
+	public static final field PERMANENTLY_RESET I
+	public static final field PERMANENTLY_SET I
+	public static final field RESET I
+	public static final field SET I
+	public static final field UNRECOGNIZED I
+}
+
+public abstract interface class io/github/ketraterm/protocol/host/TerminalHostOutput {
+	public abstract fun writeAscii (Ljava/lang/String;)V
+	public abstract fun writeByte (I)V
+	public abstract fun writeBytes ([BII)V
+	public abstract fun writeUtf8 (Ljava/lang/String;)V
+}
+
+public final class io/github/ketraterm/protocol/keyboard/FormatOtherKeysMode {
+	public static final field CSI_U I
+	public static final field DEFAULT I
+	public static final field INSTANCE Lio/github/ketraterm/protocol/keyboard/FormatOtherKeysMode;
+}
+
+public final class io/github/ketraterm/protocol/keyboard/KittyKeyboardEventType {
+	public static final field INSTANCE Lio/github/ketraterm/protocol/keyboard/KittyKeyboardEventType;
+	public static final field PRESS I
+	public static final field RELEASE I
+	public static final field REPEAT I
+}
+
+public final class io/github/ketraterm/protocol/keyboard/KittyKeyboardFlagApplicationMode {
+	public static final field CLEAR I
+	public static final field INSTANCE Lio/github/ketraterm/protocol/keyboard/KittyKeyboardFlagApplicationMode;
+	public static final field REPLACE I
+	public static final field SET I
+}
+
+public final class io/github/ketraterm/protocol/keyboard/KittyKeyboardFunctionalKeyCode {
+	public static final field BACKSPACE I
+	public static final field CAPS_LOCK I
+	public static final field ENTER I
+	public static final field ESCAPE I
+	public static final field F13 I
+	public static final field F35 I
+	public static final field INSTANCE Lio/github/ketraterm/protocol/keyboard/KittyKeyboardFunctionalKeyCode;
+	public static final field KP_0 I
+	public static final field KP_1 I
+	public static final field KP_2 I
+	public static final field KP_3 I
+	public static final field KP_4 I
+	public static final field KP_5 I
+	public static final field KP_6 I
+	public static final field KP_7 I
+	public static final field KP_8 I
+	public static final field KP_9 I
+	public static final field KP_ADD I
+	public static final field KP_BEGIN I
+	public static final field KP_DECIMAL I
+	public static final field KP_DIVIDE I
+	public static final field KP_ENTER I
+	public static final field KP_EQUAL I
+	public static final field KP_LEFT I
+	public static final field KP_MULTIPLY I
+	public static final field KP_SEPARATOR I
+	public static final field KP_SUBTRACT I
+	public static final field LEFT_SHIFT I
+	public static final field MEDIA_PLAY I
+	public static final field TAB I
+}
+
+public final class io/github/ketraterm/protocol/keyboard/KittyKeyboardProgressiveFlag {
+	public static final field DEFAULT_HOST_SUPPORTED_MASK I
+	public static final field DISAMBIGUATE_ESCAPE_CODES I
+	public static final field ENCODER_SUPPORTED_MASK I
+	public static final field INSTANCE Lio/github/ketraterm/protocol/keyboard/KittyKeyboardProgressiveFlag;
+	public static final field REPORT_ALL_KEYS_AS_ESCAPE_CODES I
+	public static final field REPORT_ALTERNATE_KEYS I
+	public static final field REPORT_ASSOCIATED_TEXT I
+	public static final field REPORT_EVENT_TYPES I
+}
+
+public final class io/github/ketraterm/protocol/keyboard/ModifyOtherKeysMode {
+	public static final field DISABLED I
+	public static final field INSTANCE Lio/github/ketraterm/protocol/keyboard/ModifyOtherKeysMode;
+	public static final field MODE_1 I
+	public static final field MODE_2 I
+	public static final field MODE_3 I
+}
+
+public final class io/github/ketraterm/protocol/keyboard/XtermKeyResource {
+	public static final field CURSOR_KEYS I
+	public static final field FUNCTION_KEYS I
+	public static final field INSTANCE Lio/github/ketraterm/protocol/keyboard/XtermKeyResource;
+	public static final field KEYBOARD I
+	public static final field KEYPAD_KEYS I
+	public static final field MODIFIER_KEYS I
+	public static final field OTHER_KEYS I
+	public static final field SPECIAL_KEYS I
+	public final fun isSupported (I)Z
+	public final fun isValidFormatValue (II)Z
+	public final fun isValidModifierValue (II)Z
+}
+
+public final class io/github/ketraterm/protocol/mouse/MouseEncodingMode {
+	public static final field DEFAULT I
+	public static final field INSTANCE Lio/github/ketraterm/protocol/mouse/MouseEncodingMode;
+	public static final field SGR I
+	public static final field SGR_PIXELS I
+	public static final field URXVT I
+	public static final field UTF8 I
+}
+
+public final class io/github/ketraterm/protocol/mouse/MouseTrackingMode {
+	public static final field ANY_EVENT I
+	public static final field BUTTON_EVENT I
+	public static final field INSTANCE Lio/github/ketraterm/protocol/mouse/MouseTrackingMode;
+	public static final field NONE I
+	public static final field NORMAL I
+	public static final field X10 I
+}
+

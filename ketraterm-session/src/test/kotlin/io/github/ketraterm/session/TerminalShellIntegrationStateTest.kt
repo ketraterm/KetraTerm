@@ -840,14 +840,21 @@ class TerminalShellIntegrationStateTest {
     }
 
     @Test
-    fun `destructive row rewind does not clear identity anchored records`() {
+    fun `viewport projection does not clear identity anchored records outside its rows`() {
         val state = TerminalShellIntegrationState()
 
-        state.observeLiveBottomRow(100)
         state.recordPromptStart(90)
         state.recordCommandStart(91, includeLine = true)
         state.recordCommandFinished(95, exitCode = 1)
-        state.observeLiveBottomRow(10)
+        state.copyViewport(
+            lineIds = longArrayOf(1, 2, 3),
+            rowCount = 3,
+            promptStarts = BooleanArray(3),
+            commandStarts = BooleanArray(3),
+            commandEnds = BooleanArray(3),
+            commandRecordIds = IntArray(3),
+            commandLifecycleStates = IntArray(3),
+        )
 
         assertTrue(state.hasPromptStartAtLine(90))
         assertTrue(state.hasFailedCommandOutputAtLine(91))

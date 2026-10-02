@@ -21,6 +21,6 @@ package io.github.ketraterm.input.event
  * @property focused true when the terminal surface gained focus, false when it
  * lost focus.
  */
-data class TerminalFocusEvent(
+public data class TerminalFocusEvent(
     val focused: Boolean,
 )

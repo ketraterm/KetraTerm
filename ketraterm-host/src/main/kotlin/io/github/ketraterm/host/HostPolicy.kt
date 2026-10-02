@@ -62,7 +62,7 @@ package io.github.ketraterm.host
  * @property maxCurrentWorkingDirectoryUriLength maximum accepted OSC 7 file URI
  * length in UTF-16 code units. Longer or malformed URIs are ignored.
  */
-data class HostPolicy(
+public data class HostPolicy(
     val titlePolicy: TerminalTitlePolicy = TerminalTitlePolicy(),
     val hyperlinkPolicy: HostControlPolicy = HostControlPolicy.ALLOW,
     val currentWorkingDirectoryPolicy: HostControlPolicy = HostControlPolicy.ALLOW,
@@ -107,7 +107,7 @@ data class HostPolicy(
  * limits. A denied family is ignored before it mutates metadata or emits host
  * callbacks, even when payload lengths are otherwise valid.
  */
-enum class HostControlPolicy {
+public enum class HostControlPolicy {
     /**
      * Ignore the terminal control family at the host adapter boundary.
      */

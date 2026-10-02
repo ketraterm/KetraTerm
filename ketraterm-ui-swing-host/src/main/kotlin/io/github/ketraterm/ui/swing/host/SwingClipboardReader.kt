@@ -34,7 +34,7 @@ import javax.swing.SwingUtilities
  *
  * @param ioDispatcher dispatcher for potentially blocking native clipboard access.
  */
-class SwingClipboardReader(
+public class SwingClipboardReader(
     private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
 ) {
     private var prompting = false
@@ -45,7 +45,7 @@ class SwingClipboardReader(
      * access occurs before consent. Cancellation and provider failures propagate.
      * [clipboard] belongs to the requesting host/client and is called off the EDT.
      */
-    suspend fun read(
+    public suspend fun read(
         request: TerminalClipboardReadRequest,
         prompt: SwingClipboardReadPrompt,
         message: String,

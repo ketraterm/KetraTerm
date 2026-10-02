@@ -22,34 +22,34 @@ package io.github.ketraterm.ui.swing.suggestion
  * Public factories defensively copy input, while indexed access lets the popup
  * paint ranges without allocating on each frame.
  */
-class SwingShellSuggestionMatchRanges private constructor(
+public class SwingShellSuggestionMatchRanges private constructor(
     private val packedOffsets: IntArray,
 ) {
     private val contentHashCode = packedOffsets.contentHashCode()
 
     /** Number of `[start, end)` matched ranges. */
-    val rangeCount: Int
+    public val rangeCount: Int
         get() = packedOffsets.size ushr 1
 
     /** Returns whether this set has no ranges. */
-    fun isEmpty(): Boolean = packedOffsets.isEmpty()
+    public fun isEmpty(): Boolean = packedOffsets.isEmpty()
 
     /**
      * Returns the inclusive UTF-16 start offset of range [index].
      *
      * @throws IndexOutOfBoundsException if [index] is outside `0 until rangeCount`.
      */
-    fun startOffset(index: Int): Int = packedOffsets[checkedPackedIndex(index)]
+    public fun startOffset(index: Int): Int = packedOffsets[checkedPackedIndex(index)]
 
     /**
      * Returns the exclusive UTF-16 end offset of range [index].
      *
      * @throws IndexOutOfBoundsException if [index] is outside `0 until rangeCount`.
      */
-    fun endOffset(index: Int): Int = packedOffsets[checkedPackedIndex(index) + 1]
+    public fun endOffset(index: Int): Int = packedOffsets[checkedPackedIndex(index) + 1]
 
     /** Returns an independent packed `[start0, end0, ...]` interoperability copy. */
-    fun copyPackedOffsets(): IntArray = packedOffsets.copyOf()
+    public fun copyPackedOffsets(): IntArray = packedOffsets.copyOf()
 
     internal fun requireValidFor(displayText: String) {
         validate(displayText, packedOffsets)
@@ -90,10 +90,10 @@ class SwingShellSuggestionMatchRanges private constructor(
         return index shl 1
     }
 
-    companion object {
+    public companion object {
         /** Shared immutable empty match range set. */
         @JvmField
-        val EMPTY: SwingShellSuggestionMatchRanges = SwingShellSuggestionMatchRanges(IntArray(0))
+        public val EMPTY: SwingShellSuggestionMatchRanges = SwingShellSuggestionMatchRanges(IntArray(0))
 
         /**
          * Creates immutable ranges for [displayText] from packed UTF-16 [offsets].
@@ -105,7 +105,7 @@ class SwingShellSuggestionMatchRanges private constructor(
          * exceed [displayText], or split a surrogate pair.
          */
         @JvmStatic
-        fun fromPackedOffsets(
+        public fun fromPackedOffsets(
             displayText: String,
             offsets: IntArray,
         ): SwingShellSuggestionMatchRanges {

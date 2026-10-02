@@ -18,7 +18,7 @@ package io.github.ketraterm.render.api
 /**
  * Identifies the visible terminal screen buffer.
  */
-enum class TerminalRenderBufferKind {
+public enum class TerminalRenderBufferKind {
     /**
      * Primary scrollback-backed screen buffer.
      */

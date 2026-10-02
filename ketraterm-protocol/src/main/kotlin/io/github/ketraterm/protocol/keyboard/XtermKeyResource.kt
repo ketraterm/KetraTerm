@@ -21,36 +21,36 @@ package io.github.ketraterm.protocol.keyboard
  * Resource 5 is reserved for string actions and is excluded.
  * See <https://invisible-island.net/xterm/ctlseqs/ctlseqs.html>.
  */
-object XtermKeyResource {
+public object XtermKeyResource {
     /** Modifier admission mask for legacy/VT220 keyboard profiles. */
-    const val KEYBOARD: Int = 0
+    public const val KEYBOARD: Int = 0
 
     /** Cursor and editing keypad keys. */
-    const val CURSOR_KEYS: Int = 1
+    public const val CURSOR_KEYS: Int = 1
 
     /** Numbered and miscellaneous function keys. */
-    const val FUNCTION_KEYS: Int = 2
+    public const val FUNCTION_KEYS: Int = 2
 
     /** Numeric keypad keys. */
-    const val KEYPAD_KEYS: Int = 3
+    public const val KEYPAD_KEYS: Int = 3
 
     /** Ordinary keys, controlled by modifyOtherKeys and formatOtherKeys. */
-    const val OTHER_KEYS: Int = 4
+    public const val OTHER_KEYS: Int = 4
 
     /** Physical modifier keys, including left/right variants. */
-    const val MODIFIER_KEYS: Int = 6
+    public const val MODIFIER_KEYS: Int = 6
 
     /** Remaining predefined keys such as Escape and Enter. */
-    const val SPECIAL_KEYS: Int = 7
+    public const val SPECIAL_KEYS: Int = 7
 
     /** Whether this is a documented key resource; string-action resource 5 is excluded. */
-    fun isSupported(resource: Int): Boolean =
+    public fun isSupported(resource: Int): Boolean =
         resource in KEYBOARD..OTHER_KEYS ||
             resource == MODIFIER_KEYS ||
             resource == SPECIAL_KEYS
 
     /** Whether a semantic resource value is implemented, including explicit disable (-1). */
-    fun isValidModifierValue(
+    public fun isValidModifierValue(
         resource: Int,
         value: Int,
     ): Boolean =
@@ -61,7 +61,7 @@ object XtermKeyResource {
         }
 
     /** Whether the resource and extended-report format (0 or 1) are supported. */
-    fun isValidFormatValue(
+    public fun isValidFormatValue(
         resource: Int,
         value: Int,
     ): Boolean = isSupported(resource) && value in 0..1

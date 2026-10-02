@@ -80,7 +80,7 @@ import kotlin.math.floor
  * @param settingsProvider provider for immutable settings snapshots.
  * @param hostServices host-provided non-render services.
  */
-class SwingTerminal
+public class SwingTerminal
     internal constructor(
         private val settingsProvider: SwingSettingsProvider,
         private val hostServices: SwingHostServices,
@@ -92,7 +92,7 @@ class SwingTerminal
     ) : JComponent(),
         SwingScrollbarScroller {
         @JvmOverloads
-        constructor(
+        public constructor(
             settingsProvider: SwingSettingsProvider = SwingSettingsProvider { SwingSettings() },
             hostServices: SwingHostServices = SwingHostServices(),
         ) : this(settingsProvider, hostServices, Dispatchers.Default)
@@ -437,7 +437,7 @@ class SwingTerminal
 
                     override fun mouseTrackingMode(): MouseTrackingMode =
                         MouseTrackingMode.entries[
-                            TerminalInputState.mouseTrackingMode(this@SwingTerminal.session?.terminal?.getInputModeBits() ?: 0L),
+                            TerminalInputState.mouseTrackingMode(this@SwingTerminal.session?.getInputModeBits() ?: 0L),
                         ]
 
                     override fun encodeMouse(event: TerminalMouseEvent) {
@@ -601,14 +601,14 @@ class SwingTerminal
         private val windowStateListener =
             WindowStateListener { event ->
                 val iconified = (event.newState and Frame.ICONIFIED) != 0
-                session?.terminal?.setWindowMinimized(iconified)
+                session?.setWindowMinimized(iconified)
             }
 
         private fun updateMinimizedStateFromAncestor() {
             val window = ancestorWindow ?: SwingUtilities.getWindowAncestor(this)
             if (window is Frame) {
                 val iconified = (window.extendedState and Frame.ICONIFIED) != 0
-                session?.terminal?.setWindowMinimized(iconified)
+                session?.setWindowMinimized(iconified)
             }
         }
 
@@ -713,7 +713,7 @@ class SwingTerminal
          *
          * @param session terminal session to display.
          */
-        fun bind(session: TerminalSession) {
+        public fun bind(session: TerminalSession) {
             runOnEdt(
                 Runnable {
                     if (disposed) return@Runnable
@@ -729,7 +729,7 @@ class SwingTerminal
          * or restoring its previous settings. Calls on the EDT take effect immediately;
          * calls from other threads dispatch asynchronously to the EDT.
          */
-        fun unbind() {
+        public fun unbind() {
             runOnEdt(unbindRunnable)
         }
 
@@ -741,7 +741,7 @@ class SwingTerminal
          * be rebound to another session. Calls on the EDT take effect immediately;
          * calls from other threads dispatch asynchronously to the EDT.
          */
-        fun dispose() {
+        public fun dispose() {
             runOnEdt {
                 disposeOnEdt()
             }
@@ -755,7 +755,7 @@ class SwingTerminal
          * Geometry changes may resize its grid and connector. Calls on the EDT take
          * effect immediately; other calls dispatch asynchronously to the EDT.
          */
-        fun reloadSettings() {
+        public fun reloadSettings() {
             runOnEdt(
                 Runnable {
                     if (disposed) return@Runnable
@@ -771,7 +771,7 @@ class SwingTerminal
          * the current host settings allow visual bell presentation. The method
          * may be called from any thread; animation state is updated on the EDT.
          */
-        fun showVisualBell() {
+        public fun showVisualBell() {
             runOnEdt {
                 visualBellController.trigger()
             }
@@ -786,7 +786,7 @@ class SwingTerminal
          *
          * @return dimension where width is columns and height is rows.
          */
-        fun visibleGridSize(): Dimension {
+        public fun visibleGridSize(): Dimension {
             if (!SwingUtilities.isEventDispatchThread()) return viewportController.visibleGridSizeSnapshot()
             return viewportController.visibleGridSizeOnEdt(
                 settings,
@@ -807,7 +807,7 @@ class SwingTerminal
          *
          * @return current scrollback viewport state.
          */
-        fun viewportState(): TerminalViewportState {
+        public fun viewportState(): TerminalViewportState {
             if (SwingUtilities.isEventDispatchThread()) {
                 publishViewportState(renderCache.historySize, notifyListener = false)
             }
@@ -820,7 +820,7 @@ class SwingTerminal
          * This method may be called from any thread; component state is updated
          * asynchronously on the EDT.
          */
-        fun scrollToLiveViewport() {
+        public fun scrollToLiveViewport() {
             scrollToScrollbackOffset(0)
         }
 
@@ -833,7 +833,7 @@ class SwingTerminal
          *
          * @param scrollbackOffset requested whole-row offset from live output.
          */
-        fun scrollToScrollbackOffset(scrollbackOffset: Int) {
+        public fun scrollToScrollbackOffset(scrollbackOffset: Int) {
             runOnEdt {
                 scrollViewportToOnEdt(scrollbackOffset)
             }
@@ -849,7 +849,7 @@ class SwingTerminal
          *
          * @param deltaLines signed row delta.
          */
-        fun scrollViewportBy(deltaLines: Double) {
+        public fun scrollViewportBy(deltaLines: Double) {
             require(deltaLines.isFinite()) { "deltaLines must be finite, was $deltaLines" }
             runOnEdt {
                 viewportController.scrollByPreciseRows(deltaLines)
@@ -889,7 +889,7 @@ class SwingTerminal
          * start line. This method may be called from any thread; component state
          * is updated asynchronously on the EDT.
          */
-        fun scrollToPreviousCommand() {
+        public fun scrollToPreviousCommand() {
             runOnEdt {
                 commandInteractionController.scrollToCommand(previous = true)
             }
@@ -903,7 +903,7 @@ class SwingTerminal
          * start line. This method may be called from any thread; component state
          * is updated asynchronously on the EDT.
          */
-        fun scrollToNextCommand() {
+        public fun scrollToNextCommand() {
             runOnEdt {
                 commandInteractionController.scrollToCommand(previous = false)
             }
@@ -920,7 +920,7 @@ class SwingTerminal
          * @param y component y coordinate in pixels.
          * @return command record id at the coordinate, or `0`.
          */
-        fun commandRecordAt(
+        public fun commandRecordAt(
             x: Int,
             y: Int,
         ): Int {
@@ -939,7 +939,7 @@ class SwingTerminal
          * @param y component y coordinate in pixels.
          * @return true when command output was selected.
          */
-        fun selectCommandOutputAt(
+        public fun selectCommandOutputAt(
             x: Int,
             y: Int,
         ): Boolean = SwingUtilities.isEventDispatchThread() && commandInteractionController.selectCommandOutputAt(x, y)
@@ -954,7 +954,7 @@ class SwingTerminal
          * @param recordId retained command record id.
          * @return true when command output was selected.
          */
-        fun selectCommandOutput(recordId: Int): Boolean =
+        public fun selectCommandOutput(recordId: Int): Boolean =
             SwingUtilities.isEventDispatchThread() && commandInteractionController.selectCommandOutput(recordId)
 
         /**
@@ -967,7 +967,7 @@ class SwingTerminal
          * @param recordId retained command record id.
          * @return command output, or `null` when unavailable or called off the EDT.
          */
-        fun commandOutputText(recordId: Int): String? {
+        public fun commandOutputText(recordId: Int): String? {
             if (!SwingUtilities.isEventDispatchThread()) return null
             return commandInteractionController.commandOutputText(recordId)
         }
@@ -978,7 +978,7 @@ class SwingTerminal
          * @param recordId retained command record id.
          * @return `true` when retained output was copied; `false` when unavailable or called off the EDT.
          */
-        fun copyCommandOutputToClipboard(recordId: Int): Boolean {
+        public fun copyCommandOutputToClipboard(recordId: Int): Boolean {
             if (!SwingUtilities.isEventDispatchThread()) return false
             val text = commandInteractionController.commandOutputText(recordId) ?: return false
             hostServices.clipboardHandler.copyText(text)
@@ -991,7 +991,7 @@ class SwingTerminal
          * @param recordId retained command record id.
          * @return `true` when command text was copied; `false` when unavailable or called off the EDT.
          */
-        fun copyCommandTextToClipboard(recordId: Int): Boolean {
+        public fun copyCommandTextToClipboard(recordId: Int): Boolean {
             if (!SwingUtilities.isEventDispatchThread()) return false
             val text = session?.shellIntegrationState?.commandText(recordId) ?: return false
             hostServices.clipboardHandler.copyText(text)
@@ -1298,7 +1298,7 @@ class SwingTerminal
          *
          * @return current selection, or `null`.
          */
-        fun currentSelection(): CellSelection? {
+        public fun currentSelection(): CellSelection? {
             if (!SwingUtilities.isEventDispatchThread()) {
                 var selection: CellSelection? = null
                 SwingUtilities.invokeAndWait { selection = currentSelection() }
@@ -1318,7 +1318,7 @@ class SwingTerminal
          * @return `true` when a bound session and non-empty render cache allowed
          * a selection to be created.
          */
-        fun selectAll(): Boolean {
+        public fun selectAll(): Boolean {
             if (!SwingUtilities.isEventDispatchThread()) return false
             if (!renderCache.hasFrame) return false
             val firstAbsoluteRow = renderCache.discardedCount
@@ -1339,7 +1339,7 @@ class SwingTerminal
          *
          * @param query literal text to find.
          */
-        fun search(query: String) {
+        public fun search(query: String) {
             runOnEdt {
                 searchController.search(query)
             }
@@ -1348,7 +1348,7 @@ class SwingTerminal
         /**
          * Clears the current terminal-buffer search query and highlights.
          */
-        fun clearSearch() {
+        public fun clearSearch() {
             runOnEdt {
                 searchController.clear()
             }
@@ -1358,7 +1358,7 @@ class SwingTerminal
          * Selects the next search result when a search query is active.
          * While searching, navigates the last completed pass; does nothing when no results are available.
          */
-        fun selectNextSearchResult() {
+        public fun selectNextSearchResult() {
             runOnEdt {
                 searchController.findNext()
             }
@@ -1368,7 +1368,7 @@ class SwingTerminal
          * Selects the previous search result when a search query is active.
          * While searching, navigates the last completed pass; does nothing when no results are available.
          */
-        fun selectPreviousSearchResult() {
+        public fun selectPreviousSearchResult() {
             runOnEdt {
                 searchController.findPrevious()
             }
@@ -1380,7 +1380,7 @@ class SwingTerminal
          * @param caseSensitive `true` to match case exactly, `false` for
          * case-insensitive search.
          */
-        fun setSearchCaseSensitive(caseSensitive: Boolean) {
+        public fun setSearchCaseSensitive(caseSensitive: Boolean) {
             runOnEdt {
                 searchController.setIgnoreCase(!caseSensitive)
             }
@@ -1395,7 +1395,7 @@ class SwingTerminal
          *
          * @return current terminal search state.
          */
-        fun currentSearchState(): TerminalSearchState = searchController.state()
+        public fun currentSearchState(): TerminalSearchState = searchController.state()
 
         /**
          * Immutable search state, safe to observe from any thread. UI collectors must
@@ -1403,7 +1403,7 @@ class SwingTerminal
          * the last completed pass; [TerminalSearchState.isSearching] marks pending work.
          * Clearing or unbinding cancels obsolete work; disposing cancels the worker.
          */
-        val searchState: StateFlow<TerminalSearchState> get() = searchController.states
+        public val searchState: StateFlow<TerminalSearchState> get() = searchController.states
 
         /**
          * Shows host-provided shell suggestions for a known command-line request.
@@ -1424,7 +1424,7 @@ class SwingTerminal
          * leave the popup passive until the user navigates it.
          */
         @JvmOverloads
-        fun showShellSuggestions(
+        public fun showShellSuggestions(
             request: SwingShellSuggestionRequest,
             suggestions: List<SwingShellSuggestion>,
             selectedIndex: Int = -1,
@@ -1474,7 +1474,7 @@ class SwingTerminal
          * an explicit user action.
          */
         @JvmOverloads
-        fun requestShellSuggestions(
+        public fun requestShellSuggestions(
             commandText: String,
             cursorOffset: Int,
             anchorColumn: Int,
@@ -1512,7 +1512,7 @@ class SwingTerminal
          * must use [SwingShellSuggestionTrigger.AUTOMATIC] to respect popup settings.
          */
         @JvmOverloads
-        fun requestActiveShellSuggestions(trigger: SwingShellSuggestionTrigger = SwingShellSuggestionTrigger.EXPLICIT) {
+        public fun requestActiveShellSuggestions(trigger: SwingShellSuggestionTrigger = SwingShellSuggestionTrigger.EXPLICIT) {
             runOnEdt(
                 Runnable {
                     val automatic = trigger == SwingShellSuggestionTrigger.AUTOMATIC
@@ -1547,29 +1547,29 @@ class SwingTerminal
          * This method may be called from any thread; component state is updated
          * asynchronously on the EDT.
          */
-        fun hideShellSuggestions() {
+        public fun hideShellSuggestions() {
             runOnEdt {
                 cancelAndHideShellSuggestionsOnEdt("Shell suggestions hidden")
             }
         }
 
         /** Registers an EDT callback for shell-bound input invalidation. */
-        fun addShellSuggestionInvalidationListener(listener: SwingShellSuggestionInvalidationListener) {
+        public fun addShellSuggestionInvalidationListener(listener: SwingShellSuggestionInvalidationListener) {
             suggestionInvalidationListeners += listener
         }
 
         /** Removes a callback previously registered with [addShellSuggestionInvalidationListener]. */
-        fun removeShellSuggestionInvalidationListener(listener: SwingShellSuggestionInvalidationListener) {
+        public fun removeShellSuggestionInvalidationListener(listener: SwingShellSuggestionInvalidationListener) {
             suggestionInvalidationListeners -= listener
         }
 
         /** Registers an EDT callback for automatic-suggestion eligibility changes. */
-        fun addShellSuggestionEligibilityListener(listener: SwingShellSuggestionEligibilityListener) {
+        public fun addShellSuggestionEligibilityListener(listener: SwingShellSuggestionEligibilityListener) {
             suggestionEligibilityListeners += listener
         }
 
         /** Removes a callback previously registered with [addShellSuggestionEligibilityListener]. */
-        fun removeShellSuggestionEligibilityListener(listener: SwingShellSuggestionEligibilityListener) {
+        public fun removeShellSuggestionEligibilityListener(listener: SwingShellSuggestionEligibilityListener) {
             suggestionEligibilityListeners -= listener
         }
 
@@ -1579,7 +1579,7 @@ class SwingTerminal
          * This method is safe to call from any thread and returns the last state
          * published by the EDT without blocking it.
          */
-        fun isAutomaticShellSuggestionEligible(): Boolean = automaticSuggestionEligible.get()
+        public fun isAutomaticShellSuggestionEligible(): Boolean = automaticSuggestionEligible.get()
 
         /**
          * Returns the current shell suggestion popup state.
@@ -1589,7 +1589,7 @@ class SwingTerminal
          *
          * @return immutable shell suggestion state snapshot.
          */
-        fun currentShellSuggestionState(): SwingShellSuggestionState {
+        public fun currentShellSuggestionState(): SwingShellSuggestionState {
             check(SwingUtilities.isEventDispatchThread()) { "shell suggestion state must be read on the EDT" }
             return shellSuggestionController?.state() ?: SwingShellSuggestionState.EMPTY
         }
@@ -1687,7 +1687,7 @@ class SwingTerminal
          *
          * @return `true` if selection was successfully copied to clipboard, `false` otherwise.
          */
-        fun copySelectionToClipboard(): Boolean {
+        public fun copySelectionToClipboard(): Boolean {
             val boundSession = session ?: return false
             val selectedText = selectionController.getSelectedText(boundSession) ?: return false
             hostServices.clipboardHandler.copyText(selectedText)
@@ -1703,7 +1703,7 @@ class SwingTerminal
          * @param text text to place on the host clipboard.
          * @return `true` when a session is bound and the clipboard handler was invoked.
          */
-        fun copyTextToClipboard(text: String): Boolean {
+        public fun copyTextToClipboard(text: String): Boolean {
             if (session == null) return false
             hostServices.clipboardHandler.copyText(text)
             return true
@@ -1714,7 +1714,7 @@ class SwingTerminal
          *
          * @return `true` if clipboard text was read and sent to the session, `false` otherwise.
          */
-        fun pasteClipboardText(): Boolean {
+        public fun pasteClipboardText(): Boolean {
             val text = hostServices.clipboardHandler.readText() ?: return false
             if (text.isEmpty()) return false
             val boundSession = session ?: return false
@@ -1822,7 +1822,7 @@ class SwingTerminal
          *
          * @return `true` when a bound session accepted the input request.
          */
-        fun clearScreen(): Boolean {
+        public fun clearScreen(): Boolean {
             if (!SwingUtilities.isEventDispatchThread()) return false
             val boundSession = session ?: return false
             selectionController.clearSelection()
@@ -2093,7 +2093,7 @@ class SwingTerminal
          * @return a new caller-owned dimension containing pixel width and height.
          */
         @JvmOverloads
-        fun preferredGridSize(
+        public fun preferredGridSize(
             columns: Int,
             rows: Int,
             activeBuffer: TerminalRenderBufferKind = TerminalRenderBufferKind.PRIMARY,

@@ -26,7 +26,7 @@ package io.github.ketraterm.ui.swing.settings
  * @property bottom spacing below the grid.
  * @property right spacing after the grid.
  */
-data class SwingPadding(
+public data class SwingPadding(
     val top: Int = 0,
     val left: Int = 0,
     val bottom: Int = 0,

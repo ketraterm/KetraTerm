@@ -32,7 +32,7 @@ import io.github.ketraterm.completion.internal.terminalCompletionRankingIdentity
  * @throws IllegalArgumentException if the digest is invalid, [commandLine] is
  * blank, multiline, malformed UTF-16, oversized, or contains a disallowed ISO control.
  */
-data class TerminalCommandReplay(
+public data class TerminalCommandReplay(
     val identityDigest: String,
     val commandLine: String,
     val profileId: String? = null,

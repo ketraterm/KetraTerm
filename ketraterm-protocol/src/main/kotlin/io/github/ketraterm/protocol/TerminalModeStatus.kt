@@ -16,19 +16,19 @@
 package io.github.ketraterm.protocol
 
 /** Wire values of the DECRPM mode-status parameter. */
-object TerminalModeStatus {
+public object TerminalModeStatus {
     /** The queried mode has no supported status report. */
-    const val UNRECOGNIZED: Int = 0
+    public const val UNRECOGNIZED: Int = 0
 
     /** The mode is currently set. */
-    const val SET: Int = 1
+    public const val SET: Int = 1
 
     /** The mode is currently reset. */
-    const val RESET: Int = 2
+    public const val RESET: Int = 2
 
     /** The mode is fixed in the set state. */
-    const val PERMANENTLY_SET: Int = 3
+    public const val PERMANENTLY_SET: Int = 3
 
     /** The mode is fixed in the reset state. */
-    const val PERMANENTLY_RESET: Int = 4
+    public const val PERMANENTLY_RESET: Int = 4
 }

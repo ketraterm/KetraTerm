@@ -34,60 +34,60 @@ import io.github.ketraterm.render.api.TerminalColorPalette
  * Read-execution audits may arrive on session workers as documented below.
  * No initial state replay or per-frame delivery is performed.
  */
-interface HostEventSink {
+public interface HostEventSink {
     /**
      * Called after the effective palette changes through OSC, host theme update,
      * or hard reset. [palette] is the immutable core-owned value and may be retained.
      * Queries, denied/invalid operations, and equal values do not emit an event.
      */
-    fun paletteChanged(palette: TerminalColorPalette) = Unit
+    public fun paletteChanged(palette: TerminalColorPalette): Unit = Unit
 
     /**
      * Called after a new OSC 8 registry entry is accepted. [hyperlinkId] is a
      * positive session-local numeric identity; [id] is the optional application ID.
      * Reusing an existing entry emits nothing. No browser action is implied.
      */
-    fun hyperlinkRegistered(
+    public fun hyperlinkRegistered(
         hyperlinkId: Int,
         uri: String,
         id: String?,
-    ) = Unit
+    ): Unit = Unit
 
     /**
      * Called after LRU eviction makes [hyperlinkId] unresolvable. Registration of
      * its replacement follows this event. Numeric IDs are never reassigned.
      * Closing OSC 8 or soft reset does not remove existing registry entries.
      */
-    fun hyperlinkRemoved(hyperlinkId: Int) = Unit
+    public fun hyperlinkRemoved(hyperlinkId: Int): Unit = Unit
 
     /** Called after hard reset clears a nonempty registry, instead of per-ID removals. */
-    fun hyperlinksCleared() = Unit
+    public fun hyperlinksCleared(): Unit = Unit
 
     /**
      * Called when the parser emits BEL.
      */
-    fun bell()
+    public fun bell()
 
     /**
      * Called after the OSC icon title metadata changes.
      *
      * @param title new icon title.
      */
-    fun iconTitleChanged(title: String)
+    public fun iconTitleChanged(title: String)
 
     /**
      * Called after the OSC window title metadata changes.
      *
      * @param title new window title.
      */
-    fun windowTitleChanged(title: String)
+    public fun windowTitleChanged(title: String)
 
     /**
      * Called after a valid OSC 7 current-working-directory URI is accepted.
      *
      * @param uri absolute `file://` URI exactly as emitted by the shell.
      */
-    fun currentWorkingDirectoryChanged(uri: String) = Unit
+    public fun currentWorkingDirectoryChanged(uri: String): Unit = Unit
 
     /**
      * Called when the shell requests a window resize.
@@ -95,7 +95,7 @@ interface HostEventSink {
      * @param rows target row count.
      * @param columns target column count.
      */
-    fun resizeWindow(
+    public fun resizeWindow(
         rows: Int,
         columns: Int,
     )
@@ -113,20 +113,20 @@ interface HostEventSink {
      * @param rows unchanged terminal row count.
      * @param columns target width, either 80 or 132.
      */
-    fun resizeForColumnMode(
+    public fun resizeForColumnMode(
         rows: Int,
         columns: Int,
-    ) = Unit
+    ): Unit = Unit
 
     /**
      * Reports a completed logical column switch with synchronized core/transport dimensions.
      * Hosts may schedule a physical window resize according to their own permission
      * and layout policy. Called during parsing; do not wait for the EDT or mutate the grid.
      */
-    fun columnModeChanged(
+    public fun columnModeChanged(
         rows: Int,
         columns: Int,
-    ) = Unit
+    ): Unit = Unit
 
     /**
      * Called when the shell requests moving the window.
@@ -134,44 +134,44 @@ interface HostEventSink {
      * @param x target x position in pixels.
      * @param y target y position in pixels.
      */
-    fun moveWindow(
+    public fun moveWindow(
         x: Int,
         y: Int,
-    ) = Unit
+    ): Unit = Unit
 
     /**
      * Called when the shell requests minimizing the window.
      */
-    fun minimizeWindow() = Unit
+    public fun minimizeWindow(): Unit = Unit
 
     /**
      * Called when the shell requests deminimizing (restoring) the window.
      */
-    fun deminimizeWindow() = Unit
+    public fun deminimizeWindow(): Unit = Unit
 
     /**
      * Called when the shell requests raising the window.
      */
-    fun raiseWindow() = Unit
+    public fun raiseWindow(): Unit = Unit
 
     /**
      * Called when the shell requests lowering the window.
      */
-    fun lowerWindow() = Unit
+    public fun lowerWindow(): Unit = Unit
 
     /**
      * Called when the shell requests maximizing or restoring the window.
      *
      * @param maximize true to maximize, false to restore.
      */
-    fun setMaximized(maximize: Boolean) = Unit
+    public fun setMaximized(maximize: Boolean): Unit = Unit
 
     /**
      * Called when an OSC 133 shell integration marker is received.
      *
      * @param event typed marker event.
      */
-    fun shellIntegrationMarker(event: ShellIntegrationEvent) = Unit
+    public fun shellIntegrationMarker(event: ShellIntegrationEvent): Unit = Unit
 
     /**
      * Called when the shell requests a desktop notification.
@@ -180,11 +180,11 @@ interface HostEventSink {
      * @param body notification body text.
      * @param level notification severity level.
      */
-    fun showNotification(
+    public fun showNotification(
         title: String,
         body: String,
         level: NotificationLevel,
-    ) = Unit
+    ): Unit = Unit
 
     /**
      * Called after an OSC 52 terminal clipboard request is evaluated by host
@@ -197,14 +197,14 @@ interface HostEventSink {
      *
      * @param event clipboard request audit record.
      */
-    fun terminalClipboardRequest(event: TerminalClipboardAuditEvent) = Unit
+    public fun terminalClipboardRequest(event: TerminalClipboardAuditEvent): Unit = Unit
 
     /**
      * Admits a validated read for session execution, including read denial when
      * terminal replies are permitted. Direct adapter embedders own the response.
      * This synchronous callback must not access the clipboard or wait for consent.
      */
-    fun terminalClipboardReadRequested(request: TerminalClipboardReadRequest) = Unit
+    public fun terminalClipboardReadRequested(request: TerminalClipboardReadRequest): Unit = Unit
 
     /**
      * Content-free execution audit. Unlike parser metadata, this callback can
@@ -212,7 +212,7 @@ interface HostEventSink {
      * Do not reenter session mutation or wait for a UI thread from this callback.
      * Never infer execution from the earlier admission decision alone.
      */
-    fun terminalClipboardReadCompleted(event: TerminalClipboardReadAuditEvent) = Unit
+    public fun terminalClipboardReadCompleted(event: TerminalClipboardReadAuditEvent): Unit = Unit
 
     /**
      * Called when an OSC 52 clipboard write request has been allowed by host
@@ -226,7 +226,7 @@ interface HostEventSink {
      *
      * @param event decoded clipboard write request.
      */
-    fun terminalClipboardWrite(event: TerminalClipboardWriteEvent) = Unit
+    public fun terminalClipboardWrite(event: TerminalClipboardWriteEvent): Unit = Unit
 
     /**
      * Called when an OSC 52 clipboard write request requires product-host user
@@ -240,31 +240,31 @@ interface HostEventSink {
      *
      * @param event decoded clipboard write prompt request.
      */
-    fun terminalClipboardPrompt(event: TerminalClipboardPromptEvent) = Unit
+    public fun terminalClipboardPrompt(event: TerminalClipboardPromptEvent): Unit = Unit
 
-    companion object {
+    public companion object {
         /**
          * Event sink used when the host does not need metadata callbacks.
          */
         @JvmField
-        val NONE: HostEventSink =
+        public val NONE: HostEventSink =
             object : HostEventSink {
-                override fun bell() = Unit
+                override fun bell(): Unit = Unit
 
-                override fun iconTitleChanged(title: String) = Unit
+                override fun iconTitleChanged(title: String): Unit = Unit
 
-                override fun windowTitleChanged(title: String) = Unit
+                override fun windowTitleChanged(title: String): Unit = Unit
 
                 override fun resizeWindow(
                     rows: Int,
                     columns: Int,
-                ) = Unit
+                ): Unit = Unit
 
                 override fun showNotification(
                     title: String,
                     body: String,
                     level: NotificationLevel,
-                ) = Unit
+                ): Unit = Unit
             }
     }
 }

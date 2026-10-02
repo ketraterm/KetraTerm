@@ -30,6 +30,8 @@ Designed for embedding into IDEs, developer tools, and standalone desktop applic
 
 > The [terminal quality audit](docs/reviews/terminal-quality-audit-2026-09-27.md) records correctness, performance and API findings, reproduction evidence, and verification requirements.
 
+> Published APIs, supported compiler/runtime versions, compatibility rules and baseline checks are documented in [Library Compatibility](docs/library-compatibility.md).
+
 ---
 
 

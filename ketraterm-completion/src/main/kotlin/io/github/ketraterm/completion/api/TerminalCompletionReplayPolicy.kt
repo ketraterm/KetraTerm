@@ -26,7 +26,7 @@ import java.util.*
  * in-memory replay index or a persistence file. Approval is not proof that a
  * command contains no credential or other sensitive value.
  */
-object TerminalCompletionReplayPolicy {
+public object TerminalCompletionReplayPolicy {
     /**
      * Returns whether [command] may be retained as plaintext replay data.
      *
@@ -38,7 +38,7 @@ object TerminalCompletionReplayPolicy {
      * @param command full command line captured by an authoritative host integration.
      * @return `true` only when the command is eligible for plaintext replay.
      */
-    fun allowsPlaintext(command: String): Boolean {
+    public fun allowsPlaintext(command: String): Boolean {
         if (!isStructurallyValidTerminalCompletionReplay(command)) return false
         if (command.startsWith(' ') || command.startsWith('\t')) return false
         if (SENSITIVE_KEYWORDS.any { command.contains(it, ignoreCase = true) }) return false

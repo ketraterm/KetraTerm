@@ -172,13 +172,11 @@ class TerminalShellIntegrationObservationTest {
     }
 
     @Test
-    fun `equal metadata unavailable targets and diagnostic rows do not invalidate`() {
+    fun `equal metadata and unavailable targets do not invalidate`() {
         val state = TerminalShellIntegrationState()
         state.recordPromptEnd(1)
         state.reanchorActivePromptStart(1)
         state.recordCommandFinished(1, 0)
-        state.observeLiveBottomRow(100)
-        state.observeLiveBottomRow(0)
         state.clear()
         assertEquals(0L, state.revision.value)
 
@@ -190,7 +188,6 @@ class TerminalShellIntegrationObservationTest {
         state.recordPromptEnd(11)
         state.reanchorActivePromptStart(10)
         state.recordCommandFinished(11, 0)
-        state.observeLiveBottomRow(20)
         assertEquals(revision, state.revision.value)
     }
 

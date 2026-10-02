@@ -34,8 +34,8 @@ private const val SUGGESTION_LEARNING_PERSISTENCE_KEY = "suggestion_learning_per
  *
  * @property configPath the path to the configuration TOML file on disk.
  */
-class TerminalWorkspaceConfigManager(
-    val configPath: Path,
+public class TerminalWorkspaceConfigManager(
+    public val configPath: Path,
 ) {
     /**
      * Loads the configuration from the TOML file.
@@ -47,7 +47,7 @@ class TerminalWorkspaceConfigManager(
      *
      * @return the loaded [TerminalConfig] instance.
      */
-    fun load(): TerminalConfig {
+    public fun load(): TerminalConfig {
         if (Files.notExists(configPath)) {
             val defaultConfig = TerminalConfig()
             saveDefaults(defaultConfig)
@@ -232,7 +232,7 @@ class TerminalWorkspaceConfigManager(
      *
      * @throws IOException if the snapshot cannot be persisted.
      */
-    fun save(config: TerminalConfig) {
+    public fun save(config: TerminalConfig) {
         val destination = configPath.toAbsolutePath()
         val parent = destination.parent
         Files.createDirectories(parent)
@@ -409,7 +409,7 @@ class TerminalWorkspaceConfigManager(
             else -> defaultValue
         }
 
-    companion object {
+    public companion object {
         /**
          * Resolves the default configuration path on disk for this operating system.
          *
@@ -418,7 +418,7 @@ class TerminalWorkspaceConfigManager(
          * @param userHome current user's home directory path.
          * @return the resolved [Path] to the configuration file on disk.
          */
-        fun getDefaultPath(
+        internal fun getDefaultPath(
             osName: String = System.getProperty("os.name"),
             env: Map<String, String> = System.getenv(),
             userHome: String = System.getProperty("user.home"),
@@ -465,6 +465,6 @@ class TerminalWorkspaceConfigManager(
          *
          * @return a default [TerminalWorkspaceConfigManager] instance.
          */
-        fun getDefault(): TerminalWorkspaceConfigManager = TerminalWorkspaceConfigManager(getDefaultPath())
+        public fun getDefault(): TerminalWorkspaceConfigManager = TerminalWorkspaceConfigManager(getDefaultPath())
     }
 }

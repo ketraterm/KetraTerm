@@ -38,7 +38,7 @@ private const val SHELL_COMMAND_LINE_CONTEXT_ACTIVE_INDEX = 2
  * command-text extractor. Active editing revisions are tracked only while
  * collected and reuse primitive scratch storage between render publications.
  */
-object OscShellIntegration : TerminalShellIntegrationFactory {
+public object OscShellIntegration : TerminalShellIntegrationFactory {
     override fun create(context: TerminalShellIntegrationContext): TerminalShellIntegration = OscShellIntegrationSession(context)
 }
 
@@ -110,7 +110,6 @@ private class OscShellIntegrationSession(
         var cursorLineId = NO_LINE_ID
         var previousLineId = NO_LINE_ID
         var cursorColumn = 0
-        var bottomAbsoluteRow = 0L
         var commandText: String? = null
         var visiblePromptStartLineId = NO_LINE_ID
         var historySize = 0
@@ -119,7 +118,6 @@ private class OscShellIntegrationSession(
             observeReadiness(event.marker, frame.activeBuffer == TerminalRenderBufferKind.PRIMARY)
             historySize = frame.historySize
             liveRows = frame.rows
-            val firstVisibleRow = frame.discardedCount + frame.historySize
             val cursor = frame.cursor
             cursorColumn = cursor.column
             if (cursor.row in 0 until frame.rows) {
@@ -128,7 +126,6 @@ private class OscShellIntegrationSession(
             if (cursor.row > 0 && cursor.row - 1 < frame.rows) {
                 previousLineId = frame.lineId(cursor.row - 1)
             }
-            bottomAbsoluteRow = firstVisibleRow + frame.rows - 1
             if (event.marker == ShellIntegrationMarker.COMMAND_START) {
                 commandText =
                     commandTextExtractor.extract(
@@ -169,7 +166,6 @@ private class OscShellIntegrationSession(
             }
         }
 
-        state.observeLiveBottomRow(bottomAbsoluteRow)
         when (event.marker) {
             ShellIntegrationMarker.PROMPT_START -> {
                 promptEndLineId = NO_LINE_ID

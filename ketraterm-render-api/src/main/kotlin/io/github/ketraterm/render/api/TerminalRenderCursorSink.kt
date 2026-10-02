@@ -21,7 +21,7 @@ package io.github.ketraterm.render.api
  * This sink lets render caches copy cursor data without requiring a
  * [TerminalRenderCursor] object allocation on every published frame.
  */
-fun interface TerminalRenderCursorSink {
+public fun interface TerminalRenderCursorSink {
     /**
      * Copies one cursor snapshot.
      *
@@ -32,7 +32,7 @@ fun interface TerminalRenderCursorSink {
      * @param shape renderer-facing cursor shape.
      * @param generation generation that changes when cursor presentation changes.
      */
-    fun onCursor(
+    public fun onCursor(
         column: Int,
         row: Int,
         visible: Boolean,

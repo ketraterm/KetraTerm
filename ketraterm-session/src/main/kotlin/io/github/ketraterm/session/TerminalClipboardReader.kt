@@ -32,21 +32,21 @@ import io.github.ketraterm.host.TerminalClipboardReadRequest
  * An available empty string succeeds. Await earlier posted allowed writes and
  * this session's host readiness before reading; never route through the selected tab.
  */
-fun interface TerminalClipboardReader {
+public fun interface TerminalClipboardReader {
     /** Called on the session I/O dispatcher; no parser/input monitor is held. */
-    suspend fun read(request: TerminalClipboardReadRequest): TerminalClipboardReadResult
+    public suspend fun read(request: TerminalClipboardReadRequest): TerminalClipboardReadResult
 }
 
 /** A platform result; failures may also be thrown and are audited without details. */
-sealed interface TerminalClipboardReadResult {
+public sealed interface TerminalClipboardReadResult {
     /** Clipboard text, kept out of generated toString/equals implementations. */
-    class Text(
-        val text: String,
+    public class Text(
+        public val text: String,
     ) : TerminalClipboardReadResult
 
     /** Consent was declined. */
-    data object Denied : TerminalClipboardReadResult
+    public data object Denied : TerminalClipboardReadResult
 
     /** No requested selection contains available text. */
-    data object Unavailable : TerminalClipboardReadResult
+    public data object Unavailable : TerminalClipboardReadResult
 }

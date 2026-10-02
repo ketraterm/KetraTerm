@@ -17,5 +17,8 @@ pluginManagement {
     repositories { gradlePluginPortal() }
     plugins { kotlin("jvm") version providers.gradleProperty("kotlinVersion").get() }
 }
+plugins {
+    id("org.gradle.toolchains.foojay-resolver-convention") version "1.0.0"
+}
 rootProject.name = "published-library-consumers"
-include("parser", "host", "completion", "ui-swing")
+include("parser", "host", "completion", "ui-swing", "pty")

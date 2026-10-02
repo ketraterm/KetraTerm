@@ -49,7 +49,7 @@ import javax.swing.SwingUtilities
  * this binding retains the session supplied at construction.
  */
 @OptIn(FlowPreview::class)
-class SwingLiveCompletionBinding
+public class SwingLiveCompletionBinding
     internal constructor(
         private val activeCommandLine: () -> TerminalShellCommandLineSnapshot?,
         private val shellCommandLineRevisions: StateFlow<Long>,
@@ -108,7 +108,7 @@ class SwingLiveCompletionBinding
          * It makes an unchanged command eligible for a fresh ranking request
          * before forwarding the event to the host callback.
          */
-        val suggestionFeedbackHandler =
+        public val suggestionFeedbackHandler: SwingShellSuggestionFeedbackHandler =
             SwingShellSuggestionFeedbackHandler { feedback ->
                 check(SwingUtilities.isEventDispatchThread()) { "shell suggestion feedback must run on the EDT" }
                 lastRequest = null
@@ -124,7 +124,7 @@ class SwingLiveCompletionBinding
          * @param rankingContextKey host context that can change ranking for equal text.
          * @param feedbackHandler host callback for suggestion feedback.
          */
-        constructor(
+        public constructor(
             session: TerminalSession,
             coroutineScope: CoroutineScope,
             suggestionsEnabled: () -> Boolean,
@@ -147,7 +147,7 @@ class SwingLiveCompletionBinding
          *
          * @param terminal Swing terminal that presents suggestions.
          */
-        fun attach(terminal: SwingTerminal) {
+        public fun attach(terminal: SwingTerminal) {
             attach(SwingTerminalLiveCompletionTarget(terminal))
         }
 
@@ -189,13 +189,13 @@ class SwingLiveCompletionBinding
         }
 
         /** Re-evaluates live completion after the shared debounce interval. */
-        fun scheduleRefresh() =
+        public fun scheduleRefresh(): Unit =
             onEdt {
                 if (!closed && invalidatedRevision == null && isEligibleOnEdt()) refreshes.value = ++refreshSequence
             }
 
         /** Cancels pending live completion and hides the current popup. */
-        fun cancelAndHide() =
+        public fun cancelAndHide(): Unit =
             onEdt {
                 if (!closed) cancelAndHideInternal()
             }
@@ -227,7 +227,7 @@ class SwingLiveCompletionBinding
         }
 
         /** Stops automatic observation without dismissing an explicit completion request. */
-        fun detach() {
+        public fun detach() {
             check(SwingUtilities.isEventDispatchThread()) { "live completion must be closed on the EDT" }
             if (closed) return
             closed = true

@@ -28,7 +28,7 @@ import javax.swing.KeyStroke
  * Hosts use this vocabulary to keep shortcut policy outside rendering/input
  * internals while sharing platform defaults across Swing-based hosts.
  */
-enum class SwingTerminalHostAction {
+public enum class SwingTerminalHostAction {
     /** Copy the current terminal selection to the host clipboard. */
     COPY_SELECTION,
 
@@ -60,7 +60,7 @@ enum class SwingTerminalHostAction {
  * @property keyCode Swing virtual key code.
  * @property modifiers extended Swing modifier mask.
  */
-data class SwingTerminalHostShortcut(
+public data class SwingTerminalHostShortcut(
     val keyCode: Int,
     val modifiers: Int,
 ) {
@@ -73,7 +73,7 @@ data class SwingTerminalHostShortcut(
      *
      * @return Swing key stroke for key-binding registration.
      */
-    fun keyStroke(): KeyStroke = KeyStroke.getKeyStroke(keyCode, modifiers)
+    public fun keyStroke(): KeyStroke = KeyStroke.getKeyStroke(keyCode, modifiers)
 }
 
 /**
@@ -81,7 +81,7 @@ data class SwingTerminalHostShortcut(
  *
  * @property shortcuts action-to-shortcut map.
  */
-class SwingTerminalHostShortcutMap private constructor(
+public class SwingTerminalHostShortcutMap private constructor(
     private val shortcuts: EnumMap<SwingTerminalHostAction, SwingTerminalHostShortcut>,
 ) {
     /**
@@ -90,7 +90,7 @@ class SwingTerminalHostShortcutMap private constructor(
      * @param action host action to query.
      * @return configured shortcut.
      */
-    fun shortcut(action: SwingTerminalHostAction): SwingTerminalHostShortcut = shortcuts.getValue(action)
+    public fun shortcut(action: SwingTerminalHostAction): SwingTerminalHostShortcut = shortcuts.getValue(action)
 
     /**
      * Returns the host action requested by [keyCode] and [modifiersEx].
@@ -100,7 +100,7 @@ class SwingTerminalHostShortcutMap private constructor(
      * @return matching action, or `null` when the key event is not a host
      * terminal shortcut.
      */
-    fun actionFor(
+    public fun actionFor(
         keyCode: Int,
         modifiersEx: Int,
     ): SwingTerminalHostAction? {
@@ -119,20 +119,20 @@ class SwingTerminalHostShortcutMap private constructor(
      *
      * @param consumer callback receiving each action and shortcut.
      */
-    fun forEachShortcut(consumer: (SwingTerminalHostAction, SwingTerminalHostShortcut) -> Unit) {
+    public fun forEachShortcut(consumer: (SwingTerminalHostAction, SwingTerminalHostShortcut) -> Unit) {
         for (entry in shortcuts.entries) {
             consumer(entry.key, entry.value)
         }
     }
 
-    companion object {
+    public companion object {
         /**
          * Returns platform-default terminal pane shortcuts for this JVM host.
          *
          * @return platform-default shortcut map.
          */
         @JvmStatic
-        fun platformDefault(): SwingTerminalHostShortcutMap = platformDefault(System.getProperty("os.name").orEmpty())
+        public fun platformDefault(): SwingTerminalHostShortcutMap = platformDefault(System.getProperty("os.name").orEmpty())
 
         internal fun platformDefault(osName: String): SwingTerminalHostShortcutMap {
             val normalized = osName.lowercase(Locale.ROOT)

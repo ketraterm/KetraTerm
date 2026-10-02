@@ -1,0 +1,479 @@
+public final class io/github/ketraterm/core/TerminalBuffers {
+	public static final field INSTANCE Lio/github/ketraterm/core/TerminalBuffers;
+	public static final fun create (II)Lio/github/ketraterm/core/api/TerminalBuffer;
+	public static final fun create (III)Lio/github/ketraterm/core/api/TerminalBuffer;
+	public static synthetic fun create$default (IIIILjava/lang/Object;)Lio/github/ketraterm/core/api/TerminalBuffer;
+}
+
+public abstract interface class io/github/ketraterm/core/api/TerminalBuffer : io/github/ketraterm/core/api/TerminalCursor, io/github/ketraterm/core/api/TerminalInspector, io/github/ketraterm/core/api/TerminalModeController, io/github/ketraterm/core/api/TerminalModeReader, io/github/ketraterm/core/api/TerminalReader, io/github/ketraterm/core/api/TerminalResponseChannel, io/github/ketraterm/core/api/TerminalWriter {
+	public abstract fun executeDeccolm (I)V
+	public abstract fun reset ()V
+	public abstract fun resize (III)Lkotlin/Pair;
+	public static synthetic fun resize$default (Lio/github/ketraterm/core/api/TerminalBuffer;IIIILjava/lang/Object;)Lkotlin/Pair;
+	public abstract fun softReset ()V
+}
+
+public final class io/github/ketraterm/core/api/TerminalBuffer$DefaultImpls {
+	public static fun getInputModeBits (Lio/github/ketraterm/core/api/TerminalBuffer;)J
+	public static synthetic fun resize$default (Lio/github/ketraterm/core/api/TerminalBuffer;IIIILjava/lang/Object;)Lkotlin/Pair;
+}
+
+public abstract interface class io/github/ketraterm/core/api/TerminalCursor {
+	public abstract fun clearAllTabStops ()V
+	public abstract fun clearTabStop ()V
+	public abstract fun cursorBackwardTab (I)V
+	public static synthetic fun cursorBackwardTab$default (Lio/github/ketraterm/core/api/TerminalCursor;IILjava/lang/Object;)V
+	public abstract fun cursorDown (I)V
+	public static synthetic fun cursorDown$default (Lio/github/ketraterm/core/api/TerminalCursor;IILjava/lang/Object;)V
+	public abstract fun cursorForwardTab (I)V
+	public static synthetic fun cursorForwardTab$default (Lio/github/ketraterm/core/api/TerminalCursor;IILjava/lang/Object;)V
+	public abstract fun cursorLeft (I)V
+	public static synthetic fun cursorLeft$default (Lio/github/ketraterm/core/api/TerminalCursor;IILjava/lang/Object;)V
+	public abstract fun cursorRight (I)V
+	public static synthetic fun cursorRight$default (Lio/github/ketraterm/core/api/TerminalCursor;IILjava/lang/Object;)V
+	public abstract fun cursorUp (I)V
+	public static synthetic fun cursorUp$default (Lio/github/ketraterm/core/api/TerminalCursor;IILjava/lang/Object;)V
+	public abstract fun horizontalTab ()V
+	public abstract fun positionCursor (II)V
+	public abstract fun resetCursor ()V
+	public abstract fun restoreCursor ()V
+	public abstract fun saveCursor ()V
+	public abstract fun setTabStop ()V
+}
+
+public final class io/github/ketraterm/core/api/TerminalCursor$DefaultImpls {
+	public static synthetic fun cursorBackwardTab$default (Lio/github/ketraterm/core/api/TerminalCursor;IILjava/lang/Object;)V
+	public static synthetic fun cursorDown$default (Lio/github/ketraterm/core/api/TerminalCursor;IILjava/lang/Object;)V
+	public static synthetic fun cursorForwardTab$default (Lio/github/ketraterm/core/api/TerminalCursor;IILjava/lang/Object;)V
+	public static synthetic fun cursorLeft$default (Lio/github/ketraterm/core/api/TerminalCursor;IILjava/lang/Object;)V
+	public static synthetic fun cursorRight$default (Lio/github/ketraterm/core/api/TerminalCursor;IILjava/lang/Object;)V
+	public static synthetic fun cursorUp$default (Lio/github/ketraterm/core/api/TerminalCursor;IILjava/lang/Object;)V
+}
+
+public abstract interface class io/github/ketraterm/core/api/TerminalHostResponseReader {
+	public abstract fun readResponseBytes ([BII)I
+	public static synthetic fun readResponseBytes$default (Lio/github/ketraterm/core/api/TerminalHostResponseReader;[BIIILjava/lang/Object;)I
+}
+
+public final class io/github/ketraterm/core/api/TerminalHostResponseReader$DefaultImpls {
+	public static synthetic fun readResponseBytes$default (Lio/github/ketraterm/core/api/TerminalHostResponseReader;[BIIILjava/lang/Object;)I
+}
+
+public abstract interface class io/github/ketraterm/core/api/TerminalInputState {
+	public static final field Companion Lio/github/ketraterm/core/api/TerminalInputState$Companion;
+	public static fun backarrowSendsBackspace (JZ)Z
+	public static fun formatOtherKeysMode (J)I
+	public abstract fun getInputModeBits ()J
+	public static fun isApplicationCursorKeys (J)Z
+	public static fun isApplicationKeypad (J)Z
+	public static fun isBackarrowKeyModeExplicit (J)Z
+	public static fun isBackarrowKeySendsBackspace (J)Z
+	public static fun isBracketedPasteEnabled (J)Z
+	public static fun isFocusReportingEnabled (J)Z
+	public static fun isNewLineMode (J)Z
+	public static fun keyFormatOption (JI)I
+	public static fun keyModifierOption (JI)I
+	public static fun kittyKeyboardFlags (J)I
+	public static fun modifyOtherKeysMode (J)I
+	public static fun mouseEncodingMode (J)I
+	public static fun mouseTrackingMode (J)I
+}
+
+public final class io/github/ketraterm/core/api/TerminalInputState$Companion {
+	public final fun backarrowSendsBackspace (JZ)Z
+	public final fun formatOtherKeysMode (J)I
+	public final fun isApplicationCursorKeys (J)Z
+	public final fun isApplicationKeypad (J)Z
+	public final fun isBackarrowKeyModeExplicit (J)Z
+	public final fun isBackarrowKeySendsBackspace (J)Z
+	public final fun isBracketedPasteEnabled (J)Z
+	public final fun isFocusReportingEnabled (J)Z
+	public final fun isNewLineMode (J)Z
+	public final fun keyFormatOption (JI)I
+	public final fun keyModifierOption (JI)I
+	public final fun kittyKeyboardFlags (J)I
+	public final fun modifyOtherKeysMode (J)I
+	public final fun mouseEncodingMode (J)I
+	public final fun mouseTrackingMode (J)I
+}
+
+public abstract interface class io/github/ketraterm/core/api/TerminalInspector {
+	public abstract fun getAllAsString ()Ljava/lang/String;
+	public abstract fun getAttrAt (II)Lio/github/ketraterm/core/model/CellAttributes;
+	public abstract fun getLineAsString (I)Ljava/lang/String;
+	public abstract fun getScreenAsString ()Ljava/lang/String;
+}
+
+public abstract interface class io/github/ketraterm/core/api/TerminalLine {
+	public abstract fun getCodepoint (I)I
+	public abstract fun getWidth ()I
+	public fun isCluster (I)Z
+	public fun readCluster (I[I)I
+}
+
+public final class io/github/ketraterm/core/api/TerminalLine$DefaultImpls {
+	public static fun isCluster (Lio/github/ketraterm/core/api/TerminalLine;I)Z
+	public static fun readCluster (Lio/github/ketraterm/core/api/TerminalLine;I[I)I
+}
+
+public final class io/github/ketraterm/core/api/TerminalModeBits {
+	public static final field AMBIGUOUS_WIDE J
+	public static final field APPLICATION_CURSOR_KEYS J
+	public static final field APPLICATION_KEYPAD J
+	public static final field AUTO_WRAP J
+	public static final field BACKARROW_KEY_MODE_EXPLICIT J
+	public static final field BACKARROW_KEY_SENDS_BACKSPACE J
+	public static final field BELL_IS_URGENT J
+	public static final field BRACKETED_PASTE J
+	public static final field COLUMN_MODE_132 J
+	public static final field CURSOR_BLINKING J
+	public static final field CURSOR_VISIBLE J
+	public static final field FOCUS_REPORTING J
+	public static final field FORMAT_OTHER_KEYS_MASK J
+	public static final field FORMAT_OTHER_KEYS_SHIFT I
+	public static final field FORMAT_OTHER_KEYS_WIDTH I
+	public static final field INSERT_MODE J
+	public static final field INSTANCE Lio/github/ketraterm/core/api/TerminalModeBits;
+	public static final field KITTY_KEYBOARD_FLAGS_MASK J
+	public static final field KITTY_KEYBOARD_FLAGS_SHIFT I
+	public static final field KITTY_KEYBOARD_FLAGS_WIDTH I
+	public static final field LEFT_RIGHT_MARGIN_MODE J
+	public static final field MODIFY_OTHER_KEYS_EXPLICITLY_DISABLED I
+	public static final field MODIFY_OTHER_KEYS_MASK J
+	public static final field MODIFY_OTHER_KEYS_SHIFT I
+	public static final field MODIFY_OTHER_KEYS_WIDTH I
+	public static final field MOUSE_ENCODING_MASK J
+	public static final field MOUSE_ENCODING_SHIFT I
+	public static final field MOUSE_ENCODING_WIDTH I
+	public static final field MOUSE_TRACKING_MASK J
+	public static final field MOUSE_TRACKING_SHIFT I
+	public static final field MOUSE_TRACKING_WIDTH I
+	public static final field NEW_LINE_MODE J
+	public static final field ORIGIN_MODE J
+	public static final field POP_ON_BELL J
+	public static final field REVERSE_VIDEO J
+	public static final field SYNCHRONIZED_OUTPUT J
+	public static final fun hasFlag (JJ)Z
+	public static final fun packedValue (JJI)I
+	public static final fun withPackedValue (JJII)J
+}
+
+public abstract interface class io/github/ketraterm/core/api/TerminalModeController {
+	public abstract fun enterAltBuffer ()V
+	public abstract fun enterAltBufferWithoutCursorSave (Z)V
+	public abstract fun exitAltBuffer ()V
+	public abstract fun exitAltBufferWithoutCursorRestore ()V
+	public abstract fun popKittyKeyboardFlags (I)V
+	public abstract fun pushKittyKeyboardFlags (I)V
+	public abstract fun resetCursorStyle ()V
+	public abstract fun resetKeyFormatOption (I)V
+	public abstract fun resetKeyFormatOptions ()V
+	public abstract fun resetKeyModifierOption (I)V
+	public abstract fun resetKeyModifierOptions ()V
+	public abstract fun setApplicationCursorKeys (Z)V
+	public abstract fun setApplicationKeypad (Z)V
+	public abstract fun setAutoWrap (Z)V
+	public abstract fun setBackarrowKeyMode (Z)V
+	public abstract fun setBellIsUrgent (Z)V
+	public abstract fun setBracketedPasteEnabled (Z)V
+	public abstract fun setCursorBlinking (Z)V
+	public abstract fun setCursorShape (Lio/github/ketraterm/render/api/TerminalRenderCursorShape;)V
+	public abstract fun setCursorVisible (Z)V
+	public abstract fun setDefaultCursorShape (Lio/github/ketraterm/render/api/TerminalRenderCursorShape;)V
+	public abstract fun setDynamicColor (II)V
+	public abstract fun setFocusReportingEnabled (Z)V
+	public abstract fun setFormatOtherKeysMode (I)V
+	public abstract fun setInsertMode (Z)V
+	public abstract fun setKeyFormatOption (II)V
+	public abstract fun setKeyModifierOption (II)V
+	public abstract fun setKittyKeyboardFlags (I)V
+	public abstract fun setLeftRightMarginMode (Z)V
+	public abstract fun setModifyOtherKeysMode (I)V
+	public abstract fun setMouseEncodingMode (Lio/github/ketraterm/protocol/MouseEncodingMode;)V
+	public abstract fun setMouseTrackingMode (Lio/github/ketraterm/protocol/MouseTrackingMode;)V
+	public abstract fun setNewLineMode (Z)V
+	public abstract fun setOriginMode (Z)V
+	public abstract fun setPaletteColor (II)V
+	public abstract fun setPopOnBell (Z)V
+	public abstract fun setReverseVideo (Z)V
+	public abstract fun setSynchronizedOutput (Z)V
+	public abstract fun setThemePalette (Lio/github/ketraterm/render/api/TerminalColorPalette;)V
+	public abstract fun setTreatAmbiguousAsWide (Z)V
+}
+
+public abstract interface class io/github/ketraterm/core/api/TerminalModeReader : io/github/ketraterm/core/api/TerminalInputState {
+	public fun getInputModeBits ()J
+	public abstract fun getModeBitsSnapshot ()J
+	public abstract fun getModeSnapshot ()Lio/github/ketraterm/core/api/TerminalModeSnapshot;
+}
+
+public final class io/github/ketraterm/core/api/TerminalModeReader$DefaultImpls {
+	public static fun getInputModeBits (Lio/github/ketraterm/core/api/TerminalModeReader;)J
+}
+
+public final class io/github/ketraterm/core/api/TerminalModeSnapshot {
+	public fun <init> (ZZZZZZZZZZZZZZZLio/github/ketraterm/protocol/MouseTrackingMode;Lio/github/ketraterm/protocol/MouseEncodingMode;IIIZZZ)V
+	public final fun component1 ()Z
+	public final fun component10 ()Z
+	public final fun component11 ()Z
+	public final fun component12 ()Z
+	public final fun component13 ()Z
+	public final fun component14 ()Z
+	public final fun component15 ()Z
+	public final fun component16 ()Lio/github/ketraterm/protocol/MouseTrackingMode;
+	public final fun component17 ()Lio/github/ketraterm/protocol/MouseEncodingMode;
+	public final fun component18 ()I
+	public final fun component19 ()I
+	public final fun component2 ()Z
+	public final fun component20 ()I
+	public final fun component21 ()Z
+	public final fun component22 ()Z
+	public final fun component23 ()Z
+	public final fun component3 ()Z
+	public final fun component4 ()Z
+	public final fun component5 ()Z
+	public final fun component6 ()Z
+	public final fun component7 ()Z
+	public final fun component8 ()Z
+	public final fun component9 ()Z
+	public final fun copy (ZZZZZZZZZZZZZZZLio/github/ketraterm/protocol/MouseTrackingMode;Lio/github/ketraterm/protocol/MouseEncodingMode;IIIZZZ)Lio/github/ketraterm/core/api/TerminalModeSnapshot;
+	public static synthetic fun copy$default (Lio/github/ketraterm/core/api/TerminalModeSnapshot;ZZZZZZZZZZZZZZZLio/github/ketraterm/protocol/MouseTrackingMode;Lio/github/ketraterm/protocol/MouseEncodingMode;IIIZZZILjava/lang/Object;)Lio/github/ketraterm/core/api/TerminalModeSnapshot;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getFormatOtherKeysMode ()I
+	public final fun getKittyKeyboardFlags ()I
+	public final fun getModifyOtherKeysMode ()I
+	public final fun getMouseEncodingMode ()Lio/github/ketraterm/protocol/MouseEncodingMode;
+	public final fun getMouseTrackingMode ()Lio/github/ketraterm/protocol/MouseTrackingMode;
+	public final fun getTreatAmbiguousAsWide ()Z
+	public fun hashCode ()I
+	public final fun isApplicationCursorKeys ()Z
+	public final fun isApplicationKeypad ()Z
+	public final fun isAutoWrap ()Z
+	public final fun isBackarrowKeyModeExplicit ()Z
+	public final fun isBackarrowKeySendsBackspace ()Z
+	public final fun isBellIsUrgent ()Z
+	public final fun isBracketedPasteEnabled ()Z
+	public final fun isCursorBlinking ()Z
+	public final fun isCursorVisible ()Z
+	public final fun isFocusReportingEnabled ()Z
+	public final fun isInsertMode ()Z
+	public final fun isLeftRightMarginMode ()Z
+	public final fun isNewLineMode ()Z
+	public final fun isOriginMode ()Z
+	public final fun isPopOnBell ()Z
+	public final fun isReverseVideo ()Z
+	public final fun isSynchronizedOutput ()Z
+	public fun toString ()Ljava/lang/String;
+}
+
+public abstract interface class io/github/ketraterm/core/api/TerminalReader {
+	public abstract fun getCodepointAt (II)I
+	public abstract fun getCursorCol ()I
+	public abstract fun getCursorRow ()I
+	public abstract fun getHeight ()I
+	public abstract fun getHistorySize ()I
+	public abstract fun getIconTitle ()Ljava/lang/String;
+	public abstract fun getLine (I)Lio/github/ketraterm/core/api/TerminalLine;
+	public abstract fun getPalette ()Lio/github/ketraterm/render/api/TerminalColorPalette;
+	public abstract fun getWidth ()I
+	public abstract fun getWindowTitle ()Ljava/lang/String;
+	public abstract fun isAlternateScreenActive ()Z
+}
+
+public abstract interface class io/github/ketraterm/core/api/TerminalResponseChannel : io/github/ketraterm/core/api/TerminalHostResponseReader {
+	public static final field Companion Lio/github/ketraterm/core/api/TerminalResponseChannel$Companion;
+	public static final field DEVICE_ATTRIBUTES_PRIMARY I
+	public static final field DEVICE_ATTRIBUTES_SECONDARY I
+	public static final field DEVICE_ATTRIBUTES_TERTIARY I
+	public static final field WINDOW_REPORT_GRID_CELLS I
+	public static final field WINDOW_REPORT_PIXELS I
+	public static final field WINDOW_REPORT_SCREEN_SIZE I
+	public static final field WINDOW_REPORT_STATE I
+	public abstract fun clearResponseBytes ()V
+	public abstract fun getPendingResponseBytes ()I
+	public abstract fun queryDynamicColor (I)V
+	public abstract fun queryPaletteColor (I)V
+	public abstract fun queryStatusString (Ljava/lang/String;)V
+	public abstract fun queryTerminfo (Ljava/lang/String;)V
+	public abstract fun requestDeviceAttributes (II)V
+	public abstract fun requestDeviceStatusReport (IZ)V
+	public abstract fun requestKeyFormatOption (I)V
+	public abstract fun requestKeyModifierOption (I)V
+	public abstract fun requestKittyKeyboardFlags ()V
+	public abstract fun requestModeStatus (IZIZ)V
+	public static synthetic fun requestModeStatus$default (Lio/github/ketraterm/core/api/TerminalResponseChannel;IZIZILjava/lang/Object;)V
+	public abstract fun requestRectangleChecksum (IIIIII)V
+	public abstract fun requestWindowReport (I)V
+	public abstract fun setWindowMinimized (Z)V
+	public abstract fun setWindowSizePixels (II)V
+}
+
+public final class io/github/ketraterm/core/api/TerminalResponseChannel$Companion {
+	public static final field DEVICE_ATTRIBUTES_PRIMARY I
+	public static final field DEVICE_ATTRIBUTES_SECONDARY I
+	public static final field DEVICE_ATTRIBUTES_TERTIARY I
+	public static final field WINDOW_REPORT_GRID_CELLS I
+	public static final field WINDOW_REPORT_PIXELS I
+	public static final field WINDOW_REPORT_SCREEN_SIZE I
+	public static final field WINDOW_REPORT_STATE I
+}
+
+public final class io/github/ketraterm/core/api/TerminalResponseChannel$DefaultImpls {
+	public static synthetic fun requestModeStatus$default (Lio/github/ketraterm/core/api/TerminalResponseChannel;IZIZILjava/lang/Object;)V
+}
+
+public abstract interface class io/github/ketraterm/core/api/TerminalWriter {
+	public abstract fun carriageReturn ()V
+	public abstract fun changeRectangleAttributes (IIIIII)V
+	public abstract fun clearAll ()V
+	public abstract fun clearScreen ()V
+	public abstract fun copyRectangle (IIIIIIII)V
+	public abstract fun decaln ()V
+	public abstract fun deleteCharacters (I)V
+	public abstract fun deleteColumns (I)V
+	public abstract fun deleteLines (I)V
+	public abstract fun eraseCharacters (I)V
+	public abstract fun eraseCurrentLine ()V
+	public abstract fun eraseEntireScreen ()V
+	public abstract fun eraseLineToCursor ()V
+	public abstract fun eraseLineToEnd ()V
+	public abstract fun eraseRectangle (IIIIZ)V
+	public abstract fun eraseScreenAndHistory ()V
+	public abstract fun eraseScreenToCursor ()V
+	public abstract fun eraseScreenToEnd ()V
+	public abstract fun fillRectangle (IIIII)V
+	public abstract fun insertBlankCharacters (I)V
+	public abstract fun insertColumns (I)V
+	public abstract fun insertLines (I)V
+	public abstract fun newLine ()V
+	public abstract fun resetPen ()V
+	public abstract fun resetScrollRegion ()V
+	public abstract fun reverseLineFeed ()V
+	public abstract fun reverseRectangleAttributes (IIIII)V
+	public abstract fun scrollDown ()V
+	public abstract fun scrollDown (I)V
+	public abstract fun scrollUp ()V
+	public abstract fun scrollUp (I)V
+	public abstract fun selectiveEraseCurrentLine ()V
+	public abstract fun selectiveEraseEntireScreen ()V
+	public abstract fun selectiveEraseLineToCursor ()V
+	public abstract fun selectiveEraseLineToEnd ()V
+	public abstract fun selectiveEraseScreenToCursor ()V
+	public abstract fun selectiveEraseScreenToEnd ()V
+	public abstract fun setAttributeChangeExtent (I)V
+	public abstract fun setHyperlinkId (I)V
+	public abstract fun setIconTitle (Ljava/lang/String;)V
+	public abstract fun setLeftRightMargins (II)V
+	public abstract fun setPenAttributes (IIZZZLio/github/ketraterm/core/model/UnderlineStyle;ZZZZZI)V
+	public static synthetic fun setPenAttributes$default (Lio/github/ketraterm/core/api/TerminalWriter;IIZZZLio/github/ketraterm/core/model/UnderlineStyle;ZZZZZIILjava/lang/Object;)V
+	public abstract fun setPenColors (Lio/github/ketraterm/core/model/CellColor;Lio/github/ketraterm/core/model/CellColor;Lio/github/ketraterm/core/model/CellColor;ZZZLio/github/ketraterm/core/model/UnderlineStyle;ZZZZZ)V
+	public static synthetic fun setPenColors$default (Lio/github/ketraterm/core/api/TerminalWriter;Lio/github/ketraterm/core/model/CellColor;Lio/github/ketraterm/core/model/CellColor;Lio/github/ketraterm/core/model/CellColor;ZZZLio/github/ketraterm/core/model/UnderlineStyle;ZZZZZILjava/lang/Object;)V
+	public abstract fun setScrollRegion (II)V
+	public abstract fun setSelectiveEraseProtection (Z)V
+	public abstract fun setWindowTitle (Ljava/lang/String;)V
+	public abstract fun updatePenColors (Lio/github/ketraterm/core/model/CellColor;Lio/github/ketraterm/core/model/CellColor;Lio/github/ketraterm/core/model/CellColor;Ljava/lang/Boolean;Ljava/lang/Boolean;Ljava/lang/Boolean;Lio/github/ketraterm/core/model/UnderlineStyle;Ljava/lang/Boolean;Ljava/lang/Boolean;Ljava/lang/Boolean;Ljava/lang/Boolean;Ljava/lang/Boolean;)V
+	public static synthetic fun updatePenColors$default (Lio/github/ketraterm/core/api/TerminalWriter;Lio/github/ketraterm/core/model/CellColor;Lio/github/ketraterm/core/model/CellColor;Lio/github/ketraterm/core/model/CellColor;Ljava/lang/Boolean;Ljava/lang/Boolean;Ljava/lang/Boolean;Lio/github/ketraterm/core/model/UnderlineStyle;Ljava/lang/Boolean;Ljava/lang/Boolean;Ljava/lang/Boolean;Ljava/lang/Boolean;Ljava/lang/Boolean;ILjava/lang/Object;)V
+	public abstract fun updatePreviousCluster ([II)V
+	public static synthetic fun updatePreviousCluster$default (Lio/github/ketraterm/core/api/TerminalWriter;[IIILjava/lang/Object;)V
+	public abstract fun writeCluster ([II)V
+	public static synthetic fun writeCluster$default (Lio/github/ketraterm/core/api/TerminalWriter;[IIILjava/lang/Object;)V
+	public abstract fun writeCodepoint (I)V
+	public abstract fun writeText (Ljava/lang/String;)V
+}
+
+public final class io/github/ketraterm/core/api/TerminalWriter$DefaultImpls {
+	public static synthetic fun setPenAttributes$default (Lio/github/ketraterm/core/api/TerminalWriter;IIZZZLio/github/ketraterm/core/model/UnderlineStyle;ZZZZZIILjava/lang/Object;)V
+	public static synthetic fun setPenColors$default (Lio/github/ketraterm/core/api/TerminalWriter;Lio/github/ketraterm/core/model/CellColor;Lio/github/ketraterm/core/model/CellColor;Lio/github/ketraterm/core/model/CellColor;ZZZLio/github/ketraterm/core/model/UnderlineStyle;ZZZZZILjava/lang/Object;)V
+	public static synthetic fun updatePenColors$default (Lio/github/ketraterm/core/api/TerminalWriter;Lio/github/ketraterm/core/model/CellColor;Lio/github/ketraterm/core/model/CellColor;Lio/github/ketraterm/core/model/CellColor;Ljava/lang/Boolean;Ljava/lang/Boolean;Ljava/lang/Boolean;Lio/github/ketraterm/core/model/UnderlineStyle;Ljava/lang/Boolean;Ljava/lang/Boolean;Ljava/lang/Boolean;Ljava/lang/Boolean;Ljava/lang/Boolean;ILjava/lang/Object;)V
+	public static synthetic fun updatePreviousCluster$default (Lio/github/ketraterm/core/api/TerminalWriter;[IIILjava/lang/Object;)V
+	public static synthetic fun writeCluster$default (Lio/github/ketraterm/core/api/TerminalWriter;[IIILjava/lang/Object;)V
+}
+
+public final class io/github/ketraterm/core/model/CellAttributes {
+	public fun <init> ()V
+	public fun <init> (Lio/github/ketraterm/core/model/CellColor;Lio/github/ketraterm/core/model/CellColor;Lio/github/ketraterm/core/model/CellColor;ZZZLio/github/ketraterm/core/model/UnderlineStyle;ZZZZZZI)V
+	public synthetic fun <init> (Lio/github/ketraterm/core/model/CellColor;Lio/github/ketraterm/core/model/CellColor;Lio/github/ketraterm/core/model/CellColor;ZZZLio/github/ketraterm/core/model/UnderlineStyle;ZZZZZZIILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Lio/github/ketraterm/core/model/CellColor;
+	public final fun component10 ()Z
+	public final fun component11 ()Z
+	public final fun component12 ()Z
+	public final fun component13 ()Z
+	public final fun component14 ()I
+	public final fun component2 ()Lio/github/ketraterm/core/model/CellColor;
+	public final fun component3 ()Lio/github/ketraterm/core/model/CellColor;
+	public final fun component4 ()Z
+	public final fun component5 ()Z
+	public final fun component6 ()Z
+	public final fun component7 ()Lio/github/ketraterm/core/model/UnderlineStyle;
+	public final fun component8 ()Z
+	public final fun component9 ()Z
+	public final fun copy (Lio/github/ketraterm/core/model/CellColor;Lio/github/ketraterm/core/model/CellColor;Lio/github/ketraterm/core/model/CellColor;ZZZLio/github/ketraterm/core/model/UnderlineStyle;ZZZZZZI)Lio/github/ketraterm/core/model/CellAttributes;
+	public static synthetic fun copy$default (Lio/github/ketraterm/core/model/CellAttributes;Lio/github/ketraterm/core/model/CellColor;Lio/github/ketraterm/core/model/CellColor;Lio/github/ketraterm/core/model/CellColor;ZZZLio/github/ketraterm/core/model/UnderlineStyle;ZZZZZZIILjava/lang/Object;)Lio/github/ketraterm/core/model/CellAttributes;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getBackground ()Lio/github/ketraterm/core/model/CellColor;
+	public final fun getBlink ()Z
+	public final fun getBold ()Z
+	public final fun getConceal ()Z
+	public final fun getFaint ()Z
+	public final fun getForeground ()Lio/github/ketraterm/core/model/CellColor;
+	public final fun getHyperlinkId ()I
+	public final fun getInverse ()Z
+	public final fun getItalic ()Z
+	public final fun getOverline ()Z
+	public final fun getSelectiveEraseProtected ()Z
+	public final fun getStrikethrough ()Z
+	public final fun getUnderlineColor ()Lio/github/ketraterm/core/model/CellColor;
+	public final fun getUnderlineStyle ()Lio/github/ketraterm/core/model/UnderlineStyle;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class io/github/ketraterm/core/model/CellColor {
+	public static final field Companion Lio/github/ketraterm/core/model/CellColor$Companion;
+	public fun <init> (Lio/github/ketraterm/core/model/CellColorKind;I)V
+	public synthetic fun <init> (Lio/github/ketraterm/core/model/CellColorKind;IILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Lio/github/ketraterm/core/model/CellColorKind;
+	public final fun component2 ()I
+	public final fun copy (Lio/github/ketraterm/core/model/CellColorKind;I)Lio/github/ketraterm/core/model/CellColor;
+	public static synthetic fun copy$default (Lio/github/ketraterm/core/model/CellColor;Lio/github/ketraterm/core/model/CellColorKind;IILjava/lang/Object;)Lio/github/ketraterm/core/model/CellColor;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getKind ()Lio/github/ketraterm/core/model/CellColorKind;
+	public final fun getValue ()I
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class io/github/ketraterm/core/model/CellColor$Companion {
+	public final fun getDEFAULT ()Lio/github/ketraterm/core/model/CellColor;
+	public final fun indexed (I)Lio/github/ketraterm/core/model/CellColor;
+	public final fun rgb (I)Lio/github/ketraterm/core/model/CellColor;
+	public final fun rgb (III)Lio/github/ketraterm/core/model/CellColor;
+}
+
+public final class io/github/ketraterm/core/model/CellColorKind : java/lang/Enum {
+	public static final field DEFAULT Lio/github/ketraterm/core/model/CellColorKind;
+	public static final field INDEXED Lio/github/ketraterm/core/model/CellColorKind;
+	public static final field RGB Lio/github/ketraterm/core/model/CellColorKind;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public static fun valueOf (Ljava/lang/String;)Lio/github/ketraterm/core/model/CellColorKind;
+	public static fun values ()[Lio/github/ketraterm/core/model/CellColorKind;
+}
+
+public final class io/github/ketraterm/core/model/UnderlineStyle : java/lang/Enum {
+	public static final field CURLY Lio/github/ketraterm/core/model/UnderlineStyle;
+	public static final field Companion Lio/github/ketraterm/core/model/UnderlineStyle$Companion;
+	public static final field DASHED Lio/github/ketraterm/core/model/UnderlineStyle;
+	public static final field DOTTED Lio/github/ketraterm/core/model/UnderlineStyle;
+	public static final field DOUBLE Lio/github/ketraterm/core/model/UnderlineStyle;
+	public static final field NONE Lio/github/ketraterm/core/model/UnderlineStyle;
+	public static final field SINGLE Lio/github/ketraterm/core/model/UnderlineStyle;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public final fun getSgrCode ()I
+	public static fun valueOf (Ljava/lang/String;)Lio/github/ketraterm/core/model/UnderlineStyle;
+	public static fun values ()[Lio/github/ketraterm/core/model/UnderlineStyle;
+}
+
+public final class io/github/ketraterm/core/model/UnderlineStyle$Companion {
+	public final fun fromSgrCode (I)Lio/github/ketraterm/core/model/UnderlineStyle;
+}
+

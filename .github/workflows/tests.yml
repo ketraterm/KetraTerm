@@ -52,8 +52,8 @@ jobs:
       - name: Compile Benchmark Harnesses
         run: ./gradlew :ketraterm-benchmarks:jmhJar
 
-      - name: Check Swing Embedding ABI
-        run: ./gradlew :ketraterm-ui-swing:checkKotlinAbi
+      - name: Check Published Library ABI and Formatting
+        run: ./gradlew checkKotlinAbi spotlessCheck
 
       - name: Upload Test Results
         if: failure()

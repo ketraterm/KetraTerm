@@ -24,26 +24,26 @@ package io.github.ketraterm.completion.model
  * @property rankingStats opaque exact-command evidence used by ranking.
  * @property replayCommands plaintext commands used by history and observed-token suggestions.
  */
-class TerminalCompletionLearningSnapshot
+public class TerminalCompletionLearningSnapshot
     @JvmOverloads
     constructor(
         rankingStats: List<TerminalCompletionRankingStats> = emptyList(),
         replayCommands: List<TerminalCommandReplay> = emptyList(),
     ) {
-        val rankingStats: List<TerminalCompletionRankingStats> = immutableListCopy(rankingStats)
-        val replayCommands: List<TerminalCommandReplay> = immutableListCopy(replayCommands)
+        public val rankingStats: List<TerminalCompletionRankingStats> = immutableListCopy(rankingStats)
+        public val replayCommands: List<TerminalCommandReplay> = immutableListCopy(replayCommands)
 
         /** Returns a snapshot with the supplied lane replacements. */
-        fun copy(
+        public fun copy(
             rankingStats: List<TerminalCompletionRankingStats> = this.rankingStats,
             replayCommands: List<TerminalCommandReplay> = this.replayCommands,
         ): TerminalCompletionLearningSnapshot = TerminalCompletionLearningSnapshot(rankingStats, replayCommands)
 
         /** Returns [rankingStats] for destructuring. */
-        operator fun component1(): List<TerminalCompletionRankingStats> = rankingStats
+        public operator fun component1(): List<TerminalCompletionRankingStats> = rankingStats
 
         /** Returns [replayCommands] for destructuring. */
-        operator fun component2(): List<TerminalCommandReplay> = replayCommands
+        public operator fun component2(): List<TerminalCommandReplay> = replayCommands
 
         override fun equals(other: Any?): Boolean =
             this === other ||
@@ -57,10 +57,10 @@ class TerminalCompletionLearningSnapshot
 
         override fun toString(): String = "TerminalCompletionLearningSnapshot(rankingStats=$rankingStats, replayCommands=$replayCommands)"
 
-        companion object {
+        public companion object {
             /** Shared empty learning snapshot. */
             @JvmField
-            val EMPTY = TerminalCompletionLearningSnapshot()
+            public val EMPTY: TerminalCompletionLearningSnapshot = TerminalCompletionLearningSnapshot()
         }
     }
 

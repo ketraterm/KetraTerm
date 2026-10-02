@@ -14,6 +14,11 @@
  * limitations under the License.
  */
 
+import org.jetbrains.kotlin.gradle.dsl.JvmDefaultMode
+import org.jetbrains.kotlin.gradle.dsl.KotlinVersion
+import org.jetbrains.kotlin.gradle.dsl.abi.BinariesSource
+import org.jetbrains.kotlin.gradle.dsl.abi.ExperimentalAbiValidation
+
 plugins {
     kotlin("jvm") version "2.4.20" apply false
     id("com.diffplug.spotless") version "8.10.2"
@@ -23,23 +28,31 @@ plugins {
 
 extra["kotlinxCoroutinesVersion"] = "1.10.2"
 
+// Only deliberate host/runtime libraries are published and checked as supported APIs.
+val publishedLibraryNames = setOf(
+    "ketraterm-protocol",
+    "ketraterm-parser",
+    "ketraterm-core",
+    "ketraterm-host",
+    "ketraterm-input",
+    "ketraterm-completion",
+    "ketraterm-completion-host",
+    "ketraterm-completion-persistence",
+    "ketraterm-render-api",
+    "ketraterm-render-cache",
+    "ketraterm-transport-api",
+    "ketraterm-session",
+    "ketraterm-shell-integration",
+    "ketraterm-ui-swing",
+    "ketraterm-ui-swing-host",
+    "ketraterm-pty",
+    "ketraterm-workspace",
+)
+
 // Stage the real publication's runtime jar and generated metadata, without invoking
 // release signing or remote publishing. Consumer fixtures resolve only this repository.
 val consumerRepository = layout.buildDirectory.dir("library-consumer-repository")
 val prepareLibraryConsumerRepository = tasks.register("prepareLibraryConsumerRepository")
-val consumerModules = setOf(
-    "protocol",
-    "render-api",
-    "render-cache",
-    "core",
-    "parser",
-    "host",
-    "input",
-    "transport-api",
-    "session",
-    "ui-swing",
-    "completion",
-)
 
 repositories {
     mavenCentral()
@@ -90,8 +103,21 @@ subprojects {
     }
 
     plugins.withId("org.jetbrains.kotlin.jvm") {
-        if (name != "ketraterm-benchmarks" && name != "ketraterm-app" && name != "ketraterm-testkit") {
+        if (name in publishedLibraryNames) {
             plugins.apply("com.vanniktech.maven.publish")
+
+            extensions.configure<org.jetbrains.kotlin.gradle.dsl.KotlinJvmProjectExtension> {
+                explicitApi()
+                compilerOptions {
+                    languageVersion.set(KotlinVersion.KOTLIN_2_4)
+                    apiVersion.set(KotlinVersion.KOTLIN_2_4)
+                    jvmDefault.set(JvmDefaultMode.ENABLE)
+                }
+                @OptIn(ExperimentalAbiValidation::class)
+                abiValidation {
+                    binariesSource.set(BinariesSource.MAVEN_PUBLICATIONS)
+                }
+            }
 
             extensions.configure<com.vanniktech.maven.publish.MavenPublishBaseExtension> {
                 publishToMavenCentral(automaticRelease = true)
@@ -121,24 +147,22 @@ subprojects {
                 }
             }
 
-            if (name.removePrefix("ketraterm-") in consumerModules) {
-                extensions.configure<PublishingExtension> {
-                    publications.withType<MavenPublication>().configureEach {
-                        val publication = this
-                        val publicationName = name.replaceFirstChar(Char::uppercaseChar)
-                        val stage = tasks.register<Sync>("stage${publicationName}ConsumerPublication") {
-                            val pom = tasks.named<GenerateMavenPom>("generatePomFileFor${publicationName}Publication")
-                            val metadata = tasks.named<GenerateModuleMetadata>("generateMetadataFileFor${publicationName}Publication")
-                            dependsOn(pom, metadata)
-                            from(tasks.named("jar"))
-                            from(pom.map { it.destination }) { rename { "${publication.artifactId}-${publication.version}.pom" } }
-                            from(metadata.flatMap { it.outputFile }) { rename { "${publication.artifactId}-${publication.version}.module" } }
-                            into(consumerRepository.map {
-                                it.dir("${publication.groupId.replace('.', '/')}/${publication.artifactId}/${publication.version}")
-                            })
-                        }
-                        prepareLibraryConsumerRepository.configure { dependsOn(stage) }
+            extensions.configure<PublishingExtension> {
+                publications.withType<MavenPublication>().configureEach {
+                    val publication = this
+                    val publicationName = name.replaceFirstChar(Char::uppercaseChar)
+                    val stage = tasks.register<Sync>("stage${publicationName}ConsumerPublication") {
+                        val pom = tasks.named<GenerateMavenPom>("generatePomFileFor${publicationName}Publication")
+                        val metadata = tasks.named<GenerateModuleMetadata>("generateMetadataFileFor${publicationName}Publication")
+                        dependsOn(pom, metadata)
+                        from(tasks.named("jar"))
+                        from(pom.map { it.destination }) { rename { "${publication.artifactId}-${publication.version}.pom" } }
+                        from(metadata.flatMap { it.outputFile }) { rename { "${publication.artifactId}-${publication.version}.module" } }
+                        into(consumerRepository.map {
+                            it.dir("${publication.groupId.replace('.', '/')}/${publication.artifactId}/${publication.version}")
+                        })
                     }
+                    prepareLibraryConsumerRepository.configure { dependsOn(stage) }
                 }
             }
         }

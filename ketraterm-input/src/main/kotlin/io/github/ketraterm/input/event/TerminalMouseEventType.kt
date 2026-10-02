@@ -18,7 +18,7 @@ package io.github.ketraterm.input.event
 /**
  * Mouse event family accepted by the terminal input encoder.
  */
-enum class TerminalMouseEventType {
+public enum class TerminalMouseEventType {
     /** Concrete button press. */
     PRESS,
 

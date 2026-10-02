@@ -16,6 +16,7 @@
 package io.github.ketraterm.ui.swing.api
 
 import io.github.ketraterm.core.TerminalBuffers
+import io.github.ketraterm.core.api.TerminalBuffer
 import io.github.ketraterm.input.api.TerminalInputEncoder
 import io.github.ketraterm.input.event.TerminalFocusEvent
 import io.github.ketraterm.input.event.TerminalKeyEvent
@@ -366,7 +367,7 @@ class SwingTerminalThreadingTest {
     @ValueSource(strings = ["select", "bind", "unbind"])
     fun `currentSelection snapshots state after queued EDT changes`(change: String) {
         val session = testSession()
-        session.renderPublisher.updateAndPublish(session.terminal as TerminalRenderFrameReader)
+        session.renderPublisher.updateAndPublish(session)
         val component = SwingTerminal(settingsProvider = { SwingSettings(columns = 3, rows = 1, cursorBlinkMillis = 0) })
         val edtBlocked = CountDownLatch(1)
         val releaseEdt = CountDownLatch(1)
@@ -475,13 +476,14 @@ class SwingTerminalThreadingTest {
 
     @Test
     fun `publication from a previously bound session is ignored`() {
-        val first = testSession()
-        val second = testSession()
+        val terminal = TerminalBuffers.create(width = 3, height = 1, maxHistory = 5)
         repeat(3) {
-            first.terminal.writeCodepoint('x'.code)
-            first.terminal.carriageReturn()
-            first.terminal.newLine()
+            terminal.writeCodepoint('x'.code)
+            terminal.carriageReturn()
+            terminal.newLine()
         }
+        val first = testSession(terminal = terminal)
+        val second = testSession()
         val component = SwingTerminal()
         edtCall {
             component.size = component.preferredGridSize(3, 1)
@@ -649,7 +651,7 @@ class SwingTerminalThreadingTest {
         component.bind(session)
         drainEdt()
 
-        assertTrue(session.terminal.getModeSnapshot().treatAmbiguousAsWide)
+        assertTrue(session.modeSnapshot.treatAmbiguousAsWide)
         session.close()
     }
 
@@ -664,13 +666,13 @@ class SwingTerminalThreadingTest {
 
         component.bind(session)
         drainEdt()
-        assertFalse(session.terminal.getModeSnapshot().treatAmbiguousAsWide)
+        assertFalse(session.modeSnapshot.treatAmbiguousAsWide)
 
         ambiguousAsWide = true
         component.reloadSettings()
         drainEdt()
 
-        assertTrue(session.terminal.getModeSnapshot().treatAmbiguousAsWide)
+        assertTrue(session.modeSnapshot.treatAmbiguousAsWide)
         session.close()
     }
 
@@ -830,9 +832,11 @@ class SwingTerminalThreadingTest {
         component.focusListeners.forEach { it.focusLost(lost) }
     }
 
-    private fun testSession(connector: TerminalConnector = NoOpConnector): TerminalSession {
-        val terminal = TerminalBuffers.create(width = 3, height = 1, maxHistory = 5)
-        return TerminalSession(
+    private fun testSession(
+        connector: TerminalConnector = NoOpConnector,
+        terminal: TerminalBuffer = TerminalBuffers.create(width = 3, height = 1, maxHistory = 5),
+    ): TerminalSession =
+        TerminalSession(
             terminal = terminal,
             renderPublisher = TerminalRenderPublisher(3, 1),
             renderReader = terminal as TerminalRenderFrameReader,
@@ -842,7 +846,6 @@ class SwingTerminalThreadingTest {
             inputEncoder = NoOpInputEncoder,
             workerDispatcher = dispatcher,
         )
-    }
 
     private fun runOffEdt(action: () -> Unit) {
         assertFalse(SwingUtilities.isEventDispatchThread())

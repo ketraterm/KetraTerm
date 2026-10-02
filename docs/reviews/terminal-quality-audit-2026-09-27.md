@@ -346,6 +346,58 @@ concurrent-consumer bug. Restrict accidental surfaces or specify enforceable
 ownership/lifetime rules while a pre-v1 change is still possible. Preserve
 necessary custom connector/renderer freedom.
 
+**Follow-up review (2026-10-02):** The public pipeline and embedding surfaces were
+reviewed before generating publication-wide snapshots. The visibility re-review
+removed accidental public inspection and helper APIs before accepting the initial
+baseline. The remaining role contracts and host extension points have concrete
+host/module consumers. Configuration/value data classes keep their existing
+shapes, with constructor, `copy`, defaults and encoded numeric meanings covered
+by the [compatibility contract](../library-compatibility.md). Public inline render
+lease helpers remain `@PublishedApi` linkage and belong in the baseline.
+
+The review corrected Java clipboard selector/reply access, the exported Pty4j
+dependency, core coordinate/borrowed-data KDoc and session collaborator ownership.
+`renderPublisher` is already a read-only property; its mutable publication
+capability is session-owned. The low-level constructor remains a deliberate
+custom-pipeline seam with exclusive ownership and same-pipeline preconditions;
+the mutable core property and externally supplied admission lock were removed.
+Unverifiable wrapper identity checks were not added. Swing window-state updates
+and standalone mode reads now go through session serialization. Non-renderable
+buffers are rejected by session creation before transport ownership transfers.
+Factory/resize history and scratch-capacity overflow, omitted byte-slice lengths
+and invalid Swing rendering settings have explicit rejection/default contracts
+and focused regressions; these were corrected before recording the new baseline.
+
+The second pass hides unleased publisher reads and its front-index setter, opaque
+core attribute words, selection packing, same-module input/configuration/clock helpers
+and shell projection assertion probes. Unread shell diagnostic state and the
+unused search-bar component factory were deleted. Tests and JMH callers use
+existing leased frames, semantic attributes and retained input cores. All 17
+selected libraries have actual reusable host/runtime roles; publication now uses
+an explicit list rather than automatically publishing new Kotlin modules. The
+retained clients are not regenerated to accommodate these visibility changes.
+
+Strict explicit API mode, language/API version and JVM default-method mode are
+configured centrally for published modules. ABI checks inspect actual publication
+jars without the former Swing-only allowlist. The
+[consumer fixtures](../../ketraterm-testkit/src/consumerTest/README.md) retain real
+Kotlin/Java caller binaries independently of current compilation and verify
+upgrades with Gradle metadata and POM-only resolution; missing-class and
+missing-method controls verify linkage failure detection. These are a new
+development baseline, not evidence of compatibility with earlier 0.x releases.
+Current completion status and verification scope remain in the canonical maps.
+
+Validation passed on Windows/JDK 25: root tests, published consumers, all 17 ABI
+checks, Spotless, benchmark packaging and the xterm, resize/reflow and cursor-wrap
+smoke campaigns. The 22 compiled-client cases include both metadata modes,
+stdlib 2.4.0/2.4.20 and the linkage-failure controls. Current source fixtures also
+passed with compiler/runtime 2.4.0. The nested IntelliJ 2026.2 tests and formatting
+passed separately. Root JUnit results report 4,659 passed and 42 skipped; IntelliJ
+reports 241 passed. The skips include the existing accepted R06 streaming
+limitations and environment/opt-in cases. Native/GUI and supported-platform
+release proof remain G02 work; these checks do not establish G03 performance
+budgets.
+
 ### G02 — make release artifacts depend on verification of their revision
 
 [publish-binaries.yml](../../.github/workflows/publish-binaries.yml) publishes

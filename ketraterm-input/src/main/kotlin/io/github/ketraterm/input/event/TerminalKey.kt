@@ -21,7 +21,7 @@ package io.github.ketraterm.input.event
  * Printable text is represented as a Unicode scalar on [io.github.ketraterm.input.event.TerminalKeyEvent],
  * never as a `TerminalKey` enum value.
  */
-enum class TerminalKey {
+public enum class TerminalKey {
     /** Cursor-up key. */
     UP,
 

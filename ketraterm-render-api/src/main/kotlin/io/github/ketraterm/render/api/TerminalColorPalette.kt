@@ -35,16 +35,16 @@ package io.github.ketraterm.render.api
  * light or custom themes must supply their preference explicitly.
  * @param indexedColors 256-entry indexed palette in packed ARGB form.
  */
-class TerminalColorPalette(
-    val defaultForeground: Int = 0xFFFFFFFF.toInt(),
-    val defaultBackground: Int = 0xFF000000.toInt(),
-    val selectionForeground: Int = 0xFFFFFFFF.toInt(),
-    val selectionBackground: Int = 0xFF000000.toInt(),
-    val cursorForeground: Int = 0xFF000000.toInt(),
-    val cursorBackground: Int = 0xFFFFFFFF.toInt(),
+public class TerminalColorPalette(
+    public val defaultForeground: Int = 0xFFFFFFFF.toInt(),
+    public val defaultBackground: Int = 0xFF000000.toInt(),
+    public val selectionForeground: Int = 0xFFFFFFFF.toInt(),
+    public val selectionBackground: Int = 0xFF000000.toInt(),
+    public val cursorForeground: Int = 0xFF000000.toInt(),
+    public val cursorBackground: Int = 0xFFFFFFFF.toInt(),
     indexedColors: IntArray = defaultIndexedColors(),
-    val boldAsBright: Boolean = true,
-    val isDark: Boolean = true,
+    public val boldAsBright: Boolean = true,
+    public val isDark: Boolean = true,
 ) {
     private val indexedColorStorage: IntArray
 
@@ -61,7 +61,7 @@ class TerminalColorPalette(
      * @param attrWord public render attribute word.
      * @return packed ARGB foreground color.
      */
-    fun foreground(attrWord: Long): Int {
+    public fun foreground(attrWord: Long): Int {
         if (TerminalRenderAttrs.isInvisible(attrWord)) {
             return background(attrWord)
         }
@@ -88,7 +88,7 @@ class TerminalColorPalette(
      * @param attrWord public render attribute word.
      * @return packed ARGB background color.
      */
-    fun background(attrWord: Long): Int =
+    public fun background(attrWord: Long): Int =
         if (TerminalRenderAttrs.isInverse(attrWord)) {
             foregroundWithoutInverse(attrWord)
         } else {
@@ -101,7 +101,7 @@ class TerminalColorPalette(
      * @param index ANSI indexed color in `0..255`.
      * @return packed ARGB color.
      */
-    fun indexedColor(index: Int): Int {
+    public fun indexedColor(index: Int): Int {
         require(index in 0 until INDEXED_COLOR_COUNT) {
             "indexed color index out of range: $index"
         }
@@ -116,7 +116,7 @@ class TerminalColorPalette(
      * @param destination destination array receiving 256 packed ARGB colors.
      * @param offset first destination index to write.
      */
-    fun copyIndexedColorsInto(
+    public fun copyIndexedColorsInto(
         destination: IntArray,
         offset: Int = 0,
     ) {
@@ -131,7 +131,7 @@ class TerminalColorPalette(
      *
      * @return 256-entry indexed palette in packed ARGB form.
      */
-    fun toIndexedColorsArray(): IntArray = indexedColorStorage.copyOf()
+    public fun toIndexedColorsArray(): IntArray = indexedColorStorage.copyOf()
 
     /**
      * Creates a palette with selected properties replaced.
@@ -148,7 +148,7 @@ class TerminalColorPalette(
      * @param isDark host theme preference; retained when individual colors change.
      * @return immutable palette copy.
      */
-    fun copy(
+    public fun copy(
         defaultForeground: Int = this.defaultForeground,
         defaultBackground: Int = this.defaultBackground,
         selectionForeground: Int = this.selectionForeground,
@@ -255,7 +255,7 @@ class TerminalColorPalette(
             "isDark=$isDark" +
             ")"
 
-    companion object {
+    public companion object {
         private const val INDEXED_COLOR_COUNT = 256
 
         /**
@@ -265,7 +265,7 @@ class TerminalColorPalette(
          * ramp entries.
          */
         @JvmStatic
-        fun defaultIndexedColors(): IntArray {
+        public fun defaultIndexedColors(): IntArray {
             val colors = IntArray(INDEXED_COLOR_COUNT)
             val ansi16 =
                 intArrayOf(

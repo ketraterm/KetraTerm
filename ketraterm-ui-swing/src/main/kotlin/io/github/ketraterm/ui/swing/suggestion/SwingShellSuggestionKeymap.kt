@@ -26,7 +26,7 @@ private const val RELEVANT_MODIFIERS =
         InputEvent.ALT_GRAPH_DOWN_MASK
 
 /** Semantic action understood by the reusable shell-suggestion controller. */
-enum class SwingShellSuggestionAction {
+public enum class SwingShellSuggestionAction {
     /** Selects the next visible suggestion. */
     SELECT_NEXT,
 
@@ -62,19 +62,19 @@ enum class SwingShellSuggestionAction {
  * standalone application can use conventional Swing defaults while an IDE can
  * honor its active, user-configurable keymap.
  */
-fun interface SwingShellSuggestionKeymap {
+public fun interface SwingShellSuggestionKeymap {
     /**
      * Resolves one key press while the suggestion popup is visible.
      *
      * @param event Swing key-pressed event.
      * @return semantic action, or `null` when the key is not claimed.
      */
-    fun actionFor(event: KeyEvent): SwingShellSuggestionAction?
+    public fun actionFor(event: KeyEvent): SwingShellSuggestionAction?
 
-    companion object {
+    public companion object {
         /** Conventional terminal-popup bindings used by standalone Swing hosts. */
         @JvmField
-        val STANDARD: SwingShellSuggestionKeymap =
+        public val STANDARD: SwingShellSuggestionKeymap =
             SwingShellSuggestionKeymap { event ->
                 val modifiers = event.modifiersEx and RELEVANT_MODIFIERS
                 if (event.keyCode == KeyEvent.VK_TAB && modifiers == InputEvent.SHIFT_DOWN_MASK) {

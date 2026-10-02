@@ -18,7 +18,7 @@ package io.github.ketraterm.ui.swing.api
 import io.github.ketraterm.render.api.TerminalRenderUnderline
 
 /** A UTF-16 offset in a logical line anchored at its first absolute physical row. */
-data class SwingHyperlinkTextPosition(
+public data class SwingHyperlinkTextPosition(
     val absoluteRow: Long,
     val offset: Int,
 ) : Comparable<SwingHyperlinkTextPosition> {
@@ -31,7 +31,7 @@ data class SwingHyperlinkTextPosition(
 }
 
 /** Half-open logical-text range; an end offset may include the line's trailing newline. */
-data class SwingHyperlinkTextRange(
+public data class SwingHyperlinkTextRange(
     val start: SwingHyperlinkTextPosition,
     val end: SwingHyperlinkTextPosition,
 ) {
@@ -40,11 +40,11 @@ data class SwingHyperlinkTextRange(
     }
 
     /** Whether this range contains all text coordinates in [other]. */
-    fun contains(other: SwingHyperlinkTextRange): Boolean = start <= other.start && other.end <= end
+    public fun contains(other: SwingHyperlinkTextRange): Boolean = start <= other.start && other.end <= end
 }
 
 /** Resolved, host-neutral colors and decoration. Null fields inherit terminal presentation. */
-data class SwingHyperlinkStyle(
+public data class SwingHyperlinkStyle(
     val foregroundArgb: Int? = null,
     val backgroundArgb: Int? = null,
     val underlineArgb: Int? = null,
@@ -65,21 +65,21 @@ data class SwingHyperlinkStyle(
  * for activation; when absent it uses [hovered] with the same fallback.
  * A missing [followed] style inherits [normal].
  */
-data class SwingHyperlinkPresentation(
+public data class SwingHyperlinkPresentation(
     val normal: SwingHyperlinkStyle? = null,
     val hovered: SwingHyperlinkStyle? = null,
     val active: SwingHyperlinkStyle? = null,
     val followed: SwingHyperlinkStyle? = null,
     val isVisible: Boolean = false,
 ) {
-    companion object {
+    public companion object {
         /** Inherit existing detected-link presentation. */
-        @JvmField val DEFAULT = SwingHyperlinkPresentation()
+        @JvmField public val DEFAULT: SwingHyperlinkPresentation = SwingHyperlinkPresentation()
     }
 }
 
 /** Host activation policy, applied independently of visibility and link appearance. */
-enum class SwingHyperlinkActivation {
+public enum class SwingHyperlinkActivation {
     /** Ordinary primary-button activation. */
     DIRECT,
 
@@ -99,15 +99,15 @@ enum class SwingHyperlinkActivation {
  * Objects/styles/actions may allocate during discovery. Providers must not
  * mutate them after reporting; [action] runs on the EDT only on activation.
  */
-class SwingHyperlink(
-    val sourceRange: SwingHyperlinkTextRange,
-    val dependencyRange: SwingHyperlinkTextRange,
-    val action: SwingHyperlinkAction,
-    val uri: String? = null,
-    val presentation: SwingHyperlinkPresentation = SwingHyperlinkPresentation.DEFAULT,
-    val activation: SwingHyperlinkActivation = SwingHyperlinkActivation.MODIFIER,
-    val consumedThrough: SwingHyperlinkTextPosition = dependencyRange.end,
-    val providerOrder: Int = 0,
+public class SwingHyperlink(
+    public val sourceRange: SwingHyperlinkTextRange,
+    public val dependencyRange: SwingHyperlinkTextRange,
+    public val action: SwingHyperlinkAction,
+    public val uri: String? = null,
+    public val presentation: SwingHyperlinkPresentation = SwingHyperlinkPresentation.DEFAULT,
+    public val activation: SwingHyperlinkActivation = SwingHyperlinkActivation.MODIFIER,
+    public val consumedThrough: SwingHyperlinkTextPosition = dependencyRange.end,
+    public val providerOrder: Int = 0,
 ) {
     init {
         require(sourceRange.start < sourceRange.end)

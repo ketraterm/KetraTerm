@@ -31,7 +31,7 @@ package io.github.ketraterm.render.api
  * @property generation generation that changes when position, visibility,
  * blinking mode, or shape changes.
  */
-data class TerminalRenderCursor(
+public data class TerminalRenderCursor(
     val column: Int,
     val row: Int,
     val visible: Boolean,

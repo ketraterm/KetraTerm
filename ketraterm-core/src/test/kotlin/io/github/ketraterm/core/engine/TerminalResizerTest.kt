@@ -23,6 +23,7 @@ import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.params.ParameterizedTest
 import org.junit.jupiter.params.provider.CsvSource
+import org.junit.jupiter.params.provider.ValueSource
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -119,6 +120,36 @@ private data class ResizeRowSpec(
 
 @DisplayName("TerminalResizer Test Suite")
 class TerminalResizerTest {
+    @ParameterizedTest
+    @ValueSource(ints = [1, 80, 1000, 214_748_363, 214_748_364, 214_748_365, 1_073_741_823, Int.MAX_VALUE - 1, Int.MAX_VALUE])
+    fun `initial logical line capacity remains representable and holds a complete physical row`(width: Int) {
+        val capacity = TerminalResizer.initialLogicalLineCapacity(width)
+
+        assertTrue(capacity > 0, "width=$width, capacity=$capacity")
+        assertTrue(capacity >= width, "width=$width, capacity=$capacity")
+    }
+
+    @ParameterizedTest
+    @CsvSource(
+        "1, 2",
+        "17, 18",
+        "1073741823, 1073741824",
+        "1073741824, 1073741825",
+        "2147483646, 2147483647",
+        "2147483647, 2147483647",
+        "1, 2147483647",
+    )
+    fun `logical line growth terminates with a representable capacity covering all required cells`(
+        currentCapacity: Int,
+        requiredCapacity: Int,
+    ) {
+        val capacity = TerminalResizer.expandedLogicalLineCapacity(currentCapacity, requiredCapacity)
+
+        assertTrue(capacity > 0, "capacity=$capacity")
+        assertTrue(capacity >= currentCapacity, "current=$currentCapacity, capacity=$capacity")
+        assertTrue(capacity >= requiredCapacity, "required=$requiredCapacity, capacity=$capacity")
+    }
+
     // =========================================================================
     // Same-size resize
     // =========================================================================

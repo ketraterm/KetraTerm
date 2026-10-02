@@ -26,27 +26,27 @@ import java.util.*
  * Hosts can replace it to show prompts, route links through an
  * IDE, audit activations, or deny all links in locked-down environments.
  */
-fun interface TerminalHyperlinkHandler {
+public fun interface TerminalHyperlinkHandler {
     /**
      * Activates [uri] after explicit user intent.
      *
      * @param uri target URI supplied by terminal output metadata.
      * @return `true` when activation was handled.
      */
-    fun openHyperlink(uri: String): Boolean
+    public fun openHyperlink(uri: String): Boolean
 
-    companion object {
+    public companion object {
         /**
          * Conservative system-browser handler for common user-facing URI schemes.
          */
         @JvmField
-        val SYSTEM: TerminalHyperlinkHandler = SystemTerminalHyperlinkHandler
+        public val SYSTEM: TerminalHyperlinkHandler = SystemTerminalHyperlinkHandler
 
         /**
          * Handler that denies every activation request.
          */
         @JvmField
-        val NONE: TerminalHyperlinkHandler = TerminalHyperlinkHandler { false }
+        public val NONE: TerminalHyperlinkHandler = TerminalHyperlinkHandler { false }
     }
 }
 

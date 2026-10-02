@@ -24,7 +24,7 @@ import java.util.*
  * UI layers can use it for icons and menus without parsing live terminal titles
  * or process output.
  */
-enum class TerminalProfileKind {
+public enum class TerminalProfileKind {
     /** Windows PowerShell or cross-platform PowerShell Core. */
     POWERSHELL,
 
@@ -59,7 +59,7 @@ enum class TerminalProfileKind {
     DEFAULT,
     ;
 
-    companion object {
+    public companion object {
         /**
          * Classifies a profile from stable launch metadata.
          *
@@ -68,7 +68,7 @@ enum class TerminalProfileKind {
          * @param command command and arguments passed to the local PTY child process.
          * @return stable presentation category for the profile.
          */
-        fun classify(
+        public fun classify(
             id: String,
             displayName: String,
             command: List<String>,

@@ -252,13 +252,13 @@ registerCursorWrapModelProfile(
 )
 
 tasks.test {
-    useJUnitPlatform()
+    useJUnitPlatform { excludeTags("compiled-client-upgrade") }
 }
 
 // Compile consumer fixtures against each module's exported API variant, not testkit's classpath.
 val consumerClasspathsDirectory = layout.buildDirectory.dir("consumer-classpaths")
 val prepareConsumerClasspaths =
-    listOf("host", "parser", "completion", "ui-swing").map { module ->
+    listOf("host", "parser", "completion", "completion-host", "ui-swing", "pty").map { module ->
         val consumerClasspath =
             configurations.create("${module}ConsumerCompileClasspath") {
                 isCanBeConsumed = false
@@ -295,35 +295,100 @@ val preparePublishedConsumers =
         preserve { include("**/build/**", ".gradle/**") }
     }
 
+fun JavaExec.configureConsumerBuild(
+    metadata: String,
+    verificationTask: String,
+) {
+    dependsOn(preparePublishedConsumers, rootProject.tasks.named("prepareLibraryConsumerRepository"))
+    javaLauncher.set(javaToolchains.launcherFor { languageVersion.set(JavaLanguageVersion.of(25)) })
+    classpath = files(rootProject.file("gradle/wrapper/gradle-wrapper.jar"))
+    mainClass.set("org.gradle.wrapper.GradleWrapperMain")
+    jvmArgs("--enable-native-access=ALL-UNNAMED")
+    args(
+        "--project-dir",
+        consumerFixtureDirectory.get().asFile.absolutePath,
+        "--console=plain",
+        "--no-daemon",
+        "--max-workers=2",
+        "-PkotlinVersion=${org.jetbrains.kotlin.gradle.plugin.getKotlinPluginVersion(logger)}",
+        "-PlibraryVersion=${project.version}",
+        "-PlibraryRepository=${rootProject.layout.buildDirectory.dir("library-consumer-repository").get().asFile.toURI()}",
+        "-PmetadataMode=$metadata",
+        verificationTask,
+    )
+}
+
 val verifyPublishedConsumers =
     listOf("gradle", "pom").map { metadata ->
         tasks.register<JavaExec>("verify${metadata.replaceFirstChar(Char::uppercaseChar)}PublishedConsumers") {
             group = "verification"
             description = "Compiles and runs isolated Kotlin/Java consumers using $metadata publication metadata."
-            dependsOn(preparePublishedConsumers, rootProject.tasks.named("prepareLibraryConsumerRepository"))
-            javaLauncher.set(javaToolchains.launcherFor { languageVersion.set(JavaLanguageVersion.of(25)) })
-            classpath = files(rootProject.file("gradle/wrapper/gradle-wrapper.jar"))
-            mainClass.set("org.gradle.wrapper.GradleWrapperMain")
-            jvmArgs("--enable-native-access=ALL-UNNAMED")
-            args(
-                "--project-dir",
-                consumerFixtureDirectory.get().asFile.absolutePath,
-                "--console=plain",
-                "--no-daemon",
-                "--max-workers=2",
-                "-PkotlinVersion=${org.jetbrains.kotlin.gradle.plugin.getKotlinPluginVersion(logger)}",
-                "-PlibraryVersion=${project.version}",
-                "-PlibraryRepository=${rootProject.layout.buildDirectory.dir("library-consumer-repository").get().asFile.toURI()}",
-                "-PmetadataMode=$metadata",
-                "check",
-            )
+            configureConsumerBuild(metadata, "check")
         }
     }
 verifyPublishedConsumers[1].configure { mustRunAfter(verifyPublishedConsumers[0]) }
 
+val prepareCompiledClientRuntimes =
+    listOf("gradle", "pom").flatMap { metadata ->
+        listOf<String?>(null, "2.4.0").map { kotlinRuntime ->
+            val runtimeSuffix = if (kotlinRuntime == null) "" else "Kotlin${kotlinRuntime.replace(".", "")}"
+            tasks.register<JavaExec>("prepare${metadata.replaceFirstChar(Char::uppercaseChar)}${runtimeSuffix}CompiledClientRuntime") {
+                description = "Resolves $metadata runtime artifacts with Kotlin ${kotlinRuntime ?: "current"}, without compiling clients."
+                configureConsumerBuild(metadata, "prepareCompiledClientRuntime")
+                if (kotlinRuntime != null) args("-PruntimeKotlinVersion=$kotlinRuntime")
+            }
+        }
+    }
+prepareCompiledClientRuntimes.zipWithNext { previous, next -> next.configure { mustRunAfter(previous) } }
+
+val compiledClientUpgradeTest =
+    tasks.register<Test>("compiledClientUpgradeTest") {
+        group = "verification"
+        description = "Runs retained Kotlin/Java client binaries against current published libraries."
+        dependsOn(tasks.testClasses, prepareCompiledClientRuntimes)
+        testClassesDirs =
+            sourceSets.test
+                .get()
+                .output.classesDirs
+        classpath = sourceSets.test.get().runtimeClasspath
+        useJUnitPlatform { includeTags("compiled-client-upgrade") }
+        val baseline = layout.projectDirectory.dir("src/consumerTest/baseline")
+        val runtimes = consumerFixtureDirectory.map { it.dir("upgrade-classpaths") }
+        inputs.dir(baseline)
+        inputs.dir(runtimes)
+        inputs.dir(rootProject.layout.buildDirectory.dir("library-consumer-repository"))
+        systemProperty("ketraterm.compiledClientBaseline", baseline.asFile.absolutePath)
+        systemProperty("ketraterm.compiledClientRuntimes", runtimes.get().asFile.absolutePath)
+        systemProperty(
+            "ketraterm.currentKotlinRuntimeVersion",
+            org.jetbrains.kotlin.gradle.plugin
+                .getKotlinPluginVersion(logger),
+        )
+    }
+
+tasks.register<JavaExec>("recordCompiledClientBaseline") {
+    group = "verification"
+    description = "Intentionally recompiles and replaces the retained consumer baseline for review."
+    configureConsumerBuild("gradle", "recordCompiledClientBaseline")
+    val revision =
+        providers.gradleProperty("compiledClientBaselineRevision").orElse(
+            providers
+                .exec { commandLine("git", "rev-parse", "HEAD") }
+                .standardOutput.asText
+                .map(String::trim),
+        )
+    args("-PbaselineRevision=${revision.get()}")
+    doLast {
+        copy {
+            from(consumerFixtureDirectory.map { it.dir("baseline") })
+            into(layout.projectDirectory.dir("src/consumerTest/baseline"))
+        }
+    }
+}
+
 tasks.register("publishedConsumerTest") {
     group = "verification"
-    description = "Verifies published parser, host, completion and Swing libraries without project dependencies."
-    dependsOn(verifyPublishedConsumers)
+    description = "Verifies isolated published-library consumption and retained-client upgrades."
+    dependsOn(verifyPublishedConsumers, compiledClientUpgradeTest)
 }
 tasks.named("check") { dependsOn("publishedConsumerTest") }

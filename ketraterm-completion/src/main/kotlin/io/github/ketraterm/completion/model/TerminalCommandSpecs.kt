@@ -19,7 +19,7 @@ package io.github.ketraterm.completion.model
  * Curated static command specs useful as a bootstrap source before richer
  * imported corpora and host context providers are available.
  */
-object TerminalCommandSpecs {
+public object TerminalCommandSpecs {
     private val DEFAULT_CATALOG: List<TerminalCommandSpec> =
         freezeSpecs(
             listOf(
@@ -59,7 +59,7 @@ object TerminalCommandSpecs {
      * @return built-in command specifications.
      */
     @JvmStatic
-    fun defaults(): List<TerminalCommandSpec> = DEFAULT_CATALOG
+    public fun defaults(): List<TerminalCommandSpec> = DEFAULT_CATALOG
 
     private fun cd(): TerminalCommandSpec =
         TerminalCommandSpec(

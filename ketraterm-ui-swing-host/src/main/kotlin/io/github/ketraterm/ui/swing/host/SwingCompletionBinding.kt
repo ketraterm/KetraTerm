@@ -36,7 +36,7 @@ import javax.swing.SwingUtilities
  * observation and forwards requests only to the current resources. Configure,
  * attach, and close on the EDT. An empty binding starts no coroutine work.
  */
-class SwingCompletionBinding(
+public class SwingCompletionBinding(
     private val session: TerminalSession,
     private val rankingContextKey: () -> String? = { null },
 ) : AutoCloseable {
@@ -47,7 +47,7 @@ class SwingCompletionBinding(
     private var closed = false
 
     /** Stable provider installed in host services before the terminal is attached. */
-    val provider =
+    public val provider: SwingShellSuggestionProvider =
         SwingShellSuggestionProvider { request ->
             flow {
                 val current = resources ?: return@flow
@@ -56,7 +56,7 @@ class SwingCompletionBinding(
         }
 
     /** Stable callback; obsolete or disabled bindings cannot record feedback. */
-    val feedbackHandler =
+    public val feedbackHandler: SwingShellSuggestionFeedbackHandler =
         SwingShellSuggestionFeedbackHandler { feedback ->
             checkEdt()
             val current = resources
@@ -66,17 +66,17 @@ class SwingCompletionBinding(
         }
 
     /** Whether this pane currently has a host-provided completion implementation. */
-    val isEnabled: Boolean get() = resources != null
+    public val isEnabled: Boolean get() = resources != null
 
     /** Attaches once after the terminal has been bound to its session. */
-    fun attach(terminal: SwingTerminal) {
+    public fun attach(terminal: SwingTerminal) {
         checkEdt()
         check(!closed && this.terminal == null)
         this.terminal = terminal
     }
 
     /** Replaces resources; null disables all completion and releases observation. */
-    fun update(
+    public fun update(
         resources: SwingCompletionResources?,
         automaticPopup: Boolean,
     ) {

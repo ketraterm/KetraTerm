@@ -22,7 +22,7 @@ package io.github.ketraterm.transport
  * The terminal session that uses the connector owns parser/core synchronization
  * and host-bound byte ordering.
  */
-interface TerminalConnector : AutoCloseable {
+public interface TerminalConnector : AutoCloseable {
     /**
      * Returns the current foreground executable name, without arguments or a path.
      *
@@ -31,7 +31,7 @@ interface TerminalConnector : AutoCloseable {
      * threads. Queries must be bounded, tolerate concurrent close, and never launch commands.
      * Platform-specific detection limitations belong in the implementing connector's contract.
      */
-    fun foregroundProcessName(): String? = null
+    public fun foregroundProcessName(): String? = null
 
     /**
      * Starts delivering transport events to [listener].
@@ -40,7 +40,7 @@ interface TerminalConnector : AutoCloseable {
      *
      * @param listener callback sink for transport events.
      */
-    fun start(listener: TerminalConnectorListener)
+    public fun start(listener: TerminalConnectorListener)
 
     /**
      * Writes a contiguous byte range to the remote host input stream.
@@ -50,12 +50,12 @@ interface TerminalConnector : AutoCloseable {
      *
      * @param bytes byte array containing data to write.
      * @param offset starting index in the byte array.
-     * @param length number of bytes to write.
+     * @param length number of bytes to write; defaults to the remaining suffix.
      */
-    fun write(
+    public fun write(
         bytes: ByteArray,
         offset: Int = 0,
-        length: Int = bytes.size,
+        length: Int = bytes.size - offset,
     )
 
     /**
@@ -64,7 +64,7 @@ interface TerminalConnector : AutoCloseable {
      * @param columns new column width count.
      * @param rows new row height count.
      */
-    fun resize(
+    public fun resize(
         columns: Int,
         rows: Int,
     )

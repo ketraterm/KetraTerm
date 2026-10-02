@@ -1,0 +1,348 @@
+public abstract interface class io/github/ketraterm/session/TerminalClipboardReadResult {
+}
+
+public final class io/github/ketraterm/session/TerminalClipboardReadResult$Denied : io/github/ketraterm/session/TerminalClipboardReadResult {
+	public static final field INSTANCE Lio/github/ketraterm/session/TerminalClipboardReadResult$Denied;
+	public fun equals (Ljava/lang/Object;)Z
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class io/github/ketraterm/session/TerminalClipboardReadResult$Text : io/github/ketraterm/session/TerminalClipboardReadResult {
+	public fun <init> (Ljava/lang/String;)V
+	public final fun getText ()Ljava/lang/String;
+}
+
+public final class io/github/ketraterm/session/TerminalClipboardReadResult$Unavailable : io/github/ketraterm/session/TerminalClipboardReadResult {
+	public static final field INSTANCE Lio/github/ketraterm/session/TerminalClipboardReadResult$Unavailable;
+	public fun equals (Ljava/lang/Object;)Z
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public abstract interface class io/github/ketraterm/session/TerminalClipboardReader {
+	public abstract fun read (Lio/github/ketraterm/host/TerminalClipboardReadRequest;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+}
+
+public abstract interface class io/github/ketraterm/session/TerminalHyperlinkResolver {
+	public static final field Companion Lio/github/ketraterm/session/TerminalHyperlinkResolver$Companion;
+	public static final field NONE Lio/github/ketraterm/session/TerminalHyperlinkResolver;
+	public abstract fun uriForHyperlinkId (I)Ljava/lang/String;
+}
+
+public final class io/github/ketraterm/session/TerminalHyperlinkResolver$Companion {
+}
+
+public final class io/github/ketraterm/session/TerminalSession : io/github/ketraterm/core/api/TerminalInputState, io/github/ketraterm/input/api/TerminalInputEncoder, io/github/ketraterm/render/api/TerminalRenderFrameReader, io/github/ketraterm/transport/TerminalConnectorListener, java/lang/AutoCloseable {
+	public static final field Companion Lio/github/ketraterm/session/TerminalSession$Companion;
+	public fun <init> (Lio/github/ketraterm/core/api/TerminalBuffer;Lio/github/ketraterm/render/cache/TerminalRenderPublisher;Lio/github/ketraterm/render/api/TerminalRenderFrameReader;Lio/github/ketraterm/core/api/TerminalHostResponseReader;Lio/github/ketraterm/transport/TerminalConnector;Lio/github/ketraterm/parser/api/TerminalOutputParser;Lio/github/ketraterm/input/api/TerminalInputEncoder;Lio/github/ketraterm/session/TerminalHyperlinkResolver;Lio/github/ketraterm/host/HostCommandAdapter;Lio/github/ketraterm/input/policy/TerminalInputPolicy;Lkotlinx/coroutines/CoroutineDispatcher;Lkotlinx/coroutines/CoroutineDispatcher;Lio/github/ketraterm/session/TerminalShellIntegrationFactory;)V
+	public synthetic fun <init> (Lio/github/ketraterm/core/api/TerminalBuffer;Lio/github/ketraterm/render/cache/TerminalRenderPublisher;Lio/github/ketraterm/render/api/TerminalRenderFrameReader;Lio/github/ketraterm/core/api/TerminalHostResponseReader;Lio/github/ketraterm/transport/TerminalConnector;Lio/github/ketraterm/parser/api/TerminalOutputParser;Lio/github/ketraterm/input/api/TerminalInputEncoder;Lio/github/ketraterm/session/TerminalHyperlinkResolver;Lio/github/ketraterm/host/HostCommandAdapter;Lio/github/ketraterm/input/policy/TerminalInputPolicy;Lkotlinx/coroutines/CoroutineDispatcher;Lkotlinx/coroutines/CoroutineDispatcher;Lio/github/ketraterm/session/TerminalShellIntegrationFactory;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun activeShellCommandLine ()Lio/github/ketraterm/session/TerminalShellCommandLineSnapshot;
+	public fun close ()V
+	public static final fun create (Lio/github/ketraterm/core/api/TerminalBuffer;Lio/github/ketraterm/transport/TerminalConnector;)Lio/github/ketraterm/session/TerminalSession;
+	public static final fun create (Lio/github/ketraterm/core/api/TerminalBuffer;Lio/github/ketraterm/transport/TerminalConnector;Lio/github/ketraterm/host/HostEventSink;)Lio/github/ketraterm/session/TerminalSession;
+	public static final fun create (Lio/github/ketraterm/core/api/TerminalBuffer;Lio/github/ketraterm/transport/TerminalConnector;Lio/github/ketraterm/host/HostEventSink;Lio/github/ketraterm/host/HostPolicy;)Lio/github/ketraterm/session/TerminalSession;
+	public static final fun create (Lio/github/ketraterm/core/api/TerminalBuffer;Lio/github/ketraterm/transport/TerminalConnector;Lio/github/ketraterm/host/HostEventSink;Lio/github/ketraterm/host/HostPolicy;Lio/github/ketraterm/input/policy/TerminalInputPolicy;)Lio/github/ketraterm/session/TerminalSession;
+	public static final fun create (Lio/github/ketraterm/core/api/TerminalBuffer;Lio/github/ketraterm/transport/TerminalConnector;Lio/github/ketraterm/host/HostEventSink;Lio/github/ketraterm/host/HostPolicy;Lio/github/ketraterm/input/policy/TerminalInputPolicy;I)Lio/github/ketraterm/session/TerminalSession;
+	public static final fun create (Lio/github/ketraterm/core/api/TerminalBuffer;Lio/github/ketraterm/transport/TerminalConnector;Lio/github/ketraterm/host/HostEventSink;Lio/github/ketraterm/host/HostPolicy;Lio/github/ketraterm/input/policy/TerminalInputPolicy;ILkotlinx/coroutines/CoroutineDispatcher;)Lio/github/ketraterm/session/TerminalSession;
+	public static final fun create (Lio/github/ketraterm/core/api/TerminalBuffer;Lio/github/ketraterm/transport/TerminalConnector;Lio/github/ketraterm/host/HostEventSink;Lio/github/ketraterm/host/HostPolicy;Lio/github/ketraterm/input/policy/TerminalInputPolicy;ILkotlinx/coroutines/CoroutineDispatcher;Lio/github/ketraterm/session/TerminalStartupCommand;)Lio/github/ketraterm/session/TerminalSession;
+	public static final fun create (Lio/github/ketraterm/core/api/TerminalBuffer;Lio/github/ketraterm/transport/TerminalConnector;Lio/github/ketraterm/host/HostEventSink;Lio/github/ketraterm/host/HostPolicy;Lio/github/ketraterm/input/policy/TerminalInputPolicy;ILkotlinx/coroutines/CoroutineDispatcher;Lio/github/ketraterm/session/TerminalStartupCommand;Lkotlinx/coroutines/CoroutineDispatcher;)Lio/github/ketraterm/session/TerminalSession;
+	public static final fun create (Lio/github/ketraterm/core/api/TerminalBuffer;Lio/github/ketraterm/transport/TerminalConnector;Lio/github/ketraterm/host/HostEventSink;Lio/github/ketraterm/host/HostPolicy;Lio/github/ketraterm/input/policy/TerminalInputPolicy;ILkotlinx/coroutines/CoroutineDispatcher;Lio/github/ketraterm/session/TerminalStartupCommand;Lkotlinx/coroutines/CoroutineDispatcher;I)Lio/github/ketraterm/session/TerminalSession;
+	public static final fun create (Lio/github/ketraterm/core/api/TerminalBuffer;Lio/github/ketraterm/transport/TerminalConnector;Lio/github/ketraterm/host/HostEventSink;Lio/github/ketraterm/host/HostPolicy;Lio/github/ketraterm/input/policy/TerminalInputPolicy;ILkotlinx/coroutines/CoroutineDispatcher;Lio/github/ketraterm/session/TerminalStartupCommand;Lkotlinx/coroutines/CoroutineDispatcher;ILio/github/ketraterm/session/TerminalClipboardReader;)Lio/github/ketraterm/session/TerminalSession;
+	public static final fun create (Lio/github/ketraterm/core/api/TerminalBuffer;Lio/github/ketraterm/transport/TerminalConnector;Lio/github/ketraterm/host/HostEventSink;Lio/github/ketraterm/host/HostPolicy;Lio/github/ketraterm/input/policy/TerminalInputPolicy;ILkotlinx/coroutines/CoroutineDispatcher;Lio/github/ketraterm/session/TerminalStartupCommand;Lkotlinx/coroutines/CoroutineDispatcher;ILio/github/ketraterm/session/TerminalClipboardReader;Lkotlin/time/TimeSource;)Lio/github/ketraterm/session/TerminalSession;
+	public static final fun create (Lio/github/ketraterm/core/api/TerminalBuffer;Lio/github/ketraterm/transport/TerminalConnector;Lio/github/ketraterm/host/HostEventSink;Lio/github/ketraterm/host/HostPolicy;Lio/github/ketraterm/input/policy/TerminalInputPolicy;ILkotlinx/coroutines/CoroutineDispatcher;Lio/github/ketraterm/session/TerminalStartupCommand;Lkotlinx/coroutines/CoroutineDispatcher;ILio/github/ketraterm/session/TerminalClipboardReader;Lkotlin/time/TimeSource;Lio/github/ketraterm/session/TerminalShellIntegrationFactory;)Lio/github/ketraterm/session/TerminalSession;
+	public final fun currentWorkingDirectoryUri ()Ljava/lang/String;
+	public fun encodeFocus (Lio/github/ketraterm/input/event/TerminalFocusEvent;)V
+	public fun encodeKey (Lio/github/ketraterm/input/event/TerminalKeyEvent;)V
+	public fun encodeMouse (Lio/github/ketraterm/input/event/TerminalMouseEvent;)V
+	public fun encodePaste (Lio/github/ketraterm/input/event/TerminalPasteEvent;)V
+	public fun encodeTextReplacement (Lio/github/ketraterm/input/event/TerminalTextReplacementEvent;)V
+	public final fun getActiveShellCommandLineRevision ()Lkotlinx/coroutines/flow/StateFlow;
+	public final fun getExitCode ()Ljava/lang/Integer;
+	public final fun getFailure ()Ljava/lang/Throwable;
+	public final fun getForegroundProcessName ()Lkotlinx/coroutines/flow/StateFlow;
+	public fun getInputModeBits ()J
+	public final fun getModeSnapshot ()Lio/github/ketraterm/core/api/TerminalModeSnapshot;
+	public final fun getPalette ()Lio/github/ketraterm/render/api/TerminalColorPalette;
+	public final fun getRenderGeneration ()Lkotlinx/coroutines/flow/StateFlow;
+	public final fun getRenderPublisher ()Lio/github/ketraterm/render/cache/TerminalRenderPublisher;
+	public final fun getShellIntegrationState ()Lio/github/ketraterm/session/TerminalShellIntegrationState;
+	public final fun getStartupCommandStatus ()Lkotlinx/coroutines/flow/StateFlow;
+	public final fun getState ()Lkotlinx/coroutines/flow/StateFlow;
+	public final fun hyperlinkUri (I)Ljava/lang/String;
+	public final fun isClosed ()Z
+	public fun onBytes ([BII)V
+	public fun onClosed (Ljava/lang/Integer;)V
+	public fun onError (Ljava/lang/Throwable;)V
+	public fun readRenderFrame (IILio/github/ketraterm/render/api/TerminalRenderFrameConsumer;)V
+	public fun readRenderFrame (ILio/github/ketraterm/render/api/TerminalRenderFrameConsumer;)V
+	public fun readRenderFrame (Lio/github/ketraterm/render/api/TerminalRenderFrameConsumer;)V
+	public fun readRenderFrameForAbsoluteRange (JJLio/github/ketraterm/render/api/TerminalRenderFrameConsumer;)V
+	public final fun requestRender (I)V
+	public final fun requestRender (II)V
+	public final fun resize (III)Lkotlin/Pair;
+	public static synthetic fun resize$default (Lio/github/ketraterm/session/TerminalSession;IIIILjava/lang/Object;)Lkotlin/Pair;
+	public final fun resizeViewport (III)Lio/github/ketraterm/session/TerminalViewportResizeResult;
+	public static synthetic fun resizeViewport$default (Lio/github/ketraterm/session/TerminalSession;IIIILjava/lang/Object;)Lio/github/ketraterm/session/TerminalViewportResizeResult;
+	public final fun setCursorShape (Lio/github/ketraterm/render/api/TerminalRenderCursorShape;)V
+	public final fun setHostPolicy (Lio/github/ketraterm/host/HostPolicy;)V
+	public fun setInputPolicy (Lio/github/ketraterm/input/policy/TerminalInputPolicy;)V
+	public final fun setPasteControlPolicy (Lio/github/ketraterm/input/policy/PasteControlPolicy;)V
+	public final fun setThemePalette (Lio/github/ketraterm/render/api/TerminalColorPalette;)V
+	public final fun setTreatAmbiguousAsWide (Z)V
+	public final fun setWindowMinimized (Z)V
+	public final fun start (II)V
+}
+
+public final class io/github/ketraterm/session/TerminalSession$Companion {
+	public final fun create (Lio/github/ketraterm/core/api/TerminalBuffer;Lio/github/ketraterm/transport/TerminalConnector;)Lio/github/ketraterm/session/TerminalSession;
+	public final fun create (Lio/github/ketraterm/core/api/TerminalBuffer;Lio/github/ketraterm/transport/TerminalConnector;Lio/github/ketraterm/host/HostEventSink;)Lio/github/ketraterm/session/TerminalSession;
+	public final fun create (Lio/github/ketraterm/core/api/TerminalBuffer;Lio/github/ketraterm/transport/TerminalConnector;Lio/github/ketraterm/host/HostEventSink;Lio/github/ketraterm/host/HostPolicy;)Lio/github/ketraterm/session/TerminalSession;
+	public final fun create (Lio/github/ketraterm/core/api/TerminalBuffer;Lio/github/ketraterm/transport/TerminalConnector;Lio/github/ketraterm/host/HostEventSink;Lio/github/ketraterm/host/HostPolicy;Lio/github/ketraterm/input/policy/TerminalInputPolicy;)Lio/github/ketraterm/session/TerminalSession;
+	public final fun create (Lio/github/ketraterm/core/api/TerminalBuffer;Lio/github/ketraterm/transport/TerminalConnector;Lio/github/ketraterm/host/HostEventSink;Lio/github/ketraterm/host/HostPolicy;Lio/github/ketraterm/input/policy/TerminalInputPolicy;I)Lio/github/ketraterm/session/TerminalSession;
+	public final fun create (Lio/github/ketraterm/core/api/TerminalBuffer;Lio/github/ketraterm/transport/TerminalConnector;Lio/github/ketraterm/host/HostEventSink;Lio/github/ketraterm/host/HostPolicy;Lio/github/ketraterm/input/policy/TerminalInputPolicy;ILkotlinx/coroutines/CoroutineDispatcher;)Lio/github/ketraterm/session/TerminalSession;
+	public final fun create (Lio/github/ketraterm/core/api/TerminalBuffer;Lio/github/ketraterm/transport/TerminalConnector;Lio/github/ketraterm/host/HostEventSink;Lio/github/ketraterm/host/HostPolicy;Lio/github/ketraterm/input/policy/TerminalInputPolicy;ILkotlinx/coroutines/CoroutineDispatcher;Lio/github/ketraterm/session/TerminalStartupCommand;)Lio/github/ketraterm/session/TerminalSession;
+	public final fun create (Lio/github/ketraterm/core/api/TerminalBuffer;Lio/github/ketraterm/transport/TerminalConnector;Lio/github/ketraterm/host/HostEventSink;Lio/github/ketraterm/host/HostPolicy;Lio/github/ketraterm/input/policy/TerminalInputPolicy;ILkotlinx/coroutines/CoroutineDispatcher;Lio/github/ketraterm/session/TerminalStartupCommand;Lkotlinx/coroutines/CoroutineDispatcher;)Lio/github/ketraterm/session/TerminalSession;
+	public final fun create (Lio/github/ketraterm/core/api/TerminalBuffer;Lio/github/ketraterm/transport/TerminalConnector;Lio/github/ketraterm/host/HostEventSink;Lio/github/ketraterm/host/HostPolicy;Lio/github/ketraterm/input/policy/TerminalInputPolicy;ILkotlinx/coroutines/CoroutineDispatcher;Lio/github/ketraterm/session/TerminalStartupCommand;Lkotlinx/coroutines/CoroutineDispatcher;I)Lio/github/ketraterm/session/TerminalSession;
+	public final fun create (Lio/github/ketraterm/core/api/TerminalBuffer;Lio/github/ketraterm/transport/TerminalConnector;Lio/github/ketraterm/host/HostEventSink;Lio/github/ketraterm/host/HostPolicy;Lio/github/ketraterm/input/policy/TerminalInputPolicy;ILkotlinx/coroutines/CoroutineDispatcher;Lio/github/ketraterm/session/TerminalStartupCommand;Lkotlinx/coroutines/CoroutineDispatcher;ILio/github/ketraterm/session/TerminalClipboardReader;)Lio/github/ketraterm/session/TerminalSession;
+	public final fun create (Lio/github/ketraterm/core/api/TerminalBuffer;Lio/github/ketraterm/transport/TerminalConnector;Lio/github/ketraterm/host/HostEventSink;Lio/github/ketraterm/host/HostPolicy;Lio/github/ketraterm/input/policy/TerminalInputPolicy;ILkotlinx/coroutines/CoroutineDispatcher;Lio/github/ketraterm/session/TerminalStartupCommand;Lkotlinx/coroutines/CoroutineDispatcher;ILio/github/ketraterm/session/TerminalClipboardReader;Lkotlin/time/TimeSource;)Lio/github/ketraterm/session/TerminalSession;
+	public final fun create (Lio/github/ketraterm/core/api/TerminalBuffer;Lio/github/ketraterm/transport/TerminalConnector;Lio/github/ketraterm/host/HostEventSink;Lio/github/ketraterm/host/HostPolicy;Lio/github/ketraterm/input/policy/TerminalInputPolicy;ILkotlinx/coroutines/CoroutineDispatcher;Lio/github/ketraterm/session/TerminalStartupCommand;Lkotlinx/coroutines/CoroutineDispatcher;ILio/github/ketraterm/session/TerminalClipboardReader;Lkotlin/time/TimeSource;Lio/github/ketraterm/session/TerminalShellIntegrationFactory;)Lio/github/ketraterm/session/TerminalSession;
+	public static synthetic fun create$default (Lio/github/ketraterm/session/TerminalSession$Companion;Lio/github/ketraterm/core/api/TerminalBuffer;Lio/github/ketraterm/transport/TerminalConnector;Lio/github/ketraterm/host/HostEventSink;Lio/github/ketraterm/host/HostPolicy;Lio/github/ketraterm/input/policy/TerminalInputPolicy;ILkotlinx/coroutines/CoroutineDispatcher;Lio/github/ketraterm/session/TerminalStartupCommand;Lkotlinx/coroutines/CoroutineDispatcher;ILio/github/ketraterm/session/TerminalClipboardReader;Lkotlin/time/TimeSource;Lio/github/ketraterm/session/TerminalShellIntegrationFactory;ILjava/lang/Object;)Lio/github/ketraterm/session/TerminalSession;
+}
+
+public final class io/github/ketraterm/session/TerminalSessionCloseEvent {
+	public fun <init> (Ljava/lang/Integer;Ljava/lang/Throwable;Z)V
+	public final fun component1 ()Ljava/lang/Integer;
+	public final fun component2 ()Ljava/lang/Throwable;
+	public final fun component3 ()Z
+	public final fun copy (Ljava/lang/Integer;Ljava/lang/Throwable;Z)Lio/github/ketraterm/session/TerminalSessionCloseEvent;
+	public static synthetic fun copy$default (Lio/github/ketraterm/session/TerminalSessionCloseEvent;Ljava/lang/Integer;Ljava/lang/Throwable;ZILjava/lang/Object;)Lio/github/ketraterm/session/TerminalSessionCloseEvent;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getExitCode ()Ljava/lang/Integer;
+	public final fun getFailure ()Ljava/lang/Throwable;
+	public final fun getLocallyRequested ()Z
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public abstract interface class io/github/ketraterm/session/TerminalSessionState {
+}
+
+public final class io/github/ketraterm/session/TerminalSessionState$Closed : io/github/ketraterm/session/TerminalSessionState {
+	public fun <init> (Lio/github/ketraterm/session/TerminalSessionCloseEvent;)V
+	public final fun component1 ()Lio/github/ketraterm/session/TerminalSessionCloseEvent;
+	public final fun copy (Lio/github/ketraterm/session/TerminalSessionCloseEvent;)Lio/github/ketraterm/session/TerminalSessionState$Closed;
+	public static synthetic fun copy$default (Lio/github/ketraterm/session/TerminalSessionState$Closed;Lio/github/ketraterm/session/TerminalSessionCloseEvent;ILjava/lang/Object;)Lio/github/ketraterm/session/TerminalSessionState$Closed;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getEvent ()Lio/github/ketraterm/session/TerminalSessionCloseEvent;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class io/github/ketraterm/session/TerminalSessionState$Created : io/github/ketraterm/session/TerminalSessionState {
+	public static final field INSTANCE Lio/github/ketraterm/session/TerminalSessionState$Created;
+	public fun equals (Ljava/lang/Object;)Z
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class io/github/ketraterm/session/TerminalSessionState$Running : io/github/ketraterm/session/TerminalSessionState {
+	public static final field INSTANCE Lio/github/ketraterm/session/TerminalSessionState$Running;
+	public fun equals (Ljava/lang/Object;)Z
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class io/github/ketraterm/session/TerminalShellCommandLineSnapshot {
+	public fun <init> (Ljava/lang/String;III)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component2 ()I
+	public final fun component3 ()I
+	public final fun component4 ()I
+	public final fun copy (Ljava/lang/String;III)Lio/github/ketraterm/session/TerminalShellCommandLineSnapshot;
+	public static synthetic fun copy$default (Lio/github/ketraterm/session/TerminalShellCommandLineSnapshot;Ljava/lang/String;IIIILjava/lang/Object;)Lio/github/ketraterm/session/TerminalShellCommandLineSnapshot;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getCommandText ()Ljava/lang/String;
+	public final fun getCursorColumn ()I
+	public final fun getCursorOffset ()I
+	public final fun getCursorRow ()I
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public abstract interface class io/github/ketraterm/session/TerminalShellIntegration {
+	public abstract fun activeCommandLine ()Lio/github/ketraterm/session/TerminalShellCommandLineSnapshot;
+	public abstract fun getCommandLineChanges ()Lkotlinx/coroutines/flow/Flow;
+	public abstract fun getPromptReady ()Lkotlinx/coroutines/flow/StateFlow;
+	public abstract fun getState ()Lio/github/ketraterm/session/TerminalShellIntegrationState;
+	public fun observeShellMarker (Lio/github/ketraterm/protocol/ShellIntegrationEvent;)V
+	public fun observeWorkingDirectory (Ljava/lang/String;)V
+	public fun outputProcessed ()V
+}
+
+public final class io/github/ketraterm/session/TerminalShellIntegration$DefaultImpls {
+	public static fun observeShellMarker (Lio/github/ketraterm/session/TerminalShellIntegration;Lio/github/ketraterm/protocol/ShellIntegrationEvent;)V
+	public static fun observeWorkingDirectory (Lio/github/ketraterm/session/TerminalShellIntegration;Ljava/lang/String;)V
+	public static fun outputProcessed (Lio/github/ketraterm/session/TerminalShellIntegration;)V
+}
+
+public final class io/github/ketraterm/session/TerminalShellIntegrationCommandBlockRange {
+	public static final field END_LINE_ID_INDEX I
+	public static final field INSTANCE Lio/github/ketraterm/session/TerminalShellIntegrationCommandBlockRange;
+	public static final field REQUIRED_LONGS I
+	public static final field START_LINE_ID_INDEX I
+}
+
+public final class io/github/ketraterm/session/TerminalShellIntegrationCommandLifecycle {
+	public static final field ABANDONED I
+	public static final field FAILED I
+	public static final field FINISHED_UNKNOWN I
+	public static final field INSTANCE Lio/github/ketraterm/session/TerminalShellIntegrationCommandLifecycle;
+	public static final field NONE I
+	public static final field PROMPT_ONLY I
+	public static final field RUNNING I
+	public static final field SUCCEEDED I
+}
+
+public final class io/github/ketraterm/session/TerminalShellIntegrationCommandMetadata {
+	public fun <init> (IILjava/lang/String;Ljava/lang/String;Ljava/lang/Integer;JLjava/lang/Long;)V
+	public final fun component1 ()I
+	public final fun component2 ()I
+	public final fun component3 ()Ljava/lang/String;
+	public final fun component4 ()Ljava/lang/String;
+	public final fun component5 ()Ljava/lang/Integer;
+	public final fun component6 ()J
+	public final fun component7 ()Ljava/lang/Long;
+	public final fun copy (IILjava/lang/String;Ljava/lang/String;Ljava/lang/Integer;JLjava/lang/Long;)Lio/github/ketraterm/session/TerminalShellIntegrationCommandMetadata;
+	public static synthetic fun copy$default (Lio/github/ketraterm/session/TerminalShellIntegrationCommandMetadata;IILjava/lang/String;Ljava/lang/String;Ljava/lang/Integer;JLjava/lang/Long;ILjava/lang/Object;)Lio/github/ketraterm/session/TerminalShellIntegrationCommandMetadata;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getCommandText ()Ljava/lang/String;
+	public final fun getExitCode ()Ljava/lang/Integer;
+	public final fun getFinishedAtEpochMillis ()Ljava/lang/Long;
+	public final fun getLifecycle ()I
+	public final fun getRecordId ()I
+	public final fun getStartedAtEpochMillis ()J
+	public final fun getWorkingDirectoryUri ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class io/github/ketraterm/session/TerminalShellIntegrationCommandOutputRange {
+	public static final field END_LINE_ID_INDEX I
+	public static final field INSTANCE Lio/github/ketraterm/session/TerminalShellIntegrationCommandOutputRange;
+	public static final field REQUIRED_LONGS I
+	public static final field START_INCLUSIVE_INDEX I
+	public static final field START_LINE_ID_INDEX I
+}
+
+public final class io/github/ketraterm/session/TerminalShellIntegrationCommandRecord {
+	public static final field INSTANCE Lio/github/ketraterm/session/TerminalShellIntegrationCommandRecord;
+	public static final field NONE I
+	public static final field UNKNOWN_EXIT_CODE I
+}
+
+public final class io/github/ketraterm/session/TerminalShellIntegrationContext : io/github/ketraterm/render/api/TerminalRenderFrameReader {
+	public final fun getRenderGeneration ()Lkotlinx/coroutines/flow/StateFlow;
+	public final fun readPublishedFrame (Lkotlin/jvm/functions/Function1;)Ljava/lang/Object;
+	public fun readRenderFrame (IILio/github/ketraterm/render/api/TerminalRenderFrameConsumer;)V
+	public fun readRenderFrame (ILio/github/ketraterm/render/api/TerminalRenderFrameConsumer;)V
+	public fun readRenderFrame (Lio/github/ketraterm/render/api/TerminalRenderFrameConsumer;)V
+	public fun readRenderFrameForAbsoluteRange (JJLio/github/ketraterm/render/api/TerminalRenderFrameConsumer;)V
+	public final fun withTerminalState (Lkotlin/jvm/functions/Function0;)Ljava/lang/Object;
+}
+
+public abstract interface class io/github/ketraterm/session/TerminalShellIntegrationFactory {
+	public static final field Companion Lio/github/ketraterm/session/TerminalShellIntegrationFactory$Companion;
+	public abstract fun create (Lio/github/ketraterm/session/TerminalShellIntegrationContext;)Lio/github/ketraterm/session/TerminalShellIntegration;
+	public static fun host (Lio/github/ketraterm/session/TerminalShellIntegrationState;)Lio/github/ketraterm/session/TerminalShellIntegrationFactory;
+	public static fun host (Lio/github/ketraterm/session/TerminalShellIntegrationState;Lkotlinx/coroutines/flow/StateFlow;)Lio/github/ketraterm/session/TerminalShellIntegrationFactory;
+	public static fun host (Lio/github/ketraterm/session/TerminalShellIntegrationState;Lkotlinx/coroutines/flow/StateFlow;Lkotlinx/coroutines/flow/StateFlow;)Lio/github/ketraterm/session/TerminalShellIntegrationFactory;
+}
+
+public final class io/github/ketraterm/session/TerminalShellIntegrationFactory$Companion {
+	public final fun host (Lio/github/ketraterm/session/TerminalShellIntegrationState;)Lio/github/ketraterm/session/TerminalShellIntegrationFactory;
+	public final fun host (Lio/github/ketraterm/session/TerminalShellIntegrationState;Lkotlinx/coroutines/flow/StateFlow;)Lio/github/ketraterm/session/TerminalShellIntegrationFactory;
+	public final fun host (Lio/github/ketraterm/session/TerminalShellIntegrationState;Lkotlinx/coroutines/flow/StateFlow;Lkotlinx/coroutines/flow/StateFlow;)Lio/github/ketraterm/session/TerminalShellIntegrationFactory;
+	public static synthetic fun host$default (Lio/github/ketraterm/session/TerminalShellIntegrationFactory$Companion;Lio/github/ketraterm/session/TerminalShellIntegrationState;Lkotlinx/coroutines/flow/StateFlow;Lkotlinx/coroutines/flow/StateFlow;ILjava/lang/Object;)Lio/github/ketraterm/session/TerminalShellIntegrationFactory;
+}
+
+public final class io/github/ketraterm/session/TerminalShellIntegrationState {
+	public fun <init> ()V
+	public fun <init> (IILkotlin/jvm/functions/Function0;)V
+	public synthetic fun <init> (IILkotlin/jvm/functions/Function0;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun addCommandFinishedListener (Lkotlin/jvm/functions/Function1;)Ljava/lang/AutoCloseable;
+	public final fun addCurrentWorkingDirectoryListener (Lkotlin/jvm/functions/Function1;)Ljava/lang/AutoCloseable;
+	public final fun clear ()V
+	public final fun commandAnchorLineId (I)J
+	public final fun commandMetadata (I)Lio/github/ketraterm/session/TerminalShellIntegrationCommandMetadata;
+	public final fun commandRecordIdAtLine (J)I
+	public final fun commandText (I)Ljava/lang/String;
+	public final fun commandWorkingDirectoryUri (I)Ljava/lang/String;
+	public final fun copyCommandBlockRange (I[JI)Z
+	public static synthetic fun copyCommandBlockRange$default (Lio/github/ketraterm/session/TerminalShellIntegrationState;I[JIILjava/lang/Object;)Z
+	public final fun copyCommandOutputRange (I[JI)Z
+	public static synthetic fun copyCommandOutputRange$default (Lio/github/ketraterm/session/TerminalShellIntegrationState;I[JIILjava/lang/Object;)Z
+	public final fun copyRecords ([I[I[J[J[J[J[III)I
+	public final fun copyViewport ([JI[Z[Z[Z[I[I[ZI)V
+	public static synthetic fun copyViewport$default (Lio/github/ketraterm/session/TerminalShellIntegrationState;[JI[Z[Z[Z[I[I[ZIILjava/lang/Object;)V
+	public final fun currentWorkingDirectoryUri ()Ljava/lang/String;
+	public final fun getRevision ()Lkotlinx/coroutines/flow/StateFlow;
+	public final fun hasRunningCommand ()Z
+	public final fun latestCommandRecordId ()I
+	public final fun nextCommandRecordId (I)I
+	public final fun nextCommandRecordIdAfterLine (J)I
+	public final fun previousCommandRecordId (I)I
+	public final fun previousCommandRecordIdBeforeLine (J)I
+	public final fun reanchorActivePromptStart (J)V
+	public final fun recordCommandFinished (JLjava/lang/Integer;)V
+	public final fun recordCommandStart (JZLjava/lang/String;Ljava/lang/String;)V
+	public static synthetic fun recordCommandStart$default (Lio/github/ketraterm/session/TerminalShellIntegrationState;JZLjava/lang/String;Ljava/lang/String;ILjava/lang/Object;)V
+	public final fun recordCount ()I
+	public final fun recordCurrentWorkingDirectory (Ljava/lang/String;)V
+	public final fun recordPromptEnd (J)V
+	public final fun recordPromptStart (J)V
+}
+
+public final class io/github/ketraterm/session/TerminalStartupCommand {
+	public static final field Companion Lio/github/ketraterm/session/TerminalStartupCommand$Companion;
+	public static final field MAX_LENGTH I
+	public fun <init> (Ljava/lang/String;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun copy (Ljava/lang/String;)Lio/github/ketraterm/session/TerminalStartupCommand;
+	public static synthetic fun copy$default (Lio/github/ketraterm/session/TerminalStartupCommand;Ljava/lang/String;ILjava/lang/Object;)Lio/github/ketraterm/session/TerminalStartupCommand;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getText ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class io/github/ketraterm/session/TerminalStartupCommand$Companion {
+	public final fun fromText (Ljava/lang/String;)Lio/github/ketraterm/session/TerminalStartupCommand;
+}
+
+public final class io/github/ketraterm/session/TerminalStartupCommandStatus : java/lang/Enum {
+	public static final field CANCELLED_BY_INPUT Lio/github/ketraterm/session/TerminalStartupCommandStatus;
+	public static final field CLOSED Lio/github/ketraterm/session/TerminalStartupCommandStatus;
+	public static final field FAILED Lio/github/ketraterm/session/TerminalStartupCommandStatus;
+	public static final field SUBMITTED Lio/github/ketraterm/session/TerminalStartupCommandStatus;
+	public static final field WAITING Lio/github/ketraterm/session/TerminalStartupCommandStatus;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public static fun valueOf (Ljava/lang/String;)Lio/github/ketraterm/session/TerminalStartupCommandStatus;
+	public static fun values ()[Lio/github/ketraterm/session/TerminalStartupCommandStatus;
+}
+
+public final class io/github/ketraterm/session/TerminalViewportResizeResult {
+	public fun <init> (IIJ)V
+	public final fun component1 ()I
+	public final fun component2 ()I
+	public final fun component3 ()J
+	public final fun copy (IIJ)Lio/github/ketraterm/session/TerminalViewportResizeResult;
+	public static synthetic fun copy$default (Lio/github/ketraterm/session/TerminalViewportResizeResult;IIJILjava/lang/Object;)Lio/github/ketraterm/session/TerminalViewportResizeResult;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getDiscardedCount ()J
+	public final fun getHistorySize ()I
+	public final fun getScrollbackOffset ()I
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+

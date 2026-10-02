@@ -42,6 +42,11 @@ import kotlin.collections.ArrayDeque
  * cursor physics, and width policy. This adapter is the narrow place where ANSI/DEC
  * mode ids become concrete core API calls.
  *
+ * Serialize command calls and mutable metadata reads with the supplied terminal. Host
+ * callbacks run synchronously on that caller's thread and their failures propagate.
+ * Policy replacement and [currentPolicy] are safe across threads; metadata registries and
+ * the remaining command surface are not independently thread-safe.
+ *
  * @param terminal public core buffer API mutated by parser semantic commands.
  * @param hostEvents optional sink for accepted host metadata and requests.
  * @param hostPolicy safety limits for host-owned metadata.
@@ -51,7 +56,7 @@ import kotlin.collections.ArrayDeque
  * active input host can provide truthfully. The value must be a subset of the
  * input encoder's implemented protocol mask.
  */
-class HostCommandAdapter(
+public class HostCommandAdapter(
     private val terminal: TerminalBuffer,
     private val hostEvents: HostEventSink = HostEventSink.NONE,
     @Volatile private var hostPolicy: HostPolicy = HostPolicy(),
@@ -80,12 +85,12 @@ class HostCommandAdapter(
      *
      * @param policy new security policy.
      */
-    fun setHostPolicy(policy: HostPolicy) {
+    public fun setHostPolicy(policy: HostPolicy) {
         this.hostPolicy = policy
     }
 
     /** Immutable active policy snapshot for asynchronous host-operation revalidation. */
-    val currentPolicy: HostPolicy
+    public val currentPolicy: HostPolicy
         get() = hostPolicy
 
     @Volatile
@@ -94,25 +99,25 @@ class HostCommandAdapter(
     /**
      * The current window title reported by the shell or application.
      */
-    var windowTitle: String = ""
+    public var windowTitle: String = ""
         private set
 
     /**
      * The current icon title reported by the shell or application.
      */
-    var iconTitle: String = ""
+    public var iconTitle: String = ""
         private set
 
     /**
      * The URI of the currently active hyperlink (OSC 8), or `null` if none.
      */
-    var activeHyperlinkUri: String? = null
+    public var activeHyperlinkUri: String? = null
         private set
 
     /**
      * The client-provided ID of the currently active hyperlink (OSC 8), or `null` if none.
      */
-    var activeHyperlinkId: String? = null
+    public var activeHyperlinkId: String? = null
         private set
 
     private val windowTitleStack = ArrayDeque<String>()
@@ -565,9 +570,9 @@ class HostCommandAdapter(
         }
     }
 
-    override fun resetKeyModifierOption(resource: Int) = terminal.resetKeyModifierOption(resource)
+    override fun resetKeyModifierOption(resource: Int): Unit = terminal.resetKeyModifierOption(resource)
 
-    override fun resetKeyModifierOptions() = terminal.resetKeyModifierOptions()
+    override fun resetKeyModifierOptions(): Unit = terminal.resetKeyModifierOptions()
 
     override fun disableKeyModifierOption(resource: Int) {
         if (XtermKeyResource.isSupported(resource)) terminal.setKeyModifierOption(resource, -1)
@@ -588,9 +593,9 @@ class HostCommandAdapter(
         if (XtermKeyResource.isValidFormatValue(resource, value)) terminal.setKeyFormatOption(resource, value)
     }
 
-    override fun resetKeyFormatOption(resource: Int) = terminal.resetKeyFormatOption(resource)
+    override fun resetKeyFormatOption(resource: Int): Unit = terminal.resetKeyFormatOption(resource)
 
-    override fun resetKeyFormatOptions() = terminal.resetKeyFormatOptions()
+    override fun resetKeyFormatOptions(): Unit = terminal.resetKeyFormatOptions()
 
     override fun applyKittyKeyboardFlags(
         flags: Int,
@@ -622,7 +627,7 @@ class HostCommandAdapter(
      * The host serializes publication with its input-policy update. Mode queries
      * read the last published default without waiting for outbound writes.
      */
-    fun setDefaultBackarrowSendsBackspace(value: Boolean) {
+    public fun setDefaultBackarrowSendsBackspace(value: Boolean) {
         defaultBackarrowSendsBackspace = value
     }
 
@@ -875,7 +880,7 @@ class HostCommandAdapter(
      * return zero, retaining the parser's ordinary envelope bound and small-request auditing.
      * This does not authorize execution: [requestClipboard] rechecks the current policy.
      */
-    fun clipboardWriteLimitBytes(): Int {
+    public fun clipboardWriteLimitBytes(): Int {
         val policy = hostPolicy.clipboardPolicy
         return when (clipboardDecisionForWrite(policy)) {
             TerminalClipboardDecision.ALLOWED_BY_POLICY, TerminalClipboardDecision.PROMPT_REQUIRED -> policy.maxDecodedBytes
@@ -986,7 +991,7 @@ class HostCommandAdapter(
      * Unlike application OSC controls, this operation is not gated by host policy.
      * The caller must serialize it with parser/core mutations.
      */
-    fun setThemePalette(palette: TerminalColorPalette) {
+    public fun setThemePalette(palette: TerminalColorPalette) {
         val previous = terminal.palette
         terminal.setThemePalette(palette)
         publishPaletteChange(previous)
@@ -1041,14 +1046,14 @@ class HostCommandAdapter(
      * @param hyperlinkId render-cell hyperlink id.
      * @return target URI, or `null`.
      */
-    fun hyperlinkUri(hyperlinkId: Int): String? = hyperlinkKeysByNumericId[hyperlinkId]?.uri
+    public fun hyperlinkUri(hyperlinkId: Int): String? = hyperlinkKeysByNumericId[hyperlinkId]?.uri
 
     /**
      * Returns the latest valid OSC 7 current-working-directory URI.
      *
      * @return accepted absolute `file://` URI, or `null` before one is received.
      */
-    fun currentWorkingDirectoryUri(): String? = currentWorkingDirectory
+    public fun currentWorkingDirectoryUri(): String? = currentWorkingDirectory
 
     private fun setMouseTrackingMode(
         enabled: Boolean,

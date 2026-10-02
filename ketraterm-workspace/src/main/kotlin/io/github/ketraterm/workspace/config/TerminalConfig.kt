@@ -86,7 +86,7 @@ private fun defaultFontFamily(): String {
  * @property clipboardMaxDecodedBytes maximum decoded clipboard payload size.
  * @property titlePermission window/tab renaming permission for all output in a session.
  */
-data class TerminalConfig(
+public data class TerminalConfig(
     val theme: String = DEFAULT_THEME,
     val treatAmbiguousAsWide: Boolean = DEFAULT_TREAT_AMBIGUOUS_AS_WIDE,
     val fontFamily: String = DEFAULT_FONT_FAMILY,
@@ -158,62 +158,62 @@ data class TerminalConfig(
      * If you need to change a limit or default, change it here and it will be reflected
      * everywhere automatically.
      */
-    companion object {
-        const val DEFAULT_SHOW_FOREGROUND_PROCESS_NAME: Boolean = true
+    public companion object {
+        public const val DEFAULT_SHOW_FOREGROUND_PROCESS_NAME: Boolean = true
 
         // Defaults
-        const val DEFAULT_THEME: String = "one-dark"
-        const val DEFAULT_TREAT_AMBIGUOUS_AS_WIDE: Boolean = false
-        const val DEFAULT_FONT_SIZE: Int = 16
-        const val DEFAULT_COLUMNS: Int = 100
-        const val DEFAULT_ROWS: Int = 30
-        const val DEFAULT_CURSOR_BLINK_MILLIS: Int = 600
-        const val DEFAULT_USE_SYSTEM_FALLBACK_FONTS: Boolean = true
-        const val DEFAULT_CURSOR_SHAPE: String = "block"
-        const val DEFAULT_AUDIBLE_BELL: Boolean = true
-        const val DEFAULT_VISUAL_BELL: Boolean = true
-        const val DEFAULT_PASTE_ON_MIDDLE_CLICK: Boolean = true
-        val DEFAULT_PASTE_CONTROL_POLICY: PasteControlPolicy = PasteControlPolicy.PRESERVE
-        const val DEFAULT_SCROLLBACK_LINES: Int = 1000
-        const val DEFAULT_LINE_HEIGHT: Float = 1.0f
-        const val DEFAULT_SHELL_REQUEST_RESIZE_WINDOW: Boolean = false
-        const val DEFAULT_SHELL_REQUEST_WINDOW_MANIPULATION: Boolean = false
-        const val DEFAULT_DESKTOP_NOTIFICATIONS_ENABLED: Boolean = true
-        const val DEFAULT_SMART_SUGGESTIONS_ENABLED: Boolean = false
-        const val DEFAULT_SHELL_SUGGESTIONS_ENABLED: Boolean = true
-        const val DEFAULT_ACCEPT_SELECTED_SUGGESTION_WITH_ENTER: Boolean = true
-        const val DEFAULT_PERSISTENT_SUGGESTION_LEARNING_ENABLED: Boolean = false
-        const val DEFAULT_SCROLL_ON_OUTPUT: Boolean = true
+        public const val DEFAULT_THEME: String = "one-dark"
+        public const val DEFAULT_TREAT_AMBIGUOUS_AS_WIDE: Boolean = false
+        public const val DEFAULT_FONT_SIZE: Int = 16
+        public const val DEFAULT_COLUMNS: Int = 100
+        public const val DEFAULT_ROWS: Int = 30
+        public const val DEFAULT_CURSOR_BLINK_MILLIS: Int = 600
+        public const val DEFAULT_USE_SYSTEM_FALLBACK_FONTS: Boolean = true
+        public const val DEFAULT_CURSOR_SHAPE: String = "block"
+        public const val DEFAULT_AUDIBLE_BELL: Boolean = true
+        public const val DEFAULT_VISUAL_BELL: Boolean = true
+        public const val DEFAULT_PASTE_ON_MIDDLE_CLICK: Boolean = true
+        public val DEFAULT_PASTE_CONTROL_POLICY: PasteControlPolicy = PasteControlPolicy.PRESERVE
+        public const val DEFAULT_SCROLLBACK_LINES: Int = 1000
+        public const val DEFAULT_LINE_HEIGHT: Float = 1.0f
+        public const val DEFAULT_SHELL_REQUEST_RESIZE_WINDOW: Boolean = false
+        public const val DEFAULT_SHELL_REQUEST_WINDOW_MANIPULATION: Boolean = false
+        public const val DEFAULT_DESKTOP_NOTIFICATIONS_ENABLED: Boolean = true
+        public const val DEFAULT_SMART_SUGGESTIONS_ENABLED: Boolean = false
+        public const val DEFAULT_SHELL_SUGGESTIONS_ENABLED: Boolean = true
+        public const val DEFAULT_ACCEPT_SELECTED_SUGGESTION_WITH_ENTER: Boolean = true
+        public const val DEFAULT_PERSISTENT_SUGGESTION_LEARNING_ENABLED: Boolean = false
+        public const val DEFAULT_SCROLL_ON_OUTPUT: Boolean = true
 
-        val DEFAULT_CLIPBOARD_WRITE: TerminalClipboardPermission = TerminalClipboardPermission.ALLOW
+        public val DEFAULT_CLIPBOARD_WRITE: TerminalClipboardPermission = TerminalClipboardPermission.ALLOW
 
         /** Product default for new settings and explicit resets; persisted omissions remain denied. */
-        val DEFAULT_CLIPBOARD_READ: TerminalClipboardPermission = TerminalClipboardPermission.PROMPT
-        const val DEFAULT_CLIPBOARD_MAX_DECODED_BYTES: Int = TerminalClipboardPolicy.DEFAULT_MAX_DECODED_BYTES
-        val DEFAULT_TITLE_PERMISSION: TerminalTitlePermission = TerminalTitlePermission.ALLOW
+        public val DEFAULT_CLIPBOARD_READ: TerminalClipboardPermission = TerminalClipboardPermission.PROMPT
+        public const val DEFAULT_CLIPBOARD_MAX_DECODED_BYTES: Int = TerminalClipboardPolicy.DEFAULT_MAX_DECODED_BYTES
+        public val DEFAULT_TITLE_PERMISSION: TerminalTitlePermission = TerminalTitlePermission.ALLOW
 
-        val DEFAULT_FONT_FAMILY: String get() = defaultFontFamily()
-        val DEFAULT_SHELL_PATH: String get() = defaultShellPath()
-        val DEFAULT_START_DIRECTORY: String get() = System.getProperty("user.home") ?: ""
+        public val DEFAULT_FONT_FAMILY: String get() = defaultFontFamily()
+        public val DEFAULT_SHELL_PATH: String get() = defaultShellPath()
+        public val DEFAULT_START_DIRECTORY: String get() = System.getProperty("user.home") ?: ""
 
         // Limits
-        const val COLUMNS_MIN: Int = 10
-        const val COLUMNS_MAX: Int = 1000
+        public const val COLUMNS_MIN: Int = 10
+        public const val COLUMNS_MAX: Int = 1000
 
-        const val ROWS_MIN: Int = 10
-        const val ROWS_MAX: Int = 500
+        public const val ROWS_MIN: Int = 10
+        public const val ROWS_MAX: Int = 500
 
-        const val FONT_SIZE_MIN: Int = 10
-        const val FONT_SIZE_MAX: Int = 56
+        public const val FONT_SIZE_MIN: Int = 10
+        public const val FONT_SIZE_MAX: Int = 56
 
         /** Zero disables blinking. */
-        const val CURSOR_BLINK_MIN: Int = 0
-        const val CURSOR_BLINK_MAX: Int = 10_000
+        public const val CURSOR_BLINK_MIN: Int = 0
+        public const val CURSOR_BLINK_MAX: Int = 10_000
 
-        const val SCROLLBACK_MIN: Int = 0
-        const val SCROLLBACK_MAX: Int = 1_000_000
+        public const val SCROLLBACK_MIN: Int = 0
+        public const val SCROLLBACK_MAX: Int = 1_000_000
 
-        const val LINE_HEIGHT_MIN: Float = 0.7f
-        const val LINE_HEIGHT_MAX: Float = 1.5f
+        public const val LINE_HEIGHT_MIN: Float = 0.7f
+        public const val LINE_HEIGHT_MAX: Float = 1.5f
     }
 }

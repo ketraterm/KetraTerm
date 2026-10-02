@@ -24,6 +24,54 @@ import org.junit.jupiter.params.provider.CsvSource
 import org.junit.jupiter.params.provider.ValueSource
 
 class DefaultTerminalBufferResizeTest {
+    @ParameterizedTest
+    @ValueSource(booleans = [false, true])
+    fun `overflowing retained line capacity is rejected without changing either screen`(alternate: Boolean) {
+        val buffer = DefaultTerminalBuffer(initialWidth = 6, initialHeight = 3, maxHistory = 2)
+        writeRows(buffer, "first", "middle", "last", "tail")
+        val primaryText = buffer.getAllAsString()
+        if (alternate) buffer.enterAltBuffer()
+        buffer.positionCursor(col = 0, row = 0)
+        buffer.writeCluster("\u4e2d".codePoints().toArray())
+        buffer.writeCluster("e\u0301".codePoints().toArray())
+        buffer.writeCluster("\ud83d\udc69\u200d\ud83d\udcbb".codePoints().toArray())
+        buffer.setScrollRegion(top = 2, bottom = 3)
+        buffer.setLeftRightMarginMode(true)
+        buffer.setLeftRightMargins(left = 2, right = 5)
+        buffer.setOriginMode(true)
+        val activeText = buffer.getAllAsString()
+        val modes = buffer.getModeBitsSnapshot()
+        val cursor = buffer.cursorCol to buffer.cursorRow
+        val attributes = buffer.getAttrAt(0, 0)
+        var generations = Triple(0L, 0L, 0L)
+        buffer.readRenderFrame { frame ->
+            generations = Triple(frame.frameGeneration, frame.contentGeneration, frame.structureGeneration)
+        }
+
+        val failure =
+            assertThrows(IllegalArgumentException::class.java) {
+                buffer.resize(newWidth = 7, newHeight = Int.MAX_VALUE, oldScrollbackOffset = 1)
+            }
+
+        assertTrue(failure.message.orEmpty().contains("maxHistory + newHeight exceeds Int.MAX_VALUE"))
+        assertAll(
+            { assertEquals(6, buffer.width) },
+            { assertEquals(3, buffer.height) },
+            { assertEquals(alternate, buffer.isAlternateScreenActive) },
+            { assertEquals(activeText, buffer.getAllAsString()) },
+            { assertEquals(modes, buffer.getModeBitsSnapshot()) },
+            { assertEquals(cursor, buffer.cursorCol to buffer.cursorRow) },
+            { assertEquals(attributes, buffer.getAttrAt(0, 0)) },
+        )
+        buffer.readRenderFrame { frame ->
+            assertEquals(generations, Triple(frame.frameGeneration, frame.contentGeneration, frame.structureGeneration))
+        }
+        if (alternate) {
+            buffer.exitAltBuffer()
+            assertEquals(primaryText, buffer.getAllAsString())
+        }
+    }
+
     @Test
     fun `narrowing keeps a retained scrollback anchor after earlier rows are evicted`() {
         val buffer = DefaultTerminalBuffer(initialWidth = 8, initialHeight = 3, maxHistory = 2)

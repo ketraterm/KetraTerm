@@ -30,23 +30,28 @@ import kotlin.concurrent.withLock
  * Writer and UI never touch the same buffer simultaneously when UI consumers
  * access the front buffer through [readCurrent].
  *
+ * The public inline reader avoids a callback allocation. Its [PublishedApi] lease
+ * helpers are binary compatibility commitments because compiled Kotlin callers link
+ * to them directly; they are not host extension points.
+ *
  * @param columns initial cache width in cells.
  * @param rows initial cache height in rows.
  */
-class TerminalRenderPublisher(
+public class TerminalRenderPublisher(
     columns: Int,
     rows: Int,
 ) {
-    @PublishedApi internal val buffers = Array(3) { TerminalRenderCache(columns, rows) }
+    @PublishedApi internal val buffers: Array<TerminalRenderCache> = Array(3) { TerminalRenderCache(columns, rows) }
 
-    @PublishedApi internal val readerCounts = IntArray(BUFFER_COUNT)
+    @PublishedApi internal val readerCounts: IntArray = IntArray(BUFFER_COUNT)
     private val writerOwned = BooleanArray(BUFFER_COUNT)
 
     // Buffer indices, reader counts, and writer leases are mutated under publishLock.
-    @PublishedApi internal var frontIndex = NO_FRONT
+    @PublishedApi internal var frontIndex: Int = NO_FRONT
+        private set
     private var nextWriteIndex = 0
 
-    @PublishedApi internal val publishLock = ReentrantLock()
+    @PublishedApi internal val publishLock: ReentrantLock = ReentrantLock()
     private val bufferAvailable = publishLock.newCondition()
 
     // AtomicReference for lock-free front reads.
@@ -58,7 +63,7 @@ class TerminalRenderPublisher(
      *
      * @param reader source of the short-lived render frame.
      */
-    fun updateAndPublish(reader: TerminalRenderFrameReader) {
+    public fun updateAndPublish(reader: TerminalRenderFrameReader) {
         updateAndPublish(reader, scrollbackOffset = 0)
     }
 
@@ -71,7 +76,7 @@ class TerminalRenderPublisher(
      * @param reader source of the short-lived render frame.
      * @param scrollbackOffset requested lines above the live bottom viewport.
      */
-    fun updateAndPublish(
+    public fun updateAndPublish(
         reader: TerminalRenderFrameReader,
         scrollbackOffset: Int,
     ) {
@@ -89,7 +94,7 @@ class TerminalRenderPublisher(
      * @param scrollbackOffset requested lines above the live bottom viewport.
      * @param viewportRows requested render rows, or zero for the reader default.
      */
-    fun updateAndPublish(
+    public fun updateAndPublish(
         reader: TerminalRenderFrameReader,
         scrollbackOffset: Int,
         viewportRows: Int,
@@ -121,13 +126,12 @@ class TerminalRenderPublisher(
     /**
      * Returns the latest published snapshot without acquiring a reader lease.
      *
-     * This is intended for short polling and tests that do not retain the
-     * returned cache or require multi-field snapshot stability. Paint and
-     * repaint-planning code should use [readCurrent].
+     * Only tests in this module use this while publication is quiescent. External
+     * consumers must inspect or copy cache state through [readCurrent].
      *
      * @return the latest published [TerminalRenderCache] snapshot, or null if no frame has been published yet.
      */
-    fun current(): TerminalRenderCache? = frontRef.get()
+    internal fun current(): TerminalRenderCache? = frontRef.get()
 
     /**
      * Reads the latest published front buffer while preventing it from being
@@ -140,7 +144,7 @@ class TerminalRenderPublisher(
      * @param block reader invoked with the current front buffer.
      * @return [block]'s result, or `null` when no frame is available.
      */
-    inline fun <T> readCurrent(block: (TerminalRenderCache) -> T): T? {
+    public inline fun <T> readCurrent(block: (TerminalRenderCache) -> T): T? {
         val index =
             publishLock.withLock {
                 val i = frontIndex
@@ -198,9 +202,9 @@ class TerminalRenderPublisher(
         }
     }
 
-    companion object {
-        @PublishedApi internal const val BUFFER_COUNT = 3
+    public companion object {
+        @PublishedApi internal const val BUFFER_COUNT: Int = 3
 
-        @PublishedApi internal const val NO_FRONT = -1
+        @PublishedApi internal const val NO_FRONT: Int = -1
     }
 }

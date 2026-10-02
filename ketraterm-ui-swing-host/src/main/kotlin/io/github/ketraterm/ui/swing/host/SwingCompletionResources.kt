@@ -24,7 +24,7 @@ import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionProvider
  * @property provider source of progressive completion results.
  * @property feedbackHandler learning callback paired with this provider's runtime.
  */
-data class SwingCompletionResources(
+public data class SwingCompletionResources(
     val provider: SwingShellSuggestionProvider,
     val feedbackHandler: SwingShellSuggestionFeedbackHandler,
 )

@@ -18,7 +18,7 @@ package io.github.ketraterm.transport
 /**
  * Callback sink for terminal transport events.
  */
-interface TerminalConnectorListener {
+public interface TerminalConnectorListener {
     /**
      * Delivers bytes emitted by the remote host.
      *
@@ -31,7 +31,7 @@ interface TerminalConnectorListener {
      * @param offset starting index of valid data in the byte array.
      * @param length number of valid bytes to consume.
      */
-    fun onBytes(
+    public fun onBytes(
         bytes: ByteArray,
         offset: Int,
         length: Int,
@@ -46,7 +46,7 @@ interface TerminalConnectorListener {
      * @param exitCode process exit code when the transport has one, otherwise
      * `null`.
      */
-    fun onClosed(exitCode: Int?)
+    public fun onClosed(exitCode: Int?)
 
     /**
      * Reports a remote transport failure.
@@ -55,5 +55,5 @@ interface TerminalConnectorListener {
      *
      * @param error the transport exception or failure.
      */
-    fun onError(error: Throwable)
+    public fun onError(error: Throwable)
 }

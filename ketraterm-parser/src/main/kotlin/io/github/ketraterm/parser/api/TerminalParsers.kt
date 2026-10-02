@@ -21,7 +21,7 @@ import io.github.ketraterm.parser.spi.TerminalCommandSink
 /**
  * Factory for terminal output parsers.
  */
-object TerminalParsers {
+public object TerminalParsers {
     /**
      * Creates a new instance of [TerminalOutputParser] that routes parsed
      * commands to the specified [sink].
@@ -43,7 +43,7 @@ object TerminalParsers {
      */
     @JvmStatic
     @JvmOverloads
-    fun create(
+    public fun create(
         sink: TerminalCommandSink,
         clipboardWriteLimitBytes: () -> Int = { 0 },
     ): TerminalOutputParser = TerminalParser(sink, clipboardWriteLimitBytes = clipboardWriteLimitBytes)

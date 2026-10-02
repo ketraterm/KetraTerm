@@ -22,7 +22,7 @@ import java.nio.file.Path
 /**
  * Factory for local PTY-backed terminal connectors.
  */
-object PtyConnectors {
+public object PtyConnectors {
     /**
      * Creates a connector for a new local PTY process.
      *
@@ -40,7 +40,7 @@ object PtyConnectors {
     @JvmStatic
     @JvmOverloads
     @Throws(IOException::class)
-    fun create(
+    public fun create(
         command: List<String>,
         env: Map<String, String> = System.getenv(),
         workingDirectory: Path? = null,

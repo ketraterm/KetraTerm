@@ -23,6 +23,8 @@ import io.github.ketraterm.input.event.TerminalKey
 import io.github.ketraterm.input.event.TerminalKeyEvent
 import io.github.ketraterm.input.event.TerminalPasteEvent
 import io.github.ketraterm.protocol.TerminalCapabilityIdentity
+import io.github.ketraterm.render.api.TerminalRenderCellFlags
+import io.github.ketraterm.render.cache.TerminalRenderCache
 import io.github.ketraterm.session.*
 import io.github.ketraterm.shell.integration.OscShellIntegration
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -241,9 +243,10 @@ class PtySessionTest {
         assertEquals(TerminalCapabilityIdentity.COLOR_TERM_TRUECOLOR, environment.getValue("COLORTERM"))
     }
 
-    @Test
-    fun `pty stdout is parsed into terminal core through shared session`() {
-        val process = FakePtyProcess(inputBytes = "hello\u001B[5n".ascii())
+    @ParameterizedTest
+    @ValueSource(strings = ["hello", "hello  ", "e\u0301 \u754c "])
+    fun `pty stdout is parsed into terminal core through shared session`(text: String) {
+        val process = FakePtyProcess(inputBytes = "$text\u001B[5n".toByteArray(StandardCharsets.UTF_8))
         val session =
             startSession(
                 options =
@@ -258,22 +261,21 @@ class PtySessionTest {
 
         awaitClosed(session)
 
-        assertEquals("hello", session.terminal.getLineAsString(0))
+        assertEquals(text, session.retainedText().lineSequence().first())
     }
 
     @Test
     fun `parser core responses are written back to pty stdin`() {
-        val process = FakePtyProcess.running(inputBytes = "\u001B[6n".ascii())
-        val session =
-            startSession(
-                options = PtyOptions(command = listOf("fake"), columns = 10, rows = 3),
-                processFactory = FixedProcessFactory(process),
-            )
+        val expected = "\u001B[1;1R\u001B[0n"
+        val process = FakePtyProcess.running(inputBytes = "\u001B[6n\u001B[5n".ascii(), expectedOutputBytes = expected.length)
+        startSession(
+            options = PtyOptions(command = listOf("fake"), columns = 10, rows = 3),
+            processFactory = FixedProcessFactory(process),
+        )
 
         process.awaitWrite()
 
-        assertEquals("\u001B[1;1R", process.outputText())
-        assertEquals(0, session.terminal.pendingResponseBytes)
+        assertEquals(expected, process.outputText())
     }
 
     @Test
@@ -328,14 +330,27 @@ class PtySessionTest {
 
     @Test
     fun `default pty input policy sends Return as CR even when newline mode is active`() {
-        val process = FakePtyProcess.running()
+        val modeApplied = CountDownLatch(1)
+        val process = FakePtyProcess.running(inputBytes = "\u001B[20h\u0007".ascii())
         val session =
             startSession(
-                options = PtyOptions(command = listOf("fake"), columns = 10, rows = 3),
+                options =
+                    PtyOptions(
+                        command = listOf("fake"),
+                        columns = 10,
+                        rows = 3,
+                        eventListener =
+                            object : PtyEventListener by PtyEventListener.NONE {
+                                override fun bell(session: TerminalSession) {
+                                    modeApplied.countDown()
+                                }
+                            },
+                    ),
                 processFactory = FixedProcessFactory(process),
             )
 
-        session.terminal.setNewLineMode(true)
+        assertTrue(modeApplied.await(10, TimeUnit.SECONDS), "newline mode output was not processed")
+        assertTrue(session.modeSnapshot.isNewLineMode)
         session.encodeKey(TerminalKeyEvent.key(TerminalKey.ENTER))
 
         process.awaitWrite()
@@ -368,8 +383,10 @@ class PtySessionTest {
 
         session.resize(columns = 20, rows = 5)
 
-        assertEquals(20, session.terminal.width)
-        assertEquals(5, session.terminal.height)
+        session.readRenderFrame { frame ->
+            assertEquals(20, frame.columns)
+            assertEquals(5, frame.rows)
+        }
         assertEquals(listOf(10 to 3, 20 to 5), process.sizes)
     }
 
@@ -390,11 +407,12 @@ class PtySessionTest {
 
         awaitClosed(session)
 
+        val frame = TerminalRenderCache(6, 2).apply { updateFrom(session) }
         assertAll(
-            { assertEquals(0x20AC, session.terminal.getCodepointAt(0, 0)) },
-            { assertEquals(-1, session.terminal.getCodepointAt(1, 0)) },
-            { assertEquals('X'.code, session.terminal.getCodepointAt(2, 0)) },
-            { assertTrue(session.terminal.getModeSnapshot().treatAmbiguousAsWide) },
+            { assertEquals(0x20AC, frame.codeWords[0]) },
+            { assertEquals(TerminalRenderCellFlags.WIDE_TRAILING, frame.flags[1]) },
+            { assertEquals('X'.code, frame.codeWords[2]) },
+            { assertTrue(session.modeSnapshot.treatAmbiguousAsWide) },
         )
     }
 
@@ -446,7 +464,7 @@ class PtySessionTest {
 
         awaitClosed(session)
 
-        assertEquals(20_000, session.terminal.getAllAsString().count { it == 'x' })
+        assertEquals(20_000, session.retainedText().count { it == 'x' })
     }
 
     @Test
@@ -683,4 +701,25 @@ class PtySessionTest {
         runBlocking {
             withTimeout(10.seconds) { session.state.first { it is TerminalSessionState.Closed } }
         }
+}
+
+/** Copies the retained output while holding the session's frame-read boundary. */
+internal fun TerminalSession.retainedText(): String {
+    val cache = TerminalRenderCache(1, 1).apply { updateFromAbsoluteRange(this@retainedText, 0, Long.MAX_VALUE) }
+    return (0 until cache.rows).joinToString("\n") { row ->
+        val start = cache.rowOffset(row)
+        var last = cache.columns - 1
+        while (last >= 0 && cache.flags[start + last] and TerminalRenderCellFlags.EMPTY != 0) last--
+        buildString {
+            for (column in 0..last) {
+                val index = start + column
+                when {
+                    cache.flags[index] and TerminalRenderCellFlags.WIDE_TRAILING != 0 -> Unit
+                    cache.flags[index] and TerminalRenderCellFlags.CLUSTER != 0 -> append(checkNotNull(cache.clusterText(row, column)))
+                    cache.flags[index] and TerminalRenderCellFlags.CODEPOINT != 0 -> appendCodePoint(cache.codeWords[index])
+                    else -> append(' ')
+                }
+            }
+        }
+    }
 }

@@ -1,0 +1,24 @@
+public abstract interface class io/github/ketraterm/transport/TerminalConnector : java/lang/AutoCloseable {
+	public abstract fun close ()V
+	public fun foregroundProcessName ()Ljava/lang/String;
+	public abstract fun resize (II)V
+	public abstract fun start (Lio/github/ketraterm/transport/TerminalConnectorListener;)V
+	public abstract fun write ([BII)V
+	public static synthetic fun write$default (Lio/github/ketraterm/transport/TerminalConnector;[BIIILjava/lang/Object;)V
+}
+
+public final class io/github/ketraterm/transport/TerminalConnector$DefaultImpls {
+	public static fun foregroundProcessName (Lio/github/ketraterm/transport/TerminalConnector;)Ljava/lang/String;
+	public static synthetic fun write$default (Lio/github/ketraterm/transport/TerminalConnector;[BIIILjava/lang/Object;)V
+}
+
+public abstract interface class io/github/ketraterm/transport/TerminalConnectorListener {
+	public abstract fun onBytes ([BII)V
+	public abstract fun onClosed (Ljava/lang/Integer;)V
+	public abstract fun onError (Ljava/lang/Throwable;)V
+}
+
+public final class io/github/ketraterm/transport/ValidationKt {
+	public static final fun checkBounds ([BII)V
+}
+

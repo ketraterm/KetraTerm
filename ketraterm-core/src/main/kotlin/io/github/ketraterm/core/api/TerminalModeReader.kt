@@ -46,7 +46,7 @@ package io.github.ketraterm.core.api
  * @property isBellIsUrgent `true` when urgent bell mode (?1042) is active.
  * @property isPopOnBell `true` when pop on bell mode (?1043) is active.
  */
-data class TerminalModeSnapshot(
+public data class TerminalModeSnapshot(
     val isInsertMode: Boolean,
     val isAutoWrap: Boolean,
     val isApplicationCursorKeys: Boolean,
@@ -78,8 +78,11 @@ data class TerminalModeSnapshot(
  * Intended for parser, input, and UI handoff. The returned snapshot is
  * immutable and detached from internal storage, so callers cannot mutate core
  * state accidentally.
+ * Factory-created buffers expose each mode snapshot atomically, including during
+ * mutation. An operation that also reads grid/cursor state still requires the
+ * terminal's external serialization to keep those separate reads coherent.
  */
-interface TerminalModeReader : TerminalInputState {
+public interface TerminalModeReader : TerminalInputState {
     /**
      * Returns one atomic packed snapshot of durable mode state.
      *
@@ -89,7 +92,7 @@ interface TerminalModeReader : TerminalInputState {
      *
      * @return A packed 64-bit word containing a snapshot of all active modes.
      */
-    fun getModeBitsSnapshot(): Long
+    public fun getModeBitsSnapshot(): Long
 
     /**
      * Returns one atomic packed snapshot for input encoders.
@@ -109,5 +112,5 @@ interface TerminalModeReader : TerminalInputState {
      *
      * @return A detached [TerminalModeSnapshot] of the commonly used mode fields.
      */
-    fun getModeSnapshot(): TerminalModeSnapshot
+    public fun getModeSnapshot(): TerminalModeSnapshot
 }

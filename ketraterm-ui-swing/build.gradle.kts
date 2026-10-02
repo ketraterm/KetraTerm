@@ -14,7 +14,6 @@
  * limitations under the License.
  */
 
-import org.jetbrains.kotlin.gradle.dsl.abi.ExperimentalAbiValidation
 import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 
 plugins {
@@ -24,26 +23,6 @@ plugins {
 
 repositories {
     mavenCentral()
-}
-
-// Review the hyperlink contract and its embedding entry points without freezing unrelated UI APIs.
-@OptIn(ExperimentalAbiValidation::class)
-kotlin {
-    abiValidation {
-        filters {
-            include {
-                byNames.addAll(
-                    "io.github.ketraterm.ui.swing.api.SwingHyperlink**",
-                    "io.github.ketraterm.ui.swing.api.SwingHostServices",
-                    "io.github.ketraterm.ui.swing.api.SwingHostServices.**",
-                    "io.github.ketraterm.ui.swing.api.SwingTerminal",
-                    "io.github.ketraterm.ui.swing.api.SwingTerminal.**",
-                    "io.github.ketraterm.ui.swing.api.TerminalUiDispatcher",
-                    "io.github.ketraterm.ui.swing.api.TerminalUiDispatcher.**",
-                )
-            }
-        }
-    }
 }
 
 // Keep benchmarks of internal helpers in the same Kotlin target for Gradle and IDE visibility.

@@ -118,45 +118,6 @@ private class SearchTextField(
 }
 
 /**
- * Factory for text controls used by [SwingTerminalSearchBar].
- *
- * Hosts can provide IDE-specific text component subclasses while reusing the
- * shared host search behavior. Command buttons and toggles are intentionally
- * owned by the search bar so hover, pressed, and selected states stay
- * consistent across Swing hosts.
- */
-interface SwingTerminalSearchBarComponentFactory {
-    /**
-     * Creates the search query field.
-     *
-     * @param columns preferred text columns.
-     * @return editable query field.
-     */
-    fun textField(columns: Int): JTextField
-
-    /**
-     * Creates a label for result counters.
-     *
-     * @param text initial label text.
-     * @return label component.
-     */
-    fun label(text: String): JLabel
-
-    companion object {
-        /**
-         * Default plain-Swing text control factory.
-         */
-        @JvmField
-        val DEFAULT: SwingTerminalSearchBarComponentFactory =
-            object : SwingTerminalSearchBarComponentFactory {
-                override fun textField(columns: Int): JTextField = SearchTextField(columns)
-
-                override fun label(text: String): JLabel = JLabel(text)
-            }
-    }
-}
-
-/**
  * Optional host-owned search bar for a [SwingTerminal].
  *
  * The bar owns visible search chrome only. Search scanning, highlight
@@ -165,17 +126,14 @@ interface SwingTerminalSearchBarComponentFactory {
  * shortcut opens it.
  *
  * @param terminal terminal whose headless search API backs this bar.
- * @param componentFactory factory for host-specific Swing controls.
  */
-class SwingTerminalSearchBar
-    @JvmOverloads
-    constructor(
+public class SwingTerminalSearchBar
+    public constructor(
         private val terminal: SwingTerminal,
-        componentFactory: SwingTerminalSearchBarComponentFactory = SwingTerminalSearchBarComponentFactory.DEFAULT,
     ) {
         private var suppressDocumentEvents = false
-        private val queryField = componentFactory.textField(24)
-        private val counterLabel = componentFactory.label("0/0")
+        private val queryField = SearchTextField(24)
+        private val counterLabel = JLabel("0/0")
         private val previousButton = IconButton(ButtonIcon.PREVIOUS)
         private val nextButton = IconButton(ButtonIcon.NEXT)
         private val caseSensitiveToggle = FlatToggleButton("Aa")
@@ -198,7 +156,7 @@ class SwingTerminalSearchBar
         /**
          * Swing component that hosts should mount as floating pane chrome.
          */
-        val component: JComponent =
+        public val component: JComponent =
             JPanel(BorderLayout()).apply {
                 isVisible = false
                 isOpaque = false
@@ -288,7 +246,7 @@ class SwingTerminalSearchBar
         /**
          * Opens the search bar and focuses the query field.
          */
-        fun open() {
+        public fun open() {
             if (!SwingUtilities.isEventDispatchThread()) {
                 SwingUtilities.invokeLater { open() }
                 return
@@ -311,7 +269,7 @@ class SwingTerminalSearchBar
         /**
          * Closes the search bar and clears active terminal search highlights.
          */
-        fun close() {
+        public fun close() {
             if (!SwingUtilities.isEventDispatchThread()) {
                 SwingUtilities.invokeLater { close() }
                 return
@@ -331,12 +289,12 @@ class SwingTerminalSearchBar
          *
          * @return `true` when the bar is open.
          */
-        fun isOpen(): Boolean = component.isVisible
+        public fun isOpen(): Boolean = component.isVisible
 
         /**
          * Refreshes host colors from the terminal component.
          */
-        fun refreshColors() {
+        public fun refreshColors() {
             component.background = Color(0, 0, 0, 0)
             component.foreground = FOREGROUND
             searchPanel.background = PANEL_BACKGROUND

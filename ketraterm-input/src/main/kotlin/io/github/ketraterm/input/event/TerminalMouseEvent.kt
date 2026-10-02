@@ -29,7 +29,7 @@ package io.github.ketraterm.input.event
  * @property pixelX optional pixel-level column coordinate (zero-based).
  * @property pixelY optional pixel-level row coordinate (zero-based).
  */
-data class TerminalMouseEvent(
+public data class TerminalMouseEvent(
     val column: Int,
     val row: Int,
     val button: TerminalMouseButton,

@@ -23,7 +23,7 @@ package io.github.ketraterm.session
  * resolver from user input paths, such as Ctrl-click hit testing, where looking
  * up host metadata is not part of frame painting.
  */
-fun interface TerminalHyperlinkResolver {
+public fun interface TerminalHyperlinkResolver {
     /**
      * Returns the target URI for [hyperlinkId], or `null` when the id is zero,
      * unknown, evicted by host policy, or otherwise not activatable.
@@ -31,13 +31,13 @@ fun interface TerminalHyperlinkResolver {
      * @param hyperlinkId primitive id copied from a render-frame cell.
      * @return target URI, or `null`.
      */
-    fun uriForHyperlinkId(hyperlinkId: Int): String?
+    public fun uriForHyperlinkId(hyperlinkId: Int): String?
 
-    companion object {
+    public companion object {
         /**
          * Resolver for sessions that do not expose hyperlink metadata.
          */
         @JvmField
-        val NONE: TerminalHyperlinkResolver = TerminalHyperlinkResolver { null }
+        public val NONE: TerminalHyperlinkResolver = TerminalHyperlinkResolver { null }
     }
 }

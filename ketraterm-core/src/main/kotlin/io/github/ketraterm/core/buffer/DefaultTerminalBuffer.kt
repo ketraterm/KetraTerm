@@ -100,6 +100,9 @@ internal class DefaultTerminalBuffer private constructor(
     ): Pair<Int, Int> {
         require(newWidth > 0) { "newWidth must be > 0, was $newWidth" }
         require(newHeight > 0) { "newHeight must be > 0, was $newHeight" }
+        require(state.primaryBuffer.maxHistory <= Int.MAX_VALUE - newHeight) {
+            "maxHistory + newHeight exceeds Int.MAX_VALUE: maxHistory=${state.primaryBuffer.maxHistory}, newHeight=$newHeight"
+        }
 
         val oldWidth = state.dimensions.width
         val oldHeight = state.dimensions.height

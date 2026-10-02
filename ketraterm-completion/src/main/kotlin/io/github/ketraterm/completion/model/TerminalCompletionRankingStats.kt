@@ -35,7 +35,7 @@ package io.github.ketraterm.completion.model
  * @throws IllegalArgumentException if the digest shape is invalid, a counter is
  * negative, successful executions exceed total executions, or [lastUsedEpochMillis] is negative.
  */
-data class TerminalCompletionRankingStats
+public data class TerminalCompletionRankingStats
     @JvmOverloads
     constructor(
         val identityDigest: String,

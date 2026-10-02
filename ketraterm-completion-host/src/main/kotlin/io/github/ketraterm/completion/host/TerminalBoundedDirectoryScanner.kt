@@ -28,22 +28,33 @@ import java.util.concurrent.TimeUnit
  *
  * @param maxVisitedEntries positive cap on inspected direct children.
  * @param scanBudgetNanos positive best-effort monotonic scan budget.
- * @param nanoTime monotonic clock used to enforce the budget.
  * @param ioDispatcher dispatcher used only for blocking filesystem access.
  * @throws IllegalArgumentException if a capacity or the scan budget is not positive.
  */
-class TerminalBoundedDirectoryScanner
-    @JvmOverloads
-    constructor(
+public class TerminalBoundedDirectoryScanner
+    internal constructor(
         private val maxVisitedEntries: Int = DEFAULT_MAX_VISITED_ENTRIES,
         private val scanBudgetNanos: Long = TimeUnit.MILLISECONDS.toNanos(DEFAULT_SCAN_BUDGET_MILLIS),
-        private val nanoTime: () -> Long = System::nanoTime,
+        private val nanoTime: () -> Long,
         private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
     ) : TerminalDirectoryScanner {
         init {
             require(maxVisitedEntries > 0) { "maxVisitedEntries must be > 0, was $maxVisitedEntries" }
             require(scanBudgetNanos > 0L) { "scanBudgetNanos must be > 0, was $scanBudgetNanos" }
         }
+
+        /** Configures scan limits and blocking I/O execution using the JVM monotonic clock. */
+        @JvmOverloads
+        public constructor(
+            maxVisitedEntries: Int = DEFAULT_MAX_VISITED_ENTRIES,
+            scanBudgetNanos: Long = TimeUnit.MILLISECONDS.toNanos(DEFAULT_SCAN_BUDGET_MILLIS),
+            ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
+        ) : this(
+            maxVisitedEntries = maxVisitedEntries,
+            scanBudgetNanos = scanBudgetNanos,
+            nanoTime = System::nanoTime,
+            ioDispatcher = ioDispatcher,
+        )
 
         /**
          * Returns a bounded deterministic snapshot.

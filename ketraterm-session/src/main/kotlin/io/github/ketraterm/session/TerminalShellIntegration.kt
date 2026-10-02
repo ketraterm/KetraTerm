@@ -32,25 +32,25 @@ import kotlinx.coroutines.flow.StateFlow
  * implement this runtime contract. The optional OSC implementation uses the
  * synchronous protocol callbacks below; they run under session serialization.
  */
-interface TerminalShellIntegration {
+public interface TerminalShellIntegration {
     /** Thread-safe command metadata and primitive viewport projection. */
-    val state: TerminalShellIntegrationState
+    public val state: TerminalShellIntegrationState
 
     /** True only while the shell can accept a startup command at its live prompt. */
-    val promptReady: StateFlow<Boolean>
+    public val promptReady: StateFlow<Boolean>
 
     /** Opaque nonnegative edit revisions; unavailable/equal intermediate states may conflate. */
-    val commandLineChanges: Flow<Long>
+    public val commandLineChanges: Flow<Long>
 
     /** Current immutable editing context, or null when unavailable; must be safe from any thread. */
-    fun activeCommandLine(): TerminalShellCommandLineSnapshot?
+    public fun activeCommandLine(): TerminalShellCommandLineSnapshot?
 
     /** Optional OSC 133 interpretation, called at the marker's exact output position. */
-    fun observeShellMarker(event: ShellIntegrationEvent) = Unit
+    public fun observeShellMarker(event: ShellIntegrationEvent): Unit = Unit
 
     /** Optional accepted OSC 7 interpretation. Hosts keep their own directory authority. */
-    fun observeWorkingDirectory(uri: String) = Unit
+    public fun observeWorkingDirectory(uri: String): Unit = Unit
 
     /** Optional synchronous finalization after a parser batch, before startup submission. */
-    fun outputProcessed() = Unit
+    public fun outputProcessed(): Unit = Unit
 }

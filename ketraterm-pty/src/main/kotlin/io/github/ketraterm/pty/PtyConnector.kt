@@ -43,7 +43,7 @@ import com.pty4j.PtyProcess as Pty4jNativeProcess
  * @property exitCode Process exit code after the watcher observes process termination.
  * @property isAlive Returns true while the underlying PTY process reports it is alive.
  */
-class PtyConnector internal constructor(
+public class PtyConnector internal constructor(
     private val process: PtyProcess,
     private val readBufferSize: Int = DEFAULT_READ_BUFFER_SIZE,
     private val readerThreadName: String = DEFAULT_READER_THREAD_NAME,
@@ -70,14 +70,14 @@ class PtyConnector internal constructor(
      * occurred.
      */
     @Volatile
-    var failure: IOException? = null
+    public var failure: IOException? = null
         private set
 
     /**
      * Process exit code after the watcher observes process termination.
      */
     @Volatile
-    var exitCode: Int? = null
+    public var exitCode: Int? = null
         private set
 
     /**
@@ -88,7 +88,7 @@ class PtyConnector internal constructor(
      * @param readerThreadName thread name for reading process stdout.
      * @param watcherThreadName thread name for waiting on process exit.
      */
-    constructor(
+    public constructor(
         process: Pty4jNativeProcess,
         readBufferSize: Int = DEFAULT_READ_BUFFER_SIZE,
         readerThreadName: String = DEFAULT_READER_THREAD_NAME,
@@ -104,7 +104,7 @@ class PtyConnector internal constructor(
     /**
      * Returns true while the underlying PTY process reports it is alive.
      */
-    val isAlive: Boolean
+    public val isAlive: Boolean
         get() = process.isAlive()
 
     /**
@@ -203,7 +203,7 @@ class PtyConnector internal constructor(
      */
     @Suppress("unused") // Public API for embedders waiting for process exit.
     @Throws(InterruptedException::class)
-    fun waitFor(): Int = process.waitFor()
+    public fun waitFor(): Int = process.waitFor()
 
     internal fun joinReader(timeoutMillis: Long): Boolean = joinThread(readerThread, timeoutMillis)
 

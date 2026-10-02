@@ -33,7 +33,7 @@ import java.util.*
  * @property pathSeparator platform path separator.
  * @property executableExists predicate used to verify discovered executables.
  */
-class TerminalProfileRegistry(
+public class TerminalProfileRegistry(
     private val osName: String = System.getProperty("os.name"),
     private val environment: Map<String, String> = System.getenv(),
     private val pathSeparator: String = File.pathSeparator,
@@ -44,7 +44,7 @@ class TerminalProfileRegistry(
      *
      * @return a list of discovered built-in [TerminalProfile]s.
      */
-    fun availableProfiles(): List<TerminalProfile> =
+    public fun availableProfiles(): List<TerminalProfile> =
         if (isWindows()) {
             windowsProfiles()
         } else {
@@ -73,7 +73,7 @@ class TerminalProfileRegistry(
      *   platform default.
      * @return launch profile ready for use by the PTY session.
      */
-    fun configuredProfile(
+    public fun configuredProfile(
         shellPath: String,
         workingDirectory: Path? = null,
     ): TerminalProfile {
@@ -109,7 +109,7 @@ class TerminalProfileRegistry(
      * @param shellPath shell path to validate.
      * @return true if the shell path exists and is executable, false otherwise.
      */
-    fun isValidShellPath(shellPath: String): Boolean {
+    public fun isValidShellPath(shellPath: String): Boolean {
         if (shellPath.isBlank()) return false
         val path =
             try {
@@ -133,7 +133,7 @@ class TerminalProfileRegistry(
      * @param args command-line arguments passed by the product shell.
      * @return initial terminal launch profile.
      */
-    fun initialProfile(args: List<String>): TerminalProfile =
+    public fun initialProfile(args: List<String>): TerminalProfile =
         if (args.isNotEmpty()) {
             TerminalProfile(
                 id = "command-line",

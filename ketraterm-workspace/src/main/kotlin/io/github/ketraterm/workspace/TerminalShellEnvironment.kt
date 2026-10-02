@@ -28,7 +28,7 @@ package io.github.ketraterm.workspace
  * @property pathPrefix one native directory prepended to PATH, or `null` for no
  * addition. It is applied after [variables], using the shell's path syntax.
  */
-data class TerminalShellEnvironment(
+public data class TerminalShellEnvironment(
     val variables: Map<String, String> = emptyMap(),
     val pathPrefix: String? = null,
 ) {
@@ -50,8 +50,8 @@ data class TerminalShellEnvironment(
         }
     }
 
-    companion object {
+    public companion object {
         /** Shared empty environment for ordinary launch profiles. */
-        val Empty: TerminalShellEnvironment = TerminalShellEnvironment()
+        public val Empty: TerminalShellEnvironment = TerminalShellEnvironment()
     }
 }

@@ -1,0 +1,417 @@
+public final class io/github/ketraterm/host/HostCommandAdapter : io/github/ketraterm/parser/spi/TerminalCommandSink {
+	public fun <init> (Lio/github/ketraterm/core/api/TerminalBuffer;Lio/github/ketraterm/host/HostEventSink;Lio/github/ketraterm/host/HostPolicy;IIZ)V
+	public synthetic fun <init> (Lio/github/ketraterm/core/api/TerminalBuffer;Lio/github/ketraterm/host/HostEventSink;Lio/github/ketraterm/host/HostPolicy;IIZILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun applyKittyKeyboardFlags (II)V
+	public fun backspace ()V
+	public fun bell ()V
+	public fun carriageReturn ()V
+	public fun changeRectangleAttributes (IIIIII)V
+	public fun clearAllTabStops ()V
+	public fun clearTabStop ()V
+	public final fun clipboardWriteLimitBytes ()I
+	public fun copyRectangle (IIIIIIII)V
+	public final fun currentWorkingDirectoryUri ()Ljava/lang/String;
+	public fun cursorBackward (I)V
+	public fun cursorBackwardTabs (I)V
+	public fun cursorDown (I)V
+	public fun cursorForward (I)V
+	public fun cursorForwardTabs (I)V
+	public fun cursorNextLine (I)V
+	public fun cursorPreviousLine (I)V
+	public fun cursorUp (I)V
+	public fun decaln ()V
+	public fun deleteCharacters (I)V
+	public fun deleteColumns (I)V
+	public fun deleteLines (I)V
+	public fun deminimizeWindow ()V
+	public fun disableKeyModifierOption (I)V
+	public fun endHyperlink ()V
+	public fun eraseCharacters (I)V
+	public fun eraseInDisplay (IZ)V
+	public fun eraseInLine (IZ)V
+	public fun eraseRectangle (IIIIZ)V
+	public fun fillRectangle (IIIII)V
+	public final fun getActiveHyperlinkId ()Ljava/lang/String;
+	public final fun getActiveHyperlinkUri ()Ljava/lang/String;
+	public final fun getCurrentPolicy ()Lio/github/ketraterm/host/HostPolicy;
+	public final fun getIconTitle ()Ljava/lang/String;
+	public final fun getWindowTitle ()Ljava/lang/String;
+	public final fun hyperlinkUri (I)Ljava/lang/String;
+	public fun insertCharacters (I)V
+	public fun insertColumns (I)V
+	public fun insertLines (I)V
+	public fun isAlternateScreenActive ()Z
+	public fun lineFeed ()V
+	public fun lowerWindow ()V
+	public fun minimizeWindow ()V
+	public fun moveWindow (II)V
+	public fun nextLine ()V
+	public fun popKittyKeyboardFlags (I)V
+	public fun popTitleStack (I)V
+	public fun pushKittyKeyboardFlags (I)V
+	public fun pushTitleStack (I)V
+	public fun queryDynamicColor (I)V
+	public fun queryPaletteColor (I)V
+	public fun queryStatusString (Ljava/lang/String;)V
+	public fun queryTerminfo (Ljava/lang/String;)V
+	public fun raiseWindow ()V
+	public fun requestClipboard (Ljava/lang/String;Ljava/lang/String;)V
+	public fun requestDeviceAttributes (II)V
+	public fun requestDeviceStatusReport (IZ)V
+	public fun requestKeyFormatOption (I)V
+	public fun requestKeyModifierOption (I)V
+	public fun requestKittyKeyboardFlags ()V
+	public fun requestModeStatus (IZ)V
+	public fun requestRectangleChecksum (IIIIII)V
+	public fun requestWindowReport (I)V
+	public fun resetAttributes ()V
+	public fun resetKeyFormatOption (I)V
+	public fun resetKeyFormatOptions ()V
+	public fun resetKeyModifierOption (I)V
+	public fun resetKeyModifierOptions ()V
+	public fun resetTerminal ()V
+	public fun resizeWindow (II)V
+	public fun restoreCursor ()V
+	public fun reverseIndex ()V
+	public fun reverseRectangleAttributes (IIIII)V
+	public fun saveCursor ()V
+	public fun saveCursorOrResetMargins ()Z
+	public fun scrollDown (I)V
+	public fun scrollUp (I)V
+	public fun setAnsiMode (IZ)V
+	public fun setAttributeChangeExtent (I)V
+	public fun setBackgroundDefault ()V
+	public fun setBackgroundIndexed (I)V
+	public fun setBackgroundRgb (III)V
+	public fun setBlink (Z)V
+	public fun setBold (Z)V
+	public fun setConceal (Z)V
+	public fun setCurrentWorkingDirectoryUri (Ljava/lang/String;)V
+	public fun setCursorAbsolute (II)V
+	public fun setCursorColumn (I)V
+	public fun setCursorRow (I)V
+	public fun setCursorStyle (I)V
+	public fun setDecMode (IZ)V
+	public final fun setDefaultBackarrowSendsBackspace (Z)V
+	public fun setDynamicColor (II)V
+	public fun setFaint (Z)V
+	public fun setForegroundDefault ()V
+	public fun setForegroundIndexed (I)V
+	public fun setForegroundRgb (III)V
+	public final fun setHostPolicy (Lio/github/ketraterm/host/HostPolicy;)V
+	public fun setIconAndWindowTitle (Ljava/lang/String;)V
+	public fun setIconTitle (Ljava/lang/String;)V
+	public fun setInverse (Z)V
+	public fun setItalic (Z)V
+	public fun setKeyFormatOption (II)V
+	public fun setKeyModifierOption (II)V
+	public fun setLeftRightMargins (II)V
+	public fun setMaximized (Z)V
+	public fun setOverline (Z)V
+	public fun setPaletteColor (II)V
+	public fun setScrollRegion (II)V
+	public fun setSelectiveEraseProtection (Z)V
+	public fun setStrikethrough (Z)V
+	public fun setTabStop ()V
+	public final fun setThemePalette (Lio/github/ketraterm/render/api/TerminalColorPalette;)V
+	public fun setUnderlineColorDefault ()V
+	public fun setUnderlineColorIndexed (I)V
+	public fun setUnderlineColorRgb (III)V
+	public fun setUnderlineStyle (I)V
+	public fun setWindowTitle (Ljava/lang/String;)V
+	public fun shellIntegrationMarker (Lio/github/ketraterm/protocol/ShellIntegrationEvent;)V
+	public fun showNotification (Ljava/lang/String;Ljava/lang/String;Lio/github/ketraterm/protocol/NotificationLevel;)V
+	public fun softReset ()V
+	public fun startHyperlink (Ljava/lang/String;Ljava/lang/String;)V
+	public fun tab ()V
+	public fun updatePreviousCluster ([II)V
+	public fun writeCluster ([II)V
+	public fun writeCodepoint (I)V
+}
+
+public final class io/github/ketraterm/host/HostControlPolicy : java/lang/Enum {
+	public static final field ALLOW Lio/github/ketraterm/host/HostControlPolicy;
+	public static final field DENY Lio/github/ketraterm/host/HostControlPolicy;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public static fun valueOf (Ljava/lang/String;)Lio/github/ketraterm/host/HostControlPolicy;
+	public static fun values ()[Lio/github/ketraterm/host/HostControlPolicy;
+}
+
+public abstract interface class io/github/ketraterm/host/HostEventSink {
+	public static final field Companion Lio/github/ketraterm/host/HostEventSink$Companion;
+	public static final field NONE Lio/github/ketraterm/host/HostEventSink;
+	public abstract fun bell ()V
+	public fun columnModeChanged (II)V
+	public fun currentWorkingDirectoryChanged (Ljava/lang/String;)V
+	public fun deminimizeWindow ()V
+	public fun hyperlinkRegistered (ILjava/lang/String;Ljava/lang/String;)V
+	public fun hyperlinkRemoved (I)V
+	public fun hyperlinksCleared ()V
+	public abstract fun iconTitleChanged (Ljava/lang/String;)V
+	public fun lowerWindow ()V
+	public fun minimizeWindow ()V
+	public fun moveWindow (II)V
+	public fun paletteChanged (Lio/github/ketraterm/render/api/TerminalColorPalette;)V
+	public fun raiseWindow ()V
+	public fun resizeForColumnMode (II)V
+	public abstract fun resizeWindow (II)V
+	public fun setMaximized (Z)V
+	public fun shellIntegrationMarker (Lio/github/ketraterm/protocol/ShellIntegrationEvent;)V
+	public fun showNotification (Ljava/lang/String;Ljava/lang/String;Lio/github/ketraterm/protocol/NotificationLevel;)V
+	public fun terminalClipboardPrompt (Lio/github/ketraterm/host/TerminalClipboardPromptEvent;)V
+	public fun terminalClipboardReadCompleted (Lio/github/ketraterm/host/TerminalClipboardReadAuditEvent;)V
+	public fun terminalClipboardReadRequested (Lio/github/ketraterm/host/TerminalClipboardReadRequest;)V
+	public fun terminalClipboardRequest (Lio/github/ketraterm/host/TerminalClipboardAuditEvent;)V
+	public fun terminalClipboardWrite (Lio/github/ketraterm/host/TerminalClipboardWriteEvent;)V
+	public abstract fun windowTitleChanged (Ljava/lang/String;)V
+}
+
+public final class io/github/ketraterm/host/HostEventSink$Companion {
+}
+
+public final class io/github/ketraterm/host/HostEventSink$DefaultImpls {
+	public static fun columnModeChanged (Lio/github/ketraterm/host/HostEventSink;II)V
+	public static fun currentWorkingDirectoryChanged (Lio/github/ketraterm/host/HostEventSink;Ljava/lang/String;)V
+	public static fun deminimizeWindow (Lio/github/ketraterm/host/HostEventSink;)V
+	public static fun hyperlinkRegistered (Lio/github/ketraterm/host/HostEventSink;ILjava/lang/String;Ljava/lang/String;)V
+	public static fun hyperlinkRemoved (Lio/github/ketraterm/host/HostEventSink;I)V
+	public static fun hyperlinksCleared (Lio/github/ketraterm/host/HostEventSink;)V
+	public static fun lowerWindow (Lio/github/ketraterm/host/HostEventSink;)V
+	public static fun minimizeWindow (Lio/github/ketraterm/host/HostEventSink;)V
+	public static fun moveWindow (Lio/github/ketraterm/host/HostEventSink;II)V
+	public static fun paletteChanged (Lio/github/ketraterm/host/HostEventSink;Lio/github/ketraterm/render/api/TerminalColorPalette;)V
+	public static fun raiseWindow (Lio/github/ketraterm/host/HostEventSink;)V
+	public static fun resizeForColumnMode (Lio/github/ketraterm/host/HostEventSink;II)V
+	public static fun setMaximized (Lio/github/ketraterm/host/HostEventSink;Z)V
+	public static fun shellIntegrationMarker (Lio/github/ketraterm/host/HostEventSink;Lio/github/ketraterm/protocol/ShellIntegrationEvent;)V
+	public static fun showNotification (Lio/github/ketraterm/host/HostEventSink;Ljava/lang/String;Ljava/lang/String;Lio/github/ketraterm/protocol/NotificationLevel;)V
+	public static fun terminalClipboardPrompt (Lio/github/ketraterm/host/HostEventSink;Lio/github/ketraterm/host/TerminalClipboardPromptEvent;)V
+	public static fun terminalClipboardReadCompleted (Lio/github/ketraterm/host/HostEventSink;Lio/github/ketraterm/host/TerminalClipboardReadAuditEvent;)V
+	public static fun terminalClipboardReadRequested (Lio/github/ketraterm/host/HostEventSink;Lio/github/ketraterm/host/TerminalClipboardReadRequest;)V
+	public static fun terminalClipboardRequest (Lio/github/ketraterm/host/HostEventSink;Lio/github/ketraterm/host/TerminalClipboardAuditEvent;)V
+	public static fun terminalClipboardWrite (Lio/github/ketraterm/host/HostEventSink;Lio/github/ketraterm/host/TerminalClipboardWriteEvent;)V
+}
+
+public final class io/github/ketraterm/host/HostPolicy {
+	public fun <init> ()V
+	public fun <init> (Lio/github/ketraterm/host/TerminalTitlePolicy;Lio/github/ketraterm/host/HostControlPolicy;Lio/github/ketraterm/host/HostControlPolicy;Lio/github/ketraterm/host/HostControlPolicy;Lio/github/ketraterm/host/HostControlPolicy;Lio/github/ketraterm/host/HostControlPolicy;Lio/github/ketraterm/host/HostControlPolicy;Lio/github/ketraterm/host/TerminalClipboardPolicy;IIIIII)V
+	public synthetic fun <init> (Lio/github/ketraterm/host/TerminalTitlePolicy;Lio/github/ketraterm/host/HostControlPolicy;Lio/github/ketraterm/host/HostControlPolicy;Lio/github/ketraterm/host/HostControlPolicy;Lio/github/ketraterm/host/HostControlPolicy;Lio/github/ketraterm/host/HostControlPolicy;Lio/github/ketraterm/host/HostControlPolicy;Lio/github/ketraterm/host/TerminalClipboardPolicy;IIIIIIILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Lio/github/ketraterm/host/TerminalTitlePolicy;
+	public final fun component10 ()I
+	public final fun component11 ()I
+	public final fun component12 ()I
+	public final fun component13 ()I
+	public final fun component14 ()I
+	public final fun component2 ()Lio/github/ketraterm/host/HostControlPolicy;
+	public final fun component3 ()Lio/github/ketraterm/host/HostControlPolicy;
+	public final fun component4 ()Lio/github/ketraterm/host/HostControlPolicy;
+	public final fun component5 ()Lio/github/ketraterm/host/HostControlPolicy;
+	public final fun component6 ()Lio/github/ketraterm/host/HostControlPolicy;
+	public final fun component7 ()Lio/github/ketraterm/host/HostControlPolicy;
+	public final fun component8 ()Lio/github/ketraterm/host/TerminalClipboardPolicy;
+	public final fun component9 ()I
+	public final fun copy (Lio/github/ketraterm/host/TerminalTitlePolicy;Lio/github/ketraterm/host/HostControlPolicy;Lio/github/ketraterm/host/HostControlPolicy;Lio/github/ketraterm/host/HostControlPolicy;Lio/github/ketraterm/host/HostControlPolicy;Lio/github/ketraterm/host/HostControlPolicy;Lio/github/ketraterm/host/HostControlPolicy;Lio/github/ketraterm/host/TerminalClipboardPolicy;IIIIII)Lio/github/ketraterm/host/HostPolicy;
+	public static synthetic fun copy$default (Lio/github/ketraterm/host/HostPolicy;Lio/github/ketraterm/host/TerminalTitlePolicy;Lio/github/ketraterm/host/HostControlPolicy;Lio/github/ketraterm/host/HostControlPolicy;Lio/github/ketraterm/host/HostControlPolicy;Lio/github/ketraterm/host/HostControlPolicy;Lio/github/ketraterm/host/HostControlPolicy;Lio/github/ketraterm/host/HostControlPolicy;Lio/github/ketraterm/host/TerminalClipboardPolicy;IIIIIIILjava/lang/Object;)Lio/github/ketraterm/host/HostPolicy;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getClipboardPolicy ()Lio/github/ketraterm/host/TerminalClipboardPolicy;
+	public final fun getCurrentWorkingDirectoryPolicy ()Lio/github/ketraterm/host/HostControlPolicy;
+	public final fun getHyperlinkPolicy ()Lio/github/ketraterm/host/HostControlPolicy;
+	public final fun getMaxCurrentWorkingDirectoryUriLength ()I
+	public final fun getMaxHyperlinkEntries ()I
+	public final fun getMaxHyperlinkIdLength ()I
+	public final fun getMaxHyperlinkUriLength ()I
+	public final fun getMaxNotificationBodyLength ()I
+	public final fun getMaxNotificationTitleLength ()I
+	public final fun getNotificationPolicy ()Lio/github/ketraterm/host/HostControlPolicy;
+	public final fun getPalettePolicy ()Lio/github/ketraterm/host/HostControlPolicy;
+	public final fun getTerminalResponsePolicy ()Lio/github/ketraterm/host/HostControlPolicy;
+	public final fun getTitlePolicy ()Lio/github/ketraterm/host/TerminalTitlePolicy;
+	public final fun getWindowManipulationPolicy ()Lio/github/ketraterm/host/HostControlPolicy;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class io/github/ketraterm/host/TerminalClipboardAuditEvent {
+	public fun <init> (Lio/github/ketraterm/host/TerminalClipboardOperation;Ljava/lang/String;IIILio/github/ketraterm/host/TerminalClipboardDecision;)V
+	public final fun component1 ()Lio/github/ketraterm/host/TerminalClipboardOperation;
+	public final fun component2 ()Ljava/lang/String;
+	public final fun component3 ()I
+	public final fun component4 ()I
+	public final fun component5 ()I
+	public final fun component6 ()Lio/github/ketraterm/host/TerminalClipboardDecision;
+	public final fun copy (Lio/github/ketraterm/host/TerminalClipboardOperation;Ljava/lang/String;IIILio/github/ketraterm/host/TerminalClipboardDecision;)Lio/github/ketraterm/host/TerminalClipboardAuditEvent;
+	public static synthetic fun copy$default (Lio/github/ketraterm/host/TerminalClipboardAuditEvent;Lio/github/ketraterm/host/TerminalClipboardOperation;Ljava/lang/String;IIILio/github/ketraterm/host/TerminalClipboardDecision;ILjava/lang/Object;)Lio/github/ketraterm/host/TerminalClipboardAuditEvent;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getDecision ()Lio/github/ketraterm/host/TerminalClipboardDecision;
+	public final fun getDecodedBytes ()I
+	public final fun getEncodedLength ()I
+	public final fun getMaxDecodedBytes ()I
+	public final fun getOperation ()Lio/github/ketraterm/host/TerminalClipboardOperation;
+	public final fun getSelection ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class io/github/ketraterm/host/TerminalClipboardDecision : java/lang/Enum {
+	public static final field ALLOWED_BY_POLICY Lio/github/ketraterm/host/TerminalClipboardDecision;
+	public static final field DENIED_BY_POLICY Lio/github/ketraterm/host/TerminalClipboardDecision;
+	public static final field DENIED_MALFORMED_PAYLOAD Lio/github/ketraterm/host/TerminalClipboardDecision;
+	public static final field DENIED_PAYLOAD_TOO_LARGE Lio/github/ketraterm/host/TerminalClipboardDecision;
+	public static final field DENIED_READ_DISABLED Lio/github/ketraterm/host/TerminalClipboardDecision;
+	public static final field PROMPT_REQUIRED Lio/github/ketraterm/host/TerminalClipboardDecision;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public static fun valueOf (Ljava/lang/String;)Lio/github/ketraterm/host/TerminalClipboardDecision;
+	public static fun values ()[Lio/github/ketraterm/host/TerminalClipboardDecision;
+}
+
+public final class io/github/ketraterm/host/TerminalClipboardOperation : java/lang/Enum {
+	public static final field READ_QUERY Lio/github/ketraterm/host/TerminalClipboardOperation;
+	public static final field WRITE Lio/github/ketraterm/host/TerminalClipboardOperation;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public static fun valueOf (Ljava/lang/String;)Lio/github/ketraterm/host/TerminalClipboardOperation;
+	public static fun values ()[Lio/github/ketraterm/host/TerminalClipboardOperation;
+}
+
+public final class io/github/ketraterm/host/TerminalClipboardPermission : java/lang/Enum {
+	public static final field ALLOW Lio/github/ketraterm/host/TerminalClipboardPermission;
+	public static final field DENY Lio/github/ketraterm/host/TerminalClipboardPermission;
+	public static final field PROMPT Lio/github/ketraterm/host/TerminalClipboardPermission;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public static fun valueOf (Ljava/lang/String;)Lio/github/ketraterm/host/TerminalClipboardPermission;
+	public static fun values ()[Lio/github/ketraterm/host/TerminalClipboardPermission;
+}
+
+public final class io/github/ketraterm/host/TerminalClipboardPolicy {
+	public static final field Companion Lio/github/ketraterm/host/TerminalClipboardPolicy$Companion;
+	public static final field DEFAULT_MAX_DECODED_BYTES I
+	public fun <init> ()V
+	public fun <init> (Lio/github/ketraterm/host/TerminalClipboardPermission;Lio/github/ketraterm/host/TerminalClipboardPermission;I)V
+	public synthetic fun <init> (Lio/github/ketraterm/host/TerminalClipboardPermission;Lio/github/ketraterm/host/TerminalClipboardPermission;IILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Lio/github/ketraterm/host/TerminalClipboardPermission;
+	public final fun component2 ()Lio/github/ketraterm/host/TerminalClipboardPermission;
+	public final fun component3 ()I
+	public final fun copy (Lio/github/ketraterm/host/TerminalClipboardPermission;Lio/github/ketraterm/host/TerminalClipboardPermission;I)Lio/github/ketraterm/host/TerminalClipboardPolicy;
+	public static synthetic fun copy$default (Lio/github/ketraterm/host/TerminalClipboardPolicy;Lio/github/ketraterm/host/TerminalClipboardPermission;Lio/github/ketraterm/host/TerminalClipboardPermission;IILjava/lang/Object;)Lio/github/ketraterm/host/TerminalClipboardPolicy;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getMaxDecodedBytes ()I
+	public final fun getReadPermission ()Lio/github/ketraterm/host/TerminalClipboardPermission;
+	public final fun getWritePermission ()Lio/github/ketraterm/host/TerminalClipboardPermission;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class io/github/ketraterm/host/TerminalClipboardPolicy$Companion {
+}
+
+public final class io/github/ketraterm/host/TerminalClipboardPromptEvent {
+	public fun <init> (Ljava/lang/String;Ljava/lang/String;Lio/github/ketraterm/host/TerminalClipboardAuditEvent;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component2 ()Ljava/lang/String;
+	public final fun component3 ()Lio/github/ketraterm/host/TerminalClipboardAuditEvent;
+	public final fun copy (Ljava/lang/String;Ljava/lang/String;Lio/github/ketraterm/host/TerminalClipboardAuditEvent;)Lio/github/ketraterm/host/TerminalClipboardPromptEvent;
+	public static synthetic fun copy$default (Lio/github/ketraterm/host/TerminalClipboardPromptEvent;Ljava/lang/String;Ljava/lang/String;Lio/github/ketraterm/host/TerminalClipboardAuditEvent;ILjava/lang/Object;)Lio/github/ketraterm/host/TerminalClipboardPromptEvent;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getAudit ()Lio/github/ketraterm/host/TerminalClipboardAuditEvent;
+	public final fun getSelection ()Ljava/lang/String;
+	public final fun getText ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class io/github/ketraterm/host/TerminalClipboardReadAuditEvent {
+	public synthetic fun <init> (Ljava/lang/String;Lio/github/ketraterm/host/TerminalClipboardReadOutcome;Lkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1-ZpuyuOA ()Ljava/lang/String;
+	public final fun component2 ()Lio/github/ketraterm/host/TerminalClipboardReadOutcome;
+	public final fun copy-3F051is (Ljava/lang/String;Lio/github/ketraterm/host/TerminalClipboardReadOutcome;)Lio/github/ketraterm/host/TerminalClipboardReadAuditEvent;
+	public static synthetic fun copy-3F051is$default (Lio/github/ketraterm/host/TerminalClipboardReadAuditEvent;Ljava/lang/String;Lio/github/ketraterm/host/TerminalClipboardReadOutcome;ILjava/lang/Object;)Lio/github/ketraterm/host/TerminalClipboardReadAuditEvent;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getOutcome ()Lio/github/ketraterm/host/TerminalClipboardReadOutcome;
+	public final fun getSelection-ZpuyuOA ()Ljava/lang/String;
+	public final fun getSelectionValue ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class io/github/ketraterm/host/TerminalClipboardReadOutcome : java/lang/Enum {
+	public static final field BUSY Lio/github/ketraterm/host/TerminalClipboardReadOutcome;
+	public static final field CANCELLED Lio/github/ketraterm/host/TerminalClipboardReadOutcome;
+	public static final field DENIED Lio/github/ketraterm/host/TerminalClipboardReadOutcome;
+	public static final field FAILED Lio/github/ketraterm/host/TerminalClipboardReadOutcome;
+	public static final field INVALID_DATA Lio/github/ketraterm/host/TerminalClipboardReadOutcome;
+	public static final field SENT Lio/github/ketraterm/host/TerminalClipboardReadOutcome;
+	public static final field TIMED_OUT Lio/github/ketraterm/host/TerminalClipboardReadOutcome;
+	public static final field UNAVAILABLE Lio/github/ketraterm/host/TerminalClipboardReadOutcome;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public static fun valueOf (Ljava/lang/String;)Lio/github/ketraterm/host/TerminalClipboardReadOutcome;
+	public static fun values ()[Lio/github/ketraterm/host/TerminalClipboardReadOutcome;
+}
+
+public final class io/github/ketraterm/host/TerminalClipboardReadRequest {
+	public synthetic fun <init> (Ljava/lang/String;Lio/github/ketraterm/host/TerminalClipboardPermission;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1-ZpuyuOA ()Ljava/lang/String;
+	public final fun component2 ()Lio/github/ketraterm/host/TerminalClipboardPermission;
+	public final fun component3 ()I
+	public final fun copy-mbL6M1c (Ljava/lang/String;Lio/github/ketraterm/host/TerminalClipboardPermission;I)Lio/github/ketraterm/host/TerminalClipboardReadRequest;
+	public static synthetic fun copy-mbL6M1c$default (Lio/github/ketraterm/host/TerminalClipboardReadRequest;Ljava/lang/String;Lio/github/ketraterm/host/TerminalClipboardPermission;IILjava/lang/Object;)Lio/github/ketraterm/host/TerminalClipboardReadRequest;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getMaxDecodedBytes ()I
+	public final fun getPermission ()Lio/github/ketraterm/host/TerminalClipboardPermission;
+	public final fun getSelection-ZpuyuOA ()Ljava/lang/String;
+	public final fun getSelectionValue ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class io/github/ketraterm/host/TerminalClipboardWriteEvent {
+	public fun <init> (Ljava/lang/String;Ljava/lang/String;Lio/github/ketraterm/host/TerminalClipboardAuditEvent;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component2 ()Ljava/lang/String;
+	public final fun component3 ()Lio/github/ketraterm/host/TerminalClipboardAuditEvent;
+	public final fun copy (Ljava/lang/String;Ljava/lang/String;Lio/github/ketraterm/host/TerminalClipboardAuditEvent;)Lio/github/ketraterm/host/TerminalClipboardWriteEvent;
+	public static synthetic fun copy$default (Lio/github/ketraterm/host/TerminalClipboardWriteEvent;Ljava/lang/String;Ljava/lang/String;Lio/github/ketraterm/host/TerminalClipboardAuditEvent;ILjava/lang/Object;)Lio/github/ketraterm/host/TerminalClipboardWriteEvent;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getAudit ()Lio/github/ketraterm/host/TerminalClipboardAuditEvent;
+	public final fun getSelection ()Ljava/lang/String;
+	public final fun getText ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class io/github/ketraterm/host/TerminalTitleOverflowPolicy : java/lang/Enum {
+	public static final field CLAMP Lio/github/ketraterm/host/TerminalTitleOverflowPolicy;
+	public static final field REJECT Lio/github/ketraterm/host/TerminalTitleOverflowPolicy;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public static fun valueOf (Ljava/lang/String;)Lio/github/ketraterm/host/TerminalTitleOverflowPolicy;
+	public static fun values ()[Lio/github/ketraterm/host/TerminalTitleOverflowPolicy;
+}
+
+public final class io/github/ketraterm/host/TerminalTitlePermission : java/lang/Enum {
+	public static final field ALLOW Lio/github/ketraterm/host/TerminalTitlePermission;
+	public static final field DENY Lio/github/ketraterm/host/TerminalTitlePermission;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public static fun valueOf (Ljava/lang/String;)Lio/github/ketraterm/host/TerminalTitlePermission;
+	public static fun values ()[Lio/github/ketraterm/host/TerminalTitlePermission;
+}
+
+public final class io/github/ketraterm/host/TerminalTitlePolicy {
+	public static final field Companion Lio/github/ketraterm/host/TerminalTitlePolicy$Companion;
+	public static final field DEFAULT_MAX_LENGTH I
+	public fun <init> ()V
+	public fun <init> (Lio/github/ketraterm/host/TerminalTitlePermission;Lio/github/ketraterm/host/TerminalTitleOverflowPolicy;I)V
+	public synthetic fun <init> (Lio/github/ketraterm/host/TerminalTitlePermission;Lio/github/ketraterm/host/TerminalTitleOverflowPolicy;IILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Lio/github/ketraterm/host/TerminalTitlePermission;
+	public final fun component2 ()Lio/github/ketraterm/host/TerminalTitleOverflowPolicy;
+	public final fun component3 ()I
+	public final fun copy (Lio/github/ketraterm/host/TerminalTitlePermission;Lio/github/ketraterm/host/TerminalTitleOverflowPolicy;I)Lio/github/ketraterm/host/TerminalTitlePolicy;
+	public static synthetic fun copy$default (Lio/github/ketraterm/host/TerminalTitlePolicy;Lio/github/ketraterm/host/TerminalTitlePermission;Lio/github/ketraterm/host/TerminalTitleOverflowPolicy;IILjava/lang/Object;)Lio/github/ketraterm/host/TerminalTitlePolicy;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getMaxLength ()I
+	public final fun getOverflowPolicy ()Lio/github/ketraterm/host/TerminalTitleOverflowPolicy;
+	public final fun getPermission ()Lio/github/ketraterm/host/TerminalTitlePermission;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class io/github/ketraterm/host/TerminalTitlePolicy$Companion {
+}
+

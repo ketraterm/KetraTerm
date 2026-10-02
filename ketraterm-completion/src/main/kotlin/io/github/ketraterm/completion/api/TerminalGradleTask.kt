@@ -30,7 +30,7 @@ package io.github.ketraterm.completion.api
  * @throws IllegalArgumentException if [path] is not a canonical non-root Gradle
  * task path or [projectDirectory] is present but blank.
  */
-data class TerminalGradleTask
+public data class TerminalGradleTask
     @JvmOverloads
     constructor(
         val path: String,

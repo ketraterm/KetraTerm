@@ -29,7 +29,7 @@ package io.github.ketraterm.input.event
  * @property replacementText text pasted after both deletion phases; an empty
  * value represents deletion without insertion.
  */
-data class TerminalTextReplacementEvent(
+public data class TerminalTextReplacementEvent(
     val deleteAfterCursorCount: Int,
     val deleteBeforeCursorCount: Int,
     val replacementText: String,

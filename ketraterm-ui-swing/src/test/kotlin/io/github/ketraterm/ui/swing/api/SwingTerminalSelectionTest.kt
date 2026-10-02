@@ -16,6 +16,7 @@
 package io.github.ketraterm.ui.swing.api
 
 import io.github.ketraterm.core.TerminalBuffers
+import io.github.ketraterm.core.api.TerminalBuffer
 import io.github.ketraterm.input.api.TerminalInputEncoder
 import io.github.ketraterm.input.event.TerminalFocusEvent
 import io.github.ketraterm.input.event.TerminalKeyEvent
@@ -317,7 +318,10 @@ class SwingTerminalSelectionTest {
                     reused.bind(replacement)
                     fresh.bind(replacement)
 
-                    assertNull(replacement.renderPublisher.current(), "The test scheduler must hold the replacement's first frame")
+                    assertNull(
+                        replacement.renderPublisher.readCurrent { true },
+                        "The test scheduler must hold the replacement's first frame",
+                    )
                     assertAll(
                         {
                             assertArrayEquals(
@@ -356,7 +360,7 @@ class SwingTerminalSelectionTest {
 
                     dispatcher.scheduler.runCurrent()
 
-                    assertNotNull(replacement.renderPublisher.current())
+                    assertNotNull(replacement.renderPublisher.readCurrent { true })
                     val newPixels = componentPixels(reused)
                     assertFalse(emptyPixels.contentEquals(newPixels), "The first publication must display the replacement text")
                     assertArrayEquals(componentPixels(fresh), newPixels)
@@ -508,11 +512,12 @@ class SwingTerminalSelectionTest {
             object : TestRenderFrame(arrayOf(Array(3) { TestCell() })) {
                 override val activeBuffer = TerminalRenderBufferKind.ALTERNATE
             }
-        val session = testSession(frame, inputEncoder = input)
+        val terminal = TerminalBuffers.create(width = frame.columns, height = frame.rows, maxHistory = 5)
+        terminal.setMouseTrackingMode(io.github.ketraterm.protocol.MouseTrackingMode.NORMAL)
+        val session = testSession(frame, inputEncoder = input, terminal = terminal)
         val settings = SwingSettings(padding = SwingPadding(0, 4, 0, 6))
         val component = createComponent(settingsProvider = { settings })
         session.start(columns = 3, rows = 1)
-        session.terminal.setMouseTrackingMode(io.github.ketraterm.protocol.MouseTrackingMode.NORMAL)
         try {
             SwingUtilities.invokeAndWait {
                 component.setSize(200, 40)
@@ -538,11 +543,12 @@ class SwingTerminalSelectionTest {
     fun `rtl mouse reports map both cell and pixel coordinates back to the logical grid`() {
         val input = RecordingInputEncoder()
         val frame = TestRenderFrame.text("\u05D0\u05D1\u05D2")
-        val session = testSession(frame, inputEncoder = input)
+        val terminal = TerminalBuffers.create(width = frame.columns, height = frame.rows, maxHistory = 5)
+        terminal.setMouseTrackingMode(io.github.ketraterm.protocol.MouseTrackingMode.NORMAL)
+        val session = testSession(frame, inputEncoder = input, terminal = terminal)
         val settings = SwingSettings(padding = SwingPadding(0, 0, 0, 0), shellIntegrationDecorationGutterWidth = 0)
         val component = createComponent(settingsProvider = { settings })
         session.start(columns = 3, rows = 1)
-        session.terminal.setMouseTrackingMode(io.github.ketraterm.protocol.MouseTrackingMode.NORMAL)
         try {
             SwingUtilities.invokeAndWait {
                 component.setSize(100, 40)
@@ -1080,7 +1086,9 @@ class SwingTerminalSelectionTest {
         val clipboard = RecordingClipboard(readValue = "middle click pasted text")
         val input = RecordingInputEncoder()
         val frame = TestRenderFrame.text("ready")
-        val session = testSession(frame = frame, inputEncoder = input)
+        val terminal = TerminalBuffers.create(width = frame.columns, height = frame.rows, maxHistory = 5)
+        terminal.setMouseTrackingMode(io.github.ketraterm.protocol.MouseTrackingMode.NORMAL)
+        val session = testSession(frame = frame, inputEncoder = input, terminal = terminal)
         val component =
             createComponent(
                 settingsProvider = {
@@ -1093,7 +1101,6 @@ class SwingTerminalSelectionTest {
             )
 
         session.start(columns = 5, rows = 1)
-        session.terminal.setMouseTrackingMode(io.github.ketraterm.protocol.MouseTrackingMode.NORMAL)
 
         SwingUtilities.invokeAndWait {
             component.setSize(300, 80)
@@ -1232,8 +1239,8 @@ class SwingTerminalSelectionTest {
         hyperlinkResolver: TerminalHyperlinkResolver = TerminalHyperlinkResolver.NONE,
         workerDispatcher: CoroutineDispatcher = Dispatchers.Unconfined,
         publishInitialFrame: Boolean = true,
+        terminal: TerminalBuffer = TerminalBuffers.create(width = frame.columns, height = frame.rows, maxHistory = 5),
     ): TerminalSession {
-        val terminal = TerminalBuffers.create(width = frame.columns, height = frame.rows, maxHistory = 5)
         val session =
             TerminalSession(
                 terminal = terminal,

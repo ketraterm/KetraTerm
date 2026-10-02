@@ -22,7 +22,7 @@ import io.github.ketraterm.completion.model.TerminalCommandSpecs
 /**
  * Factories for production completion engines.
  */
-object TerminalCompletionEngines {
+public object TerminalCompletionEngines {
     /**
      * Creates a deterministic merged engine from prioritized completion sources.
      *
@@ -41,7 +41,7 @@ object TerminalCompletionEngines {
      */
     @JvmStatic
     @JvmOverloads
-    fun fromSources(
+    public fun fromSources(
         sources: List<TerminalCompletionSourceEntry>,
         commandSpecs: List<TerminalCommandSpec> = TerminalCommandSpecs.defaults(),
         learningStore: TerminalCompletionLearningStore? = null,

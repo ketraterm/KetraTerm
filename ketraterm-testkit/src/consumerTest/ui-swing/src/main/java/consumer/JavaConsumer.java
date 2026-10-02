@@ -15,6 +15,10 @@
  */
 package consumer;
 
+import io.github.ketraterm.host.TerminalClipboardReadRequest;
+import io.github.ketraterm.host.TerminalClipboardReadAuditEvent;
+import io.github.ketraterm.input.TerminalClipboardReply;
+import io.github.ketraterm.protocol.host.TerminalHostOutput;
 import io.github.ketraterm.ui.swing.api.SwingHostServices;
 import io.github.ketraterm.ui.swing.api.SwingHyperlinkAction;
 import io.github.ketraterm.ui.swing.api.SwingTerminal;
@@ -22,11 +26,14 @@ import io.github.ketraterm.ui.swing.api.TerminalUiDispatcher;
 import io.github.ketraterm.ui.swing.settings.SwingSettings;
 import io.github.ketraterm.ui.swing.settings.TerminalClipboardHandler;
 import java.awt.event.MouseEvent;
+import java.io.ByteArrayOutputStream;
+import java.nio.charset.StandardCharsets;
 import java.util.concurrent.atomic.AtomicInteger;
 import javax.swing.SwingUtilities;
 
 public final class JavaConsumer {
     public static void verify() throws Exception {
+        verifyClipboardReply();
         try (var metadata = SwingTerminal.class.getResourceAsStream("/META-INF/io.github.ketraterm_ketraterm-ui-swing.kotlin_module")) {
             if (metadata == null || metadata.readAllBytes().length == 0) throw new AssertionError("Missing Kotlin metadata");
         }
@@ -55,5 +62,32 @@ public final class JavaConsumer {
             }
         });
         if (opened.get() != 2) throw new AssertionError("Expected host and event activation");
+    }
+
+    public static void verifyClipboardCallbacks(TerminalClipboardReadRequest request, TerminalClipboardReadAuditEvent audit) {
+        if (!request.getSelectionValue().equals("cp") || !audit.getSelectionValue().equals("cp")) {
+            throw new AssertionError("Java clipboard selector access");
+        }
+    }
+
+    private static void verifyClipboardReply() {
+        var bytes = new ByteArrayOutputStream();
+        TerminalHostOutput output = new TerminalHostOutput() {
+            @Override public void writeByte(int value) { bytes.write(value); }
+            @Override public void writeBytes(byte[] value, int offset, int length) { bytes.write(value, offset, length); }
+            @Override public void writeAscii(String text) { bytes.writeBytes(text.getBytes(StandardCharsets.US_ASCII)); }
+            @Override public void writeUtf8(String text) { bytes.writeBytes(text.getBytes(StandardCharsets.UTF_8)); }
+        };
+        try (var reply = TerminalClipboardReply.prepare("cc", "hello", 16, 64)) {
+            if (reply == null) throw new AssertionError("Valid clipboard reply rejected");
+            reply.writeTo(output);
+            var expected = "\u001b]52;c;aGVsbG8=\u001b\\";
+            if (reply.getByteCount() != bytes.size() || !bytes.toString(StandardCharsets.US_ASCII).equals(expected)) {
+                throw new AssertionError("Java clipboard reply bytes");
+            }
+        }
+        if (TerminalClipboardReply.prepare("c;bad", "hello", 16, 64) != null) {
+            throw new AssertionError("Malformed clipboard selectors accepted");
+        }
     }
 }

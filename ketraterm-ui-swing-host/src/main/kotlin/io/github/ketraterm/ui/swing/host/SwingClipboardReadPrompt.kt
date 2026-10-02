@@ -30,12 +30,12 @@ import kotlin.coroutines.resume
  * for this pane's lifetime, including later requests admitted with Allow.
  * @param showDialog opens product UI, delivers a decision on the EDT, and returns its disposal handle.
  */
-class SwingClipboardReadPrompt(
+public class SwingClipboardReadPrompt(
     private val showDialog: (request: SwingDialogRequest, decide: (Int?) -> Unit) -> AutoCloseable,
 ) : AutoCloseable {
     /** Choices shared by both products' standard clipboard dialogs. */
-    enum class Decision(
-        val label: String,
+    public enum class Decision(
+        public val label: String,
     ) {
         ALLOW_ONCE("Allow once"),
         DENY("Deny"),
@@ -47,14 +47,14 @@ class SwingClipboardReadPrompt(
     private var closed = false
 
     /** Whether this pane has been blocked or closed. */
-    val isBlocked: Boolean
+    public val isBlocked: Boolean
         get() {
             check(SwingUtilities.isEventDispatchThread())
             return blocked || closed
         }
 
     /** Suspends for one decision; concurrent requests cannot replace the current dialog. */
-    suspend fun request(message: String): Boolean {
+    public suspend fun request(message: String): Boolean {
         check(SwingUtilities.isEventDispatchThread())
         if (isBlocked || pending != null) return false
         var dialog: AutoCloseable? = null
@@ -86,7 +86,7 @@ class SwingClipboardReadPrompt(
     }
 
     /** Denies a pending request, returning whether terminal Escape was consumed. */
-    fun dismiss(): Boolean {
+    public fun dismiss(): Boolean {
         check(SwingUtilities.isEventDispatchThread())
         val continuation = pending ?: return false
         if (continuation.isActive) continuation.resume(false)

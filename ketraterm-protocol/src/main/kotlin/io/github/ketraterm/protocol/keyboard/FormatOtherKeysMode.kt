@@ -18,10 +18,10 @@ package io.github.ketraterm.protocol.keyboard
 /**
  * Xterm formatOtherKeys values stored in core's packed input-mode word.
  */
-object FormatOtherKeysMode {
+public object FormatOtherKeysMode {
     /** Use the original xterm `CSI 27 ; modifier ; codepoint ~` format. */
-    const val DEFAULT: Int = 0
+    public const val DEFAULT: Int = 0
 
     /** Use xterm's compact `CSI codepoint ; modifier u` format. */
-    const val CSI_U: Int = 1
+    public const val CSI_U: Int = 1
 }

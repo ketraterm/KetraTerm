@@ -923,7 +923,7 @@ internal class TabManager(
                 }
             }
 
-            val modes = tab.session.terminal.getModeSnapshot()
+            val modes = tab.session.modeSnapshot
             if (modes.isBellIsUrgent) {
                 SwingUtilities.invokeLater {
                     try {

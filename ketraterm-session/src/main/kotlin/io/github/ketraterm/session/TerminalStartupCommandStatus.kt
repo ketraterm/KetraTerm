@@ -16,7 +16,7 @@
 package io.github.ketraterm.session
 
 /** Session-local outcome of an explicitly configured startup command. */
-enum class TerminalStartupCommandStatus {
+public enum class TerminalStartupCommandStatus {
     /** Awaiting a complete primary-screen prompt; no timer submits the command. */
     WAITING,
 

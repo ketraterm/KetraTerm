@@ -16,12 +16,12 @@
 package io.github.ketraterm.ui.swing.host
 
 /** Shared clipboard consent wording; terminal names are treated as untrusted text. */
-object SwingClipboardPrompts {
+public object SwingClipboardPrompts {
     /** Title used by both products for reads and writes. */
-    const val TITLE: String = "Clipboard Access"
+    public const val TITLE: String = "Clipboard Access"
 
     /** Read consent never contains clipboard contents or a claimed process origin. */
-    fun readQuestion(
+    public fun readQuestion(
         profileName: String,
         clipboardName: String = "clipboard",
     ): String {
@@ -31,7 +31,7 @@ object SwingClipboardPrompts {
     }
 
     /** Write consent describes clear/count semantics without disclosing the payload. */
-    fun writeQuestion(
+    public fun writeQuestion(
         profileName: String,
         text: String,
         clipboardName: String = "clipboard",
@@ -46,7 +46,7 @@ object SwingClipboardPrompts {
     }
 
     /** Shared write choices and safe initial action for both product presenters. */
-    fun writeConfirmation(
+    public fun writeConfirmation(
         profileName: String,
         text: String,
         clipboardName: String = "clipboard",

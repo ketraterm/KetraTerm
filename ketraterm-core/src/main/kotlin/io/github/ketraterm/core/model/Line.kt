@@ -190,9 +190,9 @@ internal class Line(
      *
      * @param col Column index.
      */
-    override fun getPackedAttr(col: Int): Long = attrs[col]
+    fun getPackedAttr(col: Int): Long = attrs[col]
 
-    override fun getPackedExtendedAttr(col: Int): Long = extendedAttrs[col]
+    fun getPackedExtendedAttr(col: Int): Long = extendedAttrs[col]
 
     /**
      * Returns `true` if [col] holds a multi-codepoint grapheme cluster.
@@ -525,10 +525,6 @@ internal object VoidLine : TerminalLine {
     override val width: Int = 0
 
     override fun getCodepoint(col: Int): Int = TerminalConstants.EMPTY
-
-    override fun getPackedAttr(col: Int): Long = 0
-
-    override fun getPackedExtendedAttr(col: Int): Long = 0
 
     override fun isCluster(col: Int): Boolean = false
 

@@ -19,13 +19,13 @@ package io.github.ketraterm.protocol
  * Host actions available to DEC mode status reporting, independently of permission
  * or acceptance of an individual request. Embedders opt in only for implemented actions.
  */
-object TerminalHostModeCapability {
+public object TerminalHostModeCapability {
     /** Host can request user attention on BEL. */
-    const val URGENT_BELL: Int = 2
+    public const val URGENT_BELL: Int = 2
 
     /** Host can raise its window on BEL. */
-    const val POP_ON_BELL: Int = 4
+    public const val POP_ON_BELL: Int = 4
 
     /** All defined bits, for validating host configuration. */
-    const val ALL: Int = URGENT_BELL or POP_ON_BELL
+    public const val ALL: Int = URGENT_BELL or POP_ON_BELL
 }

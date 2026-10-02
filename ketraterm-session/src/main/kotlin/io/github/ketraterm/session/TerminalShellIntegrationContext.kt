@@ -26,35 +26,36 @@ import kotlinx.coroutines.flow.StateFlow
  * terminal output. Frames and published caches are borrowed only for the callback;
  * never mutate or retain them. No callback may block on UI work or close the session.
  */
-class TerminalShellIntegrationContext internal constructor(
+public class TerminalShellIntegrationContext internal constructor(
     private val mutationLock: Any,
     private val reader: TerminalRenderFrameReader,
     private val publisher: TerminalRenderPublisher,
     /** Successfully published frame revisions; -1 before the first frame. */
-    val renderGeneration: StateFlow<Long>,
+    public val renderGeneration: StateFlow<Long>,
 ) : TerminalRenderFrameReader {
     /** Serializes a short compound context/frame read with parser and grid mutation. */
-    fun <T> withTerminalState(action: () -> T): T = synchronized(mutationLock, action)
+    public fun <T> withTerminalState(action: () -> T): T = synchronized(mutationLock, action)
 
     /** Borrows the most recent copied frame without acquiring terminal mutation serialization. */
-    fun <T> readPublishedFrame(action: (TerminalRenderCache) -> T): T? = publisher.readCurrent(action)
+    public fun <T> readPublishedFrame(action: (TerminalRenderCache) -> T): T? = publisher.readCurrent(action)
 
-    override fun readRenderFrame(consumer: TerminalRenderFrameConsumer) = synchronized(mutationLock) { reader.readRenderFrame(consumer) }
+    override fun readRenderFrame(consumer: TerminalRenderFrameConsumer): Unit =
+        synchronized(mutationLock) { reader.readRenderFrame(consumer) }
 
     override fun readRenderFrame(
         scrollbackOffset: Int,
         consumer: TerminalRenderFrameConsumer,
-    ) = synchronized(mutationLock) { reader.readRenderFrame(scrollbackOffset, consumer) }
+    ): Unit = synchronized(mutationLock) { reader.readRenderFrame(scrollbackOffset, consumer) }
 
     override fun readRenderFrame(
         scrollbackOffset: Int,
         viewportRows: Int,
         consumer: TerminalRenderFrameConsumer,
-    ) = synchronized(mutationLock) { reader.readRenderFrame(scrollbackOffset, viewportRows, consumer) }
+    ): Unit = synchronized(mutationLock) { reader.readRenderFrame(scrollbackOffset, viewportRows, consumer) }
 
     override fun readRenderFrameForAbsoluteRange(
         startAbsoluteRow: Long,
         endAbsoluteRow: Long,
         consumer: TerminalRenderFrameConsumer,
-    ) = synchronized(mutationLock) { reader.readRenderFrameForAbsoluteRange(startAbsoluteRow, endAbsoluteRow, consumer) }
+    ): Unit = synchronized(mutationLock) { reader.readRenderFrameForAbsoluteRange(startAbsoluteRow, endAbsoluteRow, consumer) }
 }

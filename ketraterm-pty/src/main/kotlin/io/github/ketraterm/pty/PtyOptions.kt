@@ -28,6 +28,11 @@ import java.nio.file.Path
 /**
  * Configuration for starting a local PTY-backed terminal session.
  *
+ * Constructor, [copy], and destructuring signatures are part of the public ABI.
+ * New options must preserve those signatures for compiled consumers. Command
+ * and environment collections are borrowed read-only; callers must not mutate
+ * them while this configuration is in use.
+ *
  * @param command command and arguments passed to the PTY child process.
  * @param environment environment variables for the child process. `TERM` and
  * `COLORTERM` default to the shared terminal capability identity when the
@@ -57,7 +62,7 @@ import java.nio.file.Path
  * prompt readiness. Null installs no shell integration. PTY assembly does not
  * select a protocol implementation or own the producer's lifetime.
  */
-data class PtyOptions
+public data class PtyOptions
     @JvmOverloads
     constructor(
         val command: List<String> = defaultCommand(),
@@ -94,14 +99,14 @@ data class PtyOptions
             require(watcherThreadName.isNotBlank()) { "PTY watcherThreadName must not be blank" }
         }
 
-        companion object {
+        public companion object {
             /**
              * Returns the platform default interactive shell command.
              *
              * @return default interactive shell command.
              */
             @JvmStatic
-            fun defaultCommand(): List<String> {
+            public fun defaultCommand(): List<String> {
                 val osName = System.getProperty("os.name").lowercase()
                 if (osName.contains("windows")) {
                     val comspec = System.getenv("COMSPEC")
@@ -117,7 +122,7 @@ data class PtyOptions
              * @return default process environment variables.
              */
             @JvmStatic
-            fun defaultEnvironment(): Map<String, String> {
+            public fun defaultEnvironment(): Map<String, String> {
                 val env = LinkedHashMap(System.getenv())
                 env["TERM"] = TerminalCapabilityIdentity.TERM_NAME
                 env["COLORTERM"] = TerminalCapabilityIdentity.COLOR_TERM_TRUECOLOR
@@ -130,7 +135,7 @@ data class PtyOptions
              * @return default terminal input policy.
              */
             @JvmStatic
-            fun defaultInputPolicy(): TerminalInputPolicy =
+            public fun defaultInputPolicy(): TerminalInputPolicy =
                 TerminalInputPolicy(
                     enterNewLineModePolicy = EnterNewLineModePolicy.SEND_CR,
                     pasteLineEndingPolicy = PasteLineEndingPolicy.CARRIAGE_RETURN,

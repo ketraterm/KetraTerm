@@ -348,21 +348,21 @@ EDT with both Gradle module metadata and POM-only dependency resolution:
 ./gradlew :ketraterm-testkit:publishedConsumerTest
 ```
 
-Kotlin's [built-in ABI validation](https://kotlinlang.org/docs/gradle-binary-compatibility-validation.html)
-tracks the hyperlink types, `SwingHostServices`, `SwingTerminal` and
-`TerminalUiDispatcher` in [the signature baseline](api/ketraterm-ui-swing.api).
-It reads Kotlin visibility metadata; internal rendering and discovery helpers
-are outside this contract. Referenced settings and service types appear in
-signatures but are not recursively baselined.
+Kotlin's built-in ABI validation tracks the complete published Swing surface in
+[the signature baseline](api/ketraterm-ui-swing.api), including settings, host
+services, suggestions and compiler-generated default/data-class members.
+Other published libraries have their own baselines. Internal rendering and
+discovery helpers remain implementation details; `@PublishedApi` inline linkage
+is included where it forms part of the JVM contract.
 
 ```text
 ./gradlew :ketraterm-ui-swing:checkKotlinAbi
 ./gradlew :ketraterm-ui-swing:updateKotlinAbi
 ```
 
-`checkKotlinAbi` runs with this module's `check` task and explicitly in test CI.
-Run `updateKotlinAbi` only for intentional signature changes, then review its diff
-alongside the source. Keep compiler-generated default-argument and data-class
-members in the generated baseline. A matching snapshot guards against accidental
-signature changes; cross-release compiled-client compatibility and the broader
-v1 contract remain tracked in the [API verification map](../docs/terminal-feature-gap-map.md#api-and-product-verification).
+`checkKotlinAbi` runs with this module's `check` task and across all published
+libraries in test CI. Retained Kotlin/Java consumer binaries also run against
+current artifacts without recompilation. Run `updateKotlinAbi` only for an
+intentional, reviewed signature change; updating a snapshot does not make a
+breaking change compatible. See the [library compatibility contract](../docs/library-compatibility.md)
+for supported versions, ownership, evolution rules and baseline review.

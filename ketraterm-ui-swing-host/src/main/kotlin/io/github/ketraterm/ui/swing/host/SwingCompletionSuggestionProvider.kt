@@ -35,7 +35,7 @@ import java.util.*
  * a dispatcher; the owning suggestion caller controls its coroutine context.
  * @param contextProvider supplier for current host-owned request metadata.
  */
-class SwingCompletionSuggestionProvider(
+public class SwingCompletionSuggestionProvider(
     private val engine: TerminalCompletionEngine,
     private val contextProvider: () -> SwingCompletionContext = { SwingCompletionContext.EMPTY },
 ) : SwingShellSuggestionProvider {
@@ -148,16 +148,16 @@ class SwingCompletionSuggestionProvider(
  * @property workingDirectoryUri current authoritative working-directory URI.
  * @property shellCapabilities explicit shell lexical and replacement policy.
  */
-data class SwingCompletionContext
+public data class SwingCompletionContext
     @JvmOverloads
     constructor(
         val profileId: String? = null,
         val workingDirectoryUri: String? = null,
         val shellCapabilities: TerminalShellCapabilities = TerminalShellCapabilities.PLAIN,
     ) {
-        companion object {
+        public companion object {
             /** Empty context for hosts without profile or directory metadata. */
             @JvmField
-            val EMPTY: SwingCompletionContext = SwingCompletionContext()
+            public val EMPTY: SwingCompletionContext = SwingCompletionContext()
         }
     }

@@ -28,11 +28,11 @@ package io.github.ketraterm.render.api
  * - bit 26: overline.
  * - bits 27..63: reserved and currently zero.
  */
-object TerminalRenderExtraAttrs {
+public object TerminalRenderExtraAttrs {
     /**
      * Empty extra attributes.
      */
-    const val DEFAULT: Long = 0L
+    public const val DEFAULT: Long = 0L
 
     private const val UNDERLINE_KIND_SHIFT = 0
     private const val UNDERLINE_VALUE_SHIFT = 2
@@ -48,7 +48,7 @@ object TerminalRenderExtraAttrs {
      * @param word public render extra-attribute word.
      * @return one of the [TerminalRenderColorKind] constants.
      */
-    fun underlineColorKind(word: Long): Int = ((word ushr UNDERLINE_KIND_SHIFT) and COLOR_KIND_MASK).toInt()
+    public fun underlineColorKind(word: Long): Int = ((word ushr UNDERLINE_KIND_SHIFT) and COLOR_KIND_MASK).toInt()
 
     /**
      * Returns the underline color value.
@@ -57,7 +57,7 @@ object TerminalRenderExtraAttrs {
      * @return zero for default colors, `0..255` for indexed colors, or
      * `0xRRGGBB` for RGB colors.
      */
-    fun underlineColorValue(word: Long): Int = ((word ushr UNDERLINE_VALUE_SHIFT) and COLOR_VALUE_MASK).toInt()
+    public fun underlineColorValue(word: Long): Int = ((word ushr UNDERLINE_VALUE_SHIFT) and COLOR_VALUE_MASK).toInt()
 
     /**
      * Returns whether overline decoration is enabled.
@@ -65,7 +65,7 @@ object TerminalRenderExtraAttrs {
      * @param word public render extra-attribute word.
      * @return `true` when overline is enabled.
      */
-    fun isOverline(word: Long): Boolean = word and OVERLINE_MASK != 0L
+    public fun isOverline(word: Long): Boolean = word and OVERLINE_MASK != 0L
 
     /**
      * Packs a public render extra-attribute word.
@@ -75,7 +75,7 @@ object TerminalRenderExtraAttrs {
      * @param overline whether overline decoration is enabled.
      * @return packed public render extra-attribute word.
      */
-    fun pack(
+    public fun pack(
         underlineColorKind: Int = TerminalRenderColorKind.DEFAULT,
         underlineColorValue: Int = 0,
         overline: Boolean = false,

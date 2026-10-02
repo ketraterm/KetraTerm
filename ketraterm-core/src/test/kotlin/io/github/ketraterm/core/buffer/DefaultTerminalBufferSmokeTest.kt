@@ -16,6 +16,7 @@
 package io.github.ketraterm.core.buffer
 
 import io.github.ketraterm.core.TerminalBuffers
+import io.github.ketraterm.render.api.TerminalRenderFrameReader
 import org.junit.jupiter.api.Assertions.assertAll
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Test
@@ -41,5 +42,30 @@ class DefaultTerminalBufferSmokeTest {
     fun `constructor and resize validation still reject non-positive dimensions`() {
         assertThrows<IllegalArgumentException> { DefaultTerminalBuffer(0, 1) }
         assertThrows<IllegalArgumentException> { TerminalBuffers.create(1, 0) }
+    }
+
+    @Test
+    fun `factory rejects negative and overflowing retained line capacities before allocation`() {
+        for (history in listOf(-1, Int.MIN_VALUE)) {
+            assertThrows<IllegalArgumentException> { TerminalBuffers.create(1, 4, history) }
+        }
+        for ((height, history) in listOf(1 to Int.MAX_VALUE, Int.MAX_VALUE to 1, Int.MAX_VALUE to Int.MAX_VALUE)) {
+            assertThrows<IllegalArgumentException> { TerminalBuffers.create(1, height, history) }
+        }
+    }
+
+    @Test
+    fun `factory permits zero history and exposes primitive render frames`() {
+        val buffer = TerminalBuffers.create(2, 1, 0)
+        buffer.writeText("A")
+        buffer.newLine()
+
+        assertEquals(0, buffer.historySize)
+        assertEquals("", buffer.getScreenAsString())
+        (buffer as TerminalRenderFrameReader).readRenderFrame { frame ->
+            assertEquals(2, frame.columns)
+            assertEquals(1, frame.rows)
+            assertEquals(0, frame.historySize)
+        }
     }
 }
