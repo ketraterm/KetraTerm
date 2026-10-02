@@ -17,7 +17,7 @@ package io.github.ketraterm.benchmark
 
 import io.github.ketraterm.render.api.*
 
-/** Frozen scalar-cell viewport; copying uses retained primitive planes. */
+/** Prepared scalar-cell viewport; the owning fixture serializes mutations and frame reads. */
 internal class TerminalRenderBenchmarkFrame(
     lines: List<String>,
     attributes: LongArray? = null,
@@ -55,6 +55,14 @@ internal class TerminalRenderBenchmarkFrame(
     override fun lineId(row: Int): Long = row + 1L
 
     override fun lineWrapped(row: Int): Boolean = false
+
+    fun setCodePoint(
+        row: Int,
+        column: Int,
+        codePoint: Int,
+    ) {
+        codes[row * columns + column] = codePoint
+    }
 
     override fun copyLine(
         row: Int,

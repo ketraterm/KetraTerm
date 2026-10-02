@@ -25,6 +25,7 @@ import io.github.ketraterm.parser.api.TerminalParsers
 import io.github.ketraterm.protocol.keyboard.KittyKeyboardProgressiveFlag
 import io.github.ketraterm.render.api.*
 import io.github.ketraterm.render.cache.TerminalRenderPublisher
+import io.github.ketraterm.render.cache.TerminalRenderRangeCopy
 import io.github.ketraterm.testkit.MockConnector
 import io.github.ketraterm.transport.TerminalConnector
 import kotlinx.coroutines.*
@@ -1845,8 +1846,9 @@ class TerminalSessionTest {
         }
     }
 
-    @Test
-    fun `onBytes cannot mutate while copyLine is running inside render callback`() {
+    @ParameterizedTest
+    @ValueSource(booleans = [false, true])
+    fun `onBytes cannot mutate while copyLine is running inside render callback`(boundedAbsoluteCopy: Boolean) {
         val terminal = TerminalBuffers.create(width = 10, height = 3)
         val connector = MockConnector()
         val parser = RecordingParser()
@@ -1869,13 +1871,18 @@ class TerminalSessionTest {
 
         session.use {
             SessionTestThread("terminal-session-copyline-lock-test") {
-                session.readRenderFrame { frame ->
-                    frame.copyLine(
-                        row = 0,
-                        codeWords = IntArray(frame.columns),
-                        attrWords = LongArray(frame.columns),
-                        flags = IntArray(frame.columns),
-                    )
+                if (boundedAbsoluteCopy) {
+                    val copy = TerminalRenderRangeCopy()
+                    assertTrue(copy.read(session, 0L, Long.MAX_VALUE))
+                } else {
+                    session.readRenderFrame { frame ->
+                        frame.copyLine(
+                            row = 0,
+                            codeWords = IntArray(frame.columns),
+                            attrWords = LongArray(frame.columns),
+                            flags = IntArray(frame.columns),
+                        )
+                    }
                 }
             }.use { renderThread ->
                 try {

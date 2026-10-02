@@ -21,16 +21,59 @@ import io.github.ketraterm.session.TerminalShellIntegrationCommandLifecycle
 import io.github.ketraterm.session.TerminalShellIntegrationCommandRecord
 import io.github.ketraterm.session.TerminalShellIntegrationState
 import io.github.ketraterm.ui.swing.api.CellSelection
+import io.github.ketraterm.ui.swing.api.SwingHyperlinkPresentation
+import io.github.ketraterm.ui.swing.api.SwingHyperlinkStyle
 import io.github.ketraterm.ui.swing.settings.SwingMetrics
 import io.github.ketraterm.ui.swing.settings.SwingPadding
 import io.github.ketraterm.ui.swing.settings.SwingSettings
 import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.Test
+import org.junit.jupiter.params.ParameterizedTest
+import org.junit.jupiter.params.provider.ValueSource
 import java.awt.Font
 import java.awt.RenderingHints
 import java.awt.image.BufferedImage
 
 class GridPainterTest {
+    @ParameterizedTest
+    @ValueSource(booleans = [false, true])
+    fun `native hyperlink background respects concealment and selection precedence`(osc8: Boolean) {
+        val image = BufferedImage(100, 40, BufferedImage.TYPE_INT_ARGB)
+        val graphics = image.createGraphics()
+        val presentation = SwingHyperlinkPresentation(normal = SwingHyperlinkStyle(backgroundArgb = BLUE), isVisible = true)
+        val settings =
+            SwingSettings(
+                padding = SwingPadding(0, 0, 0, 0),
+                shellIntegrationDecorationGutterWidth = 0,
+                palette = TerminalColorPalette(defaultForeground = WHITE, defaultBackground = BLACK),
+                selectionBackground = RED,
+                osc8HyperlinkPresentation = if (osc8) presentation else null,
+            )
+        val metrics = SwingMetrics.from(graphics.getFontMetrics(settings.font))
+        val cache = TerminalRenderCache(3, 1).apply { updateFrom(TextFrame("   ", false, palette = settings.palette)) }
+        val presentations = Array<SwingHyperlinkPresentation?>(cache.columns) { presentation }
+        cache.hyperlinkIds.fill(if (osc8) 7 else -1)
+        cache.attrWords[1] = TerminalRenderAttrs.pack(invisible = true)
+        try {
+            GridPainter().paint(
+                graphics,
+                cache,
+                settings,
+                metrics,
+                image.width,
+                image.height,
+                true,
+                selection = CellSelection(2, 0, 3, 0),
+                hyperlinkPresentations = if (osc8) null else presentations,
+            )
+            assertEquals(BLUE, image.getRGB(metrics.cellWidth / 2, 1))
+            assertEquals(BLACK, image.getRGB(metrics.cellWidth + metrics.cellWidth / 2, 1))
+            assertEquals(RED, image.getRGB(2 * metrics.cellWidth + metrics.cellWidth / 2, 1))
+        } finally {
+            graphics.dispose()
+        }
+    }
+
     @Test
     fun `alternate grid paints at balanced default padding`() {
         val image = BufferedImage(100, 40, BufferedImage.TYPE_INT_ARGB)

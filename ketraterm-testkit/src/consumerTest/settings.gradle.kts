@@ -18,4 +18,4 @@ pluginManagement {
     plugins { kotlin("jvm") version providers.gradleProperty("kotlinVersion").get() }
 }
 rootProject.name = "published-library-consumers"
-include("parser", "host", "completion")
+include("parser", "host", "completion", "ui-swing")

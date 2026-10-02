@@ -15,8 +15,16 @@
  */
 package io.github.ketraterm.ui.swing.render.painter
 
+import io.github.ketraterm.render.api.TerminalRenderCellFlags
+import io.github.ketraterm.render.api.TerminalRenderUnderline
+import io.github.ketraterm.ui.swing.api.SwingHyperlinkPresentation
+import io.github.ketraterm.ui.swing.api.SwingHyperlinkStyle
 import io.github.ketraterm.ui.swing.render.TestRenderFrame
+import io.github.ketraterm.ui.swing.render.hyperlinkHover
 import io.github.ketraterm.ui.swing.render.renderCache
+import io.github.ketraterm.ui.swing.render.styleFor
+import io.github.ketraterm.ui.swing.settings.SwingSettings
+import org.junit.jupiter.api.Test
 import org.junit.jupiter.params.ParameterizedTest
 import org.junit.jupiter.params.provider.ValueSource
 import kotlin.test.assertEquals
@@ -24,24 +32,152 @@ import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 class TerminalTextRunStyleTest {
+    private val settings = SwingSettings()
+
+    @ParameterizedTest
+    @ValueSource(ints = [-1, 7])
+    fun `prepared styles follow normal hover active and followed state for both link sources`(id: Int) {
+        val cache = renderCache(TestRenderFrame.text("link"))
+        val colors = intArrayOf(0xff123456.toInt(), 0xff234567.toInt(), 0xff345678.toInt(), 0xff456789.toInt())
+
+        fun style(index: Int) = SwingHyperlinkStyle(colors[index], colors[index], colors[index], TerminalRenderUnderline.CURLY)
+        val presentation = SwingHyperlinkPresentation(style(0), style(1), style(2), style(3), true)
+        val presentations = Array<SwingHyperlinkPresentation?>(cache.columns) { presentation }
+        val settings = settings.copy(osc8HyperlinkPresentation = presentation)
+        cache.hyperlinkIds.fill(id)
+        val run = TerminalTextRunStyle()
+        var followed = 0
+
+        fun assertStyle(
+            index: Int,
+            hovered: Boolean,
+            active: Boolean,
+        ) {
+            run.configureRow(true, cache.hyperlinkIds, hyperlinkHover(if (hovered) id else 0, active), settings, presentations, followed)
+            run.begin(cache, cache.palette, 0, 0)
+            assertEquals(colors[index], run.foreground)
+            assertEquals(colors[index], run.hyperlinkUnderlineColor)
+            assertEquals(TerminalRenderUnderline.CURLY, run.hyperlinkUnderline)
+            assertTrue(run.matches(cache, cache.palette, 0, 1))
+            assertEquals(colors[index], presentation.styleFor(hovered, active, id == followed)?.backgroundArgb)
+        }
+        assertStyle(0, false, false)
+        assertStyle(1, true, false)
+        assertStyle(2, true, true)
+        followed = id
+        assertStyle(3, false, false)
+        assertStyle(1, true, false)
+        assertStyle(2, true, true)
+    }
+
+    @Test
+    fun `explicit OSC8 presentation can inherit terminal styling until activation`() {
+        val cache = renderCache(TestRenderFrame.text("link"))
+        cache.hyperlinkIds.fill(7)
+        val active = 0xff336699.toInt()
+        val settings =
+            settings.copy(
+                osc8HyperlinkPresentation = SwingHyperlinkPresentation(active = SwingHyperlinkStyle(foregroundArgb = active)),
+            )
+        val run = TerminalTextRunStyle()
+        for (hovered in listOf(false, true)) {
+            run.configureRow(true, cache.hyperlinkIds, hyperlinkHover(if (hovered) 7 else 0), settings)
+            run.begin(cache, cache.palette, 0, 0)
+            assertEquals(cache.palette.defaultForeground, run.foreground)
+            assertEquals(TerminalRenderUnderline.NONE, run.hyperlinkUnderline)
+        }
+        run.configureRow(true, cache.hyperlinkIds, hyperlinkHover(7, true), settings)
+        run.begin(cache, cache.palette, 0, 0)
+        assertEquals(active, run.foreground)
+        assertEquals(TerminalRenderUnderline.NONE, run.hyperlinkUnderline)
+    }
+
+    @Test
+    fun `missing hover styles preserve followed presentation until another link is followed`() {
+        val cache = renderCache(TestRenderFrame.text("link"))
+        val normal = 0xff123456.toInt()
+        val followed = 0xff654321.toInt()
+        val presentation =
+            SwingHyperlinkPresentation(
+                normal = SwingHyperlinkStyle(normal, normal, normal, TerminalRenderUnderline.SINGLE),
+                followed = SwingHyperlinkStyle(followed, followed, followed, TerminalRenderUnderline.CURLY),
+                isVisible = true,
+            )
+        val presentations = Array<SwingHyperlinkPresentation?>(cache.columns) { presentation }
+        val id = -1
+        cache.hyperlinkIds.fill(id)
+        val run = TerminalTextRunStyle()
+        var followedId = 0
+
+        fun assertPresentation(
+            color: Int,
+            underline: Int,
+        ) {
+            for (hovered in listOf(false, true)) {
+                for (active in listOf(false, true)) {
+                    run.configureRow(
+                        true,
+                        cache.hyperlinkIds,
+                        hyperlinkHover(if (hovered) id else 0, active),
+                        settings,
+                        presentations,
+                        followedId,
+                    )
+                    run.begin(cache, cache.palette, 0, 0)
+                    assertEquals(color, run.foreground)
+                    assertEquals(color, run.hyperlinkUnderlineColor)
+                    assertEquals(underline, run.hyperlinkUnderline)
+                    assertEquals(color, presentation.styleFor(hovered, active, id == followedId)?.backgroundArgb)
+                }
+            }
+        }
+        assertPresentation(normal, TerminalRenderUnderline.SINGLE)
+        followedId = id
+        assertPresentation(followed, TerminalRenderUnderline.CURLY)
+        followedId = -2
+        assertPresentation(normal, TerminalRenderUnderline.SINGLE)
+    }
+
+    @Test
+    fun `explicit hover style is also the active fallback after following a link`() {
+        val hovered = 0xff112233.toInt()
+        val presentation =
+            SwingHyperlinkPresentation(
+                hovered = SwingHyperlinkStyle(foregroundArgb = hovered),
+                followed = SwingHyperlinkStyle(foregroundArgb = 0xff332211.toInt()),
+            )
+        assertEquals(hovered, presentation.styleFor(hovered = true, active = false, followed = true)?.foregroundArgb)
+        assertEquals(hovered, presentation.styleFor(hovered = true, active = true, followed = true)?.foregroundArgb)
+    }
+
+    @Test
+    fun `artificial wrap padding has no hyperlink decoration while authored spaces retain it`() {
+        val cache = renderCache(TestRenderFrame.text("  "))
+        cache.hyperlinkIds.fill(7)
+        cache.flags[1] = cache.flags[1] or TerminalRenderCellFlags.WRAP_PADDING
+        val style = TerminalTextRunStyle()
+        style.configureRow(true, cache.hyperlinkIds, hyperlinkHover(7, true), settings)
+        style.begin(cache, cache.palette, 0, 0)
+        assertTrue(style.hovered)
+        assertEquals(7, style.hyperlinkId)
+        assertFalse(style.matches(cache, cache.palette, 0, 1))
+        style.begin(cache, cache.palette, 0, 1)
+        assertFalse(style.hovered)
+        assertEquals(0, style.hyperlinkId)
+    }
+
     @ParameterizedTest
     @ValueSource(booleans = [false, true])
-    fun `hover interval splits runs at its inclusive start and exclusive end`(activationHover: Boolean) {
+    fun `semantic hover splits runs at hyperlink segment boundaries`(activationHover: Boolean) {
         val cache = renderCache(TestRenderFrame.text("A".repeat(80)))
-        cache.hyperlinkIds.fill(7)
+        cache.hyperlinkIds.fill(7, 20, 60)
         val style = TerminalTextRunStyle()
         val activationForeground = 0xFF4DA3FF.toInt()
         style.configureRow(
-            row = 0,
             textBlinkVisible = true,
             hyperlinkIds = cache.hyperlinkIds,
-            hoveredHyperlinkId = 7,
-            hoveredHyperlinkStartRow = 0,
-            hoveredHyperlinkStartColumn = 20,
-            hoveredHyperlinkEndRow = 0,
-            hoveredHyperlinkEndColumn = 60,
-            hyperlinkActivationHover = activationHover,
-            hyperlinkActivationForeground = activationForeground,
+            hyperlinkHover = hyperlinkHover(7, activationHover),
+            settings = settings.copy(hyperlinkActivationForeground = activationForeground),
         )
         style.begin(cache, cache.palette, 0, 0)
         val starts = mutableListOf(0)

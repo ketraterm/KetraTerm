@@ -258,7 +258,7 @@ tasks.test {
 // Compile consumer fixtures against each module's exported API variant, not testkit's classpath.
 val consumerClasspathsDirectory = layout.buildDirectory.dir("consumer-classpaths")
 val prepareConsumerClasspaths =
-    listOf("host", "parser", "completion").map { module ->
+    listOf("host", "parser", "completion", "ui-swing").map { module ->
         val consumerClasspath =
             configurations.create("${module}ConsumerCompileClasspath") {
                 isCanBeConsumed = false
@@ -271,7 +271,8 @@ val prepareConsumerClasspaths =
                 }
             }
         dependencies.add(consumerClasspath.name, dependencies.project(mapOf("path" to ":ketraterm-$module")))
-        tasks.register<Sync>("prepare${module.replaceFirstChar(Char::uppercaseChar)}ConsumerClasspath") {
+        val consumerName = module.split('-').joinToString("") { it.replaceFirstChar(Char::uppercaseChar) }
+        tasks.register<Sync>("prepare${consumerName}ConsumerClasspath") {
             from(consumerClasspath)
             into(consumerClasspathsDirectory.map { it.dir(module) })
         }
@@ -322,7 +323,7 @@ verifyPublishedConsumers[1].configure { mustRunAfter(verifyPublishedConsumers[0]
 
 tasks.register("publishedConsumerTest") {
     group = "verification"
-    description = "Verifies published parser, host and completion libraries without project dependencies."
+    description = "Verifies published parser, host, completion and Swing libraries without project dependencies."
     dependsOn(verifyPublishedConsumers)
 }
 tasks.named("check") { dependsOn("publishedConsumerTest") }

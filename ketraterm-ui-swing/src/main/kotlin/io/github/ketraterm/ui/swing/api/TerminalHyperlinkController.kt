@@ -15,7 +15,11 @@
  */
 package io.github.ketraterm.ui.swing.api
 
+import io.github.ketraterm.render.api.TerminalRenderAttrs
+import io.github.ketraterm.render.api.TerminalRenderBufferKind
 import io.github.ketraterm.render.cache.TerminalRenderCache
+import io.github.ketraterm.ui.swing.input.hyperlinkNavigationModifierDown
+import io.github.ketraterm.ui.swing.render.hyperlinkIdForCell
 import java.awt.Cursor
 import java.awt.event.MouseEvent
 import javax.swing.SwingUtilities
@@ -44,6 +48,22 @@ internal interface TerminalHyperlinkHost {
     fun isHyperlinkResolvable(hyperlinkId: Int): Boolean
 
     fun openHyperlink(hyperlinkId: Int): Boolean
+
+    fun openHyperlink(
+        hyperlinkId: Int,
+        event: MouseEvent,
+    ): Boolean = openHyperlink(hyperlinkId)
+
+    fun hyperlinkActivation(hyperlinkId: Int): SwingHyperlinkActivation = SwingHyperlinkActivation.MODIFIER
+
+    fun hyperlinkAction(hyperlinkId: Int): SwingHyperlinkAction? = null
+
+    fun enterHyperlink(
+        action: SwingHyperlinkAction,
+        row: Int,
+        startColumn: Int,
+        endColumn: Int,
+    ) = Unit
 }
 
 internal class TerminalHyperlinkController(
@@ -51,7 +71,6 @@ internal class TerminalHyperlinkController(
 ) {
     companion object {
         private const val NO_HYPERLINK_ID = 0
-        private const val NO_HYPERLINK_ROW = -1
         private val HAND_CURSOR: Cursor = Cursor.getPredefinedCursor(Cursor.HAND_CURSOR)
         private val DEFAULT_CURSOR: Cursor = Cursor.getDefaultCursor()
 
@@ -60,43 +79,135 @@ internal class TerminalHyperlinkController(
         private fun unpackCellRow(packed: Long): Int = packed.toInt()
     }
 
-    var hoveredHyperlinkId: Int = NO_HYPERLINK_ID
+    var hover = TerminalHyperlinkHover()
         private set
-    var hoveredHyperlinkStartRow: Int = NO_HYPERLINK_ROW
-        private set
-    var hoveredHyperlinkStartColumn: Int = 0
-        private set
-    var hoveredHyperlinkEndRow: Int = NO_HYPERLINK_ROW
-        private set
-    var hoveredHyperlinkEndColumn: Int = 0
-        private set
-    var hyperlinkActivationHover: Boolean = false
-        private set
+    private var pendingHover = TerminalHyperlinkHover()
+    val hoveredHyperlinkId: Int get() = hover.hyperlinkId
+    val hyperlinkActivationHover: Boolean get() = hover.activation
+    val hoveredSegmentCount: Int get() = hover.segmentCount
     private var pointerKnown = false
     private var pointerX = 0
     private var pointerY = 0
     private var controlDown = false
+    private var pressedHyperlinkId = 0
+    private var pressedAbsoluteRow = 0L
+    private var pressedColumn = 0
+    private var pressedLineId = 0L
+    private var pressedLineGeneration = 0L
+    private var pressedHistoryGeneration = 0L
+    private var pressedBuffer = TerminalRenderBufferKind.PRIMARY
+    private var hoverAction: SwingHyperlinkAction? = null
 
-    fun handleMouseMoved(event: MouseEvent) {
+    fun segmentRow(index: Int): Int = hover.row(index)
+
+    fun segmentStartColumn(index: Int): Int = hover.start(index)
+
+    fun segmentEndColumn(index: Int): Int = hover.end(index)
+
+    fun handleMouseMoved(
+        event: MouseEvent,
+        enabled: Boolean = true,
+    ) {
+        controlDown = hyperlinkNavigationModifierDown(event)
         pointerKnown = true
         pointerX = event.x
         pointerY = event.y
-        controlDown = event.isControlDown
-        refreshHyperlinkHover()
+        if (!enabled) {
+            clearHyperlinkHover(forgetPointer = false)
+            return
+        }
+        val id = hyperlinkIdAt(event)
+        val cell = host.cellAt(event.x, event.y)
+        if (id == hoveredHyperlinkId && hover.contains(unpackCellRow(cell), unpackCellColumn(cell))) {
+            updateHyperlinkActivationHover(controlDown)
+        } else {
+            refreshHyperlinkHover()
+        }
     }
 
-    fun handleMouseExited() {
-        clearHyperlinkHover()
+    /** Restores stationary-pointer state after showing or returning to the application. */
+    fun updatePointerPosition(
+        x: Int,
+        y: Int,
+        enabled: Boolean = true,
+    ) {
+        pointerKnown = true
+        pointerX = x
+        pointerY = y
+        if (enabled) refreshHyperlinkHover() else clearHyperlinkHover(forgetPointer = false)
     }
+
+    fun handleMouseExited() = clearHyperlinkHover()
 
     fun handleMousePressed(event: MouseEvent): Boolean {
-        if (!SwingUtilities.isLeftMouseButton(event) || !event.isControlDown) return false
-        val hyperlinkId = hyperlinkIdAt(event)
-        if (hyperlinkId == NO_HYPERLINK_ID) return false
-        if (!host.openHyperlink(hyperlinkId)) return false
+        pressedHyperlinkId = 0
+        if (!SwingUtilities.isLeftMouseButton(event) ||
+            event.clickCount != 1 ||
+            (event.isShiftDown && !hyperlinkNavigationModifierDown(event))
+        ) {
+            return false
+        }
+        controlDown = hyperlinkNavigationModifierDown(event)
+        updatePointerPosition(event.x, event.y)
+        val hyperlinkId = hoveredHyperlinkId
+        if (hyperlinkId != NO_HYPERLINK_ID &&
+            canActivate(hyperlinkId, controlDown)
+        ) {
+            pressedHyperlinkId = hyperlinkId
+            if (hyperlinkId > 0) {
+                val cache = host.renderCache
+                val cell = host.cellAt(event.x, event.y)
+                val row = unpackCellRow(cell)
+                pressedAbsoluteRow = cache.discardedCount + cache.historySize - cache.scrollbackOffset + row
+                pressedColumn = unpackCellColumn(cell)
+                pressedLineId = cache.lineIds[row]
+                pressedLineGeneration = cache.lineGenerations[row]
+                pressedHistoryGeneration = cache.historyContentGeneration
+                pressedBuffer = cache.activeBuffer
+            }
+        }
+        // Direct links still allow a selection drag. Modifier clicks preserve an existing selection.
+        return pressedHyperlinkId != 0 && hyperlinkNavigationModifierDown(event)
+    }
+
+    fun handleMouseDragged() {
+        pressedHyperlinkId = 0
+    }
+
+    fun handleMouseReleased(event: MouseEvent): Boolean {
+        val pressed = pressedHyperlinkId
+        pressedHyperlinkId = 0
+        if (!SwingUtilities.isLeftMouseButton(event) || pressed == 0) return false
+        controlDown = hyperlinkNavigationModifierDown(event)
+        updatePointerPosition(event.x, event.y)
+        if (hoveredHyperlinkId != pressed ||
+            (pressed > 0 && !pressedOsc8OccurrenceIsHovered()) ||
+            !canActivate(pressed, hyperlinkNavigationModifierDown(event)) ||
+            !host.openHyperlink(pressed, event)
+        ) {
+            return false
+        }
         event.consume()
         return true
     }
+
+    /** A shared OSC 8 ID cannot identify which displayed occurrence received the press. */
+    private fun pressedOsc8OccurrenceIsHovered(): Boolean {
+        val cache = host.renderCache
+        if (cache.activeBuffer != pressedBuffer || cache.historyContentGeneration != pressedHistoryGeneration) return false
+        val row = pressedAbsoluteRow - (cache.discardedCount + cache.historySize - cache.scrollbackOffset)
+        return !(row !in 0 until cache.rows.toLong() || !hover.contains(row.toInt(), pressedColumn)) &&
+            if (pressedLineId != 0L) {
+                cache.lineIds[row.toInt()] == pressedLineId
+            } else {
+                cache.lineGenerations[row.toInt()] == pressedLineGeneration
+            }
+    }
+
+    private fun canActivate(
+        id: Int,
+        modifier: Boolean,
+    ): Boolean = host.hyperlinkActivation(id) == SwingHyperlinkActivation.DIRECT || modifier
 
     fun hyperlinkIdAt(event: MouseEvent): Int {
         val cache = host.renderCache
@@ -106,78 +217,89 @@ internal class TerminalHyperlinkController(
 
     fun updateHyperlinkActivationHover(active: Boolean) {
         controlDown = active
-        if (hoveredHyperlinkId == NO_HYPERLINK_ID || hyperlinkActivationHover == active) return
-        hyperlinkActivationHover = active
-        repaintHyperlinkSpan(
-            hoveredHyperlinkId,
-            hoveredHyperlinkStartRow,
-            hoveredHyperlinkStartColumn,
-            hoveredHyperlinkEndRow,
-            hoveredHyperlinkEndColumn,
-        )
+        val activation = hoveredHyperlinkId != NO_HYPERLINK_ID && canActivate(hoveredHyperlinkId, active)
+        if (hoveredHyperlinkId == NO_HYPERLINK_ID || hyperlinkActivationHover == activation) return
+        hover.activation = activation
+        updateCursor(activation)
+        repaintSegments()
     }
 
-    fun clearHyperlinkHover() {
-        pointerKnown = false
-        controlDown = false
-        clearHoveredSpan()
-        applyHyperlinkHover(NO_HYPERLINK_ID, activationHover = false)
+    fun clearHyperlinkHover(forgetPointer: Boolean = true) {
+        if (forgetPointer) {
+            pointerKnown = false
+            controlDown = false
+        }
+        pressedHyperlinkId = 0
+        pendingHover.reset()
+        applyHyperlinkHover(NO_HYPERLINK_ID)
     }
 
-    /** Re-hit-tests the last pointer position after frame, geometry, or detected-link changes. */
+    /** Reprojects the semantic occurrence after frame, geometry, or detected-link changes. */
     fun refreshHyperlinkHover() {
         if (!pointerKnown) return
         val cache = host.renderCache
         val cell = if (cache.columns > 0 && cache.rows > 0) host.cellAt(pointerX, pointerY) else -1L
-        val hyperlinkId = resolvableHyperlinkIdAt(cell)
-        if (hyperlinkId != NO_HYPERLINK_ID) {
-            resolveHoveredSpan(cell, hyperlinkId)
-        } else {
-            clearHoveredSpan()
+        val id = resolvableHyperlinkIdAt(cell)
+        pendingHover.reset()
+        if (id != NO_HYPERLINK_ID) {
+            // Detector IDs identify occurrences; OSC 8 IDs can be shared by separate displayed links.
+            for (row in 0 until cache.rows) {
+                var column = 0
+                while (column < cache.columns) {
+                    if (hyperlinkIdAt(row, column) != id) {
+                        column++
+                        continue
+                    }
+                    val start = column++
+                    while (column < cache.columns && hyperlinkIdAt(row, column) == id) column++
+                    pendingHover.add(row, start, column)
+                }
+            }
         }
-        applyHyperlinkHover(hyperlinkId, activationHover = controlDown)
+        if (id > 0) pendingHover.retainConnected(unpackCellRow(cell), unpackCellColumn(cell), cache)
+        applyHyperlinkHover(id)
     }
 
-    private fun applyHyperlinkHover(
-        hyperlinkId: Int,
-        activationHover: Boolean,
-    ) {
-        val normalizedActivationHover = hyperlinkId != NO_HYPERLINK_ID && activationHover
-        val previousHyperlinkId = hoveredHyperlinkId
-        val previousStartRow = hoveredHyperlinkStartRow
-        val previousStartColumn = hoveredHyperlinkStartColumn
-        val previousEndRow = hoveredHyperlinkEndRow
-        val previousEndColumn = hoveredHyperlinkEndColumn
-        val changed =
-            hoveredHyperlinkId != hyperlinkId ||
-                hyperlinkActivationHover != normalizedActivationHover ||
-                hoveredHyperlinkStartRow != pendingHoverStartRow ||
-                hoveredHyperlinkStartColumn != pendingHoverStartColumn ||
-                hoveredHyperlinkEndRow != pendingHoverEndRow ||
-                hoveredHyperlinkEndColumn != pendingHoverEndColumn
-        hoveredHyperlinkId = hyperlinkId
-        hoveredHyperlinkStartRow = pendingHoverStartRow
-        hoveredHyperlinkStartColumn = pendingHoverStartColumn
-        hoveredHyperlinkEndRow = pendingHoverEndRow
-        hoveredHyperlinkEndColumn = pendingHoverEndColumn
-        hyperlinkActivationHover = normalizedActivationHover
-        val nextCursor = if (hyperlinkId != NO_HYPERLINK_ID) HAND_CURSOR else DEFAULT_CURSOR
-        if (host.cursor !== nextCursor) host.cursor = nextCursor
-        if (changed) {
-            repaintHyperlinkSpan(previousHyperlinkId, previousStartRow, previousStartColumn, previousEndRow, previousEndColumn)
-            repaintHyperlinkSpan(hyperlinkId, pendingHoverStartRow, pendingHoverStartColumn, pendingHoverEndRow, pendingHoverEndColumn)
+    private fun applyHyperlinkHover(id: Int) {
+        val occurrenceChanged = id != hoveredHyperlinkId
+        val activation = id != NO_HYPERLINK_ID && canActivate(id, controlDown)
+        pendingHover.setIdentity(id, activation)
+        if (!hover.sameAs(pendingHover)) {
+            repaintSegments()
+            val previous = hover
+            hover = pendingHover
+            pendingHover = previous
+            repaintSegments()
         }
+        val action = if (id == 0) null else host.hyperlinkAction(id)
+        if (occurrenceChanged || hoverAction !== action) {
+            hoverAction?.mouseExited()
+            hoverAction = action
+            if (action != null && hoveredSegmentCount > 0) {
+                val cell = host.cellAt(pointerX, pointerY)
+                val row = unpackCellRow(cell)
+                val column = unpackCellColumn(cell)
+                for (segment in 0 until hoveredSegmentCount) {
+                    if (segmentRow(segment) == row && column in segmentStartColumn(segment) until segmentEndColumn(segment)) {
+                        host.enterHyperlink(action, row, segmentStartColumn(segment), segmentEndColumn(segment))
+                        break
+                    }
+                }
+            }
+        }
+        updateCursor(activation)
     }
 
-    private fun repaintHyperlinkSpan(
-        hyperlinkId: Int,
-        startRow: Int,
-        startColumn: Int,
-        endRow: Int,
-        endColumn: Int,
-    ) {
-        if (hyperlinkId == NO_HYPERLINK_ID || startRow == NO_HYPERLINK_ROW || endRow == NO_HYPERLINK_ROW) return
-        host.repaintHyperlinkSpan(startRow, startColumn, endRow, endColumn)
+    private fun updateCursor(activation: Boolean) {
+        val cursor = if (activation) HAND_CURSOR else DEFAULT_CURSOR
+        if (host.cursor !== cursor) host.cursor = cursor
+    }
+
+    private fun repaintSegments() {
+        for (index in 0 until hoveredSegmentCount) {
+            val row = segmentRow(index)
+            host.repaintHyperlinkSpan(row, segmentStartColumn(index), row, segmentEndColumn(index))
+        }
     }
 
     private fun resolvableHyperlinkIdAt(cell: Long): Int {
@@ -185,73 +307,17 @@ internal class TerminalHyperlinkController(
         val column = unpackCellColumn(cell)
         val row = unpackCellRow(cell)
         if (row !in 0 until cache.rows || column !in 0 until cache.columns) return NO_HYPERLINK_ID
-        val hyperlinkId = hyperlinkIdAt(row, column)
-        if (hyperlinkId == NO_HYPERLINK_ID) return NO_HYPERLINK_ID
-        return if (host.isHyperlinkResolvable(hyperlinkId)) hyperlinkId else NO_HYPERLINK_ID
-    }
-
-    private var pendingHoverStartRow: Int = NO_HYPERLINK_ROW
-    private var pendingHoverStartColumn: Int = 0
-    private var pendingHoverEndRow: Int = NO_HYPERLINK_ROW
-    private var pendingHoverEndColumn: Int = 0
-
-    private fun resolveHoveredSpan(
-        cell: Long,
-        hyperlinkId: Int,
-    ) {
-        val cache = host.renderCache
-        var startColumn = unpackCellColumn(cell)
-        var startRow = unpackCellRow(cell)
-        var endColumn = startColumn + 1
-        var endRow = startRow
-
-        while (startColumn > 0 && hyperlinkIdAt(startRow, startColumn - 1) == hyperlinkId) {
-            startColumn--
-        }
-        while (
-            startColumn == 0 &&
-            startRow > 0 &&
-            cache.lineWrapped[startRow - 1] &&
-            hyperlinkIdAt(startRow - 1, cache.columns - 1) == hyperlinkId
-        ) {
-            startRow--
-            startColumn = cache.columns - 1
-            while (startColumn > 0 && hyperlinkIdAt(startRow, startColumn - 1) == hyperlinkId) {
-                startColumn--
-            }
-        }
-
-        while (endColumn < cache.columns && hyperlinkIdAt(endRow, endColumn) == hyperlinkId) {
-            endColumn++
-        }
-        while (
-            endColumn == cache.columns &&
-            endRow + 1 < cache.rows &&
-            cache.lineWrapped[endRow] &&
-            hyperlinkIdAt(endRow + 1, 0) == hyperlinkId
-        ) {
-            endRow++
-            endColumn = 1
-            while (endColumn < cache.columns && hyperlinkIdAt(endRow, endColumn) == hyperlinkId) {
-                endColumn++
-            }
-        }
-
-        pendingHoverStartRow = startRow
-        pendingHoverStartColumn = startColumn
-        pendingHoverEndRow = endRow
-        pendingHoverEndColumn = endColumn
-    }
-
-    private fun clearHoveredSpan() {
-        pendingHoverStartRow = NO_HYPERLINK_ROW
-        pendingHoverStartColumn = 0
-        pendingHoverEndRow = NO_HYPERLINK_ROW
-        pendingHoverEndColumn = 0
+        if (TerminalRenderAttrs.isInvisible(cache.attrWords[cache.rowOffset(row) + column])) return NO_HYPERLINK_ID
+        val id = hyperlinkIdAt(row, column)
+        return if (id != NO_HYPERLINK_ID && host.isHyperlinkResolvable(id)) id else NO_HYPERLINK_ID
     }
 
     private fun hyperlinkIdAt(
         row: Int,
         column: Int,
-    ): Int = host.hyperlinkIdAt(row, column)
+    ): Int {
+        val cell = host.renderCache.rowOffset(row) + column
+        if (TerminalRenderAttrs.isInvisible(host.renderCache.attrWords[cell])) return NO_HYPERLINK_ID
+        return hyperlinkIdForCell(host.hyperlinkIdAt(row, column), host.renderCache.flags[cell])
+    }
 }

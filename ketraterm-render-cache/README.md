@@ -57,6 +57,18 @@ For deep-dive technical details on triple-buffering logic and grapheme cluster c
 
 ## How to Use
 
+Background text consumers can use `TerminalRenderRangeCopy` to copy an absolute
+range through the existing reader/session synchronization boundary. Each read
+copies at most 64 rows and 4096 cells by default, permitting one wider physical
+row; row and cluster planes are retained for subsequent reads. Use its explicit
+`firstAbsoluteRow`/`lastAbsoluteRow` bounds for the sliced origin. Assemble text
+and invoke detectors after `read` returns, outside the mutation lock. The helper
+is worker-owned and must not be shared concurrently.
+
+`TerminalRenderCache` copies `historyContentGeneration` alongside the other
+source generations, including cache-to-cache publication. Reset removes all
+source metadata while retaining allocated planes.
+
 The following example shows how a UI component initializes a publisher and draws using the double/triple-buffered cache:
 
 ```kotlin

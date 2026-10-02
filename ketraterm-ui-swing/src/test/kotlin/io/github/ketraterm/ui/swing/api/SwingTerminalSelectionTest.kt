@@ -28,6 +28,7 @@ import io.github.ketraterm.session.TerminalHyperlinkResolver
 import io.github.ketraterm.session.TerminalSession
 import io.github.ketraterm.transport.TerminalConnector
 import io.github.ketraterm.transport.TerminalConnectorListener
+import io.github.ketraterm.ui.swing.input.hyperlinkNavigationModifierMask
 import io.github.ketraterm.ui.swing.render.TestCell
 import io.github.ketraterm.ui.swing.render.TestRenderFrame
 import io.github.ketraterm.ui.swing.settings.*
@@ -222,7 +223,7 @@ class SwingTerminalSelectionTest {
             component.setSize(120, 40)
             component.bind(session)
             dispatcher.scheduler.advanceUntilIdle()
-            val move = MouseEvent(component, MouseEvent.MOUSE_MOVED, 0L, InputEvent.CTRL_DOWN_MASK, 1, 1, 0, false)
+            val move = MouseEvent(component, MouseEvent.MOUSE_MOVED, 0L, hyperlinkNavigationModifierMask, 1, 1, 0, false)
             component.mouseMotionListeners.forEach { it.mouseMoved(move) }
             assertEquals(java.awt.Cursor.HAND_CURSOR, component.cursor.type)
             publish(2L, 8)
@@ -342,7 +343,7 @@ class SwingTerminalSelectionTest {
                         { assertNull(reused.currentSelection(), "The previous selection must not survive replacement") },
                         { assertFalse(reused.selectAll(), "Selection requires a published frame belonging to this session") },
                         {
-                            for (listener in reused.mouseListeners) listener.mousePressed(mousePressedWithCtrl(reused, 1, 1))
+                            clickWithCtrl(reused, 1, 1)
                             assertTrue(openedLinks.isEmpty(), "Retained hyperlink cells must not activate against the new session")
                         },
                         {
@@ -361,7 +362,7 @@ class SwingTerminalSelectionTest {
                     assertArrayEquals(componentPixels(fresh), newPixels)
                     assertTrue(reused.viewportState().contentHeightPixels > 0)
                     assertEquals(fresh.viewportState(), reused.viewportState())
-                    for (listener in reused.mouseListeners) listener.mousePressed(mousePressedWithCtrl(reused, 1, 1))
+                    clickWithCtrl(reused, 1, 1)
                     assertEquals(listOf("https://new.example/7"), openedLinks)
                     assertTrue(reused.selectAll())
                     assertEquals(CellSelection(0, 0, 5, 0), reused.currentSelection())
@@ -438,7 +439,7 @@ class SwingTerminalSelectionTest {
                     fresh.bind(second)
 
                     assertArrayEquals(componentPixels(fresh), componentPixels(reused), "Session replacement retained old bidi layout")
-                    for (listener in reused.mouseListeners) listener.mousePressed(mousePressedWithCtrl(reused, 1, 1))
+                    clickWithCtrl(reused, 1, 1)
                     assertEquals("https://new.example/$expectedLink", opened)
                 } finally {
                     reused.dispose()
@@ -491,7 +492,7 @@ class SwingTerminalSelectionTest {
                 component.setSize(100, 40)
                 component.bind(session)
                 session.renderPublisher.updateAndPublish(StaticFrameReader(frame))
-                component.mouseListeners.forEach { it.mousePressed(mousePressedWithCtrl(component, 1, 1)) }
+                clickWithCtrl(component, 1, 1)
             }
             assertEquals("https://example.com/3", opened.get())
         } finally {
@@ -1153,6 +1154,19 @@ class SwingTerminalSelectionTest {
             session.renderPublisher.updateAndPublish(StaticFrameReader(frame))
             component.mouseListeners.forEach {
                 it.mousePressed(mousePressedWithCtrl(component, x = 8, y = 8))
+                it.mouseReleased(
+                    MouseEvent(
+                        component,
+                        MouseEvent.MOUSE_RELEASED,
+                        0L,
+                        hyperlinkNavigationModifierMask,
+                        8,
+                        8,
+                        1,
+                        false,
+                        MouseEvent.BUTTON1,
+                    ),
+                )
             }
         }
 
@@ -1324,6 +1338,19 @@ class SwingTerminalSelectionTest {
             MouseEvent.BUTTON1,
         )
 
+    private fun clickWithCtrl(
+        component: SwingTerminal,
+        x: Int,
+        y: Int,
+    ) {
+        component.mouseListeners.forEach { it.mousePressed(mousePressedWithCtrl(component, x, y)) }
+        component.mouseListeners.forEach {
+            it.mouseReleased(
+                MouseEvent(component, MouseEvent.MOUSE_RELEASED, 0L, hyperlinkNavigationModifierMask, x, y, 1, false, MouseEvent.BUTTON1),
+            )
+        }
+    }
+
     private fun mousePressedWithCtrl(
         component: SwingTerminal,
         x: Int,
@@ -1333,7 +1360,7 @@ class SwingTerminalSelectionTest {
             component,
             MouseEvent.MOUSE_PRESSED,
             System.currentTimeMillis(),
-            InputEvent.BUTTON1_DOWN_MASK or InputEvent.CTRL_DOWN_MASK,
+            InputEvent.BUTTON1_DOWN_MASK or hyperlinkNavigationModifierMask,
             x,
             y,
             1,

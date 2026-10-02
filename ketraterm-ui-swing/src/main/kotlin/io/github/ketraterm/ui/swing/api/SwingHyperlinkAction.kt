@@ -15,13 +15,16 @@
  */
 package io.github.ketraterm.ui.swing.api
 
+import java.awt.event.MouseEvent
+import javax.swing.JComponent
+
 /**
- * Host-owned action for a hyperlink discovered from visible terminal text.
+ * Host-owned navigation and optional hover behavior for a discovered hyperlink.
  *
- * Reusable Swing UI stores only compact primitive ids in its paint and hit-test
- * paths. The host action is invoked only after explicit user activation, such
- * as Ctrl-left-click, and may route to an IDE, browser, file opener, or a
- * security prompt.
+ * Actions belong to retained occurrences independently of the viewport. Swing UI
+ * invokes activation and hover callbacks on the EDT, never during painting.
+ * [open] follows the occurrence's [SwingHyperlinkActivation] policy or an explicit
+ * context-menu request and may navigate through an IDE, browser, or file opener.
  */
 fun interface SwingHyperlinkAction {
     /**
@@ -30,6 +33,21 @@ fun interface SwingHyperlinkAction {
      * @return `true` when the activation was handled.
      */
     fun open(): Boolean
+
+    /** Opens from a captured gesture, preserving a host navigation popup's anchor. */
+    fun open(event: MouseEvent): Boolean = open()
+
+    /** Optional provider hover callback. Bounds are component-local; invoked on entry, never in paint. */
+    fun mouseEntered(
+        component: JComponent,
+        x: Int,
+        y: Int,
+        width: Int,
+        height: Int,
+    ) = Unit
+
+    /** Balances an entry when the pointer leaves, the occurrence changes, or the binding closes. */
+    fun mouseExited() = Unit
 
     companion object {
         /**

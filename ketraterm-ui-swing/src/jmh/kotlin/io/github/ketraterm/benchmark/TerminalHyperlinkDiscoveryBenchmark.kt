@@ -16,6 +16,8 @@
 package io.github.ketraterm.benchmark
 
 import io.github.ketraterm.render.api.TerminalRenderFrame
+import io.github.ketraterm.render.api.TerminalRenderFrameConsumer
+import io.github.ketraterm.render.api.TerminalRenderFrameReader
 import io.github.ketraterm.render.cache.TerminalRenderCache
 import io.github.ketraterm.ui.swing.api.SwingHyperlinkAction
 import io.github.ketraterm.ui.swing.api.SwingHyperlinkDetector
@@ -28,6 +30,7 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import org.openjdk.jmh.annotations.*
 import java.lang.Runnable
+import java.util.concurrent.ConcurrentLinkedQueue
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 import javax.swing.SwingUtilities
@@ -60,11 +63,8 @@ open class TerminalHyperlinkDiscoveryBenchmark {
         Runnable {
             var checksum = 0
             repeat(FRAMES_PER_BATCH) {
-                frame.generation++
+                frame.advance()
                 cache.accept(frame)
-                if (changingProgress) {
-                    cache.codeWords[(ROWS - 1) * COLUMNS + PROGRESS_COLUMN] = '0'.code + (frame.generation % 10).toInt()
-                }
                 controller.scheduleForFrame()
                 checksum += controller.hyperlinkIdAt(0, 0, cache)
             }
@@ -83,10 +83,11 @@ open class TerminalHyperlinkDiscoveryBenchmark {
             val host =
                 object : TerminalHyperlinkDiscoveryHost {
                     override val renderCache: TerminalRenderCache = cache
+                    override val hyperlinkSource = frame
                     override val hyperlinkDetector =
-                        SwingHyperlinkDetector { request, sink ->
-                            for (line in 0 until request.lineCount) {
-                                sink.addHyperlink(
+                        SwingHyperlinkDetector { request ->
+                            List(request.lineCount) { line ->
+                                request.hyperlink(
                                     line,
                                     0,
                                     URL.length,
@@ -136,28 +137,47 @@ open class TerminalHyperlinkDiscoveryBenchmark {
 
     private class UpdatingFrame(
         private val changingProgress: Boolean,
-    ) : TerminalRenderFrame by TerminalRenderBenchmarkFrame(List(ROWS) { "$URL 0% row $it".padEnd(COLUMNS) }) {
+        private val cells: TerminalRenderBenchmarkFrame = TerminalRenderBenchmarkFrame(List(ROWS) { "$URL 0% row $it".padEnd(COLUMNS) }),
+    ) : TerminalRenderFrame by cells,
+        TerminalRenderFrameReader {
         var generation = 1L
+            private set
         override val frameGeneration: Long get() = generation
         override val contentGeneration: Long get() = if (changingProgress) generation else 1L
+        override val historyContentGeneration: Long get() = 1L
 
         override fun lineGeneration(row: Int): Long = if (changingProgress && row == ROWS - 1) generation else 1L
+
+        @Synchronized
+        fun advance() {
+            generation++
+            if (changingProgress) cells.setCodePoint(ROWS - 1, PROGRESS_COLUMN, '0'.code + (generation % 10).toInt())
+        }
+
+        @Synchronized
+        override fun readRenderFrame(consumer: TerminalRenderFrameConsumer) = consumer.accept(this)
+
+        override fun readRenderFrameForAbsoluteRange(
+            startAbsoluteRow: Long,
+            endAbsoluteRow: Long,
+            consumer: TerminalRenderFrameConsumer,
+        ) = readRenderFrame(consumer)
     }
 
     private class PausingDispatcher : CoroutineDispatcher() {
+        @Volatile
         var paused = false
-        private val pending = ArrayDeque<Runnable>()
+        private val pending = ConcurrentLinkedQueue<Runnable>()
 
         override fun dispatch(
             context: CoroutineContext,
             block: Runnable,
         ) {
-            check(SwingUtilities.isEventDispatchThread())
-            if (paused) pending.addLast(block) else Dispatchers.Default.dispatch(context, block)
+            if (paused) pending.add(block) else Dispatchers.Default.dispatch(context, block)
         }
 
         fun drainCancelledWork() {
-            while (pending.isNotEmpty()) pending.removeFirst().run()
+            while (true) (pending.poll() ?: return).run()
         }
     }
 

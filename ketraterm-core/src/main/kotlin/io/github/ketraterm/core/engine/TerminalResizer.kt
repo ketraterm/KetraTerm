@@ -186,6 +186,7 @@ internal object TerminalResizer {
                 val newLine = newRing.push()
                 newLine.assignLineId(outputLineId)
                 newLine.clear(0, 0)
+                newLine.hasOutput = builder.outputEnd >= 0
 
                 placeCursorAtEmptyLogicalLine()
                 placeViewportAtEmptyLogicalLine()
@@ -200,6 +201,7 @@ internal object TerminalResizer {
                 val newLine = newRing.push()
                 newLine.assignLineId(outputLineId)
                 newLine.clear(0, 0)
+                newLine.hasOutput = builder.outputEnd >= 0 && (offset == 0 || offset < builder.outputEnd)
 
                 var chunkLength =
                     minOf(newWidth, builder.size - offset)
@@ -322,8 +324,8 @@ internal object TerminalResizer {
             }
 
             /*
-             * Trailing blank viewport rows are layout capacity rather than
-             * durable content. They are recreated after reflow.
+             * Untouched trailing viewport rows are layout capacity. Explicit
+             * blank output remains durable content and participates in reflow.
              */
             if (
                 i >= oldTrailingBlankStart &&
@@ -349,6 +351,7 @@ internal object TerminalResizer {
                 } else {
                     logicalLen
                 }
+            if (oldLine.hasOutput) builder.outputEnd = builder.size + dataLength
 
             val hasCursor =
                 i == absoluteOldCursorRow
@@ -554,6 +557,7 @@ internal object TerminalResizer {
 
         while (
             row >= liveScreenTop &&
+            !buffer.ring[row].hasOutput &&
             getLogicalLength(buffer.ring[row]) == 0
         ) {
             count++
@@ -597,6 +601,9 @@ private class LogicalLineBuilder(
     var cursorAbsoluteIndex = -1
     var viewportTopAbsoluteIndex = -1
     var lineId = 0L
+
+    /** Authored cell end, excluding cursor-placement padding; -1 means no output, 0 an authored blank. */
+    var outputEnd = -1
 
     /**
      * Captures the source identity for the current logical line.
@@ -642,6 +649,7 @@ private class LogicalLineBuilder(
         cursorAbsoluteIndex = -1
         viewportTopAbsoluteIndex = -1
         lineId = 0L
+        outputEnd = -1
     }
 
     private fun ensureCapacity(required: Int) {

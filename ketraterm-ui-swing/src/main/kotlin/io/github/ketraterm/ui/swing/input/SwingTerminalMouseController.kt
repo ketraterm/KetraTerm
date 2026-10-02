@@ -34,6 +34,7 @@ internal class SwingTerminalMouseController(
     private val alternateWheelAccumulator = ScrollDeltaAccumulator()
     private var wheelRoute = WheelRoute.NONE
     private var wheelSession: TerminalInputEncoder? = null
+    private var shiftDown = false
 
     fun resetWheelInput() {
         alternateWheelAccumulator.reset()
@@ -49,6 +50,7 @@ internal class SwingTerminalMouseController(
     val mouseListener =
         object : MouseAdapter() {
             override fun mousePressed(event: MouseEvent) {
+                updatePointerModifiers(event.modifiersEx)
                 host.requestFocusInWindow()
                 if (handleContextMenu(event)) return
                 if (!host.renderCache.hasFrame) return
@@ -59,9 +61,11 @@ internal class SwingTerminalMouseController(
             }
 
             override fun mouseReleased(event: MouseEvent) {
+                updatePointerModifiers(event.modifiersEx)
                 if (handleContextMenu(event)) return
                 if (!host.renderCache.hasFrame) return
                 if (handleMouseTracking(event, TerminalMouseEventType.RELEASE)) return
+                host.handleHyperlinkMouseReleased(event)
                 host.handleSelectionMouseReleased(event)
             }
 
@@ -74,30 +78,31 @@ internal class SwingTerminalMouseController(
     val mouseMotionListener =
         object : MouseMotionAdapter() {
             override fun mouseDragged(event: MouseEvent) {
+                updatePointerModifiers(event.modifiersEx)
+                host.handleHyperlinkMouseDragged()
                 if (!host.renderCache.hasFrame) return
                 if (handleMouseTracking(event, TerminalMouseEventType.MOTION)) return
                 host.handleSelectionMouseDragged(event)
             }
 
             override fun mouseMoved(event: MouseEvent) {
+                updatePointerModifiers(event.modifiersEx)
                 if (!host.renderCache.hasFrame) return
                 if (host.handlePromptMarkerMouseMoved(event)) {
                     return
                 }
-                if (handleMouseTracking(event, TerminalMouseEventType.MOTION)) {
-                    host.clearHyperlinkHover()
-                    return
-                }
-                host.handleHyperlinkMouseMoved(event)
+                val tracked = handleMouseTracking(event, TerminalMouseEventType.MOTION)
+                host.handleHyperlinkMouseMoved(event, enabled = !tracked)
             }
         }
 
     private fun handleMouseWheel(event: MouseWheelEvent) {
+        updatePointerModifiers(event.modifiersEx)
         if (!host.renderCache.hasFrame) {
             resetWheelInput()
             return
         }
-        if (isMouseTrackingIntercepted(event)) {
+        if (isMouseTrackingIntercepted()) {
             selectWheelRoute(WheelRoute.TRACKED)
             host.finishViewportScroll()
             handleMouseTracking(event, TerminalMouseEventType.WHEEL)
@@ -140,13 +145,22 @@ internal class SwingTerminalMouseController(
         wheelSession = session
     }
 
-    fun isMouseTrackingIntercepted(event: MouseEvent): Boolean = !event.isShiftDown && host.mouseTrackingMode() != MouseTrackingMode.OFF
+    /** Remembers the same Shift override for stationary-pointer reconciliation as event routing. */
+    fun updatePointerModifiers(modifiers: Int): Boolean {
+        val next = modifiers and InputEvent.SHIFT_DOWN_MASK != 0
+        val changed = shiftDown != next
+        shiftDown = next
+        return changed
+    }
+
+    fun isMouseTrackingIntercepted(): Boolean = !shiftDown && host.mouseTrackingMode() != MouseTrackingMode.OFF
 
     private fun handleContextMenu(event: MouseEvent): Boolean {
         if (!event.isPopupTrigger) return false
-        if (!event.isShiftDown && host.mouseTrackingMode() != MouseTrackingMode.OFF) return false
+        if (isMouseTrackingIntercepted()) return false
         val handled = host.handleContextMenuMouseEvent(event, forcedByShift = event.isShiftDown)
         if (!handled) return false
+        host.handleHyperlinkMouseDragged()
         event.consume()
         return true
     }
@@ -155,7 +169,8 @@ internal class SwingTerminalMouseController(
         event: MouseEvent,
         type: TerminalMouseEventType,
     ): Boolean {
-        if (!isMouseTrackingIntercepted(event)) return false
+        if (!isMouseTrackingIntercepted()) return false
+        host.clearHyperlinkHover()
 
         val wheelRotation = if (event is MouseWheelEvent) event.wheelRotation else 0
         if (event is MouseWheelEvent && wheelRotation == 0) {

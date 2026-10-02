@@ -144,3 +144,217 @@ val customServices = SwingHostServices(
     }
 )
 ```
+
+## Hyperlink detector contract and migration
+
+`SwingHyperlinkDetector.detect` is suspending. The discovery owner serializes
+invocations within each context, owns cancellation and rejects results from obsolete binding,
+source, provider or analysis epochs. Providers must propagate cancellation and discard
+tainted ordered state. Return a completed `List<SwingHyperlink>` and do not mutate
+it afterwards. An empty list is successful analysis without links; throwing means
+failure or cancellation. Discovery may allocate ordinary Kotlin results and collections.
+
+The IntelliJ adapter uses a cancellable `readAction` per line/provider. If a write
+interrupts an invocation, its mutated filter state is discarded and reconstructed
+through ordered replay. A read-action retry never invokes that same mutated filter
+again. Completed results are published outside the read action.
+
+Choose `INDEPENDENT_LINE` for text-derived links whose logical lines can be
+analyzed independently, or `ORDERED_CONTENT` for console filters that consume
+source order and may highlight earlier lines. `INDEPENDENT_AND_ORDERED` enables both
+lanes; such detectors must allow the two contexts to run concurrently. Each request
+selects one context. Slow console filters cannot hold up independent URLs/paths.
+`configurationGeneration` is an equality-only invalidation counter. Publish the
+changed configuration and a distinct generation before emitting `configurationChanges`
+so it reconciles without new terminal output. A signal with an unchanged generation
+does not invalidate results; a generation change without a signal is observed at the
+next reconciliation. The binding owns the flow's subscription and cancellation.
+A configuration refresh keeps prepared links until replacement batches arrive,
+including successful empty replacements. Replacing the detector instance retires old actions immediately.
+Implement `discardOrderedState` when a detector retains ordered source/provider
+state. The owner invokes it at binding/provider teardown only after the ordered
+call has exited, so cleanup cannot race a running filter.
+
+Requests own their strings and row arrays. Each logical line includes one
+trailing newline; soft wrapping joins physical rows while omitting wrap padding
+and wide trailing cells. Coordinates use the first absolute physical row of the
+logical line and a UTF-16 offset in its extracted text, rather than viewport rows
+or terminal columns. Platform-specific cumulative console offsets belong to the
+plugin's ordered filter state. Search and detection share cell extraction rules
+while retaining their own mapping and trimming policies.
+
+Report a `SwingHyperlink` containing the source range, dependency range, action,
+optional complete copyable URI, prepared presentation and activation policy.
+Dependencies include every character affecting detection/navigation, including
+token delimiters. Ordered results record the `consumedThrough` position that
+produced them. A result can refer to earlier source lines; coordinates outside
+the owner's captured source are ignored. Styles contain resolved colors and
+underline metadata; resolve theme/framework data outside painting.
+
+For a single-line result, the request builds absolute coordinates:
+
+```kotlin
+return listOf(
+    request.hyperlink(
+        lineIndex, startOffset, endOffset, action,
+        validationStartOffset = tokenStart,
+        validationEndOffset = tokenEndIncludingDelimiter,
+        uri = completeDestination,
+    )
+)
+```
+
+Migration is atomic: replace `LOGICAL_LINE` with `INDEPENDENT_LINE`, `VIEWPORT`
+with `ORDERED_CONTENT` and make detector overrides suspending. The current signature
+is `suspend fun detect(request: SwingHyperlinkDetectionRequest): List<SwingHyperlink>`.
+Replace sink publication with a returned list, using the request factory above for
+single-line ranges. The sink interface and batch cumulative-offset accessors were
+removed; use logical-line anchors and UTF-16 offsets. There is no compatibility
+detector pipeline.
+
+Hover shares one primitive row/start/end projection between interaction, painting
+and repainting. OSC 8 runs join adjacent overlapping spans and terminal soft wraps;
+disconnected captions or runs hover separately even when the application reuses
+one ID/destination. Detected links keep their semantic occurrence across visible
+fragments. Moving within the selected region does not reconstruct it or request
+additional painting. Reflow and frame changes reproject current geometry.
+Hover callbacks are paired per detected occurrence, even when two results share
+one action instance. OSC 8 activation validates the pressed source row as well as
+its protocol ID, so scrolling or row replacement cannot retarget a held click.
+
+Context menus capture the resolved action and optional complete URI when opened.
+They retain their target across output changes, eviction and rebinding. Detectors
+should provide `SwingHyperlink.uri` when their target can be copied; the existing
+host menu then exposes Copy Link. The captured `providerAction` and original popup
+`triggerEvent` allow the plugin to preserve native provider menu actions.
+
+Discovery now uses one retained logical-line index for the binding, with separate
+primary/alternate state validated against each buffer's history-content generation.
+Stable occurrence IDs own actions independently of viewport projection. Successful
+empty results are retained too. Incremental source scans use bounded absolute-range
+copies under session synchronization and assemble full logical text outside the lock,
+including soft-wrapped lines that cross copy or viewport boundaries. Newly admitted
+history is reconciled even if it was edited before its admission was published.
+Every discovery request uses this source-backed path, including fixtures; an
+unbound terminal has no discovery source. The index alone validates result ranges
+and splits them into line segments. Independent-line readiness is separate from
+ordered progress: replaying an ordered dependency does not reanalyze unchanged URLs.
+
+Core frames expose `outputEndAbsoluteRow`, an exclusive absolute boundary that
+includes authored blank lines and excludes the unused live tail. It is independent
+of the viewport and follows content through scrolling and reflow. Discovery does
+not feed unused rows to ordered filters, so later output in those rows extends the
+existing chain. Cursor movement alone does not supply output. External render
+readers may leave the boundary unknown (`Long.MAX_VALUE`); discovery then includes
+all available rows conservatively. Editing an already-consumed logical line,
+including appending text to its unfinished tail, can still require ordered replay.
+
+Scrolling prepared content projects existing results synchronously into reusable
+ID and presentation-reference buffers without running detectors. The strict
+allocation constraint applies to recurring frame and paint work. Discovery,
+publication, hit testing and interaction may use ordinary Kotlin objects and
+collections; their retained lifetime and work must remain bounded.
+Projection clips the UTF-16 mapping before visiting cells, so a long wrapped link
+does not incur whole-destination traversal on each frame. Eviction retires affected
+records/actions without changing surviving occurrence IDs; partially retained
+wrapped occurrences keep their complete prepared destination until their final
+source row leaves retention. Reset/reflow invalidates the affected buffer's state.
+
+Discovery belongs to the session binding. Temporary hiding/removal preserves its
+index and running work; showing, reattachment, component focus and ancestor-window
+focus reconcile prepared links and the current stationary pointer. Unbind/dispose
+cancel work and release retained results. A provider that ignores cancellation
+keeps the serialization slot until it returns, and cannot publish obsolete results.
+
+Content demand is conflated independently of viewport/cursor frames. Missing visible
+content is copied first; independent results publish in batches of up to 64 logical
+lines. Worker validation rechecks current source rows after detection, preserving
+valid independent results when unrelated lines changed. Changed visible targets,
+including wrapped targets with an edited off-screen live tail, lose activation
+before rediscovery. Only the latter case needs bounded primitive row-stamp reads on
+the EDT; complete text extraction and provider execution stay on the worker.
+
+Failures and interrupted provider reads retain unprocessed work and allow three
+delayed retries (100 ms, 500 ms, 2 s). Successful empty analysis is retained.
+Scroll/cursor frames cannot restart exhausted recovery. New content, provider/source
+invalidation or an explicit bind/show/focus reconciliation starts a fresh attempt.
+Unprocessed content remains asynchronous. Ordered requests continue in source order
+in batches of up to 64 logical lines. On `analysisEpoch` changes, rebuild provider
+state from the retained beginning; ordinary eviction only advances `firstRetainedRow`.
+Results can highlight earlier retained lines and must identify the producer through
+`consumedThrough`. Replaying a producer to an empty result retires its old spans.
+Unchanged occurrences before an edit preserve their identities/actions during replay.
+The request's `lineFirstId` associates output with historical host directory metadata.
+
+Prepared normal, hovered, active and followed styles remain immutable Kotlin
+objects. Painting reads projected references using a renderer-internal extension
+that selects the existing style; the public presentation model only describes data.
+Painting performs no action-map or framework lookup. Terminal-authored underlines and
+concealment retain precedence. Native
+visible links activate directly; implicit links require Ctrl (Cmd on macOS). Both
+activate on release only while the pressed occurrence remains unchanged and no drag
+occurred. Modifier clicks preserve existing selection; direct links still permit
+selection dragging. Application mouse reporting retains precedence, with the existing
+Shift override. OSC 8 wins overlaps, then visible links, narrower ranges and stable
+provider order. Actions remain attached to retained occurrences independently of
+the viewport. Activation and hover callbacks run on the EDT; hover callbacks run
+at semantic transitions, outside painting.
+
+Hosts may set `SwingSettings.osc8HyperlinkPresentation` to a resolved
+`SwingHyperlinkPresentation`. OSC 8 and detected links use the same style-selection
+path, including backgrounds and visibility metadata. The default preserves the
+standalone dotted resting underline and solid hover underline; the IntelliJ host
+supplies the same resting/hover underlines with IDE theme styling on activation. The hand cursor appears only when activation is eligible; OSC 8 defaults to Ctrl/Cmd.
+Settings reload prepares styles and reconciles stationary-pointer feedback outside
+painting.
+
+Hyperlink configuration uses the existing immutable DTOs:
+
+```kotlin
+val settings = SwingSettings(
+    osc8HyperlinkPresentation = myPresentation, // null retains the built-in styles
+    osc8HyperlinkActivation = SwingHyperlinkActivation.DIRECT,
+)
+val terminal = SwingTerminal(settingsProvider = { settings })
+```
+
+`SwingHyperlinkPresentation` supplies normal, hovered, active and followed styles;
+each `SwingHyperlinkStyle` contains resolved colors and underline decoration.
+OSC 8 activation accepts `DIRECT` (ordinary primary click) or `MODIFIER` (Ctrl/Cmd,
+the default). Detected links provide the same presentation and activation DTOs per
+`SwingHyperlink` result. The host's `SwingHostServices.hyperlinkHandler` handles OSC 8
+destinations; detected results carry their own actions. To change component settings,
+return a new immutable snapshot from `settingsProvider` and call `reloadSettings()`.
+The stationary cursor and active styling reconcile immediately. Cursor eligibility,
+release/drag rules, authored-underline precedence and mouse-reporting precedence are
+shared interaction rules, not separate configuration switches.
+
+## Consumer and ABI verification
+
+The [published consumer fixtures](../ketraterm-testkit/src/consumerTest/README.md)
+compile Kotlin and Java with one direct dependency on this module. They exercise
+public host services, a suspending hyperlink detector and binding/disposal on the
+EDT with both Gradle module metadata and POM-only dependency resolution:
+
+```text
+./gradlew :ketraterm-testkit:publishedConsumerTest
+```
+
+Kotlin's [built-in ABI validation](https://kotlinlang.org/docs/gradle-binary-compatibility-validation.html)
+tracks the hyperlink types, `SwingHostServices`, `SwingTerminal` and
+`TerminalUiDispatcher` in [the signature baseline](api/ketraterm-ui-swing.api).
+It reads Kotlin visibility metadata; internal rendering and discovery helpers
+are outside this contract. Referenced settings and service types appear in
+signatures but are not recursively baselined.
+
+```text
+./gradlew :ketraterm-ui-swing:checkKotlinAbi
+./gradlew :ketraterm-ui-swing:updateKotlinAbi
+```
+
+`checkKotlinAbi` runs with this module's `check` task and explicitly in test CI.
+Run `updateKotlinAbi` only for intentional signature changes, then review its diff
+alongside the source. Keep compiler-generated default-argument and data-class
+members in the generated baseline. A matching snapshot guards against accidental
+signature changes; cross-release compiled-client compatibility and the broader
+v1 contract remain tracked in the [API verification map](../docs/terminal-feature-gap-map.md#api-and-product-verification).

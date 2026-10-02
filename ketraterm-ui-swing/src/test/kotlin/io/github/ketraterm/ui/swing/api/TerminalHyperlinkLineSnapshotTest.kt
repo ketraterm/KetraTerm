@@ -41,15 +41,17 @@ class TerminalHyperlinkLineSnapshotTest {
         val builder = TerminalHyperlinkLineSnapshotBuilder()
         val padded = builder.snapshot(cache, 0, 2)
         assertEquals("abc\n", padded.text)
-        assertTrue(padded.matchesRows(cache, 0, 2))
-        assertTrue(padded.sameIdentity(builder.snapshot(cache, 0, 2)))
+        assertTrue(padded.matchesRow(cache, 0, 0))
+        assertTrue(padded.matchesRow(cache, 1, 1))
+        assertTrue(padded.matchesTextRow(cache, 0, 0))
 
         cache.flags[2] = TerminalRenderCellFlags.EMPTY
         cache.lineGenerations[0]++
         val blank = builder.snapshot(cache, 0, 2)
         assertEquals("ab c\n", blank.text)
-        assertFalse(padded.matchesRows(cache, 0, 2))
-        assertFalse(padded.sameIdentity(blank))
+        assertFalse(padded.matchesRow(cache, 0, 0))
+        assertFalse(padded.matchesTextRow(cache, 0, 0))
+        assertTrue(padded.matchesRow(cache, 1, 1))
         assertEquals(2, blank.cellStarts[2])
         assertEquals(3, blank.cellEnds[2])
         assertEquals(3, blank.cellStarts[3])
@@ -84,14 +86,16 @@ class TerminalHyperlinkLineSnapshotTest {
                         assertEquals(expectedStart, snapshot.cellStarts[offset], "All cluster code units own the wide leading cell")
                         assertEquals(expectedStart + 2, snapshot.cellEnds[offset], "The mapping must cover the entire wide cell")
                     }
-                    val viewport = TerminalHyperlinkViewport()
+                    val viewport = TerminalHyperlinkIndex()
                     viewport.update(cache)
+                    viewport.ingest(snapshot, SwingHyperlinkDetectionContext.INDEPENDENT_LINE)
                     val pending = viewport.pendingLines()
-                    viewport.accept(
+                    val request = detectionRequest(pending)
+                    viewport.acceptResults(
                         pending,
-                        pending.map { line ->
-                            listOf(TerminalDetectedHyperlink(0, line.text.length - 1, SwingHyperlinkAction.NONE, 0, line.text.length))
-                        },
+                        pending.mapIndexed { index, line -> request.hyperlink(index, 0, line.text.length - 1, SwingHyperlinkAction.NONE) },
+                        SwingHyperlinkDetectionContext.INDEPENDENT_LINE,
+                        null,
                     )
                     viewport.writeOverlay(cache) { _, _, _, _ -> }
                     val ids = viewport.idsFor(cache)

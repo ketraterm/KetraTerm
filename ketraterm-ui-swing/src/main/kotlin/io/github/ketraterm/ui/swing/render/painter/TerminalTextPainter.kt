@@ -18,7 +18,9 @@ package io.github.ketraterm.ui.swing.render.painter
 import io.github.ketraterm.render.api.TerminalColorPalette
 import io.github.ketraterm.render.api.TerminalRenderCellFlags
 import io.github.ketraterm.render.cache.TerminalRenderCache
+import io.github.ketraterm.ui.swing.api.SwingHyperlinkPresentation
 import io.github.ketraterm.ui.swing.api.TerminalFontResolver
+import io.github.ketraterm.ui.swing.api.TerminalHyperlinkHover
 import io.github.ketraterm.ui.swing.render.*
 import io.github.ketraterm.ui.swing.render.cache.*
 import io.github.ketraterm.ui.swing.render.font.TerminalTextRunBuffer
@@ -50,6 +52,7 @@ internal class TerminalTextPainter(
     private val textRun = TerminalTextRunBuffer(INITIAL_TEXT_RUN_CAPACITY)
     private val asciiClipBounds = Rectangle()
     private val runStyle = TerminalTextRunStyle()
+    private var settings: SwingSettings? = null
     private val shapedTextRuns =
         TerminalShapedTextRunPainter(
             colorCache = colorCache,
@@ -63,6 +66,7 @@ internal class TerminalTextPainter(
      * Updates font-dependent caches for a settings snapshot.
      */
     fun updateSettings(settings: SwingSettings) {
+        this.settings = settings
         if (fontCache.update(settings.font, settings.fallbackFonts, settings.useSystemFallbackFonts)) {
             complexTextLayouts.clear()
             shapedTextRuns.clear()
@@ -88,25 +92,18 @@ internal class TerminalTextPainter(
         fontRenderContext: FontRenderContext,
         textBlinkVisible: Boolean = true,
         hyperlinkIds: IntArray = cache.hyperlinkIds,
-        hoveredHyperlinkId: Int = NO_HYPERLINK_ID,
-        hoveredHyperlinkStartRow: Int = DEFAULT_HOVER_START_ROW,
-        hoveredHyperlinkStartColumn: Int = 0,
-        hoveredHyperlinkEndRow: Int = DEFAULT_HOVER_END_ROW,
-        hoveredHyperlinkEndColumn: Int = DEFAULT_HOVER_END_COLUMN,
-        hyperlinkActivationHover: Boolean = false,
-        hyperlinkActivationForeground: Int = DEFAULT_HYPERLINK_ACTIVATION_FOREGROUND,
+        hyperlinkHover: TerminalHyperlinkHover? = null,
+        hyperlinkPresentations: Array<SwingHyperlinkPresentation?>? = null,
+        followedHyperlinkId: Int = 0,
     ) {
         runStyle.configureRow(
-            row = row,
             textBlinkVisible = textBlinkVisible,
             hyperlinkIds = hyperlinkIds,
-            hoveredHyperlinkId = hoveredHyperlinkId,
-            hoveredHyperlinkStartRow = hoveredHyperlinkStartRow,
-            hoveredHyperlinkStartColumn = hoveredHyperlinkStartColumn,
-            hoveredHyperlinkEndRow = hoveredHyperlinkEndRow,
-            hoveredHyperlinkEndColumn = hoveredHyperlinkEndColumn,
-            hyperlinkActivationHover = hyperlinkActivationHover,
-            hyperlinkActivationForeground = hyperlinkActivationForeground,
+            hyperlinkHover = hyperlinkHover,
+            row = row,
+            settings = checkNotNull(settings),
+            hyperlinkPresentations = hyperlinkPresentations,
+            followedHyperlinkId = followedHyperlinkId,
         )
         val bidi = cellGeometry.row(cache, row)
         val flagsPlane = cache.flags
@@ -519,10 +516,5 @@ internal class TerminalTextPainter(
 
     private companion object {
         private const val INITIAL_TEXT_RUN_CAPACITY = 256
-        private const val NO_HYPERLINK_ID = 0
-        private const val DEFAULT_HOVER_START_ROW = 0
-        private const val DEFAULT_HOVER_END_ROW = Int.MAX_VALUE
-        private const val DEFAULT_HOVER_END_COLUMN = Int.MAX_VALUE
-        private const val DEFAULT_HYPERLINK_ACTIVATION_FOREGROUND = 0xFF4DA3FF.toInt()
     }
 }

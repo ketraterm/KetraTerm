@@ -263,6 +263,7 @@ internal class MutationEngine(
         left: Int,
         right: Int,
     ) {
+        dest.hasOutput = dest.hasOutput || src.hasOutput
         for (col in left..right) {
             var raw = src.rawCodepoint(col)
             var attr = src.getPackedAttr(col)
@@ -469,6 +470,7 @@ internal class MutationEngine(
         if (state.cursor.pendingWrap) {
             state.cursor.pendingWrap = false
             line.wrapped = true
+            line.hasOutput = true
             state.markLineChanged(line)
             cCol = leftMargin
             cRow = advanceRow(cRow)
@@ -478,6 +480,7 @@ internal class MutationEngine(
         if (widthInCells == 2 && cCol >= rightMargin) {
             annihilateAt(cRow, cCol, state.pen.currentAttr, state.pen.currentExtendedAttr)
             line.wrapped = true
+            line.hasOutput = true
             line.endsWithWrapPadding = cCol == width - 1
             state.markLineChanged(line)
             cCol = leftMargin
@@ -501,6 +504,7 @@ internal class MutationEngine(
         val writtenCol = cCol
         val writtenRow = cRow
         writeCell(line, writtenCol)
+        line.hasOutput = true
         state.markLineChanged(line)
         cCol += 1
 
@@ -555,6 +559,7 @@ internal class MutationEngine(
             val line = getLine(cRow)
             if (line.rawCodepoint(cCol) == TerminalConstants.EMPTY) {
                 line.setCell(cCol, codepoint, attr, extendedAttr)
+                line.hasOutput = true
                 state.markLineChanged(line)
                 state.rememberPrintableCell(cRow, cCol)
                 if (cCol == rightMargin) {
@@ -1007,7 +1012,9 @@ internal class MutationEngine(
             if (state.modes.isLeftRightMarginMode) {
                 line.clearRange(leftMargin, rightMargin + 1, blankAttr, blankExtendedAttr)
             } else {
+                val hadOutput = line.hasOutput
                 state.clearLineAsNew(line, blankAttr, blankExtendedAttr)
+                line.hasOutput = hadOutput
             }
             line.wrapped = false
             state.markLineChanged(line)
@@ -1211,6 +1218,7 @@ internal class MutationEngine(
                     line.setCell(col, codepoint, state.pen.currentAttr, state.pen.currentExtendedAttr)
                 }
                 line.wrapped = false
+                line.hasOutput = true
                 state.markLineChanged(line)
             }
         }
@@ -1290,6 +1298,7 @@ internal class MutationEngine(
                         line.setCell(destinationCol + colOffset, raw, attr, extendedAttr)
                     }
                 }
+                line.hasOutput = true
                 state.markLineChanged(line)
             }
         }
@@ -1592,6 +1601,7 @@ internal class MutationEngine(
                 }
                 destLine.wrapped = srcLine.wrapped
                 destLine.endsWithWrapPadding = srcLine.endsWithWrapPadding
+                destLine.hasOutput = srcLine.hasOutput
                 state.markLineChanged(destLine)
             }
 
@@ -1670,8 +1680,9 @@ internal class MutationEngine(
             val oldCursorCol = state.cursor.col
             val oldCursorRow = state.cursor.row
             val sourceLine = getLine(oldCursorRow)
-            if (sourceLine.wrapped) {
+            if (sourceLine.wrapped || !sourceLine.hasOutput) {
                 sourceLine.wrapped = false
+                sourceLine.hasOutput = true
                 state.markLineChanged(sourceLine)
             }
             state.cursor.row = advanceRow(state.cursor.row)
@@ -1718,6 +1729,7 @@ internal class MutationEngine(
                 for (col in 0 until width) {
                     line.setCell(col, 'E'.code, blankAttr, blankExtendedAttr)
                 }
+                line.hasOutput = true
                 state.markLineChanged(line)
             }
             state.markStructureChanged()

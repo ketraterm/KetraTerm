@@ -18,6 +18,10 @@ package io.github.ketraterm.ui.swing.settings
 import io.github.ketraterm.input.policy.PasteControlPolicy
 import io.github.ketraterm.render.api.TerminalColorPalette
 import io.github.ketraterm.render.api.TerminalRenderCursorShape
+import io.github.ketraterm.render.api.TerminalRenderUnderline
+import io.github.ketraterm.ui.swing.api.SwingHyperlinkActivation
+import io.github.ketraterm.ui.swing.api.SwingHyperlinkPresentation
+import io.github.ketraterm.ui.swing.api.SwingHyperlinkStyle
 import kotlinx.collections.immutable.ImmutableList
 import kotlinx.collections.immutable.toImmutableList
 import java.awt.Font
@@ -52,7 +56,14 @@ import java.util.*
  * @property textAntialiasing text antialiasing hint used during painting.
  * @property fractionalMetrics fractional font metrics hint used during painting.
  * @property hyperlinkActivationForeground packed ARGB foreground used for the
- * linked span currently under Ctrl-hover.
+ * default linked span while hovered and eligible for activation.
+ * @property osc8HyperlinkPresentation prepared host styles for terminal-authored OSC 8 links.
+ * Null preserves the default dotted underline and activation color. Hosts resolve theme data
+ * before constructing this snapshot. Terminal-authored underlines retain priority over link decorations.
+ * @property osc8HyperlinkActivation gesture policy for terminal-authored links. Defaults to
+ * Ctrl/Cmd activation; DIRECT allows an ordinary primary-button click. The hand cursor and
+ * active style follow eligibility, independently of visibility. Activation occurs on release
+ * without a selection drag. Detected links carry their own per-result activation policy.
  * @property selectionBackground packed ARGB overlay used for visible terminal
  * selection ranges.
  * @property searchMatchBackground packed ARGB overlay used for non-active
@@ -143,7 +154,29 @@ data class SwingSettings
         val shellSuggestionsEnabled: Boolean = true,
         val acceptSelectedSuggestionWithEnter: Boolean = true,
         val scrollOnOutput: Boolean = true,
+        val osc8HyperlinkPresentation: SwingHyperlinkPresentation? = null,
+        val osc8HyperlinkActivation: SwingHyperlinkActivation = SwingHyperlinkActivation.MODIFIER,
     ) {
+        @get:JvmSynthetic
+        internal val defaultHyperlinkPresentation =
+            SwingHyperlinkPresentation(
+                normal = SwingHyperlinkStyle(underlineStyle = TerminalRenderUnderline.NONE),
+                hovered = SwingHyperlinkStyle(underlineStyle = TerminalRenderUnderline.SINGLE, underlineThickness = 2),
+                active =
+                    SwingHyperlinkStyle(
+                        foregroundArgb = hyperlinkActivationForeground,
+                        underlineStyle = TerminalRenderUnderline.SINGLE,
+                        underlineThickness = 2,
+                    ),
+            )
+
+        @get:JvmSynthetic
+        internal val resolvedOsc8HyperlinkPresentation =
+            osc8HyperlinkPresentation ?: defaultHyperlinkPresentation.copy(
+                normal = SwingHyperlinkStyle(underlineStyle = TerminalRenderUnderline.DOTTED),
+                isVisible = true,
+            )
+
         init {
             require(columns > 0) { "columns must be > 0, was $columns" }
             require(rows > 0) { "rows must be > 0, was $rows" }

@@ -15,6 +15,7 @@
  */
 package io.github.ketraterm.ui.swing.api
 
+import io.github.ketraterm.core.api.TerminalInputState
 import io.github.ketraterm.input.api.TerminalInputEncoder
 import io.github.ketraterm.input.event.TerminalKeyEvent
 import io.github.ketraterm.input.event.TerminalModifiers
@@ -27,10 +28,7 @@ import io.github.ketraterm.session.TerminalSession
 import io.github.ketraterm.session.TerminalSessionState
 import io.github.ketraterm.session.TerminalShellCommandLineSnapshot
 import io.github.ketraterm.session.TerminalShellIntegrationCommandRecord
-import io.github.ketraterm.ui.swing.input.SwingTerminalInputController
-import io.github.ketraterm.ui.swing.input.SwingTerminalInputHost
-import io.github.ketraterm.ui.swing.input.SwingTerminalMouseController
-import io.github.ketraterm.ui.swing.input.SwingTerminalMouseHost
+import io.github.ketraterm.ui.swing.input.*
 import io.github.ketraterm.ui.swing.render.*
 import io.github.ketraterm.ui.swing.search.TerminalSearchController
 import io.github.ketraterm.ui.swing.search.TerminalSearchHost
@@ -83,6 +81,10 @@ class SwingTerminal
         private val settingsProvider: SwingSettingsProvider,
         private val hostServices: SwingHostServices,
         searchDispatcher: CoroutineDispatcher,
+        hyperlinkDispatcher: CoroutineDispatcher = Dispatchers.Default,
+        private val pointerPosition: (JComponent) -> Point? = {
+            if (it.isShowing && !GraphicsEnvironment.isHeadless()) it.mousePosition else null
+        },
     ) : JComponent(),
         SwingScrollbarScroller {
         @JvmOverloads
@@ -150,6 +152,7 @@ class SwingTerminal
         private val shellIntegrationDecorations = TerminalShellIntegrationViewportDecorations()
         private val scrollbarOverlay = TerminalScrollbarOverlay()
         private var hoveredPromptMarkerRow: Int = NO_PROMPT_MARKER_ROW
+        private var hyperlinkCursor: Cursor = DEFAULT_CURSOR
         private val terminalMouseListener =
             object : MouseAdapter() {
                 override fun mousePressed(event: MouseEvent) {
@@ -195,8 +198,7 @@ class SwingTerminal
                             )
                     if (changed) repaint()
                     if (hostServices.scrollbarOverlayEnabled && scrollbarOverlay.hovered) {
-                        hyperlinkController.clearHyperlinkHover()
-                        updateHoveredPromptMarker(NO_PROMPT_MARKER_ROW)
+                        clearPointerHover()
                         return
                     }
                     mouseController.mouseMotionListener.mouseMoved(event)
@@ -277,8 +279,9 @@ class SwingTerminal
                         override val renderCache: TerminalRenderCache get() = this@SwingTerminal.renderCache
                         override val hyperlinkDetector: SwingHyperlinkDetector
                             get() = this@SwingTerminal.hostServices.hyperlinkDetector
+                        override val hyperlinkSource get() = this@SwingTerminal.session
 
-                        override fun hyperlinksChanged() = hyperlinkController.refreshHyperlinkHover()
+                        override fun hyperlinksChanged() = refreshHyperlinkHover()
 
                         override fun repaintHyperlinkSpan(
                             startRow: Int,
@@ -288,15 +291,17 @@ class SwingTerminal
                         ) = this@SwingTerminal.repaintHyperlinkSpan(startRow, startColumn, endRow, endColumn)
                     },
                 scope = componentScope,
+                analysisDispatcher = hyperlinkDispatcher,
             )
         private val hyperlinkController: TerminalHyperlinkController =
             TerminalHyperlinkController(
                 object : TerminalHyperlinkHost {
                     override val renderCache: TerminalRenderCache get() = this@SwingTerminal.renderCache
                     override var cursor: Cursor
-                        get() = this@SwingTerminal.cursor
+                        get() = hyperlinkCursor
                         set(value) {
-                            this@SwingTerminal.cursor = value
+                            hyperlinkCursor = value
+                            updatePointerCursor()
                         }
 
                     override fun cellAt(
@@ -319,6 +324,47 @@ class SwingTerminal
                     override fun isHyperlinkResolvable(hyperlinkId: Int): Boolean = this@SwingTerminal.isHyperlinkResolvable(hyperlinkId)
 
                     override fun openHyperlink(hyperlinkId: Int): Boolean = this@SwingTerminal.openHyperlink(hyperlinkId)
+
+                    override fun openHyperlink(
+                        hyperlinkId: Int,
+                        event: MouseEvent,
+                    ): Boolean = this@SwingTerminal.openHyperlink(hyperlinkId, event)
+
+                    override fun hyperlinkActivation(hyperlinkId: Int): SwingHyperlinkActivation =
+                        if (hyperlinkId > 0) {
+                            settings.osc8HyperlinkActivation
+                        } else {
+                            hyperlinkDiscoveryController.discoveredHyperlink(hyperlinkId, renderCache)?.activation
+                                ?: SwingHyperlinkActivation.MODIFIER
+                        }
+
+                    override fun hyperlinkAction(hyperlinkId: Int): SwingHyperlinkAction? =
+                        hyperlinkDiscoveryController.discoveredHyperlink(hyperlinkId, renderCache)?.action
+
+                    override fun enterHyperlink(
+                        action: SwingHyperlinkAction,
+                        row: Int,
+                        startColumn: Int,
+                        endColumn: Int,
+                    ) {
+                        val bidi = visualGeometry.bidiLayout.row(renderCache, row)
+                        var first = renderCache.columns
+                        var last = 0
+                        forEachVisualCellSpan(bidi, startColumn, endColumn) { start, end ->
+                            first = minOf(first, start)
+                            last = maxOf(last, end)
+                        }
+                        action.mouseEntered(
+                            this@SwingTerminal,
+                            SwingTerminalChrome.left(settings, renderCache.activeBuffer) + first * metrics.cellWidth,
+                            floor(
+                                SwingTerminalChrome.top(settings, renderCache.activeBuffer) + visualGeometry.contentOriginY +
+                                    row * metrics.cellHeight,
+                            ).toInt(),
+                            (last - first) * metrics.cellWidth,
+                            metrics.cellHeight,
+                        )
+                    }
                 },
             )
         private val searchController: TerminalSearchController =
@@ -346,8 +392,10 @@ class SwingTerminal
                 object : SwingTerminalInputHost {
                     override val session: TerminalSession? get() = this@SwingTerminal.session
 
-                    override fun updateHyperlinkActivationHover(active: Boolean) {
-                        hyperlinkController.updateHyperlinkActivationHover(active)
+                    override fun updatePointerModifiers(modifiers: Int) {
+                        val routingChanged = mouseController.updatePointerModifiers(modifiers)
+                        hyperlinkController.updateHyperlinkActivationHover(modifiers and hyperlinkNavigationModifierMask != 0)
+                        if (routingChanged) refreshHyperlinkHover()
                     }
 
                     override fun resetCursorBlink() {
@@ -356,6 +404,7 @@ class SwingTerminal
 
                     override fun setTerminalFocused(focused: Boolean) {
                         this@SwingTerminal.terminalFocused = focused
+                        if (focused) reconcileHyperlinksOnEdt() else clearPointerHover()
                     }
 
                     override fun repaintCursorState() {
@@ -385,11 +434,9 @@ class SwingTerminal
                     override val session: TerminalInputEncoder? get() = this@SwingTerminal.session
 
                     override fun mouseTrackingMode(): MouseTrackingMode =
-                        this@SwingTerminal
-                            .session
-                            ?.terminal
-                            ?.getModeSnapshot()
-                            ?.mouseTrackingMode ?: MouseTrackingMode.OFF
+                        MouseTrackingMode.entries[
+                            TerminalInputState.mouseTrackingMode(this@SwingTerminal.session?.terminal?.getInputModeBits() ?: 0L),
+                        ]
 
                     override fun encodeMouse(event: TerminalMouseEvent) {
                         this@SwingTerminal.session?.encodeMouse(event)
@@ -437,8 +484,15 @@ class SwingTerminal
 
                     override fun handleHyperlinkMousePressed(event: MouseEvent): Boolean = hyperlinkController.handleMousePressed(event)
 
-                    override fun handleHyperlinkMouseMoved(event: MouseEvent) {
-                        hyperlinkController.handleMouseMoved(event)
+                    override fun handleHyperlinkMouseReleased(event: MouseEvent): Boolean = hyperlinkController.handleMouseReleased(event)
+
+                    override fun handleHyperlinkMouseDragged() = hyperlinkController.handleMouseDragged()
+
+                    override fun handleHyperlinkMouseMoved(
+                        event: MouseEvent,
+                        enabled: Boolean,
+                    ) {
+                        hyperlinkController.handleMouseMoved(event, enabled)
                     }
 
                     override fun handleHyperlinkMouseExited() {
@@ -446,7 +500,7 @@ class SwingTerminal
                     }
 
                     override fun clearHyperlinkHover() {
-                        hyperlinkController.clearHyperlinkHover()
+                        clearPointerHover(forgetPointer = false)
                     }
 
                     override fun handleSelectionMousePressed(event: MouseEvent) {
@@ -535,6 +589,13 @@ class SwingTerminal
 
         private var ancestorWindow: Window? = null
 
+        private val windowFocusListener =
+            object : WindowAdapter() {
+                override fun windowGainedFocus(event: WindowEvent) = reconcileHyperlinksOnEdt()
+
+                override fun windowLostFocus(event: WindowEvent) = clearPointerHover()
+            }
+
         private val windowStateListener =
             WindowStateListener { event ->
                 val iconified = (event.newState and Frame.ICONIFIED) != 0
@@ -552,7 +613,7 @@ class SwingTerminal
         private fun handlePromptMarkerMousePressed(event: MouseEvent): Boolean {
             if (!SwingUtilities.isLeftMouseButton(event)) return false
             if (renderCache.activeBuffer == TerminalRenderBufferKind.ALTERNATE) return false
-            val row = promptMarkerRowAt(event)
+            val row = promptMarkerRowAt(event.x, event.y)
             if (row == NO_PROMPT_MARKER_ROW) return false
             val recordId = shellIntegrationDecorations.commandRecordIdAt(row)
             if (recordId == TerminalShellIntegrationCommandRecord.NONE) return false
@@ -566,31 +627,50 @@ class SwingTerminal
                 updateHoveredPromptMarker(NO_PROMPT_MARKER_ROW)
                 return false
             }
-            val row = promptMarkerRowAt(event)
-            if (row != NO_PROMPT_MARKER_ROW) hyperlinkController.clearHyperlinkHover()
+            val row = promptMarkerRowAt(event.x, event.y)
             updateHoveredPromptMarker(row)
+            if (row != NO_PROMPT_MARKER_ROW) hyperlinkController.clearHyperlinkHover()
             return row != NO_PROMPT_MARKER_ROW
         }
 
-        private fun promptMarkerRowAt(event: MouseEvent): Int {
+        private fun promptMarkerRowAt(
+            x: Int,
+            y: Int,
+        ): Int {
             val paddingLeft = SwingTerminalChrome.left(settings, renderCache.activeBuffer)
             val gutterWidth = SwingTerminalChrome.promptDecorationGutterWidth(settings, renderCache.activeBuffer)
-            if (gutterWidth <= 0 || event.x !in (paddingLeft - gutterWidth) until paddingLeft) {
+            if (gutterWidth <= 0 || x !in (paddingLeft - gutterWidth) until paddingLeft) {
                 return NO_PROMPT_MARKER_ROW
             }
-            val row = cellAt(event.x, event.y, renderCache).toInt()
+            val row = cellAt(x, y, renderCache).toInt()
             return if (shellIntegrationDecorations.hasPromptStartAt(row)) row else NO_PROMPT_MARKER_ROW
         }
 
         private fun updateHoveredPromptMarker(row: Int) {
-            val nextCursor = if (row == NO_PROMPT_MARKER_ROW) DEFAULT_CURSOR else HAND_CURSOR
-            if (hoveredPromptMarkerRow == row) {
-                if (cursor !== nextCursor) cursor = nextCursor
-                return
+            if (hoveredPromptMarkerRow != row) {
+                hoveredPromptMarkerRow = row
+                repaint()
             }
-            hoveredPromptMarkerRow = row
-            cursor = nextCursor
-            repaint()
+            updatePointerCursor()
+        }
+
+        private fun clearPointerHover(forgetPointer: Boolean = true) {
+            if (forgetPointer) mouseController.updatePointerModifiers(0)
+            updateHoveredPromptMarker(NO_PROMPT_MARKER_ROW)
+            hyperlinkController.clearHyperlinkHover(forgetPointer)
+        }
+
+        private fun refreshHyperlinkHover() {
+            if (mouseController.isMouseTrackingIntercepted()) {
+                hyperlinkController.clearHyperlinkHover(forgetPointer = false)
+            } else {
+                hyperlinkController.refreshHyperlinkHover()
+            }
+        }
+
+        private fun updatePointerCursor() {
+            val next = if (hoveredPromptMarkerRow != NO_PROMPT_MARKER_ROW) HAND_CURSOR else hyperlinkCursor
+            if (cursor !== next) cursor = next
         }
 
         init {
@@ -606,6 +686,11 @@ class SwingTerminal
             addMouseMotionListener(terminalMouseMotionListener)
             addMouseWheelListener(mouseController.wheelListener)
             addComponentListener(resizeListener)
+            addHierarchyListener { event ->
+                if (event.changeFlags and HierarchyEvent.SHOWING_CHANGED.toLong() != 0L) {
+                    if (isShowing) reconcileHyperlinksOnEdt() else clearPointerHover()
+                }
+            }
             preferredSize = preferredGridSize(settings.columns, settings.rows)
             cursorTimer.isRepeats = true
             configureCursorTimerOnEdt()
@@ -913,6 +998,7 @@ class SwingTerminal
 
         override fun addNotify() {
             super.addNotify()
+            if (disposed) return
             terminalFocused = isFocusOwner
             configureCursorTimerOnEdt()
 
@@ -920,8 +1006,10 @@ class SwingTerminal
             if (window != null) {
                 ancestorWindow = window
                 window.addWindowStateListener(windowStateListener)
+                window.addWindowFocusListener(windowFocusListener)
                 updateMinimizedStateFromAncestor()
             }
+            reconcileHyperlinksOnEdt()
         }
 
         override fun removeNotify() {
@@ -930,10 +1018,9 @@ class SwingTerminal
             visualBellController.stop()
             viewportController.finishScroll()
             selectionController.stopSelectionDrag()
-            hyperlinkDiscoveryController.reset()
+            clearPointerHover()
 
-            ancestorWindow?.removeWindowStateListener(windowStateListener)
-            ancestorWindow = null
+            detachAncestorWindow()
 
             super.removeNotify()
         }
@@ -1019,12 +1106,9 @@ class SwingTerminal
                     shellIntegrationDecorations = shellIntegrationDecorations,
                     hoveredPromptMarkerRow = hoveredPromptMarkerRow,
                     hyperlinkIds = hyperlinkDiscoveryController.hyperlinkIdsFor(renderCache),
-                    hoveredHyperlinkId = hyperlinkController.hoveredHyperlinkId,
-                    hoveredHyperlinkStartRow = hyperlinkController.hoveredHyperlinkStartRow,
-                    hoveredHyperlinkStartColumn = hyperlinkController.hoveredHyperlinkStartColumn,
-                    hoveredHyperlinkEndRow = hyperlinkController.hoveredHyperlinkEndRow,
-                    hoveredHyperlinkEndColumn = hyperlinkController.hoveredHyperlinkEndColumn,
-                    hyperlinkActivationHover = hyperlinkController.hyperlinkActivationHover,
+                    hyperlinkHover = hyperlinkController.hover,
+                    hyperlinkPresentations = hyperlinkDiscoveryController.hyperlinkPresentationsFor(renderCache),
+                    followedHyperlinkId = hyperlinkDiscoveryController.followedHyperlinkId,
                 )
                 if (hostServices.scrollbarOverlayEnabled) {
                     scrollbarOverlay.paint(
@@ -1066,7 +1150,7 @@ class SwingTerminal
             lastResizedColumns = NO_RESIZE_DIMENSION
             lastResizedRows = NO_RESIZE_DIMENSION
             renderFrameController.reset()
-            hyperlinkController.clearHyperlinkHover()
+            clearPointerHover()
             hyperlinkDiscoveryController.reset()
             resizeSessionToVisibleGridOnEdt()
             bindingJob =
@@ -1102,6 +1186,7 @@ class SwingTerminal
                 renderFrameController.handlePublishedFrame()
             }
             requestRenderFromSession(session)
+            reconcileHyperlinksOnEdt()
             publishViewportState(renderCache.historySize)
             repaint()
         }
@@ -1123,7 +1208,7 @@ class SwingTerminal
             lastResizedColumns = NO_RESIZE_DIMENSION
             lastResizedRows = NO_RESIZE_DIMENSION
             renderFrameController.reset()
-            hyperlinkController.clearHyperlinkHover()
+            clearPointerHover()
             hyperlinkDiscoveryController.reset()
             publishViewportState(0)
             repaint()
@@ -1133,6 +1218,7 @@ class SwingTerminal
             if (disposed) return
             disposed = true
             unbindOnEdt()
+            detachAncestorWindow()
             cursorTimer.stop()
             visualBellController.stop()
             viewportController.finishScroll()
@@ -1179,8 +1265,8 @@ class SwingTerminal
             if (geometryChanged) {
                 resizeSessionToVisibleGridOnEdt()
                 searchController.updateViewportHighlights()
-                hyperlinkController.clearHyperlinkHover()
-                hyperlinkDiscoveryController.reset()
+                clearPointerHover()
+                hyperlinkDiscoveryController.reconcile()
                 session?.let { requestRenderFromSession(it) }
             }
             if (geometryChanged || next.columns != previous.columns || next.rows != previous.rows) {
@@ -1188,6 +1274,11 @@ class SwingTerminal
                 revalidate()
             }
             updateAutomaticSuggestionEligibilityOnEdt()
+            if (next.osc8HyperlinkPresentation != previous.osc8HyperlinkPresentation ||
+                next.osc8HyperlinkActivation != previous.osc8HyperlinkActivation
+            ) {
+                reconcileHyperlinksOnEdt()
+            }
             repaint()
         }
 
@@ -1757,6 +1848,7 @@ class SwingTerminal
                     y = event.y,
                     forcedByShift = forcedByShift,
                     hyperlink = contextHyperlinkAt(event),
+                    triggerEvent = event,
                 )
             return hostServices.contextMenuHandler.handleContextMenu(request)
         }
@@ -1764,13 +1856,29 @@ class SwingTerminal
         private fun contextHyperlinkAt(event: MouseEvent): SwingTerminalContextHyperlink? {
             val hyperlinkId = hyperlinkController.hyperlinkIdAt(event)
             if (hyperlinkId == NO_HYPERLINK_ID) return null
-            val uri = if (hyperlinkId > 0) session?.hyperlinkUri(hyperlinkId) else null
+            val detected = hyperlinkDiscoveryController.discoveredHyperlink(hyperlinkId, renderCache)
+            val uri = if (hyperlinkId > 0) session?.hyperlinkUri(hyperlinkId) else detected?.uri
+            val openAction: () -> Boolean =
+                if (hyperlinkId > 0) {
+                    if (uri == null) return null
+                    val handler = hostServices.hyperlinkHandler
+                    { handler.openHyperlink(uri) }
+                } else {
+                    val action = detected?.action ?: return null
+                    val activate: () -> Boolean = {
+                        action.open(event).also { opened ->
+                            if (opened) hyperlinkDiscoveryController.markFollowed(hyperlinkId, renderCache)
+                        }
+                    }
+                    activate
+                }
             return SwingTerminalContextHyperlink(
                 uri = uri,
-                openAction = { openHyperlink(hyperlinkId) },
+                openAction = openAction,
                 copyUriAction = {
                     uri != null && copyTextToClipboard(uri)
                 },
+                providerAction = detected?.action,
             )
         }
 
@@ -1780,13 +1888,16 @@ class SwingTerminal
             return hyperlinkDiscoveryController.isDiscoveredHyperlinkResolvable(hyperlinkId, renderCache)
         }
 
-        private fun openHyperlink(hyperlinkId: Int): Boolean {
+        private fun openHyperlink(
+            hyperlinkId: Int,
+            event: MouseEvent? = null,
+        ): Boolean {
             if (hyperlinkId == NO_HYPERLINK_ID) return false
             if (hyperlinkId > 0) {
                 val uri = session?.hyperlinkUri(hyperlinkId) ?: return false
                 return hostServices.hyperlinkHandler.openHyperlink(uri)
             }
-            return hyperlinkDiscoveryController.openDiscoveredHyperlink(hyperlinkId, renderCache)
+            return hyperlinkDiscoveryController.openDiscoveredHyperlink(hyperlinkId, renderCache, event)
         }
 
         private fun cellAt(
@@ -2062,6 +2173,35 @@ class SwingTerminal
             hyperlinkDiscoveryController.scheduleForFrame()
         }
 
+        private fun reconcileHyperlinksOnEdt() {
+            if (disposed) return
+            val boundSession = session ?: return
+            refreshRenderCacheFromSession(boundSession)
+            hyperlinkDiscoveryController.reconcile()
+            val position = pointerPosition(this)
+            if (position == null) {
+                clearPointerHover()
+            } else {
+                val markerRow = promptMarkerRowAt(position.x, position.y)
+                updateHoveredPromptMarker(markerRow)
+                if (markerRow == NO_PROMPT_MARKER_ROW) {
+                    hyperlinkController.updatePointerPosition(
+                        position.x,
+                        position.y,
+                        enabled = !mouseController.isMouseTrackingIntercepted(),
+                    )
+                } else {
+                    hyperlinkController.clearHyperlinkHover()
+                }
+            }
+        }
+
+        private fun detachAncestorWindow() {
+            ancestorWindow?.removeWindowStateListener(windowStateListener)
+            ancestorWindow?.removeWindowFocusListener(windowFocusListener)
+            ancestorWindow = null
+        }
+
         private fun requestRenderFromSession(session: TerminalSession) {
             session.requestRender(
                 scrollbackOffset = viewportController.requestedOffset,
@@ -2093,7 +2233,7 @@ class SwingTerminal
                         visibleGridRows = visibleGridRows(),
                     ),
                 )
-            hyperlinkController.refreshHyperlinkHover()
+            refreshHyperlinkHover()
             return layoutChanged or originChanged
         }
 

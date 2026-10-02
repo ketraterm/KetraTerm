@@ -101,6 +101,22 @@ internal class CoreTerminalRenderFrame(
             return state.contentGeneration
         }
 
+    override val historyContentGeneration: Long
+        get() {
+            checkValid()
+            return state.activeBuffer.historyContentGeneration
+        }
+
+    override val outputEndAbsoluteRow: Long
+        get() {
+            checkValid()
+            val ring = state.ring
+            val liveTop = state.historySize
+            var end = ring.size
+            while (end > liveTop && !ring[end - 1].hasOutput) end--
+            return ring.discardedCount + end
+        }
+
     override val structureGeneration: Long
         get() {
             checkValid()

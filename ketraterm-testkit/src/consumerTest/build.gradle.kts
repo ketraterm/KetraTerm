@@ -49,6 +49,7 @@ subprojects {
             dependsOn("classes")
             classpath = project.extensions.getByType<SourceSetContainer>()["main"].runtimeClasspath
             mainClass.set("consumer.KotlinConsumerKt")
+            if (project.name == "ui-swing") systemProperty("java.awt.headless", "true")
             javaLauncher.set(
                 project.extensions.getByType<JavaToolchainService>().launcherFor {
                     languageVersion.set(JavaLanguageVersion.of(25))

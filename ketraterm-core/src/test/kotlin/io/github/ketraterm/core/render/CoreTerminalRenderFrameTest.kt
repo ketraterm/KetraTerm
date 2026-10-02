@@ -29,6 +29,68 @@ import org.junit.jupiter.params.provider.ValueSource
 
 class CoreTerminalRenderFrameTest {
     @Test
+    fun `history content generation survives live edits admission and saturated eviction`() {
+        val buffer = DefaultTerminalBuffer(initialWidth = 4, initialHeight = 2, maxHistory = 2)
+        var initial = 0L
+        buffer.readRenderFrame { initial = it.historyContentGeneration }
+        repeat(8) {
+            buffer.writeText("row")
+            buffer.carriageReturn()
+            buffer.newLine()
+            buffer.readRenderFrame { assertEquals(initial, it.historyContentGeneration) }
+        }
+        assertEquals(2, buffer.historySize)
+        buffer.positionCursor(0, 0)
+        buffer.eraseCurrentLine()
+        buffer.writeText("edit")
+        buffer.readRenderFrame(scrollbackOffset = 1) {
+            assertEquals(initial, it.historyContentGeneration)
+            assertTrue(it.discardedCount > 0)
+        }
+        buffer.softReset()
+        buffer.resize(4, 2)
+        buffer.readRenderFrame { assertEquals(initial, it.historyContentGeneration) }
+    }
+
+    @Test
+    fun `history content generation changes on clearing replacement and reflow`() {
+        val buffer = DefaultTerminalBuffer(initialWidth = 4, initialHeight = 2, maxHistory = 2)
+
+        fun assertInvalidated(mutate: () -> Unit) {
+            var previous = 0L
+            buffer.readRenderFrame { previous = it.historyContentGeneration }
+            mutate()
+            buffer.readRenderFrame { assertNotEquals(previous, it.historyContentGeneration) }
+        }
+        buffer.writeText("wrapped content")
+        assertInvalidated { buffer.eraseScreenAndHistory() }
+        assertInvalidated { buffer.resize(8, 2) }
+        assertInvalidated { buffer.resize(8, 3) }
+        assertInvalidated { buffer.reset() }
+    }
+
+    @Test
+    fun `history generations belong to their buffers and detect inactive reflow`() {
+        val buffer = DefaultTerminalBuffer(initialWidth = 4, initialHeight = 2)
+        var primary = 0L
+        var alternate = 0L
+        buffer.readRenderFrame { primary = it.historyContentGeneration }
+        buffer.enterAltBufferWithoutCursorSave(clearBeforeEnter = false)
+        buffer.readRenderFrame { alternate = it.historyContentGeneration }
+        buffer.writeText("alt")
+        buffer.exitAltBufferWithoutCursorRestore()
+        buffer.readRenderFrame { assertEquals(primary, it.historyContentGeneration) }
+        buffer.enterAltBufferWithoutCursorSave(clearBeforeEnter = false)
+        buffer.readRenderFrame { assertEquals(alternate, it.historyContentGeneration) }
+        buffer.exitAltBufferWithoutCursorRestore()
+        buffer.enterAltBufferWithoutCursorSave(clearBeforeEnter = true)
+        buffer.readRenderFrame { assertNotEquals(alternate, it.historyContentGeneration) }
+        buffer.resize(8, 2)
+        buffer.exitAltBufferWithoutCursorRestore()
+        buffer.readRenderFrame { assertNotEquals(primary, it.historyContentGeneration) }
+    }
+
+    @Test
     fun `content generation ignores cursor title and viewport changes`() {
         val buffer = DefaultTerminalBuffer(initialWidth = 4, initialHeight = 2)
         buffer.writeText("one")

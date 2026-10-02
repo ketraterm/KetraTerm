@@ -93,6 +93,13 @@ internal class Line(
         internal set
 
     /**
+     * Whether this row has received text or an explicit line feed from the host.
+     * Unlike cell emptiness, this preserves authored blank lines. Cursor movement
+     * and erasure do not create output; replacing the logical row resets it.
+     */
+    var hasOutput: Boolean = false
+
+    /**
      * Stable identity of the logical buffer line represented by this physical row.
      *
      * The identifier moves with row content through scroll operations and is
@@ -113,6 +120,7 @@ internal class Line(
     fun assignLineId(lineId: Long) {
         require(lineId > 0L) { "lineId must be positive, was $lineId" }
         this.lineId = lineId
+        hasOutput = false
     }
 
     // Internal raw accessors: used by GridWriter and TerminalResizer only

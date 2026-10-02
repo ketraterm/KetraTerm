@@ -35,11 +35,22 @@ Render frame reading is orchestrated through the [TerminalRenderFrameReader](../
 
 ## 2. Monotonic Generation Counters
 
-To optimize cache invalidation and UI repaint schedules without costly deep comparisons, a frame exposes three distinct generation metrics:
+Frame generations serve different invalidation needs. Compare them for equality;
+they belong to one reader's source and may wrap.
 
 * **`frameGeneration` (Long)**: Incremented monotonically on any visually relevant change in the terminal (cursor movements, cell writes, scroll actions). Excellent for a cheap "does the UI need redrawing?" check.
+* **`contentGeneration` (Long)**: Changes for retained cell content and terminal-owned row mapping, including edits outside the viewport. Cursor-only and caller-requested scrollback changes may preserve it. External readers default to `frameGeneration`.
+* **`historyContentGeneration` (Long)**: Changes when retained storage is replaced, cleared or reflowed. Ordinary live edits, history admission and oldest-row eviction preserve it in core. It belongs to the active buffer: keys must include reader identity and `activeBuffer`. Non-clearing switches preserve each buffer's counter; resizing also invalidates the inactive buffer. External readers default conservatively to `contentGeneration`.
 * **`structureGeneration` (Long)**: Incremented only when the grid structure layout changes (such as resizes, terminal resets, buffer switching, or scrollback line reflowing). When this changes, previous row caches must be invalidated or resized.
 * **`lineGeneration(row)` (Long)**: Incremented per individual line when its text, attributes, or flags are updated. Allows UI paint engines to redraw only the specific modified rows.
+
+Retained analysis combines the history generation with absolute row anchors,
+`lineId(row)`, line generations and `discardedCount`. The history generation alone
+does not identify edited live rows or evicted records. Absolute range reads must
+resolve coordinates and expose borrowed frames under the same mutation lock.
+Copy bounded primitive rows inside that callback, then assemble logical strings
+and perform analysis after it returns. `TerminalRenderRangeCopy` in the cache
+module supplies this reusable copying boundary.
 
 ---
 

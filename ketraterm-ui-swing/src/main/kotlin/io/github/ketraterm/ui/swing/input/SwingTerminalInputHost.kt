@@ -23,7 +23,7 @@ import io.github.ketraterm.session.TerminalSession
 internal interface SwingTerminalInputHost {
     val session: TerminalSession?
 
-    fun updateHyperlinkActivationHover(active: Boolean)
+    fun updatePointerModifiers(modifiers: Int)
 
     /** Restarts the shared blink phase and repaints cursor/text regions whose visibility changed. */
     fun resetCursorBlink()

@@ -1,1 +1,2 @@
 ketraterm-app/src/main/resources/io/github/ketraterm/app/cli/* text eol=lf
+ketraterm-ui-swing/src/test/resources/hyperlinks/*.ansi -text

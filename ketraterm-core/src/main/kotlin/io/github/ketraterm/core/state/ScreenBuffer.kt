@@ -48,7 +48,14 @@ internal class ScreenBuffer(
         internal set
 
     var ring = HistoryRing(maxHistory + initialHeight) { Line(initialWidth, store) }
-        internal set
+        internal set(value) {
+            if (field !== value) historyContentGeneration++
+            field = value
+        }
+
+    /** Separate from admission/eviction and live-row generations; local to this buffer. */
+    var historyContentGeneration: Long = 0L
+        private set
 
     val cursor = Cursor()
     val savedCursor = SavedCursorState()
@@ -166,6 +173,7 @@ internal class ScreenBuffer(
             ring[i].clear(penAttr, penExtendedAttr)
         }
         ring.clear()
+        historyContentGeneration++
         repeat(viewportHeight) { clearLineAsNew(ring.push(), penAttr, penExtendedAttr) }
     }
 

@@ -2,6 +2,7 @@
 
 ## [Unreleased]
 
+- Improved link highlighting and activation across wrapped lines, scrolling and output updates, with hand cursors only when links can be activated.
 - Improved cursor-position reporting in terminal apps using margins.
 - Fixed terminal apps failing to query the current cursor shape and blinking style.
 - Fixed unsupported terminal status queries reflecting supplied text and control characters into shell or application input.

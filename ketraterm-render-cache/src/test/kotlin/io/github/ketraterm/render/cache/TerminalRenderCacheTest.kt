@@ -22,6 +22,108 @@ import org.junit.jupiter.params.ParameterizedTest
 import org.junit.jupiter.params.provider.ValueSource
 
 class TerminalRenderCacheTest {
+    @Test
+    fun `output boundary defaults to unknown and survives cache and range copies`() {
+        val frame = MutableFrame(4, 5)
+        assertEquals(Long.MAX_VALUE, frame.outputEndAbsoluteRow)
+        val bounded =
+            object : TerminalRenderFrame by frame {
+                override val outputEndAbsoluteRow = 3L
+            }
+        val source = TerminalRenderCache(4, 5).apply { accept(bounded) }
+        val destination = TerminalRenderCache(4, 5).apply { updateFrom(source) }
+        assertEquals(3L, destination.outputEndAbsoluteRow)
+        val reader =
+            object : TerminalRenderFrameReader {
+                override fun readRenderFrame(consumer: TerminalRenderFrameConsumer) = consumer.accept(bounded)
+            }
+        val copy = TerminalRenderRangeCopy(maxRows = 1)
+        assertTrue(copy.read(reader, 1L, 1L))
+        assertEquals(3L, copy.cache.outputEndAbsoluteRow, "Slicing geometry must not alter the source's output boundary")
+        source.reset()
+        assertEquals(Long.MAX_VALUE, source.outputEndAbsoluteRow)
+    }
+
+    @Test
+    fun `external history generation defaults conservatively and is copied between caches`() {
+        val frame = MutableFrame(4, 1)
+        frame.contentGeneration = 19L
+        assertEquals(19L, frame.historyContentGeneration)
+        val source = TerminalRenderCache(4, 1)
+        val destination = TerminalRenderCache(4, 1)
+        source.accept(
+            object : TerminalRenderFrame by frame {
+                override val historyContentGeneration = 7L
+            },
+        )
+        destination.updateFrom(source)
+        assertEquals(7L, source.historyContentGeneration)
+        assertEquals(7L, destination.historyContentGeneration)
+        source.reset()
+        assertNotEquals(7L, source.historyContentGeneration)
+    }
+
+    @Test
+    fun `absolute copy omits live prefix and respects row and cell budgets`() {
+        val frame =
+            MutableFrame(4, 5).apply {
+                repeat(5) { setRow(it, "row$it") }
+                discardedCount = 10L
+                historySize = 8
+                cursor = TerminalRenderCursor(1, 3, true, false, TerminalRenderCursorShape.BLOCK, 2L)
+            }
+        val copy = TerminalRenderRangeCopy(maxRows = 3, maxCells = 8)
+        assertTrue(copy.read(frame.reader, 20L, Long.MAX_VALUE))
+        assertEquals(20L, copy.firstAbsoluteRow)
+        assertEquals(21L, copy.lastAbsoluteRow)
+        assertEquals(2, copy.cache.rows)
+        assertEquals("row2", copy.cache.rowText(0))
+        assertEquals("row3", copy.cache.rowText(1))
+        assertArrayEquals(intArrayOf(0, 0, 1, 1, 0), frame.copyCounts)
+        assertEquals(1, copy.cache.cursorRow)
+        assertTrue(copy.cache.cursorVisible)
+        assertTrue(copy.read(frame.reader, 22L, 22L))
+        assertFalse(copy.cache.cursorVisible)
+        assertFalse(copy.read(frame.reader, Long.MAX_VALUE, Long.MAX_VALUE))
+        assertFalse(copy.cache.hasFrame)
+        assertEquals(Long.MAX_VALUE, copy.firstAbsoluteRow)
+        assertTrue(copy.lastAbsoluteRow < copy.firstAbsoluteRow)
+    }
+
+    @Test
+    fun `absolute copy intersects evicted rows and permits one row wider than cell budget`() {
+        val frame =
+            MutableFrame(8, 3).apply {
+                setClusterRow("e\u0301x")
+                discardedCount = 12L
+            }
+        val copy = TerminalRenderRangeCopy(maxRows = 2, maxCells = 4)
+        assertTrue(copy.read(frame.reader, 0L, Long.MAX_VALUE))
+        assertEquals(12L, copy.firstAbsoluteRow)
+        assertEquals(12L, copy.lastAbsoluteRow)
+        assertEquals(1, copy.cache.rows)
+        assertEquals(2, copy.cache.clusterLength(copy.cache.clusterRefs[0]))
+        assertArrayEquals(intArrayOf('e'.code, 0x0301), copy.cache.clusterCodepoints.copyOf(2))
+        assertArrayEquals(intArrayOf(1, 0, 0), frame.copyCounts)
+        assertFalse(copy.read(frame.reader, 0L, 11L))
+        assertThrows(IllegalArgumentException::class.java) { copy.read(frame.reader, -1L, 0L) }
+        assertThrows(IllegalArgumentException::class.java) { TerminalRenderRangeCopy(maxRows = 0) }
+    }
+
+    @Test
+    fun `absolute copy propagates cancellation inside locked copying without a usable partial frame`() {
+        val frame = MutableFrame(4, 3)
+        val copy = TerminalRenderRangeCopy()
+        var calls = 0
+        assertThrows(java.util.concurrent.CancellationException::class.java) {
+            copy.read(frame.reader, 0L, 2L) {
+                if (++calls == 3) throw java.util.concurrent.CancellationException()
+            }
+        }
+        assertFalse(copy.cache.hasFrame)
+        assertArrayEquals(intArrayOf(1, 0, 0), frame.copyCounts)
+    }
+
     @ParameterizedTest
     @ValueSource(booleans = [false, true])
     fun `replacement reader cannot reuse equal metadata from the previous source`(absoluteRange: Boolean) {
