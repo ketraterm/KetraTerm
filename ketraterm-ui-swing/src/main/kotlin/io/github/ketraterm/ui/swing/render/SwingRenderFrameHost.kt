@@ -33,7 +33,7 @@ internal interface SwingRenderFrameHost {
     val searchHighlights: TerminalSearchViewportHighlights
     val componentWidth: Int
     val componentHeight: Int
-    val cursorPresentationEnabled: Boolean
+    val terminalFocused: Boolean
 
     /**
      * Restarts the shared cursor/text blink phase without requesting a repaint.

@@ -73,6 +73,10 @@ import kotlin.math.floor
  * selection and stop selection dragging. Selection uses physical cell coordinates;
  * unchanged grid dimensions preserve it.
  *
+ * A focused terminal paints the application's cursor shape and blink state.
+ * Without keyboard focus blocks become steady outlines; bars and underlines stay steady, preserving application
+ * cursor visibility and viewport clipping. Focus never changes the session's cursor style.
+ *
  * @param settingsProvider provider for immutable settings snapshots.
  * @param hostServices host-provided non-render services.
  */
@@ -99,8 +103,6 @@ class SwingTerminal
         private var metrics: SwingMetrics = buildMetrics(settings)
         private var terminalFocused: Boolean = false
         internal var cursorBlinkVisible: Boolean = true
-        internal val cursorPresentationEnabled: Boolean
-            get() = terminalFocused
         private var lastResizedColumns: Int = NO_RESIZE_DIMENSION
         private var lastResizedRows: Int = NO_RESIZE_DIMENSION
         private val unbindRunnable = Runnable { unbindOnEdt() }
@@ -528,7 +530,7 @@ class SwingTerminal
                     override val searchHighlights get() = this@SwingTerminal.searchController.viewportHighlights
                     override val componentWidth: Int get() = this@SwingTerminal.width
                     override val componentHeight: Int get() = this@SwingTerminal.height
-                    override val cursorPresentationEnabled: Boolean get() = this@SwingTerminal.cursorPresentationEnabled
+                    override val terminalFocused: Boolean get() = this@SwingTerminal.terminalFocused
 
                     override fun resetCursorBlinkForFrame(): Boolean = resetCursorBlinkOnEdt()
 
@@ -1097,7 +1099,7 @@ class SwingTerminal
                     metrics = metrics,
                     width = width,
                     height = height,
-                    cursorVisible = cursorPresentationEnabled,
+                    terminalFocused = terminalFocused,
                     cursorBlinkVisible = cursorBlinkVisible,
                     textBlinkVisible = cursorBlinkVisible,
                     visualGeometry = visualGeometry,

@@ -63,6 +63,14 @@ Create and access the component on the EDT. `bind`, `unbind`, `dispose`, and `re
 
 Shell metadata comes from the integration selected when the session is created. A host can supply `TerminalShellIntegrationFactory.host(...)` without depending on the optional OSC integration module. The binding observes model revisions and refreshes decorations against its copied frame even when no new terminal output arrives. This observation ends on session closure, unbinding, rebinding, or disposal; it never owns the host's model or producer.
 
+### Cursor presentation
+
+The terminal with keyboard focus displays the application's block, bar, or underline cursor using the configured blink interval. When unfocused, block cursors become thin hollow outlines; bars and underlines retain their shape without blinking. All shapes use the resolved cursor color and preserve the underlying text, backgrounds, and selection. Outlines use Java2D's normalized stroke rendering. Filled beams and underlines align to device pixels, with thickness rounded independently of pane position at fractional display scales. All shapes follow the same wide-cell ownership and bidi geometry as focused cursors and stay within their visual cell bounds.
+
+Application-hidden cursors remain hidden. Cursors outside the displayed viewport remain clipped, and focus changes do not scroll the view. Applications can move, hide, or change their cursor while unfocused; regaining focus immediately restores the latest shape and starts a visible blink phase. Focus reporting through DEC 1004 remains independent of this local presentation.
+
+The cursor uses the existing shared cursor/text blink timer. Inactive cursors ignore its phase and receive no cursor-only blink damage; SGR blinking text retains its existing timing and repaint behavior.
+
 ### Suggestion request ownership
 
 `requestActiveShellSuggestions()` uses the bound session's selected command source, including a host-owned source. It defaults to an explicit request; automatic observers pass `SwingShellSuggestionTrigger.AUTOMATIC`. Pending results and acceptance are checked against that session and command context, and context observation stops when the request and popup end.

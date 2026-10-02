@@ -30,6 +30,7 @@ import io.github.ketraterm.ui.swing.settings.SwingSettingsProvider
 import org.openjdk.jmh.annotations.*
 import org.openjdk.jmh.infra.Blackhole
 import java.awt.Graphics2D
+import java.awt.event.FocusEvent
 import java.awt.image.BufferedImage
 import java.nio.charset.StandardCharsets
 import java.util.concurrent.TimeUnit
@@ -146,6 +147,9 @@ open class TerminalRenderPublishBenchmark {
 @Fork(1)
 @Threads(1)
 open class SwingPaintBenchmark {
+    @Param("false", "true")
+    var focused: Boolean = false
+
     @Param("80", "160", "240")
     var columns: Int = 0
 
@@ -210,6 +214,10 @@ open class SwingPaintBenchmark {
             component.paint(graphics)
             val emptyPixels = image.getRGB(0, 0, image.width, image.height / 2, null, 0, image.width)
             component.bind(session)
+            val focusEvent = FocusEvent(component, if (focused) FocusEvent.FOCUS_GAINED else FocusEvent.FOCUS_LOST)
+            for (listener in component.focusListeners) {
+                if (focused) listener.focusGained(focusEvent) else listener.focusLost(focusEvent)
+            }
             if (selected) check(component.selectAll())
             component.paint(graphics)
             val contentPixels = image.getRGB(0, 0, image.width, image.height / 2, null, 0, image.width)

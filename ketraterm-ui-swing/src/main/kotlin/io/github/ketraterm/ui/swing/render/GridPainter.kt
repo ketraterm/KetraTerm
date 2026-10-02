@@ -81,7 +81,7 @@ internal class GridPainter(
         height: Int,
         cursorBlinkVisible: Boolean,
         textBlinkVisible: Boolean = true,
-        cursorVisible: Boolean = true,
+        terminalFocused: Boolean = true,
         visualGeometry: TerminalVisualViewportGeometry? = null,
         selection: CellSelection? = null,
         searchHighlights: TerminalSearchViewportHighlights? = null,
@@ -190,7 +190,7 @@ internal class GridPainter(
                 cursorBlinkVisible,
                 textBlinkVisible,
                 fontRenderContext,
-                cursorVisible = cursorVisible,
+                terminalFocused = terminalFocused,
                 bidi = cellGeometry.row(cache, cache.cursorRow),
             )
         } finally {

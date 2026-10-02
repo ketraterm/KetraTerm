@@ -83,7 +83,7 @@ internal class SwingRenderFrameController(
 
     fun repaintBlinkState() {
         if (host.session == null || !host.renderCache.hasFrame) return
-        if (host.cursorPresentationEnabled) {
+        if (host.terminalFocused) {
             repaintPlanner.requestCursorBlinkRepaint(
                 cache = host.renderCache,
                 metrics = host.metrics,

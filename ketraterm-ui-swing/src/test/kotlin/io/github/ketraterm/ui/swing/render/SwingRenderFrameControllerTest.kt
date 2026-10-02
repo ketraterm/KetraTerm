@@ -148,9 +148,9 @@ class SwingRenderFrameControllerTest {
         }
 
         @Test
-        fun resetFromHiddenPhaseMustRepaintUnchangedTextWithoutCursorPresentation() {
+        fun resetFromHiddenPhaseMustRepaintUnchangedTextWhileUnfocused() {
             val session = createSession(blinkFrame(textBlinks = true))
-            val host = RecordingRenderFrameHost(session, cursorPresentationEnabled = false)
+            val host = RecordingRenderFrameHost(session, terminalFocused = false)
             val controller = SwingRenderFrameController(host)
             try {
                 controller.handlePublishedFrame()
@@ -184,6 +184,65 @@ class SwingRenderFrameControllerTest {
                 assertEquals(0, host.fullRepaintCount)
                 assertEquals(setOf(Region(0, 0, 10, 20), Region(0, 20, 800, 20), Region(0, 40, 800, 20)), host.regions.toSet())
                 assertTrue(host.repaintFrameGenerations.all { it == 2L }, "blink regions must use the refreshed frame")
+            } finally {
+                session.close()
+            }
+        }
+
+        @Test
+        fun `inactive cursor focus repaint is bounded and blink ticks repaint only blinking text`() {
+            val session = createSession(blinkFrame(textBlinks = true))
+            val host = RecordingRenderFrameHost(session, terminalFocused = false)
+            val controller = SwingRenderFrameController(host)
+            try {
+                controller.handlePublishedFrame()
+                host.clearRepaints()
+
+                controller.repaintCursorState()
+                assertEquals(0, host.fullRepaintCount)
+                assertEquals(listOf(Region(0, 0, 10, 20)), host.regions)
+                host.clearRepaints()
+
+                controller.repaintBlinkState()
+                assertEquals(0, host.fullRepaintCount)
+                assertEquals(listOf(Region(0, 20, 800, 20)), host.regions)
+            } finally {
+                session.close()
+            }
+        }
+
+        @Test
+        fun `inactive cursor without blinking text needs no blink repaint`() {
+            val session = createSession(blinkFrame())
+            val host = RecordingRenderFrameHost(session, terminalFocused = false)
+            val controller = SwingRenderFrameController(host)
+            try {
+                controller.handlePublishedFrame()
+                host.clearRepaints()
+
+                controller.repaintBlinkState()
+
+                assertEquals(0, host.fullRepaintCount)
+                assertTrue(host.regions.isEmpty())
+            } finally {
+                session.close()
+            }
+        }
+
+        @Test
+        fun `inactive cursor movement damages old and new bounds without row changes`() {
+            val session = createSession(blinkFrame())
+            val host = RecordingRenderFrameHost(session, terminalFocused = false)
+            val controller = SwingRenderFrameController(host)
+            try {
+                controller.handlePublishedFrame()
+                host.clearRepaints()
+                session.renderPublisher.updateAndPublish(blinkFrame(cursorColumn = 1))
+
+                controller.handlePublishedFrame()
+
+                assertEquals(0, host.fullRepaintCount)
+                assertEquals(listOf(Region(0, 0, 10, 20), Region(10, 0, 10, 20)), host.regions)
             } finally {
                 session.close()
             }
@@ -275,7 +334,7 @@ class SwingRenderFrameControllerTest {
     private class RecordingRenderFrameHost(
         override val session: TerminalSession?,
         private val clampViewportResult: Boolean = false,
-        override val cursorPresentationEnabled: Boolean = true,
+        override val terminalFocused: Boolean = true,
     ) : SwingRenderFrameHost {
         override val renderCache = TerminalRenderCache(80, 24)
         override val settings = SwingSettings(padding = SwingPadding(), shellIntegrationDecorationGutterWidth = 0)
@@ -385,6 +444,7 @@ class SwingRenderFrameControllerTest {
         textBlinks: Boolean = false,
         cursorBlinks: Boolean = true,
         generation: Long = 1,
+        cursorColumn: Int = 0,
     ): TestRenderFrame =
         object : TestRenderFrame(
             cells =
@@ -397,7 +457,7 @@ class SwingRenderFrameControllerTest {
                         )
                     }
                 },
-            cursorValue = TerminalRenderCursor(0, 0, true, cursorBlinks, TerminalRenderCursorShape.BLOCK, 1),
+            cursorValue = TerminalRenderCursor(cursorColumn, 0, true, cursorBlinks, TerminalRenderCursorShape.BLOCK, 1),
         ) {
             override val frameGeneration: Long = generation
 

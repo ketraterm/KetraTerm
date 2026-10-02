@@ -2,6 +2,7 @@
 
 ## [Unreleased]
 
+- Keep cursors visible when terminals lose focus, with thin outlines for blocks and steady bars or underlines. Cursor thickness stays consistent across split panes.
 - Improved link responsiveness, underlines and hover feedback, with hand cursors only when links can be activated and IDE navigation for files and folders.
 - Improved cursor-position reporting in terminal apps using margins.
 - Fixed terminal apps failing to query the current cursor shape and blinking style.
