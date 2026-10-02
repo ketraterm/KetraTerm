@@ -333,16 +333,7 @@ public class TerminalShellIntegrationState(
      * @param lineId stable render line identity where prompt printing ended.
      */
     public fun recordPromptEnd(lineId: Long) {
-        require(lineId > 0L) { "lineId must be positive, was $lineId" }
-        val changedRevision =
-            synchronized(lock) {
-                val index = activePromptIndex
-                if (index == NO_INDEX || promptEndLineIds[index] == lineId) return
-
-                promptEndLineIds[index] = lineId
-                ++metadataRevision
-            }
-        publishRevision(changedRevision)
+        updateActivePromptAnchor(lineId, promptEndLineIds)
     }
 
     /**
@@ -354,15 +345,7 @@ public class TerminalShellIntegrationState(
      * Without an active prompt, or when the anchor is unchanged, this does nothing.
      */
     public fun reanchorActivePromptStart(lineId: Long) {
-        require(lineId > 0L) { "lineId must be positive, was $lineId" }
-        val changedRevision =
-            synchronized(lock) {
-                val index = activePromptIndex
-                if (index == NO_INDEX || promptStartLineIds[index] == lineId) return
-                promptStartLineIds[index] = lineId
-                ++metadataRevision
-            }
-        publishRevision(changedRevision)
+        updateActivePromptAnchor(lineId, promptStartLineIds)
     }
 
     /**
@@ -501,13 +484,9 @@ public class TerminalShellIntegrationState(
      */
     public fun commandText(recordId: Int): String? {
         if (recordId == TerminalShellIntegrationCommandRecord.NONE) return null
-        synchronized(lock) {
-            var index = 0
-            while (index < count) {
-                if (recordIds[index] == recordId) return commandTexts[index]
-                index++
-            }
-            return null
+        return synchronized(lock) {
+            val index = indexForRecordIdLocked(recordId)
+            if (index == NO_INDEX) null else commandTexts[index]
         }
     }
 
@@ -519,13 +498,9 @@ public class TerminalShellIntegrationState(
      */
     public fun commandWorkingDirectoryUri(recordId: Int): String? {
         if (recordId == TerminalShellIntegrationCommandRecord.NONE) return null
-        synchronized(lock) {
-            var index = 0
-            while (index < count) {
-                if (recordIds[index] == recordId) return commandWorkingDirectoryUris[index]
-                index++
-            }
-            return null
+        return synchronized(lock) {
+            val index = indexForRecordIdLocked(recordId)
+            if (index == NO_INDEX) null else commandWorkingDirectoryUris[index]
         }
     }
 
@@ -986,6 +961,21 @@ public class TerminalShellIntegrationState(
         publishRevision(changedRevision)
     }
 
+    private fun updateActivePromptAnchor(
+        lineId: Long,
+        anchors: LongArray,
+    ) {
+        require(lineId > 0L) { "lineId must be positive, was $lineId" }
+        val changedRevision =
+            synchronized(lock) {
+                val index = activePromptIndex
+                if (index == NO_INDEX || anchors[index] == lineId) return
+                anchors[index] = lineId
+                ++metadataRevision
+            }
+        publishRevision(changedRevision)
+    }
+
     private fun publishRevision(changedRevision: Long) {
         mutableRevision.update { current -> maxOf(current, changedRevision) }
     }
@@ -1022,6 +1012,7 @@ public class TerminalShellIntegrationState(
                 listener(value)
             } catch (cancelled: CancellationException) {
                 val first = cancellation
+                @Suppress("KotlinConstantConditions")
                 if (first == null) {
                     cancellation = cancelled
                 } else if (first !== cancelled) {
@@ -1076,6 +1067,8 @@ public class TerminalShellIntegrationState(
         return appendCommandLocked()
     }
 
+    // Separate primitive columns share one eviction slice and retain their alignment.
+    @Suppress("DuplicatedCode")
     private fun evictOldestLocked() {
         promptStartLineIds.copyInto(promptStartLineIds, destinationOffset = 0, startIndex = 1, endIndex = count)
         promptEndLineIds.copyInto(promptEndLineIds, destinationOffset = 0, startIndex = 1, endIndex = count)
@@ -1152,7 +1145,7 @@ public class TerminalShellIntegrationState(
             if (promptEnd != NO_LINE_ID) {
                 val first = minOf(promptStart, promptEnd)
                 val last = maxOf(promptStart, promptEnd)
-                if (lineId >= first && lineId <= last) return true
+                if (lineId in first..last) return true
             } else if (lineId == promptStart) {
                 return true
             }
@@ -1312,7 +1305,7 @@ public class TerminalShellIntegrationState(
     ): Boolean {
         if (start > end) return false
         val lastOutputLine = lastCommandOutputLineBeforePromptLocked(start, end)
-        return !(lineId < start || lineId > lastOutputLine) && (isCommandStartInclusive(index) || lineId != start)
+        return lineId in start..lastOutputLine && (isCommandStartInclusive(index) || lineId != start)
     }
 
     /**
@@ -1331,7 +1324,7 @@ public class TerminalShellIntegrationState(
         var i = 0
         while (i < count) {
             val promptStart = promptStartLineIds[i]
-            if (promptStart >= start && promptStart <= lastOutputLine) {
+            if (promptStart in start..lastOutputLine) {
                 lastOutputLine = promptStart - 1L
             }
             i++
@@ -1360,9 +1353,9 @@ public class TerminalShellIntegrationState(
     private fun isCommandStartInclusive(index: Int): Boolean = flags[index] and FLAG_COMMAND_START_INCLUSIVE != 0
 
     private fun lifecycleForExitCode(exitCode: Int?): Int =
-        when {
-            exitCode == null -> TerminalShellIntegrationCommandLifecycle.FINISHED_UNKNOWN
-            exitCode == 0 -> TerminalShellIntegrationCommandLifecycle.SUCCEEDED
+        when (exitCode) {
+            null -> TerminalShellIntegrationCommandLifecycle.FINISHED_UNKNOWN
+            0 -> TerminalShellIntegrationCommandLifecycle.SUCCEEDED
             else -> TerminalShellIntegrationCommandLifecycle.FAILED
         }
 
@@ -1496,7 +1489,7 @@ public class TerminalShellIntegrationState(
             var row = 0
             while (row < rowCount) {
                 val lineId = lineIds[row]
-                if (lineId >= first && lineId <= last) {
+                if (lineId in first..last) {
                     val destinationIndex = destinationOffset + row
                     commandRecordIds[destinationIndex] = commandRecordId
                     commandLifecycleStates[destinationIndex] = lifecycle

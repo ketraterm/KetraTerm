@@ -901,6 +901,32 @@ class TerminalShellIntegrationStateTest {
     }
 
     @Test
+    fun `prompt anchor updates preserve independent boundaries and record identity`() {
+        val state = TerminalShellIntegrationState()
+        val records = RecordColumns(capacity = 1)
+        state.recordPromptStart(10)
+        state.recordPromptEnd(12)
+        records.copyFrom(state)
+        val recordId = records.recordIds[0]
+
+        state.reanchorActivePromptStart(11)
+        records.copyFrom(state)
+
+        assertEquals(1, state.recordCount())
+        assertEquals(recordId, records.recordIds[0])
+        assertEquals(11L, records.promptStartLineIds[0])
+        assertEquals(12L, records.promptEndLineIds[0])
+
+        state.recordPromptEnd(13)
+        records.copyFrom(state)
+
+        assertEquals(1, state.recordCount())
+        assertEquals(recordId, records.recordIds[0])
+        assertEquals(11L, records.promptStartLineIds[0])
+        assertEquals(13L, records.promptEndLineIds[0])
+    }
+
+    @Test
     fun `prompt end without prompt start is ignored`() {
         val state = TerminalShellIntegrationState()
         val promptStarts = BooleanArray(2)
