@@ -259,8 +259,12 @@ and recovery coverage. All five teardown regressions from the follow-up at
 `5facdcbd` also pass: owned cleanup completes before propagating callback failures
 or cancellation, preserving the first failure and suppressing later failures.
 Additional coverage verifies reused exceptions, view release, peer reattachment
-and rebinding after failed unbinding. Disposal cancels the component scope; peer
-removal retains it. Sessions and native target resources remain host-owned.
+and rebinding after failed unbinding. Popup hiding completes despite a view update
+failure, and viewport metrics and eligibility are committed before host notification.
+Reentrant state changes or disposal supersede obsolete eligibility notifications.
+Disposal cancels the component scope; peer removal retains it. Sessions and native
+target resources remain host-owned. The final review records regression evidence
+and the completed follow-up to `104db318`.
 Both reviews retain their historical evidence. E04's independent renderer proposal
 remains outside scope.
 

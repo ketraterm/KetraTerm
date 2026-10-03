@@ -22,13 +22,18 @@ internal fun cleanupSwingResources(vararg actions: () -> Unit) {
         try {
             action()
         } catch (next: Throwable) {
-            val first = failure
-            if (first == null) {
-                failure = next
-            } else if (first !== next) {
-                first.addSuppressed(next)
-            }
+            failure = preserveSwingFailure(failure, next)
         }
     }
     failure?.let { throw it }
+}
+
+/** Retains the original throwable, including cancellation, without self-suppression. */
+internal fun preserveSwingFailure(
+    first: Throwable?,
+    next: Throwable,
+): Throwable {
+    if (first == null) return next
+    if (first !== next) first.addSuppressed(next)
+    return first
 }

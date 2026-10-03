@@ -332,10 +332,14 @@ Verification and retained audit oracles are recorded in the
 - **Bell Indicators**: Alerts embedding hosts of beep signals (`BEL`) through independently configurable audible bell and visual bell policies. The reusable Swing terminal can show a subtle edge pulse that remains available when audio is disabled.
 - **Independent Completion Presentation**: Hosts can retain embedded views, route optional automatic coordination through `SwingShellSuggestionTarget` to a native popup, or collect `SwingCompletionSuggestionProvider` results with their own controller. EDT `SwingTerminal.copyCellBounds` supplies clipped component-local anchors using shared padding, bidi and scrolling geometry. View-owned provider diagnostics exclude cancellation and obsolete requests. Context suppliers use their caller's context and read thread-safe immutable host metadata; Swing's provider pipeline runs off the EDT. Session termination closes attached coordinators and cancels/hides native automatic work. Synchronous input and eligibility callbacks propagate failures, including cancellation, and stop at the first failing listener. Target resources remain host-owned. Existing immutable settings/services construction shapes remain fixed. IntelliJ retains its embedded JBList and routes operational failures to its platform logger.
 
-Swing teardown attempts every owned cleanup before propagating the first failure
-or cancellation, with later failures suppressed. Disposal closes the embedded
-suggestion view and cancels the component scope; peer removal retains the scope
-for reattachment. Sessions and native target resources remain host-owned.
+Disposal, peer removal and suggestion-view closure attempt independent resource
+cleanup before propagating the first failure or cancellation, with later failures
+suppressed. Disposal closes the embedded suggestion view and cancels the component
+scope; peer removal retains the scope for reattachment. Sessions and native target
+resources remain host-owned. Popup hiding completes even when the host's view update
+fails. Viewport metrics and suggestion eligibility are committed before host
+notification. Reentrant eligibility changes or disposal supersede older notifications;
+callback failures retain their original identity and suppress later independent failures.
 
 ---
 

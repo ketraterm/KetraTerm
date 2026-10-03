@@ -318,14 +318,13 @@ internal class SwingViewportController(
             )
         }
 
+    /** Commits viewport metrics without invoking the host, so related component state can be published before notification. */
     fun publishViewportState(
         historySize: Int,
         visibleRows: Int,
         renderRows: Int,
         viewportHeightPixels: Int,
         contentHeightPixels: Int,
-        notifyListener: Boolean = true,
-        notifyPrimitiveListener: Boolean = false,
     ) {
         val requestedRows = scrollModel.requestedRows(renderRows)
         val scrollbackOffset = scrollModel.preciseScrollbackOffset
@@ -346,33 +345,27 @@ internal class SwingViewportController(
             publishedContentHeightPixels = contentHeightPixels
             publishedCellHeightPixels = cellHeightPixels
         }
+    }
+
+    /** Notifies the host on the EDT from completed metrics, leaving primitive notifications allocation-free. */
+    fun notifyViewportListener(
+        notifyListener: Boolean = true,
+        notifyPrimitiveListener: Boolean = false,
+    ) {
         if (!notifyListener) {
             if (notifyPrimitiveListener) {
                 listener.viewportChanged(
-                    historySize = historySize,
-                    scrollbackOffset = scrollbackOffset,
-                    renderOffset = renderOffset,
-                    visibleRows = visibleRows,
-                    requestedRows = requestedRows,
+                    historySize = publishedHistorySize,
+                    scrollbackOffset = publishedScrollbackOffset,
+                    renderOffset = publishedRenderOffset,
+                    visibleRows = publishedVisibleRows,
+                    requestedRows = publishedRequestedRows,
                 )
             }
             return
         }
 
-        listener.viewportStateChanged(
-            TerminalViewportState(
-                historySize = historySize,
-                scrollbackOffset = scrollbackOffset,
-                renderOffset = renderOffset,
-                visibleRows = visibleRows,
-                requestedRows = requestedRows,
-                visualScrollOffsetPixels = visualScrollOffsetPixels,
-                visualScrollRangePixels = visualScrollRangePixels,
-                viewportHeightPixels = viewportHeightPixels,
-                contentHeightPixels = contentHeightPixels,
-                cellHeightPixels = cellHeightPixels,
-            ),
-        )
+        listener.viewportStateChanged(viewportStateSnapshot())
     }
 
     private companion object {

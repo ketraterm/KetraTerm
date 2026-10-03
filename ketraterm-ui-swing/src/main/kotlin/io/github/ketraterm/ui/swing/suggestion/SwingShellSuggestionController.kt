@@ -98,17 +98,18 @@ internal class SwingShellSuggestionController(
         selectedIndex = NO_SELECTION
         viewportStartIndex = 0
         request = SwingShellSuggestionRequest.EMPTY
-        view.update(SwingShellSuggestionViewSnapshot.EMPTY)
-        view.component.isVisible = false
-        host.revalidate()
-        host.repaint()
+        cleanupSwingResources(
+            { view.component.isVisible = false },
+            { view.update(SwingShellSuggestionViewSnapshot.EMPTY) },
+            host::revalidate,
+            host::repaint,
+        )
         return true
     }
 
     fun close() {
         cleanupSwingResources(
             { hide() },
-            { view.component.isVisible = false },
             view::close,
         )
     }

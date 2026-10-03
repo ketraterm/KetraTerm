@@ -30,6 +30,7 @@ import io.github.ketraterm.session.TerminalShellCommandLineSnapshot
 import io.github.ketraterm.session.TerminalShellIntegrationCommandRecord
 import io.github.ketraterm.ui.swing.cleanupSwingResources
 import io.github.ketraterm.ui.swing.input.*
+import io.github.ketraterm.ui.swing.preserveSwingFailure
 import io.github.ketraterm.ui.swing.render.*
 import io.github.ketraterm.ui.swing.search.TerminalSearchController
 import io.github.ketraterm.ui.swing.search.TerminalSearchHost
@@ -129,6 +130,9 @@ public class SwingTerminal
         private val suggestionInvalidationListeners = CopyOnWriteArraySet<SwingShellSuggestionInvalidationListener>()
         private val suggestionEligibilityListeners = CopyOnWriteArraySet<SwingShellSuggestionEligibilityListener>()
         private val automaticSuggestionEligible = AtomicBoolean(settings.smartSuggestionsEnabled && settings.shellSuggestionsEnabled)
+
+        // Callbacks may reenter the component; the revision prevents obsolete notifications.
+        private var automaticSuggestionEligibilityRevision = 0L
 
         internal val hasActiveRenderBinding: Boolean
             get() = bindingJob?.isActive == true
@@ -1253,6 +1257,7 @@ public class SwingTerminal
         private fun disposeOnEdt() {
             if (disposed) return
             disposed = true
+            automaticSuggestionEligibilityRevision++
             cleanupSwingResources(
                 ::unbindOnEdt,
                 ::detachAncestorWindow,
@@ -2167,24 +2172,63 @@ public class SwingTerminal
                 renderRows = visibleRenderRows(),
                 viewportHeightPixels = viewportController.viewportPixelHeight(settings, height, renderCache.activeBuffer),
                 contentHeightPixels = visualContentHeightPixels(),
-                notifyListener = notifyListener,
-                notifyPrimitiveListener = notifyPrimitiveListener,
             )
-            updateAutomaticSuggestionEligibilityOnEdt()
+            val eligibilityChanged = applyAutomaticSuggestionEligibilityOnEdt()
+            val eligibilityRevision = automaticSuggestionEligibilityRevision
+            var failure: Throwable? = null
+            try {
+                viewportController.notifyViewportListener(notifyListener, notifyPrimitiveListener)
+            } catch (next: Throwable) {
+                failure = next
+            }
+            try {
+                notifyAutomaticSuggestionEligibilityOnEdt(eligibilityChanged, eligibilityRevision)
+            } catch (next: Throwable) {
+                failure = preserveSwingFailure(failure, next)
+            }
+            failure?.let { throw it }
         }
 
         private fun updateAutomaticSuggestionEligibilityOnEdt() {
+            val changed = applyAutomaticSuggestionEligibilityOnEdt()
+            notifyAutomaticSuggestionEligibilityOnEdt(changed, automaticSuggestionEligibilityRevision)
+        }
+
+        private fun applyAutomaticSuggestionEligibilityOnEdt(): Boolean {
+            val eligible = !disposed && settings.smartSuggestionsEnabled && isLiveViewportOnEdt() && settings.shellSuggestionsEnabled
+            if (automaticSuggestionEligible.getAndSet(eligible) == eligible) return false
+            automaticSuggestionEligibilityRevision++
+            return true
+        }
+
+        private fun notifyAutomaticSuggestionEligibilityOnEdt(
+            changed: Boolean,
+            revision: Long,
+        ) {
+            if (revision != automaticSuggestionEligibilityRevision) return
             val liveViewport = isLiveViewportOnEdt()
+            var failure: Throwable? = null
             if (!settings.smartSuggestionsEnabled || !liveViewport || !settings.shellSuggestionsEnabled && activeSuggestionIsAutomatic) {
-                cancelAndHideShellSuggestionsOnEdt(
-                    if (liveViewport) "Automatic suggestions disabled by settings" else "Viewport left live output",
-                )
+                try {
+                    cancelAndHideShellSuggestionsOnEdt(
+                        if (liveViewport) "Automatic suggestions disabled by settings" else "Viewport left live output",
+                    )
+                } catch (next: Throwable) {
+                    failure = next
+                }
             }
-            val eligible = !disposed && settings.smartSuggestionsEnabled && liveViewport && settings.shellSuggestionsEnabled
-            if (automaticSuggestionEligible.getAndSet(eligible) == eligible) return
-            suggestionEligibilityListeners.forEach { listener ->
-                listener.onAutomaticShellSuggestionEligibilityChanged(eligible)
+            if (changed && revision == automaticSuggestionEligibilityRevision) {
+                val eligible = automaticSuggestionEligible.get()
+                try {
+                    for (listener in suggestionEligibilityListeners) {
+                        if (revision != automaticSuggestionEligibilityRevision) break
+                        listener.onAutomaticShellSuggestionEligibilityChanged(eligible)
+                    }
+                } catch (next: Throwable) {
+                    failure = preserveSwingFailure(failure, next)
+                }
             }
+            failure?.let { throw it }
         }
 
         private fun isLiveViewportOnEdt(): Boolean = viewportController.preciseOffset == 0.0

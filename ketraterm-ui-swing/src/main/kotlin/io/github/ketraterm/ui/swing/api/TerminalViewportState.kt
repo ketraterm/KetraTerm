@@ -82,6 +82,8 @@ public data class TerminalViewportState(
  * The callback is invoked on the Swing Event Dispatch Thread after the
  * component's internal viewport state changes. Implementations should keep work
  * lightweight and defer expensive host updates outside this callback.
+ * Viewport metrics and suggestion eligibility are committed before notification.
+ * A failure propagates after required UI reconciliation; later failures are suppressed.
  */
 public fun interface TerminalViewportListener {
     /**

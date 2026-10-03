@@ -563,6 +563,73 @@ class SwingShellSuggestionControllerTest {
             assertEquals(-1, controller.state().selectedIndex)
         }
 
+    @ParameterizedTest
+    @ValueSource(booleans = [false, true])
+    fun `hide completes cleanup and permits reuse when the host view update fails`(cancelled: Boolean) =
+        onEdt {
+            val host = RecordingSuggestionHost()
+            lateinit var view: RecordingSuggestionView
+            val controller =
+                SwingShellSuggestionController(host, viewFactory = { listener ->
+                    RecordingSuggestionView(listener).also { view = it }
+                })
+            assertTrue(controller.show(request(), suggestions(2), selectedIndex = 1))
+            assertTrue(view.component.isVisible)
+            val revalidations = host.revalidations
+            val repaints = host.repaints
+            val failure = if (cancelled) CancellationException("hide cancelled") else IllegalStateException("hide failed")
+            view.updateFailure = failure
+
+            assertSame(failure, assertThrows(RuntimeException::class.java) { controller.hide() })
+            assertAll(
+                { assertFalse(view.component.isVisible, "The old popup must be hidden despite the failed visual update") },
+                { assertEquals(SwingShellSuggestionState.EMPTY, controller.state()) },
+                { assertEquals(revalidations + 1, host.revalidations) },
+                { assertEquals(repaints + 1, host.repaints) },
+                { assertEquals(0, view.closeCount, "Hiding must leave the host view available for reuse") },
+                { assertTrue(failure.suppressed.isEmpty()) },
+            )
+
+            view.updateFailure = null
+            val replacement = suggestions(1)
+            assertTrue(controller.show(request(commandText = "next"), replacement, selectedIndex = 0))
+            assertTrue(view.component.isVisible)
+            assertEquals(replacement, view.suggestions)
+            assertSame(replacement.single(), controller.state().selectedSuggestion)
+            assertEquals(0, view.closeCount)
+            assertTrue(controller.hide())
+        }
+
+    @Test
+    fun `hide preserves the view update failure and suppresses later host cleanup failures in order`() =
+        onEdt {
+            val host = RecordingSuggestionHost()
+            lateinit var view: RecordingSuggestionView
+            val controller =
+                SwingShellSuggestionController(host, viewFactory = { listener ->
+                    RecordingSuggestionView(listener).also { view = it }
+                })
+            assertTrue(controller.show(request(), suggestions(2), selectedIndex = 0))
+            val revalidations = host.revalidations
+            val repaints = host.repaints
+            val updateFailure = IllegalStateException("hide failed")
+            val revalidationFailure = IllegalArgumentException("revalidation failed")
+            val repaintFailure = IllegalStateException("repaint failed")
+            view.updateFailure = updateFailure
+            host.revalidationFailure = revalidationFailure
+            host.repaintFailure = repaintFailure
+
+            assertSame(updateFailure, assertThrows(IllegalStateException::class.java) { controller.hide() })
+            assertAll(
+                { assertFalse(view.component.isVisible) },
+                { assertEquals(SwingShellSuggestionState.EMPTY, controller.state()) },
+                { assertEquals(revalidations + 1, host.revalidations) },
+                { assertEquals(repaints + 1, host.repaints) },
+                { assertEquals(0, view.closeCount) },
+                { assertEquals(listOf(revalidationFailure, repaintFailure), updateFailure.suppressed.toList()) },
+            )
+        }
+
     @Test
     fun `close releases the host view when hiding update fails`() =
         onEdt {
@@ -725,6 +792,8 @@ class SwingShellSuggestionControllerTest {
         var revalidations = 0
         var repaints = 0
         var invalidations = 0
+        var revalidationFailure: Throwable? = null
+        var repaintFailure: Throwable? = null
 
         override val suggestionHandler: SwingShellSuggestionHandler =
             SwingShellSuggestionHandler { acceptance ->
@@ -742,10 +811,12 @@ class SwingShellSuggestionControllerTest {
 
         override fun revalidate() {
             revalidations++
+            revalidationFailure?.let { throw it }
         }
 
         override fun repaint() {
             repaints++
+            repaintFailure?.let { throw it }
         }
 
         override fun requestFocusInWindow(): Boolean {

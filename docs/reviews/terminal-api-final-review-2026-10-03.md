@@ -1,5 +1,69 @@
 # Terminal API final review
 
+## A15 completion after `104db318`
+
+Verified 2026-10-03 in the working tree based on `104db318`. The residual unbind
+and disposed-eligibility failures below were reproduced in three independent
+regression cases before implementation. They now pass, alongside the original
+teardown regressions and additional failure, cancellation, suppression and reuse
+coverage. A01–A15 are resolved; G02/G03 remain separate verification work.
+
+Viewport metrics publication is separate from host notification. The component
+commits eligibility before callbacks, retains viewport-before-eligibility callback
+order and hides ineligible suggestions before eligibility observers run. An
+eligibility revision prevents reentrant disposal or unbinding from delivering
+obsolete values to later observers. Unchanged snapshot queries do not invalidate
+pending notifications. Host failures leave owned state applied; the original
+throwable propagates with later independent failures suppressed.
+
+Popup hiding commits logical state and component visibility before the host's
+empty update. A guarded viewport-query regression reproduced duplicate updates
+while the component still appeared visible; it now requires one update, coherent
+callback state and reuse of the same view after re-enabling suggestions.
+
+The cleanup helper remains limited to resource teardown. Normal publication has
+explicit state and callback phases, using one shared failure-preservation rule.
+Compiled publication, eligibility-application and eligibility-notification methods
+contain no object/array allocation or dynamic-lambda creation instructions. This
+checks the added control flow, not allocation by called UI/JVM code or a full-frame
+performance baseline. No public signatures, dependencies or retained baselines
+change. Hosts retain their sessions and reusable views after hide/unbind.
+
+| Check | Result |
+| --- | --- |
+| Complete Swing and Swing host suites | 1,178 and 84 cases pass, with no failures, errors or skips. This includes thirteen additional Swing cases beyond `104db318`. |
+| Compiled-client upgrades | All 54 checks pass against the final artifacts: 52 positive executions and two linkage-negative controls. |
+| Compatibility and formatting | `checkKotlinAbi`, root `spotlessApply` and `spotlessCheck` pass; API snapshots and retained binaries remain unchanged. |
+| Benchmark harness | `:ketraterm-benchmarks:jmhJar` passes after updating the publication benchmark to use both explicit phases. |
+
+Focused JMH GC profiling of primitive viewport publication on JDK 25.0.3 measured
+16.522 ± 1.385 ns/op and 0.196 ± 0.001 B/op (99.9% intervals; two forks, three
+warmup and five measurement iterations of one second). Each operation is one
+publication within a batch of 1,024; results include amortized Swing EDT dispatch.
+This is a narrow measurement, not proof of zero allocation across complete frames
+or a replacement for G03.
+
+## Historical A15 verification at `104db318`
+
+Re-reviewed 2026-10-03 after the cleanup fix. The five original A15 regressions
+pass. Remaining teardown actions run after host failure or cancellation, retaining
+the original throwable and suppressing later failures without self-suppression.
+Permanent disposal releases the view and cancels the component scope; peer removal
+keeps the component usable for reattachment. The internal shared cleanup function
+is justified by these repeated lifecycle operations and changes no public API.
+
+At this baseline, A15 remained open for two callback-failure paths:
+
+- [Popup hiding](../../ketraterm-ui-swing/src/main/kotlin/io/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionController.kt#L101) calls the host's final view update before making the component invisible. A throwing update during `unbind()` leaves the previous popup visible despite cleared logical suggestion state. The public hide operation shares this path. The strengthened unbind regression checks actual component visibility; an empty logical state alone does not prove dismissal.
+- [Viewport publication](../../ketraterm-ui-swing/src/main/kotlin/io/github/ketraterm/ui/swing/api/SwingTerminal.kt#L2164) notifies the host before updating automatic eligibility. A throwing listener during disposal skips that update; subsequent cleanup clears listeners and repeat disposal returns, leaving a disposed component eligible. Regressions require final eligibility to be false while preserving the original failure and releasing resources.
+
+Attempt owned visibility and eligibility updates independently of host callbacks.
+Preserve the first failure and suppress later failures. Hide/unbind must retain
+the reusable view and component scope; permanent disposal must cancel the scope.
+Sessions remain host-owned. Keep the existing development baseline; these behavior
+fixes require no signature changes. Status remains in the
+[gap map](../terminal-feature-gap-map.md#final-api-design), before G02/G03 sign-off.
+
 ## Verification follow-up at `5facdcbd`
 
 Re-reviewed 2026-10-03 after the A13/A14 fixes. All six original regressions now

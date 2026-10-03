@@ -388,6 +388,7 @@ public fun interface SwingShellSuggestionInvalidationListener {
  * work has been cancelled and hidden.
  * A callback failure, including cancellation, propagates to the invoking operation
  * and stops notification of subsequent listeners. The eligibility change remains applied.
+ * Reentrant eligibility changes or disposal supersede the remaining older notifications.
  */
 public fun interface SwingShellSuggestionEligibilityListener {
     /**
