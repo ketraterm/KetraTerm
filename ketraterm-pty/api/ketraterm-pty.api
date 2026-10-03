@@ -4,7 +4,7 @@ public final class io/github/ketraterm/pty/PtyConnector : io/github/ketraterm/tr
 	public fun close ()V
 	public fun foregroundProcessName ()Ljava/lang/String;
 	public final fun getExitCode ()Ljava/lang/Integer;
-	public final fun getFailure ()Ljava/io/IOException;
+	public final fun getFailure ()Ljava/lang/Throwable;
 	public final fun isAlive ()Z
 	public fun resize (II)V
 	public fun start (Lio/github/ketraterm/transport/TerminalConnectorListener;)V

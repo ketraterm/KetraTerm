@@ -77,7 +77,7 @@ and release the process and streams once while maintaining final-byte ordering.
 
 [Merged collection](../../ketraterm-completion/src/main/kotlin/io/github/ketraterm/completion/engine/MergedCompletionEngine.kt#L151)
 supervises source children but waits for exactly one channel result per source.
-An unexpected `Error`, such as a provider `AssertionError` or `LinkageError`,
+An unexpected `Error`, such as a provid er `AssertionError` or `LinkageError`,
 finishes a child without sending a result or failing the collector. A deterministic
 regression reproduces the suspended request after the child has terminated.
 Ensure every terminal child outcome either completes accounting or terminates

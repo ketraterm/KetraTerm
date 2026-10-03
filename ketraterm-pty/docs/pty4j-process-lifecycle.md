@@ -32,6 +32,13 @@ To prevent blocking client threads during blocking Native I/O reads or process w
   * Captures the integer exit code and safely dispatches `onClosed(exitCode)` to cleanup resources.
 * **Daemon Property**: Both threads are explicitly marked as daemon threads (`isDaemon = true`) so that when the main application shuts down, the PTY reader threads do not keep the JVM process alive.
 
+Normal closure waits for stdout delivery through EOF before `onClosed(exitCode)`.
+An exception from reading or `onBytes` instead retains the original exception in
+`PtyConnector.failure: Throwable?`, reports it through `onError`, disposes the
+process and both streams once, then reports `onClosed(null)`. Failed chunks are
+not retried. Callbacks may close reentrantly; exceptions after local close are
+treated as teardown and do not replace it with a remote failure.
+
 ---
 
 ## 2. Windows ConPTY Considerations
