@@ -47,8 +47,8 @@ The [2026-10-03 maintainability review](reviews/terminal-maintainability-review-
 records the corrected worker-termination, bounded-work and extension-lifecycle
 findings under its [owner entries](#maintainability-review). The subsequent
 [API adoption and evolution review](reviews/terminal-api-evolution-review-2026-10-03.md)
-reproduces a startup-readiness defect and tracks remaining pre-freeze ownership,
-construction and host-adoption decisions. D01 is resolved below;
+records the corrected startup, ownership and construction contracts and tracks
+remaining host-adoption work below;
 G02/G03 remain deferred by the current work scope.
 
 - `Done(ui)`: visually verify agy help-transition animation after removing frame-triggered resizing. Default alternate padding now redistributes the primary horizontal inset and preserves vertical insets; regressions cover physical resizing while alternate-screen content is active. The resize/clear defect is corrected, but animation parity is not established.
@@ -311,8 +311,9 @@ closures remain historical evidence for their tested paths.
 ### API Adoption and Evolution
 
 The [2026-10-03 review](reviews/terminal-api-evolution-review-2026-10-03.md)
-examines the corrected API at `f632fbe3`. D identifiers track design/adoption
-work, including one reproduced defect; they do not reopen resolved A/M findings.
+examines the corrected API at `f632fbe3`, with follow-up verification at
+`57623d28`. D identifiers track design/adoption work and reproduced defects;
+they do not reopen resolved A/M findings.
 The development compatibility baseline passes but is not a stable API freeze.
 Group configuration work and publication work to avoid repeated migrations;
 the review records the execution order and acceptance criteria.
@@ -327,6 +328,7 @@ the review records the execution order and acceptance criteria.
 - **D08 — `DONE(core/policy)`**: mode contracts define finite published subsets with stable numeric meanings.
 - **D09 — `DONE(ui)`**: published-consumer checks compile and exercise the actual Swing README example, including EDT and lifetime ownership.
 - **D10 — `DONE(host)`**: line-feed and Kitty flag inspection use primitive mode reads.
+- **D11 — `DONE(host/profile)`**: workspace snapshots reject undefined mode-capability bits through `create`, `copy` and `build`; regressions cover invalid bits, valid subsets and snapshot isolation.
 
 ### Release Verification
 

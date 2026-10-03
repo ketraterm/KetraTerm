@@ -1,12 +1,14 @@
 # Terminal API adoption and evolution review
 
-Reviewed on 2026-10-03 at `f632fbe3` on `audit/terminal-api-design`, initially
-with a clean working tree. This review adds correct-behavior startup regressions
-and documentation. Production code, public signatures, compatibility baselines
-and changelogs are unchanged. Ownership and closure status live in the
+Initially reviewed on 2026-10-03 at `f632fbe3` on `audit/terminal-api-design`,
+with a clean working tree. That review added correct-behavior startup regressions
+and documentation. [Follow-up verification](#verification-after-fixes) covers
+the subsequent fixes at `57623d28` and adds workspace validation regressions.
+Neither review changes production code, public signatures, compatibility
+baselines or changelogs. Ownership and closure status live in the
 [gap map](../terminal-feature-gap-map.md#api-adoption-and-evolution).
 
-## Assessment
+## Initial assessment
 
 Do not freeze the API yet. The M corrections have a green root test and
 compatibility baseline, but compatibility with a declared development API does
@@ -268,7 +270,7 @@ Require behavioral consumer proofs for the chosen design; retain failing
 correctness regressions for actual defects. No baseline refresh is justified
 while these choices remain unsettled.
 
-## Validation
+## Initial validation
 
 Before adding regressions, the root `test`, `checkKotlinAbi`, `spotlessCheck` and
 `:ketraterm-testkit:publishedConsumerTest` command passed with the cached Gradle
@@ -296,3 +298,63 @@ The separate plugin suite, native opt-in PTY tests, installed products and
 performance budgets were not rerun for this review. Source-only/design findings
 do not claim new fault injection, allocation measurements or completed adoption
 samples. Historical A/M review evidence and closures remain intact.
+
+## Verification after fixes
+
+Rechecked on 2026-10-03 at `57623d28`, initially with a clean working tree.
+The requested changes are substantially complete. Startup readiness and input
+ordering are aligned; configuration ownership and immutable Kotlin/Java updates
+are implemented; session consumers have scoped frame access and read-only shell
+state; render storage is private; mode contracts, primitive reads and the actual
+Swing documentation example have executable coverage. Shared presentation no
+longer owns IntelliJ-specific labels, and hosts can supply search styling.
+The remaining popup-policy decisions depend on the D06 integration exercise.
+This review does not establish complete external adoption or an API freeze.
+
+### D11 — P3: workspace snapshots accept undefined host capability bits
+
+[Workspace option construction](../../ketraterm-workspace/src/main/kotlin/io/github/ketraterm/workspace/TerminalWorkspace.kt#L615)
+validates dimensions and history but omits `modeReportCapabilities`, despite
+the builder promising validation. `create`, `copy` and `build` accept reserved
+bit `1`, unknown bit `8`, negative values and the sign bit.
+[PTY options](../../ketraterm-pty/src/main/kotlin/io/github/ketraterm/pty/PtyOptions.kt#L197)
+reject these values. Consequently, default workspace tab opening fails later,
+during PTY option construction and before process launch; a custom session
+factory can receive the invalid snapshot. This is inconsistent fail-fast
+validation, not a reproduced process leak. Apply the same defined-bit check at
+workspace snapshot construction; no additional abstraction is needed.
+
+Five focused tests in `TerminalWorkspaceTest` cover the four invalid-mask
+classes across all three construction/update boundaries, preservation of the
+original snapshot, every valid subset and detached builder updates. The four
+invalid cases fail with three assertions each; the valid-subset case passes.
+The owning suite reports **109 tests, four failures and six skips**, with no
+other failing identities. These correct-behavior regressions deliberately leave
+the workspace suite red until D11 is fixed. Production code is unchanged.
+
+Two documentation follow-ups remain: workspace option KDoc still declares the
+removed destructuring signatures, and the root developer changelog needs
+concrete startup, configuration-migration and publication-ownership notes.
+The product changelogs already describe the user-visible startup and styling
+changes. No changelog entry is warranted for this review itself.
+
+Before adding D11 regressions, root `test`, `checkKotlinAbi`, `spotlessCheck` and
+`:ketraterm-testkit:publishedConsumerTest` passed: **4,923 root tests, no failures
+or errors, 42 skips**. Published source consumers passed both metadata modes and
+Kotlin compilers, including the extracted README example. Retained clients
+passed all **52 upgrade cases and two deliberate linkage-failure controls**;
+all thirteen baseline jar hashes match their provenance. The construction and
+render-reader migrations intentionally replaced affected development clients;
+this verifies the declared new baselines, not compatibility with pre-migration
+clients. Separate IntelliJ plugin `test` and `spotlessCheck` also passed:
+**247 tests, no failures, errors or skips**. After the new tests, `spotlessApply`
+and `spotlessCheck` passed alongside the workspace run described above.
+
+Render lease changes preserve primitive borrowed access without a new per-read
+lease object. Existing allocation evidence is limited to the documented scoped
+read and shell projection workloads; it was not remeasured here and does not
+prove a whole-frame allocation budget. Remote Maven publication, the external
+IntelliJ reference host, native opt-in PTY coverage, installed-product checks
+and G02/G03 qualification remain outside this verification. Run the compatibility
+and consumer gates on the eventual publication revision; the current publishing
+workflow does not itself include those two gates.

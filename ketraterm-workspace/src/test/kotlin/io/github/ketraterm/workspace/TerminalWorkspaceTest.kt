@@ -27,6 +27,7 @@ import io.github.ketraterm.parser.api.TerminalOutputParser
 import io.github.ketraterm.protocol.NotificationLevel
 import io.github.ketraterm.protocol.ShellIntegrationEvent
 import io.github.ketraterm.protocol.ShellIntegrationMarker
+import io.github.ketraterm.protocol.TerminalHostModeCapability
 import io.github.ketraterm.pty.PtyEventListener
 import io.github.ketraterm.render.api.TerminalColorPalette
 import io.github.ketraterm.render.api.TerminalRenderFrameReader
@@ -50,6 +51,69 @@ import kotlin.time.Duration.Companion.milliseconds
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class TerminalWorkspaceTest {
+    @Test
+    fun `workspace options reject negative mode capabilities at every construction boundary`() = assertInvalidModeCapabilities(-1)
+
+    @Test
+    fun `workspace options reject reserved mode capability bit at every construction boundary`() = assertInvalidModeCapabilities(1)
+
+    @Test
+    fun `workspace options reject unknown mode capability bit at every construction boundary`() = assertInvalidModeCapabilities(8)
+
+    @Test
+    fun `workspace options reject sign mode capability bit at every construction boundary`() = assertInvalidModeCapabilities(Int.MIN_VALUE)
+
+    private fun assertInvalidModeCapabilities(capabilities: Int) {
+        val defaults = TerminalWorkspaceOpenOptions()
+        val original = defaults.copy { it.modeReportCapabilities = TerminalHostModeCapability.URGENT_BELL }
+        val draft = original.toBuilder()
+        draft.modeReportCapabilities = capabilities
+        assertAll(
+            {
+                assertFailsWith<IllegalArgumentException>("create must reject $capabilities") {
+                    TerminalWorkspaceOpenOptions.create { it.modeReportCapabilities = capabilities }
+                }
+            },
+            {
+                assertFailsWith<IllegalArgumentException>("copy must reject $capabilities") {
+                    original.copy { it.modeReportCapabilities = capabilities }
+                }
+            },
+            {
+                assertFailsWith<IllegalArgumentException>("build must reject $capabilities") { draft.build() }
+            },
+            { assertEquals(0, defaults.modeReportCapabilities) },
+            { assertEquals(TerminalHostModeCapability.URGENT_BELL, original.modeReportCapabilities) },
+            { assertEquals(original, original.copy {}) },
+        )
+    }
+
+    @Test
+    fun `workspace options retain every valid mode capability subset through construction and updates`() {
+        val defaults = TerminalWorkspaceOpenOptions()
+        for (capabilities in listOf(
+            0,
+            TerminalHostModeCapability.URGENT_BELL,
+            TerminalHostModeCapability.POP_ON_BELL,
+            TerminalHostModeCapability.ALL,
+        )) {
+            val created = TerminalWorkspaceOpenOptions.create { it.modeReportCapabilities = capabilities }
+            val copied = defaults.copy { it.modeReportCapabilities = capabilities }
+            val draft = defaults.toBuilder()
+            draft.modeReportCapabilities = capabilities
+            val built = draft.build()
+            draft.modeReportCapabilities = 0
+            assertAll(
+                { assertEquals(capabilities, created.modeReportCapabilities) },
+                { assertEquals(capabilities, copied.modeReportCapabilities) },
+                { assertEquals(capabilities, built.modeReportCapabilities) },
+                { assertEquals(created, copied) },
+                { assertEquals(created, built) },
+                { assertEquals(0, defaults.modeReportCapabilities) },
+            )
+        }
+    }
+
     @Test
     fun `closed workspace rejects new tabs before creating a session`() =
         runTest {

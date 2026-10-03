@@ -22,6 +22,7 @@ import io.github.ketraterm.host.TerminalClipboardWriteEvent
 import io.github.ketraterm.input.policy.PasteControlPolicy
 import io.github.ketraterm.protocol.NotificationLevel
 import io.github.ketraterm.protocol.ShellIntegrationEvent
+import io.github.ketraterm.protocol.TerminalHostModeCapability
 import io.github.ketraterm.pty.PtyEventListener
 import io.github.ketraterm.pty.PtyOptions
 import io.github.ketraterm.pty.TerminalSessions
@@ -510,7 +511,7 @@ private object LocalPtyWorkspaceSessionFactory : TerminalWorkspaceSessionFactory
 /**
  * Initial terminal options for a workspace tab.
  *
- * Constructor, [copy], and destructuring signatures are part of the public ABI.
+ * Construction rejects invalid values with [IllegalArgumentException].
  *
  * @property columns initial terminal width in cells.
  * @property rows initial terminal height in rows.
@@ -522,7 +523,7 @@ private object LocalPtyWorkspaceSessionFactory : TerminalWorkspaceSessionFactory
  * install shell hooks that emit OSC 7 and OSC 133 metadata.
  * @property hostPolicy safety policy.
  * @property showForegroundProcessName whether detected processes provide automatic title fallbacks.
- * @property modeReportCapabilities implemented host actions from TerminalHostModeCapability.
+ * @property modeReportCapabilities implemented host actions; only bits defined by [TerminalHostModeCapability] are accepted.
  */
 public class TerminalWorkspaceOpenOptions private constructor(
     builder: Builder,
@@ -616,6 +617,9 @@ public class TerminalWorkspaceOpenOptions private constructor(
         require(columns > 0) { "columns must be > 0, was $columns" }
         require(rows > 0) { "rows must be > 0, was $rows" }
         require(maxHistory >= 0) { "maxHistory must be >= 0, was $maxHistory" }
+        require(modeReportCapabilities and TerminalHostModeCapability.ALL.inv() == 0) {
+            "invalid host mode-report capabilities: $modeReportCapabilities"
+        }
     }
 
     public companion object {
