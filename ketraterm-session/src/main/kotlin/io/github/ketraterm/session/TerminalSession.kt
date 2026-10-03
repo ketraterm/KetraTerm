@@ -87,10 +87,6 @@ import kotlin.time.TimeSource
  * open, use its synchronized settings, input, and frame APIs. Direct mutation or
  * frame reads through retained core references bypass that serialization.
  *
- * @property renderPublisher session-owned publisher. Consumers may borrow its
- * copied caches through [TerminalRenderPublisher.readCurrent]; they must not
- * mutate/retain those caches or publish into this publisher. Cache callbacks
- * must not close the session or reenter its mutation APIs while holding a lease.
  * @property shellIntegrationState shared host-side prompt and command marker state.
  * @property workerDispatcher non-owned dispatcher used for session background work.
  * @property ioDispatcher non-owned dispatcher for connector writes, metadata queries, and clipboard providers.
@@ -161,11 +157,35 @@ public class TerminalSession private constructor(
         ioDispatcher,
     )
 
-    /** Session-owned copied render data; consumers borrow read-only caches through [TerminalRenderPublisher.readCurrent]. */
-    public val renderPublisher: TerminalRenderPublisher get() = runtime.publisher
+    /**
+     * Borrows the latest copied render cache, or returns null before first publication.
+     *
+     * Safe from any thread, including after closure; this does not request a new frame.
+     * The callback may read/copy borrowed primitive planes but must not mutate or retain
+     * the cache or its arrays. It must not close the session or reenter its mutation or
+     * publication APIs. Failures and non-local returns release the lease before escaping.
+     * A null result can also be the callback's own result. No lease or callback object is
+     * allocated for an inlined call; the publisher remains owned exclusively by session.
+     */
+    public inline fun <T> readPublishedFrame(block: (TerminalRenderCache) -> T): T? {
+        val cache = acquirePublishedFrame() ?: return null
+        try {
+            return block(cache)
+        } finally {
+            releasePublishedFrame(cache)
+        }
+    }
+
+    @PublishedApi
+    @JvmSynthetic
+    internal fun acquirePublishedFrame(): TerminalRenderCache? = runtime.publisher.acquireFrontLease()
+
+    @PublishedApi
+    @JvmSynthetic
+    internal fun releasePublishedFrame(cache: TerminalRenderCache): Unit = runtime.publisher.releaseFrontLease(cache)
 
     /** Bounded projection supplied by the selected shell producer, or an empty model when absent. */
-    public val shellIntegrationState: TerminalShellIntegrationState get() = runtime.shellState
+    public val shellIntegrationState: TerminalShellIntegrationView get() = runtime.shellState
     private val renderReader: TerminalRenderFrameReader get() = runtime.reader
     private val pendingRenderRequest = AtomicLong(packRenderRequest(scrollbackOffset = 0, viewportRows = 0))
     private val pendingRenderGeneration = AtomicLong(0)
@@ -890,7 +910,7 @@ public class TerminalSession private constructor(
             try {
                 synchronized(mutationLock) {
                     if (isSessionClosed()) return
-                    renderPublisher.updateAndPublish(this, offset, rows)
+                    runtime.publisher.updateAndPublish(this, offset, rows)
                     publishedGeneration = generation
                     context.ensureActive()
                     mutableRenderGeneration.value = generation
@@ -1069,7 +1089,7 @@ public class TerminalSession private constructor(
                 cleanup { parser.endOfInput() }
                 cleanup {
                     val request = pendingRenderRequest.get()
-                    renderPublisher.updateAndPublish(this, unpackScrollbackOffset(request), unpackViewportRows(request))
+                    runtime.publisher.updateAndPublish(this, unpackScrollbackOffset(request), unpackViewportRows(request))
                     mutableRenderGeneration.value = pendingRenderGeneration.incrementAndGet()
                 }
             }

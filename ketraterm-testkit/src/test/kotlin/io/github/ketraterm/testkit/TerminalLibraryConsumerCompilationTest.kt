@@ -38,6 +38,43 @@ class TerminalLibraryConsumerCompilationTest {
 
     @ParameterizedTest
     @CsvSource(
+        "getShellIntegrationState().clear()",
+        "getShellIntegrationState().recordPromptStart(1L)",
+        "getRenderPublisher().updateAndPublish(null)",
+    )
+    fun `session consumers cannot publish through their read access`(operation: String) {
+        assertCompilation(
+            "ui-swing",
+            """
+            import io.github.ketraterm.session.TerminalSession;
+            final class Consumer {
+                void mutate(TerminalSession session) { session.$operation; }
+            }
+            """.trimIndent(),
+            expectedSuccess = false,
+        )
+    }
+
+    @Test
+    fun `Java consumers can observe shell projections and borrow session frames`() {
+        assertCompilation(
+            "ui-swing",
+            """
+            import io.github.ketraterm.session.TerminalSession;
+            import io.github.ketraterm.session.TerminalShellIntegrationView;
+            final class Consumer {
+                Integer read(TerminalSession session) {
+                    TerminalShellIntegrationView view = session.getShellIntegrationState();
+                    int records = view.recordCount();
+                    return session.readPublishedFrame(cache -> cache.getCodeWords()[0] + records);
+                }
+            }
+            """.trimIndent(),
+        )
+    }
+
+    @ParameterizedTest
+    @CsvSource(
         "host,io.github.ketraterm.host.HostPolicy",
         "parser,io.github.ketraterm.parser.api.TerminalOutputParser",
         "completion,io.github.ketraterm.completion.api.TerminalCompletionCandidateKind",
@@ -50,7 +87,7 @@ class TerminalLibraryConsumerCompilationTest {
         module: String,
         publicType: String,
     ) {
-        assertCompiles(
+        assertCompilation(
             module,
             """
             final class Consumer {
@@ -63,7 +100,7 @@ class TerminalLibraryConsumerCompilationTest {
 
     @Test
     fun `Swing host exports native popup coordination and independently callable provider to Java`() {
-        assertCompiles(
+        assertCompilation(
             "ui-swing-host",
             """
             import io.github.ketraterm.completion.api.TerminalCompletionEngine;
@@ -92,7 +129,7 @@ class TerminalLibraryConsumerCompilationTest {
 
     @Test
     fun `completion host exports Java scanner configuration overloads`() {
-        assertCompiles(
+        assertCompilation(
             "completion-host",
             """
             import io.github.ketraterm.completion.host.TerminalBoundedDirectoryScanner;
@@ -114,7 +151,7 @@ class TerminalLibraryConsumerCompilationTest {
 
     @Test
     fun `host dependency exports the types needed to call its adapter`() {
-        assertCompiles(
+        assertCompilation(
             "host",
             """
             import io.github.ketraterm.host.HostCommandAdapter;
@@ -130,7 +167,7 @@ class TerminalLibraryConsumerCompilationTest {
 
     @Test
     fun `parser dependency exports protocol types in its sink contract`() {
-        assertCompiles(
+        assertCompilation(
             "parser",
             """
             import io.github.ketraterm.parser.spi.TerminalCommandSink;
@@ -152,7 +189,7 @@ class TerminalLibraryConsumerCompilationTest {
 
     @Test
     fun `host dependency exports the core types needed to construct its adapter`() {
-        assertCompiles(
+        assertCompilation(
             "host",
             """
             import io.github.ketraterm.core.api.TerminalBuffer;
@@ -171,7 +208,7 @@ class TerminalLibraryConsumerCompilationTest {
 
     @Test
     fun `completion dependency exports the flow returned by its engine`() {
-        assertCompiles(
+        assertCompilation(
             "completion",
             """
             import io.github.ketraterm.completion.api.TerminalCompletionEngine;
@@ -188,7 +225,7 @@ class TerminalLibraryConsumerCompilationTest {
 
     @Test
     fun `Swing dependency exports session and flow types needed by host integration`() {
-        assertCompiles(
+        assertCompilation(
             "ui-swing",
             """
             import io.github.ketraterm.session.TerminalSession;
@@ -212,7 +249,7 @@ class TerminalLibraryConsumerCompilationTest {
 
     @Test
     fun `PTY dependency exports the native process type in its public connector constructor`() {
-        assertCompiles(
+        assertCompilation(
             "pty",
             """
             import com.pty4j.PtyProcess;
@@ -227,9 +264,10 @@ class TerminalLibraryConsumerCompilationTest {
         )
     }
 
-    private fun assertCompiles(
+    private fun assertCompilation(
         module: String,
         source: String,
+        expectedSuccess: Boolean = true,
     ) {
         val classpaths =
             Path.of(
@@ -263,8 +301,8 @@ class TerminalLibraryConsumerCompilationTest {
                         fileManager.getJavaFileObjects(sourceFile.toFile()),
                     ).call()
             assertTrue(
-                compiled,
-                "A consumer depending only on ketraterm-$module must compile:\n" +
+                compiled == expectedSuccess,
+                "Consumer of ketraterm-$module expected compilation success=$expectedSuccess:\n" +
                     diagnostics.diagnostics.joinToString("\n") { it.getMessage(Locale.ROOT) },
             )
         }

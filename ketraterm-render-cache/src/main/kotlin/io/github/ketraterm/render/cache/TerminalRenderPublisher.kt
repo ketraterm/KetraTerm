@@ -31,10 +31,8 @@ import kotlin.concurrent.withLock
  * access the front buffer through [readCurrent].
  *
  * The public inline reader avoids a callback allocation; non-inline operations own
- * lease acquisition and release. [PublishedApi] declarations are binary compatibility
- * commitments, not host extension points. Earlier compiled readers acquire leases
- * directly through the retained lock, indices, arrays and counts; writers and new
- * readers must continue to cooperate with that algorithm.
+ * lease acquisition and release. Only cache-reference acquisition/release is part of
+ * the reader ABI; buffer layout, indices, locks and counters remain private.
  *
  * @param columns initial cache width in cells.
  * @param rows initial cache height in rows.
@@ -43,17 +41,16 @@ public class TerminalRenderPublisher(
     columns: Int,
     rows: Int,
 ) {
-    @PublishedApi internal val buffers: Array<TerminalRenderCache> = Array(3) { TerminalRenderCache(columns, rows) }
+    private val buffers: Array<TerminalRenderCache> = Array(3) { TerminalRenderCache(columns, rows) }
 
-    @PublishedApi internal val readerCounts: IntArray = IntArray(BUFFER_COUNT)
+    private val readerCounts: IntArray = IntArray(BUFFER_COUNT)
     private val writerOwned = BooleanArray(BUFFER_COUNT)
 
     // Buffer indices, reader counts, and writer leases are mutated under publishLock.
-    @PublishedApi internal var frontIndex: Int = NO_FRONT
-        private set
+    private var frontIndex: Int = NO_FRONT
     private var nextWriteIndex = 0
 
-    @PublishedApi internal val publishLock: ReentrantLock = ReentrantLock()
+    private val publishLock: ReentrantLock = ReentrantLock()
     private val bufferAvailable = publishLock.newCondition()
 
     // AtomicReference for lock-free front reads.
@@ -148,24 +145,31 @@ public class TerminalRenderPublisher(
      * @return [block]'s result, or `null` when no frame is available.
      */
     public inline fun <T> readCurrent(block: (TerminalRenderCache) -> T): T? {
-        val index = acquireFrontLease()
-
-        if (index == NO_FRONT) return null
+        val cache = acquireFrontLease() ?: return null
 
         try {
-            return block(buffers[index])
+            return block(cache)
         } finally {
-            releaseFrontLease(index)
+            releaseFrontLease(cache)
         }
     }
 
-    /** Shares acquisition bookkeeping between current calls while honoring older inline readers. */
-    @PublishedApi
-    internal fun acquireFrontLease(): Int =
+    /**
+     * Pins the current cache, or returns null before the first publication.
+     *
+     * Bridge for inline readers in other modules; prefer [readCurrent]. Each non-null
+     * result must be passed exactly once to [releaseFrontLease] on this publisher in
+     * a finally block, including on failure. The cache and its arrays are borrowed,
+     * read-only, and must not escape that lease. Acquisition does not allocate a lease.
+     * Do not reenter publication while holding one. Safe from any thread.
+     */
+    public fun acquireFrontLease(): TerminalRenderCache? =
         publishLock.withLock {
             val index = frontIndex
-            if (index != NO_FRONT) readerCounts[index]++
-            index
+            if (index == NO_FRONT) return null
+            check(readerCounts[index] < Int.MAX_VALUE) { "Too many render readers" }
+            readerCounts[index]++
+            buffers[index]
         }
 
     private fun acquireWritableIndex(): Int {
@@ -186,13 +190,20 @@ public class TerminalRenderPublisher(
         }
     }
 
-    @PublishedApi
-    internal fun releaseFrontLease(index: Int) {
+    /**
+     * Releases one successful [acquireFrontLease] using the identical cache reference.
+     *
+     * Only the matching acquisition owner may release it, once, after all reads end.
+     * No storage may be used afterward. A foreign cache or a cache with no outstanding
+     * readers is rejected without changing counts. This cannot detect duplicate releases
+     * while another reader holds the same cache; correct pairing is the caller's duty.
+     */
+    public fun releaseFrontLease(cache: TerminalRenderCache) {
         publishLock.withLock {
+            val index = buffers.indexOfFirst { it === cache }
+            require(index >= 0) { "Cache does not belong to this publisher" }
+            check(readerCounts[index] > 0) { "Render cache has no reader lease" }
             readerCounts[index]--
-            check(readerCounts[index] >= 0) {
-                "TerminalRenderPublisher reader count underflow for buffer $index"
-            }
             bufferAvailable.signalAll()
         }
     }
@@ -207,9 +218,9 @@ public class TerminalRenderPublisher(
         }
     }
 
-    public companion object {
-        @PublishedApi internal const val BUFFER_COUNT: Int = 3
+    private companion object {
+        const val BUFFER_COUNT: Int = 3
 
-        @PublishedApi internal const val NO_FRONT: Int = -1
+        const val NO_FRONT: Int = -1
     }
 }

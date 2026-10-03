@@ -123,3 +123,11 @@ cases fail at the removed constructor descriptors; the other eleven clients
 remain byte-for-byte unchanged. Source consumers now exercise Java late-field
 font resolver selection/clearing, settings drafts, detached snapshots, and
 workspace immutable updates. See [configuration migration](../../../docs/library-configuration.md).
+
+D04/D05 deliberately refreshes only Swing and render-cache reader clients after
+recording eight expected linkage failures (both metadata modes and both runtimes).
+Swing called the removed session publisher getter; render-cache had inlined the
+integer-lease descriptor. The other eleven jars remain unchanged for this migration.
+The new baseline exercises scoped session borrowing and cache-reference leases,
+including concurrent Kotlin/Java readers and failure cleanup. The removed buffer
+representation is not retained. See [reader ownership](../../../docs/render-reader-ownership.md).

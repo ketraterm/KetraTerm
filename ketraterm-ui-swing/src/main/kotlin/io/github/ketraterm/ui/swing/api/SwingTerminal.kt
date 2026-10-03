@@ -1210,7 +1210,7 @@ public class SwingTerminal
                         }
                 }
             var publishedFrameAvailable = false
-            session.renderPublisher.readCurrent {
+            session.readPublishedFrame {
                 publishedFrameAvailable = true
             }
             if (publishedFrameAvailable) {
@@ -2329,7 +2329,7 @@ public class SwingTerminal
         }
 
         private fun refreshRenderCacheFromSession(session: TerminalSession) {
-            session.renderPublisher.readCurrent { published ->
+            session.readPublishedFrame { published ->
                 renderCache.updateFrom(published)
             } ?: return
             hyperlinkDiscoveryController.scheduleForFrame()

@@ -381,7 +381,8 @@ class SwingTerminalThreadingTest {
     @ValueSource(strings = ["select", "bind", "unbind"])
     fun `currentSelection snapshots state after queued EDT changes`(change: String) {
         val session = testSession()
-        session.renderPublisher.updateAndPublish(session)
+        session.requestRender(0)
+        dispatcher.scheduler.runCurrent()
         val component =
             SwingTerminal(settingsProvider = {
                 SwingSettings.create { draft ->

@@ -40,6 +40,85 @@ import java.io.IOException
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class TerminalHostShellIntegrationTest {
+    @Test
+    fun `consumer view observes the producer without taking its lifetime`() =
+        runTest {
+            Fixture(StandardTestDispatcher(testScheduler), command = null).use { fixture ->
+                val view: TerminalShellIntegrationView = fixture.session.shellIntegrationState
+                assertSame(fixture.model, view)
+                val directories = mutableListOf<String>()
+                view.addCurrentWorkingDirectoryListener(directories::add).use {
+                    fixture.model.recordCurrentWorkingDirectory("file:///first")
+                    fixture.model.recordPromptStart(1)
+                    assertEquals(1, view.recordCount())
+                    val starts = BooleanArray(1)
+                    view.copyViewport(longArrayOf(1), 1, starts, BooleanArray(1), BooleanArray(1), IntArray(1), IntArray(1))
+                    assertTrue(starts[0])
+                    fixture.session.close()
+                    fixture.model.clear()
+                    assertEquals(0, view.recordCount())
+                    fixture.model.recordCurrentWorkingDirectory("file:///after-close")
+                    assertEquals("file:///after-close", view.currentWorkingDirectoryUri())
+                }
+                fixture.model.recordCurrentWorkingDirectory("file:///unobserved")
+                assertEquals(listOf("file:///first", "file:///after-close"), directories)
+            }
+        }
+
+    @Test
+    fun `published session reads release on failure and non-local return and survive closure`() =
+        runTest {
+            val dispatcher = StandardTestDispatcher(testScheduler)
+            val connector = MockConnector()
+            val session =
+                TerminalSession.create(
+                    TerminalBuffers.create(1, 1),
+                    connector,
+                    workerDispatcher = dispatcher,
+                    ioDispatcher = dispatcher,
+                )
+            session.use {
+                assertNull(session.readPublishedFrame<Unit> { fail("No frame yet") })
+                session.start(1, 1)
+
+                fun firstCell(): Int {
+                    session.readPublishedFrame { return it.codeWords[0] }
+                    error("Frame missing")
+                }
+                val failure = IllegalStateException("reader failure")
+                repeat(9) { index ->
+                    connector.feedFromHost("\r${'a' + index}".toByteArray())
+                    session.requestRender(0)
+                    runCurrent()
+                    assertEquals(('a' + index).code, firstCell())
+                    assertSame(failure, assertThrows(IllegalStateException::class.java) { session.readPublishedFrame { throw failure } })
+                }
+                session.close()
+                assertEquals('i'.code, firstCell())
+            }
+        }
+
+    @Test
+    fun `session consumer API does not expose shell publication authority`() {
+        val projection = TerminalSession::class.java.getMethod("getShellIntegrationState").returnType
+        val writers =
+            setOf(
+                "clear",
+                "recordPromptStart",
+                "recordPromptEnd",
+                "recordCommandStart",
+                "recordCommandFinished",
+                "recordCurrentWorkingDirectory",
+                "reanchorActivePromptStart",
+            )
+        assertTrue(projection.methods.none { it.name in writers }, "Session shell projection exposes producer methods")
+    }
+
+    @Test
+    fun `session consumer API does not expose its render publisher`() {
+        assertFalse(TerminalSession::class.java.methods.any { it.name == "getRenderPublisher" }, "Session exposes its render publisher")
+    }
+
     @ParameterizedTest
     @ValueSource(booleans = [false, true])
     fun `host observation publishes unavailable context on subscription and restart`(initiallyAvailable: Boolean) =

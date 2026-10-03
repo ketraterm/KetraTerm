@@ -329,7 +329,7 @@ class SwingTerminalSelectionTest {
                     fresh.bind(replacement)
 
                     assertNull(
-                        replacement.renderPublisher.readCurrent { true },
+                        replacement.readPublishedFrame { true },
                         "The test scheduler must hold the replacement's first frame",
                     )
                     assertAll(
@@ -370,7 +370,7 @@ class SwingTerminalSelectionTest {
 
                     dispatcher.scheduler.runCurrent()
 
-                    assertNotNull(replacement.renderPublisher.readCurrent { true })
+                    assertNotNull(replacement.readPublishedFrame { true })
                     val newPixels = componentPixels(reused)
                     assertFalse(emptyPixels.contentEquals(newPixels), "The first publication must display the replacement text")
                     assertArrayEquals(componentPixels(fresh), newPixels)
@@ -513,7 +513,7 @@ class SwingTerminalSelectionTest {
             SwingUtilities.invokeAndWait {
                 component.setSize(100, 40)
                 component.bind(session)
-                session.renderPublisher.updateAndPublish(StaticFrameReader(frame))
+                session.requestRender(0)
                 clickWithCtrl(component, 1, 1)
             }
             assertEquals("https://example.com/3", opened.get())
@@ -543,7 +543,7 @@ class SwingTerminalSelectionTest {
             SwingUtilities.invokeAndWait {
                 component.setSize(200, 40)
                 component.bind(session)
-                session.renderPublisher.updateAndPublish(StaticFrameReader(frame))
+                session.requestRender(0)
                 val metrics = SwingMetrics.from(component.getFontMetrics(settings.font))
                 val left = 13
                 val x = left + metrics.cellWidth + 1
@@ -578,7 +578,7 @@ class SwingTerminalSelectionTest {
             SwingUtilities.invokeAndWait {
                 component.setSize(100, 40)
                 component.bind(session)
-                session.renderPublisher.updateAndPublish(StaticFrameReader(frame))
+                session.requestRender(0)
                 component.mouseListeners.forEach { it.mousePressed(mousePressed(component, 1, 1, 1)) }
                 val event = requireNotNull(input.lastMouseEvent.get())
                 assertEquals(2, event.column)
@@ -609,7 +609,7 @@ class SwingTerminalSelectionTest {
         SwingUtilities.invokeAndWait {
             component.setSize(300, 80)
             component.bind(session)
-            session.renderPublisher.updateAndPublish(StaticFrameReader(frame))
+            session.requestRender(0)
             component.mouseListeners.forEach { it.mousePressed(mousePressed(component, x = 8, y = 8, clickCount = 1)) }
         }
 
@@ -631,7 +631,7 @@ class SwingTerminalSelectionTest {
         SwingUtilities.invokeAndWait {
             component.setSize(300, 80)
             component.bind(session)
-            session.renderPublisher.updateAndPublish(StaticFrameReader(frame))
+            session.requestRender(0)
             component.mouseListeners.forEach { it.mousePressed(mousePressed(component, x = 8, y = 8, clickCount = 1)) }
             component.mouseMotionListeners.forEach { it.mouseDragged(mouseDragged(component, x = 299, y = 8)) }
         }
@@ -653,7 +653,7 @@ class SwingTerminalSelectionTest {
             SwingUtilities.invokeAndWait {
                 component.setSize(300, 80)
                 component.bind(session)
-                session.renderPublisher.updateAndPublish(StaticFrameReader(frame))
+                session.requestRender(0)
                 component.mouseListeners.forEach { it.mousePressed(mousePressed(component, x = 8, y = 8, clickCount = 1)) }
                 component.mouseMotionListeners.forEach { it.mouseDragged(mouseDragged(component, x = 299, y = 8)) }
                 component.mouseListeners.forEach { it.mouseReleased(mouseReleased(component, x = 299, y = 8)) }
@@ -722,7 +722,7 @@ class SwingTerminalSelectionTest {
         SwingUtilities.invokeAndWait {
             component.setSize(300, 80)
             component.bind(session)
-            session.renderPublisher.updateAndPublish(StaticFrameReader(frame))
+            session.requestRender(0)
             component.mouseListeners.forEach { it.mousePressed(mousePressedWithAlt(component, x = 8, y = 8)) }
             component.mouseMotionListeners.forEach { it.mouseDragged(mouseDraggedWithAlt(component, x = 80, y = 8)) }
         }
@@ -897,7 +897,7 @@ class SwingTerminalSelectionTest {
         SwingUtilities.invokeAndWait {
             component.setSize(300, 80)
             component.bind(session)
-            session.renderPublisher.updateAndPublish(StaticFrameReader(frame))
+            session.requestRender(0)
             component.mouseListeners.forEach { it.mousePressed(mousePressed(component, x = 8, y = 8, clickCount = 2)) }
             assertTrue(component.copySelectionToClipboard())
         }
@@ -1053,7 +1053,7 @@ class SwingTerminalSelectionTest {
         SwingUtilities.invokeAndWait {
             component.setSize(300, 80)
             component.bind(session)
-            session.renderPublisher.updateAndPublish(StaticFrameReader(frame))
+            session.requestRender(0)
             component.mouseListeners.forEach { it.mousePressed(mousePressed(component, x = 8, y = 8, clickCount = 1)) }
             component.mouseMotionListeners.forEach { it.mouseDragged(mouseDragged(component, x = 299, y = 8)) }
             assertTrue(component.copySelectionToClipboard())
@@ -1085,7 +1085,7 @@ class SwingTerminalSelectionTest {
         SwingUtilities.invokeAndWait {
             component.setSize(300, 80)
             component.bind(session)
-            session.renderPublisher.updateAndPublish(StaticFrameReader(frame))
+            session.requestRender(0)
             component.mouseListeners.forEach { it.mousePressed(mousePressed(component, x = 8, y = 8, clickCount = 1)) }
             component.mouseMotionListeners.forEach { it.mouseDragged(mouseDragged(component, x = 299, y = 8)) }
             assertTrue(component.copySelectionToClipboard())
@@ -1249,7 +1249,7 @@ class SwingTerminalSelectionTest {
         SwingUtilities.invokeAndWait {
             component.setSize(80, 40)
             component.bind(session)
-            session.renderPublisher.updateAndPublish(StaticFrameReader(frame))
+            session.requestRender(0)
             component.mouseListeners.forEach {
                 it.mousePressed(mousePressedWithCtrl(component, x = 8, y = 8))
                 it.mouseReleased(
@@ -1312,7 +1312,7 @@ class SwingTerminalSelectionTest {
         SwingUtilities.invokeAndWait {
             component.setSize(80, 40)
             component.bind(session)
-            session.renderPublisher.updateAndPublish(StaticFrameReader(frame))
+            session.requestRender(0)
             component.mouseListeners.forEach {
                 it.mousePressed(mousePressed(component, x = 8, y = 8, clickCount = 1))
             }
@@ -1335,10 +1335,12 @@ class SwingTerminalSelectionTest {
         publishInitialFrame: Boolean = true,
         terminal: TerminalBuffer = TerminalBuffers.create(width = frame.columns, height = frame.rows, maxHistory = 5),
     ): TerminalSession {
+        val publisher = TerminalRenderPublisher(frame.columns, frame.rows)
+        if (publishInitialFrame) publisher.updateAndPublish(renderReader)
         val session =
             TerminalSession(
                 terminal = terminal,
-                renderPublisher = TerminalRenderPublisher(frame.columns, frame.rows),
+                renderPublisher = publisher,
                 renderReader = renderReader,
                 responseReader = terminal,
                 connector = NoOpConnector,
@@ -1348,7 +1350,6 @@ class SwingTerminalSelectionTest {
                 workerDispatcher = workerDispatcher,
                 ioDispatcher = workerDispatcher,
             )
-        if (publishInitialFrame) session.renderPublisher.updateAndPublish(renderReader)
         sessions += session
         return session
     }

@@ -54,7 +54,7 @@ class SwingTerminalCommandNavigationTest {
         SwingUtilities.invokeAndWait {
             HostModelFixture().use { fixture ->
                 val generation = fixture.session.renderGeneration.value
-                val state = fixture.session.shellIntegrationState
+                val state = fixture.shellState
                 val repaints = fixture.repaints.count
                 fixture.moveToPromptGutter()
                 assertEquals(Cursor.DEFAULT_CURSOR, fixture.component.cursor.type)
@@ -80,7 +80,7 @@ class SwingTerminalCommandNavigationTest {
     fun `host command records support navigation selection and output copy without protocol markers`() {
         SwingUtilities.invokeAndWait {
             HostModelFixture().use { fixture ->
-                val state = fixture.session.shellIntegrationState
+                val state = fixture.shellState
                 val generation = fixture.session.renderGeneration.value
                 state.recordPromptStart(lineIdForAbsoluteRow(5))
                 state.recordPromptEnd(lineIdForAbsoluteRow(5))
@@ -120,7 +120,7 @@ class SwingTerminalCommandNavigationTest {
                 fixture.flush()
                 val repaints = fixture.repaints.count
 
-                originalSession.shellIntegrationState.recordPromptStart(lineIdForAbsoluteRow(6))
+                fixture.shellState.recordPromptStart(lineIdForAbsoluteRow(6))
                 fixture.flush()
 
                 assertEquals(repaints, fixture.repaints.count)
@@ -611,6 +611,7 @@ class SwingTerminalCommandNavigationTest {
         firstCommandHasOutput: Boolean = true,
         populate: Boolean = true,
         workerDispatcher: CoroutineDispatcher = Dispatchers.Unconfined,
+        state: TerminalShellIntegrationState = TerminalShellIntegrationState(capacity = capacity),
     ): TerminalSession {
         val terminal = TerminalBuffers.create(width = 12, height = 2, maxHistory = HISTORY_SIZE)
         val session =
@@ -623,12 +624,11 @@ class SwingTerminalCommandNavigationTest {
                 parser = NoOpParser,
                 inputEncoderFactory = { _, _, _ -> object : TerminalInputEncoder by NoOpInputEncoder {} },
                 shellIntegration =
-                    TerminalShellIntegrationFactory.host(TerminalShellIntegrationState(capacity = capacity)),
+                    TerminalShellIntegrationFactory.host(state),
                 workerDispatcher = workerDispatcher,
                 ioDispatcher = workerDispatcher,
             )
         if (populate) {
-            val state = session.shellIntegrationState
             state.recordPromptStart(lineIdForAbsoluteRow(1))
             state.recordPromptEnd(lineIdForAbsoluteRow(1))
             if (firstCommandHasOutput) {
@@ -645,7 +645,7 @@ class SwingTerminalCommandNavigationTest {
             state.recordCommandStart(lineIdForAbsoluteRow(6), includeLine = true)
             state.recordCommandFinished(lineIdForAbsoluteRow(7), exitCode = 1)
         }
-        session.renderPublisher.updateAndPublish(renderReader)
+        session.requestRender(0)
         return session
     }
 
@@ -657,7 +657,8 @@ class SwingTerminalCommandNavigationTest {
         private val previousRepaints = RepaintManager.currentManager(null)
         val repaints = RecordingRepaints(previousRepaints)
         var clipboard: String? = null
-        val session = commandSession(CommandFrameReader(), populate = false, workerDispatcher = worker)
+        val shellState = TerminalShellIntegrationState()
+        val session = commandSession(CommandFrameReader(), populate = false, workerDispatcher = worker, state = shellState)
         val replacementSession = commandSession(CommandFrameReader(), populate = false, workerDispatcher = worker)
         val component =
             SwingTerminal(

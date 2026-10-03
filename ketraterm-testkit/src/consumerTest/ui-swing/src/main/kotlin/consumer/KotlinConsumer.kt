@@ -85,7 +85,8 @@ fun main() =
         check(runCatching { closedConnector.start(rejectedListener) }.exceptionOrNull() is IllegalStateException)
         val detector = ConsumerHyperlinkDetector()
         val commandLine = MutableStateFlow<TerminalShellCommandLineSnapshot?>(TerminalShellCommandLineSnapshot("help", 4, 4, 0))
-        val shell = TerminalShellIntegrationFactory.host(TerminalShellIntegrationState(), commandLine)
+        val shellProducer = TerminalShellIntegrationState()
+        val shell = TerminalShellIntegrationFactory.host(shellProducer, commandLine)
         val backing = TerminalBuffers.create(COLUMNS, ROWS)
         val renderBuffer: TerminalRenderBuffer = object : TerminalRenderBuffer by backing {}
         val coreOnly: TerminalBuffer = object : TerminalBuffer by renderBuffer {}
@@ -99,6 +100,10 @@ fun main() =
                 parserFactory = JavaConsumer.parserFactory(),
             )
         assembledSession.use { session ->
+            val shellView: io.github.ketraterm.session.TerminalShellIntegrationView = session.shellIntegrationState
+            check(shellView === shellProducer)
+            shellProducer.recordCurrentWorkingDirectory("file:///consumer")
+            check(shellView.currentWorkingDirectoryUri() == "file:///consumer")
             check(session.activeShellCommandLine() == commandLine.value)
             commandLine.value = null
             check(session.activeShellCommandLine() == null)
@@ -139,11 +144,17 @@ fun main() =
                 // Entry acknowledges installation in the view, not merely completion of detection.
                 withTimeout(20_000) { detector.initialHover.await() }
                 checkNotNull(
-                    session.renderPublisher.readCurrent { frame ->
+                    session.readPublishedFrame { frame ->
                         check(frame.hasFrame && frame.columns == COLUMNS && frame.rows >= ROWS)
                         for (column in URL.indices) check(frame.codeWords[column] == URL[column].code)
                     },
                 )
+
+                fun firstCell(): Int {
+                    session.readPublishedFrame { return it.codeWords[0] }
+                    error("Published frame missing")
+                }
+                check(firstCell() == URL[0].code)
                 onEdt {
                     val bounds = Rectangle()
                     check(terminal.copyCellBounds(0, 0, bounds) && bounds.width > 0 && bounds.height > 0)

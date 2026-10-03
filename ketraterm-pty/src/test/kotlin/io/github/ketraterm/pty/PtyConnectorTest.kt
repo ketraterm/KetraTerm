@@ -337,7 +337,7 @@ class PtyConnectorTest {
             val closed = assertInstanceOf(TerminalSessionState.Closed::class.java, session.state.value)
             assertFalse(closed.event.locallyRequested)
             assertNull(closed.event.exitCode)
-            assertEquals('a'.code, session.renderPublisher.readCurrent { it.codeWords[0] })
+            assertEquals('a'.code, session.readPublishedFrame { it.codeWords[0] })
             assertEquals(1, finalizations)
             assertEquals(1, process.destroyCount)
             assertEquals(1, input.closeCount)

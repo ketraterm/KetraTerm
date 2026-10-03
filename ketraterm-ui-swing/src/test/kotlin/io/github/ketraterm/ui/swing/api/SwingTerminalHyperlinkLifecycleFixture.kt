@@ -52,13 +52,14 @@ internal class SwingTerminalHyperlinkLifecycleFixture(
     private var copiedText: String? = null
     private var pointer: Point? = Point(gutterWidth + 1, 1)
     private var osc8Activation = SwingHyperlinkActivation.MODIFIER
+    private val shellState = TerminalShellIntegrationState()
     private val session =
         TerminalSession.create(
             terminal = TerminalBuffers.create(width = 40, height = 2, maxHistory = 10),
             connector = NoOpConnector,
             workerDispatcher = worker,
             ioDispatcher = worker,
-            shellIntegration = if (gutterWidth == 0) null else TerminalShellIntegrationFactory.host(TerminalShellIntegrationState()),
+            shellIntegration = if (gutterWidth == 0) null else TerminalShellIntegrationFactory.host(shellState),
         )
     private val container = onEdt { JPanel() }
     private val terminal =
@@ -126,7 +127,8 @@ internal class SwingTerminalHyperlinkLifecycleFixture(
                 container.add(this)
                 container.addNotify()
                 session.onBytes(URL.toByteArray(), 0, URL.length)
-                session.renderPublisher.updateAndPublish(session)
+                session.requestRender(0)
+                worker.scheduler.runCurrent()
                 bind(session)
             }
         }
@@ -223,7 +225,7 @@ internal class SwingTerminalHyperlinkLifecycleFixture(
 
     fun markFirstRowAsPrompt() {
         onEdt {
-            session.readRenderFrame { frame -> session.shellIntegrationState.recordPromptStart(frame.lineId(0)) }
+            session.readRenderFrame { frame -> shellState.recordPromptStart(frame.lineId(0)) }
         }
         settle()
     }

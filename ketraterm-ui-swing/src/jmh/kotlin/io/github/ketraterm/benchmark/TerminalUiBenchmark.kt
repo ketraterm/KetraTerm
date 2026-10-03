@@ -28,6 +28,7 @@ import io.github.ketraterm.ui.swing.api.CellSelection
 import io.github.ketraterm.ui.swing.api.SwingTerminal
 import io.github.ketraterm.ui.swing.settings.SwingSettings
 import io.github.ketraterm.ui.swing.settings.SwingSettingsProvider
+import kotlinx.coroutines.flow.first
 import org.openjdk.jmh.annotations.*
 import org.openjdk.jmh.infra.Blackhole
 import java.awt.Graphics2D
@@ -192,7 +193,8 @@ open class SwingPaintBenchmark {
         }
 
         session = benchmarkSession(terminal)
-        session.renderPublisher.updateAndPublish(terminal as io.github.ketraterm.render.api.TerminalRenderFrameReader)
+        session.requestRender(0)
+        kotlinx.coroutines.runBlocking { session.renderGeneration.first { it > 0 } }
 
         SwingUtilities.invokeAndWait {
             component =

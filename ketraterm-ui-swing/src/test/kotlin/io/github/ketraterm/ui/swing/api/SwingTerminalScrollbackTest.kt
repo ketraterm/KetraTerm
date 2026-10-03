@@ -148,7 +148,8 @@ class SwingTerminalScrollbackTest {
                 inputEncoderFactory = { _, _, _ -> object : TerminalInputEncoder by NoOpInputEncoder {} },
                 workerDispatcher = dispatcher,
             ).also(sessions::add)
-        session.renderPublisher.updateAndPublish(renderReader)
+        session.requestRender(0)
+        dispatcher.scheduler.runCurrent()
         val component = createComponent()
         val oldManager = RepaintManager.currentManager(component)
         val repaintManager = CountingRepaintManager(component)
@@ -206,7 +207,8 @@ class SwingTerminalScrollbackTest {
                 inputEncoderFactory = { _, _, _ -> object : TerminalInputEncoder by NoOpInputEncoder {} },
                 workerDispatcher = dispatcher,
             ).also(sessions::add)
-        session.renderPublisher.updateAndPublish(renderReader)
+        session.requestRender(0)
+        dispatcher.scheduler.runCurrent()
         val component = scrollTestTerminal()
 
         SwingUtilities.invokeAndWait {
@@ -305,7 +307,7 @@ class SwingTerminalScrollbackTest {
                 component.setSize(30, 100)
                 try {
                     component.bind(session)
-                    assertNull(session.renderPublisher.readCurrent { true }, "The worker has not published the initial viewport yet")
+                    assertNull(session.readPublishedFrame { true }, "The worker has not published the initial viewport yet")
                     dispatcher.scheduler.runCurrent()
                     assertEquals(5, component.viewportState().historySize, "Scrolling requires the published history bounds")
 
@@ -414,7 +416,7 @@ class SwingTerminalScrollbackTest {
             assertEquals(1, renderReader.lastRequestedOffset)
             assertEquals(11, renderReader.lastRequestedRows)
             assertEquals(11, component.viewportState().requestedRows)
-            session.renderPublisher.readCurrent { assertEquals(11, it.rows) }
+            session.readPublishedFrame { assertEquals(11, it.rows) }
         }
         session.close()
     }
@@ -471,7 +473,8 @@ class SwingTerminalScrollbackTest {
                 inputEncoderFactory = { _, _, _ -> object : TerminalInputEncoder by NoOpInputEncoder {} },
                 workerDispatcher = dispatcher,
             ).also(sessions::add)
-        session.renderPublisher.updateAndPublish(renderReader)
+        session.requestRender(0)
+        dispatcher.scheduler.runCurrent()
         val component = scrollTestTerminal()
 
         SwingUtilities.invokeAndWait {
@@ -503,7 +506,8 @@ class SwingTerminalScrollbackTest {
                 workerDispatcher = dispatcher,
             ).also {
                 sessions += it
-                it.renderPublisher.updateAndPublish(reader)
+                it.requestRender(0)
+                dispatcher.scheduler.runCurrent()
             }
         }
         val leftSession = newSession()
@@ -554,7 +558,8 @@ class SwingTerminalScrollbackTest {
                 workerDispatcher = dispatcher,
                 shellIntegration = TerminalShellIntegrationFactory.host(shellIntegrationState),
             ).also(sessions::add)
-        session.renderPublisher.updateAndPublish(reader)
+        session.requestRender(0)
+        dispatcher.scheduler.runCurrent()
         val component =
             scrollTestTerminal(
                 settings =
@@ -689,7 +694,7 @@ class SwingTerminalScrollbackTest {
             assertEquals(columns, connector.lastColumns.get())
             assertEquals("x".repeat(columns), terminal.getLineAsString(0))
             assertEquals("Y", terminal.getLineAsString(1))
-            session.renderPublisher.readCurrent { assertEquals(columns, it.columns) }
+            session.readPublishedFrame { assertEquals(columns, it.columns) }
             val image = BufferedImage(component.width, component.height, BufferedImage.TYPE_INT_ARGB)
             val graphics = image.createGraphics()
             try {
@@ -789,7 +794,8 @@ class SwingTerminalScrollbackTest {
                 inputEncoderFactory = { _, _, _ -> object : TerminalInputEncoder by NoOpInputEncoder {} },
                 workerDispatcher = dispatcher,
             ).also(sessions::add)
-        session.renderPublisher.updateAndPublish(reader)
+        session.requestRender(0)
+        dispatcher.scheduler.runCurrent()
         val component =
             scrollTestTerminal(
                 settings =
@@ -857,7 +863,8 @@ class SwingTerminalScrollbackTest {
                 inputEncoderFactory = { _, _, _ -> object : TerminalInputEncoder by NoOpInputEncoder {} },
                 workerDispatcher = dispatcher,
             ).also(sessions::add)
-        session.renderPublisher.updateAndPublish(reader)
+        session.requestRender(0)
+        dispatcher.scheduler.runCurrent()
         val firstChanges = ArrayList<Pair<Boolean, Boolean>>()
         val laterChanges = ArrayList<Pair<Boolean, Boolean>>()
         var unbindCalls = 0
@@ -926,7 +933,8 @@ class SwingTerminalScrollbackTest {
                 inputEncoderFactory = { _, _, _ -> object : TerminalInputEncoder by NoOpInputEncoder {} },
                 workerDispatcher = dispatcher,
             ).also(sessions::add)
-        session.renderPublisher.updateAndPublish(reader)
+        session.requestRender(0)
+        dispatcher.scheduler.runCurrent()
         val component = scrollTestTerminal()
 
         try {
@@ -1044,7 +1052,7 @@ class SwingTerminalScrollbackTest {
         expectedRows: Int,
     ) {
         var publishedRows = -1
-        session.renderPublisher.readCurrent { publishedRows = it.rows }
+        session.readPublishedFrame { publishedRows = it.rows }
         assertEquals(expectedRows, publishedRows)
     }
 

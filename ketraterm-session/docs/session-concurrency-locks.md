@@ -6,7 +6,7 @@ The session consumes borrowed inbound bytes and performs parser/core mutation sy
 
 - `mutationLock` serializes parser/core mutation, resize and render extraction. A borrowed `TerminalRenderFrame` is valid only while its callback holds this monitor. Consumers must copy promptly and must not call a mutating session API from the callback.
 - `outboundWriteLock` protects the ordinary encoder's scratch, input policy, startup state, and queue admission/draining. It never covers a connector write or bulk encoding. A complete input operation or response batch is admitted under one acquisition.
-- `TerminalRenderPublisher` owns its lease lock so the worker can promote a back cache only when no reader still leases the front cache.
+- `TerminalRenderPublisher` owns its lease lock. Promotion can proceed while readers pin an older front; a pinned cache cannot be recycled as a writer buffer. Session consumers borrow through `readPublishedFrame` and cannot retrieve the publisher.
 
 When both session monitors are needed, acquire mutation before outbound. The writer copies queued bytes into its own scratch under outbound serialization, releases the monitor, and only then calls the connector. Producers cannot modify that scratch until the synchronous connector call returns.
 

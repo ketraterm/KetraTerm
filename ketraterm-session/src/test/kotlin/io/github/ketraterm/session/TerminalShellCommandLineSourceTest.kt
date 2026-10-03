@@ -409,7 +409,7 @@ class TerminalShellCommandLineSourceTest {
     fun `host directory and command metadata remain authoritative even when OSC is allowed`() =
         runTest {
             Fixture(StandardTestDispatcher(testScheduler)).use { fixture ->
-                val state = fixture.session.shellIntegrationState
+                val state = fixture.model
                 state.recordCurrentWorkingDirectory("file:///host/project")
                 var lineId = 0L
                 fixture.session.readRenderFrame { lineId = it.lineId(0) }
@@ -440,6 +440,7 @@ class TerminalShellCommandLineSourceTest {
         dispatcher: CoroutineDispatcher,
         start: Boolean = true,
     ) : AutoCloseable {
+        val model = TerminalShellIntegrationState()
         val source = MutableStateFlow<TerminalShellCommandLineSnapshot?>(null)
         val connector = MockConnector()
         val session =
@@ -448,7 +449,7 @@ class TerminalShellCommandLineSourceTest {
                 connector = connector,
                 workerDispatcher = dispatcher,
                 ioDispatcher = dispatcher,
-                shellIntegration = TerminalShellIntegrationFactory.host(TerminalShellIntegrationState(), source),
+                shellIntegration = TerminalShellIntegrationFactory.host(model, source),
             )
 
         init {

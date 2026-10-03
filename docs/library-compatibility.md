@@ -68,7 +68,7 @@ provides the length and borrowed range without a capacity guess.
 
 The initial review deliberately narrows earlier development APIs: raw packed
 core attributes belong to core implementation, and published caches must be read
-through `readCurrent` leases. Inspect semantic attributes or public render words
+through `readCurrent` (standalone publisher) or `readPublishedFrame` (session) leases. Inspect semantic attributes or public render words
 instead. Selection packing, shell projection probes, configuration-path test
 parameters, the directory scanner's test clock and search-bar component
 construction stay inside their owner modules.
@@ -116,12 +116,12 @@ requires a separate compatibility decision.
 - Public inline bodies and `const` values are copied into consumers. Preserve
   numeric mode bits, enum ordering where ordinals are encoded, packed render
   words and their meanings; a signature comparison alone cannot detect drift.
-  Publisher changes must also honor the lease algorithm embedded in previously
-  compiled readers, not just retain their `@PublishedApi` helper signatures.
-  Current inline callbacks delegate acquisition/release bookkeeping to non-inline
-  operations. The original lock, three-buffer indices, counts, arrays, and release
-  operation remain committed for retained inline readers; this is not permission
-  to replace their representation without a compatibility decision.
+  D04/D05 intentionally replaces the development reader baseline. Inline bodies
+  now invoke the callback between cache-reference acquire/release calls in
+  `try/finally`. Preserve those operations and their lease semantics, including
+  non-local returns and concurrent readers. Buffer counts, indices, arrays and
+  locks are private implementation details. Session's two synthetic bridges are
+  likewise ABI commitments, not consumer mutation entry points.
 - Keep public dependency types available to isolated consumers through generated
   Maven metadata. Resolve each KetraTerm dependency from the same release;
   independently mixing library versions is not covered.
@@ -133,6 +133,17 @@ requires a separate compatibility decision.
 
 The construction changes deliberately replace earlier development signatures:
 
+- D04/D05 removes session publisher access, returns `TerminalShellIntegrationView`
+  from session/integration shell properties, and replaces publisher integer leases
+  and exposed bookkeeping with cache-reference acquisition/release. Recompile
+  readers and retain producer references at construction. The eight expected
+  failures in `CompiledClientUpgradeTest` were Swing cases 7/8/17/18
+  (`NoSuchMethodError: TerminalSession.getRenderPublisher`) and render-cache cases
+  29/30/31/32 (`NoSuchMethodError: int TerminalRenderPublisher.acquireFrontLease`),
+  spanning both metadata modes and both Kotlin runtimes. Only these two client
+  baselines are refreshed; the other eleven remain byte-identical. The removed
+  representation is deliberately not retained as a compatibility surface.
+  See [ownership, migration and measurements](render-reader-ownership.md).
 - D02/D03 removes nonempty constructors, generated copy/default-call and component
   methods from the four growing configuration snapshots. Recompile with named
   construction/update callbacks or Java builders. Swing's unused scrollback and
@@ -158,10 +169,11 @@ The construction changes deliberately replace earlier development signatures:
 The original five client/provenance pairs remain available in Git at `e37f5d7f`.
 Construction commit `025ccb1a` replaced the host and Swing clients for these
 intentional breaks. Parser and completion client bytes remain identical;
-D02/D03 additionally refreshes Swing and PTY as described above. Eight additional clients establish
+D02/D03 additionally refreshes Swing and PTY; D04/D05 refreshes Swing and
+render-cache as described above. Eight additional clients establish
 separate extension baselines. The current 52 positive upgrade cases verify these
 declared baselines; they do not demonstrate compatibility with the original host,
-Swing or PTY clients. This review accepts the current snapshots and retained clients
+Swing, PTY or pre-D05 render-cache clients. This review accepts the current snapshots and retained clients
 as a development baseline, subject to the open behavioral gaps in the final review.
 
 Published modules use strict explicit API mode and Kotlin's built-in ABI

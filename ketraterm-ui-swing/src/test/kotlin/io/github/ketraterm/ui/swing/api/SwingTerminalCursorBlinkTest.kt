@@ -65,7 +65,8 @@ class SwingTerminalCursorBlinkTest {
                 inputEncoderFactory = { _, _, _ -> object : TerminalInputEncoder by NoOpInputEncoder {} },
                 workerDispatcher = dispatcher,
             )
-        session.renderPublisher.updateAndPublish(reader)
+        session.requestRender(0)
+        dispatcher.scheduler.runCurrent()
         session.use { session ->
             SwingUtilities.invokeAndWait {
                 val component =

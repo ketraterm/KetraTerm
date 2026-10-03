@@ -49,23 +49,13 @@ public final class io/github/ketraterm/render/cache/TerminalRenderCache : io/git
 }
 
 public final class io/github/ketraterm/render/cache/TerminalRenderPublisher {
-	public static final field BUFFER_COUNT I
-	public static final field Companion Lio/github/ketraterm/render/cache/TerminalRenderPublisher$Companion;
-	public static final field NO_FRONT I
 	public fun <init> (II)V
-	public final fun acquireFrontLease ()I
-	public final fun getBuffers ()[Lio/github/ketraterm/render/cache/TerminalRenderCache;
-	public final fun getFrontIndex ()I
-	public final fun getPublishLock ()Ljava/util/concurrent/locks/ReentrantLock;
-	public final fun getReaderCounts ()[I
+	public final fun acquireFrontLease ()Lio/github/ketraterm/render/cache/TerminalRenderCache;
 	public final fun readCurrent (Lkotlin/jvm/functions/Function1;)Ljava/lang/Object;
-	public final fun releaseFrontLease (I)V
+	public final fun releaseFrontLease (Lio/github/ketraterm/render/cache/TerminalRenderCache;)V
 	public final fun updateAndPublish (Lio/github/ketraterm/render/api/TerminalRenderFrameReader;)V
 	public final fun updateAndPublish (Lio/github/ketraterm/render/api/TerminalRenderFrameReader;I)V
 	public final fun updateAndPublish (Lio/github/ketraterm/render/api/TerminalRenderFrameReader;II)V
-}
-
-public final class io/github/ketraterm/render/cache/TerminalRenderPublisher$Companion {
 }
 
 public final class io/github/ketraterm/render/cache/TerminalRenderRangeCopy {

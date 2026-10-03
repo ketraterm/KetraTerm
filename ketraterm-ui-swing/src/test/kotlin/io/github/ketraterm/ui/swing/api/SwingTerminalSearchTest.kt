@@ -193,7 +193,7 @@ class SwingTerminalSearchTest {
             val terminal = TerminalBuffers.create(width = 12, height = 1, maxHistory = 0)
             for (character in text) terminal.writeCodepoint(character.code)
             return TerminalSession.create(terminal, NoOpConnector, workerDispatcher = Dispatchers.Unconfined).also {
-                it.renderPublisher.updateAndPublish(it)
+                it.requestRender(0)
             }
         }
 
@@ -316,7 +316,7 @@ class SwingTerminalSearchTest {
                 workerDispatcher = Dispatchers.Unconfined,
                 ioDispatcher = Dispatchers.Unconfined,
             )
-        session.renderPublisher.updateAndPublish(renderReader)
+        session.requestRender(0)
         return session
     }
 

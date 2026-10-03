@@ -66,7 +66,8 @@ class SwingTerminalCellBoundsTest {
             val terminal = SwingTerminal(settingsProvider = { settings })
             try {
                 terminal.size = terminal.preferredGridSize(10, 3)
-                session.renderPublisher.updateAndPublish(buffer)
+                session.requestRender(0)
+                dispatcher.scheduler.runCurrent()
                 terminal.bind(session)
                 val left = if (alternate) 4 else 16
                 val top = if (alternate) 3 else 5

@@ -435,7 +435,7 @@ class TerminalSessionTest {
             }
             assertArrayEquals(
                 intArrayOf('A'.code, 0xFFFD),
-                session.renderPublisher.readCurrent { it.codeWords.copyOf(2) },
+                session.readPublishedFrame { it.codeWords.copyOf(2) },
             )
             assertTrue(session.state.value is TerminalSessionState.Closed)
             assertFalse(session.isCoroutineScopeActive)
@@ -465,7 +465,7 @@ class TerminalSessionTest {
                 runCurrent()
                 val reader =
                     CompletableFuture.runAsync {
-                        session.renderPublisher.readCurrent { frame ->
+                        session.readPublishedFrame { frame ->
                             assertEquals('O'.code, frame.codeWords[0])
                             leased.countDown()
                             release.await()
@@ -478,7 +478,7 @@ class TerminalSessionTest {
                     session.close()
                     assertEquals(
                         'F'.code,
-                        session.renderPublisher.readCurrent { it.codeWords[0] },
+                        session.readPublishedFrame { it.codeWords[0] },
                     )
                     assertTrue(session.state.value is TerminalSessionState.Closed)
                 } finally {
@@ -520,7 +520,7 @@ class TerminalSessionTest {
             assertTrue(eofFailure in connectorFailure.suppressed)
             assertEquals(
                 'F'.code,
-                session.renderPublisher.readCurrent { it.codeWords[0] },
+                session.readPublishedFrame { it.codeWords[0] },
             )
             assertTrue(session.isClosed)
             assertFalse(session.isCoroutineScopeActive)
@@ -581,7 +581,7 @@ class TerminalSessionTest {
                 val observed = mutableListOf<Pair<Int?, Int>>()
                 backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) {
                     session.state.first { it is TerminalSessionState.Closed }
-                    observed += session.renderPublisher.readCurrent { it.codeWords[0] } to connector.closeCount
+                    observed += session.readPublishedFrame { it.codeWords[0] } to connector.closeCount
                 }
                 connector.feedFromHost("LAST".ascii())
                 connector.simulateClosed(7)
@@ -589,7 +589,7 @@ class TerminalSessionTest {
                 assertEquals(session.state.value, session.state.first())
                 assertEquals(
                     'L'.code,
-                    session.renderPublisher.readCurrent { it.codeWords[0] },
+                    session.readPublishedFrame { it.codeWords[0] },
                 )
             }
         }
@@ -817,7 +817,7 @@ class TerminalSessionTest {
                     session.requestRender(0)
                     runCurrent()
                     requireNotNull(
-                        session.renderPublisher.readCurrent { alternate ->
+                        session.readPublishedFrame { alternate ->
                             assertEquals(TerminalRenderCursorShape.BLOCK, alternate.cursorShape)
                             assertFalse(alternate.cursorBlinking)
                         },
@@ -830,7 +830,7 @@ class TerminalSessionTest {
                     runCurrent()
                     assertTrue(session.renderGeneration.value > generation)
                     requireNotNull(
-                        session.renderPublisher.readCurrent { primary ->
+                        session.readPublishedFrame { primary ->
                             assertEquals(TerminalRenderCursorShape.BAR, primary.cursorShape)
                             assertTrue(primary.cursorBlinking)
                         },
@@ -841,7 +841,7 @@ class TerminalSessionTest {
                     advanceTimeBy(TerminalSession.RENDER_PUBLICATION_INTERVAL_MS.milliseconds)
                     runCurrent()
                     requireNotNull(
-                        session.renderPublisher.readCurrent { reset ->
+                        session.readPublishedFrame { reset ->
                             assertEquals(TerminalRenderCursorShape.BAR, reset.cursorShape)
                             assertTrue(reset.cursorBlinking)
                         },
@@ -1155,7 +1155,7 @@ class TerminalSessionTest {
                 session.requestRender(0)
                 runCurrent()
                 val before = session.renderGeneration.value
-                assertEquals(0, session.renderPublisher.readCurrent { it.codeWords[0] })
+                assertEquals(0, session.readPublishedFrame { it.codeWords[0] })
                 if (synchronizedOutput) connector.feedFromHost("\u001B[?2026h".ascii())
                 connector.feedFromHost("LAST \u20AC\r\n".encodeToByteArray())
                 when (termination) {
@@ -1172,7 +1172,7 @@ class TerminalSessionTest {
                     {
                         assertArrayEquals(
                             expected,
-                            session.renderPublisher.readCurrent { it.codeWords.copyOf(expected.size) },
+                            session.readPublishedFrame { it.codeWords.copyOf(expected.size) },
                         )
                     },
                     { assertNotEquals(before, session.renderGeneration.value) },
@@ -1212,7 +1212,7 @@ class TerminalSessionTest {
                     assertEquals(0, terminal.getCodepointAt(1, 0))
                     assertArrayEquals(
                         intArrayOf(0xFFFD, 0),
-                        session.renderPublisher.readCurrent { it.codeWords.copyOf(2) },
+                        session.readPublishedFrame { it.codeWords.copyOf(2) },
                     )
                     assertTrue(session.isClosed)
                 }
@@ -1239,7 +1239,7 @@ class TerminalSessionTest {
                     val expected = "LAST LINE".map(Char::code).toIntArray()
                     assertArrayEquals(
                         expected,
-                        session.renderPublisher.readCurrent { it.codeWords.copyOf(expected.size) },
+                        session.readPublishedFrame { it.codeWords.copyOf(expected.size) },
                     )
                     assertEquals(0, session.exitCode)
                 }
@@ -1413,11 +1413,11 @@ class TerminalSessionTest {
             connector.feedFromHost((0..6).joinToString("\r\n") { "row$it" }.ascii())
             runCurrent()
             val beforeResizeGeneration = session.renderGeneration.value
-            assertEquals(TerminalRenderBufferKind.PRIMARY, session.renderPublisher.readCurrent { it.activeBuffer })
-            assertEquals(4, session.renderPublisher.readCurrent { it.historySize })
+            assertEquals(TerminalRenderBufferKind.PRIMARY, session.readPublishedFrame { it.activeBuffer })
+            assertEquals(4, session.readPublishedFrame { it.historySize })
 
             connector.feedFromHost("\u001B[?1049h".ascii())
-            assertEquals(TerminalRenderBufferKind.PRIMARY, session.renderPublisher.readCurrent { it.activeBuffer })
+            assertEquals(TerminalRenderBufferKind.PRIMARY, session.readPublishedFrame { it.activeBuffer })
 
             if (usePairResult) {
                 assertEquals(0 to 0, session.resize(columns, rows, oldScrollbackOffset = 2))
@@ -1435,7 +1435,7 @@ class TerminalSessionTest {
             runCurrent()
             assertTrue(session.renderGeneration.value > beforeResizeGeneration)
             requireNotNull(
-                session.renderPublisher.readCurrent { published ->
+                session.readPublishedFrame { published ->
                     assertEquals(TerminalRenderBufferKind.ALTERNATE, published.activeBuffer)
                     assertEquals(columns, published.columns)
                     assertEquals(rows, published.rows)
@@ -1717,7 +1717,7 @@ class TerminalSessionTest {
                 assertTrue(session.renderGeneration.value > previousGeneration)
                 assertAll(
                     { assertEquals(3, renderReader.lastOffset) },
-                    { assertEquals(3, session.renderPublisher.readCurrent { it.scrollbackOffset }) },
+                    { assertEquals(3, session.readPublishedFrame { it.scrollbackOffset }) },
                 )
             }
         }
@@ -1887,7 +1887,7 @@ class TerminalSessionTest {
             assertAll(
                 { assertEquals(2, renderReader.readCalls) },
                 { assertEquals(5, renderReader.lastOffset) },
-                { assertEquals(5, session.renderPublisher.readCurrent { it.scrollbackOffset }) },
+                { assertEquals(5, session.readPublishedFrame { it.scrollbackOffset }) },
             )
             session.close()
         }
@@ -1923,7 +1923,7 @@ class TerminalSessionTest {
                 assertAll(
                     { assertEquals(2, renderReader.readCalls) },
                     { assertEquals(listOf(1, 5), renderReader.offsets.toList()) },
-                    { assertEquals(5, session.renderPublisher.readCurrent { it.scrollbackOffset }) },
+                    { assertEquals(5, session.readPublishedFrame { it.scrollbackOffset }) },
                 )
             }
         }
@@ -1954,7 +1954,7 @@ class TerminalSessionTest {
                 assertAll(
                     { assertEquals(1, renderReader.readCalls) },
                     { assertEquals(-1L, session.renderGeneration.value) },
-                    { assertNull(session.renderPublisher.readCurrent { true }) },
+                    { assertNull(session.readPublishedFrame { true }) },
                 )
 
                 session.requestRender(scrollbackOffset = 2)
@@ -1962,7 +1962,7 @@ class TerminalSessionTest {
                 runCurrent()
                 assertAll(
                     { assertEquals(2, renderReader.readCalls) },
-                    { assertEquals(2, session.renderPublisher.readCurrent { it.scrollbackOffset }) },
+                    { assertEquals(2, session.readPublishedFrame { it.scrollbackOffset }) },
                 )
             }
         }
@@ -2007,7 +2007,7 @@ class TerminalSessionTest {
 
                     assertAll(
                         { assertEquals(1, renderReader.readCalls) },
-                        { assertEquals(1, session.renderPublisher.readCurrent { it.scrollbackOffset }) },
+                        { assertEquals(1, session.readPublishedFrame { it.scrollbackOffset }) },
                     )
 
                     session.requestRender(scrollbackOffset = 2)
@@ -2016,7 +2016,7 @@ class TerminalSessionTest {
                     assertTrue(session.renderGeneration.value > firstGeneration)
                     assertAll(
                         { assertEquals(2, renderReader.readCalls) },
-                        { assertEquals(2, session.renderPublisher.readCurrent { it.scrollbackOffset }) },
+                        { assertEquals(2, session.readPublishedFrame { it.scrollbackOffset }) },
                     )
                 } finally {
                     collectorScope.cancel()

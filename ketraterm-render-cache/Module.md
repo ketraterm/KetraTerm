@@ -29,7 +29,7 @@ To guarantee safety, memory locality, and absolute performance, `ketraterm-rende
               ¦
               ? updateAndPublish()
   +------------------------+
-  ¦ TerminalRenderPublisher¦ (Triple-buffered rotation & lock-free read leases)
+  ¦ TerminalRenderPublisher¦ (Triple-buffered rotation & synchronized read leases)
   +------------------------+
               ¦
               ? readCurrent { front -> ... }
