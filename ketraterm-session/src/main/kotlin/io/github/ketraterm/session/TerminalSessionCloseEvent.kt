@@ -21,8 +21,9 @@ package io.github.ketraterm.session
  *
  * @property exitCode process exit code reported by the transport, or `null`
  *   when the process did not provide one or closure was local.
- * @property failure transport failure that closed the session, or `null` for a
- *   normal remote exit or local close.
+ * @property failure startup, transport, or outbound worker failure that closed the
+ *   session, including unexpected writer cancellation; `null` for a normal remote
+ *   exit or local close. Later cleanup failures are suppressed on this cause.
  * @property locallyRequested true when application code initiated closure via
  *   [TerminalSession.close].
  */

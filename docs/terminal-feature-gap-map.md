@@ -283,8 +283,8 @@ and ten passing serialization controls. Source-only findings and API decisions b
 do not claim executed fault injection or measured performance. Existing A01–A15
 closures remain historical evidence for their tested paths.
 
-- **M01 — `DONE(core)`**: counted Kitty pops use constant work over retained depth and reset flags on exact exhaustion or underflow, including after eviction. Removed the stale initial-flags fallback and corrected historical restoration expectations. Core regressions cover partial pops, nonpositive counts, reuse, reset and `Int.MAX_VALUE`; real parser/host byte streams cover saturated/overflow counts, every split, continued text processing, screen isolation and response denial. The original count-32 regression now passes; the core/host baseline's unrelated M09, M10 and M13 failures remain unchanged.
-- **M02 — `TODO(session)`**: unexpected connector/encoder cancellation must terminate an active session whose essential writer exits, preserving the cause and avoiding partial-write retries. Two regressions currently leave the session open.
+- **M01 — `DONE(core)`**: Kitty pops have bounded work and reset flags on stack exhaustion. Regressions pass.
+- **M02 — `DONE(session)`**: unexpected writer cancellation closes the session, retaining the cause without retrying output. Regressions pass.
 - **M03 — `TODO(transport)`**: supervise exceptions from PTY byte delivery, report the original failure and dispose the process/streams once. The gated fake-process regression currently leaves the process alive.
 - **M04 — `TODO(completion)`**: a terminated source must complete result accounting or terminate collection. Unexpected provider errors currently strand the supervised collector; the deterministic regression permits isolation or propagation while preserving failure visibility.
 - **M05 — `TODO(ui)`**: completion resource replacement and close must detach observation despite throwing/cancelling popup callbacks. Four regressions expose retained focus observation and obsolete feedback.

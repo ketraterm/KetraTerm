@@ -6,11 +6,9 @@ Release notes for library consumers and embedders. Product-specific changes are 
 
 ### Improvements and fixes
 
-- Fixed M01 Kitty keyboard counted pops: constant work independent of the requested count, zero flags on stack exhaustion, and no restoration of evicted initial flags. Added saturated-count core and byte-stream regressions and clarified the public stack contract.
 - Cancel native completion work when sessions stop. Complete popup hiding and eligibility updates despite host callback failures, preserve cancellation and suppress later failures. Commit Swing state before host notification and skip obsolete notifications after reentrant changes.
 - Expanded concrete implementation and retained-client compatibility checks; clarified complete cluster reads and isolated render-lease acquisition.
 - Added native completion popup anchoring, optional host controller coordination, and provider diagnostics while preserving existing Swing configuration signatures.
-
 - Bound custom session encoders to ordered output and preserved session services with parser factories. Made render capabilities explicit; consumers must recompile for the revised construction signatures.
 - Made suggestion and dialog lists unmodifiable from Java and rejected overflowing projection ranges before mutation.
 - Preserve application cursor shapes in unfocused Swing terminals: blocks become thin hollow outlines, while bars and underlines remain steady. Device-aligned beams and underlines keep thickness consistent across panes at fractional display scales. Focus restores application blinking; cursor visibility, wide-cell ownership, bidi placement, and blinking-text behavior are preserved.

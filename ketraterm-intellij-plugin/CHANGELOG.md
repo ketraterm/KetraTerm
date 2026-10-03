@@ -2,7 +2,6 @@
 
 ## [Unreleased]
 
-- Prevented oversized Kitty keyboard reset commands from stalling terminal output and fixed keyboard modes remaining enabled after their stack is exhausted.
 - Improved cleanup of completion popups when terminals close or suggestions are disabled.
 - Improved window-state reporting while terminal output is active.
 - Keep cursors visible when terminals lose focus, with thin outlines for blocks and steady bars or underlines. Cursor thickness stays consistent across split panes.

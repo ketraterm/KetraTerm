@@ -58,9 +58,12 @@ import kotlin.time.TimeSource
  * background encoding, bounded to 16 operations and 16 * 1024 * 1024 combined
  * UTF-16/deletion units, including active work. One writer preserves order.
  * Returning from input methods means acceptance, not transport completion. Queue
- * exhaustion or transport failure closes the session with [failure]; closing a
+ * exhaustion or outbound worker failure closes the session with [failure]; closing a
  * session discards pending output. Custom encoders bind to session-owned mode
  * sources and output sinks through [TerminalInputEncoderFactory].
+ * Unexpected cancellation in connector writes or bulk encoding also closes the
+ * session without retrying potentially partial output, retaining the cause. Cancellation during
+ * an already claimed shutdown preserves the first termination event.
  *
  * A session publishes one active render viewport. Independently scrolling
  * views of the same session are unsupported: each new viewport request replaces
@@ -305,6 +308,8 @@ public class TerminalSession private constructor(
             try {
                 outboundWriter.run()
             } catch (cancelled: CancellationException) {
+                // Only session termination may stop this essential worker without failure.
+                if (!isSessionClosed()) failWrite(cancelled)
                 throw cancelled
             } catch (failure: Exception) {
                 failWrite(failure)
@@ -349,8 +354,8 @@ public class TerminalSession private constructor(
         get() = (state.value as? TerminalSessionState.Closed)?.event?.exitCode
 
     /**
-     * Transport failure reported by [onError], or `null` when the remote closed
-     * normally or the session was locally closed.
+     * The first startup, transport, or outbound worker failure, including unexpected
+     * writer cancellation; `null` for normal remote closure or local close.
      */
     public val failure: Throwable?
         get() = (state.value as? TerminalSessionState.Closed)?.event?.failure

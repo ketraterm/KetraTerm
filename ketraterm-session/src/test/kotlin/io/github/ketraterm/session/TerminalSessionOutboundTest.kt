@@ -361,6 +361,148 @@ class TerminalSessionOutboundTest {
         }
 
     @ParameterizedTest
+    @ValueSource(strings = ["queued", "bulk", "encoder"])
+    fun `writer cancellation after partial output retains cause despite cleanup failure and never retries`(source: String) =
+        runTest {
+            val cancellation = CancellationException("partial output cancelled")
+            val cleanupFailure = IOException("connector cleanup failed")
+            val delegate = MockConnector()
+            var writes = 0
+            var encodings = 0
+            val connector =
+                object : TerminalConnector by delegate {
+                    override fun write(
+                        bytes: ByteArray,
+                        offset: Int,
+                        length: Int,
+                    ) {
+                        writes++
+                        delegate.write(bytes, offset, 1)
+                        if (source != "encoder") throw cancellation
+                    }
+
+                    override fun close() {
+                        delegate.close()
+                        throw cleanupFailure
+                    }
+                }
+            val factory =
+                if (source == "encoder") {
+                    TerminalInputEncoderFactory { modes, output, policy ->
+                        val encoder = TerminalInputEncoders.create(modes, output, policy)
+                        object : TerminalInputEncoder by encoder {
+                            override fun encodePaste(event: TerminalPasteEvent) {
+                                encodings++
+                                output.writeBytes(byteArrayOf('a'.code.toByte()), 0, 1)
+                                throw cancellation
+                            }
+                        }
+                    }
+                } else {
+                    null
+                }
+            val dispatcher = StandardTestDispatcher(testScheduler)
+            TerminalSession
+                .create(
+                    TerminalBuffers.create(10, 3),
+                    connector,
+                    inputEncoderFactory = factory,
+                    workerDispatcher = dispatcher,
+                    ioDispatcher = dispatcher,
+                ).use { session ->
+                    session.start(10, 3)
+                    if (source == "queued") {
+                        session.encodeKey(TerminalKeyEvent.text("abc"))
+                    } else {
+                        session.encodePaste(TerminalPasteEvent("abc"))
+                    }
+                    session.encodePaste(TerminalPasteEvent("later"))
+                    session.encodeKey(TerminalKeyEvent.codepoint('z'.code))
+                    runCurrent()
+
+                    assertTrue(session.isClosed)
+                    assertSame(cancellation, session.failure)
+                    assertEquals(listOf(cleanupFailure), cancellation.suppressed.toList())
+                    assertEquals(
+                        TerminalSessionState.Closed(TerminalSessionCloseEvent(null, cancellation, false)),
+                        session.state.value,
+                    )
+                    assertFalse(session.isCoroutineScopeActive)
+                    assertEquals(1, delegate.closeCount)
+                    session.encodePaste(TerminalPasteEvent("rejected"))
+                    session.encodeKey(TerminalKeyEvent.codepoint('q'.code))
+                    runCurrent()
+                    assertEquals(1, writes)
+                    assertEquals(if (source == "encoder") 1 else 0, encodings)
+                    assertEquals("a", delegate.writtenBytes.toString(Charsets.US_ASCII))
+                }
+            assertEquals(1, delegate.closeCount)
+        }
+
+    @ParameterizedTest
+    @ValueSource(strings = ["local", "remote", "error"])
+    fun `writer cancellation during owner cleanup preserves the first termination`(termination: String) =
+        runTest {
+            val cancellation = CancellationException("write interrupted by close")
+            val firstFailure = IOException("transport failed first")
+            val delegate = MockConnector()
+            var writes = 0
+            val connector =
+                object : TerminalConnector by delegate {
+                    override fun write(
+                        bytes: ByteArray,
+                        offset: Int,
+                        length: Int,
+                    ) {
+                        writes++
+                        throw cancellation
+                    }
+
+                    override fun close() {
+                        delegate.close()
+                        // Run the pending writer after termination is claimed but before children are cancelled.
+                        runCurrent()
+                    }
+                }
+            val dispatcher = StandardTestDispatcher(testScheduler)
+            TerminalSession
+                .create(
+                    TerminalBuffers.create(10, 3),
+                    connector,
+                    workerDispatcher = dispatcher,
+                    ioDispatcher = dispatcher,
+                ).use { session ->
+                    session.start(10, 3)
+                    runCurrent()
+                    session.encodeKey(TerminalKeyEvent.codepoint('a'.code))
+                    when (termination) {
+                        "local" -> session.close()
+                        "remote" -> delegate.simulateClosed(7)
+                        "error" -> delegate.simulateCrash(firstFailure)
+                    }
+                    runCurrent()
+
+                    assertEquals(1, writes, "the pending writer must run during connector cleanup")
+                    assertEquals(
+                        TerminalSessionState.Closed(
+                            TerminalSessionCloseEvent(
+                                exitCode = if (termination == "remote") 7 else null,
+                                failure = if (termination == "error") firstFailure else null,
+                                locallyRequested = termination == "local",
+                            ),
+                        ),
+                        session.state.value,
+                    )
+                    assertTrue(session.isClosed)
+                    assertFalse(session.isCoroutineScopeActive)
+                    assertEquals(1, delegate.closeCount)
+                    assertArrayEquals(byteArrayOf(), delegate.writtenBytes)
+                    assertTrue(firstFailure.suppressed.isEmpty())
+                }
+            assertEquals(1, delegate.closeCount)
+        }
+
+    @ParameterizedTest
     @ValueSource(booleans = [false, true])
     fun `blocked transport permits input parser and policy work and preserves operation order`(customEncoder: Boolean) {
         val text = "x".repeat(40000)
