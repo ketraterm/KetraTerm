@@ -175,6 +175,8 @@ public interface SwingShellSuggestionView {
      *
      * The default implementation is resource-free. Hosts that own platform
      * editors, popups, listeners, or disposable scopes must release them here.
+     * The controller calls this on the EDT even if the final hiding update fails.
+     * A close failure propagates, or is suppressed on an earlier hiding failure.
      */
     public fun close(): Unit = Unit
 }

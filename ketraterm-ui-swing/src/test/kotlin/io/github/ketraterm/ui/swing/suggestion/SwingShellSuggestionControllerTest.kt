@@ -16,8 +16,11 @@
 package io.github.ketraterm.ui.swing.suggestion
 
 import io.github.ketraterm.ui.swing.settings.SwingSettings
+import kotlinx.coroutines.CancellationException
 import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.Test
+import org.junit.jupiter.params.ParameterizedTest
+import org.junit.jupiter.params.provider.ValueSource
 import java.awt.event.KeyEvent
 import javax.swing.JPanel
 
@@ -599,6 +602,58 @@ class SwingShellSuggestionControllerTest {
             assertEquals(1, view.closeCount)
             assertEquals(1, thrown.suppressed.size)
             assertSame(closeFailure, thrown.suppressed.single())
+        }
+
+    @ParameterizedTest
+    @ValueSource(strings = ["cancellation", "error", "reused"])
+    fun `close completes cleanup preserving cancellation errors and reused failures`(kind: String) =
+        onEdt {
+            lateinit var view: RecordingSuggestionView
+            val controller =
+                SwingShellSuggestionController(RecordingSuggestionHost(), viewFactory = { listener ->
+                    RecordingSuggestionView(listener).also { view = it }
+                })
+            controller.show(request(), suggestions(2), selectedIndex = 0)
+            val first =
+                when (kind) {
+                    "cancellation" -> CancellationException("hide cancelled")
+                    "error" -> AssertionError("hide failed")
+                    "reused" -> IllegalStateException("shared failure")
+                    else -> error("Unexpected kind $kind")
+                }
+            val later = if (kind == "reused") first else IllegalArgumentException("close failed")
+            view.updateFailure = first
+            view.closeFailure = later
+
+            assertSame(first, assertThrows(Throwable::class.java) { controller.close() })
+            assertEquals(1, view.closeCount)
+            assertFalse(view.component.isVisible)
+            assertFalse(controller.state().visible)
+            if (kind == "reused") {
+                assertTrue(first.suppressed.isEmpty(), "Reusing the primary exception must not cause self-suppression")
+            } else {
+                assertEquals(1, first.suppressed.size)
+                assertSame(later, first.suppressed.single())
+            }
+        }
+
+    @Test
+    fun `close propagates a view close failure after successful hiding`() =
+        onEdt {
+            lateinit var view: RecordingSuggestionView
+            val controller =
+                SwingShellSuggestionController(RecordingSuggestionHost(), viewFactory = { listener ->
+                    RecordingSuggestionView(listener).also { view = it }
+                })
+            controller.show(request(), suggestions(2), selectedIndex = 0)
+            val failure = CancellationException("close cancelled")
+            view.closeFailure = failure
+
+            assertSame(failure, assertThrows(CancellationException::class.java) { controller.close() })
+            assertEquals(1, view.closeCount)
+            assertFalse(view.component.isVisible)
+            assertEquals(SwingShellSuggestionViewSnapshot.EMPTY, view.snapshot)
+            assertTrue(failure.suppressed.isEmpty())
         }
 
     private fun onEdt(block: () -> Unit) {

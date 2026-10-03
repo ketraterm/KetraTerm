@@ -6,7 +6,7 @@ Release notes for library consumers and embedders. Product-specific changes are 
 
 ### Improvements and fixes
 
-- Cancel native completion work when sessions stop and propagate popup callback failures, including cancellation.
+- Cancel native completion work when sessions stop. Propagate popup callback failures, including cancellation, and complete Swing cleanup despite them.
 - Expanded concrete implementation and retained-client compatibility checks; clarified complete cluster reads and isolated render-lease acquisition.
 - Added native completion popup anchoring, optional host controller coordination, and provider diagnostics while preserving existing Swing configuration signatures.
 

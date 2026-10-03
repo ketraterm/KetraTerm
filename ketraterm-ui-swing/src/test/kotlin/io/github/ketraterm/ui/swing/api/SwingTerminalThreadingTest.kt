@@ -38,7 +38,7 @@ import io.github.ketraterm.transport.TerminalConnectorListener
 import io.github.ketraterm.ui.swing.settings.SwingSettings
 import io.github.ketraterm.ui.swing.settings.TerminalClipboardHandler
 import io.github.ketraterm.ui.swing.settings.TerminalTheme
-import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionEligibilityListener
+import io.github.ketraterm.ui.swing.suggestion.*
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.StandardTestDispatcher
@@ -56,6 +56,7 @@ import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.atomic.AtomicReference
+import javax.swing.JPanel
 import javax.swing.SwingUtilities
 import kotlin.concurrent.thread
 
@@ -503,6 +504,130 @@ class SwingTerminalThreadingTest {
             edtCall {
                 component.removeShellSuggestionEligibilityListener(listener)
                 component.cursorTimer.stop()
+                component.dispose()
+            }
+            session.close()
+            dispatcher.scheduler.runCurrent()
+        }
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = [false, true])
+    fun `dispose releases custom view and scope despite multiple callback failures`(cancelled: Boolean) {
+        val first = if (cancelled) CancellationException("hide cancelled") else IllegalStateException("hide failed")
+        val eligibilityFailure = IllegalArgumentException("eligibility failed")
+        val closeFailure = IllegalStateException("close failed")
+        var failUpdates = false
+        var closes = 0
+        val view =
+            object : SwingShellSuggestionView {
+                override val component = JPanel()
+
+                override fun update(snapshot: SwingShellSuggestionViewSnapshot) {
+                    if (failUpdates) throw first
+                }
+
+                override fun close() {
+                    closes++
+                    throw closeFailure
+                }
+            }
+        val session = focusSession(ByteArrayOutputStream())
+        val component =
+            edtCall {
+                SwingTerminal(
+                    settingsProvider = {
+                        SwingSettings(smartSuggestionsEnabled = true, cursorBlinkMillis = 0, useSystemFallbackFonts = false)
+                    },
+                    hostServices = SwingHostServices(shellSuggestionViewFactory = { view }),
+                )
+            }
+        try {
+            edtCall {
+                component.bind(session)
+                component.showShellSuggestions(
+                    SwingShellSuggestionRequest.EMPTY,
+                    listOf(SwingShellSuggestion("test", 0, 0, "test", "COMMAND")),
+                )
+                assertTrue(component.currentShellSuggestionState().visible)
+                component.addShellSuggestionEligibilityListener { eligible ->
+                    assertFalse(eligible)
+                    throw eligibilityFailure
+                }
+                component.cursorTimer.start()
+                failUpdates = true
+
+                assertSame(first, assertThrows(RuntimeException::class.java) { component.dispose() })
+                assertEquals(2, first.suppressed.size)
+                assertSame(eligibilityFailure, first.suppressed[0])
+                assertSame(closeFailure, first.suppressed[1])
+                assertFalse(component.isCoroutineScopeActive)
+                assertFalse(component.cursorTimer.isRunning)
+                assertFalse(component.isAutomaticShellSuggestionEligible())
+                assertFalse(component.currentShellSuggestionState().visible)
+                assertFalse(view.component.isVisible)
+                assertFalse(session.isClosed)
+                assertEquals(1, closes)
+
+                component.dispose()
+                assertEquals(1, closes, "Repeat disposal must not release the custom view twice")
+                assertEquals(2, first.suppressed.size)
+            }
+        } finally {
+            edtCall { component.dispose() }
+            session.close()
+            dispatcher.scheduler.runCurrent()
+        }
+    }
+
+    @Test
+    fun `unbind clears the session and permits rebinding after a custom view failure`() {
+        val failure = IllegalStateException("hide failed")
+        var failUpdates = false
+        val view =
+            object : SwingShellSuggestionView {
+                override val component = JPanel()
+
+                override fun update(snapshot: SwingShellSuggestionViewSnapshot) {
+                    if (failUpdates) throw failure
+                }
+            }
+        val output = ByteArrayOutputStream()
+        val session = focusSession(output)
+        val component =
+            edtCall {
+                SwingTerminal(
+                    settingsProvider = {
+                        SwingSettings(smartSuggestionsEnabled = true, cursorBlinkMillis = 0, useSystemFallbackFonts = false)
+                    },
+                    hostServices = SwingHostServices(shellSuggestionViewFactory = { view }),
+                )
+            }
+        try {
+            edtCall {
+                component.bind(session)
+                component.showShellSuggestions(
+                    SwingShellSuggestionRequest.EMPTY,
+                    listOf(SwingShellSuggestion("test", 0, 0, "test", "COMMAND")),
+                )
+                failUpdates = true
+                assertSame(failure, assertThrows(IllegalStateException::class.java) { component.unbind() })
+                assertTrue(component.isCoroutineScopeActive)
+                assertFalse(session.isClosed)
+                component.clearScreen()
+            }
+            dispatcher.scheduler.runCurrent()
+            assertEquals(0, output.size(), "An unbound component must no longer send input to the previous session")
+            edtCall {
+                failUpdates = false
+                component.bind(session)
+                component.clearScreen()
+            }
+            dispatcher.scheduler.runCurrent()
+            assertArrayEquals(byteArrayOf(0x0C), output.toByteArray(), "Rebinding must restore normal input")
+        } finally {
+            edtCall {
+                failUpdates = false
                 component.dispose()
             }
             session.close()

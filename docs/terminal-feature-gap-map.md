@@ -251,16 +251,18 @@ The [IntelliJ embedding audit](reviews/intellij-embedding-audit-2026-09-27.md) d
 
 The [2026-10-02 API design review](reviews/terminal-api-design-review-2026-10-02.md)
 and [2026-10-03 final review](reviews/terminal-api-final-review-2026-10-03.md)
-findings A01–A14 are resolved by the construction, presentation, extension and
+findings A01–A15 are resolved by the construction, presentation, extension and
 lifecycle contracts, with verification recorded under G01. Native coordination
 now observes session termination; callback failures and cancellation propagate.
 All six original final-review regressions pass, with closure-boundary, detachment
-and recovery coverage. The follow-up at `5facdcbd` records the remaining teardown
-defect below.
+and recovery coverage. All five teardown regressions from the follow-up at
+`5facdcbd` also pass: owned cleanup completes before propagating callback failures
+or cancellation, preserving the first failure and suppressing later failures.
+Additional coverage verifies reused exceptions, view release, peer reattachment
+and rebinding after failed unbinding. Disposal cancels the component scope; peer
+removal retains it. Sessions and native target resources remain host-owned.
 Both reviews retain their historical evidence. E04's independent renderer proposal
 remains outside scope.
-
-- `TODO(ui)`: A15 — Swing teardown must complete even when an eligibility listener or custom suggestion view throws. `dispose()` currently marks the component disposed before an eligibility callback can interrupt timer/controller cleanup and scope cancellation; retrying then does nothing. `removeNotify()` and suggestion-controller close have the same ordering risk before superclass/view release. Attempt every owned cleanup, preserve the original failure/cancellation and suppress later cleanup failures. Peer removal must retain the component scope for reattachment; permanent disposal must cancel it. Keep sessions and native target resources host-owned. Correct regressions require resource release despite callback failure.
 
 ### Release Verification
 

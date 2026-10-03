@@ -15,6 +15,7 @@
  */
 package io.github.ketraterm.ui.swing.suggestion
 
+import io.github.ketraterm.ui.swing.cleanupSwingResources
 import io.github.ketraterm.ui.swing.settings.SwingSettings
 import java.awt.event.KeyEvent
 
@@ -105,8 +106,11 @@ internal class SwingShellSuggestionController(
     }
 
     fun close() {
-        hide()
-        view.close()
+        cleanupSwingResources(
+            { hide() },
+            { view.component.isVisible = false },
+            view::close,
+        )
     }
 
     fun handleKeyPressed(event: KeyEvent): Boolean {

@@ -35,6 +35,7 @@ import io.github.ketraterm.ui.swing.settings.SwingPadding
 import io.github.ketraterm.ui.swing.settings.SwingSettings
 import io.github.ketraterm.ui.swing.settings.SwingSettingsProvider
 import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionEligibilityListener
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.test.StandardTestDispatcher
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Assertions.*
@@ -764,8 +765,9 @@ class SwingTerminalScrollbackTest {
         }
     }
 
-    @Test
-    fun `removeNotify releases the peer when settling scroll throws from an eligibility callback`() {
+    @ParameterizedTest
+    @ValueSource(booleans = [false, true])
+    fun `removeNotify releases the peer when settling scroll throws from an eligibility callback`(cancelled: Boolean) {
         val reader = ActiveBufferFrameReader().apply { historySize = 5 }
         val terminal = TerminalBuffers.create(width = 3, height = 3, maxHistory = 5)
         val session =
@@ -790,7 +792,8 @@ class SwingTerminalScrollbackTest {
                         smartSuggestionsEnabled = true,
                     ),
             )
-        val failure = IllegalStateException("eligibility callback failed")
+        val failure =
+            if (cancelled) CancellationException("eligibility callback cancelled") else IllegalStateException("eligibility callback failed")
         var callbackCount = 0
         val listener =
             SwingShellSuggestionEligibilityListener { eligible ->
@@ -813,7 +816,7 @@ class SwingTerminalScrollbackTest {
                 component.scrollFromScrollbar(0, valueIsAdjusting = false)
                 assertEquals(0, callbackCount)
 
-                val thrown = assertThrows(IllegalStateException::class.java) { component.removeNotify() }
+                val thrown = assertThrows(RuntimeException::class.java) { component.removeNotify() }
 
                 assertSame(failure, thrown)
                 assertEquals(1, callbackCount)

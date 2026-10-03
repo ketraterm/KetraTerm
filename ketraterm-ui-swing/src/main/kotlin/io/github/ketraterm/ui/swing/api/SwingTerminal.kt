@@ -28,6 +28,7 @@ import io.github.ketraterm.session.TerminalSession
 import io.github.ketraterm.session.TerminalSessionState
 import io.github.ketraterm.session.TerminalShellCommandLineSnapshot
 import io.github.ketraterm.session.TerminalShellIntegrationCommandRecord
+import io.github.ketraterm.ui.swing.cleanupSwingResources
 import io.github.ketraterm.ui.swing.input.*
 import io.github.ketraterm.ui.swing.render.*
 import io.github.ketraterm.ui.swing.search.TerminalSearchController
@@ -730,6 +731,8 @@ public class SwingTerminal
          * Cancels view observation and suggestion work without closing the session
          * or restoring its previous settings. Calls on the EDT take effect immediately;
          * calls from other threads dispatch asynchronously to the EDT.
+         * Cleanup completes before a callback failure or cancellation propagates on
+         * the EDT; later cleanup failures are suppressed on the first failure.
          */
         public fun unbind() {
             runOnEdt(unbindRunnable)
@@ -742,6 +745,8 @@ public class SwingTerminal
          * if any, is unbound but remains host-owned. A disposed component must not
          * be rebound to another session. Calls on the EDT take effect immediately;
          * calls from other threads dispatch asynchronously to the EDT.
+         * Every owned cleanup is attempted before a failure or cancellation propagates
+         * on the EDT; later cleanup failures are suppressed on the first failure.
          */
         public fun dispose() {
             runOnEdt {
@@ -1018,15 +1023,15 @@ public class SwingTerminal
 
         override fun removeNotify() {
             terminalFocused = false
-            cursorTimer.stop()
-            visualBellController.stop()
-            viewportController.finishScroll()
-            selectionController.stopSelectionDrag()
-            clearPointerHover()
-
-            detachAncestorWindow()
-
-            super.removeNotify()
+            cleanupSwingResources(
+                cursorTimer::stop,
+                visualBellController::stop,
+                viewportController::finishScroll,
+                selectionController::stopSelectionDrag,
+                { clearPointerHover() },
+                ::detachAncestorWindow,
+                { super.removeNotify() },
+            )
         }
 
         override fun doLayout() {
@@ -1214,45 +1219,63 @@ public class SwingTerminal
         }
 
         private fun unbindOnEdt() {
-            bindingJob?.cancel(CancellationException("Terminal session unbound"))
-            bindingJob = null
-            mouseController.resetWheelInput()
-            cancelAndHideShellSuggestionsOnEdt("Terminal session unbound")
-            session = null
-            resetRenderCaches()
-            resetScrollbackState()
-            selectionController.clearSelection()
-            searchController.reset(renderCache.rows)
-            shellIntegrationDecorations.reset()
-            if (hostServices.scrollbarOverlayEnabled) scrollbarOverlay.handleExited()
-            visualGeometry.reset()
-            selectionController.stopSelectionDrag()
-            lastResizedColumns = NO_RESIZE_DIMENSION
-            lastResizedRows = NO_RESIZE_DIMENSION
-            renderFrameController.reset()
-            clearPointerHover()
-            hyperlinkDiscoveryController.reset()
-            publishViewportState(0)
-            repaint()
+            cleanupSwingResources(
+                {
+                    val job = bindingJob
+                    bindingJob = null
+                    job?.cancel(CancellationException("Terminal session unbound"))
+                },
+                mouseController::resetWheelInput,
+                { cancelAndHideShellSuggestionsOnEdt("Terminal session unbound") },
+                {
+                    session = null
+                    resetRenderCaches()
+                },
+                ::resetScrollbackState,
+                selectionController::clearSelection,
+                { searchController.reset(renderCache.rows) },
+                shellIntegrationDecorations::reset,
+                { if (hostServices.scrollbarOverlayEnabled) scrollbarOverlay.handleExited() },
+                visualGeometry::reset,
+                selectionController::stopSelectionDrag,
+                {
+                    lastResizedColumns = NO_RESIZE_DIMENSION
+                    lastResizedRows = NO_RESIZE_DIMENSION
+                    renderFrameController.reset()
+                },
+                { clearPointerHover() },
+                hyperlinkDiscoveryController::reset,
+                { publishViewportState(0) },
+                ::repaint,
+            )
         }
 
         private fun disposeOnEdt() {
             if (disposed) return
             disposed = true
-            unbindOnEdt()
-            detachAncestorWindow()
-            cursorTimer.stop()
-            visualBellController.stop()
-            viewportController.finishScroll()
-            selectionController.stopSelectionDrag()
-            hyperlinkDiscoveryController.dispose()
-            suggestionJob?.cancel(CancellationException("Swing terminal disposed"))
-            suggestionJob = null
-            suggestionInvalidationListeners.clear()
-            suggestionEligibilityListeners.clear()
-            suggestionFailureHandler = SwingShellSuggestionFailureHandler.LOGGING
-            shellSuggestionController?.close()
-            componentScope.cancel(CancellationException("Swing terminal disposed"))
+            cleanupSwingResources(
+                ::unbindOnEdt,
+                ::detachAncestorWindow,
+                cursorTimer::stop,
+                visualBellController::stop,
+                viewportController::finishScroll,
+                selectionController::stopSelectionDrag,
+                hyperlinkDiscoveryController::dispose,
+                {
+                    val job = suggestionJob
+                    suggestionJob = null
+                    job?.cancel(CancellationException("Swing terminal disposed"))
+                },
+                suggestionInvalidationListeners::clear,
+                suggestionEligibilityListeners::clear,
+                { suggestionFailureHandler = SwingShellSuggestionFailureHandler.LOGGING },
+                {
+                    val controller = shellSuggestionController
+                    shellSuggestionController = null
+                    controller?.close()
+                },
+                { componentScope.cancel(CancellationException("Swing terminal disposed")) },
+            )
         }
 
         private fun reloadSettingsOnEdt() {
