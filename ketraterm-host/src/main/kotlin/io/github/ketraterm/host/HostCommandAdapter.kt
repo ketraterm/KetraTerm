@@ -83,6 +83,10 @@ public class HostCommandAdapter(
     /**
      * Updates the active host security policy dynamically.
      *
+     * This only publishes the policy. A lowered hyperlink retention limit is
+     * reconciled by the serialized command owner on the next accepted open,
+     * including reuse of an existing explicit key.
+     *
      * @param policy new security policy.
      */
     public fun setHostPolicy(policy: HostPolicy) {
@@ -1116,6 +1120,7 @@ public class HostCommandAdapter(
         uri: String,
         id: String?,
     ): Int {
+        val maxEntries = hostPolicy.maxHyperlinkEntries
         val numericId = nextHyperlinkNumericId
         val key =
             if (id == null) {
@@ -1124,27 +1129,31 @@ public class HostCommandAdapter(
                 HyperlinkKey(id = id, uri = uri, anonymousInstance = EXPLICIT_HYPERLINK_INSTANCE)
             }
         if (id != null) {
-            hyperlinkIds[key]?.let { return it }
+            hyperlinkIds[key]?.let {
+                trimHyperlinks(maxEntries)
+                return it
+            }
         }
         if (numericId == NO_HYPERLINK_ID) return NO_HYPERLINK_ID
 
-        var evictedId = NO_HYPERLINK_ID
-        if (hyperlinkIds.size >= hostPolicy.maxHyperlinkEntries) {
-            val eldest = hyperlinkIds.entries.iterator()
-            if (eldest.hasNext()) {
-                val entry = eldest.next()
-                evictedId = entry.value
-                hyperlinkKeysByNumericId.remove(entry.value)
-                eldest.remove()
-            }
-        }
+        trimHyperlinks(maxEntries - 1)
 
         hyperlinkIds[key] = numericId
         hyperlinkKeysByNumericId[numericId] = key
         nextHyperlinkNumericId = if (numericId == Int.MAX_VALUE) NO_HYPERLINK_ID else numericId + 1
-        if (evictedId != NO_HYPERLINK_ID) hostEvents.hyperlinkRemoved(evictedId)
         hostEvents.hyperlinkRegistered(numericId, uri, id)
         return numericId
+    }
+
+    private fun trimHyperlinks(maxEntries: Int) {
+        if (hyperlinkIds.size <= maxEntries) return
+        val eldest = hyperlinkIds.entries.iterator()
+        while (hyperlinkIds.size > maxEntries) {
+            val numericId = eldest.next().value
+            hyperlinkKeysByNumericId.remove(numericId)
+            eldest.remove()
+            hostEvents.hyperlinkRemoved(numericId)
+        }
     }
 
     private fun isHyperlinkAllowed(

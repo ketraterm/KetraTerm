@@ -45,9 +45,13 @@ internal class InputScratchBuffer(
     }
 
     fun appendDecimal(value: Int) {
+        appendDecimal(value.toLong())
+    }
+
+    fun appendDecimal(value: Long) {
         require(value >= 0) { "value must be non-negative: $value" }
 
-        if (value == 0) {
+        if (value == 0L) {
             appendByte('0'.code)
             return
         }
@@ -55,7 +59,7 @@ internal class InputScratchBuffer(
         val start = length
         var current = value
         while (current > 0) {
-            appendByte('0'.code + (current % 10))
+            appendByte('0'.code + (current % 10).toInt())
             current /= 10
         }
 

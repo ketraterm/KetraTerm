@@ -45,7 +45,7 @@ public interface HostEventSink {
     /**
      * Called after a new OSC 8 registry entry is accepted. [hyperlinkId] is a
      * positive session-local numeric identity; [id] is the optional application ID.
-     * Reusing an existing entry emits nothing. No browser action is implied.
+     * Reusing an existing entry emits no registration. No browser action is implied.
      */
     public fun hyperlinkRegistered(
         hyperlinkId: Int,
@@ -55,7 +55,9 @@ public interface HostEventSink {
 
     /**
      * Called after LRU eviction makes [hyperlinkId] unresolvable. Registration of
-     * its replacement follows this event. Numeric IDs are never reassigned.
+     * a replacement follows all removals. Lowered limits can evict multiple entries,
+     * including when reusing an explicit key without registering a replacement.
+     * Numeric IDs are never reassigned.
      * Closing OSC 8 or soft reset does not remove existing registry entries.
      */
     public fun hyperlinkRemoved(hyperlinkId: Int): Unit = Unit

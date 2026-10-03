@@ -49,7 +49,9 @@ package io.github.ketraterm.host
  * @property clipboardPolicy deny-by-default permission and audit policy for
  * terminal-triggered clipboard protocols such as OSC 52.
  * @property maxHyperlinkEntries maximum distinct OSC 8 hyperlink keys retained
- * by the adapter before least-recently-used entries are evicted.
+ * after an accepted open. Lowering the limit defers least-recently-used eviction
+ * until the next accepted open, including explicit-key reuse; policy replacement
+ * itself does not mutate the registry or notify listeners.
  * @property maxHyperlinkUriLength maximum accepted OSC 8 URI length in UTF-16
  * code units. Longer URIs are ignored and mapped to no active hyperlink.
  * @property maxHyperlinkIdLength maximum accepted OSC 8 `id=` parameter length

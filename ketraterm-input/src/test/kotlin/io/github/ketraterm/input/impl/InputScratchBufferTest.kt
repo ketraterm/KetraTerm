@@ -18,6 +18,8 @@ package io.github.ketraterm.input.impl
 import io.github.ketraterm.protocol.host.TerminalHostOutput
 import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.Test
+import org.junit.jupiter.params.ParameterizedTest
+import org.junit.jupiter.params.provider.CsvSource
 
 class InputScratchBufferTest {
     @Test
@@ -95,6 +97,19 @@ class InputScratchBufferTest {
         assertOutput(ascii("0"), buffer)
     }
 
+    @ParameterizedTest
+    @CsvSource("0, 0", "2147483648, 2147483648", "9223372036854775807, 9223372036854775807")
+    fun `appends wide decimals within surrounding bytes`(
+        value: Long,
+        expected: String,
+    ) {
+        val buffer = InputScratchBuffer()
+        buffer.appendByte('['.code)
+        buffer.appendDecimal(value)
+        buffer.appendByte(']'.code)
+        assertOutput(ascii("[$expected]"), buffer)
+    }
+
     @Test
     fun `rejects negative decimal`() {
         val buffer = InputScratchBuffer(ByteArray(4))
@@ -102,6 +117,10 @@ class InputScratchBufferTest {
         assertThrows(IllegalArgumentException::class.java) {
             buffer.appendDecimal(-1)
         }
+        assertThrows(IllegalArgumentException::class.java) {
+            buffer.appendDecimal(Long.MIN_VALUE)
+        }
+        assertEquals(0, buffer.length)
     }
 
     @Test

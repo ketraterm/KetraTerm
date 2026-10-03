@@ -293,9 +293,9 @@ closures remain historical evidence for their tested paths.
 - **M08 — `DONE(host/profile)`**: reentrant tab selection or closure supersedes pending selection notifications.
 - **M09 — `DONE(core/render)`**: core rejects nested frame reads before changing the enclosing lease; reentry and callback-failure contracts are documented and tested.
 - **M10 — `DONE(host)`**: adapter title getters and stacks read authoritative core titles; host retains stacks and notifications.
-- **M11 — `TODO(input)`**: widen accepted maximum cell/pixel coordinates before one-based conversion and apply encoding-specific clamping/suppression before narrowing. Six exact-byte regressions fail; align pixel-coordinate documentation with zero-based events.
+- **M11 — `DONE(input)`**: widened cell/pixel conversion preserves accepted ranges; six exact-byte regressions verify decimal output and bounded clamping/suppression. Pixel contracts use zero-based events.
 - **M12 — `DONE(host/profile)`**: one TOML string encoder preserves accepted configuration values, including line breaks, controls, quotes, and backslashes.
-- **M13 — `TODO(host)`**: reconcile lowered OSC hyperlink limits under the serialized registry owner by the next admission. The byte-stream regression checks `4 → 1`, URI retirement and removal-before-registration ordering without requiring synchronous setter-time eviction.
+- **M13 — `DONE(host)`**: accepted OSC 8 opens reconcile lowered limits under the serialized registry owner. Byte-stream tests verify `4 → 1`, explicit-key reuse, URI retirement and ordered removals; callback-failure tests verify coherent recovery.
 - **M14 — `DONE(host/profile)`**: standalone Ctrl+Tab uses tab-bar order; PTY-backed product tests verify both directions, wraparound, deletion, and empty/single-tab behavior.
 - **M15 — `DONE(host/profile)`**: IntelliJ pane creation rolls back acquired UI resources and service listeners; IDE fixtures verify failure, cancellation, and suppressed cleanup errors.
 - **M16 — `TODO(render)`**: external frames inheriting the default palette getter construct storage on every cache acceptance. Share an immutable fallback and measure a representative external-frame path. Built-in core already caches its palette; surviving allocations and latency are unmeasured.
