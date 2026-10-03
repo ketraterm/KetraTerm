@@ -65,6 +65,12 @@ import kotlin.time.TimeSource
  * session without retrying potentially partial output, retaining the cause. Cancellation during
  * an already claimed shutdown preserves the first termination event.
  *
+ * Closure freezes terminal state after already-admitted work and parser EOF finish.
+ * Late input, policy/presentation setters and render requests are ignored; resize
+ * throws [IllegalStateException]. Retained state remains readable, but no later
+ * presentation mutation or publication is supported. Observe [state] reaching
+ * [TerminalSessionState.Closed] to know final cleanup/publication has completed.
+ *
  * A session publishes one active render viewport. Independently scrolling
  * views of the same session are unsupported: each new viewport request replaces
  * the previous request. Separate sessions are separate terminal pipelines.
@@ -501,6 +507,7 @@ public class TerminalSession private constructor(
      * @param rows target terminal row height; must be positive.
      * @param oldScrollbackOffset pre-resize whole-row offset, or zero for live output.
      * @return the resized viewport and history metadata from one synchronized state.
+     * @throws IllegalStateException if closure has begun. Invalid dimensions still fail validation first.
      */
     public fun resizeViewport(
         columns: Int,
@@ -512,6 +519,7 @@ public class TerminalSession private constructor(
 
         val result =
             synchronized(mutationLock) {
+                check(!isSessionClosed()) { "session is closed" }
                 val (scrollbackOffset, historySize) = terminal.resize(columns, rows, oldScrollbackOffset)
                 var resizedViewport: TerminalViewportResizeResult? = null
                 renderReader.readRenderFrame { frame ->
@@ -534,6 +542,7 @@ public class TerminalSession private constructor(
      */
     public fun setTreatAmbiguousAsWide(enabled: Boolean) {
         synchronized(mutationLock) {
+            if (isSessionClosed()) return
             terminal.setTreatAmbiguousAsWide(enabled)
         }
     }
@@ -560,6 +569,7 @@ public class TerminalSession private constructor(
      */
     public fun setCursorShape(shape: TerminalRenderCursorShape) {
         synchronized(mutationLock) {
+            if (isSessionClosed()) return
             terminal.setDefaultCursorShape(shape)
             terminal.setCursorShape(shape)
         }
@@ -574,6 +584,7 @@ public class TerminalSession private constructor(
     public fun setHostPolicy(policy: HostPolicy) {
         synchronized(mutationLock) {
             synchronized(outboundWriteLock) {
+                if (isSessionClosed()) return
                 hostCommandAdapter?.setHostPolicy(policy)
                 clipboardReads?.policyChanged()
             }
@@ -592,6 +603,7 @@ public class TerminalSession private constructor(
      */
     override fun setInputPolicy(policy: TerminalInputPolicy) {
         synchronized(outboundWriteLock) {
+            if (isSessionClosed()) return
             inputEncoder.setInputPolicy(policy)
             inputPolicy = policy
             hostCommandAdapter?.setDefaultBackarrowSendsBackspace(
@@ -611,6 +623,7 @@ public class TerminalSession private constructor(
      */
     public fun setPasteControlPolicy(policy: PasteControlPolicy) {
         synchronized(outboundWriteLock) {
+            if (isSessionClosed()) return
             val next = inputPolicy.copy(pasteControlPolicy = policy)
             inputEncoder.setInputPolicy(next)
             inputPolicy = next

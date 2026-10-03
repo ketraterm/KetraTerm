@@ -39,8 +39,6 @@ import kotlinx.coroutines.swing.Swing
 import java.awt.*
 import java.awt.event.InputEvent
 import java.awt.event.KeyEvent
-import java.nio.charset.StandardCharsets
-import java.nio.file.Files
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.logging.Level
 import java.util.logging.Logger
@@ -71,6 +69,7 @@ internal class TabManager(
     private val workspace = TerminalWorkspace(StandaloneWorkspaceListener())
     private val cli = KetraTermCli(settings.configPath)
     private val clipboardReader = SwingClipboardReader()
+    private val commandOutputExporter = CommandOutputExporter()
     private val attentionTaskbar: Taskbar? =
         try {
             if (Taskbar.isTaskbarSupported()) {
@@ -195,6 +194,7 @@ internal class TabManager(
             settings.addChangeListener(settingsListener)
         } catch (failure: Throwable) {
             var cleanupFailure: Throwable? = failure
+            cleanupFailure = captureCleanupFailure(cleanupFailure, commandOutputExporter::close)
             cleanupFailure = captureCleanupFailure(cleanupFailure, windowResizeController::close)
             cleanupFailure = captureCleanupFailure(cleanupFailure) { settings.removeChangeListener(settingsListener) }
             cleanupFailure = captureCleanupFailure(cleanupFailure) { focusManager.removeKeyEventDispatcher(keyEventDispatcher) }
@@ -337,6 +337,7 @@ internal class TabManager(
         if (!shutdownStarted.compareAndSet(false, true)) return
         var failure: Throwable? = null
         failure = captureCleanupFailure(failure, windowResizeController::close)
+        failure = captureCleanupFailure(failure, commandOutputExporter::close)
         failure = captureCleanupFailure(failure) { settings.removeChangeListener(settingsListener) }
         failure =
             captureCleanupFailure(failure) {
@@ -738,9 +739,7 @@ internal class TabManager(
         val output = pane.terminal.commandOutputText(commandRecordId) ?: return
         val chooser = JFileChooser().apply { selectedFile = java.io.File("command-output.txt") }
         if (chooser.showSaveDialog(frame) != JFileChooser.APPROVE_OPTION) return
-        runCatching {
-            Files.writeString(chooser.selectedFile.toPath(), output, StandardCharsets.UTF_8)
-        }.onFailure { exception ->
+        commandOutputExporter.export(chooser.selectedFile.toPath(), output) { exception ->
             SwingMessageDialogs.show(
                 frame,
                 SwingDialogRequest(

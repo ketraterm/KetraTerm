@@ -9,6 +9,11 @@ the historical evidence. The [final review](reviews/terminal-api-final-review-20
 records the resulting contracts and the intentional development baseline changes.
 This baseline does not promise compatibility with earlier 0.x shapes.
 
+The development baseline was refreshed after settling start-once connectors and
+frozen post-close session state. Existing compiled clients passed before refresh;
+the retained provenance records the source and artifact hashes of the new baseline.
+This does not constitute release verification or a stable API freeze.
+
 ## Supported boundary
 
 Public and protected declarations in each published library are part of the

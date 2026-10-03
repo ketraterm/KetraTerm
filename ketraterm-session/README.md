@@ -59,6 +59,12 @@ Collectors own their scopes. The session retains `Closed` after cleanup and fina
 frame publication. Current and late collectors can observe that result from
 caller-owned scopes independently of the cancelled session workers.
 
+After closure starts, input, render requests and policy/presentation setters are
+ignored. Resize rejects with `IllegalStateException` (dimension validation still
+runs first). Already-admitted work and parser EOF finish before `Closed` is
+published; retained frames and mode/palette reads then remain available without
+further mutation or publication. A new live terminal requires a new session.
+
 The session keeps its mutable core private. Read through its synchronized frame
 and mode APIs; a retained constructor input belongs exclusively to the session
 until `state` reaches `Closed`. Custom parser assembly retains its host-adapter

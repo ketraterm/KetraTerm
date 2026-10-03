@@ -37,8 +37,13 @@ public interface TerminalConnector : AutoCloseable {
      * Starts delivering transport events to [listener].
      *
      * Implementations may call listener methods from transport-owned threads.
+     * A connector accepts at most one start attempt. Repeated starts, including
+     * after failure or closure, throw [IllegalStateException] without replacing
+     * the original listener or starting additional workers. Closing before start
+     * also prevents startup. Local [close] is idempotent.
      *
      * @param listener callback sink for transport events.
+     * @throws IllegalStateException if already started or closed.
      */
     public fun start(listener: TerminalConnectorListener)
 
@@ -70,7 +75,8 @@ public interface TerminalConnector : AutoCloseable {
     )
 
     /**
-     * Requests local transport shutdown.
+     * Requests local transport shutdown. Repeated calls are safe and do not
+     * release resources or notify listeners more than once. May precede [start].
      */
     override fun close()
 }

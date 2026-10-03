@@ -69,6 +69,20 @@ fun main() =
             TerminalClipboardReadAuditEvent(selection, TerminalClipboardReadOutcome.SENT),
         )
         val connector = ConsumerConnector()
+        val rejectedListener =
+            object : TerminalConnectorListener {
+                override fun onBytes(
+                    bytes: ByteArray,
+                    offset: Int,
+                    length: Int,
+                ) = error("rejected listener received bytes")
+
+                override fun onClosed(exitCode: Int?) = error("rejected listener received closure")
+
+                override fun onError(error: Throwable) = throw error
+            }
+        val closedConnector = ConsumerConnector().apply { close() }
+        check(runCatching { closedConnector.start(rejectedListener) }.exceptionOrNull() is IllegalStateException)
         val detector = ConsumerHyperlinkDetector()
         val commandLine = MutableStateFlow<TerminalShellCommandLineSnapshot?>(TerminalShellCommandLineSnapshot("help", 4, 4, 0))
         val shell = TerminalShellIntegrationFactory.host(TerminalShellIntegrationState(), commandLine)
@@ -89,6 +103,7 @@ fun main() =
             commandLine.value = null
             check(session.activeShellCommandLine() == null)
             session.start(COLUMNS, ROWS)
+            check(runCatching { connector.start(rejectedListener) }.exceptionOrNull() is IllegalStateException)
             withTimeout(20_000) { session.renderGeneration.first { it >= 0L } }
             val terminal =
                 onEdt {
@@ -227,9 +242,12 @@ private class ConsumerHyperlinkDetector : SwingHyperlinkDetector {
 
 private class ConsumerConnector : TerminalConnector {
     val closed = AtomicBoolean()
+    private val started = AtomicBoolean()
     private val input = ByteArrayOutputStream()
 
     override fun start(listener: TerminalConnectorListener) {
+        check(!closed.get()) { "connector is closed" }
+        check(started.compareAndSet(false, true)) { "connector already started" }
         val bytes = "$URL\r\n".toByteArray()
         listener.onBytes(bytes, 0, bytes.size)
     }

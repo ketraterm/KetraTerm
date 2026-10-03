@@ -298,12 +298,12 @@ closures remain historical evidence for their tested paths.
 - **M13 — `DONE(host)`**: accepted OSC 8 opens reconcile lowered limits under the serialized registry owner. Byte-stream tests verify `4 → 1`, explicit-key reuse, URI retirement and ordered removals; callback-failure tests verify coherent recovery.
 - **M14 — `DONE(host/profile)`**: standalone Ctrl+Tab uses tab-bar order; PTY-backed product tests verify both directions, wraparound, deletion, and empty/single-tab behavior.
 - **M15 — `DONE(host/profile)`**: IntelliJ pane creation rolls back acquired UI resources and service listeners; IDE fixtures verify failure, cancellation, and suppressed cleanup errors.
-- **M16 — `TODO(render)`**: external frames inheriting the default palette getter construct storage on every cache acceptance. Share an immutable fallback and measure a representative external-frame path. Built-in core already caches its palette; surviving allocations and latency are unmeasured.
-- **M17 — `TODO(host/profile)`**: standalone command-output export performs filesystem writes on the EDT. Move writing into owned I/O work and verify completion, failure and cancellation with a gated writer; no latency measurement is claimed.
-- **M18 — `TODO(transport/policy)`**: settle repeated connector-start behavior in public KDoc. Secondary lifecycle prose requires idempotence while shipped PTY behavior/tests require start-once; this is a contract contradiction, not a reproduced startup failure.
-- **M19 — `TODO(session/policy)`**: settle post-close setter behavior and retained presentation publication. Current guards differ, but no normative general policy exists; choose supported/rejected/ignored mutations before adding policy-specific assertions.
+- **M16 — `DONE(render)`**: external frames share the immutable fallback palette. JMH covers unchanged/changing 80×24 frames against an allocating control; the 2,208 B/update palette allocation is removed.
+- **M17 — `DONE(host/profile)`**: standalone export uses window-owned I/O work. Gated tests verify EDT availability, original failure delivery, cancellation and suppression of callbacks after disposal.
+- **M18 — `DONE(transport/policy)`**: connector startup is explicitly start-once; repeats and startup after close reject without replacing the listener. PTY, testkit and external-consumer coverage follow that contract.
+- **M19 — `DONE(session/policy)`**: closure freezes terminal state after admitted work/EOF; late setters/input are ignored and resize rejects. Local, remote and pre-start closure tests verify retained reads and unchanged collaborators.
 - **M20 — `DONE(host/profile/completion)`**: workspace examples compile; completion documentation reflects Flow debounce and JList presentation.
-- **M21 — `TODO(parser)`**: remove unused `ParserState` UTF-8 fields and tests that assert fictional decoder state; preserve actual byte-stream reset, malformed-input and EOF coverage. This is maintenance debt, not a decoding defect.
+- **M21 — `DONE(parser)`**: removed unused decoder fields and their implementation-only tests; real byte-stream reset, malformed-input, chunking and EOF coverage remains.
 
 ### Release Verification
 

@@ -49,6 +49,7 @@ class MockConnector : TerminalConnector {
         get() = ByteArray(capturedWrites.size) { index -> capturedWrites[index] }
 
     override fun start(listener: TerminalConnectorListener) {
+        check(!isClosed) { "connector is closed" }
         check(this.listener == null) { "connector already started" }
         this.listener = listener
         startCount++

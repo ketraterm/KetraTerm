@@ -1,6 +1,6 @@
 format=1
 basis=reviewed-working-tree
-baseRevision=4a31f5bb36b31d0b3035f8862dcdc4438e6156d0
+baseRevision=9641cc719dc1ae0c3a69ee16fb1e5e8777c8eae9
 libraryVersion=0.3.0-SNAPSHOT
 kotlinVersion=2.4.20
 jvmTarget=25
@@ -8,7 +8,7 @@ jdkVersion=25.0.3+9-LTS
 jdkVendor=Eclipse Temurin
 clientSha256=b6dbc9eb6c2271468ae5b68236f5705948d20985094fd27864d79c5c8f56ee44
 artifact=io.github.ketraterm:ketraterm-completion-persistence:0.3.0-SNAPSHOT sha256=efc9625b2ca0d11e9d1ecd2f380c609cbd063f342df64673ab106b9e8fedcc62
-artifact=io.github.ketraterm:ketraterm-completion:0.3.0-SNAPSHOT sha256=b64f9141a38290e318e09fcbb35d65794ed393c788b82bebecaf5a1325626ac5
+artifact=io.github.ketraterm:ketraterm-completion:0.3.0-SNAPSHOT sha256=cf5a9164655c260cf9b93be8f2b153ca51ab6fb4a336d43d59a812b2008ea870
 artifact=org.jetbrains.kotlin:kotlin-stdlib:2.4.20 sha256=2226de463d309d4a5500a481320b3dea515a6981dcae1def531fbc158884e25f
 artifact=org.jetbrains.kotlinx:kotlinx-coroutines-core-jvm:1.10.2 sha256=5ca175b38df331fd64155b35cd8cae1251fa9ee369709b36d42e0a288ccce3fd
 artifact=org.jetbrains:annotations:23.0.0 sha256=7b0f19724082cbfcbc66e5abea2b9bc92cf08a1ea11e191933ed43801eb3cd05

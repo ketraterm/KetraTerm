@@ -86,14 +86,7 @@ internal class ParserState(
     var privateMarker: Int = 0
 
     // -------------------------------------------------------------------------
-    // PARTITION 3: UTF-8 decoder state
-    // -------------------------------------------------------------------------
-
-    var utf8State: Int = 0
-    var utf8Codepoint: Int = 0
-
-    // -------------------------------------------------------------------------
-    // PARTITION 4: Grapheme assembly state
+    // PARTITION 3: Grapheme assembly state
     // -------------------------------------------------------------------------
 
     val clusterBuffer: IntArray = IntArray(maxCluster)
@@ -109,7 +102,7 @@ internal class ParserState(
     var lastNonExtendWasExtendedPictographic: Boolean = false
 
     // -------------------------------------------------------------------------
-    // PARTITION 5: Charset designation / shift state
+    // PARTITION 4: Charset designation / shift state
     // -------------------------------------------------------------------------
 
     val charsets: IntArray = IntArray(4) { CHARSET_ASCII }
@@ -145,7 +138,7 @@ internal class ParserState(
     }
 
     // -------------------------------------------------------------------------
-    // PARTITION 6: OSC/DCS payload scratch state
+    // PARTITION 5: OSC/DCS payload scratch state
     // -------------------------------------------------------------------------
     //
     // Payload invariant:
@@ -209,11 +202,6 @@ internal class ParserState(
         regionalIndicatorParity = 0
     }
 
-    fun resetUtf8State() {
-        utf8State = 0
-        utf8Codepoint = 0
-    }
-
     fun resetCharsetState() {
         charsets[0] = CHARSET_ASCII
         charsets[1] = CHARSET_ASCII
@@ -231,7 +219,6 @@ internal class ParserState(
         clearSequenceState()
         clearPayloadState()
         clearActiveClusterAfterFlush()
-        resetUtf8State()
         resetCharsetState()
     }
 

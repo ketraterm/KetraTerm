@@ -19,7 +19,7 @@ A transport connector progresses through three distinct states:
 ### B. Active / Running
 * Toggled by calling `start(listener: TerminalConnectorListener)`.
 * The connector spawns its background reader/watcher threads and begins emitting events via `onBytes`, `onError`, and `onClosed`.
-* **Constraint**: `start()` must be idempotent. Calling it multiple times on an already active connector should have no effect.
+* **Constraint**: `start()` is start-once. A repeated attempt, including after failure or closure, throws `IllegalStateException` without replacing the listener or starting more workers. Closing before startup also prevents startup. The public `TerminalConnector` KDoc is normative.
 
 ### C. Closed
 * Toggled by calling `close()` (which implements `AutoCloseable`).

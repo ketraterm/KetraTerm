@@ -1,13 +1,13 @@
 format=1
 basis=reviewed-working-tree
-baseRevision=7ce36aab8147cd1759e914142edb8a1c782becfe
+baseRevision=9641cc719dc1ae0c3a69ee16fb1e5e8777c8eae9
 libraryVersion=0.3.0-SNAPSHOT
 kotlinVersion=2.4.20
 jvmTarget=25
 jdkVersion=25.0.3+9-LTS
 jdkVendor=Eclipse Temurin
 clientSha256=a33dc1c7483438a068ca287e70a97c16d9f42de003d9f401ae034df4edbf095a
-artifact=io.github.ketraterm:ketraterm-parser:0.3.0-SNAPSHOT sha256=caa7f0e26645aa0f324e12a770e36e7efdbf3349f282a1ebe994dc4d61504820
+artifact=io.github.ketraterm:ketraterm-parser:0.3.0-SNAPSHOT sha256=32a5444831d041a6aa95be2974b72d970b72b51695527d6567c5d73f942f3ed0
 artifact=io.github.ketraterm:ketraterm-protocol:0.3.0-SNAPSHOT sha256=629b277171eb53036d5d2d7f3a946e8f30de3e7e0de0c2a6749a98a49044fff6
 artifact=org.jetbrains.kotlin:kotlin-stdlib:2.4.20 sha256=2226de463d309d4a5500a481320b3dea515a6981dcae1def531fbc158884e25f
 artifact=org.jetbrains:annotations:13.0 sha256=ace2a10dc8e2d5fd34925ecac03e4988b2c0f851650c94b8cef49ba1bd111478

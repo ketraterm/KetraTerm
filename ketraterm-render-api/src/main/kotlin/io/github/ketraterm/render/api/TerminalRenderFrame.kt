@@ -15,6 +15,8 @@
  */
 package io.github.ketraterm.render.api
 
+private val defaultFramePalette = TerminalColorPalette()
+
 /**
  * Short-lived primitive view of the terminal's render state for one viewport.
  *
@@ -123,10 +125,10 @@ public interface TerminalRenderFrame {
     public val activeBuffer: TerminalRenderBufferKind
 
     /**
-     * Currently active resolved color palette.
+     * Currently active resolved color palette. The default is shared and immutable.
      */
     public val palette: TerminalColorPalette
-        get() = TerminalColorPalette()
+        get() = defaultFramePalette
 
     /**
      * Current render cursor overlay state.
