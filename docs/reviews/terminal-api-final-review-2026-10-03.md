@@ -1,5 +1,63 @@
 # Terminal API final review
 
+## Verification follow-up at `5facdcbd`
+
+Re-reviewed 2026-10-03 after the A13/A14 fixes. All six original regressions now
+pass, with additional coverage for local closure, already-closed attachment,
+pending debounce, failure cleanup and recovery. Before adding A15 regressions,
+the affected suites passed 1,236 cases; all 54 compiled-client checks, seventeen
+ABI checks and Spotless pass.
+Public signatures, dependency exports and retained baselines are unchanged.
+Unchanged Gradle task outputs were reused where applicable.
+
+A13/A14 are resolved. One related teardown defect remains: A15 below. Preserve
+the current development baseline and fix that behavior before delivery sign-off;
+this review still does not freeze stable APIs or complete G02/G03.
+
+### A15 — P2: callback failures can interrupt Swing resource cleanup
+
+[Component disposal](../../ketraterm-ui-swing/src/main/kotlin/io/github/ketraterm/ui/swing/api/SwingTerminal.kt#L1239)
+marks the component disposed, then unbinds it. Unbinding publishes eligibility;
+a valid public listener can throw before timer/controller cleanup and component
+scope cancellation. Subsequent disposal returns immediately, leaving cleanup
+incomplete. This remains possible after the live binding is correctly closed.
+
+Two disposal regressions cover operational failure and cancellation. They require
+the original exception to propagate while the timer stops, the component scope
+cancels, repeat disposal remains inert and the host-owned session stays open.
+
+The same exception-safety gap exists when
+[`removeNotify()`](../../ketraterm-ui-swing/src/main/kotlin/io/github/ketraterm/ui/swing/api/SwingTerminal.kt#L1019)
+finishes scrolling before superclass/ancestor teardown, and when
+[`SwingShellSuggestionController.close()`](../../ketraterm-ui-swing/src/main/kotlin/io/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionController.kt#L107)
+hides a custom view before closing it.
+A throwing eligibility callback or view update can skip the remaining teardown.
+Three further regressions require peer removal with reattachment support and view
+closure despite those failures, including preservation of a primary hide failure
+when close also fails.
+Attempt every owned cleanup and preserve the first failure with subsequent cleanup
+failures suppressed. Permanent disposal must cancel the component scope and release
+view resources; `removeNotify()` must release peer/ancestor resources while keeping
+the component usable for reattachment. Keep ordinary input/settings notification
+propagation intact. No new public API is required. Status is tracked in the
+[gap map](../terminal-feature-gap-map.md#final-api-design).
+
+### Follow-up validation
+
+| Check | Result |
+| --- | --- |
+| Complete Swing suite after adding A15 | 1,157 cases: 1,152 pass, only the five new A15 cases fail; no errors or skips. Disposal leaves its scope and timer active; peer removal leaves the peer displayable; both controller-close cases never call the host view's close operation. |
+| Swing host suite | 84 pass, including the original A13/A14 regressions and four additional lifecycle cases. |
+| Compiled-client upgrades | 54 checks pass: 52 positive executions and two linkage-negative controls. |
+| Kotlin ABI | All seventeen publication checks pass; no snapshots or retained client binaries changed. |
+| Formatting | Root `spotlessApply` and `spotlessCheck` pass; Swing formatting passes again after the A15 additions. |
+
+The new failures assert required cleanup, not current behavior. This review changes
+tests and documentation only. Source-consumer, plugin, native PTY, differential
+and performance campaigns were not rerun for this internal lifecycle follow-up.
+
+## Original review at `1f82ab10`
+
 Reviewed 2026-10-03 at `1f82ab10` on `audit/terminal-api-design`, including the
 four fix groups following the [original review](terminal-api-design-review-2026-10-02.md).
 This review adds regressions and corrects compatibility documentation; it changes
@@ -12,7 +70,7 @@ snapshots and explicitly declared clients as the development baseline. Resolve
 the two native-popup behavior defects below before proceeding to G02 delivery
 checks. This is not a stable API freeze or completion of G03.
 
-## Remaining findings
+## Original findings
 
 ### A13 — P2: session termination does not invalidate native completion
 
@@ -93,7 +151,7 @@ compatible. No compatibility shim or additional baseline regeneration is justifi
 for this pre-stable decision. Retained old inline leasing remains a real
 compatibility commitment, not permission to replace its storage representation.
 
-## Validation
+## Validation at `1f82ab10`
 
 | Check | Result |
 | --- | --- |

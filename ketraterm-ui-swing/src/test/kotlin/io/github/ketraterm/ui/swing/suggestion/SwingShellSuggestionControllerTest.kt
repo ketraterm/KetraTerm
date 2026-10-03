@@ -560,6 +560,47 @@ class SwingShellSuggestionControllerTest {
             assertEquals(-1, controller.state().selectedIndex)
         }
 
+    @Test
+    fun `close releases the host view when hiding update fails`() =
+        onEdt {
+            lateinit var view: RecordingSuggestionView
+            val controller =
+                SwingShellSuggestionController(RecordingSuggestionHost(), viewFactory = { listener ->
+                    RecordingSuggestionView(listener).also { view = it }
+                })
+            controller.show(request(), suggestions(2), selectedIndex = 0)
+            val failure = IllegalStateException("hide failed")
+            view.updateFailure = failure
+
+            val thrown = assertThrows(IllegalStateException::class.java) { controller.close() }
+
+            assertSame(failure, thrown)
+            assertEquals(1, view.closeCount)
+            assertTrue(thrown.suppressed.isEmpty())
+        }
+
+    @Test
+    fun `close preserves the hiding failure and suppresses the host view close failure`() =
+        onEdt {
+            lateinit var view: RecordingSuggestionView
+            val controller =
+                SwingShellSuggestionController(RecordingSuggestionHost(), viewFactory = { listener ->
+                    RecordingSuggestionView(listener).also { view = it }
+                })
+            controller.show(request(), suggestions(2), selectedIndex = 0)
+            val hidingFailure = IllegalStateException("hide failed")
+            val closeFailure = IllegalArgumentException("close failed")
+            view.updateFailure = hidingFailure
+            view.closeFailure = closeFailure
+
+            val thrown = assertThrows(IllegalStateException::class.java) { controller.close() }
+
+            assertSame(hidingFailure, thrown)
+            assertEquals(1, view.closeCount)
+            assertEquals(1, thrown.suppressed.size)
+            assertSame(closeFailure, thrown.suppressed.single())
+        }
+
     private fun onEdt(block: () -> Unit) {
         javax.swing.SwingUtilities.invokeAndWait(block)
     }
@@ -674,11 +715,21 @@ class SwingShellSuggestionControllerTest {
             private set
         var snapshot: SwingShellSuggestionViewSnapshot = SwingShellSuggestionViewSnapshot.EMPTY
             private set
+        var updateFailure: Throwable? = null
+        var closeFailure: Throwable? = null
+        var closeCount: Int = 0
+            private set
 
         override fun update(snapshot: SwingShellSuggestionViewSnapshot) {
+            updateFailure?.let { throw it }
             this.snapshot = snapshot
             suggestions = snapshot.visibleSuggestions
             selectedIndex = snapshot.selectedIndex
+        }
+
+        override fun close() {
+            closeCount++
+            closeFailure?.let { throw it }
         }
     }
 }

@@ -38,6 +38,8 @@ import io.github.ketraterm.transport.TerminalConnectorListener
 import io.github.ketraterm.ui.swing.settings.SwingSettings
 import io.github.ketraterm.ui.swing.settings.TerminalClipboardHandler
 import io.github.ketraterm.ui.swing.settings.TerminalTheme
+import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionEligibilityListener
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.StandardTestDispatcher
 import org.junit.jupiter.api.Assertions.*
@@ -447,6 +449,64 @@ class SwingTerminalThreadingTest {
             assertTrue(component.isCoroutineScopeActive)
             component.dispose()
             assertFalse(component.isCoroutineScopeActive)
+        }
+    }
+
+    @ParameterizedTest(name = "dispose completes cleanup after eligibility callback {0}")
+    @ValueSource(strings = ["failure", "cancellation"])
+    fun `dispose completes cleanup when an eligibility callback throws`(failureKind: String) {
+        val failure =
+            when (failureKind) {
+                "failure" -> IllegalStateException("host eligibility callback failed")
+                "cancellation" -> CancellationException("host eligibility callback cancelled")
+                else -> error("Unexpected failure kind $failureKind")
+            }
+        val session = focusSession(ByteArrayOutputStream())
+        val component =
+            edtCall {
+                SwingTerminal(settingsProvider = {
+                    SwingSettings(smartSuggestionsEnabled = true, cursorBlinkMillis = 0, useSystemFallbackFonts = false)
+                })
+            }
+        var notifications = 0
+        val listener =
+            SwingShellSuggestionEligibilityListener { eligible ->
+                assertFalse(eligible)
+                notifications++
+                throw failure
+            }
+        try {
+            edtCall {
+                component.bind(session)
+                assertTrue(component.isAutomaticShellSuggestionEligible())
+                component.addShellSuggestionEligibilityListener(listener)
+                component.cursorTimer.start()
+                assertTrue(component.cursorTimer.isRunning)
+                assertTrue(component.isCoroutineScopeActive)
+
+                assertSame(failure, assertThrows(RuntimeException::class.java) { component.dispose() })
+                assertAll(
+                    { assertFalse(component.isCoroutineScopeActive, "Disposal must cancel the component scope despite host failure") },
+                    { assertFalse(component.cursorTimer.isRunning, "Disposal must stop the cursor timer despite host failure") },
+                    { assertFalse(session.isClosed, "Disposal must preserve the host-owned session") },
+                    { assertFalse(component.isAutomaticShellSuggestionEligible()) },
+                    { assertEquals(1, notifications) },
+                )
+
+                component.dispose()
+                assertEquals(1, notifications, "Repeated disposal must not notify the failing listener again")
+                assertFalse(component.isCoroutineScopeActive)
+                assertFalse(component.cursorTimer.isRunning)
+                assertFalse(session.isClosed)
+            }
+        } finally {
+            edtCall {
+                component.removeShellSuggestionEligibilityListener(listener)
+                component.cursorTimer.stop()
+                component.dispose()
+            }
+            session.close()
+            dispatcher.scheduler.runCurrent()
         }
     }
 

@@ -34,6 +34,7 @@ import io.github.ketraterm.transport.TerminalConnectorListener
 import io.github.ketraterm.ui.swing.settings.SwingPadding
 import io.github.ketraterm.ui.swing.settings.SwingSettings
 import io.github.ketraterm.ui.swing.settings.SwingSettingsProvider
+import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionEligibilityListener
 import kotlinx.coroutines.test.StandardTestDispatcher
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Assertions.*
@@ -760,6 +761,73 @@ class SwingTerminalScrollbackTest {
             assertEquals(5, terminal.height)
         } finally {
             session.close()
+        }
+    }
+
+    @Test
+    fun `removeNotify releases the peer when settling scroll throws from an eligibility callback`() {
+        val reader = ActiveBufferFrameReader().apply { historySize = 5 }
+        val terminal = TerminalBuffers.create(width = 3, height = 3, maxHistory = 5)
+        val session =
+            TerminalSession(
+                terminal = terminal,
+                renderPublisher = TerminalRenderPublisher(3, 3),
+                renderReader = reader,
+                responseReader = terminal,
+                connector = NoOpConnector,
+                parser = NoOpParser,
+                inputEncoderFactory = TerminalInputEncoderFactory { _, _, _ -> object : TerminalInputEncoder by NoOpInputEncoder {} },
+                workerDispatcher = dispatcher,
+            ).also(sessions::add)
+        session.renderPublisher.updateAndPublish(reader)
+        val component =
+            scrollTestTerminal(
+                settings =
+                    SwingSettings(
+                        padding = SwingPadding(0, 0, 0, 0),
+                        cursorBlinkMillis = 0,
+                        useSystemFallbackFonts = false,
+                        smartSuggestionsEnabled = true,
+                    ),
+            )
+        val failure = IllegalStateException("eligibility callback failed")
+        var callbackCount = 0
+        val listener =
+            SwingShellSuggestionEligibilityListener { eligible ->
+                assertTrue(eligible)
+                callbackCount++
+                throw failure
+            }
+
+        SwingUtilities.invokeAndWait {
+            try {
+                component.setSize(30, 100)
+                component.bind(session)
+                dispatcher.scheduler.runCurrent()
+                component.addNotify()
+                assertTrue(component.isDisplayable)
+                component.scrollFromScrollbar(3, valueIsAdjusting = true)
+                assertEquals(3.0, component.viewportState().scrollbackOffset)
+                assertFalse(component.isAutomaticShellSuggestionEligible())
+                component.addShellSuggestionEligibilityListener(listener)
+                component.scrollFromScrollbar(0, valueIsAdjusting = false)
+                assertEquals(0, callbackCount)
+
+                val thrown = assertThrows(IllegalStateException::class.java) { component.removeNotify() }
+
+                assertSame(failure, thrown)
+                assertEquals(1, callbackCount)
+                assertAll(
+                    { assertFalse(component.isDisplayable, "Swing peer teardown must finish before the callback failure propagates") },
+                    { assertTrue(component.isCoroutineScopeActive, "Peer removal must retain the scope for reattachment") },
+                )
+                component.removeShellSuggestionEligibilityListener(listener)
+                component.addNotify()
+                assertTrue(component.isDisplayable, "A removed component must remain usable for reattachment")
+            } finally {
+                component.removeShellSuggestionEligibilityListener(listener)
+                if (component.isDisplayable) component.removeNotify()
+            }
         }
     }
 
