@@ -111,8 +111,8 @@ internal class MouseEncoder(
     }
 
     private fun encodeSgrPixels(event: TerminalMouseEvent) {
-        val x = if (event.pixelX >= 0) event.pixelX + 1 else oneBasedCoordinate(event.column)
-        val y = if (event.pixelY >= 0) event.pixelY + 1 else oneBasedCoordinate(event.row)
+        val x = oneBasedCoordinate(if (event.pixelX >= 0) event.pixelX else event.column)
+        val y = oneBasedCoordinate(if (event.pixelY >= 0) event.pixelY else event.row)
 
         val cb = mouseButtonCode(event, legacyRelease = false)
         if (cb < 0) {
@@ -148,8 +148,8 @@ internal class MouseEncoder(
         }
 
         val encodedButton = 32 + cb
-        val encodedX = 32 + x
-        val encodedY = 32 + y
+        val encodedX = 32 + x.toInt()
+        val encodedY = 32 + y.toInt()
 
         scratch.clear()
         scratch.appendByte(ESC)
@@ -186,8 +186,13 @@ internal class MouseEncoder(
         val x = oneBasedCoordinate(event.column)
         val y = oneBasedCoordinate(event.row)
 
-        val boundedX = boundedLegacyCoordinate(x) ?: return
-        val boundedY = boundedLegacyCoordinate(y) ?: return
+        if (policy.mouseCoordinateLimitPolicy == MouseCoordinateLimitPolicy.SUPPRESS_OUT_OF_RANGE &&
+            (x > LEGACY_MAX_COORDINATE || y > LEGACY_MAX_COORDINATE)
+        ) {
+            return
+        }
+        val boundedX = minOf(x, LEGACY_MAX_COORDINATE.toLong()).toInt()
+        val boundedY = minOf(y, LEGACY_MAX_COORDINATE.toLong()).toInt()
 
         val cb = mouseButtonCode(event, legacyRelease = true)
         if (cb < 0) {
@@ -212,18 +217,7 @@ internal class MouseEncoder(
         scratch.writeTo(output)
     }
 
-    private fun oneBasedCoordinate(zeroBased: Int): Int = zeroBased + 1
-
-    private fun boundedLegacyCoordinate(oneBased: Int): Int? {
-        if (oneBased <= LEGACY_MAX_COORDINATE) {
-            return oneBased
-        }
-
-        return when (policy.mouseCoordinateLimitPolicy) {
-            MouseCoordinateLimitPolicy.SUPPRESS_OUT_OF_RANGE -> null
-            MouseCoordinateLimitPolicy.CLAMP_TO_MAX -> LEGACY_MAX_COORDINATE
-        }
-    }
+    private fun oneBasedCoordinate(zeroBased: Int): Long = zeroBased.toLong() + 1
 
     private fun mouseButtonCode(
         event: TerminalMouseEvent,

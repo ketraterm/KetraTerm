@@ -4,6 +4,15 @@ KetraTerm's published JVM libraries are intended for Kotlin and Java hosts.
 The tracked API snapshots are a reviewed development baseline, not a claim that
 earlier 0.x releases were binary compatible. Starting at 1.0, releases within
 one major version preserve supported source, binary and behavioral contracts.
+The [API design review](reviews/terminal-api-design-review-2026-10-02.md) preserves
+the historical evidence. The [final review](reviews/terminal-api-final-review-2026-10-03.md)
+records the resulting contracts and the intentional development baseline changes.
+This baseline does not promise compatibility with earlier 0.x shapes.
+
+The development baseline was refreshed after settling start-once connectors and
+frozen post-close session state. Existing compiled clients passed before refresh;
+the retained provenance records the source and artifact hashes of the new baseline.
+This does not constitute release verification or a stable API freeze.
 
 ## Supported boundary
 
@@ -11,16 +20,39 @@ Public and protected declarations in each published library are part of the
 contract. Kotlin `internal` and private implementation details are excluded,
 except `@PublishedApi` declarations referenced by public inline functions:
 already-compiled Kotlin callers may link directly to them. Application,
-benchmark and testkit implementation APIs are not published library contracts.
+benchmark, testkit, workspace and completion-persistence implementation APIs are
+not supported library contracts.
 
-The root build explicitly selects the published libraries; a new Kotlin module
-is not published automatically. The selected artifacts include optional composed
-libraries, such as local PTY hosting, workspace, completion adapters and Swing
-host actions. Composition does not make every implementation helper an embedding
-API. Keep library-local helpers internal/private; cross-module visibility needs
-its own contract justification. The current selected libraries each have a real
-host or runtime boundary. App, benchmarks, testkit and the nested IntelliJ product
-build are outside this library publication set.
+One supported-module set selects all **15 Maven publications**, their ABI checks
+and the root public Dokka aggregation. New modules are not included automatically.
+
+| Offering | Supported modules |
+| --- | --- |
+| Headless pipeline and session | protocol, parser, core, host, input, render-api, render-cache, transport-api, session |
+| Embedded Swing view | ui-swing |
+| Optional local process and shell metadata | pty, shell-integration |
+| Optional completion engine and local filesystem support | completion, completion-host |
+| Optional Swing chrome and completion adapters | ui-swing-host |
+
+Module names above have the `ketraterm-` prefix. Optional libraries are selected
+by the consumer; the headless pipeline does not depend on Swing, PTY, the OSC
+producer, workspace or completion. Render-cache remains in session's runtime
+and public frame-read boundary.
+
+`ketraterm-workspace` and `ketraterm-completion-persistence` remain separate
+product modules bundled with standalone and the IntelliJ plugin. They are not
+published, covered by public ABI checks or included in public Dokka. Public
+declarations needed for product wiring do not make them supported embedding APIs.
+Removing their external
+support is an intentional pre-stable policy change: applications using those
+earlier development artifacts must own their workspace and persistence or retain
+the earlier revision. No compatible replacement or earlier 0.x compatibility is
+promised. App, benchmarks, testkit and the nested IntelliJ product build are also
+outside the library publication set.
+
+Publication does not make every implementation helper an embedding API. Keep
+library-local helpers internal/private; cross-module visibility needs its own
+contract justification.
 
 The reviewed extension points follow the existing module ownership:
 
@@ -31,8 +63,8 @@ The reviewed extension points follow the existing module ownership:
 | Transport and session | Ordered connectors, session assembly, serialized input and borrowed frame access |
 | Shell integration | Neutral host-owned metadata contracts in session; optional OSC producer in its own library |
 | Swing and Swing host | EDT component lifecycle, host services, immutable settings, suggestions and host-neutral actions |
-| Completion, host and persistence | Completion sources, evaluation and learning; separately owned filesystem access and sanitized persistence |
-| PTY and workspace | Local process lifecycle, profiles, local-session creation and workspace callbacks |
+| Completion and completion host | Completion sources, evaluation and in-memory learning; separately owned bounded local filesystem access |
+| PTY | Local process/connector lifecycle and convenience session creation |
 
 Use the module contracts for threading, ownership and coordinates. Grid reads,
 mutations and parser calls require external serialization; atomic mode reads
@@ -48,9 +80,18 @@ Swing component operations require the EDT; disposing a view does not close its
 host-owned session. Host shell producers and supplied dispatchers remain owned
 by the host.
 
+`TerminalCommandSink`, core role interfaces, `TerminalRenderFrameReader`,
+`TerminalRenderFrame`, and host callback interfaces support external implementations.
+Their required semantic members are implementer commitments. `TerminalLine` is a
+borrowed view that an independent core may implement; render caches and published
+snapshots are library-produced consumer views, not mutable extension hooks.
+Direct line-cluster copies require known sufficient capacity. Complete reads of
+arbitrary directly written clusters use the existing frame cluster sink, which
+provides the length and borrowed range without a capacity guess.
+
 The initial review deliberately narrows earlier development APIs: raw packed
 core attributes belong to core implementation, and published caches must be read
-through `readCurrent` leases. Inspect semantic attributes or public render words
+through `readCurrent` (standalone publisher) or `readPublishedFrame` (session) leases. Inspect semantic attributes or public render words
 instead. Selection packing, shell projection probes, configuration-path test
 parameters, the directory scanner's test clock and search-bar component
 construction stay inside their owner modules.
@@ -73,10 +114,16 @@ requires a separate compatibility decision.
 
 - Preserve JVM signatures, Kotlin metadata and documented behavior. A source
   change that recompiles successfully may still break an existing binary.
-- Configuration and value data classes retain their constructor, `copy`,
-  component and generated default-call shapes. Adding a defaulted primary
-  constructor property is a binary change. Add a separate API only when a real
-  requirement warrants it; do not introduce builders in anticipation of one.
+- Value data classes retain their constructor, `copy`, component and generated
+  default-call shapes. Adding a defaulted primary constructor property is a
+  binary change. The D02/D03 pre-freeze migration replaces the growing
+  `SwingSettings`, `SwingHostServices` and `PtyOptions` with immutable snapshots
+  and concrete construction drafts; workspace options underwent the same
+  migration but are now product-only. Preserve the supported snapshots'
+  `create(Consumer)`, `copy(Consumer)`, `builder`, `toBuilder`, `build`, default
+  constructor and existing property descriptors when adding fields. Small value
+  records retain their data-class contracts. View-lifetime integrations still
+  use EDT attachment/binding APIs. See [configuration construction](library-configuration.md).
 - Preserve old overloads and Kotlin default-call entry points. `@JvmOverloads`
   serves Java overloads; it does not make changes to Kotlin default arguments
   binary compatible.
@@ -85,11 +132,20 @@ requires a separate compatibility decision.
   check, including the configured JVM default-method mode.
   New enum or sealed variants can also break exhaustive Kotlin `when` consumers;
   assess their source and runtime behavior before calling an addition compatible.
+  Introduce an actual new semantic family through a focused optional capability
+  rather than adding required members to old contracts. Capability absence must
+  preserve truthful unsupported behavior, including protocol failure replies when
+  permitted; response-family denial suppresses those replies too. Default no-ops
+  are limited to genuinely optional observer/host hooks.
 - Public inline bodies and `const` values are copied into consumers. Preserve
   numeric mode bits, enum ordering where ordinals are encoded, packed render
   words and their meanings; a signature comparison alone cannot detect drift.
-  Publisher changes must also honor the lease algorithm embedded in previously
-  compiled readers, not just retain their `@PublishedApi` helper signatures.
+  D04/D05 intentionally replaces the development reader baseline. Inline bodies
+  now invoke the callback between cache-reference acquire/release calls in
+  `try/finally`. Preserve those operations and their lease semantics, including
+  non-local returns and concurrent readers. Buffer counts, indices, arrays and
+  locks are private implementation details. Session's two synthetic bridges are
+  likewise ABI commitments, not consumer mutation entry points.
 - Keep public dependency types available to isolated consumers through generated
   Maven metadata. Resolve each KetraTerm dependency from the same release;
   independently mixing library versions is not covered.
@@ -99,10 +155,61 @@ requires a separate compatibility decision.
 
 ## Verification and baseline changes
 
-Published modules use strict explicit API mode and Kotlin's built-in ABI
+The construction changes deliberately replace earlier development signatures:
+
+- D04/D05 removes session publisher access, returns `TerminalShellIntegrationView`
+  from session/integration shell properties, and replaces publisher integer leases
+  and exposed bookkeeping with cache-reference acquisition/release. Recompile
+  readers and retain producer references at construction. The eight expected
+  failures in `CompiledClientUpgradeTest` were Swing cases 7/8/17/18
+  (`NoSuchMethodError: TerminalSession.getRenderPublisher`) and render-cache cases
+  29/30/31/32 (`NoSuchMethodError: int TerminalRenderPublisher.acquireFrontLease`),
+  spanning both metadata modes and both Kotlin runtimes. Only these two client
+  baselines are refreshed; the other eleven remain byte-identical. The removed
+  representation is deliberately not retained as a compatibility surface.
+  See [ownership, migration and measurements](render-reader-ownership.md).
+- D02/D03 removes nonempty constructors, generated copy/default-call and component
+  methods from the four growing configuration snapshots. Recompile with named
+  construction/update callbacks or Java builders. Swing's unused scrollback and
+  window-permission properties are removed; core creation and host policy own
+  those choices. Standalone preferences/TOML types leave the workspace publication
+  and become internal app implementation. Library consumers own their persistence.
+  Baseline tests and ABI checks passed before migration. Eight retained-client
+  upgrade cases then failed with `NoSuchMethodError`: Swing's three-argument
+  `SwingHostServices` constructor and PTY's Kotlin default constructor, in both
+  metadata modes and both runtimes. Only those two client/provenance pairs are
+  refreshed for this intentional break; the other eleven remain unchanged.
+- `TerminalBuffers.create` now returns `TerminalRenderBuffer`. Recompile callers;
+  JVM descriptors include return types even when the new type extends the old one.
+- Custom session construction takes `TerminalInputEncoderFactory` instead of an
+  encoder bound to another output. The factory creates independent admission and
+  bulk encoders using the session-supplied output, mode state and policy. Standard
+  assembly accepts a combined render buffer or explicit core/reader collaborators;
+  custom parser assembly uses `TerminalOutputParserFactory`. Recompile callers of
+  changed constructors and Kotlin default-call methods.
+- `TerminalInputEncoder.setInputPolicy` is required. External encoders must apply
+  the policy synchronously or reject it; inheriting the earlier no-op is unsupported.
+
+The original five client/provenance pairs remain available in Git at `e37f5d7f`.
+Construction commit `025ccb1a` replaced the host and Swing clients for these
+intentional breaks. Parser and completion client bytes remain identical;
+D02/D03 additionally refreshes Swing and PTY; D04/D05 refreshes Swing and
+render-cache as described above. Eight additional clients established
+separate extension baselines, producing the historical thirteen-client suite.
+The support-boundary change removes the workspace and completion-persistence
+clients from current publication checks. Eleven retained clients now define
+**44 positive upgrade cases and two deliberate linkage-failure controls**.
+These check the remaining declared baselines; they do not demonstrate
+compatibility with the original host, Swing, PTY or pre-D05 render-cache clients.
+The current snapshots and retained clients form a development baseline, subject
+to the open behavioral gaps in the final review.
+
+Supported modules use strict explicit API mode and Kotlin's built-in ABI
 validator over the actual Maven publication jars, with no package allowlist.
-Each module tracks `api/<module>.api`; `checkKotlinAbi` also runs with its `check`
-task. The repository test workflow checks all published APIs and formatting.
+Each supported module tracks `api/<module>.api`; `checkKotlinAbi` also runs with
+its `check` task. The same selection controls public Dokka, so product modules
+and testkit cannot enter the root API documentation. Product implementation
+still receives ordinary compilation, tests and formatting checks.
 
 ```text
 ./gradlew spotlessApply

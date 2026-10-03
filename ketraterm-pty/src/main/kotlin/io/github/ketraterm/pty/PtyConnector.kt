@@ -31,7 +31,7 @@ import com.pty4j.PtyProcess as Pty4jNativeProcess
  * core, cursor, attribute, and input-encoder behavior are owned by
  * `terminal-session` and lower layers.
  * Normal closure follows both process exit and delivery of stdout through EOF.
- * Local close cancels pending reads instead of draining; fatal read failure
+ * Local close cancels pending reads instead of draining; read or byte-listener failure
  * reports the original error and releases the process and both streams once.
  * Listener callbacks may close this connector reentrantly.
  *
@@ -39,7 +39,7 @@ import com.pty4j.PtyProcess as Pty4jNativeProcess
  * @param readBufferSize size of the read buffer in bytes.
  * @param readerThreadName name for the daemon PTY stdout reader thread.
  * @param watcherThreadName name for the daemon process exit watcher thread.
- * @property failure Captured transport read failure, or `null` when no reader failure occurred.
+ * @property failure Original read or byte-listener exception, or `null` when no reader failure occurred.
  * @property exitCode Process exit code after the watcher observes process termination.
  * @property isAlive Returns true while the underlying PTY process reports it is alive.
  */
@@ -66,11 +66,11 @@ public class PtyConnector internal constructor(
     private var watcherThread: Thread? = null
 
     /**
-     * Captured transport read failure, or `null` when no reader failure
-     * occurred.
+     * Original read or byte-listener exception, or `null` when no reader failure
+     * occurred. Exceptions after local close are treated as teardown and ignored.
      */
     @Volatile
-    public var failure: IOException? = null
+    public var failure: Throwable? = null
         private set
 
     /**
@@ -220,7 +220,7 @@ public class PtyConnector internal constructor(
 
                 if (!localCloseRequested.get()) listenerOrThrow().onBytes(buffer, 0, read)
             }
-        } catch (exception: IOException) {
+        } catch (exception: Exception) {
             val report =
                 synchronized(lifecycleLock) {
                     !localCloseRequested.get() && closedNotified.compareAndSet(false, true)

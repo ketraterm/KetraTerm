@@ -43,7 +43,10 @@ class TerminalTextRunStyleTest {
         fun style(index: Int) = SwingHyperlinkStyle(colors[index], colors[index], colors[index], TerminalRenderUnderline.CURLY)
         val presentation = SwingHyperlinkPresentation(style(0), style(1), style(2), style(3), true)
         val presentations = Array<SwingHyperlinkPresentation?>(cache.columns) { presentation }
-        val settings = settings.copy(osc8HyperlinkPresentation = presentation)
+        val settings =
+            settings.copy { draft ->
+                draft.osc8HyperlinkPresentation = presentation
+            }
         cache.hyperlinkIds.fill(id)
         val run = TerminalTextRunStyle()
         var followed = 0
@@ -76,9 +79,9 @@ class TerminalTextRunStyleTest {
         cache.hyperlinkIds.fill(7)
         val active = 0xff336699.toInt()
         val settings =
-            settings.copy(
-                osc8HyperlinkPresentation = SwingHyperlinkPresentation(active = SwingHyperlinkStyle(foregroundArgb = active)),
-            )
+            settings.copy { draft ->
+                draft.osc8HyperlinkPresentation = SwingHyperlinkPresentation(active = SwingHyperlinkStyle(foregroundArgb = active))
+            }
         val run = TerminalTextRunStyle()
         for (hovered in listOf(false, true)) {
             run.configureRow(true, cache.hyperlinkIds, hyperlinkHover(if (hovered) 7 else 0), settings)
@@ -177,7 +180,10 @@ class TerminalTextRunStyleTest {
             textBlinkVisible = true,
             hyperlinkIds = cache.hyperlinkIds,
             hyperlinkHover = hyperlinkHover(7, activationHover),
-            settings = settings.copy(hyperlinkActivationForeground = activationForeground),
+            settings =
+                settings.copy { draft ->
+                    draft.hyperlinkActivationForeground = activationForeground
+                },
         )
         style.begin(cache, cache.palette, 0, 0)
         val starts = mutableListOf(0)

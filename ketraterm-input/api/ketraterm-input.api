@@ -24,12 +24,15 @@ public abstract interface class io/github/ketraterm/input/api/TerminalInputEncod
 	public abstract fun encodeMouse (Lio/github/ketraterm/input/event/TerminalMouseEvent;)V
 	public abstract fun encodePaste (Lio/github/ketraterm/input/event/TerminalPasteEvent;)V
 	public fun encodeTextReplacement (Lio/github/ketraterm/input/event/TerminalTextReplacementEvent;)V
-	public fun setInputPolicy (Lio/github/ketraterm/input/policy/TerminalInputPolicy;)V
+	public abstract fun setInputPolicy (Lio/github/ketraterm/input/policy/TerminalInputPolicy;)V
 }
 
 public final class io/github/ketraterm/input/api/TerminalInputEncoder$DefaultImpls {
 	public static fun encodeTextReplacement (Lio/github/ketraterm/input/api/TerminalInputEncoder;Lio/github/ketraterm/input/event/TerminalTextReplacementEvent;)V
-	public static fun setInputPolicy (Lio/github/ketraterm/input/api/TerminalInputEncoder;Lio/github/ketraterm/input/policy/TerminalInputPolicy;)V
+}
+
+public abstract interface class io/github/ketraterm/input/api/TerminalInputEncoderFactory {
+	public abstract fun create (Lio/github/ketraterm/core/api/TerminalInputState;Lio/github/ketraterm/protocol/host/TerminalHostOutput;Lio/github/ketraterm/input/policy/TerminalInputPolicy;)Lio/github/ketraterm/input/api/TerminalInputEncoder;
 }
 
 public final class io/github/ketraterm/input/event/TerminalFocusEvent {

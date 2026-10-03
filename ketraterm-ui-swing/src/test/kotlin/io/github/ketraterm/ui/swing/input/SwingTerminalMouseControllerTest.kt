@@ -507,6 +507,8 @@ class SwingTerminalMouseControllerTest {
         )
 
     private class RecordingInputEncoder : TerminalInputEncoder {
+        override fun setInputPolicy(policy: io.github.ketraterm.input.policy.TerminalInputPolicy) = Unit
+
         val encodedKeys = ArrayList<TerminalKeyEvent>()
 
         override fun encodeKey(event: TerminalKeyEvent) {
@@ -521,7 +523,10 @@ class SwingTerminalMouseControllerTest {
     }
 
     private class RecordingMouseHost(
-        override val settings: SwingSettings = SwingSettings(padding = SwingPadding(0, 0, 0, 0)),
+        override val settings: SwingSettings =
+            SwingSettings.create { draft ->
+                draft.padding = SwingPadding(0, 0, 0, 0)
+            },
         private val hyperlinkPressHandled: Boolean = false,
         private val scrollResult: Boolean = true,
         var mouseTrackingMode: MouseTrackingMode = MouseTrackingMode.OFF,

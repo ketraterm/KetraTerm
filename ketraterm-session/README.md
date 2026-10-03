@@ -6,11 +6,15 @@ It uses coroutines for lifecycle orchestration, synchronized-output timeout hand
 
 OSC 52 reads use an optional session-bound suspending provider. Session owns the deadline, permission revalidation, one active request, and a bounded owned reply; product hosts supply consent and native access. Missing providers return an empty reply when terminal responses are permitted.
 
+`TerminalBuffers.create` returns `TerminalRenderBuffer`, combining core and render capabilities. Hosts with separate collaborators use `TerminalSession.create(terminal, renderReader, connector)`; both must describe the same state. Initial render dimensions are checked before connector ownership transfers.
+
+Customization belongs in normal assembly: `inputEncoderFactory` creates independent admission and bulk encoders using session-supplied modes, ordered output, and policy. Both instances must honor policy updates. `parserFactory` receives the assembled command sink and its live clipboard-write budget, preserving clipboard reads, startup, shell events, and resize coordination. Factories create fresh instances without I/O or jobs; failed construction leaves the connector with its caller. The low-level constructor retains caller-owned parser mapping.
+
 ## Runtime model
 
 - `TerminalSession.state` retains `Created`, `Running`, or `Closed(TerminalSessionCloseEvent)`.
 - `TerminalSession.renderGeneration` publishes only successfully promoted frames.
-- `TerminalSession.renderPublisher` owns the leased primitive cache consumed by renderers.
+- `TerminalSession.readPublishedFrame` borrows the latest copied cache; the publisher stays private.
 - A session publishes one active render viewport; a new viewport request replaces the previous one. Independently scrolling views of the same session are unsupported. Separate sessions are separate terminal pipelines, not additional views of one process.
 - `mutationLock` protects parser/core mutation and borrowed frame reads.
 - Reentrant `outboundWriteLock` protects encoding and atomic admission; native writes never hold it.
@@ -34,7 +38,7 @@ val session = TerminalSession.create(
 val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
 scope.launch {
     session.renderGeneration.collect {
-        session.renderPublisher.readCurrent { published ->
+        session.readPublishedFrame { published ->
             rendererCache.updateFrom(published)
         }
     }
@@ -55,11 +59,20 @@ Collectors own their scopes. The session retains `Closed` after cleanup and fina
 frame publication. Current and late collectors can observe that result from
 caller-owned scopes independently of the cancelled session workers.
 
+After closure starts, input, render requests and policy/presentation setters are
+ignored. Resize rejects with `IllegalStateException` (dimension validation still
+runs first). Already-admitted work and parser EOF finish before `Closed` is
+published; retained frames and mode/palette reads then remain available without
+further mutation or publication. A new live terminal requires a new session.
+
 The session keeps its mutable core private. Read through its synchronized frame
 and mode APIs; a retained constructor input belongs exclusively to the session
 until `state` reaches `Closed`. Custom parser assembly retains its host-adapter
 wiring, while the session owns its admission lock. Rendering consumers must hold
-a `readCurrent` lease for every access to a published cache and its arrays.
+a `readPublishedFrame` lease for every access to a published cache and its arrays.
+The callback must not mutate or retain that storage, close the session, or reenter
+session mutation. Empty publication returns null; exceptions and Kotlin non-local
+returns release the lease. Closed sessions retain their final published frame.
 
 ## Host-owned shell integration
 
@@ -97,6 +110,11 @@ existing prompt/command events into `recordPromptStart`, `recordPromptEnd`,
 through `recordCurrentWorkingDirectory`. The IDE keeps its own authoritative
 shell model, scripts, and protocol parser. KetraTerm does not reconstruct another
 history from OSC, replace host directories, or require synthetic terminal bytes.
+
+Consumers receive `session.shellIntegrationState: TerminalShellIntegrationView`.
+It exposes the live query, primitive-copy and observation contract without record
+or clear operations. The existing producer state implements that role directly;
+the host retains its own `shellState` to publish. See [reader ownership and ABI](../docs/render-reader-ownership.md).
 
 Preserve stream order: process the matching output, capture stable primary-buffer
 line identities, publish the semantic update, then deliver later bytes. For

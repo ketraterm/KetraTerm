@@ -17,6 +17,8 @@ package io.github.ketraterm.host
 
 import io.github.ketraterm.core.TerminalBuffers
 import io.github.ketraterm.core.api.TerminalBuffer
+import io.github.ketraterm.core.api.TerminalInputState
+import io.github.ketraterm.core.api.TerminalModeSnapshot
 import io.github.ketraterm.core.model.CellColor
 import io.github.ketraterm.core.model.UnderlineStyle
 import io.github.ketraterm.parser.api.TerminalOutputParser
@@ -38,6 +40,57 @@ import org.junit.jupiter.params.provider.ValueSource
 
 @DisplayName("HostCommandAdapter")
 class HostCommandAdapterTest {
+    @Test
+    fun `line feeds use primitive mode reads across byte splits`() {
+        for (newline in listOf(false, true)) {
+            val bytes = (if (newline) "\u001B[20hAB\nC" else "AB\nC").encodeToByteArray()
+            for (split in 0..bytes.size) {
+                val backing = TerminalBuffers.create(10, 5)
+                val terminal = PrimitiveModeBuffer(backing)
+                val f = Fixture(terminal = terminal)
+                f.parser.accept(bytes, 0, split)
+                f.parser.accept(bytes, split, bytes.size - split)
+                f.end()
+                val column = if (newline) 0 else 2
+                assertEquals('C'.code, backing.getCodepointAt(column, 1), "newline=$newline split=$split")
+                assertEquals(column + 1, backing.cursorCol)
+                assertEquals(1, terminal.reads)
+            }
+        }
+    }
+
+    @Test
+    fun `Kitty replace set and clear use coherent primitive reads across byte splits`() {
+        val commands = listOf("\u001B[=9u" to 9, "\u001B[=2;2u" to 9, "\u001B[=1;3u" to 8, "\u001B[=0u" to 0)
+        for (split in 0..commands.maxOf { it.first.length }) {
+            val backing = TerminalBuffers.create(10, 5)
+            val terminal = PrimitiveModeBuffer(backing)
+            val f = Fixture(terminal = terminal)
+            for ((command, expected) in commands) {
+                val bytes = command.encodeToByteArray()
+                val boundary = split.coerceAtMost(bytes.size)
+                f.parser.accept(bytes, 0, boundary)
+                f.parser.accept(bytes, boundary, bytes.size - boundary)
+                assertEquals(expected, TerminalInputState.kittyKeyboardFlags(backing.getInputModeBits()), "command=$command split=$split")
+            }
+            f.end()
+            assertEquals(commands.size, terminal.reads)
+        }
+    }
+
+    private class PrimitiveModeBuffer(
+        private val backing: TerminalBuffer,
+    ) : TerminalBuffer by backing {
+        var reads = 0
+
+        override fun getInputModeBits(): Long {
+            reads++
+            return backing.getInputModeBits()
+        }
+
+        override fun getModeSnapshot(): TerminalModeSnapshot = error("Flag inspection must not request a full mode snapshot")
+    }
+
     @Test
     fun `output boundary distinguishes hard blank lines from cursor motion across byte chunks`() {
         val bytes = "\r\n\r\n\u001B[5;1H\u001B[H中".encodeToByteArray()
@@ -947,15 +1000,56 @@ class HostCommandAdapterTest {
             f.acceptAscii("\u001B[>8u")
             assertEquals(8, f.terminal.getModeSnapshot().kittyKeyboardFlags)
 
-            // 3. Pop 1 count: CSI < 1 u
+            // 3. Pop 1 count exhausts the stack: CSI < 1 u
             f.acceptAscii("\u001B[<1u")
-            assertEquals(9, f.terminal.getModeSnapshot().kittyKeyboardFlags)
+            assertEquals(0, f.terminal.getModeSnapshot().kittyKeyboardFlags)
 
             // 4. Push 8, then pop using default count (omitted parameter) which defaults to 1: CSI < u
             f.acceptAscii("\u001B[>8u")
             assertEquals(8, f.terminal.getModeSnapshot().kittyKeyboardFlags)
             f.acceptAscii("\u001B[<u")
+            assertEquals(0, f.terminal.getModeSnapshot().kittyKeyboardFlags)
+        }
+
+        @Test
+        fun `Kitty counted pops reset exhausted stacks across every byte split`() {
+            for (count in listOf("", "0", "31", "32", "33", "2147483647", "99999999999999999999")) {
+                val bytes = "\u001B[<${count}u\u001B[?uX".encodeToByteArray()
+                for (split in 0..bytes.size) {
+                    val f = Fixture()
+                    f.acceptAscii("\u001B[=9u")
+                    repeat(33) { f.acceptAscii("\u001B[>8u") }
+                    f.parser.accept(bytes, 0, split)
+                    f.parser.accept(bytes, split, bytes.size - split)
+                    f.end()
+
+                    val expected = if (count in listOf("", "0", "31")) 8 else 0
+                    assertAll(
+                        "count=$count split=$split",
+                        { assertEquals(expected, f.terminal.getModeSnapshot().kittyKeyboardFlags) },
+                        { assertEquals("\u001B[?${expected}u", f.drainResponses()) },
+                        { assertEquals('X'.code, f.terminal.getCodepointAt(0, 0)) },
+                    )
+                }
+            }
+        }
+
+        @Test
+        fun `Kitty saturated pops affect only the active screen and respect response denial`() {
+            val policy = HostPolicy(terminalResponsePolicy = HostControlPolicy.DENY)
+            val f = Fixture(hostPolicy = policy)
+            f.acceptAscii("\u001B[>1u\u001B[>9u\u001B[?1049h\u001B[>8u")
+            f.acceptAscii("\u001B[<2147483647u\u001B[?u")
+            assertEquals(0, f.terminal.getModeSnapshot().kittyKeyboardFlags)
+            assertEquals("", f.drainResponses())
+
+            f.acceptAscii("\u001B[?1049l")
             assertEquals(9, f.terminal.getModeSnapshot().kittyKeyboardFlags)
+            f.acceptAscii("\u001B[<u")
+            assertEquals(1, f.terminal.getModeSnapshot().kittyKeyboardFlags)
+            f.acceptAscii("\u001B[<2147483647u\u001B[?u")
+            assertEquals(0, f.terminal.getModeSnapshot().kittyKeyboardFlags)
+            assertEquals("", f.drainResponses())
         }
 
         @Test
@@ -2435,6 +2529,49 @@ class HostCommandAdapterTest {
             )
         }
 
+        @Test
+        fun `new OSC hyperlink admission reconciles a lowered retention limit`() {
+            val terminal = TerminalBuffers.create(width = 5, height = 1)
+            val registryEvents = mutableListOf<String>()
+            val hostEvents =
+                object : HostEventSink by HostEventSink.NONE {
+                    override fun hyperlinkRegistered(
+                        hyperlinkId: Int,
+                        uri: String,
+                        id: String?,
+                    ) {
+                        registryEvents += "registered:$hyperlinkId:$uri"
+                    }
+
+                    override fun hyperlinkRemoved(hyperlinkId: Int) {
+                        registryEvents += "removed:$hyperlinkId"
+                    }
+                }
+            val sink = HostCommandAdapter(terminal, hostEvents, HostPolicy(maxHyperlinkEntries = 4))
+            val parser = TerminalParsers.create(sink)
+            repeat(4) { index ->
+                parser.accept("\u001B]8;id=$index;https://example.com/$index\u0007X".encodeToByteArray())
+            }
+            val oldIds = IntArray(4) { column -> requireNotNull(terminal.getAttrAt(column, 0)).hyperlinkId }
+            oldIds.forEachIndexed { index, id -> assertEquals("https://example.com/$index", sink.hyperlinkUri(id)) }
+            registryEvents.clear()
+
+            sink.setHostPolicy(HostPolicy(maxHyperlinkEntries = 1))
+            parser.accept("\u001B]8;id=new;https://example.com/new\u0007N".encodeToByteArray())
+            val newId = requireNotNull(terminal.getAttrAt(4, 0)).hyperlinkId
+
+            assertAll(
+                { oldIds.forEach { id -> assertNull(sink.hyperlinkUri(id), "Retained old hyperlink $id exceeds the lowered limit") } },
+                { assertEquals("https://example.com/new", sink.hyperlinkUri(newId)) },
+                {
+                    assertEquals(
+                        oldIds.map { "removed:$it" } + "registered:$newId:https://example.com/new",
+                        registryEvents,
+                    )
+                },
+            )
+        }
+
         @ParameterizedTest(name = "reset from alternate screen = {0}")
         @ValueSource(booleans = [false, true])
         fun `RIS never rebinds hyperlinks retained by mode 47`(resetFromAlternate: Boolean) {
@@ -2613,6 +2750,28 @@ class HostCommandAdapterTest {
             assertAll(
                 { assertEquals("icon-only-base", f.sink.iconTitle) },
                 { assertEquals("window-stays", f.sink.windowTitle) },
+            )
+        }
+
+        @Test
+        fun `title stack restores current public core titles after direct host mutation`() {
+            val f = Fixture()
+            f.acceptAscii("\u001B]0;application-title\u0007")
+            f.terminal.setWindowTitle("host-window")
+            f.terminal.setIconTitle("host-icon")
+
+            assertEquals("host-window", f.sink.windowTitle)
+            assertEquals("host-icon", f.sink.iconTitle)
+
+            f.acceptAscii("\u001B[22t\u001B]0;temporary-title\u0007\u001B[23t")
+
+            assertAll(
+                { assertEquals("host-window", f.terminal.windowTitle) },
+                { assertEquals("host-icon", f.terminal.iconTitle) },
+                { assertEquals("host-window", f.sink.windowTitle) },
+                { assertEquals("host-icon", f.sink.iconTitle) },
+                { assertEquals(listOf("application-title", "temporary-title", "host-window"), f.events.windowTitles) },
+                { assertEquals(listOf("application-title", "temporary-title", "host-icon"), f.events.iconTitles) },
             )
         }
 

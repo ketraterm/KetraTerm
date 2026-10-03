@@ -374,5 +374,11 @@ class TerminalWorkspaceShellIntegrationTest {
         }
 
     private val profile = TerminalProfile("host", "Host shell", listOf("unused-shell"))
-    private val options = TerminalWorkspaceOpenOptions(80, 24, false, 100)
+    private val options =
+        TerminalWorkspaceOpenOptions.create { draft ->
+            draft.columns = 80
+            draft.rows = 24
+            draft.treatAmbiguousAsWide = false
+            draft.maxHistory = 100
+        }
 }

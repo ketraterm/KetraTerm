@@ -48,7 +48,12 @@ open class TerminalScrollbarBenchmark {
     @Setup
     open fun setup() {
         overlay = TerminalScrollbarOverlay()
-        settings = SwingSettings(padding = SwingPadding(0, 4, 8, 10), fallbackFonts = persistentListOf(), useSystemFallbackFonts = false)
+        settings =
+            SwingSettings.create { draft ->
+                draft.padding = SwingPadding(0, 4, 8, 10)
+                draft.fallbackFonts = persistentListOf()
+                draft.useSystemFallbackFonts = false
+            }
         image = BufferedImage(110, 108, BufferedImage.TYPE_INT_ARGB)
         graphics = image.createGraphics()
         graphics.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_OFF)

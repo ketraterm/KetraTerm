@@ -18,6 +18,7 @@ package io.github.ketraterm.ui.swing.api
 import io.github.ketraterm.core.TerminalBuffers
 import io.github.ketraterm.core.api.TerminalBuffer
 import io.github.ketraterm.input.api.TerminalInputEncoder
+import io.github.ketraterm.input.api.TerminalInputEncoderFactory
 import io.github.ketraterm.input.event.TerminalFocusEvent
 import io.github.ketraterm.input.event.TerminalKeyEvent
 import io.github.ketraterm.input.event.TerminalMouseEvent
@@ -37,6 +38,8 @@ import io.github.ketraterm.transport.TerminalConnectorListener
 import io.github.ketraterm.ui.swing.settings.SwingSettings
 import io.github.ketraterm.ui.swing.settings.TerminalClipboardHandler
 import io.github.ketraterm.ui.swing.settings.TerminalTheme
+import io.github.ketraterm.ui.swing.suggestion.*
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.StandardTestDispatcher
 import org.junit.jupiter.api.Assertions.*
@@ -53,6 +56,7 @@ import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.atomic.AtomicReference
+import javax.swing.JPanel
 import javax.swing.SwingUtilities
 import kotlin.concurrent.thread
 
@@ -232,14 +236,14 @@ class SwingTerminalThreadingTest {
         val component =
             SwingTerminal(
                 hostServices =
-                    SwingHostServices(
-                        clipboardHandler =
+                    SwingHostServices.create { draft ->
+                        draft.clipboardHandler =
                             object : TerminalClipboardHandler {
                                 override fun copyText(text: String) = error("Unexpected clipboard write")
 
                                 override fun readText(): String = text
-                            },
-                    ),
+                            }
+                    },
             )
         try {
             session.start(columns = 3, rows = 1)
@@ -279,7 +283,10 @@ class SwingTerminalThreadingTest {
                 inputPolicy = TerminalInputPolicy(pasteLineEndingPolicy = PasteLineEndingPolicy.CARRIAGE_RETURN),
                 ioDispatcher = dispatcher,
             )
-        var settings = SwingSettings(pasteControlPolicy = PasteControlPolicy.STRIP_C0_EXCEPT_TAB_CR_LF)
+        var settings =
+            SwingSettings.create { draft ->
+                draft.pasteControlPolicy = PasteControlPolicy.STRIP_C0_EXCEPT_TAB_CR_LF
+            }
         val component = SwingTerminal(settingsProvider = { settings })
         val paste = TerminalPasteEvent("A\u0001\tB\r\nC\nD\rE")
         try {
@@ -295,7 +302,10 @@ class SwingTerminalThreadingTest {
                 session.encodePaste(paste)
                 dispatcher.scheduler.runCurrent()
                 assertEquals("\u001B[200~A\tB\r\nC\nD\rE\u001B[201~", output.toString(Charsets.UTF_8))
-                settings = settings.copy(pasteControlPolicy = PasteControlPolicy.PRESERVE)
+                settings =
+                    settings.copy { draft ->
+                        draft.pasteControlPolicy = PasteControlPolicy.PRESERVE
+                    }
                 component.reloadSettings()
                 output.reset()
                 session.encodePaste(paste)
@@ -334,23 +344,27 @@ class SwingTerminalThreadingTest {
                 ioDispatcher = dispatcher,
             )
         var settings =
-            SwingSettings(
-                palette =
+            SwingSettings.create { draft ->
+                draft.palette =
                     TerminalColorPalette(
                         defaultForeground = 0xff000000.toInt(),
                         defaultBackground = 0xffffffff.toInt(),
                         isDark = false,
-                    ),
-            )
+                    )
+            }
         val component = SwingTerminal(settingsProvider = { settings })
         val query = "\u001B[?996n".toByteArray(Charsets.US_ASCII)
         try {
+            session.start(3, 1)
             edtCall {
                 component.bind(session)
                 session.onBytes(query, 0, query.size)
                 dispatcher.scheduler.runCurrent()
                 assertEquals("\u001B[?997;2n", replies.toString(Charsets.US_ASCII))
-                settings = settings.copy(palette = TerminalTheme.NORD.createPalette())
+                settings =
+                    settings.copy { draft ->
+                        draft.palette = TerminalTheme.NORD.createPalette()
+                    }
                 component.reloadSettings()
                 assertEquals("\u001B[?997;2n", replies.toString(Charsets.US_ASCII))
                 session.onBytes(query, 0, query.size)
@@ -367,8 +381,16 @@ class SwingTerminalThreadingTest {
     @ValueSource(strings = ["select", "bind", "unbind"])
     fun `currentSelection snapshots state after queued EDT changes`(change: String) {
         val session = testSession()
-        session.renderPublisher.updateAndPublish(session)
-        val component = SwingTerminal(settingsProvider = { SwingSettings(columns = 3, rows = 1, cursorBlinkMillis = 0) })
+        session.requestRender(0)
+        dispatcher.scheduler.runCurrent()
+        val component =
+            SwingTerminal(settingsProvider = {
+                SwingSettings.create { draft ->
+                    draft.columns = 3
+                    draft.rows = 1
+                    draft.cursorBlinkMillis = 0
+                }
+            })
         val edtBlocked = CountDownLatch(1)
         val releaseEdt = CountDownLatch(1)
         val snapshotQueuedOrReturned = CountDownLatch(1)
@@ -449,6 +471,737 @@ class SwingTerminalThreadingTest {
         }
     }
 
+    @ParameterizedTest(name = "dispose completes cleanup after eligibility callback {0}")
+    @ValueSource(strings = ["failure", "cancellation"])
+    fun `dispose completes cleanup when an eligibility callback throws`(failureKind: String) {
+        val failure =
+            when (failureKind) {
+                "failure" -> IllegalStateException("host eligibility callback failed")
+                "cancellation" -> CancellationException("host eligibility callback cancelled")
+                else -> error("Unexpected failure kind $failureKind")
+            }
+        val session = focusSession(ByteArrayOutputStream())
+        val component =
+            edtCall {
+                SwingTerminal(settingsProvider = {
+                    SwingSettings.create { draft ->
+                        draft.smartSuggestionsEnabled = true
+                        draft.cursorBlinkMillis = 0
+                        draft.useSystemFallbackFonts = false
+                    }
+                })
+            }
+        var notifications = 0
+        val listener =
+            SwingShellSuggestionEligibilityListener { eligible ->
+                assertFalse(eligible)
+                notifications++
+                throw failure
+            }
+        try {
+            edtCall {
+                component.bind(session)
+                assertTrue(component.isAutomaticShellSuggestionEligible())
+                component.addShellSuggestionEligibilityListener(listener)
+                component.cursorTimer.start()
+                assertTrue(component.cursorTimer.isRunning)
+                assertTrue(component.isCoroutineScopeActive)
+
+                assertSame(failure, assertThrows(RuntimeException::class.java) { component.dispose() })
+                assertAll(
+                    { assertFalse(component.isCoroutineScopeActive, "Disposal must cancel the component scope despite host failure") },
+                    { assertFalse(component.cursorTimer.isRunning, "Disposal must stop the cursor timer despite host failure") },
+                    { assertFalse(session.isClosed, "Disposal must preserve the host-owned session") },
+                    { assertFalse(component.isAutomaticShellSuggestionEligible()) },
+                    { assertEquals(1, notifications) },
+                )
+
+                component.dispose()
+                assertEquals(1, notifications, "Repeated disposal must not notify the failing listener again")
+                assertFalse(component.isCoroutineScopeActive)
+                assertFalse(component.cursorTimer.isRunning)
+                assertFalse(session.isClosed)
+            }
+        } finally {
+            edtCall {
+                component.removeShellSuggestionEligibilityListener(listener)
+                component.cursorTimer.stop()
+                component.dispose()
+            }
+            session.close()
+            dispatcher.scheduler.runCurrent()
+        }
+    }
+
+    @Test
+    fun `disposal viewport callback observes committed eligibility and snapshot before eligibility notification`() {
+        var observeDisposal = false
+        val events = ArrayList<String>()
+        val cachedEligibility = ArrayList<Boolean>()
+        val callbackStates = ArrayList<TerminalViewportState>()
+        val observedSnapshots = ArrayList<TerminalViewportState>()
+        val eligibilityChanges = ArrayList<Pair<Boolean, Boolean>>()
+        lateinit var component: SwingTerminal
+        val viewportListener =
+            object : TerminalViewportListener {
+                override fun viewportChanged(
+                    historySize: Int,
+                    scrollbackOffset: Double,
+                    renderOffset: Int,
+                    visibleRows: Int,
+                    requestedRows: Int,
+                ) = Unit
+
+                override fun viewportStateChanged(state: TerminalViewportState) {
+                    if (observeDisposal) {
+                        events += "viewport-enter"
+                        callbackStates += state
+                        cachedEligibility += component.isAutomaticShellSuggestionEligible()
+                        observedSnapshots += component.viewportState()
+                        events += "viewport-exit"
+                    }
+                }
+            }
+        val session = focusSession(ByteArrayOutputStream())
+        component =
+            edtCall {
+                SwingTerminal(
+                    settingsProvider = {
+                        SwingSettings.create { draft ->
+                            draft.smartSuggestionsEnabled = true
+                            draft.cursorBlinkMillis = 0
+                            draft.useSystemFallbackFonts = false
+                        }
+                    },
+                    hostServices =
+                        SwingHostServices.create { draft ->
+                            draft.viewportListener = viewportListener
+                        },
+                )
+            }
+        val eligibilityListener =
+            SwingShellSuggestionEligibilityListener { eligible ->
+                events += "eligibility"
+                eligibilityChanges += eligible to component.isAutomaticShellSuggestionEligible()
+            }
+        try {
+            edtCall {
+                component.bind(session)
+                assertTrue(component.isAutomaticShellSuggestionEligible())
+                component.addShellSuggestionEligibilityListener(eligibilityListener)
+                observeDisposal = true
+
+                component.dispose()
+
+                assertAll(
+                    { assertEquals(listOf(false), cachedEligibility) },
+                    { assertEquals(1, callbackStates.size) },
+                    { assertEquals(callbackStates, observedSnapshots) },
+                    { assertEquals(listOf("viewport-enter", "viewport-exit", "eligibility"), events) },
+                    { assertEquals(listOf(false to false), eligibilityChanges) },
+                    { assertFalse(component.isCoroutineScopeActive) },
+                    { assertFalse(session.isClosed) },
+                )
+            }
+        } finally {
+            edtCall {
+                observeDisposal = false
+                component.removeShellSuggestionEligibilityListener(eligibilityListener)
+                component.dispose()
+            }
+            session.close()
+            dispatcher.scheduler.runCurrent()
+        }
+    }
+
+    @Test
+    fun `reentrant disposal stops stale eligibility notification to later listeners`() {
+        var currentSettings =
+            SwingSettings.create { draft ->
+                draft.smartSuggestionsEnabled = false
+                draft.cursorBlinkMillis = 0
+                draft.useSystemFallbackFonts = false
+            }
+        val firstChanges = ArrayList<Pair<Boolean, Boolean>>()
+        val laterChanges = ArrayList<Pair<Boolean, Boolean>>()
+        val session = focusSession(ByteArrayOutputStream())
+        val component = edtCall { SwingTerminal(settingsProvider = { currentSettings }) }
+        val disposingListener =
+            SwingShellSuggestionEligibilityListener { eligible ->
+                firstChanges += eligible to component.isAutomaticShellSuggestionEligible()
+                if (eligible) component.dispose()
+            }
+        val laterListener =
+            SwingShellSuggestionEligibilityListener { eligible ->
+                laterChanges += eligible to component.isAutomaticShellSuggestionEligible()
+            }
+        try {
+            edtCall {
+                component.bind(session)
+                assertFalse(component.isAutomaticShellSuggestionEligible())
+                component.addShellSuggestionEligibilityListener(disposingListener)
+                component.addShellSuggestionEligibilityListener(laterListener)
+                component.cursorTimer.start()
+                assertTrue(component.cursorTimer.isRunning)
+                currentSettings =
+                    currentSettings.copy { draft ->
+                        draft.smartSuggestionsEnabled = true
+                    }
+
+                component.reloadSettings()
+
+                assertAll(
+                    { assertEquals(listOf(true to true, false to false), firstChanges) },
+                    { assertEquals(listOf(false to false), laterChanges) },
+                    { assertFalse(component.isAutomaticShellSuggestionEligible()) },
+                    { assertFalse(component.isCoroutineScopeActive) },
+                    { assertFalse(component.cursorTimer.isRunning) },
+                    { assertFalse(session.isClosed) },
+                )
+            }
+        } finally {
+            edtCall {
+                component.removeShellSuggestionEligibilityListener(disposingListener)
+                component.removeShellSuggestionEligibilityListener(laterListener)
+                component.cursorTimer.stop()
+                component.dispose()
+            }
+            session.close()
+            dispatcher.scheduler.runCurrent()
+        }
+    }
+
+    @ParameterizedTest(name = "dispose publishes ineligibility after viewport callback {0}")
+    @ValueSource(strings = ["failure", "cancellation"])
+    fun `dispose publishes ineligibility when a viewport callback throws`(failureKind: String) {
+        val failure =
+            when (failureKind) {
+                "failure" -> IllegalStateException("host viewport callback failed")
+                "cancellation" -> CancellationException("host viewport callback cancelled")
+                else -> error("Unexpected failure kind $failureKind")
+            }
+        var failViewportUpdates = false
+        var notifications = 0
+        val session = focusSession(ByteArrayOutputStream())
+        val component =
+            edtCall {
+                SwingTerminal(
+                    settingsProvider = {
+                        SwingSettings.create { draft ->
+                            draft.smartSuggestionsEnabled = true
+                            draft.cursorBlinkMillis = 0
+                            draft.useSystemFallbackFonts = false
+                        }
+                    },
+                    hostServices =
+                        SwingHostServices.create { draft ->
+                            draft.viewportListener =
+                                TerminalViewportListener { _, _, _, _, _ ->
+                                    if (failViewportUpdates) {
+                                        notifications++
+                                        throw failure
+                                    }
+                                }
+                        },
+                )
+            }
+        try {
+            edtCall {
+                component.bind(session)
+                assertTrue(component.isAutomaticShellSuggestionEligible())
+                component.cursorTimer.start()
+                assertTrue(component.cursorTimer.isRunning)
+                assertTrue(component.isCoroutineScopeActive)
+                failViewportUpdates = true
+
+                assertSame(failure, assertThrows(RuntimeException::class.java) { component.dispose() })
+                assertEquals(1, notifications)
+                component.dispose()
+
+                assertAll(
+                    {
+                        assertFalse(
+                            component.isAutomaticShellSuggestionEligible(),
+                            "Disposal must publish ineligibility despite viewport failure",
+                        )
+                    },
+                    { assertFalse(component.isCoroutineScopeActive, "Disposal must cancel the component scope despite viewport failure") },
+                    { assertFalse(component.cursorTimer.isRunning, "Disposal must stop the cursor timer despite viewport failure") },
+                    { assertFalse(session.isClosed, "Disposal must preserve the host-owned session") },
+                    { assertEquals(1, notifications, "Repeated disposal must not invoke the failing viewport callback again") },
+                    { assertTrue(failure.suppressed.isEmpty()) },
+                )
+            }
+        } finally {
+            edtCall {
+                failViewportUpdates = false
+                component.cursorTimer.stop()
+                component.dispose()
+            }
+            session.close()
+            dispatcher.scheduler.runCurrent()
+        }
+    }
+
+    @Test
+    fun `dispose preserves viewport failure and suppresses the first eligibility listener failure`() {
+        val viewportFailure = IllegalStateException("host viewport callback failed")
+        val eligibilityFailure = IllegalArgumentException("host eligibility callback failed")
+        var failViewportUpdates = false
+        var laterNotifications = 0
+        val events = ArrayList<String>()
+        val eligibilityListener =
+            SwingShellSuggestionEligibilityListener { eligible ->
+                assertFalse(eligible)
+                events += "eligibility"
+                throw eligibilityFailure
+            }
+        val laterListener = SwingShellSuggestionEligibilityListener { laterNotifications++ }
+        val session = focusSession(ByteArrayOutputStream())
+        val component =
+            edtCall {
+                SwingTerminal(
+                    settingsProvider = {
+                        SwingSettings.create { draft ->
+                            draft.smartSuggestionsEnabled = true
+                            draft.cursorBlinkMillis = 0
+                            draft.useSystemFallbackFonts = false
+                        }
+                    },
+                    hostServices =
+                        SwingHostServices.create { draft ->
+                            draft.viewportListener =
+                                TerminalViewportListener { _, _, _, _, _ ->
+                                    if (failViewportUpdates) {
+                                        events += "viewport"
+                                        throw viewportFailure
+                                    }
+                                }
+                        },
+                )
+            }
+        try {
+            edtCall {
+                component.bind(session)
+                assertTrue(component.isAutomaticShellSuggestionEligible())
+                component.addShellSuggestionEligibilityListener(eligibilityListener)
+                component.addShellSuggestionEligibilityListener(laterListener)
+                component.cursorTimer.start()
+                assertTrue(component.cursorTimer.isRunning)
+                assertTrue(component.isCoroutineScopeActive)
+                failViewportUpdates = true
+
+                val thrown = assertThrows(IllegalStateException::class.java) { component.dispose() }
+
+                assertSame(viewportFailure, thrown)
+                assertAll(
+                    { assertEquals(listOf("viewport", "eligibility"), events) },
+                    { assertEquals(1, thrown.suppressed.size) },
+                    { assertSame(eligibilityFailure, thrown.suppressed.single()) },
+                    { assertEquals(0, laterNotifications, "Eligibility dispatch must stop at the first failing listener") },
+                    { assertFalse(component.isAutomaticShellSuggestionEligible()) },
+                    { assertFalse(component.isCoroutineScopeActive) },
+                    { assertFalse(component.cursorTimer.isRunning) },
+                    { assertFalse(session.isClosed, "Disposal must preserve the host-owned session") },
+                )
+            }
+        } finally {
+            edtCall {
+                failViewportUpdates = false
+                component.removeShellSuggestionEligibilityListener(eligibilityListener)
+                component.removeShellSuggestionEligibilityListener(laterListener)
+                component.cursorTimer.stop()
+                component.dispose()
+            }
+            session.close()
+            dispatcher.scheduler.runCurrent()
+        }
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = [false, true])
+    fun `dispose releases custom view and scope despite multiple callback failures`(cancelled: Boolean) {
+        val first = if (cancelled) CancellationException("hide cancelled") else IllegalStateException("hide failed")
+        val eligibilityFailure = IllegalArgumentException("eligibility failed")
+        val closeFailure = IllegalStateException("close failed")
+        var failUpdates = false
+        var closes = 0
+        val view =
+            object : SwingShellSuggestionView {
+                override val component = JPanel()
+
+                override fun update(snapshot: SwingShellSuggestionViewSnapshot) {
+                    if (failUpdates) throw first
+                }
+
+                override fun close() {
+                    closes++
+                    throw closeFailure
+                }
+            }
+        val session = focusSession(ByteArrayOutputStream())
+        val component =
+            edtCall {
+                SwingTerminal(
+                    settingsProvider = {
+                        SwingSettings.create { draft ->
+                            draft.smartSuggestionsEnabled = true
+                            draft.cursorBlinkMillis = 0
+                            draft.useSystemFallbackFonts = false
+                        }
+                    },
+                    hostServices =
+                        SwingHostServices.create { draft ->
+                            draft.shellSuggestionViewFactory = { view }
+                        },
+                )
+            }
+        try {
+            edtCall {
+                component.bind(session)
+                component.showShellSuggestions(
+                    SwingShellSuggestionRequest.EMPTY,
+                    listOf(SwingShellSuggestion("test", 0, 0, "test", "COMMAND")),
+                )
+                assertTrue(component.currentShellSuggestionState().visible)
+                component.addShellSuggestionEligibilityListener { eligible ->
+                    assertFalse(eligible)
+                    throw eligibilityFailure
+                }
+                component.cursorTimer.start()
+                failUpdates = true
+
+                assertSame(first, assertThrows(RuntimeException::class.java) { component.dispose() })
+                assertEquals(2, first.suppressed.size)
+                assertSame(eligibilityFailure, first.suppressed[0])
+                assertSame(closeFailure, first.suppressed[1])
+                assertFalse(component.isCoroutineScopeActive)
+                assertFalse(component.cursorTimer.isRunning)
+                assertFalse(component.isAutomaticShellSuggestionEligible())
+                assertFalse(component.currentShellSuggestionState().visible)
+                assertFalse(view.component.isVisible)
+                assertFalse(session.isClosed)
+                assertEquals(1, closes)
+
+                component.dispose()
+                assertEquals(1, closes, "Repeat disposal must not release the custom view twice")
+                assertEquals(2, first.suppressed.size)
+            }
+        } finally {
+            edtCall { component.dispose() }
+            session.close()
+            dispatcher.scheduler.runCurrent()
+        }
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = [false, true])
+    fun `reentrant custom view hiding or disposal supersedes an unfinished show`(dispose: Boolean) {
+        lateinit var terminal: SwingTerminal
+        var armed = true
+        var closes = 0
+        var updatesAfterClose = 0
+        val view =
+            object : SwingShellSuggestionView {
+                override val component = JPanel()
+
+                override fun update(snapshot: SwingShellSuggestionViewSnapshot) {
+                    if (closes > 0) updatesAfterClose++
+                    if (armed && snapshot.visibleSuggestions.isNotEmpty()) {
+                        armed = false
+                        if (dispose) terminal.dispose() else terminal.hideShellSuggestions()
+                    }
+                }
+
+                override fun close() {
+                    closes++
+                }
+            }
+        terminal =
+            edtCall {
+                SwingTerminal(
+                    settingsProvider = {
+                        SwingSettings.create { draft ->
+                            draft.smartSuggestionsEnabled = true
+                            draft.cursorBlinkMillis = 0
+                            draft.useSystemFallbackFonts = false
+                        }
+                    },
+                    hostServices =
+                        SwingHostServices.create { draft ->
+                            draft.shellSuggestionViewFactory = { view }
+                        },
+                )
+            }
+        try {
+            edtCall {
+                val suggestion = SwingShellSuggestion("test", 0, 0, "test", "COMMAND")
+                terminal.showShellSuggestions(SwingShellSuggestionRequest.EMPTY, listOf(suggestion))
+
+                assertAll(
+                    { assertFalse(armed, "The host view must perform the reentrant transition during show") },
+                    { assertFalse(view.component.isVisible, "An older show must not make the hidden or disposed view visible again") },
+                    { assertEquals(SwingShellSuggestionState.EMPTY, terminal.currentShellSuggestionState()) },
+                    { assertEquals(if (dispose) 1 else 0, closes) },
+                    { assertEquals(0, updatesAfterClose, "The disposed host view must not receive later presentation updates") },
+                    { assertEquals(!dispose, terminal.isCoroutineScopeActive) },
+                )
+
+                terminal.showShellSuggestions(SwingShellSuggestionRequest.EMPTY, listOf(suggestion))
+                assertEquals(!dispose, view.component.isVisible, "Hiding permits reuse; disposal rejects later show requests")
+                assertEquals(0, updatesAfterClose)
+            }
+        } finally {
+            edtCall { terminal.dispose() }
+            dispatcher.scheduler.runCurrent()
+        }
+    }
+
+    @Test
+    fun `unbind clears the session and permits rebinding after a custom view failure`() {
+        val failure = IllegalStateException("hide failed")
+        var failUpdates = false
+        val view =
+            object : SwingShellSuggestionView {
+                override val component = JPanel()
+
+                override fun update(snapshot: SwingShellSuggestionViewSnapshot) {
+                    if (failUpdates) throw failure
+                }
+            }
+        val output = ByteArrayOutputStream()
+        val session = focusSession(output)
+        val component =
+            edtCall {
+                SwingTerminal(
+                    settingsProvider = {
+                        SwingSettings.create { draft ->
+                            draft.smartSuggestionsEnabled = true
+                            draft.cursorBlinkMillis = 0
+                            draft.useSystemFallbackFonts = false
+                        }
+                    },
+                    hostServices =
+                        SwingHostServices.create { draft ->
+                            draft.shellSuggestionViewFactory = { view }
+                        },
+                )
+            }
+        try {
+            edtCall {
+                component.bind(session)
+                component.showShellSuggestions(
+                    SwingShellSuggestionRequest.EMPTY,
+                    listOf(SwingShellSuggestion("test", 0, 0, "test", "COMMAND")),
+                )
+                failUpdates = true
+                assertSame(failure, assertThrows(IllegalStateException::class.java) { component.unbind() })
+                assertTrue(component.isCoroutineScopeActive)
+                assertFalse(session.isClosed)
+                assertFalse(view.component.isVisible, "Unbinding must hide the previous session's popup despite an update failure")
+                component.clearScreen()
+            }
+            dispatcher.scheduler.runCurrent()
+            assertEquals(0, output.size(), "An unbound component must no longer send input to the previous session")
+            edtCall {
+                failUpdates = false
+                component.bind(session)
+                component.clearScreen()
+            }
+            dispatcher.scheduler.runCurrent()
+            assertArrayEquals(byteArrayOf(0x0C), output.toByteArray(), "Rebinding must restore normal input")
+        } finally {
+            edtCall {
+                failUpdates = false
+                component.dispose()
+            }
+            session.close()
+            dispatcher.scheduler.runCurrent()
+        }
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = [false, true])
+    fun `disabling suggestions publishes ineligibility despite a custom view failure`(cancelled: Boolean) {
+        val failure = if (cancelled) CancellationException("hide cancelled") else IllegalStateException("hide failed")
+        var failUpdates = false
+        var currentSettings =
+            SwingSettings.create { draft ->
+                draft.smartSuggestionsEnabled = true
+                draft.cursorBlinkMillis = 0
+                draft.useSystemFallbackFonts = false
+            }
+        val visibleDuringCallback = ArrayList<Boolean>()
+        val eligibilityChanges = ArrayList<Boolean>()
+        val view =
+            object : SwingShellSuggestionView {
+                override val component = JPanel()
+
+                override fun update(snapshot: SwingShellSuggestionViewSnapshot) {
+                    if (failUpdates) throw failure
+                }
+            }
+        val component =
+            edtCall {
+                SwingTerminal(
+                    settingsProvider = { currentSettings },
+                    hostServices =
+                        SwingHostServices.create { draft ->
+                            draft.shellSuggestionViewFactory = { view }
+                        },
+                )
+            }
+        try {
+            edtCall {
+                component.showShellSuggestions(
+                    SwingShellSuggestionRequest.EMPTY,
+                    listOf(SwingShellSuggestion("test", 0, 0, "test", "COMMAND")),
+                )
+                assertTrue(view.component.isVisible)
+                component.addShellSuggestionEligibilityListener { eligible ->
+                    assertEquals(eligible, component.isAutomaticShellSuggestionEligible())
+                    eligibilityChanges += eligible
+                    visibleDuringCallback += view.component.isVisible
+                }
+                currentSettings =
+                    currentSettings.copy { draft ->
+                        draft.smartSuggestionsEnabled = false
+                    }
+                failUpdates = true
+
+                assertSame(failure, assertThrows(RuntimeException::class.java) { component.reloadSettings() })
+
+                assertFalse(component.isAutomaticShellSuggestionEligible())
+                assertFalse(view.component.isVisible)
+                assertEquals(listOf(false), eligibilityChanges)
+                assertEquals(listOf(false), visibleDuringCallback, "Physical hiding must precede eligibility notification")
+                assertTrue(component.isCoroutineScopeActive)
+                assertTrue(failure.suppressed.isEmpty())
+
+                failUpdates = false
+                currentSettings =
+                    currentSettings.copy { draft ->
+                        draft.smartSuggestionsEnabled = true
+                    }
+                component.reloadSettings()
+                assertTrue(component.isAutomaticShellSuggestionEligible())
+                assertEquals(listOf(false, true), eligibilityChanges)
+                assertEquals(listOf(false, false), visibleDuringCallback)
+            }
+        } finally {
+            edtCall {
+                failUpdates = false
+                component.dispose()
+            }
+        }
+    }
+
+    @Test
+    fun `disabling suggestions hides the view before a reentrant viewport query from its empty update`() {
+        var currentSettings =
+            SwingSettings.create { draft ->
+                draft.smartSuggestionsEnabled = true
+                draft.cursorBlinkMillis = 0
+                draft.useSystemFallbackFonts = false
+            }
+        var observeEmptyUpdates = false
+        var emptyUpdates = 0
+        var nonEmptyUpdates = 0
+        var viewportQueries = 0
+        var createdViews = 0
+        var closes = 0
+        val visibleDuringUpdate = ArrayList<Boolean>()
+        val eligibilityDuringUpdate = ArrayList<Boolean>()
+        lateinit var terminalComponent: SwingTerminal
+        val view =
+            object : SwingShellSuggestionView {
+                override val component = JPanel()
+
+                override fun update(snapshot: SwingShellSuggestionViewSnapshot) {
+                    if (snapshot.visibleSuggestions.isNotEmpty()) {
+                        nonEmptyUpdates++
+                    } else if (observeEmptyUpdates) {
+                        emptyUpdates++
+                        visibleDuringUpdate += component.isVisible
+                        eligibilityDuringUpdate += terminalComponent.isAutomaticShellSuggestionEligible()
+                        if (viewportQueries == 0) {
+                            viewportQueries++
+                            terminalComponent.viewportState()
+                        }
+                    }
+                }
+
+                override fun close() {
+                    closes++
+                }
+            }
+        terminalComponent =
+            edtCall {
+                SwingTerminal(
+                    settingsProvider = { currentSettings },
+                    hostServices =
+                        SwingHostServices.create { draft ->
+                            draft.shellSuggestionViewFactory = {
+                                createdViews++
+                                view
+                            }
+                        },
+                )
+            }
+        try {
+            edtCall {
+                terminalComponent.showShellSuggestions(
+                    SwingShellSuggestionRequest.EMPTY,
+                    listOf(SwingShellSuggestion("test", 0, 0, "test", "COMMAND")),
+                )
+                terminalComponent.viewportState()
+                assertTrue(view.component.isVisible)
+                assertTrue(terminalComponent.isAutomaticShellSuggestionEligible())
+                assertEquals(1, nonEmptyUpdates)
+                observeEmptyUpdates = true
+                currentSettings =
+                    currentSettings.copy { draft ->
+                        draft.smartSuggestionsEnabled = false
+                    }
+
+                terminalComponent.reloadSettings()
+
+                assertAll(
+                    { assertEquals(1, emptyUpdates, "The reentrant viewport query must not repeat the final empty update") },
+                    { assertEquals(1, viewportQueries) },
+                    { assertEquals(listOf(false), visibleDuringUpdate) },
+                    { assertEquals(listOf(false), eligibilityDuringUpdate) },
+                    { assertFalse(view.component.isVisible) },
+                    { assertFalse(terminalComponent.isAutomaticShellSuggestionEligible()) },
+                    { assertTrue(terminalComponent.isCoroutineScopeActive) },
+                    { assertEquals(0, closes, "Disabling suggestions must retain the reusable host view") },
+                )
+
+                observeEmptyUpdates = false
+                currentSettings =
+                    currentSettings.copy { draft ->
+                        draft.smartSuggestionsEnabled = true
+                    }
+                terminalComponent.reloadSettings()
+                terminalComponent.showShellSuggestions(
+                    SwingShellSuggestionRequest.EMPTY,
+                    listOf(SwingShellSuggestion("again", 0, 0, "test", "COMMAND")),
+                )
+                assertTrue(view.component.isVisible)
+                assertTrue(terminalComponent.currentShellSuggestionState().visible)
+                assertEquals(2, nonEmptyUpdates)
+                assertEquals(1, createdViews, "Re-enabling must reuse the same host view")
+                assertEquals(0, closes)
+                assertTrue(terminalComponent.isCoroutineScopeActive)
+            }
+        } finally {
+            edtCall {
+                observeEmptyUpdates = false
+                terminalComponent.dispose()
+            }
+        }
+    }
+
     @Test
     fun `routine frame consumption never reads the session on the EDT`() {
         val terminal = TerminalBuffers.create(width = 3, height = 1, maxHistory = 5)
@@ -462,7 +1215,7 @@ class SwingTerminalThreadingTest {
                 responseReader = terminal,
                 connector = NoOpConnector,
                 parser = NoOpParser,
-                inputEncoder = NoOpInputEncoder,
+                inputEncoderFactory = TerminalInputEncoderFactory { _, _, _ -> object : TerminalInputEncoder by NoOpInputEncoder {} },
             )
         val component = SwingTerminal()
 
@@ -534,9 +1287,9 @@ class SwingTerminalThreadingTest {
         val component =
             SwingTerminal(
                 hostServices =
-                    SwingHostServices(
-                        uiDispatcher = dispatcher,
-                    ),
+                    SwingHostServices.create { draft ->
+                        draft.uiDispatcher = dispatcher
+                    },
             )
         withEdtBlocked {
             runOffEdt {
@@ -579,11 +1332,11 @@ class SwingTerminalThreadingTest {
                 if (calls.incrementAndGet() > 1) {
                     reloadCalledOnEdt.set(SwingUtilities.isEventDispatchThread())
                 }
-                SwingSettings(
-                    font = Font(Font.MONOSPACED, Font.PLAIN, 18),
-                    columns = 100,
-                    rows = 30,
-                )
+                SwingSettings.create { draft ->
+                    draft.font = Font(Font.MONOSPACED, Font.PLAIN, 18)
+                    draft.columns = 100
+                    draft.rows = 30
+                }
             })
 
         runOffEdt {
@@ -645,7 +1398,9 @@ class SwingTerminalThreadingTest {
         val session = testSession()
         val component =
             SwingTerminal(settingsProvider = {
-                SwingSettings(treatAmbiguousAsWide = true)
+                SwingSettings.create { draft ->
+                    draft.treatAmbiguousAsWide = true
+                }
             })
 
         component.bind(session)
@@ -661,7 +1416,9 @@ class SwingTerminalThreadingTest {
         var ambiguousAsWide = false
         val component =
             SwingTerminal(settingsProvider = {
-                SwingSettings(treatAmbiguousAsWide = ambiguousAsWide)
+                SwingSettings.create { draft ->
+                    draft.treatAmbiguousAsWide = ambiguousAsWide
+                }
             })
 
         component.bind(session)
@@ -727,7 +1484,10 @@ class SwingTerminalThreadingTest {
                 session.onBytes(output, 0, output.size)
 
                 component.reloadSettings()
-                settings = settings.copy(visualBellEnabled = !settings.visualBellEnabled)
+                settings =
+                    settings.copy { draft ->
+                        draft.visualBellEnabled = !settings.visualBellEnabled
+                    }
                 component.reloadSettings()
 
                 session.readRenderFrame { frame ->
@@ -759,7 +1519,11 @@ class SwingTerminalThreadingTest {
                     assertEquals(TerminalRenderCursorShape.BAR, frame.cursor.shape)
                     assertEquals(0xFF123456.toInt(), frame.palette.indexedColor(1))
                 }
-                settings = settings.copy(palette = TerminalTheme.NORD.createPalette(), cursorShape = TerminalRenderCursorShape.UNDERLINE)
+                settings =
+                    settings.copy { draft ->
+                        draft.palette = TerminalTheme.NORD.createPalette()
+                        draft.cursorShape = TerminalRenderCursorShape.UNDERLINE
+                    }
 
                 component.reloadSettings()
 
@@ -778,7 +1542,10 @@ class SwingTerminalThreadingTest {
     fun `font size changes resize the grid but paint preferences do not`() {
         val connector = RecordingConnector()
         val session = testSession(connector)
-        var settings = SwingSettings(font = Font(Font.MONOSPACED, Font.PLAIN, 14))
+        var settings =
+            SwingSettings.create { draft ->
+                draft.font = Font(Font.MONOSPACED, Font.PLAIN, 14)
+            }
         val component = SwingTerminal(settingsProvider = { settings })
         try {
             edtCall {
@@ -789,12 +1556,18 @@ class SwingTerminalThreadingTest {
             connector.reset()
             edtCall {
                 val originalGrid = component.visibleGridSize()
-                settings = settings.copy(selectionBackground = 0xFF123456.toInt())
+                settings =
+                    settings.copy { draft ->
+                        draft.selectionBackground = 0xFF123456.toInt()
+                    }
                 component.reloadSettings()
                 assertEquals(originalGrid, component.visibleGridSize())
                 assertEquals(0, connector.resizeCount.get())
 
-                settings = settings.copy(font = settings.font.deriveFont(28f))
+                settings =
+                    settings.copy { draft ->
+                        draft.font = settings.font.deriveFont(28f)
+                    }
                 component.reloadSettings()
                 assertTrue(component.visibleGridSize().width < originalGrid.width)
                 assertTrue(component.visibleGridSize().height < originalGrid.height)
@@ -843,7 +1616,7 @@ class SwingTerminalThreadingTest {
             responseReader = terminal,
             connector = connector,
             parser = NoOpParser,
-            inputEncoder = NoOpInputEncoder,
+            inputEncoderFactory = { _, _, _ -> object : TerminalInputEncoder by NoOpInputEncoder {} },
             workerDispatcher = dispatcher,
         )
 
@@ -1013,6 +1786,8 @@ class SwingTerminalThreadingTest {
     }
 
     private object NoOpInputEncoder : TerminalInputEncoder {
+        override fun setInputPolicy(policy: TerminalInputPolicy) = Unit
+
         override fun encodeKey(event: TerminalKeyEvent) = Unit
 
         override fun encodePaste(event: TerminalPasteEvent) = Unit

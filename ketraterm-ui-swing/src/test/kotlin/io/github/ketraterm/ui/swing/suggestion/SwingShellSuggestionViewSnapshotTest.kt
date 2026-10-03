@@ -75,6 +75,37 @@ class SwingShellSuggestionViewSnapshotTest {
         }
     }
 
+    @Test
+    fun `rejects viewport bounds whose end exceeds the integer range`() {
+        val suggestions = List(2) { suggestion("candidate-$it") }
+
+        assertThrows(IllegalArgumentException::class.java) {
+            SwingShellSuggestionViewSnapshot.create(
+                visibleSuggestions = suggestions,
+                selectedIndex = 1,
+                viewportStartIndex = Int.MAX_VALUE,
+                totalSuggestionCount = Int.MAX_VALUE,
+            )
+        }
+    }
+
+    @Test
+    fun `accepts a viewport ending at the largest supported total`() {
+        val suggestions = List(2) { suggestion("candidate-$it") }
+        val snapshot =
+            SwingShellSuggestionViewSnapshot.create(
+                visibleSuggestions = suggestions,
+                selectedIndex = 1,
+                viewportStartIndex = Int.MAX_VALUE - suggestions.size,
+                totalSuggestionCount = Int.MAX_VALUE,
+            )
+
+        assertEquals(Int.MAX_VALUE - 1, snapshot.absoluteSelectedIndex)
+        assertSame(suggestions[1], snapshot.selectedSuggestion)
+        assertTrue(snapshot.hasSuggestionsBefore)
+        assertFalse(snapshot.hasSuggestionsAfter)
+    }
+
     private fun suggestion(displayText: String): SwingShellSuggestion =
         SwingShellSuggestion(
             replacementText = displayText,

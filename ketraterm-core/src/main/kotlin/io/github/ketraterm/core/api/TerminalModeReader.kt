@@ -16,11 +16,13 @@
 package io.github.ketraterm.core.api
 
 /**
- * Immutable snapshot of the terminal's durable mode state.
+ * Immutable snapshot of the published typed mode subset listed by this constructor.
  *
  * This is the handoff contract for parser, input, and UI layers that need to
  * read mode flags without mutating the core's internal `TerminalModes`
- * instance.
+ * instance. This is not an inventory of all terminal state: DECCOLM and the
+ * additional xterm key resources, for example, are available in the packed word
+ * but are not constructor fields. Future state families need not extend this type.
  *
  * @property isInsertMode `true` when insert mode (IRM) is active, `false` for replace mode.
  * @property isAutoWrap `true` when DECAWM auto-wrap mode is active.
@@ -84,13 +86,15 @@ public data class TerminalModeSnapshot(
  */
 public interface TerminalModeReader : TerminalInputState {
     /**
-     * Returns one atomic packed snapshot of durable mode state.
+     * Returns one atomic snapshot of the published packed mode subset.
      *
-     * The current bit layout is owned by core and should be treated as opaque
-     * outside optimized input/render handoff code. General callers should
-     * prefer [getModeSnapshot].
+     * [TerminalModeBits] and [TerminalInputState] helpers define its published
+     * fields. Existing numeric meanings are stable; unassigned bits must be
+     * ignored by readers. This finite word does not promise to contain every
+     * future terminal mode. General callers may prefer [getModeSnapshot] for
+     * the typed subset it exposes.
      *
-     * @return A packed 64-bit word containing a snapshot of all active modes.
+     * @return A coherent 64-bit snapshot of the published packed mode subset.
      */
     public fun getModeBitsSnapshot(): Long
 
@@ -105,7 +109,7 @@ public interface TerminalModeReader : TerminalInputState {
     override fun getInputModeBits(): Long = getModeBitsSnapshot()
 
     /**
-     * Returns an immutable snapshot of the current durable mode flags.
+     * Returns an immutable snapshot of the published [TerminalModeSnapshot] fields.
      *
      * Additional xterm key resources are read through [TerminalInputState.keyModifierOption]
      * and [TerminalInputState.keyFormatOption] from [getInputModeBits].

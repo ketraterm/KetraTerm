@@ -15,6 +15,7 @@
  */
 package io.github.ketraterm.app.ui
 
+import io.github.ketraterm.ui.swing.host.SwingTerminalSearchColors
 import java.awt.Color
 import javax.swing.UIManager
 import kotlin.math.pow
@@ -70,6 +71,24 @@ private data class ChromeColors(
  */
 internal object Chrome {
     const val APP_TITLE = "KetraTerm"
+
+    fun searchColors(): SwingTerminalSearchColors =
+        SwingTerminalSearchColors.create {
+            it.panelBackground = popupBackground
+            it.panelBorder = border
+            it.foreground = ensureContrast(textPrimary, controlBackground, MINIMUM_TEXT_CONTRAST)
+            it.counterForeground = ensureContrast(textSecondary, popupBackground, MINIMUM_TEXT_CONTRAST)
+            it.textFieldBackground = controlBackground
+            it.textFieldBorder = border
+            it.textFieldFocusBorder = accent
+            it.textFieldPlaceholder = ensureContrast(textSecondary, controlBackground, MINIMUM_TEXT_CONTRAST)
+            it.searchIconForeground = ensureContrast(controlText, controlBackground, MINIMUM_TEXT_CONTRAST)
+            it.buttonHoverBackground = controlHover
+            it.buttonPressedBackground = controlPressed
+            it.buttonSelectedBackground = accent
+            it.buttonSelectedForeground =
+                if (contrastRatio(Color.BLACK, accent) >= contrastRatio(Color.WHITE, accent)) Color.BLACK else Color.WHITE
+        }
 
     /** Root window background and deep surface. */
     val surface: Color

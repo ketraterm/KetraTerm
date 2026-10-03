@@ -42,13 +42,13 @@ class GridPainterTest {
         val graphics = image.createGraphics()
         val presentation = SwingHyperlinkPresentation(normal = SwingHyperlinkStyle(backgroundArgb = BLUE), isVisible = true)
         val settings =
-            SwingSettings(
-                padding = SwingPadding(0, 0, 0, 0),
-                shellIntegrationDecorationGutterWidth = 0,
-                palette = TerminalColorPalette(defaultForeground = WHITE, defaultBackground = BLACK),
-                selectionBackground = RED,
-                osc8HyperlinkPresentation = if (osc8) presentation else null,
-            )
+            SwingSettings.create { draft ->
+                draft.padding = SwingPadding(0, 0, 0, 0)
+                draft.shellIntegrationDecorationGutterWidth = 0
+                draft.palette = TerminalColorPalette(defaultForeground = WHITE, defaultBackground = BLACK)
+                draft.selectionBackground = RED
+                draft.osc8HyperlinkPresentation = if (osc8) presentation else null
+            }
         val metrics = SwingMetrics.from(graphics.getFontMetrics(settings.font))
         val cache = TerminalRenderCache(3, 1).apply { updateFrom(TextFrame("   ", false, palette = settings.palette)) }
         val presentations = Array<SwingHyperlinkPresentation?>(cache.columns) { presentation }
@@ -79,10 +79,10 @@ class GridPainterTest {
         val image = BufferedImage(100, 40, BufferedImage.TYPE_INT_ARGB)
         val g = image.createGraphics()
         val settings =
-            SwingSettings(
-                palette = TerminalColorPalette(defaultForeground = WHITE, defaultBackground = BLACK),
-                selectionBackground = RED,
-            )
+            SwingSettings.create { draft ->
+                draft.palette = TerminalColorPalette(defaultForeground = WHITE, defaultBackground = BLACK)
+                draft.selectionBackground = RED
+            }
         val metrics = SwingMetrics.from(g.getFontMetrics(settings.font))
         val cache = TerminalRenderCache(columns = 2, rows = 1)
         cache.updateFrom(TextFrame("  ", false, palette = settings.palette, activeBuffer = TerminalRenderBufferKind.ALTERNATE))
@@ -111,17 +111,17 @@ class GridPainterTest {
         val image = BufferedImage(80, 30, BufferedImage.TYPE_INT_ARGB)
         val g = image.createGraphics()
         val settings =
-            SwingSettings(
-                font = Font(Font.MONOSPACED, Font.PLAIN, 14),
-                palette =
+            SwingSettings.create { draft ->
+                draft.font = Font(Font.MONOSPACED, Font.PLAIN, 14)
+                draft.palette =
                     TerminalColorPalette(
                         defaultForeground = RED,
                         defaultBackground = BLACK,
-                    ),
-                textAntialiasing = RenderingHints.VALUE_TEXT_ANTIALIAS_OFF,
-                padding = SwingPadding(0, 0, 0, 0),
-                shellIntegrationDecorationGutterWidth = 0,
-            )
+                    )
+                draft.textAntialiasing = RenderingHints.VALUE_TEXT_ANTIALIAS_OFF
+                draft.padding = SwingPadding(0, 0, 0, 0)
+                draft.shellIntegrationDecorationGutterWidth = 0
+            }
         val metrics = SwingMetrics.from(g.getFontMetrics(settings.font))
         val cache = TerminalRenderCache(columns = 2, rows = 1)
         cache.updateFrom(TextFrame(text = "ii", cursorVisible = false, palette = settings.palette))
@@ -148,18 +148,18 @@ class GridPainterTest {
         val image = BufferedImage(120, 40, BufferedImage.TYPE_INT_ARGB)
         val g = image.createGraphics()
         val settings =
-            SwingSettings(
-                font = Font(Font.SERIF, Font.PLAIN, 18),
-                palette =
+            SwingSettings.create { draft ->
+                draft.font = Font(Font.SERIF, Font.PLAIN, 18)
+                draft.palette =
                     TerminalColorPalette(
                         defaultForeground = RED,
                         defaultBackground = BLACK,
-                    ),
-                textAntialiasing = RenderingHints.VALUE_TEXT_ANTIALIAS_OFF,
-                fractionalMetrics = RenderingHints.VALUE_FRACTIONALMETRICS_ON,
-                padding = SwingPadding(0, 0, 0, 0),
-                shellIntegrationDecorationGutterWidth = 0,
-            )
+                    )
+                draft.textAntialiasing = RenderingHints.VALUE_TEXT_ANTIALIAS_OFF
+                draft.fractionalMetrics = RenderingHints.VALUE_FRACTIONALMETRICS_ON
+                draft.padding = SwingPadding(0, 0, 0, 0)
+                draft.shellIntegrationDecorationGutterWidth = 0
+            }
         val fontMetrics = g.getFontMetrics(settings.font)
         val metrics =
             SwingMetrics(
@@ -200,19 +200,19 @@ class GridPainterTest {
         val image = BufferedImage(40, 30, BufferedImage.TYPE_INT_ARGB)
         val g = image.createGraphics()
         val settings =
-            SwingSettings(
-                font = Font(Font.MONOSPACED, Font.PLAIN, 14),
-                palette =
+            SwingSettings.create { draft ->
+                draft.font = Font(Font.MONOSPACED, Font.PLAIN, 14)
+                draft.palette =
                     TerminalColorPalette(
                         defaultForeground = WHITE,
                         defaultBackground = BLACK,
                         cursorForeground = RED,
                         cursorBackground = BLUE,
-                    ),
-                textAntialiasing = RenderingHints.VALUE_TEXT_ANTIALIAS_OFF,
-                padding = SwingPadding(0, 0, 0, 0),
-                shellIntegrationDecorationGutterWidth = 0,
-            )
+                    )
+                draft.textAntialiasing = RenderingHints.VALUE_TEXT_ANTIALIAS_OFF
+                draft.padding = SwingPadding(0, 0, 0, 0)
+                draft.shellIntegrationDecorationGutterWidth = 0
+            }
         val metrics = SwingMetrics.from(g.getFontMetrics(settings.font))
         val cache = TerminalRenderCache(columns = 1, rows = 1)
         cache.updateFrom(TextFrame(text = "A", cursorVisible = true, palette = settings.palette))
@@ -240,17 +240,17 @@ class GridPainterTest {
         val image = BufferedImage(40, 30, BufferedImage.TYPE_INT_ARGB)
         val g = image.createGraphics()
         val settings =
-            SwingSettings(
-                font = Font(Font.MONOSPACED, Font.PLAIN, 14),
-                palette =
+            SwingSettings.create { draft ->
+                draft.font = Font(Font.MONOSPACED, Font.PLAIN, 14)
+                draft.palette =
                     TerminalColorPalette(
                         defaultForeground = RED,
                         defaultBackground = BLACK,
-                    ),
-                textAntialiasing = RenderingHints.VALUE_TEXT_ANTIALIAS_OFF,
-                padding = SwingPadding(0, 0, 0, 0),
-                shellIntegrationDecorationGutterWidth = 0,
-            )
+                    )
+                draft.textAntialiasing = RenderingHints.VALUE_TEXT_ANTIALIAS_OFF
+                draft.padding = SwingPadding(0, 0, 0, 0)
+                draft.shellIntegrationDecorationGutterWidth = 0
+            }
         val metrics = SwingMetrics.from(g.getFontMetrics(settings.font))
         val cache = TerminalRenderCache(columns = 1, rows = 1)
         cache.updateFrom(TextFrame(text = "\u03A9", cursorVisible = false, palette = settings.palette))
@@ -286,19 +286,19 @@ class GridPainterTest {
         val image = BufferedImage(40, 30, BufferedImage.TYPE_INT_ARGB)
         val g = image.createGraphics()
         val settings =
-            SwingSettings(
-                font = Font(Font.MONOSPACED, Font.PLAIN, 14),
-                palette =
+            SwingSettings.create { draft ->
+                draft.font = Font(Font.MONOSPACED, Font.PLAIN, 14)
+                draft.palette =
                     TerminalColorPalette(
                         defaultForeground = WHITE,
                         defaultBackground = BLACK,
                         cursorForeground = GREEN,
                         cursorBackground = BLUE,
-                    ),
-                textAntialiasing = RenderingHints.VALUE_TEXT_ANTIALIAS_OFF,
-                padding = SwingPadding(0, 0, 0, 0),
-                shellIntegrationDecorationGutterWidth = 0,
-            )
+                    )
+                draft.textAntialiasing = RenderingHints.VALUE_TEXT_ANTIALIAS_OFF
+                draft.padding = SwingPadding(0, 0, 0, 0)
+                draft.shellIntegrationDecorationGutterWidth = 0
+            }
         val metrics = SwingMetrics.from(g.getFontMetrics(settings.font))
         val cache = TerminalRenderCache(columns = 1, rows = 1)
         cache.updateFrom(TextFrame(text = "\u03A9", cursorVisible = true, palette = settings.palette))
@@ -326,17 +326,17 @@ class GridPainterTest {
         val image = BufferedImage(80, 30, BufferedImage.TYPE_INT_ARGB)
         val g = image.createGraphics()
         val settings =
-            SwingSettings(
-                font = Font(Font.MONOSPACED, Font.PLAIN, 14),
-                palette =
+            SwingSettings.create { draft ->
+                draft.font = Font(Font.MONOSPACED, Font.PLAIN, 14)
+                draft.palette =
                     TerminalColorPalette(
                         defaultForeground = WHITE,
                         defaultBackground = BLACK,
-                    ),
-                textAntialiasing = RenderingHints.VALUE_TEXT_ANTIALIAS_OFF,
-                padding = SwingPadding(0, 0, 0, 0),
-                shellIntegrationDecorationGutterWidth = 0,
-            )
+                    )
+                draft.textAntialiasing = RenderingHints.VALUE_TEXT_ANTIALIAS_OFF
+                draft.padding = SwingPadding(0, 0, 0, 0)
+                draft.shellIntegrationDecorationGutterWidth = 0
+            }
         val metrics = SwingMetrics.from(g.getFontMetrics(settings.font))
         val cache = TerminalRenderCache(columns = 2, rows = 1)
         cache.updateFrom(
@@ -380,17 +380,17 @@ class GridPainterTest {
         val image = BufferedImage(80, 30, BufferedImage.TYPE_INT_ARGB)
         val g = image.createGraphics()
         val settings =
-            SwingSettings(
-                font = Font(Font.MONOSPACED, Font.PLAIN, 14),
-                palette =
+            SwingSettings.create { draft ->
+                draft.font = Font(Font.MONOSPACED, Font.PLAIN, 14)
+                draft.palette =
                     TerminalColorPalette(
                         defaultForeground = WHITE,
                         defaultBackground = BLACK,
-                    ),
-                textAntialiasing = RenderingHints.VALUE_TEXT_ANTIALIAS_OFF,
-                padding = SwingPadding(0, 0, 0, 0),
-                shellIntegrationDecorationGutterWidth = 0,
-            )
+                    )
+                draft.textAntialiasing = RenderingHints.VALUE_TEXT_ANTIALIAS_OFF
+                draft.padding = SwingPadding(0, 0, 0, 0)
+                draft.shellIntegrationDecorationGutterWidth = 0
+            }
         val metrics = SwingMetrics.from(g.getFontMetrics(settings.font))
         val cache = TerminalRenderCache(columns = 2, rows = 1)
         cache.updateFrom(
@@ -437,18 +437,18 @@ class GridPainterTest {
         val image = BufferedImage(80, 30, BufferedImage.TYPE_INT_ARGB)
         val g = image.createGraphics()
         val settings =
-            SwingSettings(
-                font = Font(Font.MONOSPACED, Font.PLAIN, 14),
-                palette =
+            SwingSettings.create { draft ->
+                draft.font = Font(Font.MONOSPACED, Font.PLAIN, 14)
+                draft.palette =
                     TerminalColorPalette(
                         defaultForeground = WHITE,
                         defaultBackground = BLACK,
-                    ),
-                selectionBackground = RED,
-                textAntialiasing = RenderingHints.VALUE_TEXT_ANTIALIAS_OFF,
-                padding = SwingPadding(0, 0, 0, 0),
-                shellIntegrationDecorationGutterWidth = 0,
-            )
+                    )
+                draft.selectionBackground = RED
+                draft.textAntialiasing = RenderingHints.VALUE_TEXT_ANTIALIAS_OFF
+                draft.padding = SwingPadding(0, 0, 0, 0)
+                draft.shellIntegrationDecorationGutterWidth = 0
+            }
         val metrics = SwingMetrics.from(g.getFontMetrics(settings.font))
         val cache = TerminalRenderCache(columns = 2, rows = 1)
         cache.updateFrom(TextFrame(text = "AB", cursorVisible = false, palette = settings.palette))
@@ -474,18 +474,18 @@ class GridPainterTest {
         val image = BufferedImage(80, 30, BufferedImage.TYPE_INT_ARGB)
         val g = image.createGraphics()
         val settings =
-            SwingSettings(
-                font = Font(Font.MONOSPACED, Font.PLAIN, 14),
-                palette =
+            SwingSettings.create { draft ->
+                draft.font = Font(Font.MONOSPACED, Font.PLAIN, 14)
+                draft.palette =
                     TerminalColorPalette(
                         defaultForeground = BLACK,
                         defaultBackground = WHITE,
-                    ),
-                selectionBackground = 0x66FFFFFF.toInt(),
-                textAntialiasing = RenderingHints.VALUE_TEXT_ANTIALIAS_OFF,
-                padding = SwingPadding(0, 0, 0, 0),
-                shellIntegrationDecorationGutterWidth = 0,
-            )
+                    )
+                draft.selectionBackground = 0x66FFFFFF.toInt()
+                draft.textAntialiasing = RenderingHints.VALUE_TEXT_ANTIALIAS_OFF
+                draft.padding = SwingPadding(0, 0, 0, 0)
+                draft.shellIntegrationDecorationGutterWidth = 0
+            }
         val metrics = SwingMetrics.from(g.getFontMetrics(settings.font))
         val cache = TerminalRenderCache(columns = 2, rows = 1)
         cache.updateFrom(TextFrame(text = "AB", cursorVisible = false, palette = settings.palette))
@@ -511,19 +511,19 @@ class GridPainterTest {
         val image = BufferedImage(120, 80, BufferedImage.TYPE_INT_ARGB)
         val g = image.createGraphics()
         val settings =
-            SwingSettings(
-                font = Font(Font.MONOSPACED, Font.PLAIN, 14),
-                palette =
+            SwingSettings.create { draft ->
+                draft.font = Font(Font.MONOSPACED, Font.PLAIN, 14)
+                draft.palette =
                     TerminalColorPalette(
                         defaultForeground = WHITE,
                         defaultBackground = BLACK,
-                    ),
-                shellIntegrationPromptDotColor = GREEN,
-                shellIntegrationPromptDotDiameter = 6,
-                shellIntegrationDecorationGutterWidth = 8,
-                textAntialiasing = RenderingHints.VALUE_TEXT_ANTIALIAS_OFF,
-                padding = SwingPadding(0, 8, 0, 0),
-            )
+                    )
+                draft.shellIntegrationPromptDotColor = GREEN
+                draft.shellIntegrationPromptDotDiameter = 6
+                draft.shellIntegrationDecorationGutterWidth = 8
+                draft.textAntialiasing = RenderingHints.VALUE_TEXT_ANTIALIAS_OFF
+                draft.padding = SwingPadding(0, 8, 0, 0)
+            }
         val metrics = SwingMetrics.from(g.getFontMetrics(settings.font))
         val cache = TerminalRenderCache(columns = 3, rows = 3)
         cache.updateFrom(TextRowsFrame(lines = arrayOf("abc", "def", "ghi"), palette = settings.palette))
@@ -564,18 +564,18 @@ class GridPainterTest {
         val image = BufferedImage(120, 100, BufferedImage.TYPE_INT_ARGB)
         val g = image.createGraphics()
         val settings =
-            SwingSettings(
-                font = Font(Font.MONOSPACED, Font.PLAIN, 14),
-                palette =
+            SwingSettings.create { draft ->
+                draft.font = Font(Font.MONOSPACED, Font.PLAIN, 14)
+                draft.palette =
                     TerminalColorPalette(
                         defaultForeground = WHITE,
                         defaultBackground = BLACK,
-                    ),
-                selectionBackground = BLUE,
-                shellIntegrationPromptDotColor = GREEN,
-                textAntialiasing = RenderingHints.VALUE_TEXT_ANTIALIAS_OFF,
-                padding = SwingPadding(0, 0, 0, 0),
-            )
+                    )
+                draft.selectionBackground = BLUE
+                draft.shellIntegrationPromptDotColor = GREEN
+                draft.textAntialiasing = RenderingHints.VALUE_TEXT_ANTIALIAS_OFF
+                draft.padding = SwingPadding(0, 0, 0, 0)
+            }
         val metrics = SwingMetrics.from(g.getFontMetrics(settings.font))
         val cache = TerminalRenderCache(columns = 3, rows = 3)
         cache.updateFrom(TextRowsFrame(lines = arrayOf("abc", "def", "ghi"), palette = settings.palette))
@@ -614,15 +614,15 @@ class GridPainterTest {
         val image = BufferedImage(120, 80, BufferedImage.TYPE_INT_ARGB)
         val g = image.createGraphics()
         val settings =
-            SwingSettings(
-                font = Font(Font.MONOSPACED, Font.PLAIN, 14),
-                palette = TerminalColorPalette(defaultForeground = WHITE, defaultBackground = BLACK),
-                shellIntegrationPromptDotColor = GREEN,
-                shellIntegrationPromptDotDiameter = 6,
-                shellIntegrationDecorationGutterWidth = 12,
-                textAntialiasing = RenderingHints.VALUE_TEXT_ANTIALIAS_OFF,
-                padding = SwingPadding(0, 12, 0, 0),
-            )
+            SwingSettings.create { draft ->
+                draft.font = Font(Font.MONOSPACED, Font.PLAIN, 14)
+                draft.palette = TerminalColorPalette(defaultForeground = WHITE, defaultBackground = BLACK)
+                draft.shellIntegrationPromptDotColor = GREEN
+                draft.shellIntegrationPromptDotDiameter = 6
+                draft.shellIntegrationDecorationGutterWidth = 12
+                draft.textAntialiasing = RenderingHints.VALUE_TEXT_ANTIALIAS_OFF
+                draft.padding = SwingPadding(0, 12, 0, 0)
+            }
         val metrics = SwingMetrics.from(g.getFontMetrics(settings.font))
         val cache = TerminalRenderCache(columns = 3, rows = 1)
         cache.updateFrom(TextRowsFrame(lines = arrayOf("   "), palette = settings.palette))
@@ -659,17 +659,17 @@ class GridPainterTest {
         val image = BufferedImage(120, 80, BufferedImage.TYPE_INT_ARGB)
         val g = image.createGraphics()
         val settings =
-            SwingSettings(
-                font = Font(Font.MONOSPACED, Font.PLAIN, 14),
-                palette =
+            SwingSettings.create { draft ->
+                draft.font = Font(Font.MONOSPACED, Font.PLAIN, 14)
+                draft.palette =
                     TerminalColorPalette(
                         defaultForeground = WHITE,
                         defaultBackground = BLACK,
-                    ),
-                shellIntegrationPromptDotColor = GREEN,
-                textAntialiasing = RenderingHints.VALUE_TEXT_ANTIALIAS_OFF,
-                padding = SwingPadding(0, 8, 0, 0),
-            )
+                    )
+                draft.shellIntegrationPromptDotColor = GREEN
+                draft.textAntialiasing = RenderingHints.VALUE_TEXT_ANTIALIAS_OFF
+                draft.padding = SwingPadding(0, 8, 0, 0)
+            }
         val metrics = SwingMetrics.from(g.getFontMetrics(settings.font))
         val cache = TerminalRenderCache(columns = 3, rows = 3)
         cache.updateFrom(TextRowsFrame(lines = arrayOf("old", "cmd", "out"), palette = settings.palette))
@@ -709,17 +709,17 @@ class GridPainterTest {
         val image = BufferedImage(120, 48, BufferedImage.TYPE_INT_ARGB)
         val g = image.createGraphics()
         val settings =
-            SwingSettings(
-                font = Font(Font.MONOSPACED, Font.PLAIN, 14),
-                palette =
+            SwingSettings.create { draft ->
+                draft.font = Font(Font.MONOSPACED, Font.PLAIN, 14)
+                draft.palette =
                     TerminalColorPalette(
                         defaultForeground = WHITE,
                         defaultBackground = BLACK,
-                    ),
-                textAntialiasing = RenderingHints.VALUE_TEXT_ANTIALIAS_OFF,
-                padding = SwingPadding(0, 0, 8, 0),
-                shellIntegrationDecorationGutterWidth = 0,
-            )
+                    )
+                draft.textAntialiasing = RenderingHints.VALUE_TEXT_ANTIALIAS_OFF
+                draft.padding = SwingPadding(0, 0, 8, 0)
+                draft.shellIntegrationDecorationGutterWidth = 0
+            }
         val metrics =
             SwingMetrics(
                 cellWidth = 10,
@@ -777,19 +777,19 @@ class GridPainterTest {
         val image = BufferedImage(120, 80, BufferedImage.TYPE_INT_ARGB)
         val g = image.createGraphics()
         val settings =
-            SwingSettings(
-                font = Font(Font.MONOSPACED, Font.PLAIN, 14),
-                palette =
+            SwingSettings.create { draft ->
+                draft.font = Font(Font.MONOSPACED, Font.PLAIN, 14)
+                draft.palette =
                     TerminalColorPalette(
                         defaultForeground = WHITE,
                         defaultBackground = BLACK,
-                    ),
-                shellIntegrationFailedPromptDotColor = RED,
-                shellIntegrationFailedCommandRailColor = RED,
-                shellIntegrationDecorationGutterWidth = 8,
-                textAntialiasing = RenderingHints.VALUE_TEXT_ANTIALIAS_OFF,
-                padding = SwingPadding(0, 8, 0, 0),
-            )
+                    )
+                draft.shellIntegrationFailedPromptDotColor = RED
+                draft.shellIntegrationFailedCommandRailColor = RED
+                draft.shellIntegrationDecorationGutterWidth = 8
+                draft.textAntialiasing = RenderingHints.VALUE_TEXT_ANTIALIAS_OFF
+                draft.padding = SwingPadding(0, 8, 0, 0)
+            }
         val metrics = SwingMetrics.from(g.getFontMetrics(settings.font))
         val cache = TerminalRenderCache(columns = 3, rows = 3)
         cache.updateFrom(TextRowsFrame(lines = arrayOf("abc", "def", "ghi"), palette = settings.palette))
@@ -827,14 +827,14 @@ class GridPainterTest {
         val image = BufferedImage(120, 80, BufferedImage.TYPE_INT_ARGB)
         val g = image.createGraphics()
         val settings =
-            SwingSettings(
-                font = Font(Font.MONOSPACED, Font.PLAIN, 14),
-                palette = TerminalColorPalette(defaultForeground = WHITE, defaultBackground = BLACK),
-                shellIntegrationPromptDotColor = GREEN,
-                shellIntegrationDecorationGutterWidth = 8,
-                textAntialiasing = RenderingHints.VALUE_TEXT_ANTIALIAS_OFF,
-                padding = SwingPadding(0, 8, 0, 0),
-            )
+            SwingSettings.create { draft ->
+                draft.font = Font(Font.MONOSPACED, Font.PLAIN, 14)
+                draft.palette = TerminalColorPalette(defaultForeground = WHITE, defaultBackground = BLACK)
+                draft.shellIntegrationPromptDotColor = GREEN
+                draft.shellIntegrationDecorationGutterWidth = 8
+                draft.textAntialiasing = RenderingHints.VALUE_TEXT_ANTIALIAS_OFF
+                draft.padding = SwingPadding(0, 8, 0, 0)
+            }
         val metrics = SwingMetrics.from(g.getFontMetrics(settings.font))
         val cache = TerminalRenderCache(columns = 3, rows = 3)
         cache.updateFrom(TextRowsFrame(lines = arrayOf("cmd", "out", "done"), palette = settings.palette))
@@ -866,21 +866,21 @@ class GridPainterTest {
         val image = BufferedImage(120, 80, BufferedImage.TYPE_INT_ARGB)
         val g = image.createGraphics()
         val settings =
-            SwingSettings(
-                font = Font(Font.MONOSPACED, Font.PLAIN, 14),
-                palette =
+            SwingSettings.create { draft ->
+                draft.font = Font(Font.MONOSPACED, Font.PLAIN, 14)
+                draft.palette =
                     TerminalColorPalette(
                         defaultForeground = WHITE,
                         defaultBackground = BLACK,
-                    ),
-                shellIntegrationPromptDotsVisible = false,
-                shellIntegrationFailedCommandRailsVisible = false,
-                shellIntegrationPromptDotColor = GREEN,
-                shellIntegrationFailedPromptDotColor = RED,
-                shellIntegrationDecorationGutterWidth = 8,
-                textAntialiasing = RenderingHints.VALUE_TEXT_ANTIALIAS_OFF,
-                padding = SwingPadding(0, 8, 0, 0),
-            )
+                    )
+                draft.shellIntegrationPromptDotsVisible = false
+                draft.shellIntegrationFailedCommandRailsVisible = false
+                draft.shellIntegrationPromptDotColor = GREEN
+                draft.shellIntegrationFailedPromptDotColor = RED
+                draft.shellIntegrationDecorationGutterWidth = 8
+                draft.textAntialiasing = RenderingHints.VALUE_TEXT_ANTIALIAS_OFF
+                draft.padding = SwingPadding(0, 8, 0, 0)
+            }
         val metrics = SwingMetrics.from(g.getFontMetrics(settings.font))
         val cache = TerminalRenderCache(columns = 3, rows = 3)
         cache.updateFrom(TextRowsFrame(lines = arrayOf("abc", "def", "ghi"), palette = settings.palette))
@@ -910,10 +910,10 @@ class GridPainterTest {
     @Test
     fun `shell integration viewport snapshot does not clear session state while scrolled back`() {
         val settings =
-            SwingSettings(
-                font = Font(Font.MONOSPACED, Font.PLAIN, 14),
-                padding = SwingPadding(0, 8, 0, 0),
-            )
+            SwingSettings.create { draft ->
+                draft.font = Font(Font.MONOSPACED, Font.PLAIN, 14)
+                draft.padding = SwingPadding(0, 8, 0, 0)
+            }
         val cache = TerminalRenderCache(columns = 3, rows = 3)
         cache.updateFrom(
             TextRowsFrame(

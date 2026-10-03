@@ -17,9 +17,11 @@ package io.github.ketraterm.session
 
 import io.github.ketraterm.core.TerminalBuffers
 import io.github.ketraterm.core.api.TerminalBuffer
+import io.github.ketraterm.core.api.TerminalRenderBuffer
 import io.github.ketraterm.host.*
 import io.github.ketraterm.input.api.TerminalInputEncoder
 import io.github.ketraterm.input.event.*
+import io.github.ketraterm.input.policy.TerminalInputPolicy
 import io.github.ketraterm.parser.api.TerminalOutputParser
 import io.github.ketraterm.parser.api.TerminalParsers
 import io.github.ketraterm.protocol.keyboard.KittyKeyboardProgressiveFlag
@@ -48,6 +50,285 @@ import kotlin.time.Duration.Companion.milliseconds
 @OptIn(ExperimentalCoroutinesApi::class)
 class TerminalSessionTest {
     @ParameterizedTest
+    @ValueSource(strings = ["start", "close"])
+    fun `concurrent startup and lifecycle operations remain serialized`(operation: String) =
+        runTest {
+            val recorded = MockConnector()
+            val entered = CountDownLatch(1)
+            val release = CountDownLatch(1)
+            val connector =
+                object : TerminalConnector by recorded {
+                    override fun start(listener: io.github.ketraterm.transport.TerminalConnectorListener) {
+                        recorded.start(listener)
+                        entered.countDown()
+                        check(release.await(SESSION_THREAD_TIMEOUT_SECONDS, TimeUnit.SECONDS)) { "Startup was not released" }
+                    }
+                }
+            val dispatcher = StandardTestDispatcher(testScheduler)
+            TerminalSession
+                .create(
+                    TerminalBuffers.create(10, 3),
+                    connector,
+                    workerDispatcher = dispatcher,
+                    ioDispatcher = dispatcher,
+                ).use { session ->
+                    SessionTestThread("session-start") { session.start(10, 3) }.use { starter ->
+                        try {
+                            assertTrue(entered.await(SESSION_THREAD_TIMEOUT_SECONDS, TimeUnit.SECONDS))
+                            assertSame(TerminalSessionState.Created, session.state.value)
+                            session.encodeKey(TerminalKeyEvent.codepoint('x'.code))
+                            session.encodePaste(TerminalPasteEvent("x"))
+                            session.encodeTextReplacement(TerminalTextReplacementEvent(0, 0, "x"))
+                            SessionTestThread("session-$operation") {
+                                if (operation == "start") {
+                                    assertThrows(IllegalStateException::class.java) { session.start(10, 3) }
+                                } else {
+                                    session.close()
+                                }
+                            }.use { contender ->
+                                try {
+                                    contender.awaitBlockedBy(starter)
+                                    assertEquals(0, recorded.closeCount)
+                                    if (operation == "close") assertTrue(session.isClosed)
+                                } finally {
+                                    release.countDown()
+                                }
+                                starter.awaitCompletion()
+                                contender.awaitCompletion()
+                            }
+                        } finally {
+                            release.countDown()
+                        }
+                    }
+                    runCurrent()
+                    assertEquals(1, recorded.startCount)
+                    assertEquals("", recorded.writtenBytes.asciiText())
+                    if (operation == "start") {
+                        assertSame(TerminalSessionState.Running, session.state.value)
+                    } else {
+                        assertTrue((session.state.value as TerminalSessionState.Closed).event.locallyRequested)
+                        assertEquals(1, recorded.closeCount)
+                        assertFalse(session.isCoroutineScopeActive)
+                    }
+                }
+        }
+
+    @ParameterizedTest
+    @ValueSource(strings = ["close", "remote", "error", "throw"])
+    fun `termination during connector startup never publishes running or writes queued replies`(termination: String) =
+        runTest {
+            val recorded = MockConnector()
+            val failure = IllegalStateException("startup failed")
+            var runningObserved = false
+            lateinit var session: TerminalSession
+            val connector =
+                object : TerminalConnector by recorded {
+                    override fun start(listener: io.github.ketraterm.transport.TerminalConnectorListener) {
+                        recorded.start(listener)
+                        recorded.feedFromHost("\u001B[5n".ascii())
+                        when (termination) {
+                            "close" -> session.close()
+                            "remote" -> listener.onClosed(7)
+                            "error" -> listener.onError(failure)
+                            "throw" -> throw failure
+                        }
+                    }
+                }
+            val dispatcher = UnconfinedTestDispatcher(testScheduler)
+            session =
+                TerminalSession.create(
+                    TerminalBuffers.create(10, 3),
+                    connector,
+                    workerDispatcher = dispatcher,
+                    ioDispatcher = dispatcher,
+                )
+            session.use {
+                backgroundScope.launch(dispatcher) {
+                    session.state.first { it === TerminalSessionState.Running }
+                    runningObserved = true
+                }
+                if (termination == "throw") {
+                    assertSame(failure, assertThrows(IllegalStateException::class.java) { session.start(10, 3) })
+                } else {
+                    session.start(10, 3)
+                }
+                runCurrent()
+                assertFalse(runningObserved)
+                val event = (session.state.value as TerminalSessionState.Closed).event
+                assertEquals(termination == "close", event.locallyRequested)
+                assertEquals(if (termination == "remote") 7 else null, event.exitCode)
+                assertSame(if (termination == "error" || termination == "throw") failure else null, event.failure)
+                assertEquals("", recorded.writtenBytes.asciiText())
+                assertEquals(1, recorded.closeCount)
+                assertFalse(session.isCoroutineScopeActive)
+                assertThrows(IllegalStateException::class.java) { session.start(10, 3) }
+                assertEquals(1, recorded.startCount)
+            }
+        }
+
+    @ParameterizedTest
+    @ValueSource(strings = ["resize", "start", "running"])
+    fun `reentrant start is rejected throughout startup`(stage: String) =
+        runTest {
+            val recorded = MockConnector()
+            var rejected = false
+            lateinit var session: TerminalSession
+
+            fun attemptAgain() {
+                assertThrows(IllegalStateException::class.java) { session.start(10, 3) }
+                rejected = true
+            }
+            val connector =
+                object : TerminalConnector by recorded {
+                    override fun resize(
+                        columns: Int,
+                        rows: Int,
+                    ) {
+                        recorded.resize(columns, rows)
+                        if (stage == "resize") attemptAgain()
+                    }
+
+                    override fun start(listener: io.github.ketraterm.transport.TerminalConnectorListener) {
+                        recorded.start(listener)
+                        if (stage == "start") attemptAgain()
+                    }
+                }
+            val dispatcher = UnconfinedTestDispatcher(testScheduler)
+            session =
+                TerminalSession.create(
+                    TerminalBuffers.create(10, 3),
+                    connector,
+                    workerDispatcher = dispatcher,
+                    ioDispatcher = dispatcher,
+                )
+            session.use {
+                if (stage == "running") {
+                    backgroundScope.launch(dispatcher) {
+                        session.state.first { it === TerminalSessionState.Running }
+                        attemptAgain()
+                    }
+                }
+                session.start(10, 3)
+                assertTrue(rejected)
+                assertEquals(1, recorded.startCount)
+                assertSame(TerminalSessionState.Running, session.state.value)
+            }
+        }
+
+    @Test
+    fun `startup output replies wait for connector start to return and precede observer input`() =
+        runTest {
+            val recorded = MockConnector()
+            var starting = true
+            val earlyWrites = mutableListOf<ByteArray>()
+            lateinit var session: TerminalSession
+            val connector =
+                object : TerminalConnector by recorded {
+                    override fun start(listener: io.github.ketraterm.transport.TerminalConnectorListener) {
+                        recorded.start(listener)
+                        recorded.feedFromHost("\u001B[5n".ascii())
+                        session.encodeKey(TerminalKeyEvent.codepoint('x'.code))
+                        session.encodePaste(TerminalPasteEvent("x"))
+                        session.encodeTextReplacement(TerminalTextReplacementEvent(0, 0, "x"))
+                        starting = false
+                    }
+
+                    override fun write(
+                        bytes: ByteArray,
+                        offset: Int,
+                        length: Int,
+                    ) {
+                        if (starting) earlyWrites += bytes.copyOfRange(offset, offset + length)
+                        recorded.write(bytes, offset, length)
+                    }
+                }
+            val dispatcher = UnconfinedTestDispatcher(testScheduler)
+            session =
+                TerminalSession.create(
+                    TerminalBuffers.create(10, 3),
+                    connector,
+                    workerDispatcher = dispatcher,
+                    ioDispatcher = dispatcher,
+                )
+            session.use {
+                backgroundScope.launch(dispatcher) {
+                    session.state.first { it === TerminalSessionState.Running }
+                    session.encodePaste(TerminalPasteEvent("y"))
+                }
+                session.start(10, 3)
+                runCurrent()
+                assertAll(
+                    { assertTrue(earlyWrites.isEmpty(), "Startup replies must wait for transport readiness") },
+                    { assertEquals("\u001B[0ny", recorded.writtenBytes.asciiText()) },
+                    { assertSame(TerminalSessionState.Running, session.state.value) },
+                )
+            }
+        }
+
+    @ParameterizedTest
+    @ValueSource(strings = ["key", "paste", "replacement"])
+    fun `input from a running state observer cannot reach an unstarted connector`(input: String) =
+        runTest {
+            val recorded = MockConnector()
+            var transportStarted = false
+            var runningObservedAfterTransportStart: Boolean? = null
+            val writesBeforeTransportStart = mutableListOf<ByteArray>()
+            val connector =
+                object : TerminalConnector by recorded {
+                    override fun start(listener: io.github.ketraterm.transport.TerminalConnectorListener) {
+                        transportStarted = true
+                        recorded.start(listener)
+                    }
+
+                    override fun write(
+                        bytes: ByteArray,
+                        offset: Int,
+                        length: Int,
+                    ) {
+                        if (!transportStarted) writesBeforeTransportStart += bytes.copyOfRange(offset, offset + length)
+                        recorded.write(bytes, offset, length)
+                    }
+                }
+            val dispatcher = UnconfinedTestDispatcher(testScheduler)
+            TerminalSession
+                .create(
+                    terminal = TerminalBuffers.create(10, 3),
+                    connector = connector,
+                    workerDispatcher = dispatcher,
+                    ioDispatcher = dispatcher,
+                ).use { session ->
+                    backgroundScope.launch(dispatcher) {
+                        session.state.first { it === TerminalSessionState.Running }
+                        runningObservedAfterTransportStart = transportStarted
+                        when (input) {
+                            "key" -> session.encodeKey(TerminalKeyEvent.codepoint('x'.code))
+                            "paste" -> session.encodePaste(TerminalPasteEvent("x"))
+                            "replacement" -> session.encodeTextReplacement(TerminalTextReplacementEvent(0, 0, "x"))
+                        }
+                    }
+
+                    session.start(10, 3)
+                    runCurrent()
+
+                    session.encodeKey(TerminalKeyEvent.codepoint('y'.code))
+                    runCurrent()
+                    assertAll(
+                        { assertEquals(true, runningObservedAfterTransportStart, "Running must mean the connector has started") },
+                        { assertTrue(writesBeforeTransportStart.isEmpty(), "No native write may precede connector startup") },
+                        { assertFalse(session.isClosed, "Input accepted in Running must not fail an otherwise healthy session") },
+                        { assertEquals(1, recorded.startCount) },
+                        {
+                            assertEquals(
+                                "xy",
+                                recorded.writtenBytes.decodeToString(),
+                                "Running and later input must both be accepted in order",
+                            )
+                        },
+                    )
+                }
+        }
+
+    @ParameterizedTest
     @ValueSource(strings = ["running", "resize"])
     fun `reentrant shutdown during startup cannot start a disposed connector`(stage: String) =
         runTest {
@@ -65,6 +346,7 @@ class TerminalSessionTest {
                     }
 
                     override fun start(listener: io.github.ketraterm.transport.TerminalConnectorListener) {
+                        assertEquals(0, recorded.closeCount, "A disposed connector must never be started")
                         starts++
                         recorded.start(listener)
                     }
@@ -84,7 +366,7 @@ class TerminalSessionTest {
             }
             session.use {
                 session.start(10, 3)
-                assertEquals(0, starts)
+                assertEquals(if (stage == "running") 1 else 0, starts)
                 assertEquals(1, recorded.closeCount)
                 assertTrue((session.state.value as TerminalSessionState.Closed).event.locallyRequested)
                 assertFalse(session.isCoroutineScopeActive)
@@ -153,7 +435,7 @@ class TerminalSessionTest {
             }
             assertArrayEquals(
                 intArrayOf('A'.code, 0xFFFD),
-                session.renderPublisher.readCurrent { it.codeWords.copyOf(2) },
+                session.readPublishedFrame { it.codeWords.copyOf(2) },
             )
             assertTrue(session.state.value is TerminalSessionState.Closed)
             assertFalse(session.isCoroutineScopeActive)
@@ -183,7 +465,7 @@ class TerminalSessionTest {
                 runCurrent()
                 val reader =
                     CompletableFuture.runAsync {
-                        session.renderPublisher.readCurrent { frame ->
+                        session.readPublishedFrame { frame ->
                             assertEquals('O'.code, frame.codeWords[0])
                             leased.countDown()
                             release.await()
@@ -196,7 +478,7 @@ class TerminalSessionTest {
                     session.close()
                     assertEquals(
                         'F'.code,
-                        session.renderPublisher.readCurrent { it.codeWords[0] },
+                        session.readPublishedFrame { it.codeWords[0] },
                     )
                     assertTrue(session.state.value is TerminalSessionState.Closed)
                 } finally {
@@ -238,7 +520,7 @@ class TerminalSessionTest {
             assertTrue(eofFailure in connectorFailure.suppressed)
             assertEquals(
                 'F'.code,
-                session.renderPublisher.readCurrent { it.codeWords[0] },
+                session.readPublishedFrame { it.codeWords[0] },
             )
             assertTrue(session.isClosed)
             assertFalse(session.isCoroutineScopeActive)
@@ -299,7 +581,7 @@ class TerminalSessionTest {
                 val observed = mutableListOf<Pair<Int?, Int>>()
                 backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) {
                     session.state.first { it is TerminalSessionState.Closed }
-                    observed += session.renderPublisher.readCurrent { it.codeWords[0] } to connector.closeCount
+                    observed += session.readPublishedFrame { it.codeWords[0] } to connector.closeCount
                 }
                 connector.feedFromHost("LAST".ascii())
                 connector.simulateClosed(7)
@@ -307,7 +589,7 @@ class TerminalSessionTest {
                 assertEquals(session.state.value, session.state.first())
                 assertEquals(
                     'L'.code,
-                    session.renderPublisher.readCurrent { it.codeWords[0] },
+                    session.readPublishedFrame { it.codeWords[0] },
                 )
             }
         }
@@ -535,7 +817,7 @@ class TerminalSessionTest {
                     session.requestRender(0)
                     runCurrent()
                     requireNotNull(
-                        session.renderPublisher.readCurrent { alternate ->
+                        session.readPublishedFrame { alternate ->
                             assertEquals(TerminalRenderCursorShape.BLOCK, alternate.cursorShape)
                             assertFalse(alternate.cursorBlinking)
                         },
@@ -548,7 +830,7 @@ class TerminalSessionTest {
                     runCurrent()
                     assertTrue(session.renderGeneration.value > generation)
                     requireNotNull(
-                        session.renderPublisher.readCurrent { primary ->
+                        session.readPublishedFrame { primary ->
                             assertEquals(TerminalRenderCursorShape.BAR, primary.cursorShape)
                             assertTrue(primary.cursorBlinking)
                         },
@@ -559,7 +841,7 @@ class TerminalSessionTest {
                     advanceTimeBy(TerminalSession.RENDER_PUBLICATION_INTERVAL_MS.milliseconds)
                     runCurrent()
                     requireNotNull(
-                        session.renderPublisher.readCurrent { reset ->
+                        session.readPublishedFrame { reset ->
                             assertEquals(TerminalRenderCursorShape.BAR, reset.cursorShape)
                             assertTrue(reset.cursorBlinking)
                         },
@@ -873,7 +1155,7 @@ class TerminalSessionTest {
                 session.requestRender(0)
                 runCurrent()
                 val before = session.renderGeneration.value
-                assertEquals(0, session.renderPublisher.readCurrent { it.codeWords[0] })
+                assertEquals(0, session.readPublishedFrame { it.codeWords[0] })
                 if (synchronizedOutput) connector.feedFromHost("\u001B[?2026h".ascii())
                 connector.feedFromHost("LAST \u20AC\r\n".encodeToByteArray())
                 when (termination) {
@@ -890,7 +1172,7 @@ class TerminalSessionTest {
                     {
                         assertArrayEquals(
                             expected,
-                            session.renderPublisher.readCurrent { it.codeWords.copyOf(expected.size) },
+                            session.readPublishedFrame { it.codeWords.copyOf(expected.size) },
                         )
                     },
                     { assertNotEquals(before, session.renderGeneration.value) },
@@ -930,7 +1212,7 @@ class TerminalSessionTest {
                     assertEquals(0, terminal.getCodepointAt(1, 0))
                     assertArrayEquals(
                         intArrayOf(0xFFFD, 0),
-                        session.renderPublisher.readCurrent { it.codeWords.copyOf(2) },
+                        session.readPublishedFrame { it.codeWords.copyOf(2) },
                     )
                     assertTrue(session.isClosed)
                 }
@@ -957,7 +1239,7 @@ class TerminalSessionTest {
                     val expected = "LAST LINE".map(Char::code).toIntArray()
                     assertArrayEquals(
                         expected,
-                        session.renderPublisher.readCurrent { it.codeWords.copyOf(expected.size) },
+                        session.readPublishedFrame { it.codeWords.copyOf(expected.size) },
                     )
                     assertEquals(0, session.exitCode)
                 }
@@ -1131,11 +1413,11 @@ class TerminalSessionTest {
             connector.feedFromHost((0..6).joinToString("\r\n") { "row$it" }.ascii())
             runCurrent()
             val beforeResizeGeneration = session.renderGeneration.value
-            assertEquals(TerminalRenderBufferKind.PRIMARY, session.renderPublisher.readCurrent { it.activeBuffer })
-            assertEquals(4, session.renderPublisher.readCurrent { it.historySize })
+            assertEquals(TerminalRenderBufferKind.PRIMARY, session.readPublishedFrame { it.activeBuffer })
+            assertEquals(4, session.readPublishedFrame { it.historySize })
 
             connector.feedFromHost("\u001B[?1049h".ascii())
-            assertEquals(TerminalRenderBufferKind.PRIMARY, session.renderPublisher.readCurrent { it.activeBuffer })
+            assertEquals(TerminalRenderBufferKind.PRIMARY, session.readPublishedFrame { it.activeBuffer })
 
             if (usePairResult) {
                 assertEquals(0 to 0, session.resize(columns, rows, oldScrollbackOffset = 2))
@@ -1153,7 +1435,7 @@ class TerminalSessionTest {
             runCurrent()
             assertTrue(session.renderGeneration.value > beforeResizeGeneration)
             requireNotNull(
-                session.renderPublisher.readCurrent { published ->
+                session.readPublishedFrame { published ->
                     assertEquals(TerminalRenderBufferKind.ALTERNATE, published.activeBuffer)
                     assertEquals(columns, published.columns)
                     assertEquals(rows, published.rows)
@@ -1330,7 +1612,7 @@ class TerminalSessionTest {
                 responseReader = terminal,
                 connector = connector,
                 parser = parser,
-                inputEncoder = NoOpInputEncoder,
+                inputEncoderFactory = noOpInputEncoderFactory,
                 ioDispatcher = UnconfinedTestDispatcher(),
             )
 
@@ -1369,7 +1651,7 @@ class TerminalSessionTest {
                 responseReader = terminal,
                 connector = connector,
                 parser = RecordingParser(),
-                inputEncoder = NoOpInputEncoder,
+                inputEncoderFactory = noOpInputEncoderFactory,
                 hyperlinkResolver =
                     { id ->
                         if (id == 42) "https://example.com" else null
@@ -1397,7 +1679,7 @@ class TerminalSessionTest {
                 responseReader = terminal,
                 connector = connector,
                 parser = RecordingParser(),
-                inputEncoder = NoOpInputEncoder,
+                inputEncoderFactory = noOpInputEncoderFactory,
                 ioDispatcher = UnconfinedTestDispatcher(),
             )
 
@@ -1423,7 +1705,7 @@ class TerminalSessionTest {
                     responseReader = terminal,
                     connector = connector,
                     parser = RecordingParser(),
-                    inputEncoder = NoOpInputEncoder,
+                    inputEncoderFactory = noOpInputEncoderFactory,
                     workerDispatcher = StandardTestDispatcher(testScheduler),
                     ioDispatcher = UnconfinedTestDispatcher(),
                 )
@@ -1435,7 +1717,7 @@ class TerminalSessionTest {
                 assertTrue(session.renderGeneration.value > previousGeneration)
                 assertAll(
                     { assertEquals(3, renderReader.lastOffset) },
-                    { assertEquals(3, session.renderPublisher.readCurrent { it.scrollbackOffset }) },
+                    { assertEquals(3, session.readPublishedFrame { it.scrollbackOffset }) },
                 )
             }
         }
@@ -1518,7 +1800,7 @@ class TerminalSessionTest {
                     responseReader = terminal,
                     connector = connector,
                     parser = RecordingParser(),
-                    inputEncoder = NoOpInputEncoder,
+                    inputEncoderFactory = noOpInputEncoderFactory,
                     workerDispatcher = StandardTestDispatcher(testScheduler),
                     ioDispatcher = UnconfinedTestDispatcher(),
                 )
@@ -1549,7 +1831,7 @@ class TerminalSessionTest {
                     responseReader = terminal,
                     connector = connector,
                     parser = RecordingParser(),
-                    inputEncoder = NoOpInputEncoder,
+                    inputEncoderFactory = noOpInputEncoderFactory,
                     workerDispatcher = dispatcher,
                     ioDispatcher = UnconfinedTestDispatcher(),
                 )
@@ -1591,7 +1873,7 @@ class TerminalSessionTest {
                     responseReader = terminal,
                     connector = connector,
                     parser = RecordingParser(),
-                    inputEncoder = NoOpInputEncoder,
+                    inputEncoderFactory = noOpInputEncoderFactory,
                     workerDispatcher = dispatcher,
                     ioDispatcher = UnconfinedTestDispatcher(),
                 )
@@ -1605,7 +1887,7 @@ class TerminalSessionTest {
             assertAll(
                 { assertEquals(2, renderReader.readCalls) },
                 { assertEquals(5, renderReader.lastOffset) },
-                { assertEquals(5, session.renderPublisher.readCurrent { it.scrollbackOffset }) },
+                { assertEquals(5, session.readPublishedFrame { it.scrollbackOffset }) },
             )
             session.close()
         }
@@ -1624,7 +1906,7 @@ class TerminalSessionTest {
                     responseReader = terminal,
                     connector = connector,
                     parser = RecordingParser(),
-                    inputEncoder = NoOpInputEncoder,
+                    inputEncoderFactory = noOpInputEncoderFactory,
                     workerDispatcher = StandardTestDispatcher(testScheduler),
                     ioDispatcher = UnconfinedTestDispatcher(),
                 )
@@ -1641,7 +1923,7 @@ class TerminalSessionTest {
                 assertAll(
                     { assertEquals(2, renderReader.readCalls) },
                     { assertEquals(listOf(1, 5), renderReader.offsets.toList()) },
-                    { assertEquals(5, session.renderPublisher.readCurrent { it.scrollbackOffset }) },
+                    { assertEquals(5, session.readPublishedFrame { it.scrollbackOffset }) },
                 )
             }
         }
@@ -1661,7 +1943,7 @@ class TerminalSessionTest {
                     responseReader = terminal,
                     connector = connector,
                     parser = RecordingParser(),
-                    inputEncoder = NoOpInputEncoder,
+                    inputEncoderFactory = noOpInputEncoderFactory,
                     workerDispatcher = StandardTestDispatcher(testScheduler),
                     ioDispatcher = UnconfinedTestDispatcher(),
                 )
@@ -1672,7 +1954,7 @@ class TerminalSessionTest {
                 assertAll(
                     { assertEquals(1, renderReader.readCalls) },
                     { assertEquals(-1L, session.renderGeneration.value) },
-                    { assertNull(session.renderPublisher.readCurrent { true }) },
+                    { assertNull(session.readPublishedFrame { true }) },
                 )
 
                 session.requestRender(scrollbackOffset = 2)
@@ -1680,7 +1962,7 @@ class TerminalSessionTest {
                 runCurrent()
                 assertAll(
                     { assertEquals(2, renderReader.readCalls) },
-                    { assertEquals(2, session.renderPublisher.readCurrent { it.scrollbackOffset }) },
+                    { assertEquals(2, session.readPublishedFrame { it.scrollbackOffset }) },
                 )
             }
         }
@@ -1699,7 +1981,7 @@ class TerminalSessionTest {
                     responseReader = terminal,
                     connector = connector,
                     parser = RecordingParser(),
-                    inputEncoder = NoOpInputEncoder,
+                    inputEncoderFactory = noOpInputEncoderFactory,
                     workerDispatcher = StandardTestDispatcher(testScheduler),
                     ioDispatcher = UnconfinedTestDispatcher(),
                 )
@@ -1725,7 +2007,7 @@ class TerminalSessionTest {
 
                     assertAll(
                         { assertEquals(1, renderReader.readCalls) },
-                        { assertEquals(1, session.renderPublisher.readCurrent { it.scrollbackOffset }) },
+                        { assertEquals(1, session.readPublishedFrame { it.scrollbackOffset }) },
                     )
 
                     session.requestRender(scrollbackOffset = 2)
@@ -1734,7 +2016,7 @@ class TerminalSessionTest {
                     assertTrue(session.renderGeneration.value > firstGeneration)
                     assertAll(
                         { assertEquals(2, renderReader.readCalls) },
-                        { assertEquals(2, session.renderPublisher.readCurrent { it.scrollbackOffset }) },
+                        { assertEquals(2, session.readPublishedFrame { it.scrollbackOffset }) },
                     )
                 } finally {
                     collectorScope.cancel()
@@ -1755,7 +2037,7 @@ class TerminalSessionTest {
                 responseReader = terminal,
                 connector = connector,
                 parser = parser,
-                inputEncoder = NoOpInputEncoder,
+                inputEncoderFactory = noOpInputEncoderFactory,
                 workerDispatcher = StandardTestDispatcher(),
                 ioDispatcher = UnconfinedTestDispatcher(),
             )
@@ -1857,7 +2139,7 @@ class TerminalSessionTest {
                 responseReader = terminal,
                 connector = connector,
                 parser = parser,
-                inputEncoder = NoOpInputEncoder,
+                inputEncoderFactory = noOpInputEncoderFactory,
                 workerDispatcher = StandardTestDispatcher(),
                 ioDispatcher = UnconfinedTestDispatcher(),
             )
@@ -1920,7 +2202,7 @@ class TerminalSessionTest {
                 responseReader = terminal,
                 connector = connector,
                 parser = parser,
-                inputEncoder = NoOpInputEncoder,
+                inputEncoderFactory = noOpInputEncoderFactory,
                 workerDispatcher = StandardTestDispatcher(),
                 ioDispatcher = UnconfinedTestDispatcher(),
             )
@@ -1971,7 +2253,7 @@ class TerminalSessionTest {
         rows: Int = 3,
         hostEvents: HostEventSink = HostEventSink.NONE,
         hostPolicy: HostPolicy = HostPolicy(),
-        terminal: TerminalBuffer = TerminalBuffers.create(width = columns, height = rows),
+        terminal: TerminalRenderBuffer = TerminalBuffers.create(width = columns, height = rows),
     ): TerminalSession {
         val session =
             TerminalSession.create(
@@ -2174,13 +2456,18 @@ class TerminalSessionTest {
         ) = Unit
     }
 
-    private object NoOpInputEncoder : TerminalInputEncoder {
-        override fun encodeKey(event: TerminalKeyEvent) = Unit
+    private val noOpInputEncoderFactory =
+        io.github.ketraterm.input.api.TerminalInputEncoderFactory { _, _, _ ->
+            object : TerminalInputEncoder {
+                override fun encodeKey(event: TerminalKeyEvent) = Unit
 
-        override fun encodePaste(event: TerminalPasteEvent) = Unit
+                override fun encodePaste(event: TerminalPasteEvent) = Unit
 
-        override fun encodeFocus(event: TerminalFocusEvent) = Unit
+                override fun encodeFocus(event: TerminalFocusEvent) = Unit
 
-        override fun encodeMouse(event: TerminalMouseEvent) = Unit
-    }
+                override fun encodeMouse(event: TerminalMouseEvent) = Unit
+
+                override fun setInputPolicy(policy: TerminalInputPolicy) = Unit
+            }
+        }
 }

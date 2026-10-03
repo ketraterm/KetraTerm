@@ -349,13 +349,14 @@ class TerminalShellCommandLineSourceTest {
     fun `startup submission without a selected integration is rejected before assembly`() =
         runTest {
             val connector = MockConnector()
-            // Deliberately lacks a render reader: argument validation must precede assembly.
-            val terminal = object : TerminalBuffer by TerminalBuffers.create(30, 3) {}
+            val renderReader = TerminalBuffers.create(30, 3)
+            val terminal = object : TerminalBuffer by renderReader {}
             val dispatcher = StandardTestDispatcher(testScheduler)
             val failure =
                 assertThrows(IllegalArgumentException::class.java) {
                     TerminalSession.create(
                         terminal = terminal,
+                        renderReader = renderReader,
                         connector = connector,
                         startupCommand = TerminalStartupCommand("echo startup"),
                         workerDispatcher = dispatcher,
@@ -408,7 +409,7 @@ class TerminalShellCommandLineSourceTest {
     fun `host directory and command metadata remain authoritative even when OSC is allowed`() =
         runTest {
             Fixture(StandardTestDispatcher(testScheduler)).use { fixture ->
-                val state = fixture.session.shellIntegrationState
+                val state = fixture.model
                 state.recordCurrentWorkingDirectory("file:///host/project")
                 var lineId = 0L
                 fixture.session.readRenderFrame { lineId = it.lineId(0) }
@@ -439,6 +440,7 @@ class TerminalShellCommandLineSourceTest {
         dispatcher: CoroutineDispatcher,
         start: Boolean = true,
     ) : AutoCloseable {
+        val model = TerminalShellIntegrationState()
         val source = MutableStateFlow<TerminalShellCommandLineSnapshot?>(null)
         val connector = MockConnector()
         val session =
@@ -447,7 +449,7 @@ class TerminalShellCommandLineSourceTest {
                 connector = connector,
                 workerDispatcher = dispatcher,
                 ioDispatcher = dispatcher,
-                shellIntegration = TerminalShellIntegrationFactory.host(TerminalShellIntegrationState(), source),
+                shellIntegration = TerminalShellIntegrationFactory.host(model, source),
             )
 
         init {

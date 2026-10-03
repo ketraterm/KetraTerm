@@ -15,6 +15,7 @@
  */
 package io.github.ketraterm.ui.swing.suggestion
 
+import java.util.*
 import javax.swing.JComponent
 
 /**
@@ -37,8 +38,8 @@ public class SwingShellSuggestionViewSnapshot private constructor(
     public val viewportStartIndex: Int,
     public val totalSuggestionCount: Int,
 ) {
-    /** Defensively copied visible suggestion window. */
-    public val visibleSuggestions: List<SwingShellSuggestion> = visibleSuggestions.toList()
+    /** Defensively copied visible suggestion window; Java mutation attempts throw [UnsupportedOperationException]. */
+    public val visibleSuggestions: List<SwingShellSuggestion> = Collections.unmodifiableList(visibleSuggestions.toList())
 
     /** Whether ranked suggestions precede this viewport. */
     public val hasSuggestionsBefore: Boolean
@@ -67,8 +68,8 @@ public class SwingShellSuggestionViewSnapshot private constructor(
         require(totalSuggestionCount >= 0) {
             "totalSuggestionCount must be >= 0, was $totalSuggestionCount"
         }
-        require(viewportStartIndex + this.visibleSuggestions.size <= totalSuggestionCount) {
-            "visible viewport [$viewportStartIndex, ${viewportStartIndex + this.visibleSuggestions.size}) " +
+        require(viewportStartIndex <= totalSuggestionCount - this.visibleSuggestions.size) {
+            "visible viewport [$viewportStartIndex, ${viewportStartIndex.toLong() + this.visibleSuggestions.size}) " +
                 "exceeds totalSuggestionCount $totalSuggestionCount"
         }
         if (this.visibleSuggestions.isEmpty()) {
@@ -174,6 +175,8 @@ public interface SwingShellSuggestionView {
      *
      * The default implementation is resource-free. Hosts that own platform
      * editors, popups, listeners, or disposable scopes must release them here.
+     * The controller calls this on the EDT even if the final hiding update fails.
+     * A close failure propagates, or is suppressed on an earlier hiding failure.
      */
     public fun close(): Unit = Unit
 }

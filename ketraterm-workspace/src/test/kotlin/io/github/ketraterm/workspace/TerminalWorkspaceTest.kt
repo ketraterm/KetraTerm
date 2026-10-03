@@ -27,6 +27,7 @@ import io.github.ketraterm.parser.api.TerminalOutputParser
 import io.github.ketraterm.protocol.NotificationLevel
 import io.github.ketraterm.protocol.ShellIntegrationEvent
 import io.github.ketraterm.protocol.ShellIntegrationMarker
+import io.github.ketraterm.protocol.TerminalHostModeCapability
 import io.github.ketraterm.pty.PtyEventListener
 import io.github.ketraterm.render.api.TerminalColorPalette
 import io.github.ketraterm.render.api.TerminalRenderFrameReader
@@ -44,11 +45,75 @@ import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
+import org.junit.jupiter.api.Assertions.assertAll
 import kotlin.test.*
 import kotlin.time.Duration.Companion.milliseconds
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class TerminalWorkspaceTest {
+    @Test
+    fun `workspace options reject negative mode capabilities at every construction boundary`() = assertInvalidModeCapabilities(-1)
+
+    @Test
+    fun `workspace options reject reserved mode capability bit at every construction boundary`() = assertInvalidModeCapabilities(1)
+
+    @Test
+    fun `workspace options reject unknown mode capability bit at every construction boundary`() = assertInvalidModeCapabilities(8)
+
+    @Test
+    fun `workspace options reject sign mode capability bit at every construction boundary`() = assertInvalidModeCapabilities(Int.MIN_VALUE)
+
+    private fun assertInvalidModeCapabilities(capabilities: Int) {
+        val defaults = TerminalWorkspaceOpenOptions()
+        val original = defaults.copy { it.modeReportCapabilities = TerminalHostModeCapability.URGENT_BELL }
+        val draft = original.toBuilder()
+        draft.modeReportCapabilities = capabilities
+        assertAll(
+            {
+                assertFailsWith<IllegalArgumentException>("create must reject $capabilities") {
+                    TerminalWorkspaceOpenOptions.create { it.modeReportCapabilities = capabilities }
+                }
+            },
+            {
+                assertFailsWith<IllegalArgumentException>("copy must reject $capabilities") {
+                    original.copy { it.modeReportCapabilities = capabilities }
+                }
+            },
+            {
+                assertFailsWith<IllegalArgumentException>("build must reject $capabilities") { draft.build() }
+            },
+            { assertEquals(0, defaults.modeReportCapabilities) },
+            { assertEquals(TerminalHostModeCapability.URGENT_BELL, original.modeReportCapabilities) },
+            { assertEquals(original, original.copy {}) },
+        )
+    }
+
+    @Test
+    fun `workspace options retain every valid mode capability subset through construction and updates`() {
+        val defaults = TerminalWorkspaceOpenOptions()
+        for (capabilities in listOf(
+            0,
+            TerminalHostModeCapability.URGENT_BELL,
+            TerminalHostModeCapability.POP_ON_BELL,
+            TerminalHostModeCapability.ALL,
+        )) {
+            val created = TerminalWorkspaceOpenOptions.create { it.modeReportCapabilities = capabilities }
+            val copied = defaults.copy { it.modeReportCapabilities = capabilities }
+            val draft = defaults.toBuilder()
+            draft.modeReportCapabilities = capabilities
+            val built = draft.build()
+            draft.modeReportCapabilities = 0
+            assertAll(
+                { assertEquals(capabilities, created.modeReportCapabilities) },
+                { assertEquals(capabilities, copied.modeReportCapabilities) },
+                { assertEquals(capabilities, built.modeReportCapabilities) },
+                { assertEquals(created, copied) },
+                { assertEquals(created, built) },
+                { assertEquals(0, defaults.modeReportCapabilities) },
+            )
+        }
+    }
+
     @Test
     fun `closed workspace rejects new tabs before creating a session`() =
         runTest {
@@ -66,7 +131,12 @@ class TerminalWorkspaceTest {
             assertFailsWith<IllegalStateException> {
                 workspace.openTab(
                     TerminalProfile("test", "Test", listOf("unused")),
-                    TerminalWorkspaceOpenOptions(80, 24, false, 100),
+                    TerminalWorkspaceOpenOptions.create { draft ->
+                        draft.columns = 80
+                        draft.rows = 24
+                        draft.treatAmbiguousAsWide = false
+                        draft.maxHistory = 100
+                    },
                 )
             }
             assertEquals(0, created)
@@ -133,7 +203,12 @@ class TerminalWorkspaceTest {
                     val tab =
                         workspace.openTab(
                             TerminalProfile("p", "Profile", listOf("mock")),
-                            TerminalWorkspaceOpenOptions(80, 24, false, 100),
+                            TerminalWorkspaceOpenOptions.create { draft ->
+                                draft.columns = 80
+                                draft.rows = 24
+                                draft.treatAmbiguousAsWide = false
+                                draft.maxHistory = 100
+                            },
                         )
                     val events = requireNotNull(ptyListener)
 
@@ -186,7 +261,13 @@ class TerminalWorkspaceTest {
                 val tab =
                     workspace.openTab(
                         TerminalProfile("p1", "Profile", listOf("mock-shell")),
-                        TerminalWorkspaceOpenOptions(80, 24, false, 100, showForegroundProcessName = false),
+                        TerminalWorkspaceOpenOptions.create { draft ->
+                            draft.columns = 80
+                            draft.rows = 24
+                            draft.treatAmbiguousAsWide = false
+                            draft.maxHistory = 100
+                            draft.showForegroundProcessName = false
+                        },
                     )
                 assertEquals("Profile", tab.title)
                 runCurrent()
@@ -234,7 +315,12 @@ class TerminalWorkspaceTest {
                 val tab =
                     workspace.openTab(
                         TerminalProfile("p1", "Profile", listOf("mock-shell")),
-                        TerminalWorkspaceOpenOptions(80, 24, false, 100),
+                        TerminalWorkspaceOpenOptions.create { draft ->
+                            draft.columns = 80
+                            draft.rows = 24
+                            draft.treatAmbiguousAsWide = false
+                            draft.maxHistory = 100
+                        },
                     )
                 runCurrent()
                 assertEquals("vim", tab.title)
@@ -251,6 +337,167 @@ class TerminalWorkspaceTest {
             }
             runCurrent()
         }
+
+    @Test
+    fun `reentrant tab close cannot select a removed tab`() = assertReentrantCloseSelection(closeRemainingTab = true)
+
+    @Test
+    fun `reentrant tab selection supersedes the outer close selection`() = assertReentrantCloseSelection(closeRemainingTab = false)
+
+    private fun assertReentrantCloseSelection(closeRemainingTab: Boolean) =
+        runTest {
+            val dispatcher = StandardTestDispatcher(testScheduler)
+            val selections = mutableListOf<String>()
+            lateinit var workspace: TerminalWorkspace
+            lateinit var first: TerminalWorkspaceTab
+            lateinit var closing: TerminalWorkspaceTab
+            var replacement: TerminalWorkspaceTab? = null
+            workspace =
+                TerminalWorkspace(
+                    listener =
+                        object : TerminalWorkspaceListener {
+                            override fun tabSelected(tabId: String) {
+                                selections += tabId
+                                assertEquals(
+                                    tabId,
+                                    workspace.selectedTab()?.id,
+                                    "selection notifications must describe current workspace state",
+                                )
+                            }
+
+                            override fun tabClosed(tabId: String) {
+                                if (tabId != closing.id) return
+                                if (closeRemainingTab) {
+                                    workspace.closeTab(first.id)
+                                } else {
+                                    workspace.selectTab(requireNotNull(replacement).id)
+                                }
+                            }
+                        },
+                    sessionFactory = { _, _, _ -> testSession(dispatcher = dispatcher) },
+                    workerDispatcher = dispatcher,
+                )
+            workspace.use {
+                val options =
+                    TerminalWorkspaceOpenOptions.create { draft ->
+                        draft.columns = 80
+                        draft.rows = 24
+                        draft.treatAmbiguousAsWide = false
+                        draft.maxHistory = 100
+                        draft.showForegroundProcessName = false
+                    }
+                first = workspace.openTab(TerminalProfile("a", "First", listOf("mock-shell")), options)
+                closing = workspace.openTab(TerminalProfile("b", "Closing", listOf("mock-shell")), options)
+                if (!closeRemainingTab) {
+                    workspace.openTab(TerminalProfile("c", "Adjacent", listOf("mock-shell")), options)
+                    replacement = first
+                    workspace.selectTab(closing.id)
+                }
+                selections.clear()
+
+                workspace.closeTab(closing.id)
+
+                val selectedId = if (closeRemainingTab) null else requireNotNull(replacement).id
+                assertEquals(selectedId, workspace.selectedTab()?.id)
+                assertEquals(listOfNotNull(selectedId), selections, "reentrant selection supersedes the outer close notification")
+                if (closeRemainingTab) assertTrue(workspace.tabSnapshot().isEmpty())
+            }
+            runCurrent()
+        }
+
+    @Test
+    fun `process title listener failure preserves shell observation and remote closure delivery`() =
+        verifyProcessTitleFailure(IllegalStateException("host title notification failed"))
+
+    @Test
+    fun `process title listener error preserves shell observation and remote closure delivery`() =
+        verifyProcessTitleFailure(AssertionError("host title notification failed"))
+
+    @Test
+    fun `process title listener cancellation preserves shell observation and remote closure delivery`() =
+        verifyProcessTitleFailure(kotlinx.coroutines.CancellationException("host title notification cancelled"))
+
+    private fun verifyProcessTitleFailure(failure: Throwable) {
+        var lifecycleAssertionsCompleted = false
+        try {
+            runTest {
+                val dispatcher = StandardTestDispatcher(testScheduler)
+                val connector = RecordingConnector(foregroundName = "vim")
+                val state = TerminalShellIntegrationState()
+                val session =
+                    testSession(
+                        connector = connector,
+                        dispatcher = dispatcher,
+                        shellIntegration = TerminalShellIntegrationFactory.host(state),
+                    )
+                val directories = mutableListOf<String>()
+                val closedTabIds = mutableListOf<String>()
+                var titleFailureDelivered = false
+                TerminalWorkspace(
+                    listener =
+                        object : TerminalWorkspaceListener {
+                            override fun titleChanged(
+                                tab: TerminalWorkspaceTab,
+                                title: String,
+                            ) {
+                                if (title == "vim" && !titleFailureDelivered) {
+                                    titleFailureDelivered = true
+                                    throw failure
+                                }
+                            }
+
+                            override fun currentWorkingDirectoryChanged(
+                                tab: TerminalWorkspaceTab,
+                                uri: String,
+                            ) {
+                                directories += uri
+                            }
+
+                            override fun sessionClosed(
+                                tab: TerminalWorkspaceTab,
+                                exitCode: Int?,
+                                failure: Throwable?,
+                            ) {
+                                assertEquals(7, exitCode)
+                                assertNull(failure)
+                                closedTabIds += tab.id
+                            }
+                        },
+                    sessionFactory = { _, _, _ -> session },
+                    workerDispatcher = dispatcher,
+                ).use { workspace ->
+                    val tab =
+                        workspace.openTab(
+                            TerminalProfile("p1", "Profile", listOf("mock-shell")),
+                            TerminalWorkspaceOpenOptions.create { draft ->
+                                draft.columns = 80
+                                draft.rows = 24
+                                draft.treatAmbiguousAsWide = false
+                                draft.maxHistory = 100
+                            },
+                        )
+                    runCurrent()
+                    assertTrue(titleFailureDelivered, "foreground metadata must exercise the failing host callback")
+                    assertFalse(session.isClosed, "a presentation callback must not terminate the terminal process")
+
+                    state.recordCurrentWorkingDirectory("file:///home/user/project")
+                    connector.simulateClosed(7)
+                    runCurrent()
+
+                    assertAll(
+                        { assertEquals(listOf("file:///home/user/project"), directories) },
+                        { assertEquals("file:///home/user/project", tab.currentWorkingDirectoryUri) },
+                        { assertEquals(listOf(tab.id), closedTabIds, "host notification failure must not detach lifecycle observation") },
+                    )
+                }
+                runCurrent()
+                lifecycleAssertionsCompleted = true
+            }
+        } catch (reported: Throwable) {
+            // Optional diagnostics may propagate; accept only the injected report after assertions and teardown.
+            if (reported !== failure || !lifecycleAssertionsCompleted || reported.suppressed.isNotEmpty()) throw reported
+        }
+    }
 
     @Test
     fun `process titles preserve custom application and directory precedence`() {
@@ -350,7 +597,12 @@ class TerminalWorkspaceTest {
             val tab =
                 workspace.openTab(
                     TerminalProfile("test", "Test", listOf("unused-shell")),
-                    TerminalWorkspaceOpenOptions(80, 24, false, 100),
+                    TerminalWorkspaceOpenOptions.create { draft ->
+                        draft.columns = 80
+                        draft.rows = 24
+                        draft.treatAmbiguousAsWide = false
+                        draft.maxHistory = 100
+                    },
                 )
             events.columnModeChanged(session, 24, 132)
             assertSame(tab, requestedTab)
@@ -387,7 +639,12 @@ class TerminalWorkspaceTest {
                 val tab =
                     workspace.openTab(
                         TerminalProfile("test", "Test", listOf("unused-shell")),
-                        TerminalWorkspaceOpenOptions(80, 24, false, 100),
+                        TerminalWorkspaceOpenOptions.create { draft ->
+                            draft.columns = 80
+                            draft.rows = 24
+                            draft.treatAmbiguousAsWide = false
+                            draft.maxHistory = 100
+                        },
                     )
                 session.encodePaste(TerminalPasteEvent("user command"))
                 runCurrent()
@@ -487,7 +744,13 @@ class TerminalWorkspaceTest {
             val tab =
                 workspace.openTab(
                     profile = TerminalProfile("p1", "Profile 1", listOf("mock-shell")),
-                    options = TerminalWorkspaceOpenOptions(80, 24, false, 100),
+                    options =
+                        TerminalWorkspaceOpenOptions.create { draft ->
+                            draft.columns = 80
+                            draft.rows = 24
+                            draft.treatAmbiguousAsWide = false
+                            draft.maxHistory = 100
+                        },
                 )
             val eventListener = requireNotNull(capturedEventListener)
 
@@ -532,13 +795,13 @@ class TerminalWorkspaceTest {
         workspace.openTab(
             profile = TerminalProfile("p1", "Profile 1", listOf("mock-shell")),
             options =
-                TerminalWorkspaceOpenOptions(
-                    columns = 80,
-                    rows = 24,
-                    treatAmbiguousAsWide = false,
-                    maxHistory = 100,
-                    pasteControlPolicy = PasteControlPolicy.STRIP_C0_EXCEPT_TAB_CR_LF,
-                ),
+                TerminalWorkspaceOpenOptions.create { draft ->
+                    draft.columns = 80
+                    draft.rows = 24
+                    draft.treatAmbiguousAsWide = false
+                    draft.maxHistory = 100
+                    draft.pasteControlPolicy = PasteControlPolicy.STRIP_C0_EXCEPT_TAB_CR_LF
+                },
         )
 
         assertEquals(
@@ -640,12 +903,12 @@ class TerminalWorkspaceTest {
             workspace.openTab(
                 profile = TerminalProfile("p1", "Profile 1", listOf("mock-shell")),
                 options =
-                    TerminalWorkspaceOpenOptions(
-                        columns = 80,
-                        rows = 24,
-                        treatAmbiguousAsWide = false,
-                        maxHistory = 100,
-                    ),
+                    TerminalWorkspaceOpenOptions.create { draft ->
+                        draft.columns = 80
+                        draft.rows = 24
+                        draft.treatAmbiguousAsWide = false
+                        draft.maxHistory = 100
+                    },
             )
         val event = ShellIntegrationEvent(ShellIntegrationMarker.COMMAND_FINISHED, exitCode = 2)
 
@@ -679,7 +942,13 @@ class TerminalWorkspaceTest {
             val tab =
                 workspace.openTab(
                     profile = TerminalProfile("p1", "Profile 1", listOf("mock-shell")),
-                    options = TerminalWorkspaceOpenOptions(80, 24, false, 100),
+                    options =
+                        TerminalWorkspaceOpenOptions.create { draft ->
+                            draft.columns = 80
+                            draft.rows = 24
+                            draft.treatAmbiguousAsWide = false
+                            draft.maxHistory = 100
+                        },
                 )
 
             connector.simulateClosed(1)
@@ -710,14 +979,20 @@ class TerminalWorkspaceTest {
         val tab =
             workspace.openTab(
                 profile = TerminalProfile("p1", "Profile 1", listOf("mock-shell")),
-                options = TerminalWorkspaceOpenOptions(80, 24, false, 100),
+                options =
+                    TerminalWorkspaceOpenOptions.create { draft ->
+                        draft.columns = 80
+                        draft.rows = 24
+                        draft.treatAmbiguousAsWide = false
+                        draft.maxHistory = 100
+                    },
             )
         assertTrue(workspace.isCoroutineScopeActive)
         assertEquals(1, workspace.sessionCollectionCount)
 
         workspace.closeTab(tab.id)
 
-        assertEquals(emptyList<String>(), closeEvents)
+        assertEquals(emptyList(), closeEvents)
         assertEquals(0, workspace.sessionCollectionCount)
         workspace.close()
         assertFalse(workspace.isCoroutineScopeActive)
@@ -749,12 +1024,12 @@ class TerminalWorkspaceTest {
             workspace.openTab(
                 profile = TerminalProfile("p1", "Profile 1", listOf("mock-shell")),
                 options =
-                    TerminalWorkspaceOpenOptions(
-                        columns = 80,
-                        rows = 24,
-                        treatAmbiguousAsWide = false,
-                        maxHistory = 100,
-                    ),
+                    TerminalWorkspaceOpenOptions.create { draft ->
+                        draft.columns = 80
+                        draft.rows = 24
+                        draft.treatAmbiguousAsWide = false
+                        draft.maxHistory = 100
+                    },
             )
         val event = testClipboardWriteEvent()
 
@@ -789,12 +1064,12 @@ class TerminalWorkspaceTest {
             workspace.openTab(
                 profile = TerminalProfile("p1", "Profile 1", listOf("mock-shell")),
                 options =
-                    TerminalWorkspaceOpenOptions(
-                        columns = 80,
-                        rows = 24,
-                        treatAmbiguousAsWide = false,
-                        maxHistory = 100,
-                    ),
+                    TerminalWorkspaceOpenOptions.create { draft ->
+                        draft.columns = 80
+                        draft.rows = 24
+                        draft.treatAmbiguousAsWide = false
+                        draft.maxHistory = 100
+                    },
             )
         val event = testClipboardPromptEvent()
 
@@ -851,7 +1126,13 @@ class TerminalWorkspaceTest {
                     List(2) { index ->
                         workspace.openTab(
                             TerminalProfile("p$index", "Profile $index", listOf("mock-shell")),
-                            TerminalWorkspaceOpenOptions(80, 24, false, 100, showForegroundProcessName = false),
+                            TerminalWorkspaceOpenOptions.create { draft ->
+                                draft.columns = 80
+                                draft.rows = 24
+                                draft.treatAmbiguousAsWide = false
+                                draft.maxHistory = 100
+                                draft.showForegroundProcessName = false
+                            },
                         )
                     }
                 failingTabId = tabs.last().id
@@ -931,7 +1212,7 @@ class TerminalWorkspaceTest {
             responseReader = terminal,
             connector = connector,
             parser = NoOpParser,
-            inputEncoder = NoOpInputEncoder,
+            inputEncoderFactory = { _, _, _ -> object : TerminalInputEncoder by NoOpInputEncoder {} },
             workerDispatcher = dispatcher,
             ioDispatcher = dispatcher,
             shellIntegration = shellIntegration,
@@ -1004,6 +1285,8 @@ class TerminalWorkspaceTest {
     }
 
     private object NoOpInputEncoder : TerminalInputEncoder {
+        override fun setInputPolicy(policy: io.github.ketraterm.input.policy.TerminalInputPolicy) = Unit
+
         override fun encodeKey(event: TerminalKeyEvent) = Unit
 
         override fun encodePaste(event: TerminalPasteEvent) = Unit

@@ -38,6 +38,8 @@ The core does not own:
 
 ## Public API surfaces
 
+`TerminalBuffers.create` returns `TerminalRenderBuffer`, which combines `TerminalBuffer` and `TerminalRenderFrameReader` for the same state. Headless implementations may expose `TerminalBuffer` alone; rendering remains a separate role. Neither interface adds synchronization.
+
 `TerminalBuffer` composes these narrower contracts:
 
 - `TerminalWriter`
@@ -51,6 +53,10 @@ External parser and input code should depend on the narrowest interface they
 need instead of the full facade.
 
 ### Render frame generations
+
+Core frame reads require external serialization with mutation and are not
+reentrant on the same buffer. A nested read throws `IllegalStateException`
+before changing the enclosing frame; callback failure releases the lease.
 
 `TerminalReader.palette` exposes the current immutable effective palette without
 allocating or acquiring a render frame. Callers serialize reads with mutation;
@@ -220,7 +226,14 @@ Guaranteed behavior:
 
 `TerminalModeController` is the public write surface for durable mode state.
 
-`TerminalModeReader.getModeSnapshot()` provides the common typed mode view.
+`TerminalModeReader.getModeSnapshot()` provides the fixed published typed subset
+listed by `TerminalModeSnapshot`, not every durable mode. The packed word exposes
+the fields in `TerminalModeBits` and the `TerminalInputState` decoding helpers;
+it additionally includes DECCOLM and xterm resources absent from the typed snapshot.
+Existing bit positions, widths, sentinels and mouse ordinal meanings are stable.
+Bits 37..62 hold xterm resources; only 19 and 63 are currently unassigned, and
+readers ignore them. Neither representation promises to hold every future mode;
+introduce a focused capability only when a new state family needs one.
 Xterm resource reads use `TerminalInputState.getInputModeBits()` with
 `keyModifierOption` and `keyFormatOption` to decode one coherent primitive snapshot.
 
@@ -248,6 +261,12 @@ Guaranteed behavior:
 - mode setters that home or otherwise alter cursor physics cancel `pendingWrap`;
   input, reporting, presentation, palette, and other non-cursor modes preserve it
 - public mode reads are immutable snapshots
+- Kitty keyboard stacks are screen-local and retain at most 32 saved entries,
+  evicting the oldest on overflow. Positive counted pops reset flags when the
+  retained stack becomes empty, including exact exhaustion; partial pops restore
+  the last popped flags. Nonpositive core counts are no-ops. Counted-pop work is
+  constant regardless of the requested count. Soft and hard reset clear both
+  stacks. Callers serialize these operations with other core mutation.
 - input reads all xterm resources from the same atomic primitive mode word;
   resource helpers decode that word directly without additional snapshot fields
 - resource setters reject invalid IDs/values before mutation; family resets
@@ -289,7 +308,7 @@ operations and invalid fill values are ignored.
 
 ## Reader contract
 
-`TerminalReader` and `TerminalLineApi` provide safe, allocation-light access to
+`TerminalReader` and `TerminalLine` provide safe, allocation-light access to
 stored state.
 
 Guaranteed behavior:
@@ -301,7 +320,11 @@ Guaranteed behavior:
 - blank cells read as `0`
 - wide spacers read as `-1`
 - cluster cells return the leading/base codepoint through `getCodepointAt`
-- full cluster contents are available through `readCluster`
+- `readCluster` copies complete clusters into caller-owned arrays of known sufficient
+  capacity; directly written clusters have no fixed public length bound
+- for complete reads without guessing capacity, `TerminalRenderFrame.copyLine` and
+  its primitive cluster sink supply the full length and a borrowed range; copy it
+  before the callback returns, under the same terminal serialization
 
 Not guaranteed:
 
@@ -426,7 +449,6 @@ These are intentional boundary choices, not accidental gaps:
 Likely to evolve before 1.0:
 
 - parser/input handoff docs
-- mode snapshot growth if more host-controlled flags are surfaced
 - parser-facing docs around charset ownership and Unicode ingestion
 
 The runtime semantics described in this document are the current intended

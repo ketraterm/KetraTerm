@@ -29,7 +29,11 @@ import java.util.concurrent.atomic.AtomicBoolean
 import javax.swing.SwingUtilities
 
 class SwingViewportControllerTest {
-    private val settings = SwingSettings(padding = SwingPadding(3, 5, 7, 11), shellIntegrationDecorationGutterWidth = 0)
+    private val settings =
+        SwingSettings.create { draft ->
+            draft.padding = SwingPadding(3, 5, 7, 11)
+            draft.shellIntegrationDecorationGutterWidth = 0
+        }
     private val metrics =
         SwingMetrics(
             cellWidth = 10,
@@ -43,7 +47,10 @@ class SwingViewportControllerTest {
 
     @Test
     fun `default alternate padding balances an odd primary inset`() {
-        val settings = SwingSettings(padding = SwingPadding(3, 5, 7, 10))
+        val settings =
+            SwingSettings.create { draft ->
+                draft.padding = SwingPadding(3, 5, 7, 10)
+            }
         assertEquals(SwingPadding(3, 15, 7, 16), settings.alternateScreenPadding)
         val controller = SwingViewportController(TerminalViewportListener.NONE) { _, _ -> }
         for (width in 1..250) {
@@ -76,10 +83,10 @@ class SwingViewportControllerTest {
         fun `alternate screen visible grid uses explicit alternate chrome instead of primary gutters`() {
             val controller = SwingViewportController(TerminalViewportListener.NONE) { _, _ -> }
             val settings =
-                SwingSettings(
-                    padding = SwingPadding(0, 4, 8, 12),
-                    alternateScreenPadding = SwingPadding(0, 8, 8, 8),
-                )
+                SwingSettings.create { draft ->
+                    draft.padding = SwingPadding(0, 4, 8, 12)
+                    draft.alternateScreenPadding = SwingPadding(0, 8, 8, 8)
+                }
 
             val primary =
                 controller.visibleGridSizeOnEdt(
@@ -159,7 +166,7 @@ class SwingViewportControllerTest {
     @Nested
     inner class ViewportPublishing {
         @Test
-        fun `publishViewportState stores snapshot and notifies listener`() {
+        fun `published snapshot is available before full listener notification`() {
             val listener = RecordingViewportListener()
             val controller = SwingViewportController(listener) { _, _ -> }
 
@@ -190,6 +197,12 @@ class SwingViewportControllerTest {
                 ),
                 snapshot,
             )
+            assertEquals(0, listener.callCount)
+            assertNull(listener.lastState)
+
+            controller.notifyViewportListener()
+
+            assertEquals(1, listener.callCount)
             assertEquals(snapshot, listener.lastState)
         }
 
@@ -207,7 +220,6 @@ class SwingViewportControllerTest {
                 renderRows = 6,
                 viewportHeightPixels = 100,
                 contentHeightPixels = 120,
-                notifyListener = false,
             )
 
             assertEquals(
@@ -242,6 +254,8 @@ class SwingViewportControllerTest {
                 renderRows = 5,
                 viewportHeightPixels = 100,
                 contentHeightPixels = 120,
+            )
+            controller.notifyViewportListener(
                 notifyListener = false,
                 notifyPrimitiveListener = true,
             )
@@ -249,6 +263,35 @@ class SwingViewportControllerTest {
             assertEquals(1, listener.callCount)
             assertEquals(2.5, listener.lastState?.scrollbackOffset)
             assertEquals(3, listener.lastState?.renderOffset)
+        }
+
+        @Test
+        fun `listener notification reads the completed publication rather than live scroll state`() {
+            SwingUtilities.invokeAndWait {
+                val listener = RecordingViewportListener()
+                val controller = SwingViewportController(listener) { _, _ -> }
+                controller.setFractionalViewport(firstPublishedState)
+                controller.publishFractionalViewport(firstPublishedState)
+                assertEquals(firstPublishedState, controller.viewportStateSnapshot())
+                assertEquals(0, listener.callCount)
+
+                controller.setFractionalViewport(secondPublishedState)
+                controller.notifyViewportListener()
+                assertEquals(1, listener.callCount)
+                assertEquals(firstPublishedState, listener.lastState)
+
+                controller.notifyViewportListener(notifyListener = false, notifyPrimitiveListener = true)
+                assertEquals(2, listener.callCount)
+                assertEquals(TerminalViewportState(100, 12.5, 13, 24, 26), listener.lastState)
+                assertEquals(firstPublishedState, controller.viewportStateSnapshot())
+
+                controller.publishFractionalViewport(secondPublishedState)
+                assertEquals(secondPublishedState, controller.viewportStateSnapshot())
+                assertEquals(2, listener.callCount)
+                controller.notifyViewportListener()
+                assertEquals(3, listener.callCount)
+                assertEquals(secondPublishedState, listener.lastState)
+            }
         }
 
         @Test
@@ -514,7 +557,6 @@ class SwingViewportControllerTest {
                 renderRows = 4,
                 viewportHeightPixels = 80,
                 contentHeightPixels = 80,
-                notifyListener = false,
             )
 
             assertEquals(
@@ -586,9 +628,10 @@ class SwingViewportControllerTest {
             renderRows = state.requestedRows - 1,
             viewportHeightPixels = state.viewportHeightPixels,
             contentHeightPixels = state.contentHeightPixels,
-            notifyListener = false,
-            notifyPrimitiveListener = notifyPrimitiveListener,
         )
+        if (notifyPrimitiveListener) {
+            notifyViewportListener(notifyListener = false, notifyPrimitiveListener = true)
+        }
     }
 
     private class RecordingViewportListener : TerminalViewportListener {
@@ -619,7 +662,6 @@ class SwingViewportControllerTest {
             renderRows = 1,
             viewportHeightPixels = 20,
             contentHeightPixels = 20,
-            notifyListener = false,
         )
         return viewportStateSnapshot().scrollbackOffset
     }

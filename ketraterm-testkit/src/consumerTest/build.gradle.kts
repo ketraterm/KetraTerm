@@ -13,6 +13,8 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+import org.gradle.api.artifacts.component.ModuleComponentIdentifier
+
 plugins {
     kotlin("jvm") apply false
 }
@@ -30,7 +32,7 @@ val runtimeName = runtimeKotlinVersion.getOrElse("current")
 subprojects {
     val consumerName = name
     apply(plugin = "org.jetbrains.kotlin.jvm")
-    layout.buildDirectory.set(layout.projectDirectory.dir("build/$metadataMode"))
+    layout.buildDirectory.set(layout.projectDirectory.dir("build/$metadataMode/${providers.gradleProperty("kotlinVersion").get()}"))
     configurations.configureEach { resolutionStrategy.cacheChangingModulesFor(0, "seconds") }
     repositories {
         exclusiveContent {
@@ -53,7 +55,8 @@ subprojects {
     }
     extensions.configure<org.jetbrains.kotlin.gradle.dsl.KotlinJvmProjectExtension> { jvmToolchain(25) }
     // The only library dependency: missing exports must not be repaired by the fixture.
-    dependencies { add("implementation", "io.github.ketraterm:ketraterm-$name:${providers.gradleProperty("libraryVersion").get()}") }
+    val libraryName = if (name == "host-spi") "host" else name
+    dependencies { add("implementation", "io.github.ketraterm:ketraterm-$libraryName:${providers.gradleProperty("libraryVersion").get()}") }
     runtimeKotlinVersion.orNull?.let { version ->
         configurations.named("runtimeClasspath") {
             resolutionStrategy.force(
@@ -68,7 +71,7 @@ subprojects {
             dependsOn("classes")
             classpath = project.extensions.getByType<SourceSetContainer>()["main"].runtimeClasspath
             mainClass.set("consumer.KotlinConsumerKt")
-            if (project.name == "ui-swing") systemProperty("java.awt.headless", "true")
+            if (project.name in setOf("ui-swing", "ui-swing-host")) systemProperty("java.awt.headless", "true")
             javaLauncher.set(
                 project.extensions.getByType<JavaToolchainService>().launcherFor {
                     languageVersion.set(JavaLanguageVersion.of(25))
@@ -154,6 +157,70 @@ subprojects {
         }
     }
 }
+
+val verifyPublicationBoundary =
+    tasks.register("verifyPublicationBoundary") {
+        val requestedVersion = providers.gradleProperty("libraryVersion")
+        val repository = providers.gradleProperty("libraryRepository").map { file(uri(it)) }
+        val runtimes = subprojects.associate { it.name to it.configurations.named("runtimeClasspath") }
+        inputs.property("libraryVersion", requestedVersion)
+        inputs.dir(repository)
+        inputs.files(runtimes.values)
+        doLast {
+            val version = requestedVersion.get()
+            val productArtifacts =
+                setOf(
+                    "ketraterm-workspace",
+                    "ketraterm-completion-persistence",
+                    "ketraterm-app",
+                    "ketraterm-testkit",
+                    "ketraterm-benchmarks",
+                    "ketraterm-intellij-plugin",
+                )
+            for (artifact in productArtifacts) {
+                check(!repository.get().resolve("io/github/ketraterm/$artifact/$version").exists()) {
+                    "Product artifact $artifact:$version leaked into the public Maven repository"
+                }
+            }
+            for ((consumer, runtime) in runtimes) {
+                val modules =
+                    runtime
+                        .get()
+                        .incoming.resolutionResult.allComponents
+                        .mapNotNull { it.id as? ModuleComponentIdentifier }
+                for (module in modules) {
+                    if (module.group == "io.github.ketraterm") {
+                        check(module.module !in productArtifacts) { "$consumer pulled product artifact $module" }
+                        check(module.version == version) { "$consumer mixed library versions: expected $version, got $module" }
+                    }
+                    if (consumer == "parser" || consumer == "core") {
+                        check(
+                            !module.module.startsWith("ketraterm-ui-") &&
+                                module.module != "ketraterm-pty" &&
+                                module.group != "org.jetbrains.pty4j" &&
+                                module.group != "net.java.dev.jna" &&
+                                module.module != "kotlinx-coroutines-swing",
+                        ) { "Headless $consumer pulled UI or native hosting dependency $module" }
+                    }
+                    if (consumer == "ui-swing") {
+                        check(
+                            module.module !in
+                                setOf(
+                                    "ketraterm-pty",
+                                    "ketraterm-shell-integration",
+                                    "ketraterm-ui-swing-host",
+                                    "ketraterm-completion",
+                                    "ketraterm-completion-host",
+                                ) &&
+                                module.group != "org.jetbrains.pty4j" &&
+                                module.group != "net.java.dev.jna",
+                        ) { "Base Swing terminal pulled optional host integration $module" }
+                    }
+                }
+            }
+        }
+    }
+subprojects { tasks.named("check") { dependsOn(verifyPublicationBoundary) } }
 
 tasks.register("prepareCompiledClientRuntime") {
     dependsOn(subprojects.map { it.tasks.named("prepareCompiledClientRuntime") })

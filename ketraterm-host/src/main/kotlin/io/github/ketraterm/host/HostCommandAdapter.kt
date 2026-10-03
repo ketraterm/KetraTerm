@@ -16,6 +16,7 @@
 package io.github.ketraterm.host
 
 import io.github.ketraterm.core.api.TerminalBuffer
+import io.github.ketraterm.core.api.TerminalInputState
 import io.github.ketraterm.core.api.TerminalModeBits
 import io.github.ketraterm.core.model.CellColor
 import io.github.ketraterm.core.model.UnderlineStyle
@@ -83,6 +84,10 @@ public class HostCommandAdapter(
     /**
      * Updates the active host security policy dynamically.
      *
+     * This only publishes the policy. A lowered hyperlink retention limit is
+     * reconciled by the serialized command owner on the next accepted open,
+     * including reuse of an existing explicit key.
+     *
      * @param policy new security policy.
      */
     public fun setHostPolicy(policy: HostPolicy) {
@@ -97,16 +102,16 @@ public class HostCommandAdapter(
     private var currentWorkingDirectory: String? = null
 
     /**
-     * The current window title reported by the shell or application.
+     * The current authoritative core window title. Read under the same serialization as core mutation.
      */
-    public var windowTitle: String = ""
-        private set
+    public val windowTitle: String
+        get() = terminal.windowTitle
 
     /**
-     * The current icon title reported by the shell or application.
+     * The current authoritative core icon title. Read under the same serialization as core mutation.
      */
-    public var iconTitle: String = ""
-        private set
+    public val iconTitle: String
+        get() = terminal.iconTitle
 
     /**
      * The URI of the currently active hyperlink (OSC 8), or `null` if none.
@@ -163,7 +168,7 @@ public class HostCommandAdapter(
 
     override fun lineFeed() {
         terminal.newLine()
-        if (terminal.getModeSnapshot().isNewLineMode) {
+        if (TerminalInputState.isNewLineMode(terminal.getInputModeBits())) {
             terminal.carriageReturn()
         }
     }
@@ -602,7 +607,7 @@ public class HostCommandAdapter(
         applicationMode: Int,
     ) {
         if (flags < 0) return
-        val current = terminal.getModeSnapshot().kittyKeyboardFlags
+        val current = TerminalInputState.kittyKeyboardFlags(terminal.getInputModeBits())
         val next =
             when (applicationMode) {
                 KittyKeyboardFlagApplicationMode.REPLACE -> flags
@@ -1075,13 +1080,11 @@ public class HostCommandAdapter(
     private fun popTitle(stack: ArrayDeque<String>): String? = if (stack.isEmpty()) null else stack.removeLast()
 
     private fun updateIconTitle(title: String) {
-        iconTitle = title
         terminal.setIconTitle(title)
         hostEvents.iconTitleChanged(title)
     }
 
     private fun updateWindowTitle(title: String) {
-        windowTitle = title
         terminal.setWindowTitle(title)
         hostEvents.windowTitleChanged(title)
     }
@@ -1118,6 +1121,7 @@ public class HostCommandAdapter(
         uri: String,
         id: String?,
     ): Int {
+        val maxEntries = hostPolicy.maxHyperlinkEntries
         val numericId = nextHyperlinkNumericId
         val key =
             if (id == null) {
@@ -1126,27 +1130,31 @@ public class HostCommandAdapter(
                 HyperlinkKey(id = id, uri = uri, anonymousInstance = EXPLICIT_HYPERLINK_INSTANCE)
             }
         if (id != null) {
-            hyperlinkIds[key]?.let { return it }
+            hyperlinkIds[key]?.let {
+                trimHyperlinks(maxEntries)
+                return it
+            }
         }
         if (numericId == NO_HYPERLINK_ID) return NO_HYPERLINK_ID
 
-        var evictedId = NO_HYPERLINK_ID
-        if (hyperlinkIds.size >= hostPolicy.maxHyperlinkEntries) {
-            val eldest = hyperlinkIds.entries.iterator()
-            if (eldest.hasNext()) {
-                val entry = eldest.next()
-                evictedId = entry.value
-                hyperlinkKeysByNumericId.remove(entry.value)
-                eldest.remove()
-            }
-        }
+        trimHyperlinks(maxEntries - 1)
 
         hyperlinkIds[key] = numericId
         hyperlinkKeysByNumericId[numericId] = key
         nextHyperlinkNumericId = if (numericId == Int.MAX_VALUE) NO_HYPERLINK_ID else numericId + 1
-        if (evictedId != NO_HYPERLINK_ID) hostEvents.hyperlinkRemoved(evictedId)
         hostEvents.hyperlinkRegistered(numericId, uri, id)
         return numericId
+    }
+
+    private fun trimHyperlinks(maxEntries: Int) {
+        if (hyperlinkIds.size <= maxEntries) return
+        val eldest = hyperlinkIds.entries.iterator()
+        while (hyperlinkIds.size > maxEntries) {
+            val numericId = eldest.next().value
+            hyperlinkKeysByNumericId.remove(numericId)
+            eldest.remove()
+            hostEvents.hyperlinkRemoved(numericId)
+        }
     }
 
     private fun isHyperlinkAllowed(

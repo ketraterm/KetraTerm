@@ -33,12 +33,33 @@ import java.util.*
  *
  * @param engine pure progressive completion engine. This adapter does not select
  * a dispatcher; the owning suggestion caller controls its coroutine context.
- * @param contextProvider supplier for current host-owned request metadata.
+ * @param contextProvider supplier for an immutable, thread-safe snapshot of current
+ * host-owned metadata. It runs synchronously when suggestions is called, in the
+ * caller's context; SwingTerminal calls it on a background dispatcher. Do not read
+ * Swing/IDE UI state here. Publish that state to thread-safe storage from its owner.
+ * @param sourceLabels exact source identifiers mapped to host-owned display labels.
+ * Copied at construction; blank labels are rejected. Labels are trimmed and bounded
+ * to 128 UTF-16 units without splitting a surrogate pair. Unknown identifiers use
+ * the neutral built-in label or a humanized identifier. Source identity and ranking
+ * are unaffected. No host callback is invoked during adaptation.
  */
 public class SwingCompletionSuggestionProvider(
     private val engine: TerminalCompletionEngine,
-    private val contextProvider: () -> SwingCompletionContext = { SwingCompletionContext.EMPTY },
+    private val contextProvider: () -> SwingCompletionContext,
+    sourceLabels: Map<String, String>,
 ) : SwingShellSuggestionProvider {
+    private val sourceLabels =
+        sourceLabels.mapValues { (_, label) ->
+            require(label.isNotBlank()) { "source display labels must not be blank" }
+            label.trim().boundedSourceLabel()
+        }
+
+    /** Creates an adapter with neutral source labels and optional live host context. */
+    public constructor(
+        engine: TerminalCompletionEngine,
+        contextProvider: () -> SwingCompletionContext = { SwingCompletionContext.EMPTY },
+    ) : this(engine, contextProvider, emptyMap())
+
     /**
      * Returns progressive candidate snapshots adapted to the reusable Swing popup contract.
      *
@@ -64,32 +85,31 @@ public class SwingCompletionSuggestionProvider(
             .map { candidates -> candidates.map { it.toSwingSuggestion(requestContext) } }
     }
 
-    private companion object {
-        private fun TerminalCompletionCandidate.toSwingSuggestion(requestContext: SwingCompletionContext): SwingShellSuggestion =
-            SwingShellSuggestion(
-                replacementText = replacementText,
-                replacementStartOffset = replacementStartOffset,
-                replacementEndOffset = replacementEndOffset,
-                source = source,
-                sourceDisplayText = source.toDisplayText(),
-                kind = kind.name,
-                displayText = displayText,
-                detail = detail,
-                accentRole = SwingShellSuggestionAccentRole.from(kind.name, source),
-                interactionContext = requestContext,
-                matchedRanges =
-                    SwingShellSuggestionMatchRanges.fromPackedOffsets(
-                        displayText,
-                        matchedRanges.copyPackedOffsets(),
-                    ),
-            )
+    private fun TerminalCompletionCandidate.toSwingSuggestion(requestContext: SwingCompletionContext): SwingShellSuggestion =
+        SwingShellSuggestion(
+            replacementText = replacementText,
+            replacementStartOffset = replacementStartOffset,
+            replacementEndOffset = replacementEndOffset,
+            source = source,
+            sourceDisplayText = sourceLabels[source] ?: source.toDisplayText(),
+            kind = kind.name,
+            displayText = displayText,
+            detail = detail,
+            accentRole = SwingShellSuggestionAccentRole.from(kind.name, source),
+            interactionContext = requestContext,
+            matchedRanges =
+                SwingShellSuggestionMatchRanges.fromPackedOffsets(
+                    displayText,
+                    matchedRanges.copyPackedOffsets(),
+                ),
+        )
 
+    private companion object {
         private fun String.toDisplayText(): String {
             val normalized = trim().boundedSourceLabel().lowercase(Locale.ROOT).boundedSourceLabel()
             return SOURCE_DISPLAY_TEXT[normalized]
                 ?: run {
                     normalized
-                        .removePrefix("intellij-")
                         .humanizeSourceIdentifier()
                         .replaceFirstChar { character -> character.titlecase(Locale.ROOT) }
                         .boundedSourceLabel()
@@ -130,13 +150,6 @@ public class SwingCompletionSuggestionProvider(
                 "learned" to "Learned",
                 "observed" to "Learned",
                 "path" to "Path",
-                "intellij-project-file" to "Project",
-                "intellij-gradle-task" to "Gradle",
-                "intellij-git-branch" to "Git",
-                "intellij-git-remote-branch" to "Git",
-                "intellij-git-tag" to "Git",
-                "intellij-git-commit" to "Git",
-                "intellij-git-status-path" to "Git",
             )
     }
 }

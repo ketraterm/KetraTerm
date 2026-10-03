@@ -34,7 +34,7 @@ import kotlinx.coroutines.flow.StateFlow
  */
 public interface TerminalShellIntegration {
     /** Thread-safe command metadata and primitive viewport projection. */
-    public val state: TerminalShellIntegrationState
+    public val state: TerminalShellIntegrationView
 
     /** True only while the shell can accept a startup command at its live prompt. */
     public val promptReady: StateFlow<Boolean>

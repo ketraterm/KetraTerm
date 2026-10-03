@@ -92,6 +92,7 @@ public final class io/github/ketraterm/ui/swing/host/SwingCompletionResources {
 public final class io/github/ketraterm/ui/swing/host/SwingCompletionSuggestionProvider : io/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionProvider {
 	public fun <init> (Lio/github/ketraterm/completion/api/TerminalCompletionEngine;Lkotlin/jvm/functions/Function0;)V
 	public synthetic fun <init> (Lio/github/ketraterm/completion/api/TerminalCompletionEngine;Lkotlin/jvm/functions/Function0;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun <init> (Lio/github/ketraterm/completion/api/TerminalCompletionEngine;Lkotlin/jvm/functions/Function0;Ljava/util/Map;)V
 	public fun suggestions (Lio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionRequest;)Lkotlinx/coroutines/flow/Flow;
 }
 
@@ -119,6 +120,7 @@ public final class io/github/ketraterm/ui/swing/host/SwingLiveCompletionBinding 
 	public fun <init> (Lio/github/ketraterm/session/TerminalSession;Lkotlinx/coroutines/CoroutineScope;Lkotlin/jvm/functions/Function0;Lkotlin/jvm/functions/Function0;Lio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionFeedbackHandler;)V
 	public synthetic fun <init> (Lio/github/ketraterm/session/TerminalSession;Lkotlinx/coroutines/CoroutineScope;Lkotlin/jvm/functions/Function0;Lkotlin/jvm/functions/Function0;Lio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionFeedbackHandler;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun attach (Lio/github/ketraterm/ui/swing/api/SwingTerminal;)V
+	public final fun attach (Lio/github/ketraterm/ui/swing/api/SwingTerminal;Lio/github/ketraterm/ui/swing/host/SwingShellSuggestionTarget;)V
 	public final fun cancelAndHide ()V
 	public fun close ()V
 	public final fun detach ()V
@@ -130,6 +132,11 @@ public final class io/github/ketraterm/ui/swing/host/SwingMessageDialogs {
 	public static final field INSTANCE Lio/github/ketraterm/ui/swing/host/SwingMessageDialogs;
 	public final fun show (Ljava/awt/Component;Lio/github/ketraterm/ui/swing/host/SwingDialogRequest;)Ljava/lang/Integer;
 	public final fun showModeless (Ljava/awt/Component;Lio/github/ketraterm/ui/swing/host/SwingDialogRequest;Lkotlin/jvm/functions/Function1;)Ljava/lang/AutoCloseable;
+}
+
+public abstract interface class io/github/ketraterm/ui/swing/host/SwingShellSuggestionTarget {
+	public abstract fun hideSuggestions ()V
+	public abstract fun requestSuggestions (Lio/github/ketraterm/session/TerminalShellCommandLineSnapshot;)V
 }
 
 public final class io/github/ketraterm/ui/swing/host/SwingTerminalContextMenuItems {
@@ -195,5 +202,82 @@ public final class io/github/ketraterm/ui/swing/host/SwingTerminalSearchBar {
 	public final fun isOpen ()Z
 	public final fun open ()V
 	public final fun refreshColors ()V
+	public final fun refreshColors (Lio/github/ketraterm/ui/swing/host/SwingTerminalSearchColors;)V
+}
+
+public final class io/github/ketraterm/ui/swing/host/SwingTerminalSearchColors {
+	public static final field Companion Lio/github/ketraterm/ui/swing/host/SwingTerminalSearchColors$Companion;
+	public fun <init> ()V
+	public static final fun builder ()Lio/github/ketraterm/ui/swing/host/SwingTerminalSearchColors$Builder;
+	public final fun copy (Ljava/util/function/Consumer;)Lio/github/ketraterm/ui/swing/host/SwingTerminalSearchColors;
+	public static final fun create (Ljava/util/function/Consumer;)Lio/github/ketraterm/ui/swing/host/SwingTerminalSearchColors;
+	public final fun getButtonHoverBackground ()Ljava/awt/Color;
+	public final fun getButtonPressedBackground ()Ljava/awt/Color;
+	public final fun getButtonSelectedBackground ()Ljava/awt/Color;
+	public final fun getButtonSelectedForeground ()Ljava/awt/Color;
+	public final fun getCounterForeground ()Ljava/awt/Color;
+	public final fun getForeground ()Ljava/awt/Color;
+	public final fun getPanelBackground ()Ljava/awt/Color;
+	public final fun getPanelBorder ()Ljava/awt/Color;
+	public final fun getPanelShadow ()Ljava/awt/Color;
+	public final fun getSearchIconForeground ()Ljava/awt/Color;
+	public final fun getTextFieldBackground ()Ljava/awt/Color;
+	public final fun getTextFieldBorder ()Ljava/awt/Color;
+	public final fun getTextFieldFocusBorder ()Ljava/awt/Color;
+	public final fun getTextFieldPlaceholder ()Ljava/awt/Color;
+	public final fun toBuilder ()Lio/github/ketraterm/ui/swing/host/SwingTerminalSearchColors$Builder;
+}
+
+public final class io/github/ketraterm/ui/swing/host/SwingTerminalSearchColors$Builder {
+	public final fun build ()Lio/github/ketraterm/ui/swing/host/SwingTerminalSearchColors;
+	public final fun getButtonHoverBackground ()Ljava/awt/Color;
+	public final fun getButtonPressedBackground ()Ljava/awt/Color;
+	public final fun getButtonSelectedBackground ()Ljava/awt/Color;
+	public final fun getButtonSelectedForeground ()Ljava/awt/Color;
+	public final fun getCounterForeground ()Ljava/awt/Color;
+	public final fun getForeground ()Ljava/awt/Color;
+	public final fun getPanelBackground ()Ljava/awt/Color;
+	public final fun getPanelBorder ()Ljava/awt/Color;
+	public final fun getPanelShadow ()Ljava/awt/Color;
+	public final fun getSearchIconForeground ()Ljava/awt/Color;
+	public final fun getTextFieldBackground ()Ljava/awt/Color;
+	public final fun getTextFieldBorder ()Ljava/awt/Color;
+	public final fun getTextFieldFocusBorder ()Ljava/awt/Color;
+	public final fun getTextFieldPlaceholder ()Ljava/awt/Color;
+	public final fun setButtonHoverBackground (Ljava/awt/Color;)V
+	public final fun setButtonPressedBackground (Ljava/awt/Color;)V
+	public final fun setButtonSelectedBackground (Ljava/awt/Color;)V
+	public final fun setButtonSelectedForeground (Ljava/awt/Color;)V
+	public final fun setCounterForeground (Ljava/awt/Color;)V
+	public final fun setForeground (Ljava/awt/Color;)V
+	public final fun setPanelBackground (Ljava/awt/Color;)V
+	public final fun setPanelBorder (Ljava/awt/Color;)V
+	public final fun setPanelShadow (Ljava/awt/Color;)V
+	public final fun setSearchIconForeground (Ljava/awt/Color;)V
+	public final fun setTextFieldBackground (Ljava/awt/Color;)V
+	public final fun setTextFieldBorder (Ljava/awt/Color;)V
+	public final fun setTextFieldFocusBorder (Ljava/awt/Color;)V
+	public final fun setTextFieldPlaceholder (Ljava/awt/Color;)V
+}
+
+public final class io/github/ketraterm/ui/swing/host/SwingTerminalSearchColors$Companion {
+	public final fun builder ()Lio/github/ketraterm/ui/swing/host/SwingTerminalSearchColors$Builder;
+	public final fun create (Ljava/util/function/Consumer;)Lio/github/ketraterm/ui/swing/host/SwingTerminalSearchColors;
+}
+
+public final class io/github/ketraterm/ui/swing/host/SwingTerminalSettingsBounds {
+	public static final field COLUMNS_MAX I
+	public static final field COLUMNS_MIN I
+	public static final field CURSOR_BLINK_MAX I
+	public static final field CURSOR_BLINK_MIN I
+	public static final field FONT_SIZE_MAX I
+	public static final field FONT_SIZE_MIN I
+	public static final field INSTANCE Lio/github/ketraterm/ui/swing/host/SwingTerminalSettingsBounds;
+	public static final field LINE_HEIGHT_MAX F
+	public static final field LINE_HEIGHT_MIN F
+	public static final field ROWS_MAX I
+	public static final field ROWS_MIN I
+	public static final field SCROLLBACK_MAX I
+	public static final field SCROLLBACK_MIN I
 }
 

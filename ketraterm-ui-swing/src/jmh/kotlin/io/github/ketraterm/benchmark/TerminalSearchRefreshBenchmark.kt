@@ -16,7 +16,7 @@
 package io.github.ketraterm.benchmark
 
 import io.github.ketraterm.core.TerminalBuffers
-import io.github.ketraterm.core.api.TerminalBuffer
+import io.github.ketraterm.core.api.TerminalRenderBuffer
 import io.github.ketraterm.render.cache.TerminalRenderCache
 import io.github.ketraterm.session.TerminalSession
 import io.github.ketraterm.ui.swing.search.TerminalSearchController
@@ -43,7 +43,7 @@ open class TerminalSearchRefreshBenchmark {
     @Param("6", "80", "160")
     var columns = 0
 
-    private lateinit var terminal: TerminalBuffer
+    private lateinit var terminal: TerminalRenderBuffer
     private lateinit var session: TerminalSession
     private lateinit var host: SearchHost
     private lateinit var controller: TerminalSearchController

@@ -7,8 +7,9 @@ never saved.
 
 ## Directory Resolution Hierarchy
 
-The workspace configuration path is resolved by
-`TerminalWorkspaceConfigManager` in this order:
+The standalone configuration path is resolved by the application-owned
+`KetraTermConfigManager` in this order. Workspace and library embedders own their
+own persistence; IntelliJ uses IDE-managed application/project state.
 
 1. System property override:
    `-Dketraterm.config.path=/path/to/config.toml`.

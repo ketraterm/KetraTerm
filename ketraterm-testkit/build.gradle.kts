@@ -258,7 +258,7 @@ tasks.test {
 // Compile consumer fixtures against each module's exported API variant, not testkit's classpath.
 val consumerClasspathsDirectory = layout.buildDirectory.dir("consumer-classpaths")
 val prepareConsumerClasspaths =
-    listOf("host", "parser", "completion", "completion-host", "ui-swing", "pty").map { module ->
+    listOf("host", "parser", "completion", "completion-host", "ui-swing", "ui-swing-host", "pty").map { module ->
         val consumerClasspath =
             configurations.create("${module}ConsumerCompileClasspath") {
                 isCanBeConsumed = false
@@ -288,9 +288,32 @@ val consumerFixtureDirectory = layout.buildDirectory.dir("published-consumers")
 configure<com.diffplug.gradle.spotless.SpotlessExtension> {
     kotlinGradle { target("*.gradle.kts", "src/consumerTest/*.gradle.kts") }
 }
+val extractSwingReadmeExample =
+    tasks.register("extractSwingReadmeExample") {
+        val readme = rootProject.layout.projectDirectory.file("ketraterm-ui-swing/README.md")
+        val destination =
+            layout.buildDirectory.file(
+                "readme-example/ui-swing/src/main/kotlin/consumer/documentation/TerminalViewExample.kt",
+            )
+        inputs.file(readme)
+        outputs.file(destination)
+        doLast {
+            val example =
+                Regex("(?s)<!-- compiled-example:terminal-view -->\\s*```kotlin\\r?\\n(.*?)\\r?\\n```")
+                    .findAll(readme.asFile.readText())
+                    .single()
+                    .groupValues[1]
+            destination.get().asFile.apply {
+                parentFile.mkdirs()
+                writeText("package consumer.documentation\n\n$example\n")
+            }
+        }
+    }
 val preparePublishedConsumers =
     tasks.register<Sync>("preparePublishedConsumers") {
+        dependsOn(extractSwingReadmeExample)
         from("src/consumerTest")
+        from(layout.buildDirectory.dir("readme-example"))
         into(consumerFixtureDirectory)
         preserve { include("**/build/**", ".gradle/**") }
     }
@@ -298,6 +321,9 @@ val preparePublishedConsumers =
 fun JavaExec.configureConsumerBuild(
     metadata: String,
     verificationTask: String,
+    kotlinCompilerVersion: String =
+        org.jetbrains.kotlin.gradle.plugin
+            .getKotlinPluginVersion(logger),
 ) {
     dependsOn(preparePublishedConsumers, rootProject.tasks.named("prepareLibraryConsumerRepository"))
     javaLauncher.set(javaToolchains.launcherFor { languageVersion.set(JavaLanguageVersion.of(25)) })
@@ -310,7 +336,7 @@ fun JavaExec.configureConsumerBuild(
         "--console=plain",
         "--no-daemon",
         "--max-workers=2",
-        "-PkotlinVersion=${org.jetbrains.kotlin.gradle.plugin.getKotlinPluginVersion(logger)}",
+        "-PkotlinVersion=$kotlinCompilerVersion",
         "-PlibraryVersion=${project.version}",
         "-PlibraryRepository=${rootProject.layout.buildDirectory.dir("library-consumer-repository").get().asFile.toURI()}",
         "-PmetadataMode=$metadata",
@@ -319,14 +345,21 @@ fun JavaExec.configureConsumerBuild(
 }
 
 val verifyPublishedConsumers =
-    listOf("gradle", "pom").map { metadata ->
-        tasks.register<JavaExec>("verify${metadata.replaceFirstChar(Char::uppercaseChar)}PublishedConsumers") {
-            group = "verification"
-            description = "Compiles and runs isolated Kotlin/Java consumers using $metadata publication metadata."
-            configureConsumerBuild(metadata, "check")
+    listOf("gradle", "pom").flatMap { metadata ->
+        listOf(false, true).map { minimumCompiler ->
+            val compilerSuffix = if (minimumCompiler) "MinimumKotlin" else ""
+            tasks.register<JavaExec>("verify${metadata.replaceFirstChar(Char::uppercaseChar)}${compilerSuffix}PublishedConsumers") {
+                group = "verification"
+                description = "Compiles and runs isolated Kotlin/Java consumers using $metadata publication metadata."
+                if (minimumCompiler) {
+                    configureConsumerBuild(metadata, "check", "2.4.0")
+                } else {
+                    configureConsumerBuild(metadata, "check")
+                }
+            }
         }
     }
-verifyPublishedConsumers[1].configure { mustRunAfter(verifyPublishedConsumers[0]) }
+verifyPublishedConsumers.zipWithNext { previous, next -> next.configure { mustRunAfter(previous) } }
 
 val prepareCompiledClientRuntimes =
     listOf("gradle", "pom").flatMap { metadata ->

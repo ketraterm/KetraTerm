@@ -4,7 +4,7 @@ public final class io/github/ketraterm/pty/PtyConnector : io/github/ketraterm/tr
 	public fun close ()V
 	public fun foregroundProcessName ()Ljava/lang/String;
 	public final fun getExitCode ()Ljava/lang/Integer;
-	public final fun getFailure ()Ljava/io/IOException;
+	public final fun getFailure ()Ljava/lang/Throwable;
 	public final fun isAlive ()Z
 	public fun resize (II)V
 	public fun start (Lio/github/ketraterm/transport/TerminalConnectorListener;)V
@@ -75,41 +75,9 @@ public final class io/github/ketraterm/pty/PtyEventListener$DefaultImpls {
 public final class io/github/ketraterm/pty/PtyOptions {
 	public static final field Companion Lio/github/ketraterm/pty/PtyOptions$Companion;
 	public fun <init> ()V
-	public fun <init> (Ljava/util/List;)V
-	public fun <init> (Ljava/util/List;Ljava/util/Map;)V
-	public fun <init> (Ljava/util/List;Ljava/util/Map;Ljava/nio/file/Path;)V
-	public fun <init> (Ljava/util/List;Ljava/util/Map;Ljava/nio/file/Path;I)V
-	public fun <init> (Ljava/util/List;Ljava/util/Map;Ljava/nio/file/Path;II)V
-	public fun <init> (Ljava/util/List;Ljava/util/Map;Ljava/nio/file/Path;IIZ)V
-	public fun <init> (Ljava/util/List;Ljava/util/Map;Ljava/nio/file/Path;IIZLio/github/ketraterm/input/policy/TerminalInputPolicy;)V
-	public fun <init> (Ljava/util/List;Ljava/util/Map;Ljava/nio/file/Path;IIZLio/github/ketraterm/input/policy/TerminalInputPolicy;I)V
-	public fun <init> (Ljava/util/List;Ljava/util/Map;Ljava/nio/file/Path;IIZLio/github/ketraterm/input/policy/TerminalInputPolicy;II)V
-	public fun <init> (Ljava/util/List;Ljava/util/Map;Ljava/nio/file/Path;IIZLio/github/ketraterm/input/policy/TerminalInputPolicy;IILjava/lang/String;)V
-	public fun <init> (Ljava/util/List;Ljava/util/Map;Ljava/nio/file/Path;IIZLio/github/ketraterm/input/policy/TerminalInputPolicy;IILjava/lang/String;Ljava/lang/String;)V
-	public fun <init> (Ljava/util/List;Ljava/util/Map;Ljava/nio/file/Path;IIZLio/github/ketraterm/input/policy/TerminalInputPolicy;IILjava/lang/String;Ljava/lang/String;Lio/github/ketraterm/pty/PtyEventListener;)V
-	public fun <init> (Ljava/util/List;Ljava/util/Map;Ljava/nio/file/Path;IIZLio/github/ketraterm/input/policy/TerminalInputPolicy;IILjava/lang/String;Ljava/lang/String;Lio/github/ketraterm/pty/PtyEventListener;Lio/github/ketraterm/host/HostPolicy;)V
-	public fun <init> (Ljava/util/List;Ljava/util/Map;Ljava/nio/file/Path;IIZLio/github/ketraterm/input/policy/TerminalInputPolicy;IILjava/lang/String;Ljava/lang/String;Lio/github/ketraterm/pty/PtyEventListener;Lio/github/ketraterm/host/HostPolicy;Lio/github/ketraterm/session/TerminalStartupCommand;)V
-	public fun <init> (Ljava/util/List;Ljava/util/Map;Ljava/nio/file/Path;IIZLio/github/ketraterm/input/policy/TerminalInputPolicy;IILjava/lang/String;Ljava/lang/String;Lio/github/ketraterm/pty/PtyEventListener;Lio/github/ketraterm/host/HostPolicy;Lio/github/ketraterm/session/TerminalStartupCommand;I)V
-	public fun <init> (Ljava/util/List;Ljava/util/Map;Ljava/nio/file/Path;IIZLio/github/ketraterm/input/policy/TerminalInputPolicy;IILjava/lang/String;Ljava/lang/String;Lio/github/ketraterm/pty/PtyEventListener;Lio/github/ketraterm/host/HostPolicy;Lio/github/ketraterm/session/TerminalStartupCommand;ILio/github/ketraterm/session/TerminalShellIntegrationFactory;)V
-	public synthetic fun <init> (Ljava/util/List;Ljava/util/Map;Ljava/nio/file/Path;IIZLio/github/ketraterm/input/policy/TerminalInputPolicy;IILjava/lang/String;Ljava/lang/String;Lio/github/ketraterm/pty/PtyEventListener;Lio/github/ketraterm/host/HostPolicy;Lio/github/ketraterm/session/TerminalStartupCommand;ILio/github/ketraterm/session/TerminalShellIntegrationFactory;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
-	public final fun component1 ()Ljava/util/List;
-	public final fun component10 ()Ljava/lang/String;
-	public final fun component11 ()Ljava/lang/String;
-	public final fun component12 ()Lio/github/ketraterm/pty/PtyEventListener;
-	public final fun component13 ()Lio/github/ketraterm/host/HostPolicy;
-	public final fun component14 ()Lio/github/ketraterm/session/TerminalStartupCommand;
-	public final fun component15 ()I
-	public final fun component16 ()Lio/github/ketraterm/session/TerminalShellIntegrationFactory;
-	public final fun component2 ()Ljava/util/Map;
-	public final fun component3 ()Ljava/nio/file/Path;
-	public final fun component4 ()I
-	public final fun component5 ()I
-	public final fun component6 ()Z
-	public final fun component7 ()Lio/github/ketraterm/input/policy/TerminalInputPolicy;
-	public final fun component8 ()I
-	public final fun component9 ()I
-	public final fun copy (Ljava/util/List;Ljava/util/Map;Ljava/nio/file/Path;IIZLio/github/ketraterm/input/policy/TerminalInputPolicy;IILjava/lang/String;Ljava/lang/String;Lio/github/ketraterm/pty/PtyEventListener;Lio/github/ketraterm/host/HostPolicy;Lio/github/ketraterm/session/TerminalStartupCommand;ILio/github/ketraterm/session/TerminalShellIntegrationFactory;)Lio/github/ketraterm/pty/PtyOptions;
-	public static synthetic fun copy$default (Lio/github/ketraterm/pty/PtyOptions;Ljava/util/List;Ljava/util/Map;Ljava/nio/file/Path;IIZLio/github/ketraterm/input/policy/TerminalInputPolicy;IILjava/lang/String;Ljava/lang/String;Lio/github/ketraterm/pty/PtyEventListener;Lio/github/ketraterm/host/HostPolicy;Lio/github/ketraterm/session/TerminalStartupCommand;ILio/github/ketraterm/session/TerminalShellIntegrationFactory;ILjava/lang/Object;)Lio/github/ketraterm/pty/PtyOptions;
+	public static final fun builder ()Lio/github/ketraterm/pty/PtyOptions$Builder;
+	public final fun copy (Ljava/util/function/Consumer;)Lio/github/ketraterm/pty/PtyOptions;
+	public static final fun create (Ljava/util/function/Consumer;)Lio/github/ketraterm/pty/PtyOptions;
 	public static final fun defaultCommand ()Ljava/util/List;
 	public static final fun defaultEnvironment ()Ljava/util/Map;
 	public static final fun defaultInputPolicy ()Lio/github/ketraterm/input/policy/TerminalInputPolicy;
@@ -131,10 +99,48 @@ public final class io/github/ketraterm/pty/PtyOptions {
 	public final fun getWatcherThreadName ()Ljava/lang/String;
 	public final fun getWorkingDirectory ()Ljava/nio/file/Path;
 	public fun hashCode ()I
-	public fun toString ()Ljava/lang/String;
+	public final fun toBuilder ()Lio/github/ketraterm/pty/PtyOptions$Builder;
+}
+
+public final class io/github/ketraterm/pty/PtyOptions$Builder {
+	public final fun build ()Lio/github/ketraterm/pty/PtyOptions;
+	public final fun getColumns ()I
+	public final fun getCommand ()Ljava/util/List;
+	public final fun getEnvironment ()Ljava/util/Map;
+	public final fun getEventListener ()Lio/github/ketraterm/pty/PtyEventListener;
+	public final fun getHostPolicy ()Lio/github/ketraterm/host/HostPolicy;
+	public final fun getInputPolicy ()Lio/github/ketraterm/input/policy/TerminalInputPolicy;
+	public final fun getMaxHistory ()I
+	public final fun getModeReportCapabilities ()I
+	public final fun getReadBufferSize ()I
+	public final fun getReaderThreadName ()Ljava/lang/String;
+	public final fun getRows ()I
+	public final fun getShellIntegration ()Lio/github/ketraterm/session/TerminalShellIntegrationFactory;
+	public final fun getStartupCommand ()Lio/github/ketraterm/session/TerminalStartupCommand;
+	public final fun getTreatAmbiguousAsWide ()Z
+	public final fun getWatcherThreadName ()Ljava/lang/String;
+	public final fun getWorkingDirectory ()Ljava/nio/file/Path;
+	public final fun setColumns (I)V
+	public final fun setCommand (Ljava/util/List;)V
+	public final fun setEnvironment (Ljava/util/Map;)V
+	public final fun setEventListener (Lio/github/ketraterm/pty/PtyEventListener;)V
+	public final fun setHostPolicy (Lio/github/ketraterm/host/HostPolicy;)V
+	public final fun setInputPolicy (Lio/github/ketraterm/input/policy/TerminalInputPolicy;)V
+	public final fun setMaxHistory (I)V
+	public final fun setModeReportCapabilities (I)V
+	public final fun setReadBufferSize (I)V
+	public final fun setReaderThreadName (Ljava/lang/String;)V
+	public final fun setRows (I)V
+	public final fun setShellIntegration (Lio/github/ketraterm/session/TerminalShellIntegrationFactory;)V
+	public final fun setStartupCommand (Lio/github/ketraterm/session/TerminalStartupCommand;)V
+	public final fun setTreatAmbiguousAsWide (Z)V
+	public final fun setWatcherThreadName (Ljava/lang/String;)V
+	public final fun setWorkingDirectory (Ljava/nio/file/Path;)V
 }
 
 public final class io/github/ketraterm/pty/PtyOptions$Companion {
+	public final fun builder ()Lio/github/ketraterm/pty/PtyOptions$Builder;
+	public final fun create (Ljava/util/function/Consumer;)Lio/github/ketraterm/pty/PtyOptions;
 	public final fun defaultCommand ()Ljava/util/List;
 	public final fun defaultEnvironment ()Ljava/util/Map;
 	public final fun defaultInputPolicy ()Lio/github/ketraterm/input/policy/TerminalInputPolicy;

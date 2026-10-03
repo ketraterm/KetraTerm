@@ -100,7 +100,7 @@ class SwingTerminalSelectionTest {
                 responseReader = terminal,
                 connector = NoOpConnector,
                 parser = NoOpParser,
-                inputEncoder = NoOpInputEncoder,
+                inputEncoderFactory = { _, _, _ -> object : TerminalInputEncoder by NoOpInputEncoder {} },
                 workerDispatcher = dispatcher,
                 ioDispatcher = dispatcher,
             ).also(sessions::add)
@@ -108,17 +108,20 @@ class SwingTerminalSelectionTest {
         SwingUtilities.invokeAndWait {
             val clipboard = RecordingClipboard()
             var settings =
-                SwingSettings(
-                    columns = 8,
-                    rows = 2,
-                    padding = SwingPadding(),
-                    shellIntegrationDecorationGutterWidth = 0,
-                    cursorBlinkMillis = 0,
-                )
+                SwingSettings.create { draft ->
+                    draft.columns = 8
+                    draft.rows = 2
+                    draft.padding = SwingPadding()
+                    draft.shellIntegrationDecorationGutterWidth = 0
+                    draft.cursorBlinkMillis = 0
+                }
             val component =
                 createComponent(
                     settingsProvider = { settings },
-                    hostServices = SwingHostServices(clipboardHandler = clipboard),
+                    hostServices =
+                        SwingHostServices.create { draft ->
+                            draft.clipboardHandler = clipboard
+                        },
                 )
             component.size = component.preferredGridSize(8, 2)
             component.bind(session)
@@ -148,7 +151,10 @@ class SwingTerminalSelectionTest {
             assertEquals("abcdefgh", clipboard.copied.get())
 
             if (fontSize != null) {
-                settings = settings.copy(font = settings.font.deriveFont(fontSize))
+                settings =
+                    settings.copy { draft ->
+                        draft.font = settings.font.deriveFont(fontSize)
+                    }
                 component.reloadSettings()
             } else {
                 component.size = component.preferredGridSize(resizedColumns, resizedRows)
@@ -220,7 +226,12 @@ class SwingTerminalSelectionTest {
         }
         SwingUtilities.invokeAndWait {
             val component =
-                createComponent(settingsProvider = { SwingSettings(padding = SwingPadding(), shellIntegrationDecorationGutterWidth = 0) })
+                createComponent(settingsProvider = {
+                    SwingSettings.create { draft ->
+                        draft.padding = SwingPadding()
+                        draft.shellIntegrationDecorationGutterWidth = 0
+                    }
+                })
             component.setSize(120, 40)
             component.bind(session)
             dispatcher.scheduler.advanceUntilIdle()
@@ -286,25 +297,24 @@ class SwingTerminalSelectionTest {
         try {
             SwingUtilities.invokeAndWait {
                 val settings =
-                    SwingSettings(
-                        columns = 5,
-                        rows = 1,
-                        padding = SwingPadding(),
-                        shellIntegrationDecorationGutterWidth = 0,
-                        cursorBlinkMillis = 0,
-                    )
+                    SwingSettings.create { draft ->
+                        draft.columns = 5
+                        draft.rows = 1
+                        draft.padding = SwingPadding()
+                        draft.shellIntegrationDecorationGutterWidth = 0
+                        draft.cursorBlinkMillis = 0
+                    }
                 val openedLinks = mutableListOf<String>()
                 val reused =
                     createComponent(
                         settingsProvider = { settings },
                         hostServices =
-                            SwingHostServices(
-                                hyperlinkHandler =
-                                    { link ->
-                                        openedLinks.add(link)
-                                        true
-                                    },
-                            ),
+                            SwingHostServices.create { draft ->
+                                draft.hyperlinkHandler = { link ->
+                                    openedLinks.add(link)
+                                    true
+                                }
+                            },
                     )
                 val fresh = createComponent(settingsProvider = { settings })
                 try {
@@ -319,7 +329,7 @@ class SwingTerminalSelectionTest {
                     fresh.bind(replacement)
 
                     assertNull(
-                        replacement.renderPublisher.readCurrent { true },
+                        replacement.readPublishedFrame { true },
                         "The test scheduler must hold the replacement's first frame",
                     )
                     assertAll(
@@ -360,7 +370,7 @@ class SwingTerminalSelectionTest {
 
                     dispatcher.scheduler.runCurrent()
 
-                    assertNotNull(replacement.renderPublisher.readCurrent { true })
+                    assertNotNull(replacement.readPublishedFrame { true })
                     val newPixels = componentPixels(reused)
                     assertFalse(emptyPixels.contentEquals(newPixels), "The first publication must display the replacement text")
                     assertArrayEquals(componentPixels(fresh), newPixels)
@@ -419,18 +429,22 @@ class SwingTerminalSelectionTest {
         try {
             SwingUtilities.invokeAndWait {
                 var opened: String? = null
-                val settings = SwingSettings(cursorBlinkMillis = 0, padding = SwingPadding(), shellIntegrationDecorationGutterWidth = 0)
+                val settings =
+                    SwingSettings.create { draft ->
+                        draft.cursorBlinkMillis = 0
+                        draft.padding = SwingPadding()
+                        draft.shellIntegrationDecorationGutterWidth = 0
+                    }
                 val reused =
                     createComponent(
                         settingsProvider = { settings },
                         hostServices =
-                            SwingHostServices(
-                                hyperlinkHandler =
-                                    {
-                                        opened = it
-                                        true
-                                    },
-                            ),
+                            SwingHostServices.create { draft ->
+                                draft.hyperlinkHandler = {
+                                    opened = it
+                                    true
+                                }
+                            },
                     )
                 val fresh = createComponent(settingsProvider = { settings })
                 try {
@@ -481,21 +495,25 @@ class SwingTerminalSelectionTest {
         val session = testSession(frame, hyperlinkResolver = TerminalHyperlinkResolver { "https://example.com/$it" })
         val component =
             createComponent(
-                settingsProvider = { SwingSettings(padding = SwingPadding(0, 0, 0, 0), shellIntegrationDecorationGutterWidth = 0) },
+                settingsProvider = {
+                    SwingSettings.create { draft ->
+                        draft.padding = SwingPadding(0, 0, 0, 0)
+                        draft.shellIntegrationDecorationGutterWidth = 0
+                    }
+                },
                 hostServices =
-                    SwingHostServices(
-                        hyperlinkHandler =
-                            { link ->
-                                opened.set(link)
-                                true
-                            },
-                    ),
+                    SwingHostServices.create { draft ->
+                        draft.hyperlinkHandler = { link ->
+                            opened.set(link)
+                            true
+                        }
+                    },
             )
         try {
             SwingUtilities.invokeAndWait {
                 component.setSize(100, 40)
                 component.bind(session)
-                session.renderPublisher.updateAndPublish(StaticFrameReader(frame))
+                session.requestRender(0)
                 clickWithCtrl(component, 1, 1)
             }
             assertEquals("https://example.com/3", opened.get())
@@ -515,14 +533,17 @@ class SwingTerminalSelectionTest {
         val terminal = TerminalBuffers.create(width = frame.columns, height = frame.rows, maxHistory = 5)
         terminal.setMouseTrackingMode(io.github.ketraterm.protocol.MouseTrackingMode.NORMAL)
         val session = testSession(frame, inputEncoder = input, terminal = terminal)
-        val settings = SwingSettings(padding = SwingPadding(0, 4, 0, 6))
+        val settings =
+            SwingSettings.create { draft ->
+                draft.padding = SwingPadding(0, 4, 0, 6)
+            }
         val component = createComponent(settingsProvider = { settings })
         session.start(columns = 3, rows = 1)
         try {
             SwingUtilities.invokeAndWait {
                 component.setSize(200, 40)
                 component.bind(session)
-                session.renderPublisher.updateAndPublish(StaticFrameReader(frame))
+                session.requestRender(0)
                 val metrics = SwingMetrics.from(component.getFontMetrics(settings.font))
                 val left = 13
                 val x = left + metrics.cellWidth + 1
@@ -546,14 +567,18 @@ class SwingTerminalSelectionTest {
         val terminal = TerminalBuffers.create(width = frame.columns, height = frame.rows, maxHistory = 5)
         terminal.setMouseTrackingMode(io.github.ketraterm.protocol.MouseTrackingMode.NORMAL)
         val session = testSession(frame, inputEncoder = input, terminal = terminal)
-        val settings = SwingSettings(padding = SwingPadding(0, 0, 0, 0), shellIntegrationDecorationGutterWidth = 0)
+        val settings =
+            SwingSettings.create { draft ->
+                draft.padding = SwingPadding(0, 0, 0, 0)
+                draft.shellIntegrationDecorationGutterWidth = 0
+            }
         val component = createComponent(settingsProvider = { settings })
         session.start(columns = 3, rows = 1)
         try {
             SwingUtilities.invokeAndWait {
                 component.setSize(100, 40)
                 component.bind(session)
-                session.renderPublisher.updateAndPublish(StaticFrameReader(frame))
+                session.requestRender(0)
                 component.mouseListeners.forEach { it.mousePressed(mousePressed(component, 1, 1, 1)) }
                 val event = requireNotNull(input.lastMouseEvent.get())
                 assertEquals(2, event.column)
@@ -574,12 +599,17 @@ class SwingTerminalSelectionTest {
     fun `single click clears selection without selecting the clicked cell`() {
         val frame = TestRenderFrame.text("hello")
         val session = testSession(frame = frame)
-        val component = createComponent(settingsProvider = { SwingSettings(padding = SwingPadding(0, 0, 0, 0)) })
+        val component =
+            createComponent(settingsProvider = {
+                SwingSettings.create { draft ->
+                    draft.padding = SwingPadding(0, 0, 0, 0)
+                }
+            })
 
         SwingUtilities.invokeAndWait {
             component.setSize(300, 80)
             component.bind(session)
-            session.renderPublisher.updateAndPublish(StaticFrameReader(frame))
+            session.requestRender(0)
             component.mouseListeners.forEach { it.mousePressed(mousePressed(component, x = 8, y = 8, clickCount = 1)) }
         }
 
@@ -591,12 +621,17 @@ class SwingTerminalSelectionTest {
     fun `drag after single click creates selection`() {
         val frame = TestRenderFrame.text("hello")
         val session = testSession(frame = frame)
-        val component = createComponent(settingsProvider = { SwingSettings(padding = SwingPadding(0, 0, 0, 0)) })
+        val component =
+            createComponent(settingsProvider = {
+                SwingSettings.create { draft ->
+                    draft.padding = SwingPadding(0, 0, 0, 0)
+                }
+            })
 
         SwingUtilities.invokeAndWait {
             component.setSize(300, 80)
             component.bind(session)
-            session.renderPublisher.updateAndPublish(StaticFrameReader(frame))
+            session.requestRender(0)
             component.mouseListeners.forEach { it.mousePressed(mousePressed(component, x = 8, y = 8, clickCount = 1)) }
             component.mouseMotionListeners.forEach { it.mouseDragged(mouseDragged(component, x = 299, y = 8)) }
         }
@@ -609,20 +644,27 @@ class SwingTerminalSelectionTest {
     fun `unrelated settings changes preserve the current text selection`() {
         val frame = TestRenderFrame.text("hello")
         val session = testSession(frame = frame)
-        var settings = SwingSettings(padding = SwingPadding(0, 0, 0, 0))
+        var settings =
+            SwingSettings.create { draft ->
+                draft.padding = SwingPadding(0, 0, 0, 0)
+            }
         val component = createComponent(settingsProvider = { settings })
         try {
             SwingUtilities.invokeAndWait {
                 component.setSize(300, 80)
                 component.bind(session)
-                session.renderPublisher.updateAndPublish(StaticFrameReader(frame))
+                session.requestRender(0)
                 component.mouseListeners.forEach { it.mousePressed(mousePressed(component, x = 8, y = 8, clickCount = 1)) }
                 component.mouseMotionListeners.forEach { it.mouseDragged(mouseDragged(component, x = 299, y = 8)) }
                 component.mouseListeners.forEach { it.mouseReleased(mouseReleased(component, x = 299, y = 8)) }
                 val selected = component.currentSelection()
                 assertNotNull(selected)
 
-                settings = settings.copy(visualBellEnabled = false, scrollOnOutput = !settings.scrollOnOutput)
+                settings =
+                    settings.copy { draft ->
+                        draft.visualBellEnabled = false
+                        draft.scrollOnOutput = !settings.scrollOnOutput
+                    }
                 component.reloadSettings()
 
                 assertEquals(selected, component.currentSelection())
@@ -642,7 +684,12 @@ class SwingTerminalSelectionTest {
                 frame = ScrollbackFrame(scrollbackOffset = 0, rows = 1),
                 renderReader = renderReader,
             )
-        val component = createComponent(settingsProvider = { SwingSettings(padding = SwingPadding(0, 0, 0, 0)) })
+        val component =
+            createComponent(settingsProvider = {
+                SwingSettings.create { draft ->
+                    draft.padding = SwingPadding(0, 0, 0, 0)
+                }
+            })
 
         SwingUtilities.invokeAndWait {
             component.setSize(60, 20)
@@ -665,12 +712,17 @@ class SwingTerminalSelectionTest {
     fun `alt drag creates rectangular block selection`() {
         val frame = TestRenderFrame.text("hello world")
         val session = testSession(frame = frame)
-        val component = createComponent(settingsProvider = { SwingSettings(padding = SwingPadding(0, 0, 0, 0)) })
+        val component =
+            createComponent(settingsProvider = {
+                SwingSettings.create { draft ->
+                    draft.padding = SwingPadding(0, 0, 0, 0)
+                }
+            })
 
         SwingUtilities.invokeAndWait {
             component.setSize(300, 80)
             component.bind(session)
-            session.renderPublisher.updateAndPublish(StaticFrameReader(frame))
+            session.requestRender(0)
             component.mouseListeners.forEach { it.mousePressed(mousePressedWithAlt(component, x = 8, y = 8)) }
             component.mouseMotionListeners.forEach { it.mouseDragged(mouseDraggedWithAlt(component, x = 80, y = 8)) }
         }
@@ -696,16 +748,19 @@ class SwingTerminalSelectionTest {
         val clipboard = RecordingClipboard()
         val session = testSession(frame, workerDispatcher = Dispatchers.Unconfined)
         val settings =
-            SwingSettings(
-                padding = SwingPadding(),
-                shellIntegrationDecorationGutterWidth = 0,
-                cursorBlinkMillis = 0,
-                selectionBackground = 0xFFFF00FF.toInt(),
-            )
+            SwingSettings.create { draft ->
+                draft.padding = SwingPadding()
+                draft.shellIntegrationDecorationGutterWidth = 0
+                draft.cursorBlinkMillis = 0
+                draft.selectionBackground = 0xFFFF00FF.toInt()
+            }
         val component =
             createComponent(
                 settingsProvider = { settings },
-                hostServices = SwingHostServices(clipboardHandler = clipboard),
+                hostServices =
+                    SwingHostServices.create { draft ->
+                        draft.clipboardHandler = clipboard
+                    },
             )
         try {
             SwingUtilities.invokeAndWait {
@@ -829,18 +884,20 @@ class SwingTerminalSelectionTest {
         val component =
             createComponent(
                 settingsProvider = {
-                    SwingSettings(padding = SwingPadding(0, 0, 0, 0))
+                    SwingSettings.create { draft ->
+                        draft.padding = SwingPadding(0, 0, 0, 0)
+                    }
                 },
                 hostServices =
-                    SwingHostServices(
-                        clipboardHandler = clipboard,
-                    ),
+                    SwingHostServices.create { draft ->
+                        draft.clipboardHandler = clipboard
+                    },
             )
 
         SwingUtilities.invokeAndWait {
             component.setSize(300, 80)
             component.bind(session)
-            session.renderPublisher.updateAndPublish(StaticFrameReader(frame))
+            session.requestRender(0)
             component.mouseListeners.forEach { it.mousePressed(mousePressed(component, x = 8, y = 8, clickCount = 2)) }
             assertTrue(component.copySelectionToClipboard())
         }
@@ -879,8 +936,16 @@ class SwingTerminalSelectionTest {
         val session = testSession(frame, inputEncoder = input)
         val component =
             createComponent(
-                settingsProvider = { SwingSettings(padding = SwingPadding(), shellIntegrationDecorationGutterWidth = 0) },
-                hostServices = SwingHostServices(clipboardHandler = clipboard),
+                settingsProvider = {
+                    SwingSettings.create { draft ->
+                        draft.padding = SwingPadding()
+                        draft.shellIntegrationDecorationGutterWidth = 0
+                    }
+                },
+                hostServices =
+                    SwingHostServices.create { draft ->
+                        draft.clipboardHandler = clipboard
+                    },
             )
         try {
             session.start(columns = 5, rows = 3)
@@ -917,11 +982,18 @@ class SwingTerminalSelectionTest {
             }
         val clipboard = RecordingClipboard()
         val session = testSession(frame)
-        val settings = SwingSettings(padding = SwingPadding(), shellIntegrationDecorationGutterWidth = 0)
+        val settings =
+            SwingSettings.create { draft ->
+                draft.padding = SwingPadding()
+                draft.shellIntegrationDecorationGutterWidth = 0
+            }
         val component =
             createComponent(
                 settingsProvider = { settings },
-                hostServices = SwingHostServices(clipboardHandler = clipboard),
+                hostServices =
+                    SwingHostServices.create { draft ->
+                        draft.clipboardHandler = clipboard
+                    },
             )
         try {
             SwingUtilities.invokeAndWait {
@@ -968,18 +1040,20 @@ class SwingTerminalSelectionTest {
         val component =
             createComponent(
                 settingsProvider = {
-                    SwingSettings(padding = SwingPadding(0, 0, 0, 0))
+                    SwingSettings.create { draft ->
+                        draft.padding = SwingPadding(0, 0, 0, 0)
+                    }
                 },
                 hostServices =
-                    SwingHostServices(
-                        clipboardHandler = clipboard,
-                    ),
+                    SwingHostServices.create { draft ->
+                        draft.clipboardHandler = clipboard
+                    },
             )
 
         SwingUtilities.invokeAndWait {
             component.setSize(300, 80)
             component.bind(session)
-            session.renderPublisher.updateAndPublish(StaticFrameReader(frame))
+            session.requestRender(0)
             component.mouseListeners.forEach { it.mousePressed(mousePressed(component, x = 8, y = 8, clickCount = 1)) }
             component.mouseMotionListeners.forEach { it.mouseDragged(mouseDragged(component, x = 299, y = 8)) }
             assertTrue(component.copySelectionToClipboard())
@@ -997,14 +1071,21 @@ class SwingTerminalSelectionTest {
         val session = testSession(frame = frame)
         val component =
             createComponent(
-                settingsProvider = { SwingSettings(padding = SwingPadding(0, 0, 0, 0)) },
-                hostServices = SwingHostServices(clipboardHandler = clipboard),
+                settingsProvider = {
+                    SwingSettings.create { draft ->
+                        draft.padding = SwingPadding(0, 0, 0, 0)
+                    }
+                },
+                hostServices =
+                    SwingHostServices.create { draft ->
+                        draft.clipboardHandler = clipboard
+                    },
             )
 
         SwingUtilities.invokeAndWait {
             component.setSize(300, 80)
             component.bind(session)
-            session.renderPublisher.updateAndPublish(StaticFrameReader(frame))
+            session.requestRender(0)
             component.mouseListeners.forEach { it.mousePressed(mousePressed(component, x = 8, y = 8, clickCount = 1)) }
             component.mouseMotionListeners.forEach { it.mouseDragged(mouseDragged(component, x = 299, y = 8)) }
             assertTrue(component.copySelectionToClipboard())
@@ -1023,12 +1104,15 @@ class SwingTerminalSelectionTest {
         val component =
             createComponent(
                 settingsProvider = {
-                    SwingSettings(smartSuggestionsEnabled = true, padding = SwingPadding(0, 0, 0, 0))
+                    SwingSettings.create { draft ->
+                        draft.smartSuggestionsEnabled = true
+                        draft.padding = SwingPadding(0, 0, 0, 0)
+                    }
                 },
                 hostServices =
-                    SwingHostServices(
-                        clipboardHandler = clipboard,
-                    ),
+                    SwingHostServices.create { draft ->
+                        draft.clipboardHandler = clipboard
+                    },
             )
 
         session.start(columns = 5, rows = 1)
@@ -1060,12 +1144,14 @@ class SwingTerminalSelectionTest {
         val component =
             createComponent(
                 settingsProvider = {
-                    SwingSettings(padding = SwingPadding(0, 0, 0, 0))
+                    SwingSettings.create { draft ->
+                        draft.padding = SwingPadding(0, 0, 0, 0)
+                    }
                 },
                 hostServices =
-                    SwingHostServices(
-                        clipboardHandler = clipboard,
-                    ),
+                    SwingHostServices.create { draft ->
+                        draft.clipboardHandler = clipboard
+                    },
             )
 
         session.start(columns = 5, rows = 1)
@@ -1092,12 +1178,14 @@ class SwingTerminalSelectionTest {
         val component =
             createComponent(
                 settingsProvider = {
-                    SwingSettings(padding = SwingPadding(0, 0, 0, 0))
+                    SwingSettings.create { draft ->
+                        draft.padding = SwingPadding(0, 0, 0, 0)
+                    }
                 },
                 hostServices =
-                    SwingHostServices(
-                        clipboardHandler = clipboard,
-                    ),
+                    SwingHostServices.create { draft ->
+                        draft.clipboardHandler = clipboard
+                    },
             )
 
         session.start(columns = 5, rows = 1)
@@ -1144,21 +1232,24 @@ class SwingTerminalSelectionTest {
             )
         val component =
             createComponent(
-                settingsProvider = { SwingSettings(padding = SwingPadding(0, 0, 0, 0)) },
+                settingsProvider = {
+                    SwingSettings.create { draft ->
+                        draft.padding = SwingPadding(0, 0, 0, 0)
+                    }
+                },
                 hostServices =
-                    SwingHostServices(
-                        hyperlinkHandler =
-                            { uri ->
-                                opened.set(uri)
-                                true
-                            },
-                    ),
+                    SwingHostServices.create { draft ->
+                        draft.hyperlinkHandler = { uri ->
+                            opened.set(uri)
+                            true
+                        }
+                    },
             )
 
         SwingUtilities.invokeAndWait {
             component.setSize(80, 40)
             component.bind(session)
-            session.renderPublisher.updateAndPublish(StaticFrameReader(frame))
+            session.requestRender(0)
             component.mouseListeners.forEach {
                 it.mousePressed(mousePressedWithCtrl(component, x = 8, y = 8))
                 it.mouseReleased(
@@ -1204,21 +1295,24 @@ class SwingTerminalSelectionTest {
             )
         val component =
             createComponent(
-                settingsProvider = { SwingSettings(padding = SwingPadding(0, 0, 0, 0)) },
+                settingsProvider = {
+                    SwingSettings.create { draft ->
+                        draft.padding = SwingPadding(0, 0, 0, 0)
+                    }
+                },
                 hostServices =
-                    SwingHostServices(
-                        hyperlinkHandler =
-                            {
-                                opened.incrementAndGet()
-                                true
-                            },
-                    ),
+                    SwingHostServices.create { draft ->
+                        draft.hyperlinkHandler = {
+                            opened.incrementAndGet()
+                            true
+                        }
+                    },
             )
 
         SwingUtilities.invokeAndWait {
             component.setSize(80, 40)
             component.bind(session)
-            session.renderPublisher.updateAndPublish(StaticFrameReader(frame))
+            session.requestRender(0)
             component.mouseListeners.forEach {
                 it.mousePressed(mousePressed(component, x = 8, y = 8, clickCount = 1))
             }
@@ -1241,19 +1335,21 @@ class SwingTerminalSelectionTest {
         publishInitialFrame: Boolean = true,
         terminal: TerminalBuffer = TerminalBuffers.create(width = frame.columns, height = frame.rows, maxHistory = 5),
     ): TerminalSession {
+        val publisher = TerminalRenderPublisher(frame.columns, frame.rows)
+        if (publishInitialFrame) publisher.updateAndPublish(renderReader)
         val session =
             TerminalSession(
                 terminal = terminal,
-                renderPublisher = TerminalRenderPublisher(frame.columns, frame.rows),
+                renderPublisher = publisher,
                 renderReader = renderReader,
                 responseReader = terminal,
                 connector = NoOpConnector,
                 parser = NoOpParser,
-                inputEncoder = inputEncoder,
+                inputEncoderFactory = { _, _, _ -> object : TerminalInputEncoder by inputEncoder {} },
                 hyperlinkResolver = hyperlinkResolver,
                 workerDispatcher = workerDispatcher,
+                ioDispatcher = workerDispatcher,
             )
-        if (publishInitialFrame) session.renderPublisher.updateAndPublish(renderReader)
         sessions += session
         return session
     }
@@ -1499,6 +1595,8 @@ class SwingTerminalSelectionTest {
     }
 
     private class RecordingInputEncoder : TerminalInputEncoder {
+        override fun setInputPolicy(policy: io.github.ketraterm.input.policy.TerminalInputPolicy) = Unit
+
         val pasteText = AtomicReference<String?>()
         val lastMouseEvent = AtomicReference<TerminalMouseEvent?>()
         var keyCount: Int = 0
@@ -1551,6 +1649,8 @@ class SwingTerminalSelectionTest {
     }
 
     private object NoOpInputEncoder : TerminalInputEncoder {
+        override fun setInputPolicy(policy: io.github.ketraterm.input.policy.TerminalInputPolicy) = Unit
+
         override fun encodeKey(event: TerminalKeyEvent) = Unit
 
         override fun encodePaste(event: TerminalPasteEvent) = Unit

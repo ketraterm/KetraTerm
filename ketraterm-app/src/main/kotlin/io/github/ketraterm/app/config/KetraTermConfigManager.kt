@@ -1,0 +1,472 @@
+/*
+ * Copyright 2026 Gagik Sargsyan
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package io.github.ketraterm.app.config
+
+import io.github.ketraterm.host.TerminalClipboardPermission
+import io.github.ketraterm.host.TerminalTitlePermission
+import io.github.ketraterm.input.policy.PasteControlPolicy
+import java.io.IOException
+import java.nio.file.Files
+import java.nio.file.Path
+import java.nio.file.StandardCopyOption
+import java.util.*
+
+private const val SUGGESTION_LEARNING_PERSISTENCE_KEY = "suggestion_learning_persistence_enabled"
+
+/**
+ * Manages loading and saving the [KetraTermConfig] TOML file.
+ *
+ * It resolves standard OS-specific directories for config files unless overridden
+ * by a system property or environment variable.
+ *
+ * @property configPath the path to the configuration TOML file on disk.
+ */
+internal class KetraTermConfigManager(
+    val configPath: Path,
+) {
+    /**
+     * Loads the configuration from the TOML file.
+     *
+     * If the file does not exist, it creates a default configuration file with comments
+     * and returns the default settings. If the file is invalid or unreadable, it falls back
+     * gracefully to default settings with clipboard reads denied. Existing files
+     * with a missing or invalid read permission retain the legacy Deny behavior.
+     *
+     * @return the loaded [KetraTermConfig] instance.
+     */
+    fun load(): KetraTermConfig {
+        if (Files.notExists(configPath)) {
+            val defaultConfig = KetraTermConfig()
+            saveDefaults(defaultConfig)
+            return defaultConfig
+        }
+
+        val default = KetraTermConfig(clipboardRead = TerminalClipboardPermission.DENY)
+        return try {
+            val content = Files.readString(configPath)
+            val parsed = TomlParser.parse(content)
+
+            val window = parsed["window"] ?: emptyMap()
+            val font = parsed["font"] ?: emptyMap()
+            val themeSection = parsed["theme"] ?: emptyMap()
+            val behavior = parsed["behavior"] ?: emptyMap()
+            val shell = parsed["shell"] ?: emptyMap()
+            val security = parsed["security"] ?: emptyMap()
+
+            val theme = themeSection["name"] ?: default.theme
+            val shellPath = shell["path"] ?: default.shellPath
+            val startDirectory = shell["start_directory"] ?: default.startDirectory
+            val treatAmbiguousAsWide =
+                behavior["treat_ambiguous_as_wide"]?.toBooleanStrictOrNull()
+                    ?: default.treatAmbiguousAsWide
+            val fontFamily = font["family"] ?: default.fontFamily
+            val fontSize =
+                parseIntSetting(
+                    raw = font["size"],
+                    defaultValue = default.fontSize,
+                    min = KetraTermConfig.FONT_SIZE_MIN,
+                    max = KetraTermConfig.FONT_SIZE_MAX,
+                )
+            val lineHeight =
+                parseFloatSetting(
+                    raw = font["line_height"],
+                    defaultValue = default.lineHeight,
+                    min = KetraTermConfig.LINE_HEIGHT_MIN,
+                    max = KetraTermConfig.LINE_HEIGHT_MAX,
+                )
+            val columns =
+                parseIntSetting(
+                    raw = window["columns"],
+                    defaultValue = default.columns,
+                    min = KetraTermConfig.COLUMNS_MIN,
+                    max = KetraTermConfig.COLUMNS_MAX,
+                )
+            val rows =
+                parseIntSetting(
+                    raw = window["rows"],
+                    defaultValue = default.rows,
+                    min = KetraTermConfig.ROWS_MIN,
+                    max = KetraTermConfig.ROWS_MAX,
+                )
+            val cursorBlinkMillis =
+                parseIntSetting(
+                    raw = behavior["cursor_blink_millis"],
+                    defaultValue = default.cursorBlinkMillis,
+                    min = KetraTermConfig.CURSOR_BLINK_MIN,
+                    max = KetraTermConfig.CURSOR_BLINK_MAX,
+                )
+            val useSystemFallbackFonts =
+                font["use_system_fallback_fonts"]?.toBooleanStrictOrNull()
+                    ?: default.useSystemFallbackFonts
+            val cursorShape = behavior["cursor_shape"] ?: default.cursorShape
+            val audibleBell = behavior["audible_bell"]?.toBooleanStrictOrNull() ?: default.audibleBell
+            val visualBell = behavior["visual_bell"]?.toBooleanStrictOrNull() ?: default.visualBell
+            val pasteOnMiddleClick = behavior["paste_on_middle_click"]?.toBooleanStrictOrNull() ?: default.pasteOnMiddleClick
+            val pasteControlPolicy =
+                parsePasteControlPolicy(
+                    behavior["paste_sanitization"],
+                    default.pasteControlPolicy,
+                )
+            val shellRequestResizeWindow =
+                behavior["shell_request_resize_window"]?.toBooleanStrictOrNull() ?: default.shellRequestResizeWindow
+            val shellRequestWindowManipulation =
+                behavior["shell_request_window_manipulation"]?.toBooleanStrictOrNull() ?: default.shellRequestWindowManipulation
+            val desktopNotificationsEnabled =
+                behavior["desktop_notifications_enabled"]?.toBooleanStrictOrNull() ?: default.desktopNotificationsEnabled
+            val shellSuggestionsEnabled =
+                behavior["shell_suggestions_enabled"]?.toBooleanStrictOrNull() ?: default.shellSuggestionsEnabled
+            val acceptSelectedSuggestionWithEnter =
+                behavior["accept_selected_suggestion_with_enter"]?.toBooleanStrictOrNull()
+                    ?: default.acceptSelectedSuggestionWithEnter
+            val persistentSuggestionLearningEnabled =
+                behavior[SUGGESTION_LEARNING_PERSISTENCE_KEY]?.toBooleanStrictOrNull()
+                    ?: default.persistentSuggestionLearningEnabled
+            val scrollOnOutput =
+                behavior["scroll_on_output"]?.toBooleanStrictOrNull()
+                    ?: default.scrollOnOutput
+            val scrollbackLines =
+                parseIntSetting(
+                    raw = window["scrollback_lines"],
+                    defaultValue = default.scrollbackLines,
+                    min = KetraTermConfig.SCROLLBACK_MIN,
+                    max = KetraTermConfig.SCROLLBACK_MAX,
+                )
+            val clipboardWrite =
+                parseClipboardPermission(
+                    raw = security["clipboard_write"],
+                    defaultValue = default.clipboardWrite,
+                )
+            val clipboardRead =
+                parseClipboardPermission(
+                    raw = security["clipboard_read"],
+                    defaultValue = default.clipboardRead,
+                )
+            val clipboardMaxDecodedBytes =
+                parseIntSetting(
+                    raw = security["clipboard_max_decoded_bytes"],
+                    defaultValue = default.clipboardMaxDecodedBytes,
+                    min = 0,
+                    max = Int.MAX_VALUE,
+                )
+            val titlePermission =
+                parseTitlePermission(
+                    raw = security["title_permission"],
+                    defaultValue = default.titlePermission,
+                )
+
+            val cleanTheme = if (theme.isNotBlank()) theme else default.theme
+            val cleanFontFamily = if (fontFamily.isNotBlank()) fontFamily else default.fontFamily
+            val cleanCursorShape = if (cursorShape.isNotBlank()) cursorShape else default.cursorShape
+            val cleanShellPath = if (shellPath.isNotBlank()) shellPath else default.shellPath
+
+            KetraTermConfig(
+                theme = cleanTheme,
+                treatAmbiguousAsWide = treatAmbiguousAsWide,
+                fontFamily = cleanFontFamily,
+                fontSize = fontSize,
+                columns = columns,
+                rows = rows,
+                cursorBlinkMillis = cursorBlinkMillis,
+                useSystemFallbackFonts = useSystemFallbackFonts,
+                cursorShape = cleanCursorShape,
+                shellPath = cleanShellPath,
+                startDirectory = startDirectory,
+                startupCommand = shell["startup_command"].orEmpty(),
+                audibleBell = audibleBell,
+                visualBell = visualBell,
+                pasteOnMiddleClick = pasteOnMiddleClick,
+                pasteControlPolicy = pasteControlPolicy,
+                scrollbackLines = scrollbackLines,
+                lineHeight = lineHeight,
+                shellRequestResizeWindow = shellRequestResizeWindow,
+                shellRequestWindowManipulation = shellRequestWindowManipulation,
+                desktopNotificationsEnabled = desktopNotificationsEnabled,
+                smartSuggestionsEnabled = behavior["smart_suggestions_enabled"]?.toBooleanStrictOrNull() ?: default.smartSuggestionsEnabled,
+                shellSuggestionsEnabled = shellSuggestionsEnabled,
+                acceptSelectedSuggestionWithEnter = acceptSelectedSuggestionWithEnter,
+                persistentSuggestionLearningEnabled = persistentSuggestionLearningEnabled,
+                clipboardWrite = clipboardWrite,
+                clipboardRead = clipboardRead,
+                clipboardMaxDecodedBytes = clipboardMaxDecodedBytes,
+                titlePermission = titlePermission,
+                scrollOnOutput = scrollOnOutput,
+                showForegroundProcessName =
+                    behavior["show_foreground_process_name"]?.toBooleanStrictOrNull() ?: default.showForegroundProcessName,
+            )
+        } catch (failure: IOException) {
+            System.err.println("Using default configuration; could not read $configPath: ${failure.message}")
+            default
+        } catch (_: IllegalArgumentException) {
+            try {
+                val backupPath = configPath.resolveSibling("${configPath.fileName}.broken")
+                Files.move(configPath, backupPath, StandardCopyOption.REPLACE_EXISTING)
+                System.err.println("Configuration file was malformed and has been backed up to $backupPath")
+            } catch (ioe: IOException) {
+                System.err.println("Failed to back up malformed configuration file: ${ioe.message}")
+                return default
+            }
+            saveDefaults(default)
+            default
+        }
+    }
+
+    /**
+     * Atomically replaces the configuration file with one complete TOML snapshot.
+     *
+     * Creates missing parent directories and stages the replacement beside the destination.
+     * If writing or replacing fails, the previous file stays intact and the failure propagates.
+     * The filesystem must support atomic replacement; there is no destructive fallback.
+     *
+     * @throws IOException if the snapshot cannot be persisted.
+     * @throws IllegalArgumentException if the startup command contains a line break.
+     */
+    fun save(config: KetraTermConfig) {
+        require('\n' !in config.startupCommand && '\r' !in config.startupCommand) { "Startup command must be one line" }
+        val destination = configPath.toAbsolutePath()
+        val parent = destination.parent
+        Files.createDirectories(parent)
+        val temporary = Files.createTempFile(parent, ".${destination.fileName}.", ".tmp")
+        try {
+            Files.writeString(temporary, generateToml(config))
+            Files.move(temporary, destination, StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING)
+        } finally {
+            Files.deleteIfExists(temporary)
+        }
+    }
+
+    private fun saveDefaults(config: KetraTermConfig) {
+        try {
+            save(config)
+        } catch (failure: IOException) {
+            System.err.println("Using default configuration; could not save $configPath: ${failure.message}")
+        }
+    }
+
+    private fun generateToml(config: KetraTermConfig): String =
+        """
+        # KetraTerm Terminal Emulator Configuration File
+        # Power users can edit this file directly to customize behavior.
+        # Changes will take effect on next application launch.
+
+        [shell]
+        # Command or path to the shell executable to run
+        path = ${TomlParser.quoteString(config.shellPath)}
+        # Initial working directory when opening a new tab
+        start_directory = ${TomlParser.quoteString(config.startDirectory)}
+        # Optional command line to run once after shell readiness; blank disables it.
+        # Requires interactive PowerShell, Bash, zsh, or fish. Use a script for multiline programs.
+        startup_command = ${TomlParser.quoteString(config.startupCommand)}
+
+        [window]
+        # Preferred default terminal size in columns and rows
+        columns = ${config.columns}
+        rows = ${config.rows}
+        # Maximum number of lines to retain in the scrollback buffer
+        scrollback_lines = ${config.scrollbackLines}
+
+        [font]
+        # Primary monospace font family
+        family = ${TomlParser.quoteString(config.fontFamily)}
+        # Font size in points
+        size = ${config.fontSize}
+        # Line height multiplier
+        line_height = ${config.lineHeight}
+        # Whether the complex-text renderer may use installed system fonts as fallback
+        use_system_fallback_fonts = ${config.useSystemFallbackFonts}
+
+        [theme]
+        # Resolved terminal color palette theme.
+        # Supported themes: campbell, one-dark, nord, tokyo-night, everforest
+        name = ${TomlParser.quoteString(config.theme)}
+
+        [behavior]
+        # Whether East Asian Ambiguous characters should occupy two terminal cells in width policy
+        treat_ambiguous_as_wide = ${config.treatAmbiguousAsWide}
+        # Cursor blink period in milliseconds
+        cursor_blink_millis = ${config.cursorBlinkMillis}
+        # Style of the text cursor (block, underline, beam)
+        cursor_shape = ${TomlParser.quoteString(config.cursorShape)}
+        # Play a system beep when the terminal receives a BEL character
+        audible_bell = ${config.audibleBell}
+        # Show a visual edge pulse when the terminal receives a BEL character
+        visual_bell = ${config.visualBell}
+        # Automatically paste clipboard contents when the middle mouse button is clicked
+        paste_on_middle_click = ${config.pasteOnMiddleClick}
+        # Paste content handling: preserve or strip-c0; bracketed paste is protected in both
+        paste_sanitization = "${pasteSanitizationId(config.pasteControlPolicy)}"
+        # Whether terminal window should resize when the shell requests a grid resize
+        shell_request_resize_window = ${config.shellRequestResizeWindow}
+        # Whether terminal window manipulation (move, minimize, maximize, raise, lower) is allowed from the shell
+        shell_request_window_manipulation = ${config.shellRequestWindowManipulation}
+        # Whether to enable desktop notifications when the terminal receives OSC 9 or OSC 777 sequences
+        desktop_notifications_enabled = ${config.desktopNotificationsEnabled}
+        # Whether host-provided shell suggestions may appear in the terminal UI
+        smart_suggestions_enabled = ${config.smartSuggestionsEnabled}
+        shell_suggestions_enabled = ${config.shellSuggestionsEnabled}
+        # Whether Enter accepts an already-selected suggestion; with no selection Enter reaches the shell
+        accept_selected_suggestion_with_enter = ${config.acceptSelectedSuggestionWithEnter}
+        # Persist compact suggestion-learning metadata (never raw terminal output) across application restarts
+        $SUGGESTION_LEARNING_PERSISTENCE_KEY = ${config.persistentSuggestionLearningEnabled}
+        # Automatically scroll to bottom when new process output arrives
+        scroll_on_output = ${config.scrollOnOutput}
+        show_foreground_process_name = ${config.showForegroundProcessName}
+
+        [security]
+        # OSC 52 clipboard write permission for the entire session, including nested SSH (allow, prompt, deny)
+        clipboard_write = "${config.clipboardWrite.name.lowercase(Locale.ROOT)}"
+        # OSC 52 clipboard read/query permission (allow, prompt, deny)
+        clipboard_read = "${config.clipboardRead.name.lowercase(Locale.ROOT)}"
+        # Maximum decoded payload size in bytes for clipboard writes
+        clipboard_max_decoded_bytes = ${config.clipboardMaxDecodedBytes}
+        # Tab/window title renaming permission for the entire session, including nested SSH (allow, deny)
+        title_permission = "${config.titlePermission.name.lowercase(Locale.ROOT)}"
+        """.trimIndent()
+
+    private fun parseIntSetting(
+        raw: String?,
+        defaultValue: Int,
+        min: Int,
+        max: Int,
+    ): Int {
+        val text = raw?.trim() ?: return defaultValue
+        val parsed = text.toLongOrNull()
+        if (parsed != null) {
+            return parsed.coerceIn(min.toLong(), max.toLong()).toInt()
+        }
+        if (isSignedIntegerText(text)) {
+            return if (text.startsWith("-")) min else max
+        }
+        return defaultValue
+    }
+
+    private fun isSignedIntegerText(text: String): Boolean {
+        val start = if (text.startsWith("-") || text.startsWith("+")) 1 else 0
+        if (start == text.length) return false
+        for (index in start until text.length) {
+            if (!text[index].isDigit()) return false
+        }
+        return true
+    }
+
+    private fun parseFloatSetting(
+        raw: String?,
+        defaultValue: Float,
+        min: Float,
+        max: Float,
+    ): Float {
+        val text = raw?.trim() ?: return defaultValue
+        val parsed = text.toFloatOrNull() ?: return defaultValue
+        if (parsed.isNaN()) return defaultValue
+        return parsed.coerceIn(min, max)
+    }
+
+    private fun parsePasteControlPolicy(
+        raw: String?,
+        defaultValue: PasteControlPolicy,
+    ): PasteControlPolicy =
+        when (raw?.trim()?.lowercase(Locale.ROOT)) {
+            // Legacy newline normalization was already supplied by the local PTY policy.
+            "preserve", "raw", "normalize-line-endings" -> PasteControlPolicy.PRESERVE
+            "strip-c0" -> PasteControlPolicy.STRIP_C0_EXCEPT_TAB_CR_LF
+            else -> defaultValue
+        }
+
+    private fun pasteSanitizationId(policy: PasteControlPolicy): String =
+        when (policy) {
+            PasteControlPolicy.PRESERVE -> "preserve"
+            PasteControlPolicy.STRIP_C0_EXCEPT_TAB_CR_LF -> "strip-c0"
+        }
+
+    private fun parseClipboardPermission(
+        raw: String?,
+        defaultValue: TerminalClipboardPermission,
+    ): TerminalClipboardPermission =
+        when (raw?.trim()?.lowercase(Locale.ROOT)) {
+            "deny" -> TerminalClipboardPermission.DENY
+            "prompt" -> TerminalClipboardPermission.PROMPT
+            "allow" -> TerminalClipboardPermission.ALLOW
+            else -> defaultValue
+        }
+
+    private fun parseTitlePermission(
+        raw: String?,
+        defaultValue: TerminalTitlePermission,
+    ): TerminalTitlePermission =
+        when (raw?.trim()?.lowercase(Locale.ROOT)) {
+            "deny" -> TerminalTitlePermission.DENY
+            "allow" -> TerminalTitlePermission.ALLOW
+            else -> defaultValue
+        }
+
+    companion object {
+        /**
+         * Resolves the default configuration path on disk for this operating system.
+         *
+         * @param osName operating system name used for platform selection.
+         * @param env environment variables map.
+         * @param userHome current user's home directory path.
+         * @return the resolved [Path] to the configuration file on disk.
+         */
+        internal fun getDefaultPath(
+            osName: String = System.getProperty("os.name"),
+            env: Map<String, String> = System.getenv(),
+            userHome: String = System.getProperty("user.home"),
+        ): Path {
+            // 1. System property override
+            val sysProp = System.getProperty("ketraterm.config.path")
+            if (!sysProp.isNullOrBlank()) {
+                return Path.of(sysProp)
+            }
+
+            // 2. Env variable override
+            val envVar = env["KetraTerm_CONFIG_PATH"]
+            if (!envVar.isNullOrBlank()) {
+                return Path.of(envVar)
+            }
+
+            // 3. OS-specific default configuration directories
+            val os = osName.lowercase(Locale.ROOT)
+            return when {
+                os.contains("windows") -> {
+                    val appData = env["APPDATA"]
+                    if (!appData.isNullOrBlank()) {
+                        Path.of(appData, "KetraTerm", "config.toml")
+                    } else {
+                        Path.of(userHome, ".config", "ketraterm", "config.toml")
+                    }
+                }
+                os.contains("mac") -> {
+                    Path.of(userHome, "Library", "Application Support", "KetraTerm", "config.toml")
+                }
+                else -> {
+                    val xdgConfig = env["XDG_CONFIG_HOME"]
+                    if (!xdgConfig.isNullOrBlank()) {
+                        Path.of(xdgConfig, "ketraterm", "config.toml")
+                    } else {
+                        Path.of(userHome, ".config", "ketraterm", "config.toml")
+                    }
+                }
+            }
+        }
+
+        /**
+         * Returns a manager configured with the OS-specific default configuration path.
+         *
+         * @return a default [KetraTermConfigManager] instance.
+         */
+        fun getDefault(): KetraTermConfigManager = KetraTermConfigManager(getDefaultPath())
+    }
+}

@@ -39,8 +39,6 @@ import kotlinx.coroutines.swing.Swing
 import java.awt.*
 import java.awt.event.InputEvent
 import java.awt.event.KeyEvent
-import java.nio.charset.StandardCharsets
-import java.nio.file.Files
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.logging.Level
 import java.util.logging.Logger
@@ -71,6 +69,7 @@ internal class TabManager(
     private val workspace = TerminalWorkspace(StandaloneWorkspaceListener())
     private val cli = KetraTermCli(settings.configPath)
     private val clipboardReader = SwingClipboardReader()
+    private val commandOutputExporter = CommandOutputExporter()
     private val attentionTaskbar: Taskbar? =
         try {
             if (Taskbar.isTaskbarSupported()) {
@@ -195,6 +194,7 @@ internal class TabManager(
             settings.addChangeListener(settingsListener)
         } catch (failure: Throwable) {
             var cleanupFailure: Throwable? = failure
+            cleanupFailure = captureCleanupFailure(cleanupFailure, commandOutputExporter::close)
             cleanupFailure = captureCleanupFailure(cleanupFailure, windowResizeController::close)
             cleanupFailure = captureCleanupFailure(cleanupFailure) { settings.removeChangeListener(settingsListener) }
             cleanupFailure = captureCleanupFailure(cleanupFailure) { focusManager.removeKeyEventDispatcher(keyEventDispatcher) }
@@ -209,24 +209,13 @@ internal class TabManager(
     }
 
     private fun switchToNextTab() {
-        val nextTabId = getNeighborTabId(forward = true) ?: return
+        val nextTabId = tabBar.neighborId(forward = true) ?: return
         selectTab(nextTabId)
     }
 
     private fun switchToPrevTab() {
-        val prevTabId = getNeighborTabId(forward = false) ?: return
+        val prevTabId = tabBar.neighborId(forward = false) ?: return
         selectTab(prevTabId)
-    }
-
-    private fun getNeighborTabId(forward: Boolean): String? {
-        val currentId = tabBar.selectedId() ?: return null
-        val tabIds = tabRoots.keys.toList()
-        if (tabIds.size <= 1) return null
-        val currentIndex = tabIds.indexOf(currentId)
-        if (currentIndex == -1) return null
-        val step = if (forward) 1 else -1
-        val nextIndex = (currentIndex + step + tabIds.size) % tabIds.size
-        return tabIds[nextIndex]
     }
 
     /**
@@ -241,17 +230,17 @@ internal class TabManager(
                 workspace.openTab(
                     profile = prepareLaunchProfile(profile),
                     options =
-                        settings.current().let { snapshot ->
-                            TerminalWorkspaceOpenOptions(
-                                columns = snapshot.columns,
-                                rows = snapshot.rows,
-                                treatAmbiguousAsWide = snapshot.treatAmbiguousAsWide,
-                                maxHistory = snapshot.scrollbackLines,
-                                pasteControlPolicy = snapshot.pasteControlPolicy,
-                                hostPolicy = settings.createHostPolicy(),
-                                showForegroundProcessName = settings.config.showForegroundProcessName,
-                                modeReportCapabilities = modeReportCapabilities,
-                            )
+                        settings.config.let { snapshot ->
+                            TerminalWorkspaceOpenOptions.create { draft ->
+                                draft.columns = snapshot.columns
+                                draft.rows = snapshot.rows
+                                draft.treatAmbiguousAsWide = snapshot.treatAmbiguousAsWide
+                                draft.maxHistory = snapshot.scrollbackLines
+                                draft.pasteControlPolicy = snapshot.pasteControlPolicy
+                                draft.hostPolicy = settings.createHostPolicy()
+                                draft.showForegroundProcessName = settings.config.showForegroundProcessName
+                                draft.modeReportCapabilities = modeReportCapabilities
+                            }
                         },
                 )
             } catch (exception: Exception) {
@@ -348,6 +337,7 @@ internal class TabManager(
         if (!shutdownStarted.compareAndSet(false, true)) return
         var failure: Throwable? = null
         failure = captureCleanupFailure(failure, windowResizeController::close)
+        failure = captureCleanupFailure(failure, commandOutputExporter::close)
         failure = captureCleanupFailure(failure) { settings.removeChangeListener(settingsListener) }
         failure =
             captureCleanupFailure(failure) {
@@ -476,17 +466,17 @@ internal class TabManager(
                 workspace.openTab(
                     profile = prepareLaunchProfile(profile),
                     options =
-                        settings.current().let { snapshot ->
-                            TerminalWorkspaceOpenOptions(
-                                columns = snapshot.columns,
-                                rows = snapshot.rows,
-                                treatAmbiguousAsWide = snapshot.treatAmbiguousAsWide,
-                                maxHistory = snapshot.scrollbackLines,
-                                pasteControlPolicy = snapshot.pasteControlPolicy,
-                                hostPolicy = settings.createHostPolicy(),
-                                showForegroundProcessName = settings.config.showForegroundProcessName,
-                                modeReportCapabilities = modeReportCapabilities,
-                            )
+                        settings.config.let { snapshot ->
+                            TerminalWorkspaceOpenOptions.create { draft ->
+                                draft.columns = snapshot.columns
+                                draft.rows = snapshot.rows
+                                draft.treatAmbiguousAsWide = snapshot.treatAmbiguousAsWide
+                                draft.maxHistory = snapshot.scrollbackLines
+                                draft.pasteControlPolicy = snapshot.pasteControlPolicy
+                                draft.hostPolicy = settings.createHostPolicy()
+                                draft.showForegroundProcessName = settings.config.showForegroundProcessName
+                                draft.modeReportCapabilities = modeReportCapabilities
+                            }
                         },
                 )
             } catch (exception: Exception) {
@@ -749,9 +739,7 @@ internal class TabManager(
         val output = pane.terminal.commandOutputText(commandRecordId) ?: return
         val chooser = JFileChooser().apply { selectedFile = java.io.File("command-output.txt") }
         if (chooser.showSaveDialog(frame) != JFileChooser.APPROVE_OPTION) return
-        runCatching {
-            Files.writeString(chooser.selectedFile.toPath(), output, StandardCharsets.UTF_8)
-        }.onFailure { exception ->
+        commandOutputExporter.export(chooser.selectedFile.toPath(), output) { exception ->
             SwingMessageDialogs.show(
                 frame,
                 SwingDialogRequest(

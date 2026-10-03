@@ -24,99 +24,6 @@ import javax.swing.event.DocumentEvent
 import javax.swing.event.DocumentListener
 import kotlin.coroutines.CoroutineContext
 
-private val PANEL_SHADOW = Color(0x70000000, true)
-private val PANEL_BACKGROUND = Color(0xF01F2227.toInt(), true)
-private val PANEL_BORDER = Color(0x55414852, true)
-private val FOREGROUND = Color(0xFFE8EAED.toInt(), true)
-private val COUNTER_FOREGROUND = Color(0xFFA4ABB6.toInt(), true)
-private val TEXT_FIELD_BACKGROUND = Color(0xFF25282E.toInt(), true)
-private val TEXT_FIELD_BORDER = Color(0x4A4B5563, true)
-private val TEXT_FIELD_FOCUS_BORDER = Color(0xFF3574F0.toInt(), true)
-private val TEXT_FIELD_PLACEHOLDER = Color(0xFF8B929D.toInt(), true)
-private val SEARCH_ICON_FOREGROUND = Color(0xFFB6BBC4.toInt(), true)
-private val BUTTON_HOVER_BACKGROUND = Color(0x18FFFFFF, true)
-private val BUTTON_PRESSED_BACKGROUND = Color(0x2CFFFFFF, true)
-private val BUTTON_SELECTED_BACKGROUND = Color(0x553574F0, true)
-private val BUTTON_SELECTED_FOREGROUND = Color(0xFFFFFFFF.toInt(), true)
-
-private class SearchTextField(
-    columns: Int,
-) : JTextField(columns) {
-    init {
-        isOpaque = false
-        caretColor = FOREGROUND
-        foreground = FOREGROUND
-        border = BorderFactory.createEmptyBorder(4, 34, 4, 48)
-        margin = Insets(0, 0, 0, 0)
-        addFocusListener(
-            object : FocusListener {
-                override fun focusGained(event: FocusEvent) = repaint()
-
-                override fun focusLost(event: FocusEvent) = repaint()
-            },
-        )
-    }
-
-    override fun getPreferredSize(): Dimension {
-        val size = super.getPreferredSize()
-        return Dimension(size.width, SEARCH_FIELD_HEIGHT)
-    }
-
-    override fun getMinimumSize(): Dimension = Dimension(160, SEARCH_FIELD_HEIGHT)
-
-    override fun paintComponent(graphics: Graphics) {
-        val g = graphics.create() as Graphics2D
-        try {
-            g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON)
-            g.color = TEXT_FIELD_BACKGROUND
-            g.fillRoundRect(1, 1, width - 2, height - 2, 8, 8)
-            g.color = if (isFocusOwner) TEXT_FIELD_FOCUS_BORDER else TEXT_FIELD_BORDER
-            g.drawRoundRect(1, 1, width - 2, height - 2, 8, 8)
-        } finally {
-            g.dispose()
-        }
-        super.paintComponent(graphics)
-        paintSearchAffordances(graphics)
-    }
-
-    private fun paintSearchAffordances(graphics: Graphics) {
-        val g = graphics.create() as Graphics2D
-        try {
-            g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON)
-            paintSearchIcon(g, 13, height / 2)
-            if (text.isEmpty() && !isFocusOwner) {
-                g.color = TEXT_FIELD_PLACEHOLDER
-                g.font = font
-                val metrics = g.fontMetrics
-                val y = ((height - metrics.height) / 2) + metrics.ascent
-                g.drawString("Search", 34, y)
-            }
-        } finally {
-            g.dispose()
-        }
-    }
-
-    private fun paintSearchIcon(
-        graphics: Graphics2D,
-        x: Int,
-        centerY: Int,
-    ) {
-        val oldStroke = graphics.stroke
-        try {
-            graphics.color = SEARCH_ICON_FOREGROUND
-            graphics.stroke = BasicStroke(1.5f, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND)
-            graphics.drawOval(x, centerY - 7, 11, 11)
-            graphics.drawLine(x + 9, centerY + 3, x + 15, centerY + 9)
-        } finally {
-            graphics.stroke = oldStroke
-        }
-    }
-
-    private companion object {
-        private const val SEARCH_FIELD_HEIGHT = 30
-    }
-}
-
 /**
  * Optional host-owned search bar for a [SwingTerminal].
  *
@@ -131,6 +38,8 @@ public class SwingTerminalSearchBar
     public constructor(
         private val terminal: SwingTerminal,
     ) {
+        private var colors = SwingTerminalSearchColors()
+
         private var suppressDocumentEvents = false
         private val queryField = SearchTextField(24)
         private val counterLabel = JLabel("0/0")
@@ -292,22 +201,41 @@ public class SwingTerminalSearchBar
         public fun isOpen(): Boolean = component.isVisible
 
         /**
-         * Refreshes host colors from the terminal component.
+         * Reapplies the last supplied colors. Off-EDT calls enqueue work on the EDT.
          */
         public fun refreshColors() {
+            if (!SwingUtilities.isEventDispatchThread()) {
+                SwingUtilities.invokeLater { refreshColors() }
+                return
+            }
+            refreshColors(colors)
+        }
+
+        /**
+         * Applies one prepared host palette without changing the query, visibility or search.
+         * Off-EDT calls enqueue work on the EDT; EDT calls apply immediately and repaint.
+         * The snapshot is retained until replaced, including across close/open cycles.
+         */
+        public fun refreshColors(colors: SwingTerminalSearchColors) {
+            if (!SwingUtilities.isEventDispatchThread()) {
+                SwingUtilities.invokeLater { refreshColors(colors) }
+                return
+            }
+            this.colors = colors
             component.background = Color(0, 0, 0, 0)
-            component.foreground = FOREGROUND
-            searchPanel.background = PANEL_BACKGROUND
-            searchPanel.foreground = FOREGROUND
+            component.foreground = colors.foreground
+            searchPanel.background = colors.panelBackground
+            searchPanel.foreground = colors.foreground
             queryField.isOpaque = false
-            queryField.foreground = FOREGROUND
-            queryField.caretColor = FOREGROUND
+            queryField.foreground = colors.foreground
+            queryField.caretColor = colors.foreground
             queryField.border = BorderFactory.createEmptyBorder(4, 34, 4, 48)
-            counterLabel.foreground = COUNTER_FOREGROUND
-            previousButton.foreground = FOREGROUND
-            nextButton.foreground = FOREGROUND
-            closeButton.foreground = FOREGROUND
-            caseSensitiveToggle.foreground = FOREGROUND
+            counterLabel.foreground = colors.counterForeground
+            previousButton.foreground = colors.foreground
+            nextButton.foreground = colors.foreground
+            closeButton.foreground = colors.foreground
+            caseSensitiveToggle.foreground = if (caseSensitiveToggle.isSelected) colors.buttonSelectedForeground else colors.foreground
+            component.repaint()
         }
 
         private fun queryChanged() {
@@ -396,7 +324,7 @@ public class SwingTerminalSearchBar
             CLOSE,
         }
 
-        private class IconButton(
+        private inner class IconButton(
             private val icon: ButtonIcon,
         ) : JButton() {
             init {
@@ -408,7 +336,7 @@ public class SwingTerminalSearchBar
                 isRolloverEnabled = true
                 cursor = Cursor.getPredefinedCursor(Cursor.HAND_CURSOR)
                 margin = Insets(0, 0, 0, 0)
-                foreground = FOREGROUND
+                foreground = colors.foreground
                 addMouseListener(RepaintOnHoverListener)
             }
 
@@ -422,7 +350,7 @@ public class SwingTerminalSearchBar
                 val g = graphics.create() as Graphics2D
                 try {
                     g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON)
-                    paintFlatButtonBackground(g, width, height, model)
+                    paintFlatButtonBackground(g, width, height, model, colors)
                     paintIcon(g, icon, width, height, foreground)
                 } finally {
                     g.dispose()
@@ -430,7 +358,7 @@ public class SwingTerminalSearchBar
             }
         }
 
-        private class FlatToggleButton(
+        private inner class FlatToggleButton(
             text: String,
         ) : JToggleButton(text) {
             init {
@@ -442,7 +370,7 @@ public class SwingTerminalSearchBar
                 isRolloverEnabled = true
                 cursor = Cursor.getPredefinedCursor(Cursor.HAND_CURSOR)
                 margin = Insets(0, 0, 0, 0)
-                foreground = FOREGROUND
+                foreground = colors.foreground
                 font = font.deriveFont(Font.BOLD)
                 addMouseListener(RepaintOnHoverListener)
             }
@@ -457,8 +385,8 @@ public class SwingTerminalSearchBar
                 val g = graphics.create() as Graphics2D
                 try {
                     g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON)
-                    paintFlatButtonBackground(g, width, height, model, isSelected)
-                    foreground = if (isSelected) BUTTON_SELECTED_FOREGROUND else FOREGROUND
+                    paintFlatButtonBackground(g, width, height, model, colors, isSelected)
+                    foreground = if (isSelected) colors.buttonSelectedForeground else colors.foreground
                 } finally {
                     g.dispose()
                 }
@@ -466,7 +394,7 @@ public class SwingTerminalSearchBar
             }
         }
 
-        private class SearchPanel : JPanel(GridBagLayout()) {
+        private inner class SearchPanel : JPanel(GridBagLayout()) {
             init {
                 isOpaque = false
                 border = BorderFactory.createEmptyBorder(6, 10, 6, 10)
@@ -476,11 +404,11 @@ public class SwingTerminalSearchBar
                 val g = graphics.create() as Graphics2D
                 try {
                     g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON)
-                    g.color = PANEL_SHADOW
+                    g.color = colors.panelShadow
                     g.fillRoundRect(2, 3, width - 4, height - 4, 14, 14)
-                    g.color = PANEL_BACKGROUND
+                    g.color = colors.panelBackground
                     g.fillRoundRect(1, 1, width - 2, height - 2, 12, 12)
-                    g.color = PANEL_BORDER
+                    g.color = colors.panelBorder
                     g.drawRoundRect(1, 1, width - 2, height - 2, 12, 12)
                 } finally {
                     g.dispose()
@@ -489,7 +417,82 @@ public class SwingTerminalSearchBar
             }
         }
 
+        private inner class SearchTextField(
+            columns: Int,
+        ) : JTextField(columns) {
+            init {
+                isOpaque = false
+                caretColor = colors.foreground
+                foreground = colors.foreground
+                border = BorderFactory.createEmptyBorder(4, 34, 4, 48)
+                margin = Insets(0, 0, 0, 0)
+                addFocusListener(
+                    object : FocusListener {
+                        override fun focusGained(event: FocusEvent) = repaint()
+
+                        override fun focusLost(event: FocusEvent) = repaint()
+                    },
+                )
+            }
+
+            override fun getPreferredSize(): Dimension {
+                val size = super.getPreferredSize()
+                return Dimension(size.width, SEARCH_FIELD_HEIGHT)
+            }
+
+            override fun getMinimumSize(): Dimension = Dimension(160, SEARCH_FIELD_HEIGHT)
+
+            override fun paintComponent(graphics: Graphics) {
+                val g = graphics.create() as Graphics2D
+                try {
+                    g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON)
+                    g.color = colors.textFieldBackground
+                    g.fillRoundRect(1, 1, width - 2, height - 2, 8, 8)
+                    g.color = if (isFocusOwner) colors.textFieldFocusBorder else colors.textFieldBorder
+                    g.drawRoundRect(1, 1, width - 2, height - 2, 8, 8)
+                } finally {
+                    g.dispose()
+                }
+                super.paintComponent(graphics)
+                paintSearchAffordances(graphics)
+            }
+
+            private fun paintSearchAffordances(graphics: Graphics) {
+                val g = graphics.create() as Graphics2D
+                try {
+                    g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON)
+                    paintSearchIcon(g, 13, height / 2)
+                    if (text.isEmpty() && !isFocusOwner) {
+                        g.color = colors.textFieldPlaceholder
+                        g.font = font
+                        val metrics = g.fontMetrics
+                        val y = ((height - metrics.height) / 2) + metrics.ascent
+                        g.drawString("Search", 34, y)
+                    }
+                } finally {
+                    g.dispose()
+                }
+            }
+
+            private fun paintSearchIcon(
+                graphics: Graphics2D,
+                x: Int,
+                centerY: Int,
+            ) {
+                val oldStroke = graphics.stroke
+                try {
+                    graphics.color = colors.searchIconForeground
+                    graphics.stroke = BasicStroke(1.5f, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND)
+                    graphics.drawOval(x, centerY - 7, 11, 11)
+                    graphics.drawLine(x + 9, centerY + 3, x + 15, centerY + 9)
+                } finally {
+                    graphics.stroke = oldStroke
+                }
+            }
+        }
+
         private companion object {
+            private const val SEARCH_FIELD_HEIGHT = 30
             private const val COMMAND_BUTTON_HEIGHT = 28
             private const val ICON_BUTTON_WIDTH = 30
             private const val TOGGLE_BUTTON_WIDTH = 38
@@ -507,12 +510,13 @@ public class SwingTerminalSearchBar
                 width: Int,
                 height: Int,
                 model: ButtonModel,
+                colors: SwingTerminalSearchColors,
                 isSelected: Boolean = false,
             ) {
                 when {
-                    isSelected -> graphics.color = BUTTON_SELECTED_BACKGROUND
-                    model.isPressed -> graphics.color = BUTTON_PRESSED_BACKGROUND
-                    model.isRollover -> graphics.color = BUTTON_HOVER_BACKGROUND
+                    isSelected -> graphics.color = colors.buttonSelectedBackground
+                    model.isPressed -> graphics.color = colors.buttonPressedBackground
+                    model.isRollover -> graphics.color = colors.buttonHoverBackground
                     else -> return
                 }
                 graphics.fillRoundRect(0, 0, width, height, 6, 6)

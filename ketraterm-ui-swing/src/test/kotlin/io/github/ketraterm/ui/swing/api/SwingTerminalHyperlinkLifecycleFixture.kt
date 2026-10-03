@@ -52,35 +52,36 @@ internal class SwingTerminalHyperlinkLifecycleFixture(
     private var copiedText: String? = null
     private var pointer: Point? = Point(gutterWidth + 1, 1)
     private var osc8Activation = SwingHyperlinkActivation.MODIFIER
+    private val shellState = TerminalShellIntegrationState()
     private val session =
         TerminalSession.create(
             terminal = TerminalBuffers.create(width = 40, height = 2, maxHistory = 10),
             connector = NoOpConnector,
             workerDispatcher = worker,
             ioDispatcher = worker,
-            shellIntegration = if (gutterWidth == 0) null else TerminalShellIntegrationFactory.host(TerminalShellIntegrationState()),
+            shellIntegration = if (gutterWidth == 0) null else TerminalShellIntegrationFactory.host(shellState),
         )
     private val container = onEdt { JPanel() }
     private val terminal =
         onEdt {
             SwingTerminal(
                 settingsProvider = {
-                    SwingSettings(
-                        columns = 40,
-                        rows = 2,
-                        padding = SwingPadding(),
-                        cursorBlinkMillis = 0,
-                        shellIntegrationDecorationGutterWidth = gutterWidth,
-                        smartSuggestionsEnabled = false,
-                        osc8HyperlinkPresentation = this.osc8Presentation,
-                        osc8HyperlinkActivation = osc8Activation,
-                    )
+                    SwingSettings.create { draft ->
+                        draft.columns = 40
+                        draft.rows = 2
+                        draft.padding = SwingPadding()
+                        draft.cursorBlinkMillis = 0
+                        draft.shellIntegrationDecorationGutterWidth = gutterWidth
+                        draft.smartSuggestionsEnabled = false
+                        draft.osc8HyperlinkPresentation = this.osc8Presentation
+                        draft.osc8HyperlinkActivation = osc8Activation
+                    }
                 },
                 hostServices =
-                    SwingHostServices(
-                        uiDispatcher = { uiTasks.add(it) },
-                        hyperlinkHandler = TerminalHyperlinkHandler { opened.add(it) },
-                        hyperlinkDetector = { request ->
+                    SwingHostServices.create { draft ->
+                        draft.uiDispatcher = { uiTasks.add(it) }
+                        draft.hyperlinkHandler = TerminalHyperlinkHandler { opened.add(it) }
+                        draft.hyperlinkDetector = { request ->
                             check(!SwingUtilities.isEventDispatchThread())
                             detectorCalls.incrementAndGet()
                             val results = ArrayList<SwingHyperlink>()
@@ -104,20 +105,20 @@ internal class SwingTerminalHyperlinkLifecycleFixture(
                                 }
                             }
                             results
-                        },
-                        contextMenuHandler = {
+                        }
+                        draft.contextMenuHandler = {
                             menuRequest = it
                             true
-                        },
-                        clipboardHandler =
+                        }
+                        draft.clipboardHandler =
                             object : TerminalClipboardHandler {
                                 override fun copyText(text: String) {
                                     copiedText = text
                                 }
 
                                 override fun readText(): String? = copiedText
-                            },
-                    ),
+                            }
+                    },
                 searchDispatcher = worker,
                 hyperlinkDispatcher = worker,
                 pointerPosition = { pointer },
@@ -126,7 +127,8 @@ internal class SwingTerminalHyperlinkLifecycleFixture(
                 container.add(this)
                 container.addNotify()
                 session.onBytes(URL.toByteArray(), 0, URL.length)
-                session.renderPublisher.updateAndPublish(session)
+                session.requestRender(0)
+                worker.scheduler.runCurrent()
                 bind(session)
             }
         }
@@ -223,7 +225,7 @@ internal class SwingTerminalHyperlinkLifecycleFixture(
 
     fun markFirstRowAsPrompt() {
         onEdt {
-            session.readRenderFrame { frame -> session.shellIntegrationState.recordPromptStart(frame.lineId(0)) }
+            session.readRenderFrame { frame -> shellState.recordPromptStart(frame.lineId(0)) }
         }
         settle()
     }

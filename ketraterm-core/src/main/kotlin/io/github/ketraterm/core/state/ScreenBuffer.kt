@@ -63,8 +63,6 @@ internal class ScreenBuffer(
     var kittyKeyboardFlags: Int = 0
     internal val kittyKeyboardStack = IntArray(32)
     internal var kittyKeyboardDepth = 0
-    internal var kittyKeyboardInitialFlags = 0
-    internal var hasSavedInitialFlags = false
 
     var scrollTop: Int = 0
         private set
@@ -214,10 +212,6 @@ internal class ScreenBuffer(
         flags: Int,
         currentFlags: Int,
     ): Int {
-        if (!hasSavedInitialFlags) {
-            kittyKeyboardInitialFlags = currentFlags
-            hasSavedInitialFlags = true
-        }
         if (kittyKeyboardDepth >= kittyKeyboardStack.size) {
             System.arraycopy(kittyKeyboardStack, 1, kittyKeyboardStack, 0, kittyKeyboardStack.size - 1)
             kittyKeyboardStack[kittyKeyboardStack.size - 1] = currentFlags
@@ -234,17 +228,9 @@ internal class ScreenBuffer(
         currentFlags: Int,
     ): Int {
         var nextFlags = currentFlags
-        repeat(count) {
-            if (kittyKeyboardDepth > 0) {
-                kittyKeyboardDepth--
-                nextFlags = kittyKeyboardStack[kittyKeyboardDepth]
-            } else {
-                if (hasSavedInitialFlags) {
-                    nextFlags = kittyKeyboardInitialFlags
-                } else {
-                    nextFlags = 0
-                }
-            }
+        if (count > 0) {
+            kittyKeyboardDepth -= minOf(count, kittyKeyboardDepth)
+            nextFlags = if (kittyKeyboardDepth == 0) 0 else kittyKeyboardStack[kittyKeyboardDepth]
         }
         kittyKeyboardFlags = nextFlags
         return nextFlags
@@ -252,8 +238,6 @@ internal class ScreenBuffer(
 
     fun clearKittyKeyboardStack() {
         kittyKeyboardDepth = 0
-        kittyKeyboardInitialFlags = 0
-        hasSavedInitialFlags = false
         kittyKeyboardFlags = 0
     }
 

@@ -17,6 +17,7 @@ package io.github.ketraterm.benchmark
 
 import io.github.ketraterm.core.TerminalBuffers
 import io.github.ketraterm.core.api.TerminalBuffer
+import io.github.ketraterm.core.api.TerminalRenderBuffer
 import io.github.ketraterm.host.HostCommandAdapter
 import io.github.ketraterm.parser.api.TerminalParsers
 import io.github.ketraterm.render.cache.TerminalRenderPublisher
@@ -27,6 +28,7 @@ import io.github.ketraterm.ui.swing.api.CellSelection
 import io.github.ketraterm.ui.swing.api.SwingTerminal
 import io.github.ketraterm.ui.swing.settings.SwingSettings
 import io.github.ketraterm.ui.swing.settings.SwingSettingsProvider
+import kotlinx.coroutines.flow.first
 import org.openjdk.jmh.annotations.*
 import org.openjdk.jmh.infra.Blackhole
 import java.awt.Graphics2D
@@ -47,7 +49,7 @@ open class TerminalLargeInputBenchmark {
     lateinit var workload: String
 
     private lateinit var bytes: ByteArray
-    private lateinit var terminal: TerminalBuffer
+    private lateinit var terminal: TerminalRenderBuffer
     private lateinit var renderReader: io.github.ketraterm.render.api.TerminalRenderFrameReader
     private lateinit var publisher: TerminalRenderPublisher
 
@@ -71,7 +73,7 @@ open class TerminalLargeInputBenchmark {
                 height = LARGE_INPUT_ROWS,
                 maxHistory = LARGE_INPUT_LINES,
             )
-        renderReader = terminal as io.github.ketraterm.render.api.TerminalRenderFrameReader
+        renderReader = terminal
         publisher = TerminalRenderPublisher(LARGE_INPUT_COLUMNS, LARGE_INPUT_ROWS)
     }
 
@@ -161,7 +163,7 @@ open class SwingPaintBenchmark {
     @Param("false", "true")
     var selected: Boolean = false
 
-    private lateinit var terminal: TerminalBuffer
+    private lateinit var terminal: TerminalRenderBuffer
     private lateinit var session: TerminalSession
     private lateinit var component: SwingTerminal
     private lateinit var image: BufferedImage
@@ -191,18 +193,19 @@ open class SwingPaintBenchmark {
         }
 
         session = benchmarkSession(terminal)
-        session.renderPublisher.updateAndPublish(terminal as io.github.ketraterm.render.api.TerminalRenderFrameReader)
+        session.requestRender(0)
+        kotlinx.coroutines.runBlocking { session.renderGeneration.first { it > 0 } }
 
         SwingUtilities.invokeAndWait {
             component =
                 SwingTerminal(
                     SwingSettingsProvider {
-                        SwingSettings(
-                            columns = columns,
-                            rows = rows,
-                            cursorBlinkMillis = 0,
-                            useSystemFallbackFonts = false,
-                        )
+                        SwingSettings.create { draft ->
+                            draft.columns = columns
+                            draft.rows = rows
+                            draft.cursorBlinkMillis = 0
+                            draft.useSystemFallbackFonts = false
+                        }
                     },
                 )
             component.size = component.preferredSize
@@ -413,7 +416,7 @@ private fun writeClusterViewport(
     }
 }
 
-internal fun benchmarkSession(terminal: TerminalBuffer): TerminalSession =
+internal fun benchmarkSession(terminal: TerminalRenderBuffer): TerminalSession =
     TerminalSession.create(
         terminal = terminal,
         connector = NoOpTerminalConnector,

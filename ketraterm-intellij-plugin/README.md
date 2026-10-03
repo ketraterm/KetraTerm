@@ -109,6 +109,9 @@ implementation("io.github.ketraterm:ketraterm-workspace")
 This keeps IDE plugin development independent while still using local KetraTerm
 sources during development.
 
+Workspace and completion persistence are product-only modules. The composite
+resolves them from source for bundling without requiring Maven publications.
+
 ## Documentation
 
 - `AGENTS.md`: agent and contributor rules for this build.

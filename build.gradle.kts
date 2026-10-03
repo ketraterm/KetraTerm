@@ -28,7 +28,7 @@ plugins {
 
 extra["kotlinxCoroutinesVersion"] = "1.10.2"
 
-// Only deliberate host/runtime libraries are published and checked as supported APIs.
+// One boundary for Maven publication, public ABI checks and aggregated API documentation.
 val publishedLibraryNames = setOf(
     "ketraterm-protocol",
     "ketraterm-parser",
@@ -37,7 +37,6 @@ val publishedLibraryNames = setOf(
     "ketraterm-input",
     "ketraterm-completion",
     "ketraterm-completion-host",
-    "ketraterm-completion-persistence",
     "ketraterm-render-api",
     "ketraterm-render-cache",
     "ketraterm-transport-api",
@@ -46,37 +45,21 @@ val publishedLibraryNames = setOf(
     "ketraterm-ui-swing",
     "ketraterm-ui-swing-host",
     "ketraterm-pty",
-    "ketraterm-workspace",
 )
 
 // Stage the real publication's runtime jar and generated metadata, without invoking
 // release signing or remote publishing. Consumer fixtures resolve only this repository.
 val consumerRepository = layout.buildDirectory.dir("library-consumer-repository")
-val prepareLibraryConsumerRepository = tasks.register("prepareLibraryConsumerRepository")
+val prepareLibraryConsumerRepository = tasks.register<Sync>("prepareLibraryConsumerRepository") {
+    into(consumerRepository)
+}
 
 repositories {
     mavenCentral()
 }
 
 dependencies {
-    dokka(project(":ketraterm-protocol"))
-    dokka(project(":ketraterm-parser"))
-    dokka(project(":ketraterm-core"))
-    dokka(project(":ketraterm-host"))
-    dokka(project(":ketraterm-input"))
-    dokka(project(":ketraterm-completion"))
-    dokka(project(":ketraterm-completion-host"))
-    dokka(project(":ketraterm-completion-persistence"))
-    dokka(project(":ketraterm-render-api"))
-    dokka(project(":ketraterm-render-cache"))
-    dokka(project(":ketraterm-transport-api"))
-    dokka(project(":ketraterm-session"))
-    dokka(project(":ketraterm-shell-integration"))
-    dokka(project(":ketraterm-ui-swing"))
-    dokka(project(":ketraterm-ui-swing-host"))
-    dokka(project(":ketraterm-testkit"))
-    dokka(project(":ketraterm-pty"))
-    dokka(project(":ketraterm-workspace"))
+    publishedLibraryNames.forEach { dokka(project(":$it")) }
 }
 
 val versionFile = rootProject.file("VERSION")
@@ -151,18 +134,18 @@ subprojects {
                 publications.withType<MavenPublication>().configureEach {
                     val publication = this
                     val publicationName = name.replaceFirstChar(Char::uppercaseChar)
-                    val stage = tasks.register<Sync>("stage${publicationName}ConsumerPublication") {
-                        val pom = tasks.named<GenerateMavenPom>("generatePomFileFor${publicationName}Publication")
-                        val metadata = tasks.named<GenerateModuleMetadata>("generateMetadataFileFor${publicationName}Publication")
+                    val artifactFileName = "${publication.artifactId}-${publication.version}"
+                    val libraryJar = tasks.named("jar")
+                    val pom = tasks.named<GenerateMavenPom>("generatePomFileFor${publicationName}Publication")
+                    val metadata = tasks.named<GenerateModuleMetadata>("generateMetadataFileFor${publicationName}Publication")
+                    prepareLibraryConsumerRepository.configure {
                         dependsOn(pom, metadata)
-                        from(tasks.named("jar"))
-                        from(pom.map { it.destination }) { rename { "${publication.artifactId}-${publication.version}.pom" } }
-                        from(metadata.flatMap { it.outputFile }) { rename { "${publication.artifactId}-${publication.version}.module" } }
-                        into(consumerRepository.map {
-                            it.dir("${publication.groupId.replace('.', '/')}/${publication.artifactId}/${publication.version}")
-                        })
+                        into("${publication.groupId.replace('.', '/')}/${publication.artifactId}/${publication.version}") {
+                            from(libraryJar)
+                            from(pom.map { it.destination }) { rename { "$artifactFileName.pom" } }
+                            from(metadata.flatMap { it.outputFile }) { rename { "$artifactFileName.module" } }
+                        }
                     }
-                    prepareLibraryConsumerRepository.configure { dependsOn(stage) }
                 }
             }
         }

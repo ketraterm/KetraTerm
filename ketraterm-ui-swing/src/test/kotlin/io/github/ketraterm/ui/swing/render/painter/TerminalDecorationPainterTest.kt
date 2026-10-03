@@ -51,7 +51,9 @@ class TerminalDecorationPainterTest {
                 true,
                 cache.hyperlinkIds,
                 hyperlinkHover(if (hovered) id else 0),
-                SwingSettings(hyperlinkActivationForeground = TEST_BLUE),
+                SwingSettings.create { draft ->
+                    draft.hyperlinkActivationForeground = TEST_BLUE
+                },
             )
             style.begin(cache, cache.palette, 0, 0)
             fixture.painter.paintTextRun(fixture.g, cache.palette, style, 0, 1, 0, fixture.metrics)
@@ -89,7 +91,10 @@ class TerminalDecorationPainterTest {
                 true,
                 cache.hyperlinkIds,
                 hyperlinkHover(id, true),
-                SwingSettings(hyperlinkActivationForeground = TEST_BLUE, osc8HyperlinkPresentation = presentations[0]),
+                SwingSettings.create { draft ->
+                    draft.hyperlinkActivationForeground = TEST_BLUE
+                    draft.osc8HyperlinkPresentation = presentations[0]
+                },
                 presentations,
             )
             style.begin(cache, cache.palette, 0, 0)

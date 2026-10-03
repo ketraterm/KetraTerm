@@ -43,6 +43,8 @@ External UI code should construct normalized events and call the encoder from
 the serialized terminal event loop. It should not reach into specialized
 implementation encoders.
 
+`TerminalInputEncoderFactory` binds custom encoders to a host-supplied mode source, output, and initial policy. Sessions create independent admission and bulk instances; each instance's calls are serialized, and instances may run concurrently. `setInputPolicy` is required: apply an update before returning, or reject it before changing encoder state. Only encoding calls may read the supplied modes or write output.
+
 ## Event Contract
 
 For every event:
@@ -334,7 +336,8 @@ Tracking suppression is guaranteed:
 Supported mouse encodings:
 
 - SGR mouse
-- SGR-Pixels mouse (`?1016`) when the host supplies one-based pixel coordinates
+- SGR-Pixels mouse (`?1016`) using zero-based pixel coordinates; `-1` falls
+  back to the corresponding zero-based cell coordinate
 - default legacy `ESC [ M`
 - UTF-8 extended mouse (`?1005`)
 - URXVT mouse (`?1015`)
@@ -343,10 +346,16 @@ Guaranteed behavior:
 
 - SGR release preserves the original button code and uses lowercase `m`
 - legacy release uses button code 3
-- SGR coordinates are decimal and are not limited by the legacy byte range
+- SGR, SGR-Pixels and URXVT coordinates are decimal; all accepted coordinates,
+  including `Int.MAX_VALUE`, convert to positive one-based values without overflow
 - legacy default coordinates are bounded to one-based coordinate 223, with
-  out-of-range behavior controlled by policy
+  out-of-range reports suppressed by default or clamped by policy
+- UTF-8 extended reports are suppressed if either one-based coordinate exceeds
+  2015; range checks precede narrowing or byte encoding
 - Meta is ignored for mouse v1 modifier packing
+
+Wire formats and limits follow [xterm extended coordinates](https://invisible-island.net/xterm/ctlseqs/ctlseqs.html#h3-Extended-coordinates).
+Clamping, suppression and missing-pixel fallback are KetraTerm input policies.
 
 Not guaranteed yet:
 

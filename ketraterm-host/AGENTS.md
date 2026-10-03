@@ -12,8 +12,8 @@ Integration owns:
 
 - mapping parser semantic commands to core APIs.
 - converting parser coordinate conventions to core API conventions.
-- holding temporary host metadata when core does not own it yet, such as title
-  and hyperlink fields.
+- owning title stacks, hyperlink metadata, and host notifications; current title
+  values remain authoritative in core.
 - explicit TODOs for parser/core gaps.
 
 Integration must not:

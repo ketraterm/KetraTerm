@@ -37,7 +37,11 @@ The translation of string-based hyperlink keys (combining a unique ID and a dest
 To protect terminal memory against unbounded memory growth (e.g. applications writing millions of unique URLs in scrollback logs), the registry is governed by safety constraints in [HostPolicy](../src/main/kotlin/io/github/ketraterm/host/HostPolicy.kt):
 
 * **`maxHyperlinkEntries`**: The maximum number of active hyperlinks retained in the registry (default `4096`).
-* **Eviction rule**: When the limit is reached, the oldest hyperlink is evicted from both collections. Cells carrying the evicted numeric ID will still display text but fail to resolve to active URIs, safely reclaiming memory.
+* **Eviction rule**: An accepted open removes enough least-recently-used entries from both collections to satisfy the captured limit, reserving one slot for a new key. Explicit-key reuse refreshes recency before trimming and preserves that entry. Cells carrying evicted IDs still display text but no longer resolve to URIs.
+
+Policy replacement only publishes a volatile value; it never mutates either registry or emits callbacks. A lowered limit takes effect on the next accepted open under the serialized command owner. Denied, invalid and exhausted new opens do not trigger eviction. Work is bounded by the retained entry count, independently of the configured limit's magnitude.
+
+Each removal callback observes its ID as unresolved, and all removals precede replacement registration. Callback failures propagate and stop the admission; completed removals remain coherent in both indexes, and a later accepted open resumes enforcing the limit. Callbacks must not reenter mutation.
 
 ## 4. Identity Lifetime and Reset
 

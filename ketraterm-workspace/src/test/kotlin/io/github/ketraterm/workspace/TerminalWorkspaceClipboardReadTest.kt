@@ -259,7 +259,13 @@ class TerminalWorkspaceClipboardReadTest {
         fun open(name: String): TerminalWorkspaceTab =
             workspace.openTab(
                 TerminalProfile(name, name, listOf("mock")),
-                TerminalWorkspaceOpenOptions(10, 3, false, 0, hostPolicy = ALLOW_READS),
+                TerminalWorkspaceOpenOptions.create { draft ->
+                    draft.columns = 10
+                    draft.rows = 3
+                    draft.treatAmbiguousAsWide = false
+                    draft.maxHistory = 0
+                    draft.hostPolicy = ALLOW_READS
+                },
             )
 
         override fun close() {

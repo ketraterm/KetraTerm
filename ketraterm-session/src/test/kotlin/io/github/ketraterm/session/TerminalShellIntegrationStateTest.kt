@@ -19,6 +19,132 @@ import kotlin.test.*
 
 class TerminalShellIntegrationStateTest {
     @Test
+    fun `record projection rejects an overflowing destination slice without changing arrays`() {
+        val state = TerminalShellIntegrationState()
+        val records = RecordColumns(capacity = 1).apply { fillStaleValues() }
+
+        assertFailsWith<IllegalArgumentException> {
+            state.copyRecords(
+                recordIds = records.recordIds,
+                lifecycleStates = records.lifecycleStates,
+                promptStartLineIds = records.promptStartLineIds,
+                promptEndLineIds = records.promptEndLineIds,
+                commandStartLineIds = records.commandStartLineIds,
+                commandEndLineIds = records.commandEndLineIds,
+                exitCodes = records.exitCodes,
+                destinationOffset = Int.MAX_VALUE,
+                maxRecords = 1,
+            )
+        }
+
+        assertContentEquals(intArrayOf(STALE_INT), records.recordIds)
+        assertContentEquals(intArrayOf(STALE_INT), records.lifecycleStates)
+        assertContentEquals(intArrayOf(STALE_INT), records.exitCodes)
+        assertContentEquals(longArrayOf(STALE_LONG), records.promptStartLineIds)
+        assertContentEquals(longArrayOf(STALE_LONG), records.promptEndLineIds)
+        assertContentEquals(longArrayOf(STALE_LONG), records.commandStartLineIds)
+        assertContentEquals(longArrayOf(STALE_LONG), records.commandEndLineIds)
+    }
+
+    @Test
+    fun `viewport projection rejects an overflowing destination slice without changing arrays`() {
+        val state = TerminalShellIntegrationState()
+        val promptStarts = booleanArrayOf(true)
+        val commandStarts = booleanArrayOf(true)
+        val commandEnds = booleanArrayOf(true)
+        val recordIds = intArrayOf(STALE_INT)
+        val lifecycleStates = intArrayOf(STALE_INT)
+        val failedCommandRails = booleanArrayOf(true)
+
+        assertFailsWith<IllegalArgumentException> {
+            state.copyViewport(
+                lineIds = longArrayOf(1),
+                rowCount = 1,
+                promptStarts = promptStarts,
+                commandStarts = commandStarts,
+                commandEnds = commandEnds,
+                commandRecordIds = recordIds,
+                commandLifecycleStates = lifecycleStates,
+                failedCommandRails = failedCommandRails,
+                destinationOffset = Int.MAX_VALUE,
+            )
+        }
+
+        assertContentEquals(booleanArrayOf(true), promptStarts)
+        assertContentEquals(booleanArrayOf(true), commandStarts)
+        assertContentEquals(booleanArrayOf(true), commandEnds)
+        assertContentEquals(booleanArrayOf(true), failedCommandRails)
+        assertContentEquals(intArrayOf(STALE_INT), recordIds)
+        assertContentEquals(intArrayOf(STALE_INT), lifecycleStates)
+    }
+
+    @Test
+    fun `command output range rejects overflowing offset even when record is absent`() {
+        val state = TerminalShellIntegrationState()
+        val range = LongArray(TerminalShellIntegrationCommandOutputRange.REQUIRED_LONGS) { STALE_LONG }
+
+        assertFailsWith<IllegalArgumentException> {
+            state.copyCommandOutputRange(1, range, destinationOffset = Int.MAX_VALUE)
+        }
+
+        assertContentEquals(LongArray(range.size) { STALE_LONG }, range)
+    }
+
+    @Test
+    fun `command block range rejects overflowing offset even when record is absent`() {
+        val state = TerminalShellIntegrationState()
+        val range = LongArray(TerminalShellIntegrationCommandBlockRange.REQUIRED_LONGS) { STALE_LONG }
+
+        assertFailsWith<IllegalArgumentException> {
+            state.copyCommandBlockRange(1, range, destinationOffset = Int.MAX_VALUE)
+        }
+
+        assertContentEquals(LongArray(range.size) { STALE_LONG }, range)
+    }
+
+    @Test
+    fun `zero length projections accept the exact destination end`() {
+        val state = TerminalShellIntegrationState()
+        val records = RecordColumns(capacity = 1).apply { fillStaleValues() }
+        val flags = booleanArrayOf(true)
+
+        assertEquals(
+            0,
+            state.copyRecords(
+                recordIds = records.recordIds,
+                lifecycleStates = records.lifecycleStates,
+                promptStartLineIds = records.promptStartLineIds,
+                promptEndLineIds = records.promptEndLineIds,
+                commandStartLineIds = records.commandStartLineIds,
+                commandEndLineIds = records.commandEndLineIds,
+                exitCodes = records.exitCodes,
+                destinationOffset = 1,
+                maxRecords = 0,
+            ),
+        )
+        state.copyViewport(
+            lineIds = longArrayOf(),
+            rowCount = 0,
+            promptStarts = flags,
+            commandStarts = flags,
+            commandEnds = flags,
+            commandRecordIds = records.recordIds,
+            commandLifecycleStates = records.lifecycleStates,
+            failedCommandRails = flags,
+            destinationOffset = 1,
+        )
+
+        assertContentEquals(booleanArrayOf(true), flags)
+        assertContentEquals(intArrayOf(STALE_INT), records.recordIds)
+        assertContentEquals(intArrayOf(STALE_INT), records.lifecycleStates)
+        assertContentEquals(intArrayOf(STALE_INT), records.exitCodes)
+        assertContentEquals(longArrayOf(STALE_LONG), records.promptStartLineIds)
+        assertContentEquals(longArrayOf(STALE_LONG), records.promptEndLineIds)
+        assertContentEquals(longArrayOf(STALE_LONG), records.commandStartLineIds)
+        assertContentEquals(longArrayOf(STALE_LONG), records.commandEndLineIds)
+    }
+
+    @Test
     fun `command metadata snapshots text directory exit status and timestamps`() {
         var now = 1_000L
         val state = TerminalShellIntegrationState(epochMillis = { now })
@@ -772,6 +898,32 @@ class TerminalShellIntegrationStateTest {
             ),
             projection.commandLifecycleStates,
         )
+    }
+
+    @Test
+    fun `prompt anchor updates preserve independent boundaries and record identity`() {
+        val state = TerminalShellIntegrationState()
+        val records = RecordColumns(capacity = 1)
+        state.recordPromptStart(10)
+        state.recordPromptEnd(12)
+        records.copyFrom(state)
+        val recordId = records.recordIds[0]
+
+        state.reanchorActivePromptStart(11)
+        records.copyFrom(state)
+
+        assertEquals(1, state.recordCount())
+        assertEquals(recordId, records.recordIds[0])
+        assertEquals(11L, records.promptStartLineIds[0])
+        assertEquals(12L, records.promptEndLineIds[0])
+
+        state.recordPromptEnd(13)
+        records.copyFrom(state)
+
+        assertEquals(1, state.recordCount())
+        assertEquals(recordId, records.recordIds[0])
+        assertEquals(11L, records.promptStartLineIds[0])
+        assertEquals(13L, records.promptEndLineIds[0])
     }
 
     @Test

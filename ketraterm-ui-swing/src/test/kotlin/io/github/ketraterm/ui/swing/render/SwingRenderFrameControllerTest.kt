@@ -33,6 +33,8 @@ import io.github.ketraterm.ui.swing.search.TerminalSearchViewportHighlights
 import io.github.ketraterm.ui.swing.settings.SwingMetrics
 import io.github.ketraterm.ui.swing.settings.SwingPadding
 import io.github.ketraterm.ui.swing.settings.SwingSettings
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.test.StandardTestDispatcher
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Nested
@@ -71,7 +73,8 @@ class SwingRenderFrameControllerTest {
 
                     override fun lineGeneration(row: Int): Long = if (row == 0) 1L else frameGeneration
                 }
-            val session = createSession(frame)
+            val fixture = RenderSession(frame)
+            val session = fixture.session
             val host = RecordingRenderFrameHost(session)
             host.searchQuery = "cde"
             val controller = SwingRenderFrameController(host)
@@ -82,7 +85,7 @@ class SwingRenderFrameControllerTest {
                 host.clearRepaints()
                 cells[1][0] = TestCell(codeWord = 'x'.code, flags = TerminalRenderCellFlags.CODEPOINT)
                 frame.frameGeneration++
-                session.renderPublisher.updateAndPublish(frame)
+                fixture.publish(frame)
 
                 controller.handlePublishedFrame()
 
@@ -100,7 +103,8 @@ class SwingRenderFrameControllerTest {
 
         @Test
         fun `search commands between publications become the next repaint baseline`() {
-            val session = createSession(TestRenderFrame.text("needle"))
+            val fixture = RenderSession(TestRenderFrame.text("needle"))
+            val session = fixture.session
             val host = RecordingRenderFrameHost(session)
             val controller = SwingRenderFrameController(host)
             try {
@@ -125,7 +129,8 @@ class SwingRenderFrameControllerTest {
 
         @Test
         fun resetFromHiddenPhaseMustRepaintUnchangedCursor() {
-            val session = createSession(blinkFrame())
+            val fixture = RenderSession(blinkFrame())
+            val session = fixture.session
             val host = RecordingRenderFrameHost(session)
             val controller = SwingRenderFrameController(host)
             try {
@@ -149,7 +154,8 @@ class SwingRenderFrameControllerTest {
 
         @Test
         fun resetFromHiddenPhaseMustRepaintUnchangedTextWhileUnfocused() {
-            val session = createSession(blinkFrame(textBlinks = true))
+            val fixture = RenderSession(blinkFrame(textBlinks = true))
+            val session = fixture.session
             val host = RecordingRenderFrameHost(session, terminalFocused = false)
             val controller = SwingRenderFrameController(host)
             try {
@@ -169,14 +175,15 @@ class SwingRenderFrameControllerTest {
 
         @Test
         fun unrelatedRowUpdateAlsoRepaintsUnchangedBlinkingContent() {
-            val session = createSession(blinkFrame(textBlinks = true))
+            val fixture = RenderSession(blinkFrame(textBlinks = true))
+            val session = fixture.session
             val host = RecordingRenderFrameHost(session)
             val controller = SwingRenderFrameController(host)
             try {
                 controller.handlePublishedFrame()
                 host.clearRepaints()
                 host.blinkVisible = false
-                session.renderPublisher.updateAndPublish(blinkFrame(textBlinks = true, generation = 2))
+                fixture.publish(blinkFrame(textBlinks = true, generation = 2))
 
                 controller.handlePublishedFrame()
 
@@ -191,7 +198,8 @@ class SwingRenderFrameControllerTest {
 
         @Test
         fun `inactive cursor focus repaint is bounded and blink ticks repaint only blinking text`() {
-            val session = createSession(blinkFrame(textBlinks = true))
+            val fixture = RenderSession(blinkFrame(textBlinks = true))
+            val session = fixture.session
             val host = RecordingRenderFrameHost(session, terminalFocused = false)
             val controller = SwingRenderFrameController(host)
             try {
@@ -213,7 +221,8 @@ class SwingRenderFrameControllerTest {
 
         @Test
         fun `inactive cursor without blinking text needs no blink repaint`() {
-            val session = createSession(blinkFrame())
+            val fixture = RenderSession(blinkFrame())
+            val session = fixture.session
             val host = RecordingRenderFrameHost(session, terminalFocused = false)
             val controller = SwingRenderFrameController(host)
             try {
@@ -231,13 +240,14 @@ class SwingRenderFrameControllerTest {
 
         @Test
         fun `inactive cursor movement damages old and new bounds without row changes`() {
-            val session = createSession(blinkFrame())
+            val fixture = RenderSession(blinkFrame())
+            val session = fixture.session
             val host = RecordingRenderFrameHost(session, terminalFocused = false)
             val controller = SwingRenderFrameController(host)
             try {
                 controller.handlePublishedFrame()
                 host.clearRepaints()
-                session.renderPublisher.updateAndPublish(blinkFrame(cursorColumn = 1))
+                fixture.publish(blinkFrame(cursorColumn = 1))
 
                 controller.handlePublishedFrame()
 
@@ -250,7 +260,8 @@ class SwingRenderFrameControllerTest {
 
         @Test
         fun visiblePhaseResetDoesNotRepaintUnchangedBlinkingContent() {
-            val session = createSession(blinkFrame(textBlinks = true))
+            val fixture = RenderSession(blinkFrame(textBlinks = true))
+            val session = fixture.session
             val host = RecordingRenderFrameHost(session)
             val controller = SwingRenderFrameController(host)
             try {
@@ -269,7 +280,8 @@ class SwingRenderFrameControllerTest {
 
         @Test
         fun hiddenPhaseResetDoesNotRepaintNonBlinkingContent() {
-            val session = createSession(blinkFrame(cursorBlinks = false))
+            val fixture = RenderSession(blinkFrame(cursorBlinks = false))
+            val session = fixture.session
             val host = RecordingRenderFrameHost(session)
             val controller = SwingRenderFrameController(host)
             try {
@@ -289,7 +301,8 @@ class SwingRenderFrameControllerTest {
 
         @Test
         fun `published frame refreshes session-backed state in order`() {
-            val session = createSession()
+            val fixture = RenderSession()
+            val session = fixture.session
             val host = RecordingRenderFrameHost(session = session)
             val controller = SwingRenderFrameController(host)
 
@@ -316,7 +329,8 @@ class SwingRenderFrameControllerTest {
 
         @Test
         fun `published frame requests follow up when viewport clamp changes request`() {
-            val session = createSession()
+            val fixture = RenderSession()
+            val session = fixture.session
             val host = RecordingRenderFrameHost(session = session, clampViewportResult = true)
             val controller = SwingRenderFrameController(host)
 
@@ -337,7 +351,11 @@ class SwingRenderFrameControllerTest {
         override val terminalFocused: Boolean = true,
     ) : SwingRenderFrameHost {
         override val renderCache = TerminalRenderCache(80, 24)
-        override val settings = SwingSettings(padding = SwingPadding(), shellIntegrationDecorationGutterWidth = 0)
+        override val settings =
+            SwingSettings.create { draft ->
+                draft.padding = SwingPadding()
+                draft.shellIntegrationDecorationGutterWidth = 0
+            }
         override val metrics =
             SwingMetrics(
                 cellWidth = 10,
@@ -376,7 +394,7 @@ class SwingRenderFrameControllerTest {
         override fun refreshRenderCacheFromSession(session: TerminalSession) {
             refreshCount++
             semanticCalls += "refreshRenderCacheFromSession"
-            session.renderPublisher.readCurrent { published -> renderCache.updateFrom(published) }
+            session.readPublishedFrame { published -> renderCache.updateFrom(published) }
             visualGeometry.updateLayout(metrics, renderCache.rows, componentHeight)
         }
 
@@ -464,20 +482,40 @@ class SwingRenderFrameControllerTest {
             override fun lineGeneration(row: Int): Long = if (row == 2) generation else 1
         }
 
-    private fun createSession(frameReader: TerminalRenderFrameReader? = null): TerminalSession {
-        val terminal = TerminalBuffers.create(width = 2, height = 1, maxHistory = 1)
+    @OptIn(ExperimentalCoroutinesApi::class)
+    private class RenderSession(
+        frameReader: TerminalRenderFrameReader? = null,
+    ) {
+        private val dispatcher = StandardTestDispatcher()
+        private val terminal = TerminalBuffers.create(width = 2, height = 1, maxHistory = 1)
+        private var source: TerminalRenderFrameReader = frameReader ?: terminal
+        private val reader =
+            object : TerminalRenderFrameReader {
+                override fun readRenderFrame(consumer: TerminalRenderFrameConsumer) = source.readRenderFrame(consumer)
+            }
         val session =
             TerminalSession(
                 terminal = terminal,
                 renderPublisher = TerminalRenderPublisher(2, 1),
-                renderReader = frameReader ?: terminal as TerminalRenderFrameReader,
+                renderReader = reader,
                 responseReader = terminal,
                 connector = NoOpConnector,
                 parser = NoOpParser,
-                inputEncoder = NoOpInputEncoder,
+                inputEncoderFactory = { _, _, _ -> object : TerminalInputEncoder by NoOpInputEncoder {} },
+                workerDispatcher = dispatcher,
+                ioDispatcher = dispatcher,
             )
-        session.renderPublisher.updateAndPublish(frameReader ?: terminal as TerminalRenderFrameReader)
-        return session
+
+        init {
+            session.requestRender(0)
+            dispatcher.scheduler.runCurrent()
+        }
+
+        fun publish(frame: TerminalRenderFrameReader) {
+            source = frame
+            session.requestRender(0)
+            dispatcher.scheduler.runCurrent()
+        }
     }
 
     private object NoOpConnector : TerminalConnector {
@@ -512,6 +550,8 @@ class SwingRenderFrameControllerTest {
     }
 
     private object NoOpInputEncoder : TerminalInputEncoder {
+        override fun setInputPolicy(policy: io.github.ketraterm.input.policy.TerminalInputPolicy) = Unit
+
         override fun encodeKey(event: TerminalKeyEvent) = Unit
 
         override fun encodePaste(event: TerminalPasteEvent) = Unit

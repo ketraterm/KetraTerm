@@ -16,6 +16,7 @@ The target is a modern, secure, xterm-compatible terminal pipeline for contempor
 - `TODO(render)`: render contracts or copied render data are missing.
 - `TODO(ui)`: reusable UI presentation, interaction, or rendering behavior is missing.
 - `TODO(input)`: host-bound keyboard/mouse/paste encoding is missing.
+- `TODO(completion)`: completion evaluation, ranking, learning, or source-work lifecycle is missing or incorrect.
 - `TODO(host/profile)`: product host integration, profile, or settings behavior is missing.
 - `TODO(policy)`: feature needs an explicit security or compatibility policy before implementation.
 
@@ -41,6 +42,14 @@ Correct-behavior regressions and their validation limits are indexed in the
 audit's [regression coverage](reviews/terminal-quality-audit-2026-09-27.md#regression-coverage).
 Tests may fail until their owning defects are fixed; adding coverage does not
 close these entries.
+
+The [2026-10-03 maintainability review](reviews/terminal-maintainability-review-2026-10-03.md)
+records the corrected worker-termination, bounded-work and extension-lifecycle
+findings under its [owner entries](#maintainability-review). The subsequent
+[API adoption and evolution review](reviews/terminal-api-evolution-review-2026-10-03.md)
+records the corrected startup, ownership and construction contracts and tracks
+remaining host-adoption work below;
+G02/G03 remain deferred by the current work scope.
 
 - `Done(ui)`: visually verify agy help-transition animation after removing frame-triggered resizing. Default alternate padding now redistributes the primary horizontal inset and preserves vertical insets; regressions cover physical resizing while alternate-screen content is active. The resize/clear defect is corrected, but animation parity is not established.
 
@@ -245,6 +254,83 @@ The [IntelliJ embedding audit](reviews/intellij-embedding-audit-2026-09-27.md) d
 ## API and Product Verification
 
 - `DONE(policy)`: R08 public dependency exports are corrected in parser, host and completion; isolated API-variant and published Kotlin/Java consumer coverage also exercises Swing host services, suspending hyperlink detection and EDT binding/disposal. Each published consumer declares one library dependency and runs in Gradle-metadata and POM-only modes. The test CI matrix runs `:ketraterm-testkit:publishedConsumerTest`; release signing and remote delivery are outside this check.
-- `DONE(policy)`: G01 reviews the public pipeline and embedding boundaries, ownership/lifetimes, coordinates, configuration/default-call shapes and encoded/inline behavior. All 17 explicitly selected host/runtime libraries have strict explicit API mode, unfiltered Maven-publication ABI snapshots and CI checks. The visibility review removes direct session-core/admission-lock access, public opaque core words, unleased publisher access, selection packing and unused shell/search-bar hooks; local input/configuration/projection helpers remain internal. Required host contracts and inline linkage remain supported. Five retained Kotlin/Java clients provide 20 upgrade cases across both metadata modes and stdlib 2.4.0/2.4.20, with two deliberate linkage-failure controls; isolated source consumers also pass with Kotlin compilers 2.4.0 and 2.4.20. Java clipboard access, PTY dependency exports, serialized session window/mode access, suffix defaults and embedding validation defects were corrected. The [compatibility contract](library-compatibility.md) defines module roles, minimum versions and evolution/deprecation rules; the [feature map](terminal-feature-map.md#7-embedding--swing-ui) and [consumer fixtures](../ketraterm-testkit/src/consumerTest/README.md) state coverage and limits. This is an initial development baseline, not a retrospective guarantee for earlier 0.x releases.
+- `DONE(policy)`: G01 reviews public pipeline and embedding contracts, ownership, coordinates, configuration/default-call shapes and encoded/inline behavior. One supported-module set selects 15 Maven publications, strict explicit API mode, unfiltered ABI snapshots and root public Dokka. Workspace and completion persistence are product-only modules bundled in both products; their external support is intentionally removed before stable release. Eleven retained Kotlin/Java clients define 44 upgrades across both metadata modes and stdlib 2.4.0/2.4.20, with two deliberate linkage-failure controls. Source consumers check both Kotlin compilers. Concrete external implementations, optional host combinations and concurrent old/new render leases remain in the suite. The host, Swing and PTY clients were deliberately replaced for incompatible development construction changes; D04/D05 additionally replaces Swing/render-cache readers for narrowed authority and lease ABI. Historical reviews retain their earlier 17-publication/13-client counts. The [compatibility contract](library-compatibility.md), [feature map](terminal-feature-map.md#7-embedding--swing-ui) and [consumer fixtures](../ketraterm-testkit/src/consumerTest/README.md) define the selected boundary and representative coverage. This is a development baseline, not a guarantee for earlier 0.x releases.
+
+### Final API Design
+
+The [2026-10-02 API design review](reviews/terminal-api-design-review-2026-10-02.md)
+and [2026-10-03 final review](reviews/terminal-api-final-review-2026-10-03.md)
+findings A01–A15 are resolved by the construction, presentation, extension and
+lifecycle contracts, with verification recorded under G01. Native coordination
+now observes session termination; callback failures and cancellation propagate.
+All six original final-review regressions pass, with closure-boundary, detachment
+and recovery coverage. All five teardown regressions from the follow-up at
+`5facdcbd` also pass: owned cleanup completes before propagating callback failures
+or cancellation, preserving the first failure and suppressing later failures.
+Additional coverage verifies reused exceptions, view release, peer reattachment
+and rebinding after failed unbinding. Popup hiding completes despite a view update
+failure, and viewport metrics and eligibility are committed before host notification.
+Reentrant state changes or disposal supersede obsolete eligibility notifications.
+Disposal cancels the component scope; peer removal retains it. Sessions and native
+target resources remain host-owned. The final review records regression evidence
+and the completed follow-up to `104db318`.
+Both reviews retain their historical evidence. E04's independent renderer proposal
+remains outside scope.
+
+### Maintainability Review
+
+The [full review](reviews/terminal-maintainability-review-2026-10-03.md) records
+source evidence, regression identities, validation limits and correction groups.
+The original M01–M13 baseline recorded 43 correct-behavior regressions: 33 failures
+and ten passing serialization controls. Source-only findings and API decisions below
+do not claim executed fault injection or measured performance. Existing A01–A15
+closures remain historical evidence for their tested paths.
+
+- **M01 — `DONE(core)`**: Kitty pops have bounded work and reset flags on stack exhaustion. Regressions pass.
+- **M02 — `DONE(session)`**: unexpected writer cancellation closes the session, retaining the cause without retrying output. Regressions pass.
+- **M03 — `DONE(transport)`**: PTY byte-listener exceptions report the original failure and dispose the process and streams once. Regressions pass.
+- **M04 — `DONE(completion)`**: unexpected source errors are reported and terminate collection with sibling cancellation; independently cancelled sources complete accounting. Regressions pass.
+- **M05 — `DONE(ui)`**: completion replacement and close detach observation before popup callbacks; replacement keeps provider and feedback ownership coherent.
+- **M06 — `DONE(ui)`**: popup state is committed before view callbacks, and reentrant transitions supersede unfinished shows.
+- **M07 — `DONE(host/profile)`**: optional workspace observers are supervised independently of shell and session-close observation.
+- **M08 — `DONE(host/profile)`**: reentrant tab selection or closure supersedes pending selection notifications.
+- **M09 — `DONE(core/render)`**: core rejects nested frame reads before changing the enclosing lease; reentry and callback-failure contracts are documented and tested.
+- **M10 — `DONE(host)`**: adapter title getters and stacks read authoritative core titles; host retains stacks and notifications.
+- **M11 — `DONE(input)`**: widened cell/pixel conversion preserves accepted ranges; six exact-byte regressions verify decimal output and bounded clamping/suppression. Pixel contracts use zero-based events.
+- **M12 — `DONE(host/profile)`**: one TOML string encoder preserves accepted configuration values, including line breaks, controls, quotes, and backslashes.
+- **M13 — `DONE(host)`**: accepted OSC 8 opens reconcile lowered limits under the serialized registry owner. Byte-stream tests verify `4 → 1`, explicit-key reuse, URI retirement and ordered removals; callback-failure tests verify coherent recovery.
+- **M14 — `DONE(host/profile)`**: standalone Ctrl+Tab uses tab-bar order; PTY-backed product tests verify both directions, wraparound, deletion, and empty/single-tab behavior.
+- **M15 — `DONE(host/profile)`**: IntelliJ pane creation rolls back acquired UI resources and service listeners; IDE fixtures verify failure, cancellation, and suppressed cleanup errors.
+- **M16 — `DONE(render)`**: external frames share the immutable fallback palette. JMH covers unchanged/changing 80×24 frames against an allocating control; the 2,208 B/update palette allocation is removed.
+- **M17 — `DONE(host/profile)`**: standalone export uses window-owned I/O work. Gated tests verify EDT availability, original failure delivery, cancellation and suppression of callbacks after disposal.
+- **M18 — `DONE(transport/policy)`**: connector startup is explicitly start-once; repeats and startup after close reject without replacing the listener. PTY, testkit and external-consumer coverage follow that contract.
+- **M19 — `DONE(session/policy)`**: closure freezes terminal state after admitted work/EOF; late setters/input are ignored and resize rejects. Local, remote and pre-start closure tests verify retained reads and unchanged collaborators.
+- **M20 — `DONE(host/profile/completion)`**: workspace examples compile; completion documentation reflects Flow debounce and JList presentation.
+- **M21 — `DONE(parser)`**: removed unused decoder fields and their implementation-only tests; real byte-stream reset, malformed-input, chunking and EOF coverage remains.
+
+### API Adoption and Evolution
+
+The [2026-10-03 review](reviews/terminal-api-evolution-review-2026-10-03.md)
+examines the corrected API at `f632fbe3`, with follow-up verification at
+`57623d28`. D identifiers track design/adoption work and reproduced defects;
+they do not reopen resolved A/M findings.
+The development compatibility baseline passes but is not a stable API freeze.
+Group configuration work and publication work to avoid repeated migrations;
+the review records the execution order and acceptance criteria.
+
+- **D01 — `DONE(session)`**: session readiness and input admission follow successful connector startup.
+- **D02 — `DONE(ui/host/profile)`**: core/host own launch policies; products own preferences and persistence. Ineffective Swing settings were removed.
+- **D03 — `DONE(ui/transport/host/profile/policy)`**: configuration uses immutable snapshots and named Kotlin/Java construction and updates. See [configuration contracts](library-configuration.md).
+- **D04 — `DONE(session/render)`**: session consumers receive read-only shell state and scoped frame access; producers retain mutation authority. See [ownership](render-reader-ownership.md).
+- **D05 — `DONE(render/policy)`**: render leases hide publisher storage and retain allocation behavior. See [verification](render-reader-ownership.md#allocation-measurement).
+- **D06 — `TODO(session/ui/host/profile)`**: add a runnable external host assembly that proves ordered proprietary shell decoding, metadata/editing/readiness, native completion requests/acceptance, styling and lifecycle together. Verify byte splits, anchors, cancellation and disposal without workspace or optional OSC dependencies; retain minimal default and headless examples.
+- **D07 — `TODO(ui/host/profile/policy)`**: labels now belong to product composition and search colors are host-configurable. Popup capacity and trigger overrides remain dependent on D06 integration evidence.
+- **D08 — `DONE(core/policy)`**: mode contracts define finite published subsets with stable numeric meanings.
+- **D09 — `DONE(ui)`**: published-consumer checks compile and exercise the actual Swing README example, including EDT and lifetime ownership.
+- **D10 — `DONE(host)`**: line-feed and Kitty flag inspection use primitive mode reads.
+- **D11 — `DONE(host/profile)`**: workspace snapshots reject undefined mode-capability bits through `create`, `copy` and `build`; regressions cover invalid bits, valid subsets and snapshot isolation.
+
+### Release Verification
+
 - `TODO(host/profile)`: gate binary and plugin delivery on verification of the exact release revision, including native PTY coverage, package checks, Plugin Verifier for supported IDEs, and installed-product smoke tests. Current binary publishing is independent of the test workflow; ordinary CI omits native PTY opt-in and plugin package checks. Include the IDE 2026.3 bundled-JNA module visibility change identified in the embedding review; the plugin currently relies on IDE-native dependencies while testing only 2026.2. See audit G02.
 - `TODO(policy)`: define measured allocation/latency budgets for warm terminal paths, changing content, history growth, and platform painting; keep examples executable and performance claims scoped to evidence. The audit's short Windows paint smoke is not a release baseline. See audit G03.

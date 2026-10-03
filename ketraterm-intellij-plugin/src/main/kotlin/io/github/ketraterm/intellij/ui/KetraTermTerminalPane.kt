@@ -20,10 +20,14 @@ import com.intellij.openapi.actionSystem.ActionUpdateThread
 import com.intellij.openapi.actionSystem.DefaultActionGroup
 import com.intellij.openapi.actionSystem.Separator
 import com.intellij.openapi.application.ApplicationManager
+import com.intellij.openapi.diagnostic.ControlFlowException
+import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.project.DumbAwareAction
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.ui.Messages
+import com.intellij.ui.JBColor
 import com.intellij.ui.components.JBScrollBar
+import com.intellij.util.ui.UIUtil
 import io.github.ketraterm.intellij.services.KetraTermCompletionService
 import io.github.ketraterm.intellij.services.captureCleanupFailure
 import io.github.ketraterm.intellij.settings.KetraTermIntellijSettings
@@ -32,9 +36,11 @@ import io.github.ketraterm.ui.swing.host.*
 import io.github.ketraterm.ui.swing.settings.TerminalClipboardHandler
 import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionHandler
 import io.github.ketraterm.workspace.TerminalWorkspaceTab
+import kotlinx.coroutines.CancellationException
 import java.awt.Adjustable
 import java.awt.BorderLayout
 import javax.swing.JPanel
+import javax.swing.UIManager
 
 /**
  * IntelliJ-hosted pane that binds one workspace tab to one reusable terminal component.
@@ -71,7 +77,7 @@ internal class KetraTermTerminalPane private constructor(
     fun reloadSettings() {
         terminal.reloadSettings()
         component.background = terminal.background
-        searchBar.refreshColors()
+        searchBar.refreshColors(searchColors())
         tab.session.setHostPolicy(KetraTermIntellijSettings.getInstance().createHostPolicy())
         reconcileCompletion()
     }
@@ -290,8 +296,43 @@ internal class KetraTermTerminalPane private constructor(
     }
 
     companion object {
+        private fun searchColors(): SwingTerminalSearchColors =
+            SwingTerminalSearchColors.create {
+                val foreground = UIUtil.getLabelForeground()
+                val background = UIUtil.getPanelBackground()
+                val accent =
+                    UIManager.getColor("Component.focusColor")
+                        ?: JBColor(0x3574F0, 0x548AF7)
+                it.panelBackground = background
+                it.panelBorder = JBColor.border()
+                it.foreground = foreground
+                it.counterForeground = UIUtil.getContextHelpForeground()
+                it.textFieldBackground = UIManager.getColor("TextField.background") ?: background
+                it.textFieldBorder = JBColor.border()
+                it.textFieldFocusBorder = accent
+                it.textFieldPlaceholder = UIUtil.getContextHelpForeground()
+                it.searchIconForeground = foreground
+                it.buttonHoverBackground = UIManager.getColor("ActionButton.hoverBackground") ?: background
+                it.buttonPressedBackground = UIManager.getColor("ActionButton.pressedBackground") ?: accent
+                it.buttonSelectedBackground = UIUtil.getListSelectionBackground(true)
+                it.buttonSelectedForeground = UIUtil.getListSelectionForeground(true)
+            }
+
+        private val LOG = Logger.getInstance(KetraTermTerminalPane::class.java)
+
+        internal fun reportShellSuggestionFailure(failure: Exception) {
+            if (failure is CancellationException) throw failure
+            // Translate platform control flow at the coroutine boundary; it is not an operational failure.
+            if (failure is ControlFlowException) {
+                throw CancellationException("IDE shell suggestions cancelled").apply { initCause(failure) }
+            }
+            LOG.warn("Shell suggestion provider failed", failure)
+        }
+
         /**
          * Creates and binds a pane for [tab].
+         * Until return, this factory owns acquired UI resources and releases them
+         * on failure. The caller retains ownership of the workspace session.
          *
          * @param tab workspace tab whose session should be rendered.
          * @return bound terminal pane.
@@ -310,12 +351,14 @@ internal class KetraTermTerminalPane private constructor(
             val terminal =
                 SwingTerminal(
                     settingsProvider = {
-                        KetraTermIntellijSettings.current().copy(osc8HyperlinkPresentation = intellijOsc8HyperlinkPresentation())
+                        KetraTermIntellijSettings.current().copy { draft ->
+                            draft.osc8HyperlinkPresentation = intellijOsc8HyperlinkPresentation()
+                        }
                     },
                     hostServices =
-                        SwingHostServices(
-                            clipboardHandler = clipboard,
-                            hyperlinkDetector =
+                        SwingHostServices.create { draft ->
+                            draft.clipboardHandler = clipboard
+                            draft.hyperlinkDetector =
                                 IntellijTerminalHyperlinkDetector(
                                     project,
                                     tab.profile.workingDirectory ?: java.nio.file.Path
@@ -323,60 +366,80 @@ internal class KetraTermTerminalPane private constructor(
                                 ) { lineId ->
                                     val state = tab.session.shellIntegrationState
                                     if (lineId > 0L) state.commandWorkingDirectoryUri(state.commandRecordIdAtLine(lineId)) else null
-                                },
-                            viewportListener = scrollbarAdapter,
-                            scrollbarOverlayEnabled = false,
-                            shellSuggestionProvider = completionBinding.provider,
-                            shellSuggestionHandler = SwingShellSuggestionHandler.createDefault(tab.session),
-                            shellSuggestionFeedbackHandler = completionBinding.feedbackHandler,
-                            shellSuggestionKeymap = KetraTermShellSuggestionKeymap,
-                            shellSuggestionViewFactory = IntellijCompletionListViewFactory,
-                            uiDispatcher =
+                                }
+                            draft.viewportListener = scrollbarAdapter
+                            draft.scrollbarOverlayEnabled = false
+                            draft.shellSuggestionProvider = completionBinding.provider
+                            draft.shellSuggestionHandler = SwingShellSuggestionHandler.createDefault(tab.session)
+                            draft.shellSuggestionFeedbackHandler = completionBinding.feedbackHandler
+                            draft.shellSuggestionKeymap = KetraTermShellSuggestionKeymap
+                            draft.shellSuggestionViewFactory = IntellijCompletionListViewFactory
+                            draft.uiDispatcher =
                                 TerminalUiDispatcher { runnable ->
                                     ApplicationManager.getApplication().invokeLater(runnable)
-                                },
-                            fontResolver = IntellijTerminalFontResolver,
-                            hostKeyHandler = { event -> shortcutControllerRef[0]?.handleKeyPressed(event) == true },
-                            contextMenuHandler =
+                                }
+                            draft.fontResolver = IntellijTerminalFontResolver
+                            draft.hostKeyHandler = { event -> shortcutControllerRef[0]?.handleKeyPressed(event) == true }
+                            draft.contextMenuHandler =
                                 SwingTerminalContextMenuHandler { request ->
                                     paneRef[0]?.showContextMenu(request) == true
-                                },
-                        ),
-                )
-            scrollbarAdapter.attach(terminal)
-            terminal.bind(tab.session)
-
-            val searchBar = SwingTerminalSearchBar(terminal)
-            val clipboardReadPrompt =
-                SwingClipboardReadPrompt { message, decide ->
-                    IntellijMessageDialogs.showModeless(project, message, decide)
+                                }
+                        },
+                ).apply {
+                    setShellSuggestionFailureHandler { _, failure ->
+                        reportShellSuggestionFailure(failure)
+                    }
                 }
-            val terminalArea = SwingTerminalOverlayPane(terminal, searchBar.component)
-            val component =
-                JPanel(BorderLayout()).apply {
-                    border = null
-                    background = terminal.background
-                    terminal.border = null
-                    add(terminalArea, BorderLayout.CENTER)
-                    add(scrollbar, BorderLayout.EAST)
-                }
-
-            tab.session.requestRender(scrollbackOffset = 0)
-            return KetraTermTerminalPane(
-                tab = tab,
-                terminal = terminal,
-                component = component,
-                searchBar = searchBar,
-                hostActions = hostActions,
-                project = project,
-                completionBinding = completionBinding,
-                clipboardReadPrompt = clipboardReadPrompt,
-            ).also { pane ->
-                pane.shortcutController = KetraTermTerminalShortcutController(pane)
-                shortcutControllerRef[0] = pane.shortcutController
-                paneRef[0] = pane
+            var searchBar: SwingTerminalSearchBar? = null
+            var clipboardReadPrompt: SwingClipboardReadPrompt? = null
+            var pane: KetraTermTerminalPane? = null
+            try {
+                scrollbarAdapter.attach(terminal)
+                terminal.bind(tab.session)
+                searchBar = SwingTerminalSearchBar(terminal).apply { refreshColors(searchColors()) }
+                clipboardReadPrompt =
+                    SwingClipboardReadPrompt { message, decide ->
+                        IntellijMessageDialogs.showModeless(project, message, decide)
+                    }
+                val terminalArea = SwingTerminalOverlayPane(terminal, searchBar.component)
+                val component =
+                    JPanel(BorderLayout()).apply {
+                        border = null
+                        background = terminal.background
+                        terminal.border = null
+                        add(terminalArea, BorderLayout.CENTER)
+                        add(scrollbar, BorderLayout.EAST)
+                    }
+                tab.session.requestRender(scrollbackOffset = 0)
+                val created =
+                    KetraTermTerminalPane(
+                        tab = tab,
+                        terminal = terminal,
+                        component = component,
+                        searchBar = searchBar,
+                        hostActions = hostActions,
+                        project = project,
+                        completionBinding = completionBinding,
+                        clipboardReadPrompt = clipboardReadPrompt,
+                    )
+                pane = created
+                created.shortcutController = KetraTermTerminalShortcutController(created)
+                shortcutControllerRef[0] = created.shortcutController
+                paneRef[0] = created
                 completionBinding.attach(terminal)
-                pane.reconcileCompletion()
+                created.reconcileCompletion()
+                return created
+            } catch (failure: Throwable) {
+                val created = pane
+                if (created != null) {
+                    captureCleanupFailure(failure, created::close)
+                } else {
+                    captureCleanupFailure(failure) { clipboardReadPrompt?.close() }
+                    captureCleanupFailure(failure, completionBinding::close)
+                    captureCleanupFailure(failure) { searchBar?.close() }
+                    captureCleanupFailure(failure, terminal::dispose)
+                }
+                throw failure
             }
         }
     }

@@ -16,6 +16,7 @@
 package io.github.ketraterm.ui.swing.host
 
 import io.github.ketraterm.session.TerminalSession
+import io.github.ketraterm.session.TerminalSessionState
 import io.github.ketraterm.session.TerminalShellCommandLineSnapshot
 import io.github.ketraterm.ui.swing.api.SwingTerminal
 import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionEligibilityListener
@@ -26,6 +27,7 @@ import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.debounce
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.swing.Swing
 import java.awt.event.FocusAdapter
 import java.awt.event.FocusEvent
@@ -37,7 +39,8 @@ import javax.swing.SwingUtilities
  *
  * The binding observes dedicated shell-edit revisions, applies the shared debounce policy,
  * adapts shell snapshots to Swing requests, hides suggestions when focus leaves
- * the terminal, and invalidates request deduplication after user feedback. It
+ * the terminal, and invalidates request deduplication after user feedback. Session
+ * termination closes the binding and cancels target work on the EDT. It
  * owns only its observation job; completion providers, enablement, ranking
  * context, and feedback persistence remain host supplied.
  *
@@ -60,8 +63,10 @@ public class SwingLiveCompletionBinding
         private val edtDispatcher: CoroutineDispatcher = Dispatchers.Swing,
         private val debounceMillis: Int = DEFAULT_DEBOUNCE_MILLIS,
         private val minimumNonWhitespaceCharacters: Int = DEFAULT_MINIMUM_NON_WHITESPACE_CHARACTERS,
+        private val sessionState: StateFlow<TerminalSessionState>? = null,
     ) : AutoCloseable {
         private var target: SwingLiveCompletionTarget? = null
+        private var suggestionTarget: SwingShellSuggestionTarget? = null
         private var observationJob: Job? = null
         private var invalidatedRevision: Long? = null
         private val refreshes = MutableStateFlow<Long?>(null)
@@ -99,6 +104,8 @@ public class SwingLiveCompletionBinding
                 } else {
                     refreshes.value = null
                     lastRequest = null
+                    // The embedded controller handles eligibility itself, including explicit requests.
+                    if (suggestionTarget !== target) suggestionTarget?.hideSuggestions()
                 }
             }
 
@@ -137,6 +144,7 @@ public class SwingLiveCompletionBinding
             rankingContextKey = rankingContextKey,
             feedbackHandler = feedbackHandler,
             observationScope = coroutineScope,
+            sessionState = session.state,
         )
 
         /**
@@ -151,19 +159,40 @@ public class SwingLiveCompletionBinding
             attach(SwingTerminalLiveCompletionTarget(terminal))
         }
 
-        internal fun attach(target: SwingLiveCompletionTarget) {
+        /**
+         * Observes [terminal] while routing automatic requests to a host-owned popup/controller.
+         *
+         * Close this binding before rebinding or disposing the terminal. The host
+         * retains target resources and explicit-request orchestration; this binding
+         * cancels automatic work through [suggestionTarget] on invalidation, session
+         * termination, or close.
+         * Configure the target's feedback through [suggestionFeedbackHandler].
+         */
+        public fun attach(
+            terminal: SwingTerminal,
+            suggestionTarget: SwingShellSuggestionTarget,
+        ) {
+            attach(SwingTerminalLiveCompletionTarget(terminal), suggestionTarget)
+        }
+
+        internal fun attach(
+            target: SwingLiveCompletionTarget,
+            suggestionTarget: SwingShellSuggestionTarget = target,
+        ) {
             check(SwingUtilities.isEventDispatchThread()) { "live completion must be attached on the EDT" }
             check(!closed) { "live completion binding is closed" }
             check(this.target == null) { "live completion binding is already attached" }
             this.target = target
+            this.suggestionTarget = suggestionTarget
             var focusListenerAttached = false
             try {
                 target.addFocusListener(focusListener)
                 focusListenerAttached = true
                 target.addInvalidationListener(invalidationListener)
                 target.addEligibilityListener(eligibilityListener)
+                // Install the job before an already-closed session can synchronously detach it.
                 observationJob =
-                    observationScope.launch(edtDispatcher + CoroutineName("swing-live-completion")) {
+                    observationScope.launch(edtDispatcher + CoroutineName("swing-live-completion"), start = CoroutineStart.LAZY) {
                         launch {
                             refreshes
                                 .debounce { if (it == null) 0L else debounceMillis.toLong() }
@@ -171,12 +200,19 @@ public class SwingLiveCompletionBinding
                                     if (revision != null && revision == refreshes.value) refreshNow()
                                 }
                         }
+                        sessionState?.let { states ->
+                            launch {
+                                states.first { it is TerminalSessionState.Closed }
+                                close()
+                            }
+                        }
                         shellCommandLineRevisions.collect { revision ->
                             if (revision >= 0L) {
                                 onShellCommandLineRevisionOnEdt(revision)
                             }
                         }
                     }
+                observationJob?.start()
             } catch (failure: Throwable) {
                 observationJob?.cancel()
                 observationJob = null
@@ -184,6 +220,7 @@ public class SwingLiveCompletionBinding
                 runCatching { target.removeInvalidationListener(invalidationListener) }
                 runCatching { target.removeEligibilityListener(eligibilityListener) }
                 this.target = null
+                this.suggestionTarget = null
                 throw failure
             }
         }
@@ -209,21 +246,24 @@ public class SwingLiveCompletionBinding
             val snapshot = activeCommandLine()
             if (snapshot == null || !shouldRequest(snapshot)) {
                 lastRequest = null
-                target?.hideSuggestions()
+                suggestionTarget?.hideSuggestions()
                 return
             }
             val request = RequestKey(snapshot, rankingContextKey())
             if (request == lastRequest) return
             lastRequest = request
-            target?.requestSuggestions(snapshot)
+            suggestionTarget?.requestSuggestions(snapshot)
         }
 
         /** Stops observation, removes focus wiring, and hides suggestions. */
         override fun close() {
             check(SwingUtilities.isEventDispatchThread()) { "live completion must be closed on the EDT" }
             if (closed) return
-            cancelAndHideInternal()
-            detach()
+            try {
+                cancelAndHideInternal()
+            } finally {
+                detach()
+            }
         }
 
         /** Stops automatic observation without dismissing an explicit completion request. */
@@ -239,6 +279,7 @@ public class SwingLiveCompletionBinding
             target?.removeInvalidationListener(invalidationListener)
             target?.removeEligibilityListener(eligibilityListener)
             target = null
+            suggestionTarget = null
         }
 
         private fun onEdt(action: () -> Unit) {
@@ -260,7 +301,7 @@ public class SwingLiveCompletionBinding
         private fun cancelAndHideInternal() {
             refreshes.value = null
             lastRequest = null
-            target?.hideSuggestions()
+            suggestionTarget?.hideSuggestions()
         }
 
         private fun shouldRequest(snapshot: TerminalShellCommandLineSnapshot): Boolean {
@@ -284,6 +325,7 @@ public class SwingLiveCompletionBinding
 
         private fun isEligibleOnEdt(): Boolean =
             !closed &&
+                sessionState?.value !is TerminalSessionState.Closed &&
                 target?.isFocusOwner() == true &&
                 target?.isAutomaticSuggestionEligible() == true &&
                 suggestionsEnabled()
@@ -300,11 +342,7 @@ public class SwingLiveCompletionBinding
         }
     }
 
-internal interface SwingLiveCompletionTarget {
-    fun requestSuggestions(snapshot: TerminalShellCommandLineSnapshot)
-
-    fun hideSuggestions()
-
+internal interface SwingLiveCompletionTarget : SwingShellSuggestionTarget {
     fun addFocusListener(listener: FocusListener)
 
     fun removeFocusListener(listener: FocusListener)

@@ -20,10 +20,17 @@ import io.github.ketraterm.pty.PtyOptions
 
 fun main() {
     JavaConsumer.verify()
-    val original = PtyOptions(command = listOf("consumer"), environment = mapOf("TERM" to "xterm-256color"))
-    val updated = original.copy(columns = 101, rows = 33)
-    val (command, environment) = updated
-    check(command == original.command && environment == original.environment)
+    val original =
+        PtyOptions.create { draft ->
+            draft.command = listOf("consumer")
+            draft.environment = mapOf("TERM" to "xterm-256color")
+        }
+    val updated =
+        original.copy {
+            it.columns = 101
+            it.rows = 33
+        }
+    check(updated.command == original.command && updated.environment == original.environment)
     check(updated.columns == 101 && updated.rows == 33 && updated.inputPolicy == original.inputPolicy)
     val process = JavaConsumer.newProcess()
     PtyConnector(process).use { connector ->

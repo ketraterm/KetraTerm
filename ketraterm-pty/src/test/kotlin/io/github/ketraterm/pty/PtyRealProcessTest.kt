@@ -67,12 +67,12 @@ class PtyRealProcessTest {
                 Files.writeString(expectedFile, if (deny) "" else text)
                 val session =
                     TerminalSessions.localPty(
-                        PtyOptions(
-                            command = listOf("node", script.toString(), "--expect-file", expectedFile.toString(), "--suite"),
-                            columns = 160,
-                            rows = 24,
-                            hostPolicy = HostPolicy(clipboardPolicy = TerminalClipboardPolicy(readPermission = permission)),
-                            eventListener =
+                        PtyOptions.create { draft ->
+                            draft.command = listOf("node", script.toString(), "--expect-file", expectedFile.toString(), "--suite")
+                            draft.columns = 160
+                            draft.rows = 24
+                            draft.hostPolicy = HostPolicy(clipboardPolicy = TerminalClipboardPolicy(readPermission = permission))
+                            draft.eventListener =
                                 object : PtyEventListener by PtyEventListener.NONE {
                                     override suspend fun readClipboard(
                                         session: TerminalSession,
@@ -81,8 +81,8 @@ class PtyRealProcessTest {
                                         reads.incrementAndGet()
                                         return TerminalClipboardReadResult.Text(text)
                                     }
-                                },
-                        ),
+                                }
+                        },
                     )
                 sessions += session
                 withTimeout(30.seconds) { session.state.first { it is TerminalSessionState.Closed } }
@@ -345,15 +345,15 @@ class PtyRealProcessTest {
             }
         val session =
             TerminalSessions.localPty(
-                PtyOptions(
-                    command = command,
-                    workingDirectory = Path.of(System.getProperty("user.home")),
-                    columns = columns,
-                    rows = rows,
-                    maxHistory = 200,
-                    readBufferSize = readBufferSize,
-                    eventListener = listener,
-                ),
+                PtyOptions.create { draft ->
+                    draft.command = command
+                    draft.workingDirectory = Path.of(System.getProperty("user.home"))
+                    draft.columns = columns
+                    draft.rows = rows
+                    draft.maxHistory = 200
+                    draft.readBufferSize = readBufferSize
+                    draft.eventListener = listener
+                },
             )
         sessions += session
         assertTrue(ready.await(10, TimeUnit.SECONDS), "native child did not acknowledge its output")

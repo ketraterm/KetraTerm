@@ -17,6 +17,7 @@ package io.github.ketraterm.intellij.services
 
 import com.intellij.ide.trustedProjects.TrustedProjects
 import com.intellij.ide.trustedProjects.TrustedProjectsListener
+import com.intellij.ide.ui.LafManagerListener
 import com.intellij.openapi.Disposable
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.components.Service
@@ -104,6 +105,10 @@ class KetraTermProjectTerminalService internal constructor(
 
     init {
         KetraTermIntellijSettings.getInstance().addChangeListener(settingsChangedListener)
+        ApplicationManager.getApplication().messageBus.connect(this).subscribe(
+            LafManagerListener.TOPIC,
+            LafManagerListener { reloadOpenTerminalSettings() },
+        )
         ApplicationManager.getApplication().messageBus.connect(this).subscribe(
             EditorColorsManager.TOPIC,
             EditorColorsListener {
@@ -538,15 +543,15 @@ class KetraTermProjectTerminalService internal constructor(
     }
 
     private fun openOptions(settings: SwingSettings): TerminalWorkspaceOpenOptions =
-        TerminalWorkspaceOpenOptions(
-            columns = settings.columns,
-            rows = settings.rows,
-            treatAmbiguousAsWide = settings.treatAmbiguousAsWide,
-            maxHistory = settings.scrollbackLines,
-            pasteControlPolicy = settings.pasteControlPolicy,
-            hostPolicy = KetraTermIntellijSettings.getInstance().createHostPolicy(),
-            showForegroundProcessName = KetraTermIntellijSettings.getInstance().state.showForegroundProcessName,
-        )
+        TerminalWorkspaceOpenOptions.create { draft ->
+            draft.columns = settings.columns
+            draft.rows = settings.rows
+            draft.treatAmbiguousAsWide = settings.treatAmbiguousAsWide
+            draft.maxHistory = KetraTermIntellijSettings.getInstance().state.scrollbackLines
+            draft.pasteControlPolicy = settings.pasteControlPolicy
+            draft.hostPolicy = KetraTermIntellijSettings.getInstance().createHostPolicy()
+            draft.showForegroundProcessName = KetraTermIntellijSettings.getInstance().state.showForegroundProcessName
+        }
 
     private fun installCloseQueryListener(
         content: Content,

@@ -18,12 +18,65 @@ package io.github.ketraterm.ui.swing.host
 import io.github.ketraterm.completion.api.*
 import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionAccentRole
 import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionRequest
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.last
+import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withContext
+import java.util.concurrent.atomic.AtomicReference
+import javax.swing.SwingUtilities
 import kotlin.test.*
 
 class SwingCompletionSuggestionProviderTest {
+    @Test
+    fun `host source labels are detached bounded and do not alter source identity`() =
+        runBlocking {
+            val labels = mutableMapOf("product-source" to "x".repeat(126) + "😀suffix")
+            val engine =
+                TerminalCompletionEngine {
+                    flowOf(listOf(TerminalCompletionCandidate("value", 0, 1, "product-source", TerminalCompletionCandidateKind.ARGUMENT)))
+                }
+            val provider = SwingCompletionSuggestionProvider(engine, { SwingCompletionContext.EMPTY }, labels)
+            labels["product-source"] = "changed"
+            val suggestion = provider.suggestions(request("x", cursorOffset = 1)).last().single()
+            assertEquals("product-source", suggestion.source)
+            assertEquals("x".repeat(126) + "…", suggestion.sourceDisplayText)
+            assertFailsWith<IllegalArgumentException> {
+                SwingCompletionSuggestionProvider(engine, { SwingCompletionContext.EMPTY }, mapOf("product-source" to "  "))
+            }
+        }
+
+    @Test
+    fun `context is captured once off EDT and retained for progressive results`() =
+        runBlocking {
+            val initial = SwingCompletionContext(profileId = "bash", workingDirectoryUri = "file:///first")
+            val current = AtomicReference(initial)
+            var reads = 0
+            val provider =
+                SwingCompletionSuggestionProvider(
+                    engine =
+                        { request ->
+                            assertEquals("file:///first", request.workingDirectoryUri)
+                            current.set(initial.copy(workingDirectoryUri = "file:///second"))
+                            flowOf(
+                                listOf(TerminalCompletionCandidate("status", 4, 5, "spec", TerminalCompletionCandidateKind.SUBCOMMAND)),
+                                listOf(TerminalCompletionCandidate("stash", 4, 5, "spec", TerminalCompletionCandidateKind.SUBCOMMAND)),
+                            )
+                        },
+                    contextProvider = {
+                        assertFalse(SwingUtilities.isEventDispatchThread())
+                        reads++
+                        current.get()
+                    },
+                )
+            val results = withContext(Dispatchers.Default) { provider.suggestions(request("git s", 5)).toList() }
+            assertEquals(1, reads)
+            assertEquals(2, results.size)
+            results.forEach { assertSame(initial, it.single().interactionContext) }
+            assertEquals("file:///second", current.get().workingDirectoryUri)
+        }
+
     @Test
     fun `forwards live host context and adapts candidates`() =
         runBlocking {
@@ -37,7 +90,7 @@ class SwingCompletionSuggestionProviderTest {
             val provider =
                 SwingCompletionSuggestionProvider(
                     engine =
-                        TerminalCompletionEngine { request ->
+                        { request ->
                             captured = request
                             flowOf(
                                 listOf(
@@ -96,7 +149,7 @@ class SwingCompletionSuggestionProviderTest {
                 )
             val provider =
                 SwingCompletionSuggestionProvider(
-                    TerminalCompletionEngine {
+                    {
                         flowOf(
                             sources.map { source ->
                                 TerminalCompletionCandidate(
@@ -119,12 +172,12 @@ class SwingCompletionSuggestionProviderTest {
                     "Built-in",
                     "Learned",
                     "Learned",
-                    "Git",
-                    "Gradle",
-                    "Project",
+                    "Intellij git branch",
+                    "Intellij gradle task",
+                    "Intellij project file",
                     "Path",
-                    "Git",
-                    "Custom source",
+                    "Intellij git status path",
+                    "Intellij custom source",
                     "Legitimate provider",
                     "Pathology",
                 ),
@@ -143,7 +196,7 @@ class SwingCompletionSuggestionProviderTest {
             var invoked = false
             val provider =
                 SwingCompletionSuggestionProvider(
-                    TerminalCompletionEngine {
+                    {
                         invoked = true
                         flowOf(emptyList())
                     },

@@ -157,9 +157,9 @@ Hosts are responsible for choosing whether and where persistence is enabled. `Te
 persisted hydration snapshot and accepts live feedback events, but it is not a completion source and never contributes a second visible candidate. Completion components never
 read files, scan raw shell history, spawn shells, or talk to UI frameworks.
 
-Optional disk I/O belongs to the separately published
-`ketraterm-completion-persistence` module. Its
-`TerminalCompletionLearningCoordinator` owns the public fixed-path lifecycle. Learning mutates its bounded in-memory
+Embedding hosts own optional disk I/O. KetraTerm's products use the separate,
+product-only `ketraterm-completion-persistence` module. Its
+`TerminalCompletionLearningCoordinator` owns the product's fixed-path lifecycle. Learning mutates its bounded in-memory
 store synchronously; one conflated worker hydrates once, observes last-value enablement, and checkpoints the latest dirty
 snapshot every 30 seconds. The file store persists opaque evidence and only
 positive, policy-approved replay rows, rechecking replay eligibility before encoding. It
@@ -268,15 +268,15 @@ parser. A small non-whitespace threshold plus common trigger characters keeps
 typing responsive, while the merged engine parses once and suppresses invalid
 operator, command, option, path, and value-domain requests authoritatively.
 
-Swing hosts share `SwingLiveCompletionBinding` and one EDT-confined
-one-shot `Timer` for debouncing. `SwingTerminal` owns exactly one replaceable
+Swing hosts share `SwingLiveCompletionBinding`, whose lifecycle-bound Flow
+debounces refreshes on the EDT. `SwingTerminal` owns exactly one replaceable
 `suggestionJob`; a new request or popup hide cancels it. The provider and engine
 remain suspending end to end. Provider construction and flow collection execute
 off the EDT, and progressive rankings are conflated before the latest immutable
 snapshot is published back to Swing.
 
-Presentation is intentionally platform-owned. The standalone host custom-paints
-a compact completion list; the IntelliJ plugin owns a separate native `JBList`.
+Presentation is intentionally platform-owned. The reusable Swing view uses a
+`JList`; the IntelliJ plugin owns a separate native `JBList`.
 Both consume `SwingShellSuggestionViewSnapshot` and the same authoritative
 display text, detail, source label, semantic accent role, and matched ranges.
 The Swing adapter maps the products' stable source identities through one private
@@ -465,13 +465,15 @@ position without gaining access to ranking state.
 
 Source collection uses one cold structured `channelFlow`. The engine parses
 once, resolves one context, evaluates its internal spec source directly, launches
-one child per host source under a supervisor, and serially incorporates
+one child per host source in a regular coroutine scope, and serially incorporates
 completed-source events in the parent. Each changed
 global ranking is emitted immediately, so a slow Git or index source cannot
 block a fast spec, learned, or direct-path result. Individual sources remain
-ordinary suspending functions and never own scopes or child jobs. A non-cancellation source failure is reported through
-`TerminalCompletionSourceFailureHandler` and contributes an empty result; request cancellation reaches every child,
-and source declaration order remains the deterministic final-fusion tie-breaker.
+ordinary suspending functions and never own scopes or child jobs. Non-cancellation source failures are reported through
+`TerminalCompletionSourceFailureHandler`: ordinary exceptions contribute an empty result, while unexpected errors
+fail collection and cancel siblings. Independent source cancellation contributes an empty result even if the child
+has cancelled its own job; the channel reserves one result slot per source so accounting never needs to suspend.
+Request cancellation reaches every child. Source declaration order remains the deterministic final-fusion tie-breaker.
 Host adapters therefore propagate operational failures, including abnormal filesystem access, through their source.
 Only normal absence or unsupported host context becomes an empty provider result; adapters do not duplicate diagnostic
 callbacks or silently convert failures into "no matches."

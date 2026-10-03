@@ -15,6 +15,7 @@
  */
 package io.github.ketraterm.core.render
 
+import io.github.ketraterm.core.TerminalBuffers
 import io.github.ketraterm.core.buffer.DefaultTerminalBuffer
 import io.github.ketraterm.core.buffer.impl.TerminalModeControllerImpl
 import io.github.ketraterm.core.engine.CursorEngine
@@ -28,6 +29,67 @@ import org.junit.jupiter.params.ParameterizedTest
 import org.junit.jupiter.params.provider.ValueSource
 
 class CoreTerminalRenderFrameTest {
+    @Test
+    fun `all nested read variants reject before entering and release after callback failure`() {
+        val buffer = TerminalBuffers.create(width = 4, height = 2)
+        val other = TerminalBuffers.create(width = 3, height = 1)
+        val failure = IllegalArgumentException("consumer failed")
+        var escaped: TerminalRenderFrame? = null
+        assertSame(
+            failure,
+            assertThrows(IllegalArgumentException::class.java) {
+                buffer.readRenderFrame { outer ->
+                    escaped = outer
+                    val forbidden = TerminalRenderFrameConsumer { fail<Unit>("Nested consumer must not be called") }
+                    assertThrows(IllegalStateException::class.java) { buffer.readRenderFrame(forbidden) }
+                    assertThrows(IllegalStateException::class.java) { buffer.readRenderFrame(1, forbidden) }
+                    assertThrows(IllegalStateException::class.java) { buffer.readRenderFrame(1, 1, forbidden) }
+                    assertThrows(IllegalStateException::class.java) { buffer.readRenderFrameForAbsoluteRange(0, 1, forbidden) }
+                    assertEquals(2, outer.rows)
+                    assertEquals(0, outer.scrollbackOffset)
+                    other.readRenderFrame { assertEquals(3, it.columns) }
+                    assertEquals(4, outer.columns)
+                    throw failure
+                }
+            },
+        )
+        assertThrows(IllegalStateException::class.java) { requireNotNull(escaped).rows }
+        buffer.readRenderFrame { assertEquals(2, it.rows) }
+    }
+
+    @Test
+    fun `nested render read attempt preserves the enclosing borrowed frame`() {
+        val buffer = TerminalBuffers.create(width = 4, height = 2, maxHistory = 2)
+        buffer.writeText("past")
+        buffer.carriageReturn()
+        buffer.newLine()
+        buffer.writeText("live")
+        buffer.carriageReturn()
+        buffer.newLine()
+        buffer.writeText("tail")
+
+        buffer.readRenderFrame { outer ->
+            val before = IntArray(4)
+            outer.copyLine(0, before, attrWords = LongArray(4), flags = IntArray(4))
+            assertArrayEquals(intArrayOf('l'.code, 'i'.code, 'v'.code, 'e'.code), before)
+
+            try {
+                buffer.readRenderFrame(scrollbackOffset = 1, viewportRows = 3) { inner ->
+                    assertEquals(1, inner.scrollbackOffset)
+                    assertEquals(3, inner.rows)
+                }
+            } catch (_: IllegalStateException) {
+                // A non-reentrant reader may reject the nested attempt before changing the outer lease.
+            }
+
+            assertEquals(0, outer.scrollbackOffset)
+            assertEquals(2, outer.rows)
+            val after = IntArray(4)
+            outer.copyLine(0, after, attrWords = LongArray(4), flags = IntArray(4))
+            assertArrayEquals(before, after)
+        }
+    }
+
     @Test
     fun `history content generation survives live edits admission and saturated eviction`() {
         val buffer = DefaultTerminalBuffer(initialWidth = 4, initialHeight = 2, maxHistory = 2)

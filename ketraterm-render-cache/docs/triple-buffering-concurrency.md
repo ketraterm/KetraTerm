@@ -24,15 +24,15 @@ At any given time, the three cache buffers (`TerminalRenderCache`) are distribut
 ```
 
 1. **Back Buffer (Writer-owned)**: Exclusively leased by the render worker thread. It pulls fresh row updates from the terminal frame reader.
-2. **Front Buffer (UI-readable)**: Exclusively leased by the UI thread for painting and repaint planning.
+2. **Front Buffer (UI-readable)**: Shared by concurrent readers for painting and repaint planning. Retired fronts remain pinned until all their readers release them.
 3. **Spare Buffer**: Sits idle. When the writer finishes updating the back buffer, the back buffer is promoted to the front, and the previous front buffer (or the spare buffer if the front was active) is recycled as the new spare.
 
 ---
 
-## 2. Lock-Free and Synchronized Intersections
+## 2. Synchronized leases and reader ABI
 
-### Lock-Free Front Queries
-For quick diagnostic checks (e.g. CLI utilities, testing), [current()](../src/main/kotlin/io/github/ketraterm/render/cache/TerminalRenderPublisher.kt#L116) returns the latest front buffer atomically without locks using an `AtomicReference`.
+Unleased `current()` access is internal to quiescent module tests. Consumers must
+hold a lease throughout every access to a published cache and its arrays.
 
 ### Leased Read Block
 To prevent the front buffer from being recycled or rewritten while the UI thread is actively painting from it, the UI thread must acquire a read lease:
@@ -44,6 +44,19 @@ inline fun <T> readCurrent(block: (TerminalRenderCache) -> T): T?
 * **Lease Acquisition**: Increments `readerCounts[frontIndex]` within a synchronized block.
 * **UI Execution**: Passes the leased buffer safely to `block`.
 * **Lease Release**: Decrements the count and signals waiting writers.
+
+Only the callback invocation and `try/finally` remain inline. Acquisition returns
+the existing cache reference, and release identifies it inside the publisher;
+no per-read lease object or buffer index escapes. The public acquire/release
+bridge supports cross-module inline readers; ordinary callers use `readCurrent`.
+Pair every non-null acquisition exactly once, including on failure. Foreign or
+unleased cache releases reject before changing counts; duplicate releases while
+another reader holds that cache remain caller misuse.
+
+Session retains its publisher privately and offers `readPublishedFrame` with the
+same borrowing semantics. These callbacks must not mutate or retain storage or
+reenter publication/session mutation. A standalone publisher's actual owner keeps
+`updateAndPublish`. See [reader ownership and measurements](../../docs/render-reader-ownership.md).
 
 ---
 

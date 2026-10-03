@@ -16,11 +16,13 @@
 package io.github.ketraterm.completion.api
 
 /**
- * Receives non-cancellation failures isolated from one merged completion source.
+ * Receives original non-cancellation failures from merged completion sources.
+ * Ordinary exceptions are isolated; unexpected errors are reported before they
+ * fail collection and cancel sibling sources.
  *
  * Implementations must be thread-safe, return promptly, and must not throw.
  * Different source child coroutines may report concurrently while the merged
- * engine continues collecting the remaining sources.
+ * engine collects the remaining sources.
  */
 public fun interface TerminalCompletionSourceFailureHandler {
     /**

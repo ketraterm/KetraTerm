@@ -16,6 +16,7 @@
 package io.github.ketraterm.core
 
 import io.github.ketraterm.core.api.TerminalBuffer
+import io.github.ketraterm.core.api.TerminalRenderBuffer
 import io.github.ketraterm.core.buffer.DefaultTerminalBuffer
 
 /**
@@ -26,9 +27,8 @@ public object TerminalBuffers {
      * Creates a terminal buffer with the requested visible dimensions and
      * scrollback capacity.
      *
-     * The returned buffer also implements
-     * [io.github.ketraterm.render.api.TerminalRenderFrameReader]. Direct embedders may
-     * cast to that contract and copy frames while externally serializing grid
+     * The returned [TerminalRenderBuffer] exposes both core state and render frames.
+     * Direct embedders may copy frames while externally serializing grid
      * reads, borrowed views, and mutations as documented by [TerminalBuffer].
      * Atomic mode snapshots retain their narrower method-level concurrency
      * guarantees; the factory does not install a synchronization boundary.
@@ -47,7 +47,7 @@ public object TerminalBuffers {
         width: Int,
         height: Int,
         maxHistory: Int = 1000,
-    ): TerminalBuffer {
+    ): TerminalRenderBuffer {
         require(width > 0) { "width must be positive, was $width" }
         require(height > 0) { "height must be positive, was $height" }
         require(maxHistory >= 0) { "maxHistory must be non-negative, was $maxHistory" }

@@ -280,6 +280,7 @@ class TerminalShellCommandLineObservationTest {
         val session =
             TerminalSession.create(
                 terminal,
+                terminal,
                 connector,
                 shellIntegration = OscShellIntegration,
                 workerDispatcher = dispatcher,

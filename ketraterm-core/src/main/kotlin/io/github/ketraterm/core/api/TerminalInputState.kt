@@ -16,13 +16,18 @@
 package io.github.ketraterm.core.api
 
 /**
- * Zero-allocation, read-only terminal behavior state required by input encoders.
+ * Primitive, read-only access to the published packed mode subset used by input encoders.
+ * Factory-created buffers read this word atomically without constructing a snapshot object.
+ * Implementations must return one coherent word per call; capture it once when decoding
+ * multiple fields for one decision. This does not synchronize separate grid or cursor reads.
  */
 public interface TerminalInputState {
     /**
-     * Returns one coherent snapshot of all input-readable terminal mode bits.
+     * Returns one coherent snapshot of the fields defined by [TerminalModeBits]
+     * and this interface's decoding helpers. Existing numeric meanings are stable.
+     * Ignore unassigned bits; future state families need not fit in this word.
      *
-     * @return A packed 64-bit word containing the state of all input-facing terminal modes.
+     * @return A packed 64-bit word containing the published input mode subset.
      */
     public fun getInputModeBits(): Long
 

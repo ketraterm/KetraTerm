@@ -22,6 +22,7 @@ import io.github.ketraterm.host.TerminalClipboardWriteEvent
 import io.github.ketraterm.input.policy.PasteControlPolicy
 import io.github.ketraterm.protocol.NotificationLevel
 import io.github.ketraterm.protocol.ShellIntegrationEvent
+import io.github.ketraterm.protocol.TerminalHostModeCapability
 import io.github.ketraterm.pty.PtyEventListener
 import io.github.ketraterm.pty.PtyOptions
 import io.github.ketraterm.pty.TerminalSessions
@@ -42,6 +43,8 @@ import java.util.concurrent.atomic.AtomicInteger
  * UI products adapt this model to visual containers such as Swing tabs or IDE
  * tool-window contents. This class does not know about UI widgets, painting,
  * input events, or platform actions.
+ * Optional process-title and startup-notification observers report failures
+ * through the JVM logger and stop independently of essential session observation.
  */
 public class TerminalWorkspace internal constructor(
     private val listener: TerminalWorkspaceListener,
@@ -67,6 +70,7 @@ public class TerminalWorkspace internal constructor(
         CoroutineScope(workspaceJob + workerDispatcher + CoroutineName("terminal-workspace"))
     private val nextTabNumber = AtomicInteger(1)
     private var selectedTabId: String? = null
+    private var selectionRevision = 0L
     private var closed = false
 
     internal val isCoroutineScopeActive: Boolean
@@ -143,34 +147,40 @@ public class TerminalWorkspace internal constructor(
 
             val stateJob =
                 workspaceScope.launch {
-                    val processTitleJob =
-                        launch {
-                            tab.processTitleEnabled.collectLatest { enabled ->
-                                if (enabled) session.foregroundProcessName.collect(tab::updateForegroundProcessName)
-                            }
-                        }
-                    val startupJob =
-                        session.startupCommandStatus?.let { status ->
-                            launch {
-                                if (status.first { it != TerminalStartupCommandStatus.WAITING } ==
-                                    TerminalStartupCommandStatus.CANCELLED_BY_INPUT
-                                ) {
-                                    listener.startupCommandCancelled(tab)
+                    supervisorScope {
+                        val processTitleJob =
+                            launch(presentationFailureHandler) {
+                                tab.processTitleEnabled.collectLatest { enabled ->
+                                    if (enabled) session.foregroundProcessName.collect(tab::updateForegroundProcessName)
                                 }
                             }
-                        }
-                    try {
-                        val closed = session.state.filterIsInstance<TerminalSessionState.Closed>().first()
-                        startupJob?.cancel()
-                        processTitleJob.cancelAndJoin()
-                        tab.updateForegroundProcessName(null)
-                        if (!closed.event.locallyRequested) {
-                            tabBySession(session)?.let {
-                                listener.sessionClosed(it, closed.event.exitCode, closed.event.failure)
+                        val startupJob =
+                            session.startupCommandStatus?.let { status ->
+                                launch(presentationFailureHandler) {
+                                    if (status.first { it != TerminalStartupCommandStatus.WAITING } ==
+                                        TerminalStartupCommandStatus.CANCELLED_BY_INPUT
+                                    ) {
+                                        listener.startupCommandCancelled(tab)
+                                    }
+                                }
                             }
+                        try {
+                            val closed = session.state.filterIsInstance<TerminalSessionState.Closed>().first()
+                            startupJob?.cancel()
+                            processTitleJob.cancelAndJoin()
+                            var failure = captureCleanupFailure(null) { tab.updateForegroundProcessName(null) }
+                            failure =
+                                captureCleanupFailure(failure) {
+                                    if (!closed.event.locallyRequested) {
+                                        tabBySession(session)?.let {
+                                            listener.sessionClosed(it, closed.event.exitCode, closed.event.failure)
+                                        }
+                                    }
+                                }
+                            failure?.let { throw it }
+                        } finally {
+                            synchronized(stateLock) { shellMetadataRegistrations.remove(id) }?.close()
                         }
-                    } finally {
-                        synchronized(stateLock) { shellMetadataRegistrations.remove(id) }?.close()
                     }
                 }
             synchronized(stateLock) {
@@ -206,6 +216,7 @@ public class TerminalWorkspace internal constructor(
         synchronized(stateLock) {
             require(tabByIdLocked(id) != null) { "unknown terminal tab id: $id" }
             selectedTabId = id
+            selectionRevision++
         }
         listener.tabSelected(id)
     }
@@ -214,6 +225,7 @@ public class TerminalWorkspace internal constructor(
      * Closes an existing tab and its session.
      * Attempts session cleanup and every close/selection notification even when
      * a callback throws. Rethrows the first failure with later failures suppressed.
+     * Reentrant selection or closure supersedes this call's pending selection notification.
      *
      * @param id tab id.
      */
@@ -227,15 +239,19 @@ public class TerminalWorkspace internal constructor(
                 if (selectedTabId == id) {
                     selectedTabId = tabs.getOrNull(index.coerceAtMost(tabs.lastIndex))?.id
                 }
-                Triple(tab, selectedTabId, shellMetadataRegistrations.remove(id))
+                Triple(tab, ++selectionRevision, shellMetadataRegistrations.remove(id))
             }
-        val (tab, nextSelectedTabId, shellMetadataRegistration) = result
+        val (tab, revision, shellMetadataRegistration) = result
         var failure: Throwable? = null
         failure = captureCleanupFailure(failure) { shellMetadataRegistration?.close() }
         failure = captureCleanupFailure(failure) { tab.showForegroundProcessName = false }
         failure = captureCleanupFailure(failure) { tab.session.close() }
         failure = captureCleanupFailure(failure) { listener.tabClosed(id) }
-        failure = captureCleanupFailure(failure) { nextSelectedTabId?.let(listener::tabSelected) }
+        failure =
+            captureCleanupFailure(failure) {
+                val nextSelectedTabId = synchronized(stateLock) { selectedTabId.takeIf { selectionRevision == revision } }
+                nextSelectedTabId?.let(listener::tabSelected)
+            }
         failure?.let { throw it }
     }
 
@@ -438,6 +454,12 @@ public class TerminalWorkspace internal constructor(
 
     private companion object {
         private const val INITIAL_TAB_CAPACITY = 4
+        private val presentationFailureHandler =
+            CoroutineExceptionHandler { _, failure ->
+                System
+                    .getLogger(TerminalWorkspace::class.java.name)
+                    .log(System.Logger.Level.WARNING, "Workspace presentation observer failed", failure)
+            }
     }
 }
 
@@ -462,24 +484,24 @@ private object LocalPtyWorkspaceSessionFactory : TerminalWorkspaceSessionFactory
                 enabled = options.shellIntegrationEnabled,
             )
         return TerminalSessions.createLocalPty(
-            PtyOptions(
-                command = launchProfile.command,
-                environment = PtyOptions.defaultEnvironment() + launchProfile.environment,
-                workingDirectory = launchProfile.workingDirectory ?: DEFAULT_WORKING_DIRECTORY,
-                columns = options.columns,
-                rows = options.rows,
-                treatAmbiguousAsWide = options.treatAmbiguousAsWide,
-                inputPolicy =
+            PtyOptions.create { draft ->
+                draft.command = launchProfile.command
+                draft.environment = PtyOptions.defaultEnvironment() + launchProfile.environment
+                draft.workingDirectory = launchProfile.workingDirectory ?: DEFAULT_WORKING_DIRECTORY
+                draft.columns = options.columns
+                draft.rows = options.rows
+                draft.treatAmbiguousAsWide = options.treatAmbiguousAsWide
+                draft.inputPolicy =
                     PtyOptions
                         .defaultInputPolicy()
-                        .copy(pasteControlPolicy = options.pasteControlPolicy),
-                maxHistory = options.maxHistory,
-                eventListener = eventListener,
-                hostPolicy = options.hostPolicy,
-                startupCommand = launchProfile.startupCommand,
-                modeReportCapabilities = options.modeReportCapabilities,
-                shellIntegration = OscShellIntegration,
-            ),
+                        .copy(pasteControlPolicy = options.pasteControlPolicy)
+                draft.maxHistory = options.maxHistory
+                draft.eventListener = eventListener
+                draft.hostPolicy = options.hostPolicy
+                draft.startupCommand = launchProfile.startupCommand
+                draft.modeReportCapabilities = options.modeReportCapabilities
+                draft.shellIntegration = OscShellIntegration
+            },
         )
     }
 
@@ -489,7 +511,7 @@ private object LocalPtyWorkspaceSessionFactory : TerminalWorkspaceSessionFactory
 /**
  * Initial terminal options for a workspace tab.
  *
- * Constructor, [copy], and destructuring signatures are part of the public ABI.
+ * Construction rejects invalid values with [IllegalArgumentException].
  *
  * @property columns initial terminal width in cells.
  * @property rows initial terminal height in rows.
@@ -501,23 +523,114 @@ private object LocalPtyWorkspaceSessionFactory : TerminalWorkspaceSessionFactory
  * install shell hooks that emit OSC 7 and OSC 133 metadata.
  * @property hostPolicy safety policy.
  * @property showForegroundProcessName whether detected processes provide automatic title fallbacks.
- * @property modeReportCapabilities implemented host actions from TerminalHostModeCapability.
+ * @property modeReportCapabilities implemented host actions; only bits defined by [TerminalHostModeCapability] are accepted.
  */
-public data class TerminalWorkspaceOpenOptions(
-    val columns: Int,
-    val rows: Int,
-    val treatAmbiguousAsWide: Boolean,
-    val maxHistory: Int,
-    val pasteControlPolicy: PasteControlPolicy = PasteControlPolicy.PRESERVE,
-    val shellIntegrationEnabled: Boolean = true,
-    val hostPolicy: HostPolicy = HostPolicy(),
-    val showForegroundProcessName: Boolean = true,
-    val modeReportCapabilities: Int = 0,
+public class TerminalWorkspaceOpenOptions private constructor(
+    builder: Builder,
 ) {
+    /** Creates a validated snapshot with default values. */
+    public constructor() : this(Builder())
+
+    public val columns: Int = builder.columns
+    public val rows: Int = builder.rows
+    public val treatAmbiguousAsWide: Boolean = builder.treatAmbiguousAsWide
+    public val maxHistory: Int = builder.maxHistory
+    public val pasteControlPolicy: PasteControlPolicy = builder.pasteControlPolicy
+    public val shellIntegrationEnabled: Boolean = builder.shellIntegrationEnabled
+    public val hostPolicy: HostPolicy = builder.hostPolicy
+    public val showForegroundProcessName: Boolean = builder.showForegroundProcessName
+    public val modeReportCapabilities: Int = builder.modeReportCapabilities
+
+    /** Returns a detached mutable draft. Builders are caller-confined and never retained by snapshots. */
+    public fun toBuilder(): Builder = Builder(this)
+
+    /**
+     * Configures a fresh draft synchronously and returns a validated immutable snapshot.
+     * Exceptions propagate without changing this snapshot. Supplied services remain host-owned.
+     */
+    public fun copy(configure: java.util.function.Consumer<Builder>): TerminalWorkspaceOpenOptions =
+        toBuilder().also { configure.accept(it) }.build()
+
+    /** Mutable construction draft. Not thread-safe; [build] never retains this draft. */
+    public class Builder internal constructor(
+        source: TerminalWorkspaceOpenOptions? = null,
+    ) {
+        /** Draft value for [TerminalWorkspaceOpenOptions.columns]; validated when [build] is called. */
+        public var columns: Int = source?.columns ?: 80
+
+        /** Draft value for [TerminalWorkspaceOpenOptions.rows]; validated when [build] is called. */
+        public var rows: Int = source?.rows ?: 24
+
+        /** Draft value for [TerminalWorkspaceOpenOptions.treatAmbiguousAsWide]; validated when [build] is called. */
+        public var treatAmbiguousAsWide: Boolean = source?.treatAmbiguousAsWide ?: false
+
+        /** Draft value for [TerminalWorkspaceOpenOptions.maxHistory]; validated when [build] is called. */
+        public var maxHistory: Int = source?.maxHistory ?: 1000
+
+        /** Draft value for [TerminalWorkspaceOpenOptions.pasteControlPolicy]; validated when [build] is called. */
+        public var pasteControlPolicy: PasteControlPolicy = source?.pasteControlPolicy ?: PasteControlPolicy.PRESERVE
+
+        /** Draft value for [TerminalWorkspaceOpenOptions.shellIntegrationEnabled]; validated when [build] is called. */
+        public var shellIntegrationEnabled: Boolean = source?.shellIntegrationEnabled ?: true
+
+        /** Draft value for [TerminalWorkspaceOpenOptions.hostPolicy]; validated when [build] is called. */
+        public var hostPolicy: HostPolicy = source?.hostPolicy ?: HostPolicy()
+
+        /** Draft value for [TerminalWorkspaceOpenOptions.showForegroundProcessName]; validated when [build] is called. */
+        public var showForegroundProcessName: Boolean = source?.showForegroundProcessName ?: true
+
+        /** Draft value for [TerminalWorkspaceOpenOptions.modeReportCapabilities]; validated when [build] is called. */
+        public var modeReportCapabilities: Int = source?.modeReportCapabilities ?: 0
+
+        /** Validates and freezes current values; later draft changes cannot affect the result. */
+        public fun build(): TerminalWorkspaceOpenOptions = TerminalWorkspaceOpenOptions(this)
+    }
+
+    override fun equals(other: Any?): Boolean =
+        this === other ||
+            other is TerminalWorkspaceOpenOptions &&
+            columns == other.columns &&
+            rows == other.rows &&
+            treatAmbiguousAsWide == other.treatAmbiguousAsWide &&
+            maxHistory == other.maxHistory &&
+            pasteControlPolicy == other.pasteControlPolicy &&
+            shellIntegrationEnabled == other.shellIntegrationEnabled &&
+            hostPolicy == other.hostPolicy &&
+            showForegroundProcessName == other.showForegroundProcessName &&
+            modeReportCapabilities == other.modeReportCapabilities
+
+    override fun hashCode(): Int {
+        var result = 1
+        result = 31 * result + columns.hashCode()
+        result = 31 * result + rows.hashCode()
+        result = 31 * result + treatAmbiguousAsWide.hashCode()
+        result = 31 * result + maxHistory.hashCode()
+        result = 31 * result + pasteControlPolicy.hashCode()
+        result = 31 * result + shellIntegrationEnabled.hashCode()
+        result = 31 * result + hostPolicy.hashCode()
+        result = 31 * result + showForegroundProcessName.hashCode()
+        result = 31 * result + modeReportCapabilities.hashCode()
+        return result
+    }
+
     init {
         require(columns > 0) { "columns must be > 0, was $columns" }
         require(rows > 0) { "rows must be > 0, was $rows" }
         require(maxHistory >= 0) { "maxHistory must be >= 0, was $maxHistory" }
+        require(modeReportCapabilities and TerminalHostModeCapability.ALL.inv() == 0) {
+            "invalid host mode-report capabilities: $modeReportCapabilities"
+        }
+    }
+
+    public companion object {
+        /** Creates a fresh caller-confined draft initialized to defaults. */
+        @JvmStatic
+        public fun builder(): Builder = Builder()
+
+        /** Configures a draft synchronously and returns one validated immutable snapshot. */
+        @JvmStatic
+        public fun create(configure: java.util.function.Consumer<Builder>): TerminalWorkspaceOpenOptions =
+            builder().also { configure.accept(it) }.build()
     }
 }
 

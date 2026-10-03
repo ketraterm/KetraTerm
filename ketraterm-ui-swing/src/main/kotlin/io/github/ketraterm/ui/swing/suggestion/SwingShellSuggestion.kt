@@ -371,6 +371,8 @@ public fun interface SwingShellSuggestionProvider {
  * Listeners are registered on one [io.github.ketraterm.ui.swing.api.SwingTerminal]
  * and invoked synchronously on the Swing Event Dispatch Thread after its active
  * provider collection is cancelled and its popup is hidden.
+ * A callback failure, including cancellation, propagates to the invoking operation;
+ * subsequent listeners and input submission are skipped.
  */
 public fun interface SwingShellSuggestionInvalidationListener {
     /** Called on the Swing Event Dispatch Thread before command-affecting input is submitted. */
@@ -384,6 +386,9 @@ public fun interface SwingShellSuggestionInvalidationListener {
  * current Swing settings disable automatic suggestions. Callbacks are invoked
  * synchronously on the Swing Event Dispatch Thread after ineligible component
  * work has been cancelled and hidden.
+ * A callback failure, including cancellation, propagates to the invoking operation
+ * and stops notification of subsequent listeners. The eligibility change remains applied.
+ * Reentrant eligibility changes or disposal supersede the remaining older notifications.
  */
 public fun interface SwingShellSuggestionEligibilityListener {
     /**

@@ -77,6 +77,34 @@ The cursor uses the existing shared cursor/text blink timer. Inactive cursors ig
 
 For context kept outside the session, call `requestShellSuggestions(commandText, cursorOffset, anchorColumn, anchorRow, trigger = SwingShellSuggestionTrigger.EXPLICIT)`. The default trigger remains automatic. Both methods use the same cancellable provider pipeline and require the master suggestion setting; explicit requests remain available when automatic popups are disabled. With directly supplied context, the host must replace the request or call `hideShellSuggestions()` when its editor state changes. `showShellSuggestions()` remains available when the host owns provider collection itself.
 
+Choose controller and presentation ownership independently:
+
+| Controller | Presentation | Automatic coordination |
+| --- | --- | --- |
+| Reusable Swing controller | Embedded `SwingShellSuggestionView` | Optional `SwingLiveCompletionBinding.attach(terminal)` |
+| Host controller | Host-owned native popup | Optional `attach(terminal, SwingShellSuggestionTarget)` |
+| Host controller | Host-owned results UI | Host orchestration using `SwingCompletionSuggestionProvider` or the completion engine directly |
+
+The coordinator lives in optional `ketraterm-ui-swing-host`. Its request/hide port
+leaves provider collection, selection, acceptance and popup lifetime with the host;
+it supplies focus, eligibility, debounce and invalidation. Close the binding before
+rebinding or disposing the terminal, then release host popup resources separately.
+Detach stops observation while leaving explicit presentation to the host.
+
+On the EDT, `copyCellBounds(column, row, destination)` copies the current frame's
+zero-based logical cell into a caller-owned `Rectangle`, using component-local
+pixels, active padding/gutter, bidi mapping and fractional scrolling. Bounds are
+clipped to visible content; unavailable or invalid cells clear the rectangle and
+return false. Hosts perform the component-to-screen conversion for native popups.
+Wide leading and trailing cells each describe one physical grid cell.
+
+Install view-owned diagnostics with `setShellSuggestionFailureHandler` on the
+EDT. Current provider failures are reported once after cleanup; cancellation and
+obsolete requests are excluded. Null restores logging, rebinding retains the
+handler, and disposal releases it. Completion context suppliers execute in the
+caller's context, normally off the EDT; publish immutable host metadata to
+thread-safe storage instead of reading UI state from those suppliers.
+
 ---
 
 ## Sub-Documentation
@@ -89,39 +117,34 @@ For detailed specifications on Swing painting and text pipelines:
 
 ## How to Use
 
-To place a functional, interactive terminal component in your Swing layout, instantiate `SwingTerminal` and bind it to your active `TerminalSession`:
+Call this function on the EDT with a started session, then add the returned component
+to your host's layout. The host retains the component so it can call `dispose()` on
+the EDT when the view closes. Disposal releases view work; it does not close the
+session. The host separately closes the session when the connection should end.
+The published-consumer gate extracts, compiles, and exercises this exact example.
 
+<!-- compiled-example:terminal-view -->
 ```kotlin
 import io.github.ketraterm.session.TerminalSession
 import io.github.ketraterm.ui.swing.api.SwingTerminal
 import io.github.ketraterm.ui.swing.settings.SwingSettings
 import io.github.ketraterm.ui.swing.settings.TerminalTheme
-import java.awt.BorderLayout
-import javax.swing.JComponent
-import javax.swing.JPanel
+import java.awt.Font
+import javax.swing.SwingUtilities
 
-fun createTerminalView(session: TerminalSession): JComponent {
-    val panel = JPanel(BorderLayout())
+fun createTerminalView(session: TerminalSession): SwingTerminal {
+    check(SwingUtilities.isEventDispatchThread()) { "Create terminal views on the EDT" }
 
-    // 1. Define custom, immutable settings (palette, fonts, etc.)
-    val settings = SwingSettings(
-        palette = TerminalTheme.ONE_DARK.createPalette(),
-        fontFamily = "Cascadia Mono",
-        fontSize = 15,
-        columns = 80,
-        rows = 24
-    )
-    
-    // 2. Instantiate the SwingTerminal component
-    val terminalComponent = SwingTerminal(
-        settingsProvider = { settings }
-    )
-    
-    // 3. Bind the component to the active session
-    terminalComponent.bind(session)
-    
-    panel.add(terminalComponent, BorderLayout.CENTER)
-    return panel
+    val settings = SwingSettings.create {
+        it.palette = TerminalTheme.ONE_DARK.createPalette()
+        it.font = Font("Cascadia Mono", Font.PLAIN, 15)
+        it.columns = 80
+        it.rows = 24
+    }
+
+    return SwingTerminal(settingsProvider = { settings }).apply {
+        bind(session)
+    }
 }
 ```
 
@@ -136,8 +159,8 @@ import io.github.ketraterm.ui.swing.api.SwingHostServices
 import io.github.ketraterm.ui.swing.settings.TerminalClipboardHandler
 import io.github.ketraterm.ui.swing.settings.TerminalHyperlinkHandler
 
-val customServices = SwingHostServices(
-    clipboardHandler = object : TerminalClipboardHandler {
+val customServices = SwingHostServices.create {
+    it.clipboardHandler = object : TerminalClipboardHandler {
         override fun copyText(text: String) {
             println("Copying to custom clipboard: $text")
         }
@@ -145,12 +168,12 @@ val customServices = SwingHostServices(
         override fun readText(): String? {
             return "Pasted text"
         }
-    },
-    hyperlinkHandler = TerminalHyperlinkHandler { uri ->
+    }
+    it.hyperlinkHandler = TerminalHyperlinkHandler { uri ->
         println("User clicked hyperlink: $uri")
         true
     }
-)
+}
 ```
 
 ## Hyperlink detector contract and migration
@@ -319,10 +342,10 @@ painting.
 Hyperlink configuration uses the existing immutable DTOs:
 
 ```kotlin
-val settings = SwingSettings(
-    osc8HyperlinkPresentation = myPresentation, // null retains the built-in styles
-    osc8HyperlinkActivation = SwingHyperlinkActivation.DIRECT,
-)
+val settings = SwingSettings.create {
+    it.osc8HyperlinkPresentation = myPresentation // null retains the built-in styles
+    it.osc8HyperlinkActivation = SwingHyperlinkActivation.DIRECT
+}
 val terminal = SwingTerminal(settingsProvider = { settings })
 ```
 

@@ -2,7 +2,7 @@
 
 ## KetraTerm Completion (`:ketraterm-completion`)
 
-The `ketraterm-completion` module defines the dependency-free command-line
+The `ketraterm-completion` module defines the command-line
 completion engine foundation shared by standalone and IDE hosts.
 
 It owns pure request/candidate/spec models, command-line tokenization, bounded
@@ -23,9 +23,9 @@ history candidates. Replay
 history and observed-token inference require an exact profile and canonical
 working-directory match at request time, including exact null context; opaque
 ranking evidence retains its context-fallback semantics.
-Optional local-file storage and write scheduling are supplied by the separate
-`ketraterm-completion-persistence` module, while asynchronous provider
-infrastructure belongs to `ketraterm-completion-host`.
+Hosts own persistent storage. KetraTerm's products use the separate, product-only
+`ketraterm-completion-persistence` module for local-file storage and write scheduling;
+asynchronous filesystem provider support belongs to `ketraterm-completion-host`.
 
 Completion sources such as curated command specs, Fig-style spec importers,
 path providers, and IDE context providers should adapt into this module's stable

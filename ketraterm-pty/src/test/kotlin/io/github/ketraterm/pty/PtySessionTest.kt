@@ -44,6 +44,31 @@ import java.util.concurrent.atomic.AtomicReference
 import kotlin.time.Duration.Companion.seconds
 
 class PtySessionTest {
+    @Test
+    fun `option snapshots detach launch collections and immutable updates preserve the original`() {
+        val command = mutableListOf("shell", "-l")
+        val environment = mutableMapOf("TERM" to "test")
+        val original =
+            PtyOptions.create {
+                it.command = command
+                it.environment = environment
+                it.readBufferSize = 4096
+            }
+        command.clear()
+        environment.clear()
+        assertEquals(listOf("shell", "-l"), original.command)
+        assertEquals(mapOf("TERM" to "test"), original.environment)
+        assertThrows(UnsupportedOperationException::class.java) { (original.command as MutableList<String>).clear() }
+        assertThrows(UnsupportedOperationException::class.java) { (original.environment as MutableMap<String, String>).clear() }
+        val copy = original.copy { it.readBufferSize = 2048 }
+        assertEquals(4096, original.readBufferSize)
+        assertEquals(2048, copy.readBufferSize)
+        assertEquals(original, copy.copy { it.readBufferSize = 4096 })
+        assertThrows(IllegalArgumentException::class.java) { original.copy { it.command = emptyList() } }
+        assertThrows(IllegalArgumentException::class.java) { original.copy { it.readBufferSize = 0 } }
+        assertEquals(original.hashCode(), original.toBuilder().build().hashCode())
+    }
+
     private val sessions = mutableListOf<TerminalSession>()
 
     @ParameterizedTest
@@ -53,7 +78,11 @@ class PtySessionTest {
         val source = MutableStateFlow<TerminalShellCommandLineSnapshot?>(first)
         val process = FakePtyProcess.running()
         val state = TerminalShellIntegrationState()
-        val options = PtyOptions(command = listOf("fake"), shellIntegration = TerminalShellIntegrationFactory.host(state, source))
+        val options =
+            PtyOptions.create { draft ->
+                draft.command = listOf("fake")
+                draft.shellIntegration = TerminalShellIntegrationFactory.host(state, source)
+            }
         val factory = FixedProcessFactory(process)
         val session = if (startImmediately) PtySessions.start(options, factory) else PtySessions.create(options, factory)
         sessions += session
@@ -76,10 +105,10 @@ class PtySessionTest {
     @Test
     fun `PTY options require selected shell integration before starting a startup command`() {
         assertThrows(IllegalArgumentException::class.java) {
-            PtyOptions(
-                command = listOf("fake"),
-                startupCommand = TerminalStartupCommand("echo ready"),
-            )
+            PtyOptions.create { draft ->
+                draft.command = listOf("fake")
+                draft.startupCommand = TerminalStartupCommand("echo ready")
+            }
         }
     }
 
@@ -91,11 +120,11 @@ class PtySessionTest {
         val process = FakePtyProcess.running(expectedOutputBytes = expected.length)
         val session =
             PtySessions.start(
-                PtyOptions(
-                    command = listOf("fake"),
-                    startupCommand = TerminalStartupCommand("echo ready"),
-                    shellIntegration = TerminalShellIntegrationFactory.host(state, promptReady = ready),
-                ),
+                PtyOptions.create { draft ->
+                    draft.command = listOf("fake")
+                    draft.startupCommand = TerminalStartupCommand("echo ready")
+                    draft.shellIntegration = TerminalShellIntegrationFactory.host(state, promptReady = ready)
+                },
                 FixedProcessFactory(process),
             )
         sessions += session
@@ -122,7 +151,10 @@ class PtySessionTest {
         val process = FakePtyProcess.running(inputBytes = output.ascii())
         val session =
             PtySessions.start(
-                PtyOptions(command = listOf("fake"), shellIntegration = if (integrationEnabled) OscShellIntegration else null),
+                PtyOptions.create { draft ->
+                    draft.command = listOf("fake")
+                    draft.shellIntegration = if (integrationEnabled) OscShellIntegration else null
+                },
                 FixedProcessFactory(process),
             )
         sessions += session
@@ -141,7 +173,11 @@ class PtySessionTest {
         val process = FakePtyProcess.running(inputBytes = "\u001b[6n".ascii())
         val session =
             PtySessions.create(
-                PtyOptions(command = listOf("fake"), columns = 10, rows = 3),
+                PtyOptions.create { draft ->
+                    draft.command = listOf("fake")
+                    draft.columns = 10
+                    draft.rows = 3
+                },
                 FixedProcessFactory(process),
             )
         sessions += session
@@ -154,7 +190,13 @@ class PtySessionTest {
     @Test
     fun closingAnUnstartedSessionDestroysItsProcess() {
         val process = FakePtyProcess.running()
-        val session = PtySessions.create(PtyOptions(command = listOf("fake")), FixedProcessFactory(process))
+        val session =
+            PtySessions.create(
+                PtyOptions.create { draft ->
+                    draft.command = listOf("fake")
+                },
+                FixedProcessFactory(process),
+            )
         sessions += session
         assertSame(TerminalSessionState.Created, session.state.value)
         session.close()
@@ -169,7 +211,12 @@ class PtySessionTest {
         assertSame(
             failure,
             assertThrows(IOException::class.java) {
-                PtySessions.start(PtyOptions(command = listOf("fake")), FixedProcessFactory(process))
+                PtySessions.start(
+                    PtyOptions.create { draft ->
+                        draft.command = listOf("fake")
+                    },
+                    FixedProcessFactory(process),
+                )
             },
         )
         assertTrue(process.destroyed)
@@ -213,14 +260,14 @@ class PtySessionTest {
         val session =
             startSession(
                 options =
-                    PtyOptions(
-                        command = listOf("fake"),
-                        eventListener = listener,
-                        hostPolicy =
+                    PtyOptions.create { draft ->
+                        draft.command = listOf("fake")
+                        draft.eventListener = listener
+                        draft.hostPolicy =
                             HostPolicy(
                                 clipboardPolicy = TerminalClipboardPolicy(readPermission = TerminalClipboardPermission.ALLOW),
-                            ),
-                    ),
+                            )
+                    },
                 processFactory = FixedProcessFactory(process),
             )
         process.awaitWrite()
@@ -250,12 +297,12 @@ class PtySessionTest {
         val session =
             startSession(
                 options =
-                    PtyOptions(
-                        command = listOf("fake"),
-                        columns = 10,
-                        rows = 3,
-                        readerThreadName = "terminal-pty-test-reader",
-                    ),
+                    PtyOptions.create { draft ->
+                        draft.command = listOf("fake")
+                        draft.columns = 10
+                        draft.rows = 3
+                        draft.readerThreadName = "terminal-pty-test-reader"
+                    },
                 processFactory = FixedProcessFactory(process),
             )
 
@@ -269,7 +316,12 @@ class PtySessionTest {
         val expected = "\u001B[1;1R\u001B[0n"
         val process = FakePtyProcess.running(inputBytes = "\u001B[6n\u001B[5n".ascii(), expectedOutputBytes = expected.length)
         startSession(
-            options = PtyOptions(command = listOf("fake"), columns = 10, rows = 3),
+            options =
+                PtyOptions.create { draft ->
+                    draft.command = listOf("fake")
+                    draft.columns = 10
+                    draft.rows = 3
+                },
             processFactory = FixedProcessFactory(process),
         )
 
@@ -291,7 +343,11 @@ class PtySessionTest {
         for (invalid in listOf(-1, 8)) {
             assertThrows(IllegalArgumentException::class.java) {
                 startSession(
-                    options = PtyOptions(command = listOf("fake"), modeReportCapabilities = invalid),
+                    options =
+                        PtyOptions.create { draft ->
+                            draft.command = listOf("fake")
+                            draft.modeReportCapabilities = invalid
+                        },
                     processFactory = factory,
                 )
             }
@@ -305,7 +361,13 @@ class PtySessionTest {
             val process = FakePtyProcess.running(inputBytes = "\u001B[?1043h\u001B[?1043\$p".ascii())
 
             startSession(
-                options = PtyOptions(command = listOf("fake"), columns = 10, rows = 3, modeReportCapabilities = capabilities),
+                options =
+                    PtyOptions.create { draft ->
+                        draft.command = listOf("fake")
+                        draft.columns = 10
+                        draft.rows = 3
+                        draft.modeReportCapabilities = capabilities
+                    },
                 processFactory = FixedProcessFactory(process),
             )
             process.awaitWrite()
@@ -318,7 +380,12 @@ class PtySessionTest {
         val process = FakePtyProcess.running()
         val session =
             startSession(
-                options = PtyOptions(command = listOf("fake"), columns = 10, rows = 3),
+                options =
+                    PtyOptions.create { draft ->
+                        draft.command = listOf("fake")
+                        draft.columns = 10
+                        draft.rows = 3
+                    },
                 processFactory = FixedProcessFactory(process),
             )
 
@@ -335,17 +402,17 @@ class PtySessionTest {
         val session =
             startSession(
                 options =
-                    PtyOptions(
-                        command = listOf("fake"),
-                        columns = 10,
-                        rows = 3,
-                        eventListener =
+                    PtyOptions.create { draft ->
+                        draft.command = listOf("fake")
+                        draft.columns = 10
+                        draft.rows = 3
+                        draft.eventListener =
                             object : PtyEventListener by PtyEventListener.NONE {
                                 override fun bell(session: TerminalSession) {
                                     modeApplied.countDown()
                                 }
-                            },
-                    ),
+                            }
+                    },
                 processFactory = FixedProcessFactory(process),
             )
 
@@ -362,7 +429,12 @@ class PtySessionTest {
         val process = FakePtyProcess.running()
         val session =
             startSession(
-                options = PtyOptions(command = listOf("fake"), columns = 10, rows = 3),
+                options =
+                    PtyOptions.create { draft ->
+                        draft.command = listOf("fake")
+                        draft.columns = 10
+                        draft.rows = 3
+                    },
                 processFactory = FixedProcessFactory(process),
             )
 
@@ -377,7 +449,12 @@ class PtySessionTest {
         val process = FakePtyProcess.running()
         val session =
             startSession(
-                options = PtyOptions(command = listOf("fake"), columns = 10, rows = 3),
+                options =
+                    PtyOptions.create { draft ->
+                        draft.command = listOf("fake")
+                        draft.columns = 10
+                        draft.rows = 3
+                    },
                 processFactory = FixedProcessFactory(process),
             )
 
@@ -396,12 +473,12 @@ class PtySessionTest {
         val session =
             startSession(
                 options =
-                    PtyOptions(
-                        command = listOf("fake"),
-                        columns = 6,
-                        rows = 2,
-                        treatAmbiguousAsWide = true,
-                    ),
+                    PtyOptions.create { draft ->
+                        draft.command = listOf("fake")
+                        draft.columns = 6
+                        draft.rows = 2
+                        draft.treatAmbiguousAsWide = true
+                    },
                 processFactory = FixedProcessFactory(process),
             )
 
@@ -421,7 +498,12 @@ class PtySessionTest {
         val process = FakePtyProcess.running()
         val session =
             startSession(
-                options = PtyOptions(command = listOf("fake"), columns = 10, rows = 3),
+                options =
+                    PtyOptions.create { draft ->
+                        draft.command = listOf("fake")
+                        draft.columns = 10
+                        draft.rows = 3
+                    },
                 processFactory = FixedProcessFactory(process),
             )
 
@@ -436,7 +518,12 @@ class PtySessionTest {
         val process = FakePtyProcess(inputBytes = ByteArray(0), exitCode = 7)
         val session =
             startSession(
-                options = PtyOptions(command = listOf("fake"), columns = 10, rows = 3),
+                options =
+                    PtyOptions.create { draft ->
+                        draft.command = listOf("fake")
+                        draft.columns = 10
+                        draft.rows = 3
+                    },
                 processFactory = FixedProcessFactory(process),
             )
 
@@ -452,13 +539,13 @@ class PtySessionTest {
         val session =
             startSession(
                 options =
-                    PtyOptions(
-                        command = listOf("fake"),
-                        columns = 200,
-                        rows = 120,
-                        maxHistory = 200,
-                        readBufferSize = 17,
-                    ),
+                    PtyOptions.create { draft ->
+                        draft.command = listOf("fake")
+                        draft.columns = 200
+                        draft.rows = 120
+                        draft.maxHistory = 200
+                        draft.readBufferSize = 17
+                    },
                 processFactory = FixedProcessFactory(process),
             )
 
@@ -475,12 +562,12 @@ class PtySessionTest {
         val session =
             startSession(
                 options =
-                    PtyOptions(
-                        command = listOf("fake"),
-                        columns = 10,
-                        rows = 3,
-                        eventListener = listener,
-                    ),
+                    PtyOptions.create { draft ->
+                        draft.command = listOf("fake")
+                        draft.columns = 10
+                        draft.rows = 3
+                        draft.eventListener = listener
+                    },
                 processFactory = FixedProcessFactory(process),
             )
 
@@ -509,7 +596,11 @@ class PtySessionTest {
         val process = FakePtyProcess(inputBytes = "\u0007".ascii())
         val session =
             startSession(
-                options = PtyOptions(command = listOf("fake"), eventListener = listener),
+                options =
+                    PtyOptions.create { draft ->
+                        draft.command = listOf("fake")
+                        draft.eventListener = listener
+                    },
                 processFactory = FixedProcessFactory(process),
             )
 

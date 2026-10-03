@@ -19,12 +19,12 @@ import io.github.ketraterm.render.api.TerminalRenderBufferKind
 import io.github.ketraterm.render.cache.TerminalRenderCache
 import io.github.ketraterm.session.TerminalShellIntegrationCommandLifecycle
 import io.github.ketraterm.session.TerminalShellIntegrationCommandRecord
-import io.github.ketraterm.session.TerminalShellIntegrationState
+import io.github.ketraterm.session.TerminalShellIntegrationView
 
 /**
  * Renderer-local snapshot of shell integration decorations for one viewport.
  *
- * The shared [TerminalShellIntegrationState] is the selected integration's command
+ * The shared [TerminalShellIntegrationView] is the selected integration's command
  * projection. Swing copies the visible rows into these primitive arrays before
  * painting so the row paint loop performs only array lookups.
  */
@@ -49,7 +49,7 @@ internal class TerminalShellIntegrationViewportDecorations {
      * @return true when any visible decoration flag changed.
      */
     fun updateFrom(
-        state: TerminalShellIntegrationState,
+        state: TerminalShellIntegrationView,
         cache: TerminalRenderCache,
     ): Boolean {
         ensureCapacity(cache.rows)

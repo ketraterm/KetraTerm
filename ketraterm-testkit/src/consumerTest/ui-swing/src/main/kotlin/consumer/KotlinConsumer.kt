@@ -15,7 +15,10 @@
  */
 package consumer
 
+import consumer.documentation.createTerminalView
 import io.github.ketraterm.core.TerminalBuffers
+import io.github.ketraterm.core.api.TerminalBuffer
+import io.github.ketraterm.core.api.TerminalRenderBuffer
 import io.github.ketraterm.host.TerminalClipboardPermission
 import io.github.ketraterm.host.TerminalClipboardReadAuditEvent
 import io.github.ketraterm.host.TerminalClipboardReadOutcome
@@ -42,6 +45,7 @@ import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
 import kotlinx.coroutines.yield
 import java.awt.Cursor
+import java.awt.Rectangle
 import java.awt.event.MouseEvent
 import java.io.ByteArrayOutputStream
 import java.util.concurrent.Callable
@@ -59,46 +63,92 @@ private const val ROWS = 3
 fun main() =
     runBlocking {
         JavaConsumer.verify()
+        JavaConsumer.verifySessionConstruction(ConsumerConnector())
         val selection = checkNotNull(TerminalClipboardSelection.parse("cp"))
         JavaConsumer.verifyClipboardCallbacks(
             TerminalClipboardReadRequest(selection, TerminalClipboardPermission.ALLOW, 16),
             TerminalClipboardReadAuditEvent(selection, TerminalClipboardReadOutcome.SENT),
         )
         val connector = ConsumerConnector()
+        val rejectedListener =
+            object : TerminalConnectorListener {
+                override fun onBytes(
+                    bytes: ByteArray,
+                    offset: Int,
+                    length: Int,
+                ) = error("rejected listener received bytes")
+
+                override fun onClosed(exitCode: Int?) = error("rejected listener received closure")
+
+                override fun onError(error: Throwable) = throw error
+            }
+        val closedConnector = ConsumerConnector().apply { close() }
+        check(runCatching { closedConnector.start(rejectedListener) }.exceptionOrNull() is IllegalStateException)
         val detector = ConsumerHyperlinkDetector()
         val commandLine = MutableStateFlow<TerminalShellCommandLineSnapshot?>(TerminalShellCommandLineSnapshot("help", 4, 4, 0))
-        val shell = TerminalShellIntegrationFactory.host(TerminalShellIntegrationState(), commandLine)
-        TerminalSession.create(TerminalBuffers.create(COLUMNS, ROWS), connector, shellIntegration = shell).use { session ->
+        val shellProducer = TerminalShellIntegrationState()
+        val shell = TerminalShellIntegrationFactory.host(shellProducer, commandLine)
+        val backing = TerminalBuffers.create(COLUMNS, ROWS)
+        val renderBuffer: TerminalRenderBuffer = object : TerminalRenderBuffer by backing {}
+        val coreOnly: TerminalBuffer = object : TerminalBuffer by renderBuffer {}
+        val assembledSession =
+            TerminalSession.create(
+                coreOnly,
+                renderBuffer,
+                connector,
+                shellIntegration = shell,
+                inputEncoderFactory = JavaConsumer.inputEncoderFactory(),
+                parserFactory = JavaConsumer.parserFactory(),
+            )
+        assembledSession.use { session ->
+            val shellView: io.github.ketraterm.session.TerminalShellIntegrationView = session.shellIntegrationState
+            check(shellView === shellProducer)
+            shellProducer.recordCurrentWorkingDirectory("file:///consumer")
+            check(shellView.currentWorkingDirectoryUri() == "file:///consumer")
             check(session.activeShellCommandLine() == commandLine.value)
             commandLine.value = null
             check(session.activeShellCommandLine() == null)
             session.start(COLUMNS, ROWS)
+            check(runCatching { connector.start(rejectedListener) }.exceptionOrNull() is IllegalStateException)
             withTimeout(20_000) { session.renderGeneration.first { it >= 0L } }
+            check(runCatching { createTerminalView(session) }.exceptionOrNull() is IllegalStateException)
+            onEdt {
+                check(SwingSettings().useSystemFallbackFonts)
+                val documentedView = createTerminalView(session)
+                try {
+                    check(documentedView.preferredSize.width > 0)
+                } finally {
+                    documentedView.dispose()
+                }
+            }
+            check(!session.isClosed && !connector.closed.get())
             val terminal =
                 onEdt {
                     SwingTerminal(
                         SwingSettingsProvider {
-                            SwingSettings(
-                                columns = COLUMNS,
-                                rows = ROWS,
-                                padding = SwingPadding(),
-                                shellIntegrationDecorationGutterWidth = 0,
-                                osc8HyperlinkActivation = SwingHyperlinkActivation.DIRECT,
-                                osc8HyperlinkPresentation =
+                            SwingSettings.create { draft ->
+                                draft.columns = COLUMNS
+                                draft.rows = ROWS
+                                draft.padding = SwingPadding()
+                                draft.shellIntegrationDecorationGutterWidth = 0
+                                draft.osc8HyperlinkActivation = SwingHyperlinkActivation.DIRECT
+                                draft.osc8HyperlinkPresentation =
                                     SwingHyperlinkPresentation(
                                         normal = SwingHyperlinkStyle(underlineStyle = TerminalRenderUnderline.DOTTED),
-                                    ),
-                            )
+                                    )
+                            }
                         },
-                        SwingHostServices(hyperlinkDetector = detector, scrollbarOverlayEnabled = false),
+                        SwingHostServices.create { draft ->
+                            draft.hyperlinkDetector = detector
+                            draft.scrollbarOverlayEnabled = false
+                        },
                     ).apply { size = preferredSize }
                 }
             try {
                 onEdt {
                     val original = SwingSettings()
-                    val updated = original.copy(cursorBlinkMillis = 0)
-                    val (font, fallbackFonts) = updated
-                    check(font == original.font && fallbackFonts == original.fallbackFonts)
+                    val updated = original.copy { it.cursorBlinkMillis = 0 }
+                    check(updated.font == original.font && updated.fallbackFonts == original.fallbackFonts)
                     check(updated.cursorBlinkMillis == 0 && updated.padding == original.padding)
                     terminal.bind(session)
                     terminal.dispatchPointer(MouseEvent.MOUSE_MOVED)
@@ -106,12 +156,20 @@ fun main() =
                 // Entry acknowledges installation in the view, not merely completion of detection.
                 withTimeout(20_000) { detector.initialHover.await() }
                 checkNotNull(
-                    session.renderPublisher.readCurrent { frame ->
+                    session.readPublishedFrame { frame ->
                         check(frame.hasFrame && frame.columns == COLUMNS && frame.rows >= ROWS)
                         for (column in URL.indices) check(frame.codeWords[column] == URL[column].code)
                     },
                 )
+
+                fun firstCell(): Int {
+                    session.readPublishedFrame { return it.codeWords[0] }
+                    error("Published frame missing")
+                }
+                check(firstCell() == URL[0].code)
                 onEdt {
+                    val bounds = Rectangle()
+                    check(terminal.copyCellBounds(0, 0, bounds) && bounds.width > 0 && bounds.height > 0)
                     check(terminal.cursor.type == Cursor.HAND_CURSOR)
                     terminal.dispatchPointer(MouseEvent.MOUSE_PRESSED, MouseEvent.BUTTON1)
                     terminal.dispatchPointer(MouseEvent.MOUSE_RELEASED, MouseEvent.BUTTON1)
@@ -209,9 +267,12 @@ private class ConsumerHyperlinkDetector : SwingHyperlinkDetector {
 
 private class ConsumerConnector : TerminalConnector {
     val closed = AtomicBoolean()
+    private val started = AtomicBoolean()
     private val input = ByteArrayOutputStream()
 
     override fun start(listener: TerminalConnectorListener) {
+        check(!closed.get()) { "connector is closed" }
+        check(started.compareAndSet(false, true)) { "connector already started" }
         val bytes = "$URL\r\n".toByteArray()
         listener.onBytes(bytes, 0, bytes.size)
     }

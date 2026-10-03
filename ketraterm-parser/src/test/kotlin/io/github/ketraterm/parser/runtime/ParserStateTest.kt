@@ -38,11 +38,6 @@ class ParserStateTest {
         state.privateMarker = '?'.code
     }
 
-    private fun dirtyUtf8State(state: ParserState) {
-        state.utf8State = 7
-        state.utf8Codepoint = 0x1F600
-    }
-
     private fun dirtyClusterState(state: ParserState) {
         state.clusterBuffer[0] = 'a'.code
         state.clusterBuffer[1] = 0x0301
@@ -78,7 +73,6 @@ class ParserStateTest {
     private fun dirtyEverything(state: ParserState) {
         state.fsmState = AnsiState.DCS_PASSTHROUGH
         dirtySequenceState(state)
-        dirtyUtf8State(state)
         dirtyClusterState(state)
         dirtyCharsetState(state)
         dirtyPayloadState(state)
@@ -93,13 +87,6 @@ class ParserStateTest {
             { assertEquals(0, state.intermediates) },
             { assertEquals(0, state.intermediateCount) },
             { assertEquals(0, state.privateMarker) },
-        )
-    }
-
-    private fun assertDefaultUtf8State(state: ParserState) {
-        assertAll(
-            { assertEquals(0, state.utf8State) },
-            { assertEquals(0, state.utf8Codepoint) },
         )
     }
 
@@ -161,7 +148,6 @@ class ParserStateTest {
                 { assertEquals(ParserState.DEFAULT_MAX_CLUSTER_CODEPOINTS, state.clusterBuffer.size) },
                 { assertEquals(ParserState.DEFAULT_MAX_PAYLOAD_BYTES, state.payloadBuffer.size) },
                 { assertDefaultSequenceState(state) },
-                { assertDefaultUtf8State(state) },
                 { assertDefaultClusterState(state) },
                 { assertDefaultCharsetState(state) },
                 { assertDefaultPayloadState(state) },
@@ -347,7 +333,6 @@ class ParserStateTest {
 
             assertAll(
                 { assertEquals(AnsiState.DCS_PASSTHROUGH, state.fsmState) },
-                { assertEquals(7, state.utf8State) },
                 { assertEquals(2, state.clusterLength) },
                 { assertEquals(1, state.glSlot) },
                 { assertEquals(3, state.payloadLength) },
@@ -404,7 +389,6 @@ class ParserStateTest {
             assertAll(
                 { assertEquals(AnsiState.DCS_PASSTHROUGH, state.fsmState) },
                 { assertEquals(3, state.paramCount) },
-                { assertEquals(7, state.utf8State) },
                 { assertEquals(2, state.clusterLength) },
                 { assertEquals(1, state.glSlot) },
             )
@@ -458,8 +442,6 @@ class ParserStateTest {
 
             assertAll(
                 { assertEquals(AnsiState.DCS_PASSTHROUGH, state.fsmState) },
-                { assertEquals(7, state.utf8State) },
-                { assertEquals(0x1F600, state.utf8Codepoint) },
                 { assertEquals(3, state.paramCount) },
                 { assertEquals(1, state.glSlot) },
                 { assertEquals(3, state.payloadLength) },
@@ -474,48 +456,6 @@ class ParserStateTest {
             state.clearActiveClusterAfterFlush()
 
             assertDefaultClusterState(state)
-        }
-    }
-
-    // ----- resetUtf8State ---------------------------------------------------
-
-    @Nested
-    @DisplayName("resetUtf8State")
-    inner class ResetUtf8State {
-        @Test
-        fun `resets decoder progress and partial codepoint`() {
-            val state = ParserState()
-            dirtyUtf8State(state)
-
-            state.resetUtf8State()
-
-            assertDefaultUtf8State(state)
-        }
-
-        @Test
-        fun `does not clear active cluster or parser accumulators`() {
-            val state = ParserState()
-            dirtyEverything(state)
-
-            state.resetUtf8State()
-
-            assertAll(
-                { assertEquals(2, state.clusterLength) },
-                { assertEquals(3, state.paramCount) },
-                { assertEquals(1, state.glSlot) },
-                { assertEquals(3, state.payloadLength) },
-                { assertEquals(AnsiState.DCS_PASSTHROUGH, state.fsmState) },
-            )
-        }
-
-        @Test
-        fun `is idempotent`() {
-            val state = ParserState()
-
-            state.resetUtf8State()
-            state.resetUtf8State()
-
-            assertDefaultUtf8State(state)
         }
     }
 
@@ -544,7 +484,6 @@ class ParserStateTest {
             assertAll(
                 { assertEquals(AnsiState.DCS_PASSTHROUGH, state.fsmState) },
                 { assertEquals(3, state.paramCount) },
-                { assertEquals(7, state.utf8State) },
                 { assertEquals(2, state.clusterLength) },
                 { assertEquals(3, state.payloadLength) },
             )
@@ -576,7 +515,6 @@ class ParserStateTest {
             assertAll(
                 { assertEquals(AnsiState.GROUND, state.fsmState) },
                 { assertDefaultSequenceState(state) },
-                { assertDefaultUtf8State(state) },
                 { assertDefaultClusterState(state) },
                 { assertDefaultCharsetState(state) },
                 { assertDefaultPayloadState(state) },
@@ -628,7 +566,6 @@ class ParserStateTest {
             assertAll(
                 { assertEquals(AnsiState.GROUND, state.fsmState) },
                 { assertDefaultSequenceState(state) },
-                { assertDefaultUtf8State(state) },
                 { assertDefaultClusterState(state) },
                 { assertDefaultCharsetState(state) },
                 { assertDefaultPayloadState(state) },

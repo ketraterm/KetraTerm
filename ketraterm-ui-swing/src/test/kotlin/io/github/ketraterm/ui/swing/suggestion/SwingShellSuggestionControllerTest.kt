@@ -16,13 +16,45 @@
 package io.github.ketraterm.ui.swing.suggestion
 
 import io.github.ketraterm.ui.swing.settings.SwingSettings
+import kotlinx.coroutines.CancellationException
 import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.Test
+import org.junit.jupiter.params.ParameterizedTest
+import org.junit.jupiter.params.provider.ValueSource
 import java.awt.event.KeyEvent
 import javax.swing.JPanel
 
 class SwingShellSuggestionControllerTest {
     private val source = JPanel()
+
+    @Test
+    fun `reentrant replacement owns the popup state and publication`() =
+        onEdt {
+            val host = RecordingSuggestionHost()
+            lateinit var controller: SwingShellSuggestionController
+            var replace = true
+            val replacement = suggestions(2)
+            val replacementRequest = request(anchorColumn = 8, anchorRow = 3)
+            val view =
+                object : SwingShellSuggestionView {
+                    override val component = JPanel()
+
+                    override fun update(snapshot: SwingShellSuggestionViewSnapshot) {
+                        assertTrue(controller.state().visible, "State must be committed before notifying the host view")
+                        if (replace) {
+                            replace = false
+                            assertTrue(controller.show(replacementRequest, replacement, 1))
+                        }
+                    }
+                }
+            controller = SwingShellSuggestionController(host, viewFactory = { view })
+            assertFalse(controller.show(request(), suggestions(3), 0), "The outer show was superseded")
+            assertSame(replacement[1], controller.state().selectedSuggestion)
+            assertEquals(8, controller.state().anchorColumn)
+            assertEquals(3, controller.state().anchorRow)
+            assertEquals(1, host.revalidations)
+            assertEquals(1, host.repaints)
+        }
 
     @Test
     fun `master off rejects keyboard and pointer acceptance of an existing popup`() =
@@ -34,7 +66,10 @@ class SwingShellSuggestionControllerTest {
                     RecordingSuggestionView(listener).also { view = it }
                 })
             controller.show(request(), suggestions(2), selectedIndex = 0)
-            host.settings = host.settings.copy(smartSuggestionsEnabled = false)
+            host.settings =
+                host.settings.copy { draft ->
+                    draft.smartSuggestionsEnabled = false
+                }
             assertFalse(controller.handleKeyPressed(keyPressed(KeyEvent.VK_TAB)))
             view.listener.onSuggestionClicked(0)
             assertTrue(host.acceptedSuggestions.isEmpty())
@@ -98,7 +133,14 @@ class SwingShellSuggestionControllerTest {
     @Test
     fun `explicit display is independent of automatic suggestion setting`() =
         onEdt {
-            val host = RecordingSuggestionHost(settings = SwingSettings(smartSuggestionsEnabled = true, shellSuggestionsEnabled = false))
+            val host =
+                RecordingSuggestionHost(
+                    settings =
+                        SwingSettings.create { draft ->
+                            draft.smartSuggestionsEnabled = true
+                            draft.shellSuggestionsEnabled = false
+                        },
+                )
             val controller = SwingShellSuggestionController(host)
 
             val shown = controller.show(request(), suggestions(2), selectedIndex = 0)
@@ -342,7 +384,11 @@ class SwingShellSuggestionControllerTest {
         onEdt {
             val host =
                 RecordingSuggestionHost(
-                    settings = SwingSettings(smartSuggestionsEnabled = true, acceptSelectedSuggestionWithEnter = false),
+                    settings =
+                        SwingSettings.create { draft ->
+                            draft.smartSuggestionsEnabled = true
+                            draft.acceptSelectedSuggestionWithEnter = false
+                        },
                 )
             val controller = SwingShellSuggestionController(host)
             val items = suggestions(2)
@@ -560,6 +606,166 @@ class SwingShellSuggestionControllerTest {
             assertEquals(-1, controller.state().selectedIndex)
         }
 
+    @ParameterizedTest
+    @ValueSource(booleans = [false, true])
+    fun `hide completes cleanup and permits reuse when the host view update fails`(cancelled: Boolean) =
+        onEdt {
+            val host = RecordingSuggestionHost()
+            lateinit var view: RecordingSuggestionView
+            val controller =
+                SwingShellSuggestionController(host, viewFactory = { listener ->
+                    RecordingSuggestionView(listener).also { view = it }
+                })
+            assertTrue(controller.show(request(), suggestions(2), selectedIndex = 1))
+            assertTrue(view.component.isVisible)
+            val revalidations = host.revalidations
+            val repaints = host.repaints
+            val failure = if (cancelled) CancellationException("hide cancelled") else IllegalStateException("hide failed")
+            view.updateFailure = failure
+
+            assertSame(failure, assertThrows(RuntimeException::class.java) { controller.hide() })
+            assertAll(
+                { assertFalse(view.component.isVisible, "The old popup must be hidden despite the failed visual update") },
+                { assertEquals(SwingShellSuggestionState.EMPTY, controller.state()) },
+                { assertEquals(revalidations + 1, host.revalidations) },
+                { assertEquals(repaints + 1, host.repaints) },
+                { assertEquals(0, view.closeCount, "Hiding must leave the host view available for reuse") },
+                { assertTrue(failure.suppressed.isEmpty()) },
+            )
+
+            view.updateFailure = null
+            val replacement = suggestions(1)
+            assertTrue(controller.show(request(commandText = "next"), replacement, selectedIndex = 0))
+            assertTrue(view.component.isVisible)
+            assertEquals(replacement, view.suggestions)
+            assertSame(replacement.single(), controller.state().selectedSuggestion)
+            assertEquals(0, view.closeCount)
+            assertTrue(controller.hide())
+        }
+
+    @Test
+    fun `hide preserves the view update failure and suppresses later host cleanup failures in order`() =
+        onEdt {
+            val host = RecordingSuggestionHost()
+            lateinit var view: RecordingSuggestionView
+            val controller =
+                SwingShellSuggestionController(host, viewFactory = { listener ->
+                    RecordingSuggestionView(listener).also { view = it }
+                })
+            assertTrue(controller.show(request(), suggestions(2), selectedIndex = 0))
+            val revalidations = host.revalidations
+            val repaints = host.repaints
+            val updateFailure = IllegalStateException("hide failed")
+            val revalidationFailure = IllegalArgumentException("revalidation failed")
+            val repaintFailure = IllegalStateException("repaint failed")
+            view.updateFailure = updateFailure
+            host.revalidationFailure = revalidationFailure
+            host.repaintFailure = repaintFailure
+
+            assertSame(updateFailure, assertThrows(IllegalStateException::class.java) { controller.hide() })
+            assertAll(
+                { assertFalse(view.component.isVisible) },
+                { assertEquals(SwingShellSuggestionState.EMPTY, controller.state()) },
+                { assertEquals(revalidations + 1, host.revalidations) },
+                { assertEquals(repaints + 1, host.repaints) },
+                { assertEquals(0, view.closeCount) },
+                { assertEquals(listOf(revalidationFailure, repaintFailure), updateFailure.suppressed.toList()) },
+            )
+        }
+
+    @Test
+    fun `close releases the host view when hiding update fails`() =
+        onEdt {
+            lateinit var view: RecordingSuggestionView
+            val controller =
+                SwingShellSuggestionController(RecordingSuggestionHost(), viewFactory = { listener ->
+                    RecordingSuggestionView(listener).also { view = it }
+                })
+            controller.show(request(), suggestions(2), selectedIndex = 0)
+            val failure = IllegalStateException("hide failed")
+            view.updateFailure = failure
+
+            val thrown = assertThrows(IllegalStateException::class.java) { controller.close() }
+
+            assertSame(failure, thrown)
+            assertEquals(1, view.closeCount)
+            assertTrue(thrown.suppressed.isEmpty())
+        }
+
+    @Test
+    fun `close preserves the hiding failure and suppresses the host view close failure`() =
+        onEdt {
+            lateinit var view: RecordingSuggestionView
+            val controller =
+                SwingShellSuggestionController(RecordingSuggestionHost(), viewFactory = { listener ->
+                    RecordingSuggestionView(listener).also { view = it }
+                })
+            controller.show(request(), suggestions(2), selectedIndex = 0)
+            val hidingFailure = IllegalStateException("hide failed")
+            val closeFailure = IllegalArgumentException("close failed")
+            view.updateFailure = hidingFailure
+            view.closeFailure = closeFailure
+
+            val thrown = assertThrows(IllegalStateException::class.java) { controller.close() }
+
+            assertSame(hidingFailure, thrown)
+            assertEquals(1, view.closeCount)
+            assertEquals(1, thrown.suppressed.size)
+            assertSame(closeFailure, thrown.suppressed.single())
+        }
+
+    @ParameterizedTest
+    @ValueSource(strings = ["cancellation", "error", "reused"])
+    fun `close completes cleanup preserving cancellation errors and reused failures`(kind: String) =
+        onEdt {
+            lateinit var view: RecordingSuggestionView
+            val controller =
+                SwingShellSuggestionController(RecordingSuggestionHost(), viewFactory = { listener ->
+                    RecordingSuggestionView(listener).also { view = it }
+                })
+            controller.show(request(), suggestions(2), selectedIndex = 0)
+            val first =
+                when (kind) {
+                    "cancellation" -> CancellationException("hide cancelled")
+                    "error" -> AssertionError("hide failed")
+                    "reused" -> IllegalStateException("shared failure")
+                    else -> error("Unexpected kind $kind")
+                }
+            val later = if (kind == "reused") first else IllegalArgumentException("close failed")
+            view.updateFailure = first
+            view.closeFailure = later
+
+            assertSame(first, assertThrows(Throwable::class.java) { controller.close() })
+            assertEquals(1, view.closeCount)
+            assertFalse(view.component.isVisible)
+            assertFalse(controller.state().visible)
+            if (kind == "reused") {
+                assertTrue(first.suppressed.isEmpty(), "Reusing the primary exception must not cause self-suppression")
+            } else {
+                assertEquals(1, first.suppressed.size)
+                assertSame(later, first.suppressed.single())
+            }
+        }
+
+    @Test
+    fun `close propagates a view close failure after successful hiding`() =
+        onEdt {
+            lateinit var view: RecordingSuggestionView
+            val controller =
+                SwingShellSuggestionController(RecordingSuggestionHost(), viewFactory = { listener ->
+                    RecordingSuggestionView(listener).also { view = it }
+                })
+            controller.show(request(), suggestions(2), selectedIndex = 0)
+            val failure = CancellationException("close cancelled")
+            view.closeFailure = failure
+
+            assertSame(failure, assertThrows(CancellationException::class.java) { controller.close() })
+            assertEquals(1, view.closeCount)
+            assertFalse(view.component.isVisible)
+            assertEquals(SwingShellSuggestionViewSnapshot.EMPTY, view.snapshot)
+            assertTrue(failure.suppressed.isEmpty())
+        }
+
     private fun onEdt(block: () -> Unit) {
         javax.swing.SwingUtilities.invokeAndWait(block)
     }
@@ -616,7 +822,10 @@ class SwingShellSuggestionControllerTest {
         )
 
     private class RecordingSuggestionHost(
-        override var settings: SwingSettings = SwingSettings(smartSuggestionsEnabled = true),
+        override var settings: SwingSettings =
+            SwingSettings.create { draft ->
+                draft.smartSuggestionsEnabled = true
+            },
         override val suggestionKeymap: SwingShellSuggestionKeymap = SwingShellSuggestionKeymap.STANDARD,
         private val failAcceptance: Boolean = false,
     ) : SwingShellSuggestionHost {
@@ -629,6 +838,8 @@ class SwingShellSuggestionControllerTest {
         var revalidations = 0
         var repaints = 0
         var invalidations = 0
+        var revalidationFailure: Throwable? = null
+        var repaintFailure: Throwable? = null
 
         override val suggestionHandler: SwingShellSuggestionHandler =
             SwingShellSuggestionHandler { acceptance ->
@@ -646,10 +857,12 @@ class SwingShellSuggestionControllerTest {
 
         override fun revalidate() {
             revalidations++
+            revalidationFailure?.let { throw it }
         }
 
         override fun repaint() {
             repaints++
+            repaintFailure?.let { throw it }
         }
 
         override fun requestFocusInWindow(): Boolean {
@@ -674,11 +887,21 @@ class SwingShellSuggestionControllerTest {
             private set
         var snapshot: SwingShellSuggestionViewSnapshot = SwingShellSuggestionViewSnapshot.EMPTY
             private set
+        var updateFailure: Throwable? = null
+        var closeFailure: Throwable? = null
+        var closeCount: Int = 0
+            private set
 
         override fun update(snapshot: SwingShellSuggestionViewSnapshot) {
+            updateFailure?.let { throw it }
             this.snapshot = snapshot
             suggestions = snapshot.visibleSuggestions
             selectedIndex = snapshot.selectedIndex
+        }
+
+        override fun close() {
+            closeCount++
+            closeFailure?.let { throw it }
         }
     }
 }

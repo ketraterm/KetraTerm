@@ -187,9 +187,9 @@ class TerminalTextPainterTest {
         @ValueSource(booleans = [false, true])
         fun `ASCII overhang cannot paint across a concealed run boundary`(antialiased: Boolean) {
             val settings =
-                antialiasedSettings(antialiased).copy(
-                    font = Font(Font.MONOSPACED, Font.PLAIN, 18).deriveFont(AffineTransform.getShearInstance(-1.0, 0.0)),
-                )
+                antialiasedSettings(antialiased).copy { draft ->
+                    draft.font = Font(Font.MONOSPACED, Font.PLAIN, 18).deriveFont(AffineTransform.getShearInstance(-1.0, 0.0))
+                }
             val fixture = fixture(settings = settings)
             val hidden = TerminalRenderAttrs.pack(invisible = true)
             val cache = renderCache(TestRenderFrame.text("AAA", attrs = longArrayOf(0L, hidden, 0L)))
@@ -739,7 +739,10 @@ class TerminalTextPainterTest {
         @ParameterizedTest
         @ValueSource(strings = ["uniform", "foreground", "underline", "conceal"])
         fun `Arabic run retains contextual forms across cell presentation changes`(presentation: String) {
-            val settings = defaultTestSettings().copy(font = Font(Font.SERIF, Font.PLAIN, 18))
+            val settings =
+                defaultTestSettings().copy { draft ->
+                    draft.font = Font(Font.SERIF, Font.PLAIN, 18)
+                }
             val actual = fixture(settings = settings)
             val expected = fixture(settings = settings)
             val colors = intArrayOf(TEST_RED, TEST_GREEN, TEST_BLUE)
@@ -803,7 +806,11 @@ class TerminalTextPainterTest {
                     }
                 }
             val font = RecordingShapingFont()
-            val settings = antialiasedSettings(antialiased).copy(font = font, useSystemFallbackFonts = false)
+            val settings =
+                antialiasedSettings(antialiased).copy { draft ->
+                    draft.font = font
+                    draft.useSystemFallbackFonts = false
+                }
             val actual = fixture(settings = settings, platformEmojiPainter = TerminalPlatformEmojiPainter(rasterizer))
             val cache =
                 renderCache(
@@ -864,7 +871,13 @@ class TerminalTextPainterTest {
 
         @Test
         fun `same style Hebrew glyphs occupy their individual terminal cells`() {
-            val fixture = fixture(settings = defaultTestSettings().copy(font = Font(Font.SERIF, Font.PLAIN, 18)))
+            val fixture =
+                fixture(
+                    settings =
+                        defaultTestSettings().copy { draft ->
+                            draft.font = Font(Font.SERIF, Font.PLAIN, 18)
+                        },
+                )
             val cache = renderCache(TestRenderFrame.text("\u05D0\u05D1\u05D2"))
             try {
                 fixture.paintRow(cache)
@@ -975,7 +988,10 @@ class TerminalTextPainterTest {
                     ),
                 )
 
-            val settings = defaultTestSettings().copy(font = Font(Font.SERIF, Font.PLAIN, 18))
+            val settings =
+                defaultTestSettings().copy { draft ->
+                    draft.font = Font(Font.SERIF, Font.PLAIN, 18)
+                }
             val reference = fixture(settings = settings, width = 256)
             val referenceCache = renderCache(row(3))
             val cache = renderCache(row(repetitions))
@@ -1041,7 +1057,13 @@ class TerminalTextPainterTest {
                 cache.clusterLength(cache.clusterRefs[0]) in 1 until cluster.length,
                 "Render-cache admission must bound the producer cluster",
             )
-            val fixture = fixture(settings = defaultTestSettings().copy(font = Font(Font.SERIF, Font.PLAIN, 18)))
+            val fixture =
+                fixture(
+                    settings =
+                        defaultTestSettings().copy { draft ->
+                            draft.font = Font(Font.SERIF, Font.PLAIN, 18)
+                        },
+                )
             try {
                 fixture.paintRow(cache)
                 for (column in 0 until cache.columns) {
@@ -1918,7 +1940,11 @@ class TerminalTextPainterTest {
         ) {
             g.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, settings.textAntialiasing)
             g.setRenderingHint(RenderingHints.KEY_FRACTIONALMETRICS, settings.fractionalMetrics)
-            painter.updateSettings(settings.copy(hyperlinkActivationForeground = hyperlinkActivationForeground))
+            painter.updateSettings(
+                settings.copy { draft ->
+                    draft.hyperlinkActivationForeground = hyperlinkActivationForeground
+                },
+            )
             painter.paintRow(
                 g = g,
                 cache = cache,
@@ -1954,13 +1980,13 @@ class TerminalTextPainterTest {
     }
 
     private fun createMismatchSettings(): SwingSettings =
-        SwingSettings(
-            font = Font(Font.SERIF, Font.PLAIN, 18),
-            palette = defaultTestSettings(foreground = TEST_RED, background = TEST_BLACK).palette,
-            textAntialiasing = RenderingHints.VALUE_TEXT_ANTIALIAS_OFF,
-            fractionalMetrics = RenderingHints.VALUE_FRACTIONALMETRICS_ON,
-            padding = SwingPadding(0, 0, 0, 0),
-        )
+        SwingSettings.create { draft ->
+            draft.font = Font(Font.SERIF, Font.PLAIN, 18)
+            draft.palette = defaultTestSettings(foreground = TEST_RED, background = TEST_BLACK).palette
+            draft.textAntialiasing = RenderingHints.VALUE_TEXT_ANTIALIAS_OFF
+            draft.fractionalMetrics = RenderingHints.VALUE_FRACTIONALMETRICS_ON
+            draft.padding = SwingPadding(0, 0, 0, 0)
+        }
 
     private fun createMismatchFixture(settings: SwingSettings): Triple<BufferedImage, SwingMetrics, TerminalTextPainter> {
         val image = BufferedImage(120, 40, BufferedImage.TYPE_INT_ARGB)
@@ -2016,9 +2042,9 @@ class TerminalTextPainterTest {
         private const val ASTRAL_SMILE_CODE_POINT = 0x1F642
 
         private fun antialiasedSettings(enabled: Boolean): SwingSettings =
-            defaultTestSettings().copy(
-                textAntialiasing = if (enabled) RenderingHints.VALUE_TEXT_ANTIALIAS_ON else RenderingHints.VALUE_TEXT_ANTIALIAS_OFF,
-            )
+            defaultTestSettings().copy { draft ->
+                draft.textAntialiasing = if (enabled) RenderingHints.VALUE_TEXT_ANTIALIAS_ON else RenderingHints.VALUE_TEXT_ANTIALIAS_OFF
+            }
 
         private fun underlineColor(rgb: Int): Long =
             TerminalRenderExtraAttrs.pack(

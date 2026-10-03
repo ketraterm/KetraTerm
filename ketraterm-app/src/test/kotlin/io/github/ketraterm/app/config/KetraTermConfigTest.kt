@@ -1,0 +1,577 @@
+/*
+ * Copyright 2026 Gagik Sargsyan
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package io.github.ketraterm.app.config
+
+import io.github.ketraterm.host.TerminalClipboardPermission
+import io.github.ketraterm.host.TerminalTitlePermission
+import io.github.ketraterm.input.policy.PasteControlPolicy
+import org.junit.jupiter.api.DynamicTest
+import org.junit.jupiter.api.TestFactory
+import java.io.IOException
+import java.nio.file.Files
+import java.nio.file.Path
+import java.util.*
+import kotlin.test.*
+
+class KetraTermConfigTest {
+    @TestFactory
+    fun `string configuration values survive save and reload`(): List<DynamicTest> {
+        val fields = listOf("theme", "fontFamily", "cursorShape", "shellPath", "startDirectory")
+        val values =
+            listOf(
+                "quote-and-comment" to "/tmp/a\"#directory",
+                "backslash" to "C:\\Users\\someone\\project",
+                "unicode-and-literal-quotes" to "工程 'quoted' '''suffix'",
+                "newline" to "first\nsecond",
+                "controls-and-delimiters" to " \t\r\n\u0000\u0008\u000C\u001B\u007F'''\"\"\"#=\\u0022😀 ",
+                "trailing-double-quote" to "quoted\"",
+                "leading-newline" to "\nvalue",
+            )
+        return fields.flatMap { field ->
+            values.map { (kind, value) ->
+                DynamicTest.dynamicTest("$field retains $kind") {
+                    val expected =
+                        when (field) {
+                            "theme" -> KetraTermConfig(theme = value)
+                            "fontFamily" -> KetraTermConfig(fontFamily = value)
+                            "cursorShape" -> KetraTermConfig(cursorShape = value)
+                            "shellPath" -> KetraTermConfig(shellPath = value)
+                            "startDirectory" -> KetraTermConfig(startDirectory = value)
+                            else -> error("Unknown configuration field")
+                        }
+                    val directory = Files.createTempDirectory("ketraterm-config-string-roundtrip")
+                    val file = directory.resolve("config.toml")
+                    val brokenFile = directory.resolve("config.toml.broken")
+                    try {
+                        val manager = KetraTermConfigManager(file)
+                        manager.save(expected)
+                        assertEquals(expected, manager.load(), "saving an accepted string value must preserve the complete configuration")
+                        assertFalse(Files.exists(brokenFile), "a generated configuration must be readable without recovery")
+                    } finally {
+                        Files.deleteIfExists(file)
+                        Files.deleteIfExists(brokenFile)
+                        Files.deleteIfExists(directory)
+                    }
+                }
+            }
+        }
+    }
+
+    @Test
+    fun `existing clipboard choices and omissions survive unrelated save and restart`() {
+        val directory = Files.createTempDirectory("ketraterm-clipboard-migration")
+        val file = directory.resolve("config.toml")
+        try {
+            val manager = KetraTermConfigManager(file)
+            for ((raw, permission) in listOf(
+                "" to TerminalClipboardPermission.DENY,
+                "[security]\n" to TerminalClipboardPermission.DENY,
+                "[security]\nclipboard_read = \"deny\"\n" to TerminalClipboardPermission.DENY,
+                "[security]\nclipboard_read = \"prompt\"\n" to TerminalClipboardPermission.PROMPT,
+                "[security]\nclipboard_read = \"allow\"\n" to TerminalClipboardPermission.ALLOW,
+            )) {
+                Files.writeString(file, raw)
+                val loaded = manager.load()
+                assertEquals(permission, loaded.clipboardRead, raw)
+                val edited = loaded.copy(fontSize = 20)
+                manager.save(edited)
+                assertEquals(edited, manager.load(), raw)
+                assertContains(Files.readString(file), "clipboard_read = \"${permission.name.lowercase(Locale.ROOT)}\"")
+            }
+        } finally {
+            Files.deleteIfExists(file)
+            Files.deleteIfExists(directory)
+        }
+    }
+
+    @Test
+    fun `removed origin settings use session defaults and save only the new keys`() {
+        val directory = Files.createTempDirectory("ketraterm-session-permissions")
+        val file = directory.resolve("config.toml")
+        try {
+            Files.writeString(
+                file,
+                """
+                [security]
+                clipboard_local_write = "allow"
+                clipboard_remote_write = "allow"
+                title_local_permission = "deny"
+                title_remote_permission = "deny"
+                """.trimIndent(),
+            )
+            val manager = KetraTermConfigManager(file)
+            val loaded = manager.load()
+            assertEquals(TerminalClipboardPermission.ALLOW, loaded.clipboardWrite)
+            assertEquals(TerminalTitlePermission.ALLOW, loaded.titlePermission)
+
+            val updated = loaded.copy(clipboardWrite = TerminalClipboardPermission.DENY, titlePermission = TerminalTitlePermission.DENY)
+            manager.save(updated)
+            assertEquals(updated, manager.load())
+            val saved = Files.readString(file)
+            assertContains(saved, "clipboard_write = \"deny\"")
+            assertContains(saved, "title_permission = \"deny\"")
+            assertFalse(saved.contains("clipboard_local_write"))
+            assertFalse(saved.contains("clipboard_remote_write"))
+            assertFalse(saved.contains("title_local_permission"))
+            assertFalse(saved.contains("title_remote_permission"))
+        } finally {
+            Files.deleteIfExists(file)
+            Files.deleteIfExists(directory)
+        }
+    }
+
+    @Test
+    fun `legacy paste settings migrate and save canonical control policy identifiers`() {
+        val directory = Files.createTempDirectory("ketraterm-config-paste-migration")
+        val file = directory.resolve("config.toml")
+        try {
+            val manager = KetraTermConfigManager(file)
+            for (id in listOf("raw", "normalize-line-endings", "preserve", "strip-c0", "unknown")) {
+                Files.writeString(file, "[behavior]\npaste_sanitization = \" ${id.uppercase(Locale.ROOT)} \"\n")
+                val loaded = manager.load()
+                val expected = if (id == "strip-c0") PasteControlPolicy.STRIP_C0_EXCEPT_TAB_CR_LF else PasteControlPolicy.PRESERVE
+                assertEquals(expected, loaded.pasteControlPolicy)
+                manager.save(loaded)
+                val canonical = if (id == "strip-c0") "strip-c0" else "preserve"
+                assertTrue(Files.readString(file).contains("paste_sanitization = \"$canonical\""))
+                assertEquals(loaded, manager.load())
+            }
+        } finally {
+            Files.deleteIfExists(file)
+            Files.deleteIfExists(directory)
+        }
+    }
+
+    @Test
+    fun `atomic save replaces complete file and removes staging file`() {
+        val directory = Files.createTempDirectory("ketraterm-config-atomic")
+        val destination = directory.resolve("config.toml")
+        try {
+            val manager = KetraTermConfigManager(destination)
+            manager.save(KetraTermConfig())
+            val updated = KetraTermConfig(fontSize = 28, columns = 160, smartSuggestionsEnabled = true)
+            manager.save(updated)
+            assertEquals(updated, manager.load())
+            Files.list(directory).use { assertEquals(listOf(destination), it.toList()) }
+        } finally {
+            Files.deleteIfExists(destination)
+            Files.deleteIfExists(directory)
+        }
+    }
+
+    @Test
+    fun `failed replacement propagates failure and preserves destination`() {
+        val directory = Files.createTempDirectory("ketraterm-config-failure")
+        val destination = Files.createDirectory(directory.resolve("config.toml"))
+        val existing = Files.writeString(destination.resolve("existing"), "preserve me")
+        try {
+            assertFailsWith<IOException> {
+                KetraTermConfigManager(destination).save(KetraTermConfig())
+            }
+            assertEquals("preserve me", Files.readString(existing))
+            Files.list(directory).use { assertEquals(listOf(destination), it.toList()) }
+        } finally {
+            Files.deleteIfExists(existing)
+            Files.deleteIfExists(destination)
+            Files.deleteIfExists(directory)
+        }
+    }
+
+    @Test
+    fun `unreadable config is left untouched when falling back to defaults`() {
+        val directory = Files.createTempDirectory("ketraterm-config-unreadable")
+        val existing = Files.writeString(directory.resolve("existing"), "preserve me")
+        try {
+            assertEquals(KetraTermConfig(clipboardRead = TerminalClipboardPermission.DENY), KetraTermConfigManager(directory).load())
+            assertEquals("preserve me", Files.readString(existing))
+            assertFalse(Files.exists(directory.resolveSibling("${directory.fileName}.broken")))
+        } finally {
+            Files.deleteIfExists(existing)
+            Files.deleteIfExists(directory)
+        }
+    }
+
+    @Test
+    fun `unwritable missing config uses defaults at startup but explicit save fails`() {
+        val blockedParent = Files.createTempFile("ketraterm-config-parent", ".file")
+        try {
+            val manager = KetraTermConfigManager(blockedParent.resolve("config.toml"))
+            assertEquals(KetraTermConfig(), manager.load())
+            assertFailsWith<IOException> { manager.save(KetraTermConfig(fontSize = 24)) }
+            assertTrue(Files.isRegularFile(blockedParent))
+        } finally {
+            Files.deleteIfExists(blockedParent)
+        }
+    }
+
+    @Test
+    fun `missing master flag stays off even when legacy preferences are on`() {
+        val directory = Files.createTempDirectory("ketraterm-suggestions-default")
+        val path = directory.resolve("config.toml")
+        try {
+            Files.writeString(path, "[behavior]\nshell_suggestions_enabled = true\npersistent_suggestion_learning_enabled = true\n")
+            val manager = KetraTermConfigManager(path)
+            val config = manager.load()
+            assertFalse(config.smartSuggestionsEnabled)
+            manager.save(config.copy(smartSuggestionsEnabled = true))
+            assertTrue(manager.load().smartSuggestionsEnabled)
+            assertTrue(Files.readString(path).contains("smart_suggestions_enabled = true"))
+        } finally {
+            Files.deleteIfExists(path)
+            Files.deleteIfExists(directory)
+        }
+    }
+
+    @Test
+    fun `test TomlParser parses sections keys and values correctly`() {
+        val toml =
+            """
+            # Global comment
+            [window]
+            columns = 120 # custom columns
+            rows = 40
+
+            [theme]
+            name = "tokyo-night"
+
+            [font]
+            family = 'Fira Code' # single quotes
+            size = 14
+            """.trimIndent()
+
+        val parsed = TomlParser.parse(toml)
+
+        assertEquals("120", parsed["window"]?.get("columns"))
+        assertEquals("40", parsed["window"]?.get("rows"))
+        assertEquals("tokyo-night", parsed["theme"]?.get("name"))
+        assertEquals("Fira Code", parsed["font"]?.get("family"))
+        assertEquals("14", parsed["font"]?.get("size"))
+    }
+
+    @Test
+    fun `test TomlParser ignores comments and preserves quotes inside strings`() {
+        val toml =
+            """
+            [theme]
+            color = "#ff0000" # hex value containing hash
+            description = "This is a #comment text inside quotes"
+            """.trimIndent()
+
+        val parsed = TomlParser.parse(toml)
+        assertEquals("#ff0000", parsed["theme"]?.get("color"))
+        assertEquals("This is a #comment text inside quotes", parsed["theme"]?.get("description"))
+    }
+
+    @Test
+    fun `test KetraTermConfigManager path resolution`() {
+        // Overrides
+        // Clean default system property check (which might be set or not during tests, but we can verify our overrides work)
+        System.setProperty("ketraterm.config.path", "/custom/sys/path.toml")
+        assertEquals(Path.of("/custom/sys/path.toml"), KetraTermConfigManager.getDefaultPath(osName = "Windows 11"))
+        System.clearProperty("ketraterm.config.path")
+
+        // Env override
+        val env = mapOf("KetraTerm_CONFIG_PATH" to "/custom/env/path.toml")
+        assertEquals(Path.of("/custom/env/path.toml"), KetraTermConfigManager.getDefaultPath(osName = "Windows 11", env = env))
+
+        // Windows resolution
+        val winEnv = mapOf("APPDATA" to "C:\\Users\\User\\AppData\\Roaming")
+        val winPath = KetraTermConfigManager.getDefaultPath(osName = "Windows 11", env = winEnv)
+        assertEquals(Path.of("C:\\Users\\User\\AppData\\Roaming", "KetraTerm", "config.toml"), winPath)
+
+        // Mac resolution
+        val macPath = KetraTermConfigManager.getDefaultPath(osName = "macOS Big Sur", userHome = "/Users/username")
+        assertEquals(Path.of("/Users/username/Library/Application Support/KetraTerm/config.toml"), macPath)
+
+        // Linux resolution
+        val linuxEnv = mapOf("XDG_CONFIG_HOME" to "/home/username/.custom_config")
+        val linuxPath = KetraTermConfigManager.getDefaultPath(osName = "Linux", env = linuxEnv)
+        assertEquals(Path.of("/home/username/.custom_config/ketraterm/config.toml"), linuxPath)
+
+        val linuxFallbackPath =
+            KetraTermConfigManager.getDefaultPath(
+                osName = "Linux",
+                env = emptyMap(),
+                userHome = "/home/username",
+            )
+        assertEquals(Path.of("/home/username/.config/ketraterm/config.toml"), linuxFallbackPath)
+    }
+
+    @Test
+    fun `test KetraTermConfigManager load default config if file does not exist`() {
+        val tempDir = Files.createTempDirectory("ketraterm-config-test")
+        val configFile = tempDir.resolve("config.toml")
+        val manager = KetraTermConfigManager(configFile)
+
+        assertFalse(Files.exists(configFile))
+        val config = manager.load()
+
+        assertTrue(Files.exists(configFile))
+        assertEquals("one-dark", config.theme)
+        assertEquals(100, config.columns)
+        assertEquals(30, config.rows)
+        val expectedFont =
+            when {
+                System.getProperty("os.name").lowercase(Locale.ROOT).contains("windows") -> "Cascadia Mono"
+                System.getProperty("os.name").lowercase(Locale.ROOT).contains("mac") -> "Menlo"
+                else -> "Monospaced"
+            }
+        assertEquals(expectedFont, config.fontFamily)
+        assertEquals(16, config.fontSize)
+        assertFalse(config.treatAmbiguousAsWide)
+        assertEquals(600, config.cursorBlinkMillis)
+        assertTrue(config.useSystemFallbackFonts)
+        assertEquals("block", config.cursorShape)
+        assertTrue(config.visualBell)
+        assertEquals(PasteControlPolicy.PRESERVE, config.pasteControlPolicy)
+        assertFalse(config.shellRequestResizeWindow)
+        assertFalse(config.shellRequestWindowManipulation)
+        assertFalse(config.smartSuggestionsEnabled)
+        assertTrue(config.shellSuggestionsEnabled)
+        assertTrue(config.acceptSelectedSuggestionWithEnter)
+        assertFalse(config.persistentSuggestionLearningEnabled)
+        assertEquals(TerminalClipboardPermission.ALLOW, config.clipboardWrite)
+        assertEquals(TerminalClipboardPermission.PROMPT, config.clipboardRead)
+        assertContains(Files.readString(configFile), "clipboard_read = \"prompt\"")
+        assertEquals(config, manager.load())
+        assertEquals(1024 * 1024, config.clipboardMaxDecodedBytes)
+        assertEquals(TerminalTitlePermission.ALLOW, config.titlePermission)
+
+        // Clean up
+        Files.deleteIfExists(configFile)
+        Files.deleteIfExists(tempDir)
+    }
+
+    @Test
+    fun `test KetraTermConfigManager saves and loads custom config correctly`() {
+        val tempDir = Files.createTempDirectory("ketraterm-config-test-custom")
+        val configFile = tempDir.resolve("config.toml")
+        val manager = KetraTermConfigManager(configFile)
+
+        val customConfig =
+            KetraTermConfig(
+                theme = "nord",
+                smartSuggestionsEnabled = true,
+                treatAmbiguousAsWide = true,
+                fontFamily = "JetBrains Mono",
+                fontSize = 18,
+                columns = 110,
+                rows = 35,
+                cursorBlinkMillis = 500,
+                useSystemFallbackFonts = true,
+                cursorShape = "beam",
+                audibleBell = false,
+                visualBell = false,
+                pasteControlPolicy = PasteControlPolicy.STRIP_C0_EXCEPT_TAB_CR_LF,
+                shellRequestResizeWindow = true,
+                shellRequestWindowManipulation = true,
+                shellSuggestionsEnabled = false,
+                acceptSelectedSuggestionWithEnter = false,
+                persistentSuggestionLearningEnabled = true,
+                desktopNotificationsEnabled = false,
+                clipboardWrite = TerminalClipboardPermission.ALLOW,
+                clipboardRead = TerminalClipboardPermission.PROMPT,
+                clipboardMaxDecodedBytes = 500,
+                titlePermission = TerminalTitlePermission.DENY,
+            )
+
+        manager.save(customConfig)
+        assertTrue(Files.exists(configFile))
+        assertTrue(Files.readString(configFile).contains("""paste_sanitization = "strip-c0""""))
+        assertTrue(Files.readString(configFile).contains("""shell_suggestions_enabled = false"""))
+        assertTrue(Files.readString(configFile).contains("""accept_selected_suggestion_with_enter = false"""))
+        assertTrue(Files.readString(configFile).contains("""suggestion_learning_persistence_enabled = true"""))
+        assertTrue(Files.readString(configFile).contains("""clipboard_write = "allow""""))
+        assertTrue(Files.readString(configFile).contains("""clipboard_max_decoded_bytes = 500"""))
+
+        val loaded = manager.load()
+        assertEquals(customConfig, loaded)
+
+        // Clean up
+        Files.deleteIfExists(configFile)
+        Files.deleteIfExists(tempDir)
+    }
+
+    @Test
+    fun `test KetraTermConfigManager loads new suggestion learning persistence key`() {
+        val tempDir = Files.createTempDirectory("ketraterm-config-test-suggestion-learning-new")
+        val configFile = tempDir.resolve("config.toml")
+        val manager = KetraTermConfigManager(configFile)
+
+        Files.writeString(
+            configFile,
+            """
+            [behavior]
+            suggestion_learning_persistence_enabled = true
+            """.trimIndent(),
+        )
+
+        assertTrue(manager.load().persistentSuggestionLearningEnabled)
+
+        Files.deleteIfExists(configFile)
+        Files.deleteIfExists(tempDir)
+    }
+
+    @Test
+    fun `test KetraTermConfigManager clamps hand edited numeric values`() {
+        val tempDir = Files.createTempDirectory("ketraterm-config-test-clamped")
+        val configFile = tempDir.resolve("config.toml")
+        val manager = KetraTermConfigManager(configFile)
+
+        Files.writeString(
+            configFile,
+            """
+            [window]
+            columns = 999999
+            rows = -42
+            scrollback_lines = 999999999999999999999999
+
+            [font]
+            family = "JetBrains Mono"
+            size = -9
+            line_height = 0.01
+
+            [theme]
+            name = "nord"
+
+            [behavior]
+            cursor_blink_millis = 999999999999999999999999
+            cursor_shape = "beam"
+            paste_sanitization = "strip-c0"
+            """.trimIndent(),
+        )
+
+        val loaded = manager.load()
+
+        assertEquals(KetraTermConfig.COLUMNS_MAX, loaded.columns)
+        assertEquals(KetraTermConfig.ROWS_MIN, loaded.rows)
+        assertEquals(KetraTermConfig.SCROLLBACK_MAX, loaded.scrollbackLines)
+        assertEquals(KetraTermConfig.FONT_SIZE_MIN, loaded.fontSize)
+        assertEquals(KetraTermConfig.LINE_HEIGHT_MIN, loaded.lineHeight)
+        assertEquals(KetraTermConfig.CURSOR_BLINK_MAX, loaded.cursorBlinkMillis)
+        assertEquals(PasteControlPolicy.STRIP_C0_EXCEPT_TAB_CR_LF, loaded.pasteControlPolicy)
+
+        Files.deleteIfExists(configFile)
+        Files.deleteIfExists(tempDir)
+    }
+
+    @Test
+    fun `invalid and removed permission values use field defaults and save canonical values`() {
+        val directory = Files.createTempDirectory("ketraterm-config-security-defaults")
+        val file = directory.resolve("config.toml")
+        val manager = KetraTermConfigManager(file)
+        try {
+            for (value in listOf("invalid", "allowlist")) {
+                Files.writeString(
+                    file,
+                    """
+                    [security]
+                    clipboard_write = "$value"
+                    clipboard_read = "$value"
+                    title_permission = "invalid"
+                    """.trimIndent(),
+                )
+                val loaded = manager.load()
+                assertEquals(TerminalClipboardPermission.ALLOW, loaded.clipboardWrite)
+                assertEquals(TerminalClipboardPermission.DENY, loaded.clipboardRead)
+                assertEquals(TerminalTitlePermission.ALLOW, loaded.titlePermission)
+                manager.save(loaded)
+                val saved = Files.readString(file)
+                assertFalse(saved.contains(value))
+                assertContains(saved, "clipboard_write = \"allow\"")
+                assertContains(saved, "clipboard_read = \"deny\"")
+                assertEquals(loaded, manager.load())
+            }
+        } finally {
+            Files.deleteIfExists(file)
+            Files.deleteIfExists(directory)
+        }
+    }
+
+    @Test
+    fun `test KetraTermConfigManager clamps clipboard decoded byte boundaries`() {
+        val tempDir = Files.createTempDirectory("ketraterm-config-test-clipboard-size")
+        val configFile = tempDir.resolve("config.toml")
+        val manager = KetraTermConfigManager(configFile)
+
+        Files.writeString(
+            configFile,
+            """
+            [security]
+            clipboard_max_decoded_bytes = -1
+            """.trimIndent(),
+        )
+
+        assertEquals(0, manager.load().clipboardMaxDecodedBytes)
+
+        Files.writeString(
+            configFile,
+            """
+            [security]
+            clipboard_max_decoded_bytes = 999999999999999999999999
+            """.trimIndent(),
+        )
+
+        assertEquals(Int.MAX_VALUE, manager.load().clipboardMaxDecodedBytes)
+
+        Files.deleteIfExists(configFile)
+        Files.deleteIfExists(tempDir)
+    }
+
+    @Test
+    fun `test KetraTermConfig rejects direct out of bounds values`() {
+        assertFailsWith<IllegalArgumentException> {
+            KetraTermConfig(columns = KetraTermConfig.COLUMNS_MIN - 1)
+        }
+        assertFailsWith<IllegalArgumentException> {
+            KetraTermConfig(rows = KetraTermConfig.ROWS_MAX + 1)
+        }
+        assertFailsWith<IllegalArgumentException> {
+            KetraTermConfig(scrollbackLines = KetraTermConfig.SCROLLBACK_MAX + 1)
+        }
+        assertFailsWith<IllegalArgumentException> {
+            KetraTermConfig(lineHeight = KetraTermConfig.LINE_HEIGHT_MIN - 0.1f)
+        }
+    }
+
+    @Test
+    fun `test KetraTermConfigManager fallback on invalid format`() {
+        val tempDir = Files.createTempDirectory("ketraterm-config-test-invalid")
+        val configFile = tempDir.resolve("config.toml")
+        val brokenFile = tempDir.resolve("config.toml.broken")
+        val manager = KetraTermConfigManager(configFile)
+
+        Files.writeString(configFile, "invalid toml syntax here [[[[")
+
+        val loaded = manager.load()
+        // Should return default config instead of crashing
+        assertEquals("one-dark", loaded.theme)
+        assertEquals(100, loaded.columns)
+        assertEquals(TerminalClipboardPermission.DENY, loaded.clipboardRead)
+        assertEquals(loaded, manager.load())
+
+        // Verify it backed up the broken file and generated a new valid file
+        assertTrue(Files.exists(brokenFile))
+        assertEquals("invalid toml syntax here [[[[", Files.readString(brokenFile))
+        assertTrue(Files.exists(configFile))
+        assertNotEquals("invalid toml syntax here [[[[", Files.readString(configFile))
+
+        // Clean up
+        Files.deleteIfExists(configFile)
+        Files.deleteIfExists(brokenFile)
+        Files.deleteIfExists(tempDir)
+    }
+}

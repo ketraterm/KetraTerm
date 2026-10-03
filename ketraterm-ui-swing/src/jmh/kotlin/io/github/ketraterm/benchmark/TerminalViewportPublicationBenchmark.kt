@@ -41,9 +41,8 @@ open class TerminalViewportPublicationBenchmark {
                     renderRows = 25,
                     viewportHeightPixels = 480,
                     contentHeightPixels = 500,
-                    notifyListener = false,
-                    notifyPrimitiveListener = true,
                 )
+                controller.notifyViewportListener(notifyListener = false, notifyPrimitiveListener = true)
             }
         }
 

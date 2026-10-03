@@ -28,7 +28,9 @@ import io.github.ketraterm.session.TerminalSession
 import io.github.ketraterm.session.TerminalSessionState
 import io.github.ketraterm.session.TerminalShellCommandLineSnapshot
 import io.github.ketraterm.session.TerminalShellIntegrationCommandRecord
+import io.github.ketraterm.ui.swing.cleanupSwingResources
 import io.github.ketraterm.ui.swing.input.*
+import io.github.ketraterm.ui.swing.preserveSwingFailure
 import io.github.ketraterm.ui.swing.render.*
 import io.github.ketraterm.ui.swing.search.TerminalSearchController
 import io.github.ketraterm.ui.swing.search.TerminalSearchHost
@@ -122,11 +124,15 @@ public class SwingTerminal
             CoroutineScope(componentJob + uiCoroutineDispatcher + CoroutineName("swing-terminal"))
         private var bindingJob: Job? = null
         private var suggestionJob: Job? = null
+        private var suggestionFailureHandler: SwingShellSuggestionFailureHandler = SwingShellSuggestionFailureHandler.LOGGING
         private var activeSuggestionContext: SessionSuggestionContext? = null
         private var activeSuggestionIsAutomatic: Boolean = false
         private val suggestionInvalidationListeners = CopyOnWriteArraySet<SwingShellSuggestionInvalidationListener>()
         private val suggestionEligibilityListeners = CopyOnWriteArraySet<SwingShellSuggestionEligibilityListener>()
         private val automaticSuggestionEligible = AtomicBoolean(settings.smartSuggestionsEnabled && settings.shellSuggestionsEnabled)
+
+        // Callbacks may reenter the component; the revision prevents obsolete notifications.
+        private var automaticSuggestionEligibilityRevision = 0L
 
         internal val hasActiveRenderBinding: Boolean
             get() = bindingJob?.isActive == true
@@ -135,6 +141,7 @@ public class SwingTerminal
             get() = componentJob.isActive
 
         private val visualGeometry = TerminalVisualViewportGeometry()
+        private val suggestionAnchorBounds = Rectangle()
         private val painter = GridPainter(hostServices.fontResolver, visualGeometry.bidiLayout)
         private val visualBellController =
             TerminalVisualBellController {
@@ -728,6 +735,8 @@ public class SwingTerminal
          * Cancels view observation and suggestion work without closing the session
          * or restoring its previous settings. Calls on the EDT take effect immediately;
          * calls from other threads dispatch asynchronously to the EDT.
+         * Cleanup completes before a callback failure or cancellation propagates on
+         * the EDT; later cleanup failures are suppressed on the first failure.
          */
         public fun unbind() {
             runOnEdt(unbindRunnable)
@@ -740,6 +749,8 @@ public class SwingTerminal
          * if any, is unbound but remains host-owned. A disposed component must not
          * be rebound to another session. Calls on the EDT take effect immediately;
          * calls from other threads dispatch asynchronously to the EDT.
+         * Every owned cleanup is attempted before a failure or cancellation propagates
+         * on the EDT; later cleanup failures are suppressed on the first failure.
          */
         public fun dispose() {
             runOnEdt {
@@ -1016,15 +1027,15 @@ public class SwingTerminal
 
         override fun removeNotify() {
             terminalFocused = false
-            cursorTimer.stop()
-            visualBellController.stop()
-            viewportController.finishScroll()
-            selectionController.stopSelectionDrag()
-            clearPointerHover()
-
-            detachAncestorWindow()
-
-            super.removeNotify()
+            cleanupSwingResources(
+                cursorTimer::stop,
+                visualBellController::stop,
+                viewportController::finishScroll,
+                selectionController::stopSelectionDrag,
+                { clearPointerHover() },
+                ::detachAncestorWindow,
+                { super.removeNotify() },
+            )
         }
 
         override fun doLayout() {
@@ -1062,16 +1073,34 @@ public class SwingTerminal
                 } else {
                     state.anchorColumn
                 }
-            val anchorX = paddingLeft + anchorColumn * metrics.cellWidth
+            val hasCellBounds = copyCellBounds(state.anchorColumn, state.anchorRow, suggestionAnchorBounds)
+            // Explicit host context also works without a frame; keep its grid-coordinate fallback.
+            val anchorX =
+                if (hasCellBounds) {
+                    suggestionAnchorBounds.x
+                } else {
+                    (paddingLeft.toLong() + anchorColumn.toLong() * metrics.cellWidth)
+                        .coerceIn(Int.MIN_VALUE.toLong(), Int.MAX_VALUE.toLong())
+                        .toInt()
+                }
             val bottomLimit = height - paddingBottom
             val anchorTop =
-                floor(paddingTop + contentOriginY + state.anchorRow * metrics.cellHeight)
-                    .toInt()
-                    .coerceIn(paddingTop, bottomLimit)
+                if (hasCellBounds) {
+                    suggestionAnchorBounds.y
+                } else {
+                    floor(
+                        paddingTop + contentOriginY + state.anchorRow.toDouble() * metrics.cellHeight,
+                    ).toInt()
+                        .coerceIn(paddingTop, bottomLimit)
+                }
             val anchorBottom =
-                ceil(paddingTop + contentOriginY + (state.anchorRow + 1) * metrics.cellHeight)
-                    .toInt()
-                    .coerceIn(paddingTop, bottomLimit)
+                if (hasCellBounds) {
+                    suggestionAnchorBounds.y + suggestionAnchorBounds.height
+                } else {
+                    ceil(paddingTop + contentOriginY + (state.anchorRow.toDouble() + 1.0) * metrics.cellHeight)
+                        .toInt()
+                        .coerceIn(paddingTop, bottomLimit)
+                }
             val spaceAbove = anchorTop - paddingTop
             val spaceBelow = bottomLimit - anchorBottom
             val placeBelow = preferred.height <= spaceBelow || spaceBelow >= spaceAbove
@@ -1181,7 +1210,7 @@ public class SwingTerminal
                         }
                 }
             var publishedFrameAvailable = false
-            session.renderPublisher.readCurrent {
+            session.readPublishedFrame {
                 publishedFrameAvailable = true
             }
             if (publishedFrameAvailable) {
@@ -1194,44 +1223,64 @@ public class SwingTerminal
         }
 
         private fun unbindOnEdt() {
-            bindingJob?.cancel(CancellationException("Terminal session unbound"))
-            bindingJob = null
-            mouseController.resetWheelInput()
-            cancelAndHideShellSuggestionsOnEdt("Terminal session unbound")
-            session = null
-            resetRenderCaches()
-            resetScrollbackState()
-            selectionController.clearSelection()
-            searchController.reset(renderCache.rows)
-            shellIntegrationDecorations.reset()
-            if (hostServices.scrollbarOverlayEnabled) scrollbarOverlay.handleExited()
-            visualGeometry.reset()
-            selectionController.stopSelectionDrag()
-            lastResizedColumns = NO_RESIZE_DIMENSION
-            lastResizedRows = NO_RESIZE_DIMENSION
-            renderFrameController.reset()
-            clearPointerHover()
-            hyperlinkDiscoveryController.reset()
-            publishViewportState(0)
-            repaint()
+            cleanupSwingResources(
+                {
+                    val job = bindingJob
+                    bindingJob = null
+                    job?.cancel(CancellationException("Terminal session unbound"))
+                },
+                mouseController::resetWheelInput,
+                { cancelAndHideShellSuggestionsOnEdt("Terminal session unbound") },
+                {
+                    session = null
+                    resetRenderCaches()
+                },
+                ::resetScrollbackState,
+                selectionController::clearSelection,
+                { searchController.reset(renderCache.rows) },
+                shellIntegrationDecorations::reset,
+                { if (hostServices.scrollbarOverlayEnabled) scrollbarOverlay.handleExited() },
+                visualGeometry::reset,
+                selectionController::stopSelectionDrag,
+                {
+                    lastResizedColumns = NO_RESIZE_DIMENSION
+                    lastResizedRows = NO_RESIZE_DIMENSION
+                    renderFrameController.reset()
+                },
+                { clearPointerHover() },
+                hyperlinkDiscoveryController::reset,
+                { publishViewportState(0) },
+                ::repaint,
+            )
         }
 
         private fun disposeOnEdt() {
             if (disposed) return
             disposed = true
-            unbindOnEdt()
-            detachAncestorWindow()
-            cursorTimer.stop()
-            visualBellController.stop()
-            viewportController.finishScroll()
-            selectionController.stopSelectionDrag()
-            hyperlinkDiscoveryController.dispose()
-            suggestionJob?.cancel(CancellationException("Swing terminal disposed"))
-            suggestionJob = null
-            suggestionInvalidationListeners.clear()
-            suggestionEligibilityListeners.clear()
-            shellSuggestionController?.close()
-            componentScope.cancel(CancellationException("Swing terminal disposed"))
+            automaticSuggestionEligibilityRevision++
+            cleanupSwingResources(
+                ::unbindOnEdt,
+                ::detachAncestorWindow,
+                cursorTimer::stop,
+                visualBellController::stop,
+                viewportController::finishScroll,
+                selectionController::stopSelectionDrag,
+                hyperlinkDiscoveryController::dispose,
+                {
+                    val job = suggestionJob
+                    suggestionJob = null
+                    job?.cancel(CancellationException("Swing terminal disposed"))
+                },
+                suggestionInvalidationListeners::clear,
+                suggestionEligibilityListeners::clear,
+                { suggestionFailureHandler = SwingShellSuggestionFailureHandler.LOGGING },
+                {
+                    val controller = shellSuggestionController
+                    shellSuggestionController = null
+                    controller?.close()
+                },
+                { componentScope.cancel(CancellationException("Swing terminal disposed")) },
+            )
         }
 
         private fun reloadSettingsOnEdt() {
@@ -1306,6 +1355,61 @@ public class SwingTerminal
             }
             if (!renderCache.hasFrame) return null
             return selectionController.getViewportSelection(renderCache)
+        }
+
+        /**
+         * Copies a displayed cell's visible bounds into caller-owned storage on the EDT.
+         *
+         * Coordinates are zero-based logical columns and rows of the displayed frame,
+         * before bidi permutation. The result uses component-local Swing pixels and
+         * includes the active buffer's padding, prompt gutter, and fractional scrolling.
+         * Partially visible cells return clipped bounds. Invalid coordinates, unavailable
+         * frames, unbound/disposed views, and cells outside the content viewport return
+         * `false` and clear [destination]. This performs no refresh or transport work.
+         * Hosts convert these bounds to screen coordinates when positioning native popups.
+         * Each leading/trailing half of wide text describes one physical grid cell.
+         *
+         * @throws IllegalStateException when called outside the EDT.
+         */
+        public fun copyCellBounds(
+            column: Int,
+            row: Int,
+            destination: Rectangle,
+        ): Boolean {
+            check(SwingUtilities.isEventDispatchThread()) { "cell bounds must be read on the EDT" }
+            if (disposed || session == null) {
+                destination.setBounds(0, 0, 0, 0)
+                return false
+            }
+            val buffer = renderCache.activeBuffer
+            return visualGeometry.copyCellBounds(
+                renderCache,
+                metrics,
+                column,
+                row,
+                SwingTerminalChrome.left(settings, buffer),
+                SwingTerminalChrome.top(settings, buffer),
+                width - SwingTerminalChrome.right(settings, buffer),
+                height - SwingTerminalChrome.bottom(settings, buffer),
+                destination,
+            )
+        }
+
+        /**
+         * Selects provider diagnostics for this view on the EDT; null restores logging.
+         *
+         * Reports each current provider failure once, after cancelling its work and
+         * hiding suggestions. Cancellation and obsolete requests are excluded.
+         * The callback runs on the EDT and may start a new request. Disposal releases
+         * it; rebinding retains the view-owned handler. Callback failures are logged,
+         * while callback cancellation propagates.
+         *
+         * @throws IllegalStateException when called outside the EDT or after disposal.
+         */
+        public fun setShellSuggestionFailureHandler(handler: SwingShellSuggestionFailureHandler?) {
+            check(SwingUtilities.isEventDispatchThread()) { "suggestion diagnostics must be configured on the EDT" }
+            check(!disposed) { "Swing terminal is disposed" }
+            suggestionFailureHandler = handler ?: SwingShellSuggestionFailureHandler.LOGGING
         }
 
         /**
@@ -1793,11 +1897,28 @@ public class SwingTerminal
                             activeSuggestionContext = null
                         }
                     } catch (cancellation: CancellationException) {
+                        if (suggestionJob === coroutineContext[Job]) {
+                            cancelAndHideShellSuggestionsOnEdt("Shell suggestion provider cancelled")
+                        }
                         throw cancellation
                     } catch (exception: Exception) {
                         this@launch.ensureActive()
-                        System.err.println("Shell suggestion provider failed: ${exception.message}")
+                        if (context != null && !context.isCurrent(session)) {
+                            cancelAndHideShellSuggestionsOnEdt("Active shell command changed")
+                            return@launch
+                        }
                         cancelAndHideShellSuggestionsOnEdt("Shell suggestion provider failed")
+                        try {
+                            suggestionFailureHandler.onSuggestionFailure(request, exception)
+                        } catch (cancellation: CancellationException) {
+                            throw cancellation
+                        } catch (callbackFailure: Exception) {
+                            System.getLogger(SwingTerminal::class.java.name).log(
+                                System.Logger.Level.WARNING,
+                                "Shell suggestion failure handler failed",
+                                callbackFailure,
+                            )
+                        }
                     }
                 }
             suggestionJob = requestJob
@@ -1835,7 +1956,7 @@ public class SwingTerminal
         private fun invalidateShellSuggestionsOnEdt() {
             cancelAndHideShellSuggestionsOnEdt("Shell suggestions invalidated by input")
             suggestionInvalidationListeners.forEach { listener ->
-                runCatching(listener::onShellSuggestionsInvalidated)
+                listener.onShellSuggestionsInvalidated()
             }
         }
 
@@ -2051,24 +2172,63 @@ public class SwingTerminal
                 renderRows = visibleRenderRows(),
                 viewportHeightPixels = viewportController.viewportPixelHeight(settings, height, renderCache.activeBuffer),
                 contentHeightPixels = visualContentHeightPixels(),
-                notifyListener = notifyListener,
-                notifyPrimitiveListener = notifyPrimitiveListener,
             )
-            updateAutomaticSuggestionEligibilityOnEdt()
+            val eligibilityChanged = applyAutomaticSuggestionEligibilityOnEdt()
+            val eligibilityRevision = automaticSuggestionEligibilityRevision
+            var failure: Throwable? = null
+            try {
+                viewportController.notifyViewportListener(notifyListener, notifyPrimitiveListener)
+            } catch (next: Throwable) {
+                failure = next
+            }
+            try {
+                notifyAutomaticSuggestionEligibilityOnEdt(eligibilityChanged, eligibilityRevision)
+            } catch (next: Throwable) {
+                failure = preserveSwingFailure(failure, next)
+            }
+            failure?.let { throw it }
         }
 
         private fun updateAutomaticSuggestionEligibilityOnEdt() {
+            val changed = applyAutomaticSuggestionEligibilityOnEdt()
+            notifyAutomaticSuggestionEligibilityOnEdt(changed, automaticSuggestionEligibilityRevision)
+        }
+
+        private fun applyAutomaticSuggestionEligibilityOnEdt(): Boolean {
+            val eligible = !disposed && settings.smartSuggestionsEnabled && isLiveViewportOnEdt() && settings.shellSuggestionsEnabled
+            if (automaticSuggestionEligible.getAndSet(eligible) == eligible) return false
+            automaticSuggestionEligibilityRevision++
+            return true
+        }
+
+        private fun notifyAutomaticSuggestionEligibilityOnEdt(
+            changed: Boolean,
+            revision: Long,
+        ) {
+            if (revision != automaticSuggestionEligibilityRevision) return
             val liveViewport = isLiveViewportOnEdt()
+            var failure: Throwable? = null
             if (!settings.smartSuggestionsEnabled || !liveViewport || !settings.shellSuggestionsEnabled && activeSuggestionIsAutomatic) {
-                cancelAndHideShellSuggestionsOnEdt(
-                    if (liveViewport) "Automatic suggestions disabled by settings" else "Viewport left live output",
-                )
+                try {
+                    cancelAndHideShellSuggestionsOnEdt(
+                        if (liveViewport) "Automatic suggestions disabled by settings" else "Viewport left live output",
+                    )
+                } catch (next: Throwable) {
+                    failure = next
+                }
             }
-            val eligible = !disposed && settings.smartSuggestionsEnabled && liveViewport && settings.shellSuggestionsEnabled
-            if (automaticSuggestionEligible.getAndSet(eligible) == eligible) return
-            suggestionEligibilityListeners.forEach { listener ->
-                runCatching { listener.onAutomaticShellSuggestionEligibilityChanged(eligible) }
+            if (changed && revision == automaticSuggestionEligibilityRevision) {
+                val eligible = automaticSuggestionEligible.get()
+                try {
+                    for (listener in suggestionEligibilityListeners) {
+                        if (revision != automaticSuggestionEligibilityRevision) break
+                        listener.onAutomaticShellSuggestionEligibilityChanged(eligible)
+                    }
+                } catch (next: Throwable) {
+                    failure = preserveSwingFailure(failure, next)
+                }
             }
+            failure?.let { throw it }
         }
 
         private fun isLiveViewportOnEdt(): Boolean = viewportController.preciseOffset == 0.0
@@ -2169,7 +2329,7 @@ public class SwingTerminal
         }
 
         private fun refreshRenderCacheFromSession(session: TerminalSession) {
-            session.renderPublisher.readCurrent { published ->
+            session.readPublishedFrame { published ->
                 renderCache.updateFrom(published)
             } ?: return
             hyperlinkDiscoveryController.scheduleForFrame()

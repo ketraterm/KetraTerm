@@ -29,18 +29,47 @@ import javax.swing.SwingUtilities
 import kotlin.test.*
 
 class SwingSettingsTest {
+    @Test
+    fun builderSnapshotsAreDetachedAndFailedUpdatesLeaveTheOriginalValid() {
+        val fonts = mutableListOf(Font(Font.MONOSPACED, Font.PLAIN, 14))
+        val builder = SwingSettings.builder()
+        builder.fallbackFonts = fonts
+        builder.padding = SwingPadding(1, 2, 3, 4)
+        builder.shellIntegrationDecorationGutterWidth = 8
+        val original = builder.build()
+        fonts.clear()
+        builder.columns = 120
+        assertEquals(80, original.columns)
+        assertEquals(1, original.fallbackFonts.size)
+        assertEquals(SwingPadding(1, 7, 3, 7), original.alternateScreenPadding)
+        assertFailsWith<IllegalArgumentException> { original.copy { it.lineHeight = Float.NaN } }
+        assertEquals(1f, original.lineHeight)
+        val updated = original.copy { it.lineHeight = 1.25f }
+        assertEquals(1.25f, updated.lineHeight)
+        assertEquals(original, updated.copy { it.lineHeight = 1f })
+        assertEquals(original.hashCode(), original.toBuilder().build().hashCode())
+    }
+
     @ParameterizedTest
     @ValueSource(floats = [Float.NaN, Float.NEGATIVE_INFINITY, Float.POSITIVE_INFINITY, -1f, 0f])
     fun invalidLineHeightsAreRejectedBeforeRendering(lineHeight: Float) {
         assertFailsWith<IllegalArgumentException> {
-            SwingSettings(lineHeight = lineHeight)
+            SwingSettings.create { draft ->
+                draft.lineHeight = lineHeight
+            }
         }
     }
 
     @ParameterizedTest
     @ValueSource(floats = [0.5f, 1f, 2f])
     fun finitePositiveLineHeightsAreAccepted(lineHeight: Float) {
-        assertEquals(lineHeight, SwingSettings(lineHeight = lineHeight).lineHeight)
+        assertEquals(
+            lineHeight,
+            SwingSettings
+                .create { draft ->
+                    draft.lineHeight = lineHeight
+                }.lineHeight,
+        )
     }
 
     @Test
@@ -65,7 +94,11 @@ class SwingSettingsTest {
             )
         for (antialiasing in antialiasingValues) {
             for (fractional in fractionalValues) {
-                val copy = settings.copy(textAntialiasing = antialiasing, fractionalMetrics = fractional)
+                val copy =
+                    settings.copy { draft ->
+                        draft.textAntialiasing = antialiasing
+                        draft.fractionalMetrics = fractional
+                    }
                 assertSame(antialiasing, copy.textAntialiasing)
                 assertSame(fractional, copy.fractionalMetrics)
             }
@@ -76,14 +109,26 @@ class SwingSettingsTest {
     fun incompatibleRenderingHintsAreRejectedBeforeRendering() {
         val settings = SwingSettings()
         for (value in listOf("on", 1, Any(), RenderingHints.VALUE_RENDER_SPEED)) {
-            assertFailsWith<IllegalArgumentException> { settings.copy(textAntialiasing = value) }
-            assertFailsWith<IllegalArgumentException> { settings.copy(fractionalMetrics = value) }
+            assertFailsWith<IllegalArgumentException> {
+                settings.copy { draft ->
+                    draft.textAntialiasing = value
+                }
+            }
+            assertFailsWith<IllegalArgumentException> {
+                settings.copy { draft ->
+                    draft.fractionalMetrics = value
+                }
+            }
         }
         assertFailsWith<IllegalArgumentException> {
-            settings.copy(textAntialiasing = RenderingHints.VALUE_FRACTIONALMETRICS_ON)
+            settings.copy { draft ->
+                draft.textAntialiasing = RenderingHints.VALUE_FRACTIONALMETRICS_ON
+            }
         }
         assertFailsWith<IllegalArgumentException> {
-            settings.copy(fractionalMetrics = RenderingHints.VALUE_TEXT_ANTIALIAS_ON)
+            settings.copy { draft ->
+                draft.fractionalMetrics = RenderingHints.VALUE_TEXT_ANTIALIAS_ON
+            }
         }
     }
 
@@ -92,11 +137,11 @@ class SwingSettingsTest {
     fun unchangedFontSettingsRetainUnsupportedGlyphResolution(fallbackCount: Int) {
         val font = Font(Font.MONOSPACED, Font.PLAIN, 14)
         val settings =
-            SwingSettings(
-                font = font,
-                fallbackFonts = List(fallbackCount) { font }.toImmutableList(),
-                useSystemFallbackFonts = false,
-            )
+            SwingSettings.create { draft ->
+                draft.font = font
+                draft.fallbackFonts = List(fallbackCount) { font }.toImmutableList()
+                draft.useSystemFallbackFonts = false
+            }
         val cache = FontCache()
         assertTrue(cache.update(settings.font, settings.fallbackFonts, settings.useSystemFallbackFonts))
         val missingGlyphFont = cache.fontForCodePoint(0x10FFFF, Font.PLAIN)
@@ -113,24 +158,30 @@ class SwingSettingsTest {
     fun settingsFontSnapshotIsIndependentOfHostList() {
         val font = Font(Font.MONOSPACED, Font.PLAIN, 14)
         val fonts = mutableListOf(font)
-        val settings = SwingSettings(fallbackFonts = fonts.toImmutableList())
+        val settings =
+            SwingSettings.create { draft ->
+                draft.fallbackFonts = fonts.toImmutableList()
+            }
         val hash = settings.hashCode()
         fonts.clear()
 
         assertEquals(listOf(font), settings.fallbackFonts)
-        assertEquals(settings, settings.copy())
-        assertEquals(hash, settings.copy().hashCode())
+        assertEquals(settings, settings.copy {})
+        assertEquals(hash, settings.copy {}.hashCode())
     }
 
     @Test
     fun settingsCopySharesImmutableValues() {
         val settings =
-            SwingSettings(
-                fallbackFonts = persistentListOf(Font(Font.MONOSPACED, Font.PLAIN, 14)),
-                padding = SwingPadding(1, 2, 3, 4),
-                alternateScreenPadding = SwingPadding(5, 6, 7, 8),
-            )
-        val copy = settings.copy(columns = 123)
+            SwingSettings.create { draft ->
+                draft.fallbackFonts = persistentListOf(Font(Font.MONOSPACED, Font.PLAIN, 14))
+                draft.padding = SwingPadding(1, 2, 3, 4)
+                draft.alternateScreenPadding = SwingPadding(5, 6, 7, 8)
+            }
+        val copy =
+            settings.copy { draft ->
+                draft.columns = 123
+            }
         assertSame(settings.padding, copy.padding)
         assertSame(settings.alternateScreenPadding, copy.alternateScreenPadding)
         assertSame(settings.fallbackFonts, copy.fallbackFonts)
@@ -142,14 +193,17 @@ class SwingSettingsTest {
     fun replacingPaddingAndFontsLeavesOriginalSettingsUnchanged() {
         val originalFont = Font(Font.MONOSPACED, Font.PLAIN, 14)
         val replacementFont = Font(Font.DIALOG, Font.BOLD, 18)
-        val settings = SwingSettings(fallbackFonts = persistentListOf(originalFont))
+        val settings =
+            SwingSettings.create { draft ->
+                draft.fallbackFonts = persistentListOf(originalFont)
+            }
         val fonts = mutableListOf(replacementFont)
         val copy =
-            settings.copy(
-                fallbackFonts = fonts.toImmutableList(),
-                padding = settings.padding.copy(left = 12),
-                alternateScreenPadding = settings.alternateScreenPadding.copy(bottom = 9),
-            )
+            settings.copy { draft ->
+                draft.fallbackFonts = fonts.toImmutableList()
+                draft.padding = settings.padding.copy(left = 12)
+                draft.alternateScreenPadding = settings.alternateScreenPadding.copy(bottom = 9)
+            }
         fonts.clear()
 
         assertEquals(listOf(originalFont), settings.fallbackFonts)
@@ -165,16 +219,23 @@ class SwingSettingsTest {
     @Test
     fun settingsRejectInvalidGridSizes() {
         assertFailsWith<IllegalArgumentException> {
-            SwingSettings(columns = 0)
+            SwingSettings.create { draft ->
+                draft.columns = 0
+            }
         }
         assertFailsWith<IllegalArgumentException> {
-            SwingSettings(rows = 0)
+            SwingSettings.create { draft ->
+                draft.rows = 0
+            }
         }
     }
 
     @Test
     fun settingsAllowZeroCursorBlinkToDisableBlinking() {
-        val settings = SwingSettings(cursorBlinkMillis = 0)
+        val settings =
+            SwingSettings.create { draft ->
+                draft.cursorBlinkMillis = 0
+            }
 
         assertEquals(0, settings.cursorBlinkMillis)
     }
@@ -285,29 +346,39 @@ class SwingSettingsTest {
     @Test
     fun settingsRejectInvalidShellIntegrationDecorationDimensions() {
         assertFailsWith<IllegalArgumentException> {
-            SwingSettings(visualBellDurationMillis = -1)
+            SwingSettings.create { draft ->
+                draft.visualBellDurationMillis = -1
+            }
         }
         assertFailsWith<IllegalArgumentException> {
-            SwingSettings(visualBellEdgeThicknessPixels = -1)
+            SwingSettings.create { draft ->
+                draft.visualBellEdgeThicknessPixels = -1
+            }
         }
         assertFailsWith<IllegalArgumentException> {
-            SwingSettings(shellIntegrationPromptDotDiameter = 0)
+            SwingSettings.create { draft ->
+                draft.shellIntegrationPromptDotDiameter = 0
+            }
         }
         assertFailsWith<IllegalArgumentException> {
-            SwingSettings(shellIntegrationDecorationGutterWidth = -1)
+            SwingSettings.create { draft ->
+                draft.shellIntegrationDecorationGutterWidth = -1
+            }
         }
         assertFailsWith<IllegalArgumentException> {
-            SwingSettings(shellIntegrationFailedCommandRailWidth = 0)
+            SwingSettings.create { draft ->
+                draft.shellIntegrationFailedCommandRailWidth = 0
+            }
         }
     }
 
     @Test
     fun settingsAcceptCustomPadding() {
         val settings =
-            SwingSettings(
-                padding = SwingPadding(4, 8, 4, 8),
-                alternateScreenPadding = SwingPadding(1, 2, 3, 4),
-            )
+            SwingSettings.create { draft ->
+                draft.padding = SwingPadding(4, 8, 4, 8)
+                draft.alternateScreenPadding = SwingPadding(1, 2, 3, 4)
+            }
         assertEquals(SwingPadding(4, 8, 4, 8), settings.padding)
         assertEquals(SwingPadding(1, 2, 3, 4), settings.alternateScreenPadding)
     }
@@ -331,10 +402,10 @@ class SwingSettingsTest {
     @Test
     fun alternateScreenChromeDoesNotInheritPrimaryScrollbarGutter() {
         val settings =
-            SwingSettings(
-                padding = SwingPadding(0, 40, 8, 14),
-                alternateScreenPadding = SwingPadding(0, 3, 4, 5),
-            )
+            SwingSettings.create { draft ->
+                draft.padding = SwingPadding(0, 40, 8, 14)
+                draft.alternateScreenPadding = SwingPadding(0, 3, 4, 5)
+            }
 
         assertEquals(56, SwingTerminalChrome.left(settings, TerminalRenderBufferKind.PRIMARY))
         assertEquals(14, SwingTerminalChrome.right(settings, TerminalRenderBufferKind.PRIMARY))
@@ -348,10 +419,14 @@ class SwingSettingsTest {
     @Test
     fun settingsRejectNegativePaddingEdges() {
         assertFailsWith<IllegalArgumentException> {
-            SwingSettings(padding = SwingPadding(0, -1, 0, 0))
+            SwingSettings.create { draft ->
+                draft.padding = SwingPadding(0, -1, 0, 0)
+            }
         }
         assertFailsWith<IllegalArgumentException> {
-            SwingSettings(alternateScreenPadding = SwingPadding(0, 0, 0, -1))
+            SwingSettings.create { draft ->
+                draft.alternateScreenPadding = SwingPadding(0, 0, 0, -1)
+            }
         }
     }
 
@@ -476,7 +551,10 @@ class SwingSettingsTest {
     fun componentReportsVisibleGridFromFrozenMetrics() {
         val component =
             SwingTerminal(settingsProvider = {
-                SwingSettings(columns = 10, rows = 4)
+                SwingSettings.create { draft ->
+                    draft.columns = 10
+                    draft.rows = 4
+                }
             })
         val preferred = component.preferredSize
         var visibleColumns = 0
@@ -498,12 +576,12 @@ class SwingSettingsTest {
         SwingUtilities.invokeAndWait {
             val component =
                 SwingTerminal(settingsProvider = {
-                    SwingSettings(
-                        columns = 10,
-                        rows = 4,
-                        padding = SwingPadding(3, 5, 7, 11),
-                        alternateScreenPadding = SwingPadding(2, 4, 6, 8),
-                    )
+                    SwingSettings.create { draft ->
+                        draft.columns = 10
+                        draft.rows = 4
+                        draft.padding = SwingPadding(3, 5, 7, 11)
+                        draft.alternateScreenPadding = SwingPadding(2, 4, 6, 8)
+                    }
                 })
             val cellWidth = (component.preferredGridSize(2, 1).width - component.preferredGridSize(1, 1).width)
             val cellHeight = (component.preferredGridSize(1, 2).height - component.preferredGridSize(1, 1).height)

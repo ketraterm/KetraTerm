@@ -498,6 +498,8 @@ class TerminalHyperlinkControllerTest {
     }
 
     private object NoOpInputEncoder : TerminalInputEncoder {
+        override fun setInputPolicy(policy: io.github.ketraterm.input.policy.TerminalInputPolicy) = Unit
+
         override fun encodeKey(event: TerminalKeyEvent) = Unit
 
         override fun encodePaste(event: TerminalPasteEvent) = Unit
@@ -517,7 +519,14 @@ class TerminalHyperlinkControllerTest {
         val terminal = TerminalBuffers.create(width = width, height = height, maxHistory = maxHistory)
         val session = TerminalSession.create(terminal = terminal, connector = NoOpConnector, hostPolicy = hostPolicy)
         val cache = TerminalRenderCache(width, height)
-        val host = FakeHyperlinkHost(cache, session, SwingHostServices(hyperlinkHandler = hyperlinkHandler))
+        val host =
+            FakeHyperlinkHost(
+                cache,
+                session,
+                SwingHostServices.create { draft ->
+                    draft.hyperlinkHandler = hyperlinkHandler
+                },
+            )
         val controller = TerminalHyperlinkController(host)
         private val component = JButton()
 
@@ -617,40 +626,6 @@ class TerminalHyperlinkControllerTest {
             }
         }
 
-        fun click(
-            column: Int,
-            row: Int,
-        ): Boolean {
-            val event =
-                MouseEvent(
-                    component,
-                    MouseEvent.MOUSE_PRESSED,
-                    0L,
-                    InputEvent.BUTTON1_DOWN_MASK or hyperlinkNavigationModifierMask,
-                    column * CELL_WIDTH + CELL_WIDTH / 2,
-                    row * CELL_HEIGHT + CELL_HEIGHT / 2,
-                    1,
-                    false,
-                    MouseEvent.BUTTON1,
-                )
-            controller.handleMousePressed(event)
-            val release =
-                MouseEvent(
-                    component,
-                    MouseEvent.MOUSE_RELEASED,
-                    0L,
-                    hyperlinkNavigationModifierMask,
-                    event.x,
-                    event.y,
-                    1,
-                    false,
-                    MouseEvent.BUTTON1,
-                )
-            val handled = controller.handleMouseReleased(release)
-            assertEquals(handled, release.isConsumed)
-            return handled
-        }
-
         fun assertNoHover() {
             assertEquals(0, controller.hoveredHyperlinkId)
             assertEquals(Cursor.getDefaultCursor(), host.cursor)
@@ -690,7 +665,7 @@ class TerminalHyperlinkControllerTest {
                 responseReader = terminal,
                 connector = NoOpConnector,
                 parser = NoOpParser,
-                inputEncoder = NoOpInputEncoder,
+                inputEncoderFactory = { _, _, _ -> object : TerminalInputEncoder by NoOpInputEncoder {} },
                 hyperlinkResolver = { id -> if (id == 5) "https://example.com" else null },
             )
         val host = FakeHyperlinkHost(cache, session, SwingHostServices())
@@ -727,7 +702,7 @@ class TerminalHyperlinkControllerTest {
                 responseReader = terminal,
                 connector = NoOpConnector,
                 parser = NoOpParser,
-                inputEncoder = NoOpInputEncoder,
+                inputEncoderFactory = { _, _, _ -> object : TerminalInputEncoder by NoOpInputEncoder {} },
                 hyperlinkResolver = { id -> if (id == 5) "https://example.com" else null },
             )
         val host = FakeHyperlinkHost(cache, session, SwingHostServices())
@@ -760,7 +735,7 @@ class TerminalHyperlinkControllerTest {
                 responseReader = terminal,
                 connector = NoOpConnector,
                 parser = NoOpParser,
-                inputEncoder = NoOpInputEncoder,
+                inputEncoderFactory = { _, _, _ -> object : TerminalInputEncoder by NoOpInputEncoder {} },
                 hyperlinkResolver = { id -> if (id == 5) "https://example.com" else null },
             )
         val host = FakeHyperlinkHost(cache, session, SwingHostServices())
@@ -801,7 +776,7 @@ class TerminalHyperlinkControllerTest {
                 responseReader = terminal,
                 connector = NoOpConnector,
                 parser = NoOpParser,
-                inputEncoder = NoOpInputEncoder,
+                inputEncoderFactory = { _, _, _ -> object : TerminalInputEncoder by NoOpInputEncoder {} },
                 hyperlinkResolver = { id -> if (id == 5) "https://example.com" else null },
             )
         val host = FakeHyperlinkHost(cache, session, SwingHostServices())
@@ -835,7 +810,7 @@ class TerminalHyperlinkControllerTest {
                 responseReader = terminal,
                 connector = NoOpConnector,
                 parser = NoOpParser,
-                inputEncoder = NoOpInputEncoder,
+                inputEncoderFactory = { _, _, _ -> object : TerminalInputEncoder by NoOpInputEncoder {} },
                 hyperlinkResolver = { id -> if (id == 5) "https://example.com" else null },
             )
         val host = FakeHyperlinkHost(cache, session, SwingHostServices())
@@ -984,7 +959,7 @@ class TerminalHyperlinkControllerTest {
                 responseReader = terminal,
                 connector = NoOpConnector,
                 parser = NoOpParser,
-                inputEncoder = NoOpInputEncoder,
+                inputEncoderFactory = { _, _, _ -> object : TerminalInputEncoder by NoOpInputEncoder {} },
                 hyperlinkResolver = { id -> if (id == 5) "https://example.com" else null },
             )
         val openedUri = AtomicReference<String?>()
@@ -993,7 +968,14 @@ class TerminalHyperlinkControllerTest {
                 openedUri.set(uri)
                 true
             }
-        val host = FakeHyperlinkHost(cache, session, SwingHostServices(hyperlinkHandler = handler))
+        val host =
+            FakeHyperlinkHost(
+                cache,
+                session,
+                SwingHostServices.create { draft ->
+                    draft.hyperlinkHandler = handler
+                },
+            )
         val controller = TerminalHyperlinkController(host)
 
         val button = JButton()

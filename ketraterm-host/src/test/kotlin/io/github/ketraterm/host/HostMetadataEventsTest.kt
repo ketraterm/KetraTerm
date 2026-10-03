@@ -21,6 +21,8 @@ import io.github.ketraterm.protocol.NotificationLevel
 import io.github.ketraterm.render.api.TerminalColorPalette
 import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.Test
+import org.junit.jupiter.params.ParameterizedTest
+import org.junit.jupiter.params.provider.ValueSource
 
 class HostMetadataEventsTest {
     @Test
@@ -99,6 +101,95 @@ class HostMetadataEventsTest {
         assertEquals(listOf("cleared", "registered:4:https://b:key"), f.events.takeLast(2))
         assertNull(f.sink.hyperlinkUri(2))
         assertNull(f.sink.hyperlinkUri(3))
+    }
+
+    @ParameterizedTest
+    @ValueSource(ints = [0, 3, 4])
+    fun `lowered registry limit reconciles new and reused links at every byte split`(key: Int) {
+        val bytes = "\u001B]8;id=$key;https://$key\u001B\\X".encodeToByteArray()
+        for (split in 0..bytes.size) {
+            val f = Fixture(HostPolicy(maxHyperlinkEntries = 4))
+            repeat(4) { f.accept("\u001B]8;id=$it;https://$it\u0007") }
+            f.events.clear()
+            f.sink.setHostPolicy(HostPolicy(maxHyperlinkEntries = 1))
+            assertTrue(f.events.isEmpty())
+            repeat(4) { assertEquals("https://$it", f.sink.hyperlinkUri(it + 1)) }
+
+            f.parser.accept(bytes, 0, split)
+            f.parser.accept(bytes, split, bytes.size - split)
+
+            val retainedId = key + 1
+            assertEquals(retainedId, f.terminal.getAttrAt(0, 0)?.hyperlinkId, "split $split")
+            assertEquals("https://$key", f.sink.hyperlinkUri(retainedId))
+            val retiredIds = (1..4).filter { it != retainedId }
+            retiredIds.forEach { assertNull(f.sink.hyperlinkUri(it)) }
+            val registration = if (key == 4) listOf("registered:5:https://4:4") else emptyList()
+            assertEquals(retiredIds.map { "removed:$it" } + registration, f.events, "split $split")
+        }
+    }
+
+    @Test
+    fun `denied and malformed opens defer trimming until an accepted open`() {
+        val f = Fixture(HostPolicy(maxHyperlinkEntries = 2))
+        f.accept("\u001B]8;id=a;https://a\u0007\u001B]8;id=b;https://b\u0007")
+        f.events.clear()
+        f.sink.setHostPolicy(HostPolicy(maxHyperlinkEntries = 1, hyperlinkPolicy = HostControlPolicy.DENY))
+        f.accept("\u001B]8;id=c;https://c\u0007X")
+        f.sink.setHostPolicy(HostPolicy(maxHyperlinkEntries = 1, maxHyperlinkUriLength = 9))
+        f.accept("\u001B]8;id=c;https://too-long\u0007Y\u001B]8;;\u0007")
+        assertTrue(f.events.isEmpty())
+        assertEquals("https://a", f.sink.hyperlinkUri(1))
+        assertEquals("https://b", f.sink.hyperlinkUri(2))
+        assertEquals(0, f.terminal.getAttrAt(0, 0)?.hyperlinkId)
+        assertEquals(0, f.terminal.getAttrAt(1, 0)?.hyperlinkId)
+
+        f.accept("\u001B]8;id=c;https://c\u0007Z")
+        assertEquals(listOf("removed:1", "removed:2", "registered:3:https://c:c"), f.events)
+        f.sink.setHostPolicy(HostPolicy(maxHyperlinkEntries = Int.MAX_VALUE))
+        f.accept("\u001B]8;id=d;https://d\u0007")
+        assertEquals("https://c", f.sink.hyperlinkUri(3))
+        assertEquals("https://d", f.sink.hyperlinkUri(4))
+        assertEquals("registered:4:https://d:d", f.events.last())
+    }
+
+    @Test
+    fun `failed eviction callback aborts admission with coherent indexes and permits recovery`() {
+        val failure = IllegalStateException("removal failed")
+        val events = mutableListOf<String>()
+        var failRemoval = true
+        val sink =
+            HostCommandAdapter(
+                TerminalBuffers.create(10, 3),
+                object : HostEventSink by HostEventSink.NONE {
+                    override fun hyperlinkRemoved(hyperlinkId: Int) {
+                        events += "removed:$hyperlinkId"
+                        if (failRemoval) throw failure
+                    }
+
+                    override fun hyperlinkRegistered(
+                        hyperlinkId: Int,
+                        uri: String,
+                        id: String?,
+                    ) {
+                        events += "registered:$hyperlinkId"
+                    }
+                },
+                HostPolicy(maxHyperlinkEntries = 3),
+            )
+        repeat(3) { sink.startHyperlink("https://$it", "$it") }
+        events.clear()
+        sink.setHostPolicy(HostPolicy(maxHyperlinkEntries = 1))
+        assertSame(failure, assertThrows(IllegalStateException::class.java) { sink.startHyperlink("https://new", "new") })
+        assertEquals(listOf("removed:1"), events)
+        assertNull(sink.hyperlinkUri(1))
+        assertNull(sink.hyperlinkUri(4))
+
+        failRemoval = false
+        sink.startHyperlink("https://0", "0")
+        assertEquals(listOf("removed:1", "removed:2", "removed:3", "registered:4"), events)
+        assertNull(sink.hyperlinkUri(2))
+        assertNull(sink.hyperlinkUri(3))
+        assertEquals("https://0", sink.hyperlinkUri(4))
     }
 
     @Test

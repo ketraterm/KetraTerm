@@ -48,13 +48,13 @@ public object PtyConnectors {
         rows: Int = 24,
     ): TerminalConnector {
         val options =
-            PtyOptions(
-                command = command,
-                environment = env,
-                workingDirectory = workingDirectory,
-                columns = columns,
-                rows = rows,
-            )
+            PtyOptions.create { draft ->
+                draft.command = command
+                draft.environment = env
+                draft.workingDirectory = workingDirectory
+                draft.columns = columns
+                draft.rows = rows
+            }
         return create(options, Pty4jProcessFactory)
     }
 

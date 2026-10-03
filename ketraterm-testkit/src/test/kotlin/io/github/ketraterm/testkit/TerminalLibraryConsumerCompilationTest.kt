@@ -38,18 +38,56 @@ class TerminalLibraryConsumerCompilationTest {
 
     @ParameterizedTest
     @CsvSource(
+        "getShellIntegrationState().clear()",
+        "getShellIntegrationState().recordPromptStart(1L)",
+        "getRenderPublisher().updateAndPublish(null)",
+    )
+    fun `session consumers cannot publish through their read access`(operation: String) {
+        assertCompilation(
+            "ui-swing",
+            """
+            import io.github.ketraterm.session.TerminalSession;
+            final class Consumer {
+                void mutate(TerminalSession session) { session.$operation; }
+            }
+            """.trimIndent(),
+            expectedSuccess = false,
+        )
+    }
+
+    @Test
+    fun `Java consumers can observe shell projections and borrow session frames`() {
+        assertCompilation(
+            "ui-swing",
+            """
+            import io.github.ketraterm.session.TerminalSession;
+            import io.github.ketraterm.session.TerminalShellIntegrationView;
+            final class Consumer {
+                Integer read(TerminalSession session) {
+                    TerminalShellIntegrationView view = session.getShellIntegrationState();
+                    int records = view.recordCount();
+                    return session.readPublishedFrame(cache -> cache.getCodeWords()[0] + records);
+                }
+            }
+            """.trimIndent(),
+        )
+    }
+
+    @ParameterizedTest
+    @CsvSource(
         "host,io.github.ketraterm.host.HostPolicy",
         "parser,io.github.ketraterm.parser.api.TerminalOutputParser",
         "completion,io.github.ketraterm.completion.api.TerminalCompletionCandidateKind",
         "completion-host,io.github.ketraterm.completion.host.TerminalBoundedDirectoryScanner",
         "ui-swing,io.github.ketraterm.ui.swing.api.SwingTerminal",
+        "ui-swing-host,io.github.ketraterm.ui.swing.host.SwingShellSuggestionTarget",
         "pty,io.github.ketraterm.pty.PtyConnector",
     )
     fun `isolated consumer classpaths contain the requested library and Kotlin runtime`(
         module: String,
         publicType: String,
     ) {
-        assertCompiles(
+        assertCompilation(
             module,
             """
             final class Consumer {
@@ -61,8 +99,37 @@ class TerminalLibraryConsumerCompilationTest {
     }
 
     @Test
+    fun `Swing host exports native popup coordination and independently callable provider to Java`() {
+        assertCompilation(
+            "ui-swing-host",
+            """
+            import io.github.ketraterm.completion.api.TerminalCompletionEngine;
+            import io.github.ketraterm.session.TerminalShellCommandLineSnapshot;
+            import io.github.ketraterm.ui.swing.api.SwingTerminal;
+            import io.github.ketraterm.ui.swing.host.*;
+            import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionRequest;
+            import kotlin.jvm.functions.Function0;
+
+            final class Consumer {
+                static final class Popup implements SwingShellSuggestionTarget {
+                    @Override public void requestSuggestions(TerminalShellCommandLineSnapshot snapshot) {}
+                    @Override public void hideSuggestions() {}
+                }
+                void wire(SwingLiveCompletionBinding binding, SwingTerminal terminal,
+                          TerminalCompletionEngine engine, Function0<SwingCompletionContext> context) {
+                    binding.attach(terminal, new Popup());
+                    var provider = new SwingCompletionSuggestionProvider(engine, context);
+                    provider.suggestions(new SwingShellSuggestionRequest("git", 3, 3, 0));
+                    terminal.copyCellBounds(3, 0, new java.awt.Rectangle());
+                }
+            }
+            """.trimIndent(),
+        )
+    }
+
+    @Test
     fun `completion host exports Java scanner configuration overloads`() {
-        assertCompiles(
+        assertCompilation(
             "completion-host",
             """
             import io.github.ketraterm.completion.host.TerminalBoundedDirectoryScanner;
@@ -84,7 +151,7 @@ class TerminalLibraryConsumerCompilationTest {
 
     @Test
     fun `host dependency exports the types needed to call its adapter`() {
-        assertCompiles(
+        assertCompilation(
             "host",
             """
             import io.github.ketraterm.host.HostCommandAdapter;
@@ -100,7 +167,7 @@ class TerminalLibraryConsumerCompilationTest {
 
     @Test
     fun `parser dependency exports protocol types in its sink contract`() {
-        assertCompiles(
+        assertCompilation(
             "parser",
             """
             import io.github.ketraterm.parser.spi.TerminalCommandSink;
@@ -122,7 +189,7 @@ class TerminalLibraryConsumerCompilationTest {
 
     @Test
     fun `host dependency exports the core types needed to construct its adapter`() {
-        assertCompiles(
+        assertCompilation(
             "host",
             """
             import io.github.ketraterm.core.api.TerminalBuffer;
@@ -141,7 +208,7 @@ class TerminalLibraryConsumerCompilationTest {
 
     @Test
     fun `completion dependency exports the flow returned by its engine`() {
-        assertCompiles(
+        assertCompilation(
             "completion",
             """
             import io.github.ketraterm.completion.api.TerminalCompletionEngine;
@@ -158,7 +225,7 @@ class TerminalLibraryConsumerCompilationTest {
 
     @Test
     fun `Swing dependency exports session and flow types needed by host integration`() {
-        assertCompiles(
+        assertCompilation(
             "ui-swing",
             """
             import io.github.ketraterm.session.TerminalSession;
@@ -182,7 +249,7 @@ class TerminalLibraryConsumerCompilationTest {
 
     @Test
     fun `PTY dependency exports the native process type in its public connector constructor`() {
-        assertCompiles(
+        assertCompilation(
             "pty",
             """
             import com.pty4j.PtyProcess;
@@ -197,9 +264,10 @@ class TerminalLibraryConsumerCompilationTest {
         )
     }
 
-    private fun assertCompiles(
+    private fun assertCompilation(
         module: String,
         source: String,
+        expectedSuccess: Boolean = true,
     ) {
         val classpaths =
             Path.of(
@@ -233,8 +301,8 @@ class TerminalLibraryConsumerCompilationTest {
                         fileManager.getJavaFileObjects(sourceFile.toFile()),
                     ).call()
             assertTrue(
-                compiled,
-                "A consumer depending only on ketraterm-$module must compile:\n" +
+                compiled == expectedSuccess,
+                "Consumer of ketraterm-$module expected compilation success=$expectedSuccess:\n" +
                     diagnostics.diagnostics.joinToString("\n") { it.getMessage(Locale.ROOT) },
             )
         }

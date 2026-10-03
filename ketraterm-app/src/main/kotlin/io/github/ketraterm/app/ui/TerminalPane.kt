@@ -53,7 +53,7 @@ internal class TerminalPane private constructor(
     fun reloadSettings() {
         terminal.reloadSettings()
         component.background = terminal.background
-        searchBar.refreshColors()
+        searchBar.refreshColors(Chrome.searchColors())
         tab.session.setHostPolicy(settings.createHostPolicy())
         completionBinding.update(
             completionResources.takeIf { settings.config.smartSuggestionsEnabled },
@@ -140,25 +140,25 @@ internal class TerminalPane private constructor(
                     SwingTerminal(
                         settingsProvider = { settings.current() },
                         hostServices =
-                            SwingHostServices(
-                                shellSuggestionProvider = completionBinding.provider,
-                                shellSuggestionHandler = SwingShellSuggestionHandler.createDefault(tab.session),
-                                shellSuggestionFeedbackHandler = completionBinding.feedbackHandler,
-                                shellSuggestionKeymap = SwingShellSuggestionKeymap.STANDARD,
-                                hostKeyHandler = { event -> shortcutControllerRef[0]?.handleKeyPressed(event) == true },
-                                contextMenuHandler =
+                            SwingHostServices.create { draft ->
+                                draft.shellSuggestionProvider = completionBinding.provider
+                                draft.shellSuggestionHandler = SwingShellSuggestionHandler.createDefault(tab.session)
+                                draft.shellSuggestionFeedbackHandler = completionBinding.feedbackHandler
+                                draft.shellSuggestionKeymap = SwingShellSuggestionKeymap.STANDARD
+                                draft.hostKeyHandler = { event -> shortcutControllerRef[0]?.handleKeyPressed(event) == true }
+                                draft.contextMenuHandler =
                                     SwingTerminalContextMenuHandler { request ->
                                         val pane = paneRef[0] ?: return@SwingTerminalContextMenuHandler false
                                         onContextMenu(pane, request)
                                         true
-                                    },
-                            ),
+                                    }
+                            },
                     )
 
                 ownedTerminal = terminal
                 terminal.bind(tab.session)
 
-                val searchBar = SwingTerminalSearchBar(terminal)
+                val searchBar = SwingTerminalSearchBar(terminal).apply { refreshColors(Chrome.searchColors()) }
                 ownedSearchBar = searchBar
                 val clipboardReadPrompt =
                     SwingClipboardReadPrompt { message, decide ->

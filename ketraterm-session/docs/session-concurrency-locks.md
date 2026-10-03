@@ -6,7 +6,7 @@ The session consumes borrowed inbound bytes and performs parser/core mutation sy
 
 - `mutationLock` serializes parser/core mutation, resize and render extraction. A borrowed `TerminalRenderFrame` is valid only while its callback holds this monitor. Consumers must copy promptly and must not call a mutating session API from the callback.
 - `outboundWriteLock` protects the ordinary encoder's scratch, input policy, startup state, and queue admission/draining. It never covers a connector write or bulk encoding. A complete input operation or response batch is admitted under one acquisition.
-- `TerminalRenderPublisher` owns its lease lock so the worker can promote a back cache only when no reader still leases the front cache.
+- `TerminalRenderPublisher` owns its lease lock. Promotion can proceed while readers pin an older front; a pinned cache cannot be recycled as a writer buffer. Session consumers borrow through `readPublishedFrame` and cannot retrieve the publisher.
 
 When both session monitors are needed, acquire mutation before outbound. The writer copies queued bytes into its own scratch under outbound serialization, releases the monitor, and only then calls the connector. Producers cannot modify that scratch until the synchronous connector call returns.
 
@@ -34,11 +34,24 @@ A slow connector backpressures bulk encoding on the I/O worker. Producers can co
 
 ## Acceptance and lifecycle
 
-Input methods return after admission, not transport completion. For ordinary input this includes encoding/copying; for paste and replacement it includes source retention and mode/policy capture. Startup `SUBMITTED` also means queue acceptance. The connector contract is unchanged: each `write` synchronously consumes or copies the supplied bytes. Embedders supplying a custom input encoder retain synchronous invocation and own its output sink; `TerminalSession.create` wires the standard shared writer.
+Startup claims one attempt under the connector lifecycle monitor, independently
+of observable readiness. State remains `Created` and user input is ignored until
+`connector.start` returns successfully. Synchronous startup output is parsed and
+its replies enter the bounded queue, but the writer remains unstarted. Session
+then publishes `Running` before starting the writer, so even reentrant observers
+can admit keys, paste, or replacement without reaching an unready connector.
+Replies already queued precede that input. Startup failure or closure discards
+the queue, cancels the unstarted writer, and never publishes `Running`. Reentrant
+closure from a `Running` observer closes the already-started connector; it cannot
+cause another start. Concurrent startup and connector disposal remain serialized.
 
-`state` retains `Created`, `Running`, or `Closed`. Budget exhaustion and native write failure use `Closed.event.failure`, close the connector, discard pending output, and cancel session children. A failed transport write may already have sent a prefix; no bytes are retried.
+Input methods return after admission, not transport completion. For ordinary input this includes encoding/copying; for paste and replacement it includes source retention and mode/policy capture. Startup `SUBMITTED` also means queue acceptance. Each connector `write` synchronously consumes or copies the supplied bytes. Custom encoder factories receive the same session-owned output paths and create independent admission and bulk instances; their calls and policy updates are serialized per instance, while the two instances may run concurrently. Rejected policy updates leave the session policy and reported Backarrow default unchanged.
 
-Local close publishes the closed state and calls `connector.close` before taking cleanup locks. It does not join the writer while a native call is blocked. Remote close cancels pending writes too. A connector must tolerate concurrent close; session cancellation alone cannot interrupt an arbitrary native call. The ring is cleared/released and pending bulk references are dropped on cleanup. While open, active bulk work remains charged to the budgets until its callback returns. The bulk sink checks closure/cancellation before every chunk; a racing native call already entered can finish, and pure encoding between writes is bounded by admitted work. Writer scratch is cleared when its call returns and the coroutine unwinds.
+`state` retains `Created`, `Running`, or `Closed`. Budget exhaustion and outbound worker failure use `Closed.event.failure`, close the connector, discard pending output, and cancel session children. A failed transport write or bulk encoder may already have sent a prefix; no bytes are retried.
+
+The writer is essential even though session children are supervised. A connector or bulk encoder throwing `CancellationException` while the session remains open triggers the same failure shutdown, retaining that exception before it is rethrown. Cancellation after a termination event has already been claimed preserves that first event, even while connector cleanup is still running and the session job remains active. Cleanup failures are suppressed on the original failure; no replacement writer is started.
+
+Local close claims termination and calls `connector.close` before taking cleanup locks. It does not join the writer while a native call is blocked. Remote close cancels pending writes too. A connector must tolerate concurrent close; session cancellation alone cannot interrupt an arbitrary native call. The ring is cleared/released and pending bulk references are dropped on cleanup. While open, active bulk work remains charged to the budgets until its callback returns. The bulk sink checks closure/cancellation before every chunk; a racing native call already entered can finish, and pure encoding between writes is bounded by admitted work. Writer scratch is cleared when its call returns and the coroutine unwinds. `Closed` is published after cleanup and final frame publication have been attempted.
 
 ## Selected shell integration
 

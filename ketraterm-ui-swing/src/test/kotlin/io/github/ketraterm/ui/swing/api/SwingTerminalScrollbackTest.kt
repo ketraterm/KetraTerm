@@ -33,6 +33,8 @@ import io.github.ketraterm.transport.TerminalConnectorListener
 import io.github.ketraterm.ui.swing.settings.SwingPadding
 import io.github.ketraterm.ui.swing.settings.SwingSettings
 import io.github.ketraterm.ui.swing.settings.SwingSettingsProvider
+import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionEligibilityListener
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.test.StandardTestDispatcher
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Assertions.*
@@ -90,7 +92,13 @@ class SwingTerminalScrollbackTest {
                     updates.add(state.scrollbackOffset)
                 }
             }
-        return SwingTerminal(settingsProvider = settingsProvider, hostServices = hostServices.copy(viewportListener = listener)).also {
+        return SwingTerminal(
+            settingsProvider = settingsProvider,
+            hostServices =
+                hostServices.copy { draft ->
+                    draft.viewportListener = listener
+                },
+        ).also {
             components += it
             viewportUpdates[it] = updates
         }
@@ -137,10 +145,11 @@ class SwingTerminalScrollbackTest {
                 responseReader = terminal,
                 connector = NoOpConnector,
                 parser = NoOpParser,
-                inputEncoder = NoOpInputEncoder,
+                inputEncoderFactory = { _, _, _ -> object : TerminalInputEncoder by NoOpInputEncoder {} },
                 workerDispatcher = dispatcher,
             ).also(sessions::add)
-        session.renderPublisher.updateAndPublish(renderReader)
+        session.requestRender(0)
+        dispatcher.scheduler.runCurrent()
         val component = createComponent()
         val oldManager = RepaintManager.currentManager(component)
         val repaintManager = CountingRepaintManager(component)
@@ -195,10 +204,11 @@ class SwingTerminalScrollbackTest {
                 responseReader = terminal,
                 connector = NoOpConnector,
                 parser = NoOpParser,
-                inputEncoder = NoOpInputEncoder,
+                inputEncoderFactory = { _, _, _ -> object : TerminalInputEncoder by NoOpInputEncoder {} },
                 workerDispatcher = dispatcher,
             ).also(sessions::add)
-        session.renderPublisher.updateAndPublish(renderReader)
+        session.requestRender(0)
+        dispatcher.scheduler.runCurrent()
         val component = scrollTestTerminal()
 
         SwingUtilities.invokeAndWait {
@@ -243,7 +253,7 @@ class SwingTerminalScrollbackTest {
                 responseReader = terminal,
                 connector = NoOpConnector,
                 parser = NoOpParser,
-                inputEncoder = NoOpInputEncoder,
+                inputEncoderFactory = { _, _, _ -> object : TerminalInputEncoder by NoOpInputEncoder {} },
                 workerDispatcher = dispatcher,
             ).also(sessions::add)
         val component = scrollTestTerminal()
@@ -287,7 +297,7 @@ class SwingTerminalScrollbackTest {
                 responseReader = terminal,
                 connector = NoOpConnector,
                 parser = NoOpParser,
-                inputEncoder = NoOpInputEncoder,
+                inputEncoderFactory = { _, _, _ -> object : TerminalInputEncoder by NoOpInputEncoder {} },
                 workerDispatcher = dispatcher,
             ).also(sessions::add)
         val component = scrollTestTerminal()
@@ -297,7 +307,7 @@ class SwingTerminalScrollbackTest {
                 component.setSize(30, 100)
                 try {
                     component.bind(session)
-                    assertNull(session.renderPublisher.readCurrent { true }, "The worker has not published the initial viewport yet")
+                    assertNull(session.readPublishedFrame { true }, "The worker has not published the initial viewport yet")
                     dispatcher.scheduler.runCurrent()
                     assertEquals(5, component.viewportState().historySize, "Scrolling requires the published history bounds")
 
@@ -332,15 +342,15 @@ class SwingTerminalScrollbackTest {
                 responseReader = terminal,
                 connector = NoOpConnector,
                 parser = NoOpParser,
-                inputEncoder = NoOpInputEncoder,
+                inputEncoderFactory = { _, _, _ -> object : TerminalInputEncoder by NoOpInputEncoder {} },
                 workerDispatcher = dispatcher,
             ).also(sessions::add)
         val component =
             scrollTestTerminal(
                 hostServices =
-                    SwingHostServices(
-                        viewportListener = listener,
-                    ),
+                    SwingHostServices.create { draft ->
+                        draft.viewportListener = listener
+                    },
             )
 
         SwingUtilities.invokeAndWait {
@@ -380,7 +390,7 @@ class SwingTerminalScrollbackTest {
                 responseReader = terminal,
                 connector = NoOpConnector,
                 parser = NoOpParser,
-                inputEncoder = NoOpInputEncoder,
+                inputEncoderFactory = { _, _, _ -> object : TerminalInputEncoder by NoOpInputEncoder {} },
                 workerDispatcher = dispatcher,
             ).also(sessions::add)
         val component = scrollTestTerminal()
@@ -406,7 +416,7 @@ class SwingTerminalScrollbackTest {
             assertEquals(1, renderReader.lastRequestedOffset)
             assertEquals(11, renderReader.lastRequestedRows)
             assertEquals(11, component.viewportState().requestedRows)
-            session.renderPublisher.readCurrent { assertEquals(11, it.rows) }
+            session.readPublishedFrame { assertEquals(11, it.rows) }
         }
         session.close()
     }
@@ -423,7 +433,7 @@ class SwingTerminalScrollbackTest {
                 responseReader = terminal,
                 connector = NoOpConnector,
                 parser = NoOpParser,
-                inputEncoder = NoOpInputEncoder,
+                inputEncoderFactory = { _, _, _ -> object : TerminalInputEncoder by NoOpInputEncoder {} },
                 workerDispatcher = dispatcher,
             ).also(sessions::add)
         val component = scrollTestTerminal()
@@ -460,10 +470,11 @@ class SwingTerminalScrollbackTest {
                 responseReader = terminal,
                 connector = NoOpConnector,
                 parser = NoOpParser,
-                inputEncoder = NoOpInputEncoder,
+                inputEncoderFactory = { _, _, _ -> object : TerminalInputEncoder by NoOpInputEncoder {} },
                 workerDispatcher = dispatcher,
             ).also(sessions::add)
-        session.renderPublisher.updateAndPublish(renderReader)
+        session.requestRender(0)
+        dispatcher.scheduler.runCurrent()
         val component = scrollTestTerminal()
 
         SwingUtilities.invokeAndWait {
@@ -491,11 +502,12 @@ class SwingTerminalScrollbackTest {
                 responseReader = terminal,
                 connector = NoOpConnector,
                 parser = NoOpParser,
-                inputEncoder = NoOpInputEncoder,
+                inputEncoderFactory = { _, _, _ -> object : TerminalInputEncoder by NoOpInputEncoder {} },
                 workerDispatcher = dispatcher,
             ).also {
                 sessions += it
-                it.renderPublisher.updateAndPublish(reader)
+                it.requestRender(0)
+                dispatcher.scheduler.runCurrent()
             }
         }
         val leftSession = newSession()
@@ -542,17 +554,18 @@ class SwingTerminalScrollbackTest {
                 responseReader = terminal,
                 connector = NoOpConnector,
                 parser = NoOpParser,
-                inputEncoder = NoOpInputEncoder,
+                inputEncoderFactory = { _, _, _ -> object : TerminalInputEncoder by NoOpInputEncoder {} },
                 workerDispatcher = dispatcher,
                 shellIntegration = TerminalShellIntegrationFactory.host(shellIntegrationState),
             ).also(sessions::add)
-        session.renderPublisher.updateAndPublish(reader)
+        session.requestRender(0)
+        dispatcher.scheduler.runCurrent()
         val component =
             scrollTestTerminal(
                 settings =
-                    SwingSettings(
-                        padding = SwingPadding(0, 0, 0, 0),
-                    ),
+                    SwingSettings.create { draft ->
+                        draft.padding = SwingPadding(0, 0, 0, 0)
+                    },
             )
 
         SwingUtilities.invokeAndWait {
@@ -605,16 +618,16 @@ class SwingTerminalScrollbackTest {
                 responseReader = terminal,
                 connector = connector,
                 parser = NoOpParser,
-                inputEncoder = NoOpInputEncoder,
+                inputEncoderFactory = { _, _, _ -> object : TerminalInputEncoder by NoOpInputEncoder {} },
                 workerDispatcher = dispatcher,
                 shellIntegration = TerminalShellIntegrationFactory.host(shellIntegrationState),
             ).also(sessions::add)
         val settingsProvider =
             MutableSettingsProvider(
-                SwingSettings(
-                    padding = SwingPadding(0, 0, 0, 0),
-                    shellIntegrationPromptDotsVisible = false,
-                ),
+                SwingSettings.create { draft ->
+                    draft.padding = SwingPadding(0, 0, 0, 0)
+                    draft.shellIntegrationPromptDotsVisible = false
+                },
             )
         val component = createComponent(settingsProvider = settingsProvider)
 
@@ -629,7 +642,10 @@ class SwingTerminalScrollbackTest {
         assertEquals(3, connector.lastColumns.get())
         assertEquals(3, connector.lastRows.get())
 
-        settingsProvider.settings = settingsProvider.settings.copy(shellIntegrationPromptDotsVisible = true)
+        settingsProvider.settings =
+            settingsProvider.settings.copy { draft ->
+                draft.shellIntegrationPromptDotsVisible = true
+            }
         component.reloadSettings()
         drainEdt()
 
@@ -678,7 +694,7 @@ class SwingTerminalScrollbackTest {
             assertEquals(columns, connector.lastColumns.get())
             assertEquals("x".repeat(columns), terminal.getLineAsString(0))
             assertEquals("Y", terminal.getLineAsString(1))
-            session.renderPublisher.readCurrent { assertEquals(columns, it.columns) }
+            session.readPublishedFrame { assertEquals(columns, it.columns) }
             val image = BufferedImage(component.width, component.height, BufferedImage.TYPE_INT_ARGB)
             val graphics = image.createGraphics()
             try {
@@ -709,10 +725,10 @@ class SwingTerminalScrollbackTest {
                     ioDispatcher = dispatcher,
                 ).also(sessions::add)
         val settings =
-            SwingSettings(
-                padding = SwingPadding(0, 40, 8, 8),
-                shellIntegrationDecorationGutterWidth = 32,
-            )
+            SwingSettings.create { draft ->
+                draft.padding = SwingPadding(0, 40, 8, 8)
+                draft.shellIntegrationDecorationGutterWidth = 32
+            }
         val component = createComponent(settingsProvider = { settings })
 
         try {
@@ -762,6 +778,146 @@ class SwingTerminalScrollbackTest {
         }
     }
 
+    @ParameterizedTest
+    @ValueSource(booleans = [false, true])
+    fun `removeNotify releases the peer when settling scroll throws from an eligibility callback`(cancelled: Boolean) {
+        val reader = ActiveBufferFrameReader().apply { historySize = 5 }
+        val terminal = TerminalBuffers.create(width = 3, height = 3, maxHistory = 5)
+        val session =
+            TerminalSession(
+                terminal = terminal,
+                renderPublisher = TerminalRenderPublisher(3, 3),
+                renderReader = reader,
+                responseReader = terminal,
+                connector = NoOpConnector,
+                parser = NoOpParser,
+                inputEncoderFactory = { _, _, _ -> object : TerminalInputEncoder by NoOpInputEncoder {} },
+                workerDispatcher = dispatcher,
+            ).also(sessions::add)
+        session.requestRender(0)
+        dispatcher.scheduler.runCurrent()
+        val component =
+            scrollTestTerminal(
+                settings =
+                    SwingSettings.create { draft ->
+                        draft.padding = SwingPadding(0, 0, 0, 0)
+                        draft.cursorBlinkMillis = 0
+                        draft.useSystemFallbackFonts = false
+                        draft.smartSuggestionsEnabled = true
+                    },
+            )
+        val failure =
+            if (cancelled) CancellationException("eligibility callback cancelled") else IllegalStateException("eligibility callback failed")
+        var callbackCount = 0
+        val listener =
+            SwingShellSuggestionEligibilityListener { eligible ->
+                assertTrue(eligible)
+                callbackCount++
+                throw failure
+            }
+
+        SwingUtilities.invokeAndWait {
+            try {
+                component.setSize(30, 100)
+                component.bind(session)
+                dispatcher.scheduler.runCurrent()
+                component.addNotify()
+                assertTrue(component.isDisplayable)
+                component.scrollFromScrollbar(3, valueIsAdjusting = true)
+                assertEquals(3.0, component.viewportState().scrollbackOffset)
+                assertFalse(component.isAutomaticShellSuggestionEligible())
+                component.addShellSuggestionEligibilityListener(listener)
+                component.scrollFromScrollbar(0, valueIsAdjusting = false)
+                assertEquals(0, callbackCount)
+
+                val thrown = assertThrows(RuntimeException::class.java) { component.removeNotify() }
+
+                assertSame(failure, thrown)
+                assertEquals(1, callbackCount)
+                assertAll(
+                    { assertFalse(component.isDisplayable, "Swing peer teardown must finish before the callback failure propagates") },
+                    { assertTrue(component.isCoroutineScopeActive, "Peer removal must retain the scope for reattachment") },
+                )
+                component.removeShellSuggestionEligibilityListener(listener)
+                component.addNotify()
+                assertTrue(component.isDisplayable, "A removed component must remain usable for reattachment")
+            } finally {
+                component.removeShellSuggestionEligibilityListener(listener)
+                if (component.isDisplayable) component.removeNotify()
+            }
+        }
+    }
+
+    @Test
+    fun `reentrant unbind stops stale eligibility notification while leaving the live viewport`() {
+        val reader = ActiveBufferFrameReader().apply { historySize = 5 }
+        val terminal = TerminalBuffers.create(width = 3, height = 3, maxHistory = 5)
+        val session =
+            TerminalSession(
+                terminal = terminal,
+                renderPublisher = TerminalRenderPublisher(3, 3),
+                renderReader = reader,
+                responseReader = terminal,
+                connector = NoOpConnector,
+                parser = NoOpParser,
+                inputEncoderFactory = { _, _, _ -> object : TerminalInputEncoder by NoOpInputEncoder {} },
+                workerDispatcher = dispatcher,
+            ).also(sessions::add)
+        session.requestRender(0)
+        dispatcher.scheduler.runCurrent()
+        val firstChanges = ArrayList<Pair<Boolean, Boolean>>()
+        val laterChanges = ArrayList<Pair<Boolean, Boolean>>()
+        var unbindCalls = 0
+
+        SwingUtilities.invokeAndWait {
+            val component =
+                scrollTestTerminal(
+                    settings =
+                        SwingSettings.create { draft ->
+                            draft.padding = SwingPadding(0, 0, 0, 0)
+                            draft.cursorBlinkMillis = 0
+                            draft.useSystemFallbackFonts = false
+                            draft.smartSuggestionsEnabled = true
+                        },
+                )
+            val unbindingListener =
+                SwingShellSuggestionEligibilityListener { eligible ->
+                    firstChanges += eligible to component.isAutomaticShellSuggestionEligible()
+                    if (!eligible && unbindCalls == 0) {
+                        unbindCalls++
+                        component.unbind()
+                    }
+                }
+            val laterListener =
+                SwingShellSuggestionEligibilityListener { eligible ->
+                    laterChanges += eligible to component.isAutomaticShellSuggestionEligible()
+                }
+            try {
+                component.setSize(30, 100)
+                component.bind(session)
+                dispatcher.scheduler.runCurrent()
+                assertTrue(component.isAutomaticShellSuggestionEligible())
+                component.addShellSuggestionEligibilityListener(unbindingListener)
+                component.addShellSuggestionEligibilityListener(laterListener)
+
+                component.scrollFromScrollbar(3, valueIsAdjusting = true)
+
+                assertAll(
+                    { assertEquals(1, unbindCalls) },
+                    { assertEquals(listOf(false to false, true to true), firstChanges) },
+                    { assertEquals(listOf(true to true), laterChanges) },
+                    { assertEquals(0.0, component.viewportState().scrollbackOffset) },
+                    { assertTrue(component.isAutomaticShellSuggestionEligible()) },
+                    { assertTrue(component.isCoroutineScopeActive) },
+                    { assertFalse(session.isClosed) },
+                )
+            } finally {
+                component.removeShellSuggestionEligibilityListener(unbindingListener)
+                component.removeShellSuggestionEligibilityListener(laterListener)
+            }
+        }
+    }
+
     @Test
     fun `alternate buffer transition clears an active primary scrollback viewport`() {
         val reader = ActiveBufferFrameReader().apply { historySize = 5 }
@@ -774,10 +930,11 @@ class SwingTerminalScrollbackTest {
                 responseReader = terminal,
                 connector = NoOpConnector,
                 parser = NoOpParser,
-                inputEncoder = NoOpInputEncoder,
+                inputEncoderFactory = { _, _, _ -> object : TerminalInputEncoder by NoOpInputEncoder {} },
                 workerDispatcher = dispatcher,
             ).also(sessions::add)
-        session.renderPublisher.updateAndPublish(reader)
+        session.requestRender(0)
+        dispatcher.scheduler.runCurrent()
         val component = scrollTestTerminal()
 
         try {
@@ -895,7 +1052,7 @@ class SwingTerminalScrollbackTest {
         expectedRows: Int,
     ) {
         var publishedRows = -1
-        session.renderPublisher.readCurrent { publishedRows = it.rows }
+        session.readPublishedFrame { publishedRows = it.rows }
         assertEquals(expectedRows, publishedRows)
     }
 
@@ -919,7 +1076,10 @@ class SwingTerminalScrollbackTest {
 
     private fun scrollTestTerminal(
         hostServices: SwingHostServices = SwingHostServices(),
-        settings: SwingSettings = SwingSettings(padding = SwingPadding(0, 0, 0, 0)),
+        settings: SwingSettings =
+            SwingSettings.create { draft ->
+                draft.padding = SwingPadding(0, 0, 0, 0)
+            },
     ): SwingTerminal =
         createComponent(
             settingsProvider = { settings },
@@ -1266,6 +1426,8 @@ class SwingTerminalScrollbackTest {
     }
 
     private object NoOpInputEncoder : TerminalInputEncoder {
+        override fun setInputPolicy(policy: io.github.ketraterm.input.policy.TerminalInputPolicy) = Unit
+
         override fun encodeKey(event: TerminalKeyEvent) = Unit
 
         override fun encodePaste(event: TerminalPasteEvent) = Unit

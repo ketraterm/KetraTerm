@@ -102,7 +102,20 @@ internal class IntellijCompletionRegistry(
                     learningStore = learningStore,
                 )
             return SwingCompletionResources(
-                provider = SwingCompletionSuggestionProvider(engine, context::swingContext),
+                provider =
+                    SwingCompletionSuggestionProvider(
+                        engine,
+                        context::swingContext,
+                        mapOf(
+                            "intellij-project-file" to "Project",
+                            "intellij-gradle-task" to "Gradle",
+                            "intellij-git-branch" to "Git",
+                            "intellij-git-remote-branch" to "Git",
+                            "intellij-git-tag" to "Git",
+                            "intellij-git-commit" to "Git",
+                            "intellij-git-status-path" to "Git",
+                        ),
+                    ),
                 feedbackHandler = feedbackRecorder.createHandler(),
             )
         }

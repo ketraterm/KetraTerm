@@ -22,8 +22,6 @@ import io.github.ketraterm.host.TerminalClipboardPolicy
 import io.github.ketraterm.host.TerminalTitlePolicy
 import io.github.ketraterm.ui.swing.settings.SwingSettings
 import io.github.ketraterm.ui.swing.settings.TerminalTheme
-import io.github.ketraterm.workspace.config.TerminalConfig
-import io.github.ketraterm.workspace.config.TerminalWorkspaceConfigManager
 import java.awt.Font
 import java.nio.file.Path
 import java.util.*
@@ -33,16 +31,16 @@ import javax.swing.SwingUtilities
 /**
  * Standalone application settings model integrated with TOML configuration.
  *
- * It acts as the bridge between host-neutral persisted [TerminalConfig] and
+ * It acts as the bridge between standalone persisted [KetraTermConfig] and
  * host-specific Swing settings. Each update saves one complete immutable snapshot
  * before publishing it to consumers on the Swing EDT.
  */
 internal class KetraTermSettings(
-    private val configManager: TerminalWorkspaceConfigManager = TerminalWorkspaceConfigManager.getDefault(),
-    private val saveConfig: (TerminalConfig) -> Unit = configManager::save,
+    private val configManager: KetraTermConfigManager = KetraTermConfigManager.getDefault(),
+    private val saveConfig: (KetraTermConfig) -> Unit = configManager::save,
 ) {
     @Volatile
-    var config: TerminalConfig = configManager.load()
+    var config: KetraTermConfig = configManager.load()
         private set
 
     private val changeListeners = CopyOnWriteArrayList<() -> Unit>()
@@ -62,26 +60,23 @@ internal class KetraTermSettings(
     fun current(): SwingSettings {
         val config = config
         val resolvedFamily = SwingSettings.resolveFontFamily(config.fontFamily)
-        return SwingSettings(
-            font = Font(resolvedFamily, Font.PLAIN, config.fontSize),
-            columns = config.columns,
-            rows = config.rows,
-            palette = (TerminalTheme.fromId(config.theme) ?: TerminalTheme.ONE_DARK).createPalette(),
-            treatAmbiguousAsWide = config.treatAmbiguousAsWide,
-            cursorBlinkMillis = config.cursorBlinkMillis,
-            useSystemFallbackFonts = config.useSystemFallbackFonts,
-            visualBellEnabled = config.visualBell,
-            pasteControlPolicy = config.pasteControlPolicy,
-            cursorShape = parseCursorShape(config.cursorShape),
-            scrollbackLines = config.scrollbackLines,
-            lineHeight = config.lineHeight,
-            shellRequestResizeWindow = config.shellRequestResizeWindow,
-            shellRequestWindowManipulation = config.shellRequestWindowManipulation,
-            smartSuggestionsEnabled = config.smartSuggestionsEnabled,
-            shellSuggestionsEnabled = config.shellSuggestionsEnabled,
-            acceptSelectedSuggestionWithEnter = config.acceptSelectedSuggestionWithEnter,
-            scrollOnOutput = config.scrollOnOutput,
-        )
+        return SwingSettings.create { draft ->
+            draft.font = Font(resolvedFamily, Font.PLAIN, config.fontSize)
+            draft.columns = config.columns
+            draft.rows = config.rows
+            draft.palette = (TerminalTheme.fromId(config.theme) ?: TerminalTheme.ONE_DARK).createPalette()
+            draft.treatAmbiguousAsWide = config.treatAmbiguousAsWide
+            draft.cursorBlinkMillis = config.cursorBlinkMillis
+            draft.useSystemFallbackFonts = config.useSystemFallbackFonts
+            draft.visualBellEnabled = config.visualBell
+            draft.pasteControlPolicy = config.pasteControlPolicy
+            draft.cursorShape = parseCursorShape(config.cursorShape)
+            draft.lineHeight = config.lineHeight
+            draft.smartSuggestionsEnabled = config.smartSuggestionsEnabled
+            draft.shellSuggestionsEnabled = config.shellSuggestionsEnabled
+            draft.acceptSelectedSuggestionWithEnter = config.acceptSelectedSuggestionWithEnter
+            draft.scrollOnOutput = config.scrollOnOutput
+        }
     }
 
     /** Builds permissions for all output in a session, independent of its launch command. */
@@ -128,7 +123,7 @@ internal class KetraTermSettings(
      * Saves and publishes one validated snapshot. Call off the EDT because saving blocks.
      * A failed save leaves the active snapshot unchanged. Equal updates do no work.
      */
-    fun update(newConfig: TerminalConfig) {
+    fun update(newConfig: KetraTermConfig) {
         check(!SwingUtilities.isEventDispatchThread()) { "Settings must be saved off the EDT" }
         synchronized(updateLock) {
             if (config == newConfig) return

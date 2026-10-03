@@ -25,11 +25,11 @@ import com.intellij.ui.components.JBTextField
 import com.intellij.ui.dsl.builder.AlignX
 import com.intellij.ui.dsl.builder.panel
 import io.github.ketraterm.intellij.KetraTermBundle
+import io.github.ketraterm.ui.swing.host.SwingTerminalSettingsBounds
 import io.github.ketraterm.ui.swing.settings.SwingSettings
 import io.github.ketraterm.ui.swing.settings.TerminalTheme
 import io.github.ketraterm.workspace.TerminalProfile
 import io.github.ketraterm.workspace.TerminalProfileRegistry
-import io.github.ketraterm.workspace.config.TerminalConfig
 import java.awt.Component
 import java.util.*
 import javax.swing.*
@@ -54,19 +54,33 @@ class KetraTermSettingsConfigurable internal constructor(
     private val fontFamilyCombo = ComboBox(fontFamilyOptions()).apply { isEditable = false }
     private val fallbackFontFamilyCombo = ComboBox(fontFamilyOptions()).apply { isEditable = false }
     private val fontSizeSpinner =
-        spinner(KetraTermIntellijSettings.DEFAULT_FONT_SIZE, TerminalConfig.FONT_SIZE_MIN, TerminalConfig.FONT_SIZE_MAX)
-    private val columnsSpinner = spinner(TerminalConfig.DEFAULT_COLUMNS, TerminalConfig.COLUMNS_MIN, TerminalConfig.COLUMNS_MAX)
-    private val rowsSpinner = spinner(TerminalConfig.DEFAULT_ROWS, TerminalConfig.ROWS_MIN, TerminalConfig.ROWS_MAX)
+        spinner(
+            KetraTermIntellijSettings.DEFAULT_FONT_SIZE,
+            SwingTerminalSettingsBounds.FONT_SIZE_MIN,
+            SwingTerminalSettingsBounds.FONT_SIZE_MAX,
+        )
+    private val columnsSpinner =
+        spinner(KetraTermIntellijSettings.DEFAULT_COLUMNS, SwingTerminalSettingsBounds.COLUMNS_MIN, SwingTerminalSettingsBounds.COLUMNS_MAX)
+    private val rowsSpinner =
+        spinner(KetraTermIntellijSettings.DEFAULT_ROWS, SwingTerminalSettingsBounds.ROWS_MIN, SwingTerminalSettingsBounds.ROWS_MAX)
     private val scrollbackSpinner =
-        spinner(TerminalConfig.DEFAULT_SCROLLBACK_LINES, TerminalConfig.SCROLLBACK_MIN, TerminalConfig.SCROLLBACK_MAX)
+        spinner(
+            KetraTermIntellijSettings.DEFAULT_SCROLLBACK_LINES,
+            SwingTerminalSettingsBounds.SCROLLBACK_MIN,
+            SwingTerminalSettingsBounds.SCROLLBACK_MAX,
+        )
     private val cursorBlinkSpinner =
-        spinner(TerminalConfig.DEFAULT_CURSOR_BLINK_MILLIS, TerminalConfig.CURSOR_BLINK_MIN, TerminalConfig.CURSOR_BLINK_MAX)
+        spinner(
+            KetraTermIntellijSettings.DEFAULT_CURSOR_BLINK_MILLIS,
+            SwingTerminalSettingsBounds.CURSOR_BLINK_MIN,
+            SwingTerminalSettingsBounds.CURSOR_BLINK_MAX,
+        )
     private val lineHeightSpinner =
         JSpinner(
             SpinnerNumberModel(
-                TerminalConfig.DEFAULT_LINE_HEIGHT.toDouble(),
-                TerminalConfig.LINE_HEIGHT_MIN.toDouble(),
-                TerminalConfig.LINE_HEIGHT_MAX.toDouble(),
+                KetraTermIntellijSettings.DEFAULT_LINE_HEIGHT.toDouble(),
+                SwingTerminalSettingsBounds.LINE_HEIGHT_MIN.toDouble(),
+                SwingTerminalSettingsBounds.LINE_HEIGHT_MAX.toDouble(),
                 0.1,
             ),
         ).apply {
@@ -103,7 +117,7 @@ class KetraTermSettingsConfigurable internal constructor(
     private val pasteSanitizationCombo = ComboBox(pasteSanitizationOptions())
     private val clipboardWriteCombo = ComboBox(permissionOptions())
     private val clipboardReadCombo = ComboBox(permissionOptions())
-    private val clipboardMaxDecodedBytesSpinner = spinner(TerminalConfig.DEFAULT_CLIPBOARD_MAX_DECODED_BYTES, 0, Int.MAX_VALUE)
+    private val clipboardMaxDecodedBytesSpinner = spinner(KetraTermIntellijSettings.DEFAULT_CLIPBOARD_MAX_DECODED_BYTES, 0, Int.MAX_VALUE)
     private val titlePermissionCheckBox = JBCheckBox(KetraTermBundle.message("settings.ketraterm.titlePermission"))
 
     private var panel: JComponent? = null
@@ -341,7 +355,7 @@ class KetraTermSettingsConfigurable internal constructor(
             pasteSanitization = (pasteSanitizationCombo.selectedItem as? PasteSanitizationOption)?.id ?: "preserve",
             clipboardWrite =
                 (clipboardWriteCombo.selectedItem as? PermissionOption)?.id
-                    ?: TerminalConfig.DEFAULT_CLIPBOARD_WRITE.name.lowercase(Locale.ROOT),
+                    ?: KetraTermIntellijSettings.DEFAULT_CLIPBOARD_WRITE.name.lowercase(Locale.ROOT),
             clipboardRead =
                 (clipboardReadCombo.selectedItem as? PermissionOption)?.id
                     ?: settings.state.clipboardRead,

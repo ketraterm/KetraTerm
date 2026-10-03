@@ -7,8 +7,10 @@ Run from the repository root with JDK 25:
 ```
 
 This verification is also part of `:ketraterm-testkit:check` and the test CI
-matrix. Each external project declares just one KetraTerm dependency: parser,
-host, completion, ui-swing or pty. Kotlin and Java sources compile and execute
+matrix. Eleven external projects cover all 15 publications through one declared
+KetraTerm dependency per project, including direct core/render and optional
+completion-host, shell-integration and Swing-host roots.
+Kotlin and Java sources compile and execute
 public APIs; the smoke programs verify parsed/grid text, collected completion
 results, Swing host integration and packaged Kotlin metadata.
 
@@ -22,6 +24,18 @@ handshakes coordinate the headless smoke; it uses no timing assertions, private
 reflection, internal constructors or extra library dependencies. The Java smoke
 uses functional actions and public host wiring, without adapting coroutines.
 
+The Swing-host consumer also supplies product source labels and switches prepared
+search colors through Kotlin and Java construction/update APIs. It retains the
+existing host-owned suggestion target; these styling and labeling needs do not
+require new popup timing or capacity controls.
+
+`extractSwingReadmeExample` also extracts the marked Kotlin usage fence directly
+from `ketraterm-ui-swing/README.md` into the staged Swing consumer. A missing or
+duplicate example fails extraction; API drift fails compilation in every compiler
+and metadata combination. The smoke invokes it on the EDT, rejects off-EDT use,
+disposes its returned view and verifies that the host-owned session stays open.
+It also checks the documented enabled default for system fallback fonts.
+
 The PTY consumer supplies an in-memory implementation of the exported pty4j
 process contract. It verifies Java construction, Kotlin constructor defaults,
 resize forwarding and connector-owned destruction without launching a native
@@ -33,16 +47,31 @@ their transitive KetraTerm artifacts. Release signing,
 remote publishing, Maven Local and source-project substitution are not used.
 Sources and documentation variants are outside this runtime-consumer check.
 
-The fixture is copied into testkit's build directory and run twice, with
-separate compiler outputs: Gradle module metadata, then POM-only resolution
+The fixture is copied into testkit's build directory and run with both Kotlin
+2.4.0 and the current compiler, each using separate outputs for Gradle module
+metadata and POM-only resolution
 with Gradle metadata redirection disabled. KetraTerm coordinates resolve
 exclusively from the staged repository; third-party dependencies resolve from
-Maven Central. The repository's Gradle wrapper, Kotlin plugin version and JDK
-25 toolchain are reused.
+Maven Central. The repository's Gradle wrapper and JDK 25 toolchain are reused;
+the current-compiler cases track the root Kotlin plugin version.
 
 Existing `TerminalLibraryConsumerCompilationTest` regressions separately check
 Java compilation against exported project API variants without the fixture's
 Kotlin plugin or testkit classpath.
+
+Workspace and completion persistence are product implementation modules, not
+supported Maven libraries. Their external fixtures and retained client pairs were
+deliberately retired when narrowing that support boundary; the remaining client
+binaries and provenance were preserved unchanged. Product and owner-module tests
+continue to verify those implementations. Historical reviews retain the earlier
+publication evidence.
+
+`verifyPublicationBoundary` rejects product, testkit and benchmark artifacts in
+the staged repository at the requested version, checks consistent library versions
+in every runtime graph, and prevents UI/native hosting dependencies from entering
+the parser/core consumers. The base Swing consumer must remain free of optional
+PTY, OSC, workspace and completion implementations. These checks run in all four
+source-consumer compiler/metadata combinations; they do not add upgrade cases.
 
 ## Compiled-client upgrades
 
@@ -50,10 +79,10 @@ Kotlin plugin or testkit classpath.
 ./gradlew :ketraterm-testkit:compiledClientUpgradeTest
 ```
 
-This check is included in `publishedConsumerTest`. It runs the five tracked
+This check is included in `publishedConsumerTest`. It runs the eleven tracked
 `baseline/*.jar` clients against the current staged runtime publications in
 both metadata modes, using Maven stdlib 2.4.20 and 2.4.0, the latter matching
-IDEA 2026.2's boot runtime version (20 executions). This does not run the IDE's
+IDEA 2026.2's boot runtime version (44 executions). This does not run the IDE's
 packaged `util-8.jar`. Each classpath must resolve exactly the expected
 stdlib version. An isolated Java launcher checks the actually loaded Kotlin
 version and its code-source jar before invoking the retained main; no testkit
@@ -70,6 +99,22 @@ values with current public fields and their observable semantics. Controls remov
 the parser artifact and shadow its factory with a class missing the old method;
 they require `NoClassDefFoundError` and `NoSuchMethodError`, respectively. Process deadlines
 bound hangs; no timing-based assertions are used.
+
+Concrete Kotlin/Java parser sinks, core readers, host observers and render
+frames/readers exercise required operations and inherited defaults. The render
+client retains the original inline lease body, mixes it with Java calls to the
+current reader, pins frames across publication, throws from callbacks and proves
+that all earlier leases release before their buffer can be recycled. Optional
+clients execute bounded directory access, OSC metadata and the supported
+completion host combinations.
+Compared with the original five client/provenance pairs at `e37f5d7f`, parser
+and completion client bytes remain identical, with refreshed provenance.
+Construction commit `025ccb1a` deliberately replaced host and Swing clients after
+incompatible core/session construction changes; D02/D03 later refreshes Swing and PTY.
+Six additional retained clients
+establish extension baselines with their own source/artifact hashes. The 44 cases
+verify upgrades from these declared baselines, not compatibility with the original
+host and Swing callers. See the [migration and baseline decision](../../../docs/library-compatibility.md#verification-and-baseline-changes).
 
 Only an intentional compatibility-boundary review should replace these clients:
 
@@ -88,11 +133,27 @@ including reviewed uncommitted changes. Review the source, provenance,
 and ABI differences together; run `spotlessApply`, `publishedConsumerTest` and
 the repository's ABI check before accepting an intentional update. Ordinary
 verification must never re-record this baseline to hide an upgrade failure.
-The source hashes identify recording inputs; Git history retains the original
-fixture sources when current source-consumer checks evolve independently.
+The source hashes identify recording inputs; current source-consumer fixtures
+may evolve independently of the retained binaries.
 
 The small jars retain compiled Kotlin/Java callers, including public inline
 bodies; library classes resolve from the current publications. They cover
 representative executed boundaries; the tracked ABI checks cover the
 remaining reviewed declarations. This initial pre-v1 baseline establishes the
 upgrade mechanism and does not claim compatibility with earlier releases.
+
+D02/D03 deliberately refreshes only the Swing and PTY retained clients after
+their growing data-class configuration APIs become immutable snapshots with
+named construction/update callbacks. Before refresh, exactly eight upgrade
+cases fail at the removed constructor descriptors; the other eleven clients
+remain byte-for-byte unchanged. Source consumers now exercise Java late-field
+font resolver selection/clearing, settings drafts and detached snapshots.
+See [configuration migration](../../../docs/library-configuration.md).
+
+D04/D05 deliberately refreshes only Swing and render-cache reader clients after
+recording eight expected linkage failures (both metadata modes and both runtimes).
+Swing called the removed session publisher getter; render-cache had inlined the
+integer-lease descriptor. The other eleven jars remain unchanged for this migration.
+The new baseline exercises scoped session borrowing and cache-reference leases,
+including concurrent Kotlin/Java readers and failure cleanup. The removed buffer
+representation is not retained. See [reader ownership](../../../docs/render-reader-ownership.md).

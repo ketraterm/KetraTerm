@@ -15,6 +15,14 @@
  */
 package consumer;
 
+import io.github.ketraterm.core.TerminalBuffers;
+import io.github.ketraterm.input.TerminalInputEncoders;
+import io.github.ketraterm.input.api.TerminalInputEncoderFactory;
+import io.github.ketraterm.parser.api.TerminalOutputParserFactory;
+import io.github.ketraterm.parser.api.TerminalParsers;
+import io.github.ketraterm.render.api.TerminalRenderFrameReader;
+import io.github.ketraterm.session.TerminalSession;
+import io.github.ketraterm.transport.TerminalConnector;
 import io.github.ketraterm.host.TerminalClipboardReadRequest;
 import io.github.ketraterm.host.TerminalClipboardReadAuditEvent;
 import io.github.ketraterm.input.TerminalClipboardReply;
@@ -26,13 +34,53 @@ import io.github.ketraterm.ui.swing.api.TerminalUiDispatcher;
 import io.github.ketraterm.ui.swing.settings.SwingSettings;
 import io.github.ketraterm.ui.swing.settings.TerminalClipboardHandler;
 import java.awt.event.MouseEvent;
+import java.awt.Rectangle;
 import java.io.ByteArrayOutputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.concurrent.atomic.AtomicInteger;
 import javax.swing.SwingUtilities;
 
 public final class JavaConsumer {
+    public static TerminalInputEncoderFactory inputEncoderFactory() {
+        return TerminalInputEncoders::create;
+    }
+
+    public static TerminalOutputParserFactory parserFactory() {
+        return TerminalParsers::create;
+    }
+
+    public static void verifySessionConstruction(TerminalConnector connector) {
+        var buffer = TerminalBuffers.create(80, 3);
+        TerminalRenderFrameReader reader = buffer;
+        try (var session = TerminalSession.create(buffer, reader, connector)) {
+            session.readRenderFrame(frame -> {
+                if (frame.getColumns() != 80 || frame.getRows() != 3) throw new AssertionError("Java render capability");
+            });
+        }
+    }
+
     public static void verify() throws Exception {
+        var resolver = new io.github.ketraterm.ui.swing.api.TerminalFontResolver() {
+            public java.awt.Font resolveFallbackFont(int codePoint, int style, float size) { return null; }
+            public java.awt.Font resolveFallbackFont(String text, int style, float size) { return null; }
+        };
+        var custom = SwingHostServices.create(b -> b.setFontResolver(resolver));
+        var cleared = custom.copy(b -> b.setFontResolver(null));
+        if (custom.getFontResolver() != resolver || cleared.getFontResolver() != null)
+            throw new AssertionError("Selective host service construction and immutable clearing");
+        var settings = SwingSettings.create(b -> b.setLineHeight(1.25f));
+        try {
+            settings.getFallbackFonts().clear();
+            throw new AssertionError("Font snapshot is mutable from Java");
+        } catch (UnsupportedOperationException expected) {
+            // The public Java view is immutable too.
+        }
+        var settingsDraft = settings.toBuilder();
+        settingsDraft.setColumns(120);
+        var resized = settingsDraft.build();
+        settingsDraft.setColumns(90);
+        if (settings.getColumns() != 80 || resized.getColumns() != 120 || resized.getLineHeight() != 1.25f)
+            throw new AssertionError("Immutable settings snapshots");
         verifyClipboardReply();
         try (var metadata = SwingTerminal.class.getResourceAsStream("/META-INF/io.github.ketraterm_ketraterm-ui-swing.kotlin_module")) {
             if (metadata == null || metadata.readAllBytes().length == 0) throw new AssertionError("Missing Kotlin metadata");
@@ -43,15 +91,23 @@ public final class JavaConsumer {
             opened.incrementAndGet();
             return true;
         };
-        var services = new SwingHostServices(
-            TerminalUiDispatcher.SWING,
-            TerminalClipboardHandler.SYSTEM,
-            uri -> uri.equals("https://example.test/java") && action.open()
-        );
+        var services = SwingHostServices.create(draft -> {
+draft.setUiDispatcher(TerminalUiDispatcher.SWING);
+draft.setClipboardHandler(TerminalClipboardHandler.SYSTEM);
+draft.setHyperlinkHandler(uri -> uri.equals("https://example.test/java") && action.open());
+});
         SwingUtilities.invokeAndWait(() -> {
             new SwingTerminal().dispose();
             var terminal = new SwingTerminal(SwingSettings::new, services);
             try {
+                terminal.setShellSuggestionFailureHandler((request, failure) -> {
+                    if (!SwingUtilities.isEventDispatchThread()) throw new AssertionError("Diagnostics must run on EDT");
+                });
+                var bounds = new Rectangle(1, 2, 3, 4);
+                if (terminal.copyCellBounds(0, 0, bounds) || !bounds.isEmpty()) {
+                    throw new AssertionError("Unbound geometry must clear caller bounds");
+                }
+                terminal.setShellSuggestionFailureHandler(null);
                 if (!services.getHyperlinkHandler().openHyperlink("https://example.test/java")) {
                     throw new AssertionError("Host navigation callback was not invoked");
                 }

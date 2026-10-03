@@ -45,6 +45,7 @@ public class SwingCompletionBinding(
     private var liveBinding: SwingLiveCompletionBinding? = null
     private var observationScope: CoroutineScope? = null
     private var closed = false
+    private var updateRevision = 0L
 
     /** Stable provider installed in host services before the terminal is attached. */
     public val provider: SwingShellSuggestionProvider =
@@ -75,18 +76,24 @@ public class SwingCompletionBinding(
         this.terminal = terminal
     }
 
-    /** Replaces resources; null disables all completion and releases observation. */
+    /**
+     * Replaces resources; null disables all completion and releases observation.
+     * Replacement takes effect and detaches old observation before hiding the popup.
+     * A presentation failure propagates; a later update may start observation again.
+     */
     public fun update(
         resources: SwingCompletionResources?,
         automaticPopup: Boolean,
     ) {
         checkEdt()
         check(!closed)
+        val revision = ++updateRevision
         val terminal = checkNotNull(terminal)
         if (this.resources !== resources) {
             this.resources = resources
-            terminal.hideShellSuggestions()
             stopObservation()
+            terminal.hideShellSuggestions()
+            if (closed || updateRevision != revision) return
         }
         if (resources == null || !automaticPopup) {
             stopObservation()
@@ -114,10 +121,15 @@ public class SwingCompletionBinding(
     }
 
     private fun stopObservation() {
-        liveBinding?.detach()
+        val live = liveBinding
+        val scope = observationScope
         liveBinding = null
-        observationScope?.cancel()
         observationScope = null
+        try {
+            live?.detach()
+        } finally {
+            scope?.cancel()
+        }
     }
 
     /** Cancels requests and observation and releases references to host resources. */
@@ -126,9 +138,10 @@ public class SwingCompletionBinding(
         if (closed) return
         closed = true
         resources = null
-        terminal?.hideShellSuggestions()
+        val terminal = terminal
+        this.terminal = null
         stopObservation()
-        terminal = null
+        terminal?.hideShellSuggestions()
     }
 
     private fun checkEdt() = check(SwingUtilities.isEventDispatchThread()) { "completion binding must run on the EDT" }

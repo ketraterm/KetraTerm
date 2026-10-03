@@ -15,6 +15,7 @@
  */
 package io.github.ketraterm.ui.swing.render
 
+import io.github.ketraterm.render.cache.TerminalRenderCache
 import io.github.ketraterm.ui.swing.settings.SwingMetrics
 import java.awt.Rectangle
 import kotlin.math.ceil
@@ -96,6 +97,39 @@ internal class TerminalVisualViewportGeometry {
         visualHeight = 0
         viewportPixelHeight = 0
         contentOriginY = 0.0
+    }
+
+    /** Copies one logical cell's visual bounds, clipped to the component's content area. */
+    fun copyCellBounds(
+        cache: TerminalRenderCache,
+        metrics: SwingMetrics,
+        column: Int,
+        row: Int,
+        left: Int,
+        top: Int,
+        right: Int,
+        bottom: Int,
+        destination: Rectangle,
+    ): Boolean {
+        destination.setBounds(0, 0, 0, 0)
+        if (!cache.hasFrame ||
+            column !in 0 until cache.columns ||
+            row !in 0 until cache.rows ||
+            right <= left ||
+            bottom <= top
+        ) {
+            return false
+        }
+        val visualColumn = bidiLayout.row(cache, row)?.visualColumn(column) ?: column
+        val x = left.toLong() + visualColumn.toLong() * metrics.cellWidth
+        val xStart = maxOf(left.toLong(), x)
+        val xEnd = minOf(right.toLong(), x + metrics.cellWidth)
+        val origin = if (rowCount == cache.rows) contentOriginY else 0.0
+        val yStart = maxOf(top, floor(top.toDouble() + origin + row.toDouble() * metrics.cellHeight).toInt())
+        val yEnd = minOf(bottom, ceil(top.toDouble() + origin + (row.toDouble() + 1.0) * metrics.cellHeight).toInt())
+        if (xEnd <= xStart || yEnd <= yStart) return false
+        destination.setBounds(xStart.toInt(), yStart, (xEnd - xStart).toInt(), yEnd - yStart)
+        return true
     }
 
     /**

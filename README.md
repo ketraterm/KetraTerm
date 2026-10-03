@@ -97,9 +97,9 @@ KetraTerm is composed of strict, decoupled Gradle modules:
 * **`:ketraterm-core`**: Headless text grid storage, circular scrollback buffers, and resizing reflow.
 * **`:ketraterm-host`**: Semantic translation adapter connecting the parser to core state.
 * **`:ketraterm-input`**: Keyboard/mouse event models and host-bound ANSI encoders.
-* **`:ketraterm-completion`**: Dependency-free command completion models, parsing, ranking, and learning indexes.
+* **`:ketraterm-completion`**: Command completion models, parsing, ranking, and learning indexes.
 * **`:ketraterm-completion-host`**: Direct suspending local path-provider and bounded scanning infrastructure.
-* **`:ketraterm-completion-persistence`**: Optional sanitized local-file storage for completion learning.
+* **`:ketraterm-completion-persistence`**: Shared product implementation of sanitized local-file storage for completion learning.
 * **`:ketraterm-render-api`**: Dependency-free visual frame contracts.
 * **`:ketraterm-render-cache`**: Double/triple-buffered publication cache.
 * **`:ketraterm-transport-api`**: Duplex I/O connector interfaces.
@@ -108,10 +108,14 @@ KetraTerm is composed of strict, decoupled Gradle modules:
 * **`:ketraterm-pty`**: Local native process Pty4J launcher and stream pump.
 * **`:ketraterm-ui-swing`**: Reusable desktop `JComponent` painter and mouse interaction adapters.
 * **`:ketraterm-ui-swing-host`**: Optional host chrome, actions, and completion-to-Swing adapters.
-* **`:ketraterm-workspace`**: Headless tab/profile workspace layer used by product hosts.
+* **`:ketraterm-workspace`**: Shared product implementation of local tabs, profiles, and workspace lifecycle.
 * **`:ketraterm-app`**: Standalone desktop application host.
 * **`:ketraterm-testkit`**: In-memory connector mocks and simulation tools.
 * **`:ketraterm-benchmarks`**: JMH benchmarks for parser, core, render, and session hot paths.
+
+The [supported library boundary](docs/library-compatibility.md#supported-boundary)
+defines Maven publications and public API documentation. Shared product modules
+remain separate from that boundary.
 
 > [TIP]
 > For a detailed walkthrough of the unidirectional pipeline flow, concurrency locks, in-memory cell storage, and caches, refer to our [Architecture Guide](ARCHITECTURE.md).

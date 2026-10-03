@@ -2,6 +2,9 @@
 
 ## [Unreleased]
 
+- Search controls follow the selected theme.
+- Fixed typing or pasting during terminal startup causing premature writes or closing the terminal.
+- Improved cleanup of completion popups when terminals close or suggestions are disabled.
 - Improved window-state reporting while terminal output is active.
 - Keep cursors visible when terminals lose focus, with thin outlines for blocks and steady bars or underlines. Cursor thickness stays consistent across split panes.
 - Improved link highlighting and activation across wrapped lines, scrolling and output updates, with hand cursors only when links can be activated.

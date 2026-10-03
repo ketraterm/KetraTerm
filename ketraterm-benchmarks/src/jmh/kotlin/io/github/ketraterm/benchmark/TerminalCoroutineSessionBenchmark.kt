@@ -107,7 +107,7 @@ open class TerminalCoroutineSessionBenchmark {
     ) {
         var index = 0
         while (index < state.sessionCount) {
-            state.sessions[index].renderPublisher.readCurrent { published ->
+            state.sessions[index].readPublishedFrame { published ->
                 state.swingCaches[index].updateFrom(published)
             }
             blackhole.consume(state.swingCaches[index].frameGeneration)

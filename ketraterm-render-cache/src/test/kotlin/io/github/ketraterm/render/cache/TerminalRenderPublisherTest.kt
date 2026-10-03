@@ -25,6 +25,67 @@ import kotlin.concurrent.thread
 
 class TerminalRenderPublisherTest {
     @Test
+    fun `reader ABI does not expose buffer bookkeeping`() {
+        val internals = setOf("getBuffers", "getReaderCounts", "getFrontIndex", "getPublishLock")
+        assertTrue(TerminalRenderPublisher::class.java.methods.none { it.name in internals }, "Reader ABI exposes buffer representation")
+    }
+
+    @Test
+    fun `empty publication does not invoke the reader`() {
+        val publisher = TerminalRenderPublisher(1, 1)
+        assertNull(publisher.readCurrent<Unit> { fail("No frame has been published") })
+    }
+
+    @Test
+    fun `non-local return and callback failure release all reader leases`() {
+        val publisher = TerminalRenderPublisher(3, 1)
+        publisher.updateAndPublish(MockFrame(3, 1, "abc"))
+        val original = checkNotNull(publisher.acquireFrontLease())
+        publisher.releaseFrontLease(original)
+
+        fun firstCodepoint(): Int {
+            publisher.readCurrent { return it.codeWords[0] }
+            return 0
+        }
+        assertEquals('a'.code, firstCodepoint())
+        val failure = IllegalStateException("Reader failed")
+        assertSame(failure, assertThrows(IllegalStateException::class.java) { publisher.readCurrent { throw failure } })
+        assertThrows(IllegalStateException::class.java) { publisher.releaseFrontLease(original) }
+        // Every returned/failed callback leaves its own buffer with no outstanding lease.
+        TestWorker {
+            repeat(9) {
+                publisher.updateAndPublish(MockFrame(3, 1, "abc"))
+                val current = checkNotNull(publisher.acquireFrontLease())
+                publisher.releaseFrontLease(current)
+                assertEquals('a'.code, firstCodepoint())
+                assertSame(failure, assertThrows(IllegalStateException::class.java) { publisher.readCurrent { throw failure } })
+                assertThrows(IllegalStateException::class.java) { publisher.releaseFrontLease(current) }
+            }
+        }.use { it.await() }
+        publisher.updateAndPublish(MockFrame(3, 1, "def"))
+        assertEquals("def", publisher.readCurrent { it.rowText(0) })
+    }
+
+    @Test
+    fun `manual leases reject foreign and unmatched release without damaging publication`() {
+        val publisher = TerminalRenderPublisher(3, 1)
+        assertNull(publisher.acquireFrontLease())
+        publisher.updateAndPublish(MockFrame(3, 1, "abc"))
+        val first = checkNotNull(publisher.acquireFrontLease())
+        val second = checkNotNull(publisher.acquireFrontLease())
+        assertSame(first, second)
+        assertThrows(IllegalArgumentException::class.java) { publisher.releaseFrontLease(TerminalRenderCache(3, 1)) }
+        publisher.releaseFrontLease(first)
+        publisher.updateAndPublish(MockFrame(3, 1, "def"))
+        publisher.updateAndPublish(MockFrame(3, 1, "ghi"))
+        assertEquals("abc", second.rowText(0))
+        publisher.releaseFrontLease(second)
+        assertThrows(IllegalStateException::class.java) { publisher.releaseFrontLease(second) }
+        publisher.updateAndPublish(MockFrame(3, 1, "jkl"))
+        assertEquals("jkl", publisher.readCurrent { it.rowText(0) })
+    }
+
+    @Test
     fun `writer buffers can be reused by different worker threads`() {
         val publisher = TerminalRenderPublisher(3, 1)
         val texts = listOf("abc", "def", "ghi", "jkl", "mno", "pqr")

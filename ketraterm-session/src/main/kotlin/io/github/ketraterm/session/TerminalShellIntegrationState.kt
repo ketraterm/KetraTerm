@@ -187,7 +187,7 @@ public class TerminalShellIntegrationState(
     private val capacity: Int = DEFAULT_CAPACITY,
     private val maxCommandTextLength: Int = 4096,
     private val epochMillis: () -> Long = System::currentTimeMillis,
-) {
+) : TerminalShellIntegrationView {
     init {
         require(capacity > 0) { "capacity must be > 0, was $capacity" }
         require(maxCommandTextLength >= 0) { "maxCommandTextLength must be >= 0, was $maxCommandTextLength" }
@@ -217,45 +217,13 @@ public class TerminalShellIntegrationState(
     private val commandFinishedListeners = CopyOnWriteArrayList<Listener<TerminalShellIntegrationCommandMetadata>>()
     private val directoryListeners = CopyOnWriteArrayList<Listener<String>>()
 
-    /**
-     * Invalidation signal for prompt, command, and current-directory metadata.
-     *
-     * The initial revision is zero. Changed metadata advances the revision;
-     * equal directory/anchor updates and diagnostic observations do not. Values
-     * are opaque and updates may be conflated. Read the model after an update;
-     * use [addCommandFinishedListener] when every completion must be observed.
-     */
-    public val revision: StateFlow<Long> = mutableRevision.asStateFlow()
+    public override val revision: StateFlow<Long> = mutableRevision.asStateFlow()
 
-    /**
-     * Observes future explicit command completions without replay or conflation.
-     *
-     * The immutable metadata is captured with the completed record. Callbacks
-     * run synchronously on the producer thread, in registration order, outside
-     * the storage lock. They must be nonblocking and must not publish lifecycle
-     * events reentrantly. Ordinary listener exceptions are logged and isolated;
-     * cancellation is rethrown after the remaining listeners are notified.
-     * Abandoned commands and unmatched finishes do not produce notifications.
-     *
-     * Closing the registration is idempotent and prevents future dispatches;
-     * an already dispatched callback may finish. Clearing records does not remove
-     * listeners. The registration owner must close it when observation ends.
-     */
-    public fun addCommandFinishedListener(listener: (TerminalShellIntegrationCommandMetadata) -> Unit): AutoCloseable =
+    public override fun addCommandFinishedListener(listener: (TerminalShellIntegrationCommandMetadata) -> Unit): AutoCloseable =
         addListener(commandFinishedListeners, listener)
 
-    /**
-     * Observes future changed directory URIs synchronously, without replay.
-     *
-     * Equal reports do not notify. Callbacks run on the producer thread outside
-     * the storage lock, after the new directory is recorded. Delivery and
-     * registration lifetime follow [addCommandFinishedListener]: observers must
-     * not block or publish lifecycle events reentrantly, ordinary exceptions are
-     * isolated, and cancellation is rethrown after the remaining observers run.
-     * Use this when the final directory must be captured before session closure;
-     * [revision] remains a conflated invalidation signal.
-     */
-    public fun addCurrentWorkingDirectoryListener(listener: (String) -> Unit): AutoCloseable = addListener(directoryListeners, listener)
+    public override fun addCurrentWorkingDirectoryListener(listener: (String) -> Unit): AutoCloseable =
+        addListener(directoryListeners, listener)
 
     /**
      * Records the latest host-validated current-working-directory URI.
@@ -279,27 +247,12 @@ public class TerminalShellIntegrationState(
         listeners?.let { notifyListeners(uri, it, "current-directory") }
     }
 
-    /**
-     * Returns the latest recorded directory URI, or `null` before one is recorded.
-     *
-     * @return current working directory URI for the live shell session.
-     */
-    public fun currentWorkingDirectoryUri(): String? =
+    public override fun currentWorkingDirectoryUri(): String? =
         synchronized(lock) {
             currentWorkingDirectory
         }
 
-    /**
-     * Returns true while shell integration reports a command between
-     * command-start and command-finished events.
-     *
-     * Idle prompts, sessions with no shell command information,
-     * finished commands, and commands abandoned by a newer prompt all return
-     * false. The query is allocation-free and safe for host close-policy checks.
-     *
-     * @return true when an active foreground command is known to be running.
-     */
-    public fun hasRunningCommand(): Boolean =
+    public override fun hasRunningCommand(): Boolean =
         synchronized(lock) {
             val index = activeCommandIndex
             index != NO_INDEX &&
@@ -333,16 +286,7 @@ public class TerminalShellIntegrationState(
      * @param lineId stable render line identity where prompt printing ended.
      */
     public fun recordPromptEnd(lineId: Long) {
-        require(lineId > 0L) { "lineId must be positive, was $lineId" }
-        val changedRevision =
-            synchronized(lock) {
-                val index = activePromptIndex
-                if (index == NO_INDEX || promptEndLineIds[index] == lineId) return
-
-                promptEndLineIds[index] = lineId
-                ++metadataRevision
-            }
-        publishRevision(changedRevision)
+        updateActivePromptAnchor(lineId, promptEndLineIds)
     }
 
     /**
@@ -354,15 +298,7 @@ public class TerminalShellIntegrationState(
      * Without an active prompt, or when the anchor is unchanged, this does nothing.
      */
     public fun reanchorActivePromptStart(lineId: Long) {
-        require(lineId > 0L) { "lineId must be positive, was $lineId" }
-        val changedRevision =
-            synchronized(lock) {
-                val index = activePromptIndex
-                if (index == NO_INDEX || promptStartLineIds[index] == lineId) return
-                promptStartLineIds[index] = lineId
-                ++metadataRevision
-            }
-        publishRevision(changedRevision)
+        updateActivePromptAnchor(lineId, promptStartLineIds)
     }
 
     /**
@@ -475,70 +411,28 @@ public class TerminalShellIntegrationState(
         }
     }
 
-    /**
-     * Returns the current number of retained shell command records.
-     *
-     * Records are retained in chronological order from oldest to newest until
-     * bounded eviction removes the oldest entries.
-     *
-     * @return number of retained command timeline records.
-     */
-    public fun recordCount(): Int =
+    public override fun recordCount(): Int =
         synchronized(lock) {
             count
         }
 
-    /**
-     * Returns the retained command text for [recordId].
-     *
-     * Command text is optional metadata captured from the render frame at the
-     * command start. `null` means the text was unavailable, ambiguous,
-     * too large for the configured bound, or the record has been evicted.
-     *
-     * @param recordId stable command record id previously exposed by viewport
-     *   or record projection APIs.
-     * @return captured command text, or `null` when no safe text is retained.
-     */
-    public fun commandText(recordId: Int): String? {
+    public override fun commandText(recordId: Int): String? {
         if (recordId == TerminalShellIntegrationCommandRecord.NONE) return null
-        synchronized(lock) {
-            var index = 0
-            while (index < count) {
-                if (recordIds[index] == recordId) return commandTexts[index]
-                index++
-            }
-            return null
+        return synchronized(lock) {
+            val index = indexForRecordIdLocked(recordId)
+            if (index == NO_INDEX) null else commandTexts[index]
         }
     }
 
-    /**
-     * Returns the working-directory URI snapshotted when [recordId] began.
-     *
-     * @param recordId stable retained command record id.
-     * @return command working-directory URI, or `null` when unknown or evicted.
-     */
-    public fun commandWorkingDirectoryUri(recordId: Int): String? {
+    public override fun commandWorkingDirectoryUri(recordId: Int): String? {
         if (recordId == TerminalShellIntegrationCommandRecord.NONE) return null
-        synchronized(lock) {
-            var index = 0
-            while (index < count) {
-                if (recordIds[index] == recordId) return commandWorkingDirectoryUris[index]
-                index++
-            }
-            return null
+        return synchronized(lock) {
+            val index = indexForRecordIdLocked(recordId)
+            if (index == NO_INDEX) null else commandWorkingDirectoryUris[index]
         }
     }
 
-    /**
-     * Returns an immutable metadata snapshot for [recordId].
-     *
-     * This allocates only when explicitly queried and is not used by viewport
-     * projection or painting.
-     *
-     * @param recordId retained command record id.
-     * @return command metadata, or `null` for an unknown, prompt-only, or evicted record.
-     */
-    public fun commandMetadata(recordId: Int): TerminalShellIntegrationCommandMetadata? {
+    public override fun commandMetadata(recordId: Int): TerminalShellIntegrationCommandMetadata? {
         if (recordId == TerminalShellIntegrationCommandRecord.NONE) return null
         synchronized(lock) {
             val index = indexForRecordIdLocked(recordId)
@@ -548,12 +442,7 @@ public class TerminalShellIntegrationState(
         }
     }
 
-    /**
-     * Returns the newest retained command record id, skipping prompt-only records.
-     *
-     * @return newest command record id, or `0` when no command is retained.
-     */
-    public fun latestCommandRecordId(): Int =
+    public override fun latestCommandRecordId(): Int =
         synchronized(lock) {
             var index = count - 1
             while (index >= 0) {
@@ -563,17 +452,7 @@ public class TerminalShellIntegrationState(
             TerminalShellIntegrationCommandRecord.NONE
         }
 
-    /**
-     * Returns the preferred navigation anchor line for [recordId].
-     *
-     * Commands with a prompt navigate to the prompt start. Orphan
-     * command records navigate to the command-output start. Prompt-only records
-     * and evicted records return `0`.
-     *
-     * @param recordId retained command record id.
-     * @return stable line id to reveal, or `0` when unavailable.
-     */
-    public fun commandAnchorLineId(recordId: Int): Long {
+    public override fun commandAnchorLineId(recordId: Int): Long {
         if (recordId == TerminalShellIntegrationCommandRecord.NONE) return NO_LINE_ID
         synchronized(lock) {
             val index = indexForRecordIdLocked(recordId)
@@ -585,26 +464,13 @@ public class TerminalShellIntegrationState(
         }
     }
 
-    /**
-     * Copies the command-output line range for [recordId].
-     *
-     * The destination layout is defined by
-     * [TerminalShellIntegrationCommandOutputRange]. Unfinished commands,
-     * prompt-only records, unknown records, and records with no selectable
-     * output return `false` and leave the destination unchanged.
-     *
-     * @param recordId retained command record id.
-     * @param destination destination `Long` columns.
-     * @param destinationOffset first destination slot.
-     * @return true when a complete output range was copied.
-     */
-    public fun copyCommandOutputRange(
+    public override fun copyCommandOutputRange(
         recordId: Int,
         destination: LongArray,
-        destinationOffset: Int = 0,
+        destinationOffset: Int,
     ): Boolean {
         require(destinationOffset >= 0) { "destinationOffset must be >= 0, was $destinationOffset" }
-        require(destinationOffset + TerminalShellIntegrationCommandOutputRange.REQUIRED_LONGS <= destination.size) {
+        require(TerminalShellIntegrationCommandOutputRange.REQUIRED_LONGS <= destination.size - destinationOffset) {
             "destination is too small for offset=$destinationOffset size=${destination.size}"
         }
         if (recordId == TerminalShellIntegrationCommandRecord.NONE) return false
@@ -628,28 +494,13 @@ public class TerminalShellIntegrationState(
         }
     }
 
-    /**
-     * Copies the selectable prompt/input-and-output line range for [recordId].
-     *
-     * The destination layout is defined by
-     * [TerminalShellIntegrationCommandBlockRange]. A completed command with a
-     * prompt selects from that prompt's visible anchor through its output. A
-     * silent command selects its prompt/input only. The next prompt is always
-     * excluded. Unfinished, prompt-only, orphan-silent, unknown, and evicted
-     * records return `false` and leave the destination unchanged.
-     *
-     * @param recordId retained command record id.
-     * @param destination destination `Long` columns.
-     * @param destinationOffset first destination slot.
-     * @return true when a complete command block was copied.
-     */
-    public fun copyCommandBlockRange(
+    public override fun copyCommandBlockRange(
         recordId: Int,
         destination: LongArray,
-        destinationOffset: Int = 0,
+        destinationOffset: Int,
     ): Boolean {
         require(destinationOffset >= 0) { "destinationOffset must be >= 0, was $destinationOffset" }
-        require(destinationOffset + TerminalShellIntegrationCommandBlockRange.REQUIRED_LONGS <= destination.size) {
+        require(TerminalShellIntegrationCommandBlockRange.REQUIRED_LONGS <= destination.size - destinationOffset) {
             "destination is too small for offset=$destinationOffset size=${destination.size}"
         }
         if (recordId == TerminalShellIntegrationCommandRecord.NONE) return false
@@ -677,17 +528,7 @@ public class TerminalShellIntegrationState(
         }
     }
 
-    /**
-     * Returns the retained command record that owns [lineId].
-     *
-     * Ownership uses the same prompt and command range rules as viewport
-     * projection. Prompt-only records are not considered commands and return
-     * [TerminalShellIntegrationCommandRecord.NONE].
-     *
-     * @param lineId stable render line identity to query.
-     * @return owning command record id, or `0` when no command owns the line.
-     */
-    public fun commandRecordIdAtLine(lineId: Long): Int {
+    public override fun commandRecordIdAtLine(lineId: Long): Int {
         require(lineId > 0L) { "lineId must be positive, was $lineId" }
         synchronized(lock) {
             val index = commandIndexAtLineLocked(lineId)
@@ -695,16 +536,7 @@ public class TerminalShellIntegrationState(
         }
     }
 
-    /**
-     * Returns the previous retained command record before [recordId].
-     *
-     * Prompt-only records are skipped. If [recordId] is not retained, no
-     * neighbor is inferred.
-     *
-     * @param recordId retained command record id.
-     * @return previous command record id, or `0` when none exists.
-     */
-    public fun previousCommandRecordId(recordId: Int): Int {
+    public override fun previousCommandRecordId(recordId: Int): Int {
         if (recordId == TerminalShellIntegrationCommandRecord.NONE) return TerminalShellIntegrationCommandRecord.NONE
         synchronized(lock) {
             val index = indexForRecordIdLocked(recordId)
@@ -719,16 +551,7 @@ public class TerminalShellIntegrationState(
         }
     }
 
-    /**
-     * Returns the next retained command record after [recordId].
-     *
-     * Prompt-only records are skipped. If [recordId] is not retained, no
-     * neighbor is inferred.
-     *
-     * @param recordId retained command record id.
-     * @return next command record id, or `0` when none exists.
-     */
-    public fun nextCommandRecordId(recordId: Int): Int {
+    public override fun nextCommandRecordId(recordId: Int): Int {
         if (recordId == TerminalShellIntegrationCommandRecord.NONE) return TerminalShellIntegrationCommandRecord.NONE
         synchronized(lock) {
             val index = indexForRecordIdLocked(recordId)
@@ -743,17 +566,7 @@ public class TerminalShellIntegrationState(
         }
     }
 
-    /**
-     * Returns the nearest retained command record before [lineId].
-     *
-     * If [lineId] is inside a command record, the previous command before that
-     * record is returned. If no command owns [lineId], the newest command whose
-     * start line is before [lineId] is returned.
-     *
-     * @param lineId stable render line identity used as the navigation anchor.
-     * @return previous command record id, or `0` when none exists.
-     */
-    public fun previousCommandRecordIdBeforeLine(lineId: Long): Int {
+    public override fun previousCommandRecordIdBeforeLine(lineId: Long): Int {
         require(lineId > 0L) { "lineId must be positive, was $lineId" }
         synchronized(lock) {
             val owner = commandIndexAtLineLocked(lineId)
@@ -766,17 +579,7 @@ public class TerminalShellIntegrationState(
         }
     }
 
-    /**
-     * Returns the nearest retained command record after [lineId].
-     *
-     * If [lineId] is inside a command record, the next command after that
-     * record is returned. If no command owns [lineId], the oldest command whose
-     * start line is after [lineId] is returned.
-     *
-     * @param lineId stable render line identity used as the navigation anchor.
-     * @return next command record id, or `0` when none exists.
-     */
-    public fun nextCommandRecordIdAfterLine(lineId: Long): Int {
+    public override fun nextCommandRecordIdAfterLine(lineId: Long): Int {
         require(lineId > 0L) { "lineId must be positive, was $lineId" }
         synchronized(lock) {
             val owner = commandIndexAtLineLocked(lineId)
@@ -789,28 +592,7 @@ public class TerminalShellIntegrationState(
         }
     }
 
-    /**
-     * Copies retained shell command records into caller-owned primitive arrays.
-     *
-     * Records are copied in chronological order, oldest first. This method
-     * clears exactly [maxRecords] destination slots starting at
-     * [destinationOffset] before copying, so callers can safely reuse
-     * destination buffers across calls without retaining stale records. Exit
-     * codes use [TerminalShellIntegrationCommandRecord.UNKNOWN_EXIT_CODE] when
-     * omitted, malformed, not finished, or otherwise unknown.
-     *
-     * @param recordIds destination record-id column.
-     * @param lifecycleStates destination lifecycle-state column.
-     * @param promptStartLineIds destination prompt-start line-id column.
-     * @param promptEndLineIds destination prompt-end line-id column.
-     * @param commandStartLineIds destination command-start line-id column.
-     * @param commandEndLineIds destination command-end line-id column.
-     * @param exitCodes destination exit-code column.
-     * @param destinationOffset first destination index in all destination arrays.
-     * @param maxRecords maximum number of destination records to clear and copy.
-     * @return number of actual records copied.
-     */
-    public fun copyRecords(
+    public override fun copyRecords(
         recordIds: IntArray,
         lifecycleStates: IntArray,
         promptStartLineIds: LongArray,
@@ -823,25 +605,25 @@ public class TerminalShellIntegrationState(
     ): Int {
         require(destinationOffset >= 0) { "destinationOffset must be >= 0, was $destinationOffset" }
         require(maxRecords >= 0) { "maxRecords must be >= 0, was $maxRecords" }
-        require(destinationOffset + maxRecords <= recordIds.size) {
+        require(maxRecords <= recordIds.size - destinationOffset) {
             "recordIds is too small for offset=$destinationOffset maxRecords=$maxRecords size=${recordIds.size}"
         }
-        require(destinationOffset + maxRecords <= lifecycleStates.size) {
+        require(maxRecords <= lifecycleStates.size - destinationOffset) {
             "lifecycleStates is too small for offset=$destinationOffset maxRecords=$maxRecords size=${lifecycleStates.size}"
         }
-        require(destinationOffset + maxRecords <= promptStartLineIds.size) {
+        require(maxRecords <= promptStartLineIds.size - destinationOffset) {
             "promptStartLineIds is too small for offset=$destinationOffset maxRecords=$maxRecords size=${promptStartLineIds.size}"
         }
-        require(destinationOffset + maxRecords <= promptEndLineIds.size) {
+        require(maxRecords <= promptEndLineIds.size - destinationOffset) {
             "promptEndLineIds is too small for offset=$destinationOffset maxRecords=$maxRecords size=${promptEndLineIds.size}"
         }
-        require(destinationOffset + maxRecords <= commandStartLineIds.size) {
+        require(maxRecords <= commandStartLineIds.size - destinationOffset) {
             "commandStartLineIds is too small for offset=$destinationOffset maxRecords=$maxRecords size=${commandStartLineIds.size}"
         }
-        require(destinationOffset + maxRecords <= commandEndLineIds.size) {
+        require(maxRecords <= commandEndLineIds.size - destinationOffset) {
             "commandEndLineIds is too small for offset=$destinationOffset maxRecords=$maxRecords size=${commandEndLineIds.size}"
         }
-        require(destinationOffset + maxRecords <= exitCodes.size) {
+        require(maxRecords <= exitCodes.size - destinationOffset) {
             "exitCodes is too small for offset=$destinationOffset maxRecords=$maxRecords size=${exitCodes.size}"
         }
 
@@ -876,26 +658,7 @@ public class TerminalShellIntegrationState(
         }
     }
 
-    /**
-     * Copies projected shell decorations for a visible viewport.
-     *
-     * Existing values in [promptStarts], [commandStarts], [commandEnds],
-     * [commandRecordIds], and [commandLifecycleStates] are
-     * overwritten for exactly [rowCount] rows starting at [destinationOffset].
-     *
-     * @param lineIds stable line identities for visible viewport rows.
-     * @param rowCount number of viewport rows to copy.
-     * @param promptStarts destination flags for prompt-start rows.
-     * @param commandStarts destination flags for command-output start rows.
-     * @param commandEnds destination flags for command-output end rows.
-     * @param commandRecordIds destination command-record ids for rows owned by
-     *   a projected prompt or command range.
-     * @param commandLifecycleStates destination lifecycle states for rows with
-     *   a projected command record.
-     * @param failedCommandRails optional destination flags for failed-command output rows.
-     * @param destinationOffset first destination index in all destination arrays.
-     */
-    public fun copyViewport(
+    public override fun copyViewport(
         lineIds: LongArray,
         rowCount: Int,
         promptStarts: BooleanArray,
@@ -903,30 +666,30 @@ public class TerminalShellIntegrationState(
         commandEnds: BooleanArray,
         commandRecordIds: IntArray,
         commandLifecycleStates: IntArray,
-        failedCommandRails: BooleanArray? = null,
-        destinationOffset: Int = 0,
+        failedCommandRails: BooleanArray?,
+        destinationOffset: Int,
     ) {
         require(rowCount >= 0) { "rowCount must be >= 0, was $rowCount" }
         require(rowCount <= lineIds.size) {
             "lineIds is too small for rowCount=$rowCount size=${lineIds.size}"
         }
         require(destinationOffset >= 0) { "destinationOffset must be >= 0, was $destinationOffset" }
-        require(destinationOffset + rowCount <= promptStarts.size) {
+        require(rowCount <= promptStarts.size - destinationOffset) {
             "promptStarts is too small for offset=$destinationOffset rowCount=$rowCount size=${promptStarts.size}"
         }
-        require(destinationOffset + rowCount <= commandStarts.size) {
+        require(rowCount <= commandStarts.size - destinationOffset) {
             "commandStarts is too small for offset=$destinationOffset rowCount=$rowCount size=${commandStarts.size}"
         }
-        require(destinationOffset + rowCount <= commandEnds.size) {
+        require(rowCount <= commandEnds.size - destinationOffset) {
             "commandEnds is too small for offset=$destinationOffset rowCount=$rowCount size=${commandEnds.size}"
         }
-        require(destinationOffset + rowCount <= commandRecordIds.size) {
+        require(rowCount <= commandRecordIds.size - destinationOffset) {
             "commandRecordIds is too small for offset=$destinationOffset rowCount=$rowCount size=${commandRecordIds.size}"
         }
-        require(destinationOffset + rowCount <= commandLifecycleStates.size) {
+        require(rowCount <= commandLifecycleStates.size - destinationOffset) {
             "commandLifecycleStates is too small for offset=$destinationOffset rowCount=$rowCount size=${commandLifecycleStates.size}"
         }
-        require(failedCommandRails == null || destinationOffset + rowCount <= failedCommandRails.size) {
+        require(failedCommandRails == null || rowCount <= failedCommandRails.size - destinationOffset) {
             "failedCommandRails is too small for offset=$destinationOffset rowCount=$rowCount size=${failedCommandRails?.size}"
         }
 
@@ -976,6 +739,21 @@ public class TerminalShellIntegrationState(
         publishRevision(changedRevision)
     }
 
+    private fun updateActivePromptAnchor(
+        lineId: Long,
+        anchors: LongArray,
+    ) {
+        require(lineId > 0L) { "lineId must be positive, was $lineId" }
+        val changedRevision =
+            synchronized(lock) {
+                val index = activePromptIndex
+                if (index == NO_INDEX || anchors[index] == lineId) return
+                anchors[index] = lineId
+                ++metadataRevision
+            }
+        publishRevision(changedRevision)
+    }
+
     private fun publishRevision(changedRevision: Long) {
         mutableRevision.update { current -> maxOf(current, changedRevision) }
     }
@@ -1012,6 +790,7 @@ public class TerminalShellIntegrationState(
                 listener(value)
             } catch (cancelled: CancellationException) {
                 val first = cancellation
+                @Suppress("KotlinConstantConditions")
                 if (first == null) {
                     cancellation = cancelled
                 } else if (first !== cancelled) {
@@ -1066,6 +845,8 @@ public class TerminalShellIntegrationState(
         return appendCommandLocked()
     }
 
+    // Separate primitive columns share one eviction slice and retain their alignment.
+    @Suppress("DuplicatedCode")
     private fun evictOldestLocked() {
         promptStartLineIds.copyInto(promptStartLineIds, destinationOffset = 0, startIndex = 1, endIndex = count)
         promptEndLineIds.copyInto(promptEndLineIds, destinationOffset = 0, startIndex = 1, endIndex = count)
@@ -1142,7 +923,7 @@ public class TerminalShellIntegrationState(
             if (promptEnd != NO_LINE_ID) {
                 val first = minOf(promptStart, promptEnd)
                 val last = maxOf(promptStart, promptEnd)
-                if (lineId >= first && lineId <= last) return true
+                if (lineId in first..last) return true
             } else if (lineId == promptStart) {
                 return true
             }
@@ -1302,7 +1083,7 @@ public class TerminalShellIntegrationState(
     ): Boolean {
         if (start > end) return false
         val lastOutputLine = lastCommandOutputLineBeforePromptLocked(start, end)
-        return !(lineId < start || lineId > lastOutputLine) && (isCommandStartInclusive(index) || lineId != start)
+        return lineId in start..lastOutputLine && (isCommandStartInclusive(index) || lineId != start)
     }
 
     /**
@@ -1321,7 +1102,7 @@ public class TerminalShellIntegrationState(
         var i = 0
         while (i < count) {
             val promptStart = promptStartLineIds[i]
-            if (promptStart >= start && promptStart <= lastOutputLine) {
+            if (promptStart in start..lastOutputLine) {
                 lastOutputLine = promptStart - 1L
             }
             i++
@@ -1350,9 +1131,9 @@ public class TerminalShellIntegrationState(
     private fun isCommandStartInclusive(index: Int): Boolean = flags[index] and FLAG_COMMAND_START_INCLUSIVE != 0
 
     private fun lifecycleForExitCode(exitCode: Int?): Int =
-        when {
-            exitCode == null -> TerminalShellIntegrationCommandLifecycle.FINISHED_UNKNOWN
-            exitCode == 0 -> TerminalShellIntegrationCommandLifecycle.SUCCEEDED
+        when (exitCode) {
+            null -> TerminalShellIntegrationCommandLifecycle.FINISHED_UNKNOWN
+            0 -> TerminalShellIntegrationCommandLifecycle.SUCCEEDED
             else -> TerminalShellIntegrationCommandLifecycle.FAILED
         }
 
@@ -1486,7 +1267,7 @@ public class TerminalShellIntegrationState(
             var row = 0
             while (row < rowCount) {
                 val lineId = lineIds[row]
-                if (lineId >= first && lineId <= last) {
+                if (lineId in first..last) {
                     val destinationIndex = destinationOffset + row
                     commandRecordIds[destinationIndex] = commandRecordId
                     commandLifecycleStates[destinationIndex] = lifecycle
