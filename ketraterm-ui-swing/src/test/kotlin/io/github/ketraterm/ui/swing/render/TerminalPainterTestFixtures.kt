@@ -34,18 +34,18 @@ internal fun defaultTestSettings(
     foreground: Int = TEST_WHITE,
     background: Int = TEST_BLACK,
 ): SwingSettings =
-    SwingSettings(
-        font = Font(Font.MONOSPACED, Font.PLAIN, 14),
-        palette =
+    SwingSettings.create { draft ->
+        draft.font = Font(Font.MONOSPACED, Font.PLAIN, 14)
+        draft.palette =
             TerminalColorPalette(
                 defaultForeground = foreground,
                 defaultBackground = background,
                 cursorForeground = TEST_RED,
                 cursorBackground = TEST_BLUE,
-            ),
-        textAntialiasing = RenderingHints.VALUE_TEXT_ANTIALIAS_OFF,
-        padding = SwingPadding(0, 0, 0, 0),
-    )
+            )
+        draft.textAntialiasing = RenderingHints.VALUE_TEXT_ANTIALIAS_OFF
+        draft.padding = SwingPadding(0, 0, 0, 0)
+    }
 
 internal fun testMetrics(
     image: BufferedImage,

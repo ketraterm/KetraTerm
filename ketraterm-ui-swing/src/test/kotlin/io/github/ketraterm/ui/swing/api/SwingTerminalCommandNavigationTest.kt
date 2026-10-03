@@ -17,7 +17,6 @@ package io.github.ketraterm.ui.swing.api
 
 import io.github.ketraterm.core.TerminalBuffers
 import io.github.ketraterm.input.api.TerminalInputEncoder
-import io.github.ketraterm.input.api.TerminalInputEncoderFactory
 import io.github.ketraterm.input.event.TerminalFocusEvent
 import io.github.ketraterm.input.event.TerminalKeyEvent
 import io.github.ketraterm.input.event.TerminalMouseEvent
@@ -147,7 +146,12 @@ class SwingTerminalCommandNavigationTest {
     fun `previous command from inside command output reveals current command prompt`() {
         val reader = CommandFrameReader()
         val session = commandSession(reader)
-        val component = SwingTerminal(settingsProvider = { SwingSettings(padding = SwingPadding(0, 0, 0, 0)) })
+        val component =
+            SwingTerminal(settingsProvider = {
+                SwingSettings.create { draft ->
+                    draft.padding = SwingPadding(0, 0, 0, 0)
+                }
+            })
 
         SwingUtilities.invokeAndWait {
             component.size = component.preferredGridSize(12, 2)
@@ -164,7 +168,12 @@ class SwingTerminalCommandNavigationTest {
     fun `next command from inside command output reveals following command prompt`() {
         val reader = CommandFrameReader()
         val session = commandSession(reader)
-        val component = SwingTerminal(settingsProvider = { SwingSettings(padding = SwingPadding(0, 0, 0, 0)) })
+        val component =
+            SwingTerminal(settingsProvider = {
+                SwingSettings.create { draft ->
+                    draft.padding = SwingPadding(0, 0, 0, 0)
+                }
+            })
 
         SwingUtilities.invokeAndWait {
             component.size = component.preferredGridSize(12, 2)
@@ -182,7 +191,12 @@ class SwingTerminalCommandNavigationTest {
     fun `command navigation from prompt only row skips prompt only record`() {
         val reader = CommandFrameReader()
         val session = commandSession(reader)
-        val component = SwingTerminal(settingsProvider = { SwingSettings(padding = SwingPadding(0, 0, 0, 0)) })
+        val component =
+            SwingTerminal(settingsProvider = {
+                SwingSettings.create { draft ->
+                    draft.padding = SwingPadding(0, 0, 0, 0)
+                }
+            })
 
         SwingUtilities.invokeAndWait {
             component.size = component.preferredGridSize(12, 2)
@@ -206,7 +220,12 @@ class SwingTerminalCommandNavigationTest {
     fun `command navigation before first and after last command is a no op`() {
         val reader = CommandFrameReader()
         val session = commandSession(reader)
-        val component = SwingTerminal(settingsProvider = { SwingSettings(padding = SwingPadding(0, 0, 0, 0)) })
+        val component =
+            SwingTerminal(settingsProvider = {
+                SwingSettings.create { draft ->
+                    draft.padding = SwingPadding(0, 0, 0, 0)
+                }
+            })
 
         SwingUtilities.invokeAndWait {
             component.size = component.preferredGridSize(12, 2)
@@ -230,7 +249,12 @@ class SwingTerminalCommandNavigationTest {
     fun `command navigation ignores evicted command records`() {
         val reader = CommandFrameReader()
         val session = commandSession(reader, capacity = 1)
-        val component = SwingTerminal(settingsProvider = { SwingSettings(padding = SwingPadding(0, 0, 0, 0)) })
+        val component =
+            SwingTerminal(settingsProvider = {
+                SwingSettings.create { draft ->
+                    draft.padding = SwingPadding(0, 0, 0, 0)
+                }
+            })
 
         SwingUtilities.invokeAndWait {
             component.size = component.preferredGridSize(12, 2)
@@ -253,7 +277,12 @@ class SwingTerminalCommandNavigationTest {
     fun `command hit testing returns command records for prompt and output rows`() {
         val reader = CommandFrameReader()
         val session = commandSession(reader)
-        val component = SwingTerminal(settingsProvider = { SwingSettings(padding = SwingPadding(0, 0, 0, 0)) })
+        val component =
+            SwingTerminal(settingsProvider = {
+                SwingSettings.create { draft ->
+                    draft.padding = SwingPadding(0, 0, 0, 0)
+                }
+            })
         val firstCommandId = session.shellIntegrationState.commandRecordIdAtLine(lineIdForAbsoluteRow(3))
         val secondCommandId = session.shellIntegrationState.commandRecordIdAtLine(lineIdForAbsoluteRow(6))
 
@@ -280,7 +309,12 @@ class SwingTerminalCommandNavigationTest {
     fun `select command output excludes prompt input line for exclusive command start`() {
         val reader = CommandFrameReader()
         val session = commandSession(reader)
-        val component = SwingTerminal(settingsProvider = { SwingSettings(padding = SwingPadding(0, 0, 0, 0)) })
+        val component =
+            SwingTerminal(settingsProvider = {
+                SwingSettings.create { draft ->
+                    draft.padding = SwingPadding(0, 0, 0, 0)
+                }
+            })
         val firstCommandId = session.shellIntegrationState.commandRecordIdAtLine(lineIdForAbsoluteRow(1))
 
         SwingUtilities.invokeAndWait {
@@ -299,7 +333,12 @@ class SwingTerminalCommandNavigationTest {
     fun `select command output includes start line for inclusive command start`() {
         val reader = CommandFrameReader()
         val session = commandSession(reader)
-        val component = SwingTerminal(settingsProvider = { SwingSettings(padding = SwingPadding(0, 0, 0, 0)) })
+        val component =
+            SwingTerminal(settingsProvider = {
+                SwingSettings.create { draft ->
+                    draft.padding = SwingPadding(0, 0, 0, 0)
+                }
+            })
         val secondCommandId = session.shellIntegrationState.commandRecordIdAtLine(lineIdForAbsoluteRow(6))
 
         SwingUtilities.invokeAndWait {
@@ -318,7 +357,12 @@ class SwingTerminalCommandNavigationTest {
     fun `select command output at prompt only row is a no op`() {
         val reader = CommandFrameReader()
         val session = commandSession(reader)
-        val component = SwingTerminal(settingsProvider = { SwingSettings(padding = SwingPadding(0, 0, 0, 0)) })
+        val component =
+            SwingTerminal(settingsProvider = {
+                SwingSettings.create { draft ->
+                    draft.padding = SwingPadding(0, 0, 0, 0)
+                }
+            })
 
         SwingUtilities.invokeAndWait {
             component.size = component.preferredGridSize(12, 2)
@@ -337,7 +381,12 @@ class SwingTerminalCommandNavigationTest {
         val reader = CommandFrameReader()
         val session = commandSession(reader, firstCommandHasOutput = false)
         val padding = SwingPadding(8, 12, 8, 8)
-        val component = SwingTerminal(settingsProvider = { SwingSettings(padding = padding) })
+        val component =
+            SwingTerminal(settingsProvider = {
+                SwingSettings.create { draft ->
+                    draft.padding = padding
+                }
+            })
 
         SwingUtilities.invokeAndWait {
             component.size = component.preferredGridSize(12, 2)
@@ -370,7 +419,12 @@ class SwingTerminalCommandNavigationTest {
     fun `select command output ignores evicted command record`() {
         val reader = CommandFrameReader()
         val session = commandSession(reader, capacity = 1)
-        val component = SwingTerminal(settingsProvider = { SwingSettings(padding = SwingPadding(0, 0, 0, 0)) })
+        val component =
+            SwingTerminal(settingsProvider = {
+                SwingSettings.create { draft ->
+                    draft.padding = SwingPadding(0, 0, 0, 0)
+                }
+            })
         val evictedCommandId = 1
 
         SwingUtilities.invokeAndWait {
@@ -388,7 +442,12 @@ class SwingTerminalCommandNavigationTest {
     fun `command output text preserves hard breaks and joins soft wraps`() {
         val reader = CommandFrameReader()
         val session = commandSession(reader)
-        val component = SwingTerminal(settingsProvider = { SwingSettings(padding = SwingPadding(0, 0, 0, 0)) })
+        val component =
+            SwingTerminal(settingsProvider = {
+                SwingSettings.create { draft ->
+                    draft.padding = SwingPadding(0, 0, 0, 0)
+                }
+            })
         val secondCommandId = session.shellIntegrationState.commandRecordIdAtLine(lineIdForAbsoluteRow(6))
 
         SwingUtilities.invokeAndWait {
@@ -407,18 +466,22 @@ class SwingTerminalCommandNavigationTest {
         var clipboardText: String? = null
         val component =
             SwingTerminal(
-                settingsProvider = { SwingSettings(padding = SwingPadding()) },
+                settingsProvider = {
+                    SwingSettings.create { draft ->
+                        draft.padding = SwingPadding()
+                    }
+                },
                 hostServices =
-                    SwingHostServices(
-                        clipboardHandler =
+                    SwingHostServices.create { draft ->
+                        draft.clipboardHandler =
                             object : TerminalClipboardHandler {
                                 override fun copyText(text: String) {
                                     clipboardText = text
                                 }
 
                                 override fun readText(): String? = clipboardText
-                            },
-                    ),
+                            }
+                    },
             )
         val secondCommandId = session.shellIntegrationState.commandRecordIdAtLine(lineIdForAbsoluteRow(6))
         try {
@@ -447,7 +510,12 @@ class SwingTerminalCommandNavigationTest {
         val reader = CommandFrameReader()
         val session = commandSession(reader)
         val padding = SwingPadding(8, 12, 8, 8)
-        val component = SwingTerminal(settingsProvider = { SwingSettings(padding = padding) })
+        val component =
+            SwingTerminal(settingsProvider = {
+                SwingSettings.create { draft ->
+                    draft.padding = padding
+                }
+            })
 
         SwingUtilities.invokeAndWait {
             component.size = component.preferredGridSize(12, 2)
@@ -479,7 +547,12 @@ class SwingTerminalCommandNavigationTest {
         val reader = CommandFrameReader()
         val session = commandSession(reader)
         val padding = SwingPadding(8, 12, 8, 8)
-        val component = SwingTerminal(settingsProvider = { SwingSettings(padding = padding) })
+        val component =
+            SwingTerminal(settingsProvider = {
+                SwingSettings.create { draft ->
+                    draft.padding = padding
+                }
+            })
 
         SwingUtilities.invokeAndWait {
             component.size = component.preferredGridSize(12, 2)
@@ -548,7 +621,7 @@ class SwingTerminalCommandNavigationTest {
                 responseReader = terminal,
                 connector = NoOpConnector,
                 parser = NoOpParser,
-                inputEncoderFactory = TerminalInputEncoderFactory { _, _, _ -> object : TerminalInputEncoder by NoOpInputEncoder {} },
+                inputEncoderFactory = { _, _, _ -> object : TerminalInputEncoder by NoOpInputEncoder {} },
                 shellIntegration =
                     TerminalShellIntegrationFactory.host(TerminalShellIntegrationState(capacity = capacity)),
                 workerDispatcher = workerDispatcher,
@@ -588,19 +661,25 @@ class SwingTerminalCommandNavigationTest {
         val replacementSession = commandSession(CommandFrameReader(), populate = false, workerDispatcher = worker)
         val component =
             SwingTerminal(
-                settingsProvider = { SwingSettings(padding = padding, cursorBlinkMillis = 0, useSystemFallbackFonts = false) },
+                settingsProvider = {
+                    SwingSettings.create { draft ->
+                        draft.padding = padding
+                        draft.cursorBlinkMillis = 0
+                        draft.useSystemFallbackFonts = false
+                    }
+                },
                 hostServices =
-                    SwingHostServices(
-                        uiDispatcher = { dispatches += it },
-                        clipboardHandler =
+                    SwingHostServices.create { draft ->
+                        draft.uiDispatcher = { dispatches += it }
+                        draft.clipboardHandler =
                             object : TerminalClipboardHandler {
                                 override fun copyText(text: String) {
                                     clipboard = text
                                 }
 
                                 override fun readText(): String? = clipboard
-                            },
-                    ),
+                            }
+                    },
             )
 
         init {

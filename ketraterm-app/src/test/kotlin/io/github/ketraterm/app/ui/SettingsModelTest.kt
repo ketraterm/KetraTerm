@@ -15,6 +15,8 @@
  */
 package io.github.ketraterm.app.ui
 
+import io.github.ketraterm.app.config.KetraTermConfig
+import io.github.ketraterm.app.config.KetraTermConfigManager
 import io.github.ketraterm.app.config.KetraTermSettings
 import io.github.ketraterm.completion.persistence.TerminalCompletionLearningCoordinator
 import io.github.ketraterm.host.HostControlPolicy
@@ -22,8 +24,6 @@ import io.github.ketraterm.host.TerminalClipboardPermission
 import io.github.ketraterm.host.TerminalTitlePermission
 import io.github.ketraterm.ui.swing.settings.TerminalTheme
 import io.github.ketraterm.workspace.TerminalProfileRegistry
-import io.github.ketraterm.workspace.config.TerminalConfig
-import io.github.ketraterm.workspace.config.TerminalWorkspaceConfigManager
 import java.io.IOException
 import java.nio.file.Files
 import java.util.concurrent.LinkedBlockingQueue
@@ -41,7 +41,7 @@ class SettingsModelTest {
     @BeforeTest
     fun setUp() {
         tempFile = Files.createTempFile("ketraterm-settings-test", ".toml")
-        val manager = TerminalWorkspaceConfigManager(tempFile)
+        val manager = KetraTermConfigManager(tempFile)
         settings = KetraTermSettings(manager)
         registry = TerminalProfileRegistry(executableExists = { false })
         model = SettingsModel(settings, registry)
@@ -60,7 +60,7 @@ class SettingsModelTest {
     @Test
     fun `fresh settings publish Ask and preserve it after restart`() {
         Files.delete(tempFile)
-        val manager = TerminalWorkspaceConfigManager(tempFile)
+        val manager = KetraTermConfigManager(tempFile)
         val fresh = KetraTermSettings(manager)
         assertEquals(TerminalClipboardPermission.PROMPT, fresh.createHostPolicy().clipboardPolicy.readPermission)
         assertEquals(fresh.createHostPolicy(), KetraTermSettings(manager).createHostPolicy())
@@ -86,12 +86,12 @@ class SettingsModelTest {
 
     @Test
     fun `applying multiple changes saves and publishes one complete snapshot`() {
-        val saved = mutableListOf<TerminalConfig>()
-        val notifications = mutableListOf<TerminalConfig>()
-        val manager = TerminalWorkspaceConfigManager(tempFile)
+        val saved = mutableListOf<KetraTermConfig>()
+        val notifications = mutableListOf<KetraTermConfig>()
+        val manager = KetraTermConfigManager(tempFile)
         settings =
             KetraTermSettings(manager) { snapshot ->
-                assertEquals(TerminalConfig.DEFAULT_FONT_SIZE, settings.config.fontSize)
+                assertEquals(KetraTermConfig.DEFAULT_FONT_SIZE, settings.config.fontSize)
                 saved += snapshot
                 manager.save(snapshot)
             }
@@ -117,8 +117,8 @@ class SettingsModelTest {
 
     @Test
     fun `failed save preserves active state disk baseline and editable draft`() {
-        val manager = TerminalWorkspaceConfigManager(tempFile)
-        manager.save(TerminalConfig(fontSize = 18))
+        val manager = KetraTermConfigManager(tempFile)
+        manager.save(KetraTermConfig(fontSize = 18))
         settings = KetraTermSettings(manager) { throw IOException("Disk is full") }
         model = SettingsModel(settings, registry)
         val initial = settings.config

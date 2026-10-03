@@ -24,38 +24,11 @@ public final class io/github/ketraterm/ui/swing/api/CellSelection {
 }
 
 public final class io/github/ketraterm/ui/swing/api/SwingHostServices {
+	public static final field Companion Lio/github/ketraterm/ui/swing/api/SwingHostServices$Companion;
 	public fun <init> ()V
-	public fun <init> (Lio/github/ketraterm/ui/swing/api/TerminalUiDispatcher;)V
-	public fun <init> (Lio/github/ketraterm/ui/swing/api/TerminalUiDispatcher;Lio/github/ketraterm/ui/swing/settings/TerminalClipboardHandler;)V
-	public fun <init> (Lio/github/ketraterm/ui/swing/api/TerminalUiDispatcher;Lio/github/ketraterm/ui/swing/settings/TerminalClipboardHandler;Lio/github/ketraterm/ui/swing/settings/TerminalHyperlinkHandler;)V
-	public fun <init> (Lio/github/ketraterm/ui/swing/api/TerminalUiDispatcher;Lio/github/ketraterm/ui/swing/settings/TerminalClipboardHandler;Lio/github/ketraterm/ui/swing/settings/TerminalHyperlinkHandler;Lio/github/ketraterm/ui/swing/api/SwingHyperlinkDetector;)V
-	public fun <init> (Lio/github/ketraterm/ui/swing/api/TerminalUiDispatcher;Lio/github/ketraterm/ui/swing/settings/TerminalClipboardHandler;Lio/github/ketraterm/ui/swing/settings/TerminalHyperlinkHandler;Lio/github/ketraterm/ui/swing/api/SwingHyperlinkDetector;Lio/github/ketraterm/ui/swing/api/TerminalViewportListener;)V
-	public fun <init> (Lio/github/ketraterm/ui/swing/api/TerminalUiDispatcher;Lio/github/ketraterm/ui/swing/settings/TerminalClipboardHandler;Lio/github/ketraterm/ui/swing/settings/TerminalHyperlinkHandler;Lio/github/ketraterm/ui/swing/api/SwingHyperlinkDetector;Lio/github/ketraterm/ui/swing/api/TerminalViewportListener;Z)V
-	public fun <init> (Lio/github/ketraterm/ui/swing/api/TerminalUiDispatcher;Lio/github/ketraterm/ui/swing/settings/TerminalClipboardHandler;Lio/github/ketraterm/ui/swing/settings/TerminalHyperlinkHandler;Lio/github/ketraterm/ui/swing/api/SwingHyperlinkDetector;Lio/github/ketraterm/ui/swing/api/TerminalViewportListener;ZLio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionProvider;)V
-	public fun <init> (Lio/github/ketraterm/ui/swing/api/TerminalUiDispatcher;Lio/github/ketraterm/ui/swing/settings/TerminalClipboardHandler;Lio/github/ketraterm/ui/swing/settings/TerminalHyperlinkHandler;Lio/github/ketraterm/ui/swing/api/SwingHyperlinkDetector;Lio/github/ketraterm/ui/swing/api/TerminalViewportListener;ZLio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionProvider;Lio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionHandler;)V
-	public fun <init> (Lio/github/ketraterm/ui/swing/api/TerminalUiDispatcher;Lio/github/ketraterm/ui/swing/settings/TerminalClipboardHandler;Lio/github/ketraterm/ui/swing/settings/TerminalHyperlinkHandler;Lio/github/ketraterm/ui/swing/api/SwingHyperlinkDetector;Lio/github/ketraterm/ui/swing/api/TerminalViewportListener;ZLio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionProvider;Lio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionHandler;Lio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionFeedbackHandler;)V
-	public fun <init> (Lio/github/ketraterm/ui/swing/api/TerminalUiDispatcher;Lio/github/ketraterm/ui/swing/settings/TerminalClipboardHandler;Lio/github/ketraterm/ui/swing/settings/TerminalHyperlinkHandler;Lio/github/ketraterm/ui/swing/api/SwingHyperlinkDetector;Lio/github/ketraterm/ui/swing/api/TerminalViewportListener;ZLio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionProvider;Lio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionHandler;Lio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionFeedbackHandler;Lio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionKeymap;)V
-	public fun <init> (Lio/github/ketraterm/ui/swing/api/TerminalUiDispatcher;Lio/github/ketraterm/ui/swing/settings/TerminalClipboardHandler;Lio/github/ketraterm/ui/swing/settings/TerminalHyperlinkHandler;Lio/github/ketraterm/ui/swing/api/SwingHyperlinkDetector;Lio/github/ketraterm/ui/swing/api/TerminalViewportListener;ZLio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionProvider;Lio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionHandler;Lio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionFeedbackHandler;Lio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionKeymap;Lio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionViewFactory;)V
-	public fun <init> (Lio/github/ketraterm/ui/swing/api/TerminalUiDispatcher;Lio/github/ketraterm/ui/swing/settings/TerminalClipboardHandler;Lio/github/ketraterm/ui/swing/settings/TerminalHyperlinkHandler;Lio/github/ketraterm/ui/swing/api/SwingHyperlinkDetector;Lio/github/ketraterm/ui/swing/api/TerminalViewportListener;ZLio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionProvider;Lio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionHandler;Lio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionFeedbackHandler;Lio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionKeymap;Lio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionViewFactory;Lio/github/ketraterm/ui/swing/api/SwingTerminalHostKeyHandler;)V
-	public fun <init> (Lio/github/ketraterm/ui/swing/api/TerminalUiDispatcher;Lio/github/ketraterm/ui/swing/settings/TerminalClipboardHandler;Lio/github/ketraterm/ui/swing/settings/TerminalHyperlinkHandler;Lio/github/ketraterm/ui/swing/api/SwingHyperlinkDetector;Lio/github/ketraterm/ui/swing/api/TerminalViewportListener;ZLio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionProvider;Lio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionHandler;Lio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionFeedbackHandler;Lio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionKeymap;Lio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionViewFactory;Lio/github/ketraterm/ui/swing/api/SwingTerminalHostKeyHandler;Lio/github/ketraterm/ui/swing/api/SwingTerminalContextMenuHandler;)V
-	public fun <init> (Lio/github/ketraterm/ui/swing/api/TerminalUiDispatcher;Lio/github/ketraterm/ui/swing/settings/TerminalClipboardHandler;Lio/github/ketraterm/ui/swing/settings/TerminalHyperlinkHandler;Lio/github/ketraterm/ui/swing/api/SwingHyperlinkDetector;Lio/github/ketraterm/ui/swing/api/TerminalViewportListener;ZLio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionProvider;Lio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionHandler;Lio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionFeedbackHandler;Lio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionKeymap;Lio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionViewFactory;Lio/github/ketraterm/ui/swing/api/SwingTerminalHostKeyHandler;Lio/github/ketraterm/ui/swing/api/SwingTerminalContextMenuHandler;Lio/github/ketraterm/ui/swing/api/TerminalFontResolver;)V
-	public synthetic fun <init> (Lio/github/ketraterm/ui/swing/api/TerminalUiDispatcher;Lio/github/ketraterm/ui/swing/settings/TerminalClipboardHandler;Lio/github/ketraterm/ui/swing/settings/TerminalHyperlinkHandler;Lio/github/ketraterm/ui/swing/api/SwingHyperlinkDetector;Lio/github/ketraterm/ui/swing/api/TerminalViewportListener;ZLio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionProvider;Lio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionHandler;Lio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionFeedbackHandler;Lio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionKeymap;Lio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionViewFactory;Lio/github/ketraterm/ui/swing/api/SwingTerminalHostKeyHandler;Lio/github/ketraterm/ui/swing/api/SwingTerminalContextMenuHandler;Lio/github/ketraterm/ui/swing/api/TerminalFontResolver;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
-	public final fun component1 ()Lio/github/ketraterm/ui/swing/api/TerminalUiDispatcher;
-	public final fun component10 ()Lio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionKeymap;
-	public final fun component11 ()Lio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionViewFactory;
-	public final fun component12 ()Lio/github/ketraterm/ui/swing/api/SwingTerminalHostKeyHandler;
-	public final fun component13 ()Lio/github/ketraterm/ui/swing/api/SwingTerminalContextMenuHandler;
-	public final fun component14 ()Lio/github/ketraterm/ui/swing/api/TerminalFontResolver;
-	public final fun component2 ()Lio/github/ketraterm/ui/swing/settings/TerminalClipboardHandler;
-	public final fun component3 ()Lio/github/ketraterm/ui/swing/settings/TerminalHyperlinkHandler;
-	public final fun component4 ()Lio/github/ketraterm/ui/swing/api/SwingHyperlinkDetector;
-	public final fun component5 ()Lio/github/ketraterm/ui/swing/api/TerminalViewportListener;
-	public final fun component6 ()Z
-	public final fun component7 ()Lio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionProvider;
-	public final fun component8 ()Lio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionHandler;
-	public final fun component9 ()Lio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionFeedbackHandler;
-	public final fun copy (Lio/github/ketraterm/ui/swing/api/TerminalUiDispatcher;Lio/github/ketraterm/ui/swing/settings/TerminalClipboardHandler;Lio/github/ketraterm/ui/swing/settings/TerminalHyperlinkHandler;Lio/github/ketraterm/ui/swing/api/SwingHyperlinkDetector;Lio/github/ketraterm/ui/swing/api/TerminalViewportListener;ZLio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionProvider;Lio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionHandler;Lio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionFeedbackHandler;Lio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionKeymap;Lio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionViewFactory;Lio/github/ketraterm/ui/swing/api/SwingTerminalHostKeyHandler;Lio/github/ketraterm/ui/swing/api/SwingTerminalContextMenuHandler;Lio/github/ketraterm/ui/swing/api/TerminalFontResolver;)Lio/github/ketraterm/ui/swing/api/SwingHostServices;
-	public static synthetic fun copy$default (Lio/github/ketraterm/ui/swing/api/SwingHostServices;Lio/github/ketraterm/ui/swing/api/TerminalUiDispatcher;Lio/github/ketraterm/ui/swing/settings/TerminalClipboardHandler;Lio/github/ketraterm/ui/swing/settings/TerminalHyperlinkHandler;Lio/github/ketraterm/ui/swing/api/SwingHyperlinkDetector;Lio/github/ketraterm/ui/swing/api/TerminalViewportListener;ZLio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionProvider;Lio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionHandler;Lio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionFeedbackHandler;Lio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionKeymap;Lio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionViewFactory;Lio/github/ketraterm/ui/swing/api/SwingTerminalHostKeyHandler;Lio/github/ketraterm/ui/swing/api/SwingTerminalContextMenuHandler;Lio/github/ketraterm/ui/swing/api/TerminalFontResolver;ILjava/lang/Object;)Lio/github/ketraterm/ui/swing/api/SwingHostServices;
+	public static final fun builder ()Lio/github/ketraterm/ui/swing/api/SwingHostServices$Builder;
+	public final fun copy (Ljava/util/function/Consumer;)Lio/github/ketraterm/ui/swing/api/SwingHostServices;
+	public static final fun create (Ljava/util/function/Consumer;)Lio/github/ketraterm/ui/swing/api/SwingHostServices;
 	public fun equals (Ljava/lang/Object;)Z
 	public final fun getClipboardHandler ()Lio/github/ketraterm/ui/swing/settings/TerminalClipboardHandler;
 	public final fun getContextMenuHandler ()Lio/github/ketraterm/ui/swing/api/SwingTerminalContextMenuHandler;
@@ -72,7 +45,44 @@ public final class io/github/ketraterm/ui/swing/api/SwingHostServices {
 	public final fun getUiDispatcher ()Lio/github/ketraterm/ui/swing/api/TerminalUiDispatcher;
 	public final fun getViewportListener ()Lio/github/ketraterm/ui/swing/api/TerminalViewportListener;
 	public fun hashCode ()I
-	public fun toString ()Ljava/lang/String;
+	public final fun toBuilder ()Lio/github/ketraterm/ui/swing/api/SwingHostServices$Builder;
+}
+
+public final class io/github/ketraterm/ui/swing/api/SwingHostServices$Builder {
+	public final fun build ()Lio/github/ketraterm/ui/swing/api/SwingHostServices;
+	public final fun getClipboardHandler ()Lio/github/ketraterm/ui/swing/settings/TerminalClipboardHandler;
+	public final fun getContextMenuHandler ()Lio/github/ketraterm/ui/swing/api/SwingTerminalContextMenuHandler;
+	public final fun getFontResolver ()Lio/github/ketraterm/ui/swing/api/TerminalFontResolver;
+	public final fun getHostKeyHandler ()Lio/github/ketraterm/ui/swing/api/SwingTerminalHostKeyHandler;
+	public final fun getHyperlinkDetector ()Lio/github/ketraterm/ui/swing/api/SwingHyperlinkDetector;
+	public final fun getHyperlinkHandler ()Lio/github/ketraterm/ui/swing/settings/TerminalHyperlinkHandler;
+	public final fun getScrollbarOverlayEnabled ()Z
+	public final fun getShellSuggestionFeedbackHandler ()Lio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionFeedbackHandler;
+	public final fun getShellSuggestionHandler ()Lio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionHandler;
+	public final fun getShellSuggestionKeymap ()Lio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionKeymap;
+	public final fun getShellSuggestionProvider ()Lio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionProvider;
+	public final fun getShellSuggestionViewFactory ()Lio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionViewFactory;
+	public final fun getUiDispatcher ()Lio/github/ketraterm/ui/swing/api/TerminalUiDispatcher;
+	public final fun getViewportListener ()Lio/github/ketraterm/ui/swing/api/TerminalViewportListener;
+	public final fun setClipboardHandler (Lio/github/ketraterm/ui/swing/settings/TerminalClipboardHandler;)V
+	public final fun setContextMenuHandler (Lio/github/ketraterm/ui/swing/api/SwingTerminalContextMenuHandler;)V
+	public final fun setFontResolver (Lio/github/ketraterm/ui/swing/api/TerminalFontResolver;)V
+	public final fun setHostKeyHandler (Lio/github/ketraterm/ui/swing/api/SwingTerminalHostKeyHandler;)V
+	public final fun setHyperlinkDetector (Lio/github/ketraterm/ui/swing/api/SwingHyperlinkDetector;)V
+	public final fun setHyperlinkHandler (Lio/github/ketraterm/ui/swing/settings/TerminalHyperlinkHandler;)V
+	public final fun setScrollbarOverlayEnabled (Z)V
+	public final fun setShellSuggestionFeedbackHandler (Lio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionFeedbackHandler;)V
+	public final fun setShellSuggestionHandler (Lio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionHandler;)V
+	public final fun setShellSuggestionKeymap (Lio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionKeymap;)V
+	public final fun setShellSuggestionProvider (Lio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionProvider;)V
+	public final fun setShellSuggestionViewFactory (Lio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionViewFactory;)V
+	public final fun setUiDispatcher (Lio/github/ketraterm/ui/swing/api/TerminalUiDispatcher;)V
+	public final fun setViewportListener (Lio/github/ketraterm/ui/swing/api/TerminalViewportListener;)V
+}
+
+public final class io/github/ketraterm/ui/swing/api/SwingHostServices$Companion {
+	public final fun builder ()Lio/github/ketraterm/ui/swing/api/SwingHostServices$Builder;
+	public final fun create (Ljava/util/function/Consumer;)Lio/github/ketraterm/ui/swing/api/SwingHostServices;
 }
 
 public final class io/github/ketraterm/ui/swing/api/SwingHyperlink {
@@ -453,89 +463,9 @@ public final class io/github/ketraterm/ui/swing/settings/SwingPadding {
 public final class io/github/ketraterm/ui/swing/settings/SwingSettings {
 	public static final field Companion Lio/github/ketraterm/ui/swing/settings/SwingSettings$Companion;
 	public fun <init> ()V
-	public fun <init> (Ljava/awt/Font;)V
-	public fun <init> (Ljava/awt/Font;Lkotlinx/collections/immutable/ImmutableList;)V
-	public fun <init> (Ljava/awt/Font;Lkotlinx/collections/immutable/ImmutableList;Z)V
-	public fun <init> (Ljava/awt/Font;Lkotlinx/collections/immutable/ImmutableList;ZLio/github/ketraterm/render/api/TerminalColorPalette;)V
-	public fun <init> (Ljava/awt/Font;Lkotlinx/collections/immutable/ImmutableList;ZLio/github/ketraterm/render/api/TerminalColorPalette;I)V
-	public fun <init> (Ljava/awt/Font;Lkotlinx/collections/immutable/ImmutableList;ZLio/github/ketraterm/render/api/TerminalColorPalette;II)V
-	public fun <init> (Ljava/awt/Font;Lkotlinx/collections/immutable/ImmutableList;ZLio/github/ketraterm/render/api/TerminalColorPalette;IIZ)V
-	public fun <init> (Ljava/awt/Font;Lkotlinx/collections/immutable/ImmutableList;ZLio/github/ketraterm/render/api/TerminalColorPalette;IIZI)V
-	public fun <init> (Ljava/awt/Font;Lkotlinx/collections/immutable/ImmutableList;ZLio/github/ketraterm/render/api/TerminalColorPalette;IIZILjava/lang/Object;)V
-	public fun <init> (Ljava/awt/Font;Lkotlinx/collections/immutable/ImmutableList;ZLio/github/ketraterm/render/api/TerminalColorPalette;IIZILjava/lang/Object;Ljava/lang/Object;)V
-	public fun <init> (Ljava/awt/Font;Lkotlinx/collections/immutable/ImmutableList;ZLio/github/ketraterm/render/api/TerminalColorPalette;IIZILjava/lang/Object;Ljava/lang/Object;I)V
-	public fun <init> (Ljava/awt/Font;Lkotlinx/collections/immutable/ImmutableList;ZLio/github/ketraterm/render/api/TerminalColorPalette;IIZILjava/lang/Object;Ljava/lang/Object;II)V
-	public fun <init> (Ljava/awt/Font;Lkotlinx/collections/immutable/ImmutableList;ZLio/github/ketraterm/render/api/TerminalColorPalette;IIZILjava/lang/Object;Ljava/lang/Object;III)V
-	public fun <init> (Ljava/awt/Font;Lkotlinx/collections/immutable/ImmutableList;ZLio/github/ketraterm/render/api/TerminalColorPalette;IIZILjava/lang/Object;Ljava/lang/Object;IIII)V
-	public fun <init> (Ljava/awt/Font;Lkotlinx/collections/immutable/ImmutableList;ZLio/github/ketraterm/render/api/TerminalColorPalette;IIZILjava/lang/Object;Ljava/lang/Object;IIIIZ)V
-	public fun <init> (Ljava/awt/Font;Lkotlinx/collections/immutable/ImmutableList;ZLio/github/ketraterm/render/api/TerminalColorPalette;IIZILjava/lang/Object;Ljava/lang/Object;IIIIZI)V
-	public fun <init> (Ljava/awt/Font;Lkotlinx/collections/immutable/ImmutableList;ZLio/github/ketraterm/render/api/TerminalColorPalette;IIZILjava/lang/Object;Ljava/lang/Object;IIIIZII)V
-	public fun <init> (Ljava/awt/Font;Lkotlinx/collections/immutable/ImmutableList;ZLio/github/ketraterm/render/api/TerminalColorPalette;IIZILjava/lang/Object;Ljava/lang/Object;IIIIZIII)V
-	public fun <init> (Ljava/awt/Font;Lkotlinx/collections/immutable/ImmutableList;ZLio/github/ketraterm/render/api/TerminalColorPalette;IIZILjava/lang/Object;Ljava/lang/Object;IIIIZIIIZ)V
-	public fun <init> (Ljava/awt/Font;Lkotlinx/collections/immutable/ImmutableList;ZLio/github/ketraterm/render/api/TerminalColorPalette;IIZILjava/lang/Object;Ljava/lang/Object;IIIIZIIIZI)V
-	public fun <init> (Ljava/awt/Font;Lkotlinx/collections/immutable/ImmutableList;ZLio/github/ketraterm/render/api/TerminalColorPalette;IIZILjava/lang/Object;Ljava/lang/Object;IIIIZIIIZII)V
-	public fun <init> (Ljava/awt/Font;Lkotlinx/collections/immutable/ImmutableList;ZLio/github/ketraterm/render/api/TerminalColorPalette;IIZILjava/lang/Object;Ljava/lang/Object;IIIIZIIIZIII)V
-	public fun <init> (Ljava/awt/Font;Lkotlinx/collections/immutable/ImmutableList;ZLio/github/ketraterm/render/api/TerminalColorPalette;IIZILjava/lang/Object;Ljava/lang/Object;IIIIZIIIZIIII)V
-	public fun <init> (Ljava/awt/Font;Lkotlinx/collections/immutable/ImmutableList;ZLio/github/ketraterm/render/api/TerminalColorPalette;IIZILjava/lang/Object;Ljava/lang/Object;IIIIZIIIZIIIIZ)V
-	public fun <init> (Ljava/awt/Font;Lkotlinx/collections/immutable/ImmutableList;ZLio/github/ketraterm/render/api/TerminalColorPalette;IIZILjava/lang/Object;Ljava/lang/Object;IIIIZIIIZIIIIZI)V
-	public fun <init> (Ljava/awt/Font;Lkotlinx/collections/immutable/ImmutableList;ZLio/github/ketraterm/render/api/TerminalColorPalette;IIZILjava/lang/Object;Ljava/lang/Object;IIIIZIIIZIIIIZII)V
-	public fun <init> (Ljava/awt/Font;Lkotlinx/collections/immutable/ImmutableList;ZLio/github/ketraterm/render/api/TerminalColorPalette;IIZILjava/lang/Object;Ljava/lang/Object;IIIIZIIIZIIIIZIILio/github/ketraterm/ui/swing/settings/SwingPadding;)V
-	public fun <init> (Ljava/awt/Font;Lkotlinx/collections/immutable/ImmutableList;ZLio/github/ketraterm/render/api/TerminalColorPalette;IIZILjava/lang/Object;Ljava/lang/Object;IIIIZIIIZIIIIZIILio/github/ketraterm/ui/swing/settings/SwingPadding;Lio/github/ketraterm/ui/swing/settings/SwingPadding;)V
-	public fun <init> (Ljava/awt/Font;Lkotlinx/collections/immutable/ImmutableList;ZLio/github/ketraterm/render/api/TerminalColorPalette;IIZILjava/lang/Object;Ljava/lang/Object;IIIIZIIIZIIIIZIILio/github/ketraterm/ui/swing/settings/SwingPadding;Lio/github/ketraterm/ui/swing/settings/SwingPadding;Lio/github/ketraterm/input/policy/PasteControlPolicy;)V
-	public fun <init> (Ljava/awt/Font;Lkotlinx/collections/immutable/ImmutableList;ZLio/github/ketraterm/render/api/TerminalColorPalette;IIZILjava/lang/Object;Ljava/lang/Object;IIIIZIIIZIIIIZIILio/github/ketraterm/ui/swing/settings/SwingPadding;Lio/github/ketraterm/ui/swing/settings/SwingPadding;Lio/github/ketraterm/input/policy/PasteControlPolicy;Lio/github/ketraterm/render/api/TerminalRenderCursorShape;)V
-	public fun <init> (Ljava/awt/Font;Lkotlinx/collections/immutable/ImmutableList;ZLio/github/ketraterm/render/api/TerminalColorPalette;IIZILjava/lang/Object;Ljava/lang/Object;IIIIZIIIZIIIIZIILio/github/ketraterm/ui/swing/settings/SwingPadding;Lio/github/ketraterm/ui/swing/settings/SwingPadding;Lio/github/ketraterm/input/policy/PasteControlPolicy;Lio/github/ketraterm/render/api/TerminalRenderCursorShape;I)V
-	public fun <init> (Ljava/awt/Font;Lkotlinx/collections/immutable/ImmutableList;ZLio/github/ketraterm/render/api/TerminalColorPalette;IIZILjava/lang/Object;Ljava/lang/Object;IIIIZIIIZIIIIZIILio/github/ketraterm/ui/swing/settings/SwingPadding;Lio/github/ketraterm/ui/swing/settings/SwingPadding;Lio/github/ketraterm/input/policy/PasteControlPolicy;Lio/github/ketraterm/render/api/TerminalRenderCursorShape;IF)V
-	public fun <init> (Ljava/awt/Font;Lkotlinx/collections/immutable/ImmutableList;ZLio/github/ketraterm/render/api/TerminalColorPalette;IIZILjava/lang/Object;Ljava/lang/Object;IIIIZIIIZIIIIZIILio/github/ketraterm/ui/swing/settings/SwingPadding;Lio/github/ketraterm/ui/swing/settings/SwingPadding;Lio/github/ketraterm/input/policy/PasteControlPolicy;Lio/github/ketraterm/render/api/TerminalRenderCursorShape;IFZ)V
-	public fun <init> (Ljava/awt/Font;Lkotlinx/collections/immutable/ImmutableList;ZLio/github/ketraterm/render/api/TerminalColorPalette;IIZILjava/lang/Object;Ljava/lang/Object;IIIIZIIIZIIIIZIILio/github/ketraterm/ui/swing/settings/SwingPadding;Lio/github/ketraterm/ui/swing/settings/SwingPadding;Lio/github/ketraterm/input/policy/PasteControlPolicy;Lio/github/ketraterm/render/api/TerminalRenderCursorShape;IFZZ)V
-	public fun <init> (Ljava/awt/Font;Lkotlinx/collections/immutable/ImmutableList;ZLio/github/ketraterm/render/api/TerminalColorPalette;IIZILjava/lang/Object;Ljava/lang/Object;IIIIZIIIZIIIIZIILio/github/ketraterm/ui/swing/settings/SwingPadding;Lio/github/ketraterm/ui/swing/settings/SwingPadding;Lio/github/ketraterm/input/policy/PasteControlPolicy;Lio/github/ketraterm/render/api/TerminalRenderCursorShape;IFZZZ)V
-	public fun <init> (Ljava/awt/Font;Lkotlinx/collections/immutable/ImmutableList;ZLio/github/ketraterm/render/api/TerminalColorPalette;IIZILjava/lang/Object;Ljava/lang/Object;IIIIZIIIZIIIIZIILio/github/ketraterm/ui/swing/settings/SwingPadding;Lio/github/ketraterm/ui/swing/settings/SwingPadding;Lio/github/ketraterm/input/policy/PasteControlPolicy;Lio/github/ketraterm/render/api/TerminalRenderCursorShape;IFZZZZ)V
-	public fun <init> (Ljava/awt/Font;Lkotlinx/collections/immutable/ImmutableList;ZLio/github/ketraterm/render/api/TerminalColorPalette;IIZILjava/lang/Object;Ljava/lang/Object;IIIIZIIIZIIIIZIILio/github/ketraterm/ui/swing/settings/SwingPadding;Lio/github/ketraterm/ui/swing/settings/SwingPadding;Lio/github/ketraterm/input/policy/PasteControlPolicy;Lio/github/ketraterm/render/api/TerminalRenderCursorShape;IFZZZZZ)V
-	public fun <init> (Ljava/awt/Font;Lkotlinx/collections/immutable/ImmutableList;ZLio/github/ketraterm/render/api/TerminalColorPalette;IIZILjava/lang/Object;Ljava/lang/Object;IIIIZIIIZIIIIZIILio/github/ketraterm/ui/swing/settings/SwingPadding;Lio/github/ketraterm/ui/swing/settings/SwingPadding;Lio/github/ketraterm/input/policy/PasteControlPolicy;Lio/github/ketraterm/render/api/TerminalRenderCursorShape;IFZZZZZZ)V
-	public fun <init> (Ljava/awt/Font;Lkotlinx/collections/immutable/ImmutableList;ZLio/github/ketraterm/render/api/TerminalColorPalette;IIZILjava/lang/Object;Ljava/lang/Object;IIIIZIIIZIIIIZIILio/github/ketraterm/ui/swing/settings/SwingPadding;Lio/github/ketraterm/ui/swing/settings/SwingPadding;Lio/github/ketraterm/input/policy/PasteControlPolicy;Lio/github/ketraterm/render/api/TerminalRenderCursorShape;IFZZZZZZLio/github/ketraterm/ui/swing/api/SwingHyperlinkPresentation;)V
-	public fun <init> (Ljava/awt/Font;Lkotlinx/collections/immutable/ImmutableList;ZLio/github/ketraterm/render/api/TerminalColorPalette;IIZILjava/lang/Object;Ljava/lang/Object;IIIIZIIIZIIIIZIILio/github/ketraterm/ui/swing/settings/SwingPadding;Lio/github/ketraterm/ui/swing/settings/SwingPadding;Lio/github/ketraterm/input/policy/PasteControlPolicy;Lio/github/ketraterm/render/api/TerminalRenderCursorShape;IFZZZZZZLio/github/ketraterm/ui/swing/api/SwingHyperlinkPresentation;Lio/github/ketraterm/ui/swing/api/SwingHyperlinkActivation;)V
-	public synthetic fun <init> (Ljava/awt/Font;Lkotlinx/collections/immutable/ImmutableList;ZLio/github/ketraterm/render/api/TerminalColorPalette;IIZILjava/lang/Object;Ljava/lang/Object;IIIIZIIIZIIIIZIILio/github/ketraterm/ui/swing/settings/SwingPadding;Lio/github/ketraterm/ui/swing/settings/SwingPadding;Lio/github/ketraterm/input/policy/PasteControlPolicy;Lio/github/ketraterm/render/api/TerminalRenderCursorShape;IFZZZZZZLio/github/ketraterm/ui/swing/api/SwingHyperlinkPresentation;Lio/github/ketraterm/ui/swing/api/SwingHyperlinkActivation;IILkotlin/jvm/internal/DefaultConstructorMarker;)V
-	public final fun component1 ()Ljava/awt/Font;
-	public final fun component10 ()Ljava/lang/Object;
-	public final fun component11 ()I
-	public final fun component12 ()I
-	public final fun component13 ()I
-	public final fun component14 ()I
-	public final fun component15 ()Z
-	public final fun component16 ()I
-	public final fun component17 ()I
-	public final fun component18 ()I
-	public final fun component19 ()Z
-	public final fun component2 ()Lkotlinx/collections/immutable/ImmutableList;
-	public final fun component20 ()I
-	public final fun component21 ()I
-	public final fun component22 ()I
-	public final fun component23 ()I
-	public final fun component24 ()Z
-	public final fun component25 ()I
-	public final fun component26 ()I
-	public final fun component27 ()Lio/github/ketraterm/ui/swing/settings/SwingPadding;
-	public final fun component28 ()Lio/github/ketraterm/ui/swing/settings/SwingPadding;
-	public final fun component29 ()Lio/github/ketraterm/input/policy/PasteControlPolicy;
-	public final fun component3 ()Z
-	public final fun component30 ()Lio/github/ketraterm/render/api/TerminalRenderCursorShape;
-	public final fun component31 ()I
-	public final fun component32 ()F
-	public final fun component33 ()Z
-	public final fun component34 ()Z
-	public final fun component35 ()Z
-	public final fun component36 ()Z
-	public final fun component37 ()Z
-	public final fun component38 ()Z
-	public final fun component39 ()Lio/github/ketraterm/ui/swing/api/SwingHyperlinkPresentation;
-	public final fun component4 ()Lio/github/ketraterm/render/api/TerminalColorPalette;
-	public final fun component40 ()Lio/github/ketraterm/ui/swing/api/SwingHyperlinkActivation;
-	public final fun component5 ()I
-	public final fun component6 ()I
-	public final fun component7 ()Z
-	public final fun component8 ()I
-	public final fun component9 ()Ljava/lang/Object;
-	public final fun copy (Ljava/awt/Font;Lkotlinx/collections/immutable/ImmutableList;ZLio/github/ketraterm/render/api/TerminalColorPalette;IIZILjava/lang/Object;Ljava/lang/Object;IIIIZIIIZIIIIZIILio/github/ketraterm/ui/swing/settings/SwingPadding;Lio/github/ketraterm/ui/swing/settings/SwingPadding;Lio/github/ketraterm/input/policy/PasteControlPolicy;Lio/github/ketraterm/render/api/TerminalRenderCursorShape;IFZZZZZZLio/github/ketraterm/ui/swing/api/SwingHyperlinkPresentation;Lio/github/ketraterm/ui/swing/api/SwingHyperlinkActivation;)Lio/github/ketraterm/ui/swing/settings/SwingSettings;
-	public static synthetic fun copy$default (Lio/github/ketraterm/ui/swing/settings/SwingSettings;Ljava/awt/Font;Lkotlinx/collections/immutable/ImmutableList;ZLio/github/ketraterm/render/api/TerminalColorPalette;IIZILjava/lang/Object;Ljava/lang/Object;IIIIZIIIZIIIIZIILio/github/ketraterm/ui/swing/settings/SwingPadding;Lio/github/ketraterm/ui/swing/settings/SwingPadding;Lio/github/ketraterm/input/policy/PasteControlPolicy;Lio/github/ketraterm/render/api/TerminalRenderCursorShape;IFZZZZZZLio/github/ketraterm/ui/swing/api/SwingHyperlinkPresentation;Lio/github/ketraterm/ui/swing/api/SwingHyperlinkActivation;IILjava/lang/Object;)Lio/github/ketraterm/ui/swing/settings/SwingSettings;
+	public static final fun builder ()Lio/github/ketraterm/ui/swing/settings/SwingSettings$Builder;
+	public final fun copy (Ljava/util/function/Consumer;)Lio/github/ketraterm/ui/swing/settings/SwingSettings;
+	public static final fun create (Ljava/util/function/Consumer;)Lio/github/ketraterm/ui/swing/settings/SwingSettings;
 	public static final fun defaultFallbackFonts ()Lkotlinx/collections/immutable/ImmutableList;
 	public static final fun defaultPalette ()Lio/github/ketraterm/render/api/TerminalColorPalette;
 	public static final fun defaultTerminalFont ()Ljava/awt/Font;
@@ -558,7 +488,6 @@ public final class io/github/ketraterm/ui/swing/settings/SwingSettings {
 	public final fun getPasteControlPolicy ()Lio/github/ketraterm/input/policy/PasteControlPolicy;
 	public final fun getRows ()I
 	public final fun getScrollOnOutput ()Z
-	public final fun getScrollbackLines ()I
 	public final fun getSearchActiveMatchBackground ()I
 	public final fun getSearchMatchBackground ()I
 	public final fun getSelectionBackground ()I
@@ -570,8 +499,6 @@ public final class io/github/ketraterm/ui/swing/settings/SwingSettings {
 	public final fun getShellIntegrationPromptDotColor ()I
 	public final fun getShellIntegrationPromptDotDiameter ()I
 	public final fun getShellIntegrationPromptDotsVisible ()Z
-	public final fun getShellRequestResizeWindow ()Z
-	public final fun getShellRequestWindowManipulation ()Z
 	public final fun getShellSuggestionsEnabled ()Z
 	public final fun getSmartSuggestionsEnabled ()Z
 	public final fun getTextAntialiasing ()Ljava/lang/Object;
@@ -583,10 +510,90 @@ public final class io/github/ketraterm/ui/swing/settings/SwingSettings {
 	public final fun getVisualBellEnabled ()Z
 	public fun hashCode ()I
 	public static final fun resolveFontFamily (Ljava/lang/String;)Ljava/lang/String;
-	public fun toString ()Ljava/lang/String;
+	public final fun toBuilder ()Lio/github/ketraterm/ui/swing/settings/SwingSettings$Builder;
+}
+
+public final class io/github/ketraterm/ui/swing/settings/SwingSettings$Builder {
+	public final fun build ()Lio/github/ketraterm/ui/swing/settings/SwingSettings;
+	public final fun getAcceptSelectedSuggestionWithEnter ()Z
+	public final fun getAlternateScreenPadding ()Lio/github/ketraterm/ui/swing/settings/SwingPadding;
+	public final fun getColumns ()I
+	public final fun getCursorBlinkMillis ()I
+	public final fun getCursorShape ()Lio/github/ketraterm/render/api/TerminalRenderCursorShape;
+	public final fun getFallbackFonts ()Ljava/util/List;
+	public final fun getFont ()Ljava/awt/Font;
+	public final fun getFractionalMetrics ()Ljava/lang/Object;
+	public final fun getHyperlinkActivationForeground ()I
+	public final fun getLineHeight ()F
+	public final fun getOsc8HyperlinkActivation ()Lio/github/ketraterm/ui/swing/api/SwingHyperlinkActivation;
+	public final fun getOsc8HyperlinkPresentation ()Lio/github/ketraterm/ui/swing/api/SwingHyperlinkPresentation;
+	public final fun getPadding ()Lio/github/ketraterm/ui/swing/settings/SwingPadding;
+	public final fun getPalette ()Lio/github/ketraterm/render/api/TerminalColorPalette;
+	public final fun getPasteControlPolicy ()Lio/github/ketraterm/input/policy/PasteControlPolicy;
+	public final fun getRows ()I
+	public final fun getScrollOnOutput ()Z
+	public final fun getSearchActiveMatchBackground ()I
+	public final fun getSearchMatchBackground ()I
+	public final fun getSelectionBackground ()I
+	public final fun getShellIntegrationDecorationGutterWidth ()I
+	public final fun getShellIntegrationFailedCommandRailColor ()I
+	public final fun getShellIntegrationFailedCommandRailWidth ()I
+	public final fun getShellIntegrationFailedCommandRailsVisible ()Z
+	public final fun getShellIntegrationFailedPromptDotColor ()I
+	public final fun getShellIntegrationPromptDotColor ()I
+	public final fun getShellIntegrationPromptDotDiameter ()I
+	public final fun getShellIntegrationPromptDotsVisible ()Z
+	public final fun getShellSuggestionsEnabled ()Z
+	public final fun getSmartSuggestionsEnabled ()Z
+	public final fun getTextAntialiasing ()Ljava/lang/Object;
+	public final fun getTreatAmbiguousAsWide ()Z
+	public final fun getUseSystemFallbackFonts ()Z
+	public final fun getVisualBellColor ()I
+	public final fun getVisualBellDurationMillis ()I
+	public final fun getVisualBellEdgeThicknessPixels ()I
+	public final fun getVisualBellEnabled ()Z
+	public final fun setAcceptSelectedSuggestionWithEnter (Z)V
+	public final fun setAlternateScreenPadding (Lio/github/ketraterm/ui/swing/settings/SwingPadding;)V
+	public final fun setColumns (I)V
+	public final fun setCursorBlinkMillis (I)V
+	public final fun setCursorShape (Lio/github/ketraterm/render/api/TerminalRenderCursorShape;)V
+	public final fun setFallbackFonts (Ljava/util/List;)V
+	public final fun setFont (Ljava/awt/Font;)V
+	public final fun setFractionalMetrics (Ljava/lang/Object;)V
+	public final fun setHyperlinkActivationForeground (I)V
+	public final fun setLineHeight (F)V
+	public final fun setOsc8HyperlinkActivation (Lio/github/ketraterm/ui/swing/api/SwingHyperlinkActivation;)V
+	public final fun setOsc8HyperlinkPresentation (Lio/github/ketraterm/ui/swing/api/SwingHyperlinkPresentation;)V
+	public final fun setPadding (Lio/github/ketraterm/ui/swing/settings/SwingPadding;)V
+	public final fun setPalette (Lio/github/ketraterm/render/api/TerminalColorPalette;)V
+	public final fun setPasteControlPolicy (Lio/github/ketraterm/input/policy/PasteControlPolicy;)V
+	public final fun setRows (I)V
+	public final fun setScrollOnOutput (Z)V
+	public final fun setSearchActiveMatchBackground (I)V
+	public final fun setSearchMatchBackground (I)V
+	public final fun setSelectionBackground (I)V
+	public final fun setShellIntegrationDecorationGutterWidth (I)V
+	public final fun setShellIntegrationFailedCommandRailColor (I)V
+	public final fun setShellIntegrationFailedCommandRailWidth (I)V
+	public final fun setShellIntegrationFailedCommandRailsVisible (Z)V
+	public final fun setShellIntegrationFailedPromptDotColor (I)V
+	public final fun setShellIntegrationPromptDotColor (I)V
+	public final fun setShellIntegrationPromptDotDiameter (I)V
+	public final fun setShellIntegrationPromptDotsVisible (Z)V
+	public final fun setShellSuggestionsEnabled (Z)V
+	public final fun setSmartSuggestionsEnabled (Z)V
+	public final fun setTextAntialiasing (Ljava/lang/Object;)V
+	public final fun setTreatAmbiguousAsWide (Z)V
+	public final fun setUseSystemFallbackFonts (Z)V
+	public final fun setVisualBellColor (I)V
+	public final fun setVisualBellDurationMillis (I)V
+	public final fun setVisualBellEdgeThicknessPixels (I)V
+	public final fun setVisualBellEnabled (Z)V
 }
 
 public final class io/github/ketraterm/ui/swing/settings/SwingSettings$Companion {
+	public final fun builder ()Lio/github/ketraterm/ui/swing/settings/SwingSettings$Builder;
+	public final fun create (Ljava/util/function/Consumer;)Lio/github/ketraterm/ui/swing/settings/SwingSettings;
 	public final fun defaultFallbackFonts ()Lkotlinx/collections/immutable/ImmutableList;
 	public final fun defaultPalette ()Lio/github/ketraterm/render/api/TerminalColorPalette;
 	public final fun defaultTerminalFont ()Ljava/awt/Font;

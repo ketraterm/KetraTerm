@@ -177,7 +177,10 @@ class TerminalSelectionControllerTest {
         override val renderCache: TerminalRenderCache,
     ) : TerminalSelectionHost {
         private val bidiLayout = TerminalBidiLayout()
-        override val settings = SwingSettings(padding = SwingPadding(0, 0, 0, 0))
+        override val settings =
+            SwingSettings.create { draft ->
+                draft.padding = SwingPadding(0, 0, 0, 0)
+            }
         override val metrics =
             SwingMetrics(
                 cellWidth = 10,

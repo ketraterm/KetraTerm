@@ -66,7 +66,10 @@ class SwingShellSuggestionControllerTest {
                     RecordingSuggestionView(listener).also { view = it }
                 })
             controller.show(request(), suggestions(2), selectedIndex = 0)
-            host.settings = host.settings.copy(smartSuggestionsEnabled = false)
+            host.settings =
+                host.settings.copy { draft ->
+                    draft.smartSuggestionsEnabled = false
+                }
             assertFalse(controller.handleKeyPressed(keyPressed(KeyEvent.VK_TAB)))
             view.listener.onSuggestionClicked(0)
             assertTrue(host.acceptedSuggestions.isEmpty())
@@ -130,7 +133,14 @@ class SwingShellSuggestionControllerTest {
     @Test
     fun `explicit display is independent of automatic suggestion setting`() =
         onEdt {
-            val host = RecordingSuggestionHost(settings = SwingSettings(smartSuggestionsEnabled = true, shellSuggestionsEnabled = false))
+            val host =
+                RecordingSuggestionHost(
+                    settings =
+                        SwingSettings.create { draft ->
+                            draft.smartSuggestionsEnabled = true
+                            draft.shellSuggestionsEnabled = false
+                        },
+                )
             val controller = SwingShellSuggestionController(host)
 
             val shown = controller.show(request(), suggestions(2), selectedIndex = 0)
@@ -374,7 +384,11 @@ class SwingShellSuggestionControllerTest {
         onEdt {
             val host =
                 RecordingSuggestionHost(
-                    settings = SwingSettings(smartSuggestionsEnabled = true, acceptSelectedSuggestionWithEnter = false),
+                    settings =
+                        SwingSettings.create { draft ->
+                            draft.smartSuggestionsEnabled = true
+                            draft.acceptSelectedSuggestionWithEnter = false
+                        },
                 )
             val controller = SwingShellSuggestionController(host)
             val items = suggestions(2)
@@ -808,7 +822,10 @@ class SwingShellSuggestionControllerTest {
         )
 
     private class RecordingSuggestionHost(
-        override var settings: SwingSettings = SwingSettings(smartSuggestionsEnabled = true),
+        override var settings: SwingSettings =
+            SwingSettings.create { draft ->
+                draft.smartSuggestionsEnabled = true
+            },
         override val suggestionKeymap: SwingShellSuggestionKeymap = SwingShellSuggestionKeymap.STANDARD,
         private val failAcceptance: Boolean = false,
     ) : SwingShellSuggestionHost {

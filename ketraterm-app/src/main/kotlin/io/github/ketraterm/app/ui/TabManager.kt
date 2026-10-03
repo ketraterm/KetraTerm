@@ -230,17 +230,17 @@ internal class TabManager(
                 workspace.openTab(
                     profile = prepareLaunchProfile(profile),
                     options =
-                        settings.current().let { snapshot ->
-                            TerminalWorkspaceOpenOptions(
-                                columns = snapshot.columns,
-                                rows = snapshot.rows,
-                                treatAmbiguousAsWide = snapshot.treatAmbiguousAsWide,
-                                maxHistory = snapshot.scrollbackLines,
-                                pasteControlPolicy = snapshot.pasteControlPolicy,
-                                hostPolicy = settings.createHostPolicy(),
-                                showForegroundProcessName = settings.config.showForegroundProcessName,
-                                modeReportCapabilities = modeReportCapabilities,
-                            )
+                        settings.config.let { snapshot ->
+                            TerminalWorkspaceOpenOptions.create { draft ->
+                                draft.columns = snapshot.columns
+                                draft.rows = snapshot.rows
+                                draft.treatAmbiguousAsWide = snapshot.treatAmbiguousAsWide
+                                draft.maxHistory = snapshot.scrollbackLines
+                                draft.pasteControlPolicy = snapshot.pasteControlPolicy
+                                draft.hostPolicy = settings.createHostPolicy()
+                                draft.showForegroundProcessName = settings.config.showForegroundProcessName
+                                draft.modeReportCapabilities = modeReportCapabilities
+                            }
                         },
                 )
             } catch (exception: Exception) {
@@ -466,17 +466,17 @@ internal class TabManager(
                 workspace.openTab(
                     profile = prepareLaunchProfile(profile),
                     options =
-                        settings.current().let { snapshot ->
-                            TerminalWorkspaceOpenOptions(
-                                columns = snapshot.columns,
-                                rows = snapshot.rows,
-                                treatAmbiguousAsWide = snapshot.treatAmbiguousAsWide,
-                                maxHistory = snapshot.scrollbackLines,
-                                pasteControlPolicy = snapshot.pasteControlPolicy,
-                                hostPolicy = settings.createHostPolicy(),
-                                showForegroundProcessName = settings.config.showForegroundProcessName,
-                                modeReportCapabilities = modeReportCapabilities,
-                            )
+                        settings.config.let { snapshot ->
+                            TerminalWorkspaceOpenOptions.create { draft ->
+                                draft.columns = snapshot.columns
+                                draft.rows = snapshot.rows
+                                draft.treatAmbiguousAsWide = snapshot.treatAmbiguousAsWide
+                                draft.maxHistory = snapshot.scrollbackLines
+                                draft.pasteControlPolicy = snapshot.pasteControlPolicy
+                                draft.hostPolicy = settings.createHostPolicy()
+                                draft.showForegroundProcessName = settings.config.showForegroundProcessName
+                                draft.modeReportCapabilities = modeReportCapabilities
+                            }
                         },
                 )
             } catch (exception: Exception) {

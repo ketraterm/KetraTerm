@@ -198,7 +198,12 @@ class TerminalWindowResizeControllerTest {
         var ownedController: TerminalWindowResizeController? = null
         try {
             onEdt {
-                val terminal = SwingTerminal(settingsProvider = { SwingSettings(font = Font(Font.MONOSPACED, Font.PLAIN, 10)) })
+                val terminal =
+                    SwingTerminal(settingsProvider = {
+                        SwingSettings.create { draft ->
+                            draft.font = Font(Font.MONOSPACED, Font.PLAIN, 10)
+                        }
+                    })
                 ownedTerminal = terminal
                 terminal.bind(session)
                 terminal.setSize(640, 160)

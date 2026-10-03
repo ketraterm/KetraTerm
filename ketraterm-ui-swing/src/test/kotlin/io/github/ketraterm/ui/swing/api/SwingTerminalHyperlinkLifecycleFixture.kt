@@ -65,22 +65,22 @@ internal class SwingTerminalHyperlinkLifecycleFixture(
         onEdt {
             SwingTerminal(
                 settingsProvider = {
-                    SwingSettings(
-                        columns = 40,
-                        rows = 2,
-                        padding = SwingPadding(),
-                        cursorBlinkMillis = 0,
-                        shellIntegrationDecorationGutterWidth = gutterWidth,
-                        smartSuggestionsEnabled = false,
-                        osc8HyperlinkPresentation = this.osc8Presentation,
-                        osc8HyperlinkActivation = osc8Activation,
-                    )
+                    SwingSettings.create { draft ->
+                        draft.columns = 40
+                        draft.rows = 2
+                        draft.padding = SwingPadding()
+                        draft.cursorBlinkMillis = 0
+                        draft.shellIntegrationDecorationGutterWidth = gutterWidth
+                        draft.smartSuggestionsEnabled = false
+                        draft.osc8HyperlinkPresentation = this.osc8Presentation
+                        draft.osc8HyperlinkActivation = osc8Activation
+                    }
                 },
                 hostServices =
-                    SwingHostServices(
-                        uiDispatcher = { uiTasks.add(it) },
-                        hyperlinkHandler = TerminalHyperlinkHandler { opened.add(it) },
-                        hyperlinkDetector = { request ->
+                    SwingHostServices.create { draft ->
+                        draft.uiDispatcher = { uiTasks.add(it) }
+                        draft.hyperlinkHandler = TerminalHyperlinkHandler { opened.add(it) }
+                        draft.hyperlinkDetector = { request ->
                             check(!SwingUtilities.isEventDispatchThread())
                             detectorCalls.incrementAndGet()
                             val results = ArrayList<SwingHyperlink>()
@@ -104,20 +104,20 @@ internal class SwingTerminalHyperlinkLifecycleFixture(
                                 }
                             }
                             results
-                        },
-                        contextMenuHandler = {
+                        }
+                        draft.contextMenuHandler = {
                             menuRequest = it
                             true
-                        },
-                        clipboardHandler =
+                        }
+                        draft.clipboardHandler =
                             object : TerminalClipboardHandler {
                                 override fun copyText(text: String) {
                                     copiedText = text
                                 }
 
                                 override fun readText(): String? = copiedText
-                            },
-                    ),
+                            }
+                    },
                 searchDispatcher = worker,
                 hyperlinkDispatcher = worker,
                 pointerPosition = { pointer },

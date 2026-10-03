@@ -19,6 +19,13 @@ import io.github.ketraterm.workspace.*
 
 fun main() {
     JavaConsumer.verify()
+    val options =
+        TerminalWorkspaceOpenOptions.create {
+            it.columns = 100
+            it.rows = 30
+        }
+    val resized = options.copy { it.rows = 40 }
+    check(resized.rows == 40 && options.rows == 30 && resized.columns == options.columns)
     val profile = TerminalProfile("bash", "Bash", listOf("/bin/bash"))
     val copy = profile.copy(displayName = "Renamed")
     val (id, name, command) = copy

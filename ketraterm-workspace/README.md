@@ -1,6 +1,6 @@
 # KetraTerm Workspace (`:ketraterm-workspace`)
 
-The `ketraterm-workspace` module provides a host-neutral session and tab manager for **KetraTerm Terminal**. It coordinates multiple active terminal sessions (tabs) under a unified workspace lifecycle, maps configurations onto file-based profiles, and implements standard TOML-backed settings persistence.
+The `ketraterm-workspace` module provides host-neutral session and tab management. It coordinates local sessions under a workspace lifecycle and launches host-supplied profiles and immutable options. Products own preference schemas and persistence.
 
 This module is designed to be completely decoupled from any specific UI toolkit, serving as the headless state controller for tabbed desktop terminal interfaces or IDE tool windows.
 
@@ -33,8 +33,7 @@ graph TD
     Tab2 -->|owns| Session2["TerminalSession"]
     Tab2 -->|describes| Profile2["TerminalProfile"]
 
-    ConfigManager["TerminalWorkspaceConfigManager"] -->|loads/saves| Config["TerminalConfig"]
-    Workspace -.->|updates themes/modes from| Config
+    Host["Product host"] -->|supplies launch options| Workspace
 ```
 
 ### Clipboard read routing
@@ -44,14 +43,13 @@ graph TD
 ### Key Components
 * [TerminalWorkspace](src/main/kotlin/io/github/ketraterm/workspace/TerminalWorkspace.kt): The main lifecycle manager. Handles opening, selecting, closing, and applying settings updates to all open terminal tabs.
 * [TerminalProfile](src/main/kotlin/io/github/ketraterm/workspace/TerminalProfile.kt): Describes a launch configuration (command, display name, working directory, environment variables).
-* [TerminalWorkspaceConfigManager](src/main/kotlin/io/github/ketraterm/workspace/config/TerminalWorkspaceConfigManager.kt): Handles loading and saving TOML-based configurations from OS-specific directories, with automatic parsing backups and value clamping.
+* `TerminalWorkspaceOpenOptions`: Validated immutable launch options, built and updated through named configuration callbacks or Java builders.
 
 ---
 
 ## Sub-Documentation
 
-For detailed specifications on the persistency configuration format and resolution:
-* [profile-config-toml.md](docs/profile-config-toml.md) - TOML config blocks syntax, configuration properties list, and directory resolution hierarchies per OS.
+See [configuration ownership and construction](../docs/library-configuration.md). Standalone persistence is documented in the [application TOML guide](../ketraterm-app/docs/profile-config-toml.md).
 
 ---
 
@@ -68,7 +66,7 @@ its model.
 
 ## How to Use
 
-The following example shows how to load workspace configurations, register a workspace listener, and open multiple terminal tabs:
+Hosts own persisted preferences. Workspace accepts immutable launch options and does not choose a configuration path or schema. The following example registers a workspace listener and opens a terminal tab:
 
 ```kotlin
 import io.github.ketraterm.workspace.TerminalWorkspace
@@ -76,14 +74,9 @@ import io.github.ketraterm.workspace.TerminalWorkspaceListener
 import io.github.ketraterm.workspace.TerminalWorkspaceTab
 import io.github.ketraterm.workspace.TerminalWorkspaceOpenOptions
 import io.github.ketraterm.workspace.TerminalProfile
-import io.github.ketraterm.workspace.config.TerminalWorkspaceConfigManager
 import java.nio.file.Path
 
 fun main() {
-    // 1. Resolve configuration and load settings
-    val configManager = TerminalWorkspaceConfigManager.getDefault()
-    val config = configManager.load()
-
     // 2. Define a workspace listener to respond to tab lifecycle events
     val listener = object : TerminalWorkspaceListener {
         override fun tabOpened(tab: TerminalWorkspaceTab) {
@@ -113,12 +106,12 @@ fun main() {
     )
 
     // 5. Open a tab using the profile
-    val openOptions = TerminalWorkspaceOpenOptions(
-        columns = 80,
-        rows = 24,
-        maxHistory = config.scrollbackLines,
-        treatAmbiguousAsWide = config.treatAmbiguousAsWide
-    )
+    val openOptions = TerminalWorkspaceOpenOptions.create {
+        it.columns = 80
+        it.rows = 24
+        it.maxHistory = 1000
+        it.treatAmbiguousAsWide = false
+    }
     val tab = workspace.openTab(gitProfile, openOptions)
 }
 ```

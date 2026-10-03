@@ -23,6 +23,14 @@ import java.util.Map;
 
 public final class JavaConsumer {
     public static void verify() {
+        var options = io.github.ketraterm.workspace.TerminalWorkspaceOpenOptions.create(b -> {
+            b.setColumns(100);
+            b.setRows(30);
+            b.setModeReportCapabilities(0);
+        });
+        var updated = options.copy(b -> b.setMaxHistory(4000));
+        if (options.getMaxHistory() != 1000 || updated.getMaxHistory() != 4000 || updated.getColumns() != 100)
+            throw new AssertionError("Workspace immutable configuration");
         var environment = new TerminalShellEnvironment(Map.of("TERM", "xterm-256color"), null);
         var profile = new TerminalProfile("custom", "Custom", List.of("shell"), Map.of(), null, TerminalProfileKind.DEFAULT, environment, null);
         if (!profile.getCommand().equals(List.of("shell")) || !profile.getShellEnvironment().getVariables().get("TERM").equals("xterm-256color")) throw new AssertionError("Launch profile");

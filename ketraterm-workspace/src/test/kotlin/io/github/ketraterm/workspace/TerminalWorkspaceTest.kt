@@ -67,7 +67,12 @@ class TerminalWorkspaceTest {
             assertFailsWith<IllegalStateException> {
                 workspace.openTab(
                     TerminalProfile("test", "Test", listOf("unused")),
-                    TerminalWorkspaceOpenOptions(80, 24, false, 100),
+                    TerminalWorkspaceOpenOptions.create { draft ->
+                        draft.columns = 80
+                        draft.rows = 24
+                        draft.treatAmbiguousAsWide = false
+                        draft.maxHistory = 100
+                    },
                 )
             }
             assertEquals(0, created)
@@ -134,7 +139,12 @@ class TerminalWorkspaceTest {
                     val tab =
                         workspace.openTab(
                             TerminalProfile("p", "Profile", listOf("mock")),
-                            TerminalWorkspaceOpenOptions(80, 24, false, 100),
+                            TerminalWorkspaceOpenOptions.create { draft ->
+                                draft.columns = 80
+                                draft.rows = 24
+                                draft.treatAmbiguousAsWide = false
+                                draft.maxHistory = 100
+                            },
                         )
                     val events = requireNotNull(ptyListener)
 
@@ -187,7 +197,13 @@ class TerminalWorkspaceTest {
                 val tab =
                     workspace.openTab(
                         TerminalProfile("p1", "Profile", listOf("mock-shell")),
-                        TerminalWorkspaceOpenOptions(80, 24, false, 100, showForegroundProcessName = false),
+                        TerminalWorkspaceOpenOptions.create { draft ->
+                            draft.columns = 80
+                            draft.rows = 24
+                            draft.treatAmbiguousAsWide = false
+                            draft.maxHistory = 100
+                            draft.showForegroundProcessName = false
+                        },
                     )
                 assertEquals("Profile", tab.title)
                 runCurrent()
@@ -235,7 +251,12 @@ class TerminalWorkspaceTest {
                 val tab =
                     workspace.openTab(
                         TerminalProfile("p1", "Profile", listOf("mock-shell")),
-                        TerminalWorkspaceOpenOptions(80, 24, false, 100),
+                        TerminalWorkspaceOpenOptions.create { draft ->
+                            draft.columns = 80
+                            draft.rows = 24
+                            draft.treatAmbiguousAsWide = false
+                            draft.maxHistory = 100
+                        },
                     )
                 runCurrent()
                 assertEquals("vim", tab.title)
@@ -293,7 +314,14 @@ class TerminalWorkspaceTest {
                     workerDispatcher = dispatcher,
                 )
             workspace.use {
-                val options = TerminalWorkspaceOpenOptions(80, 24, false, 100, showForegroundProcessName = false)
+                val options =
+                    TerminalWorkspaceOpenOptions.create { draft ->
+                        draft.columns = 80
+                        draft.rows = 24
+                        draft.treatAmbiguousAsWide = false
+                        draft.maxHistory = 100
+                        draft.showForegroundProcessName = false
+                    }
                 first = workspace.openTab(TerminalProfile("a", "First", listOf("mock-shell")), options)
                 closing = workspace.openTab(TerminalProfile("b", "Closing", listOf("mock-shell")), options)
                 if (!closeRemainingTab) {
@@ -377,7 +405,12 @@ class TerminalWorkspaceTest {
                     val tab =
                         workspace.openTab(
                             TerminalProfile("p1", "Profile", listOf("mock-shell")),
-                            TerminalWorkspaceOpenOptions(80, 24, false, 100),
+                            TerminalWorkspaceOpenOptions.create { draft ->
+                                draft.columns = 80
+                                draft.rows = 24
+                                draft.treatAmbiguousAsWide = false
+                                draft.maxHistory = 100
+                            },
                         )
                     runCurrent()
                     assertTrue(titleFailureDelivered, "foreground metadata must exercise the failing host callback")
@@ -500,7 +533,12 @@ class TerminalWorkspaceTest {
             val tab =
                 workspace.openTab(
                     TerminalProfile("test", "Test", listOf("unused-shell")),
-                    TerminalWorkspaceOpenOptions(80, 24, false, 100),
+                    TerminalWorkspaceOpenOptions.create { draft ->
+                        draft.columns = 80
+                        draft.rows = 24
+                        draft.treatAmbiguousAsWide = false
+                        draft.maxHistory = 100
+                    },
                 )
             events.columnModeChanged(session, 24, 132)
             assertSame(tab, requestedTab)
@@ -537,7 +575,12 @@ class TerminalWorkspaceTest {
                 val tab =
                     workspace.openTab(
                         TerminalProfile("test", "Test", listOf("unused-shell")),
-                        TerminalWorkspaceOpenOptions(80, 24, false, 100),
+                        TerminalWorkspaceOpenOptions.create { draft ->
+                            draft.columns = 80
+                            draft.rows = 24
+                            draft.treatAmbiguousAsWide = false
+                            draft.maxHistory = 100
+                        },
                     )
                 session.encodePaste(TerminalPasteEvent("user command"))
                 runCurrent()
@@ -637,7 +680,13 @@ class TerminalWorkspaceTest {
             val tab =
                 workspace.openTab(
                     profile = TerminalProfile("p1", "Profile 1", listOf("mock-shell")),
-                    options = TerminalWorkspaceOpenOptions(80, 24, false, 100),
+                    options =
+                        TerminalWorkspaceOpenOptions.create { draft ->
+                            draft.columns = 80
+                            draft.rows = 24
+                            draft.treatAmbiguousAsWide = false
+                            draft.maxHistory = 100
+                        },
                 )
             val eventListener = requireNotNull(capturedEventListener)
 
@@ -682,13 +731,13 @@ class TerminalWorkspaceTest {
         workspace.openTab(
             profile = TerminalProfile("p1", "Profile 1", listOf("mock-shell")),
             options =
-                TerminalWorkspaceOpenOptions(
-                    columns = 80,
-                    rows = 24,
-                    treatAmbiguousAsWide = false,
-                    maxHistory = 100,
-                    pasteControlPolicy = PasteControlPolicy.STRIP_C0_EXCEPT_TAB_CR_LF,
-                ),
+                TerminalWorkspaceOpenOptions.create { draft ->
+                    draft.columns = 80
+                    draft.rows = 24
+                    draft.treatAmbiguousAsWide = false
+                    draft.maxHistory = 100
+                    draft.pasteControlPolicy = PasteControlPolicy.STRIP_C0_EXCEPT_TAB_CR_LF
+                },
         )
 
         assertEquals(
@@ -790,12 +839,12 @@ class TerminalWorkspaceTest {
             workspace.openTab(
                 profile = TerminalProfile("p1", "Profile 1", listOf("mock-shell")),
                 options =
-                    TerminalWorkspaceOpenOptions(
-                        columns = 80,
-                        rows = 24,
-                        treatAmbiguousAsWide = false,
-                        maxHistory = 100,
-                    ),
+                    TerminalWorkspaceOpenOptions.create { draft ->
+                        draft.columns = 80
+                        draft.rows = 24
+                        draft.treatAmbiguousAsWide = false
+                        draft.maxHistory = 100
+                    },
             )
         val event = ShellIntegrationEvent(ShellIntegrationMarker.COMMAND_FINISHED, exitCode = 2)
 
@@ -829,7 +878,13 @@ class TerminalWorkspaceTest {
             val tab =
                 workspace.openTab(
                     profile = TerminalProfile("p1", "Profile 1", listOf("mock-shell")),
-                    options = TerminalWorkspaceOpenOptions(80, 24, false, 100),
+                    options =
+                        TerminalWorkspaceOpenOptions.create { draft ->
+                            draft.columns = 80
+                            draft.rows = 24
+                            draft.treatAmbiguousAsWide = false
+                            draft.maxHistory = 100
+                        },
                 )
 
             connector.simulateClosed(1)
@@ -860,7 +915,13 @@ class TerminalWorkspaceTest {
         val tab =
             workspace.openTab(
                 profile = TerminalProfile("p1", "Profile 1", listOf("mock-shell")),
-                options = TerminalWorkspaceOpenOptions(80, 24, false, 100),
+                options =
+                    TerminalWorkspaceOpenOptions.create { draft ->
+                        draft.columns = 80
+                        draft.rows = 24
+                        draft.treatAmbiguousAsWide = false
+                        draft.maxHistory = 100
+                    },
             )
         assertTrue(workspace.isCoroutineScopeActive)
         assertEquals(1, workspace.sessionCollectionCount)
@@ -899,12 +960,12 @@ class TerminalWorkspaceTest {
             workspace.openTab(
                 profile = TerminalProfile("p1", "Profile 1", listOf("mock-shell")),
                 options =
-                    TerminalWorkspaceOpenOptions(
-                        columns = 80,
-                        rows = 24,
-                        treatAmbiguousAsWide = false,
-                        maxHistory = 100,
-                    ),
+                    TerminalWorkspaceOpenOptions.create { draft ->
+                        draft.columns = 80
+                        draft.rows = 24
+                        draft.treatAmbiguousAsWide = false
+                        draft.maxHistory = 100
+                    },
             )
         val event = testClipboardWriteEvent()
 
@@ -939,12 +1000,12 @@ class TerminalWorkspaceTest {
             workspace.openTab(
                 profile = TerminalProfile("p1", "Profile 1", listOf("mock-shell")),
                 options =
-                    TerminalWorkspaceOpenOptions(
-                        columns = 80,
-                        rows = 24,
-                        treatAmbiguousAsWide = false,
-                        maxHistory = 100,
-                    ),
+                    TerminalWorkspaceOpenOptions.create { draft ->
+                        draft.columns = 80
+                        draft.rows = 24
+                        draft.treatAmbiguousAsWide = false
+                        draft.maxHistory = 100
+                    },
             )
         val event = testClipboardPromptEvent()
 
@@ -1001,7 +1062,13 @@ class TerminalWorkspaceTest {
                     List(2) { index ->
                         workspace.openTab(
                             TerminalProfile("p$index", "Profile $index", listOf("mock-shell")),
-                            TerminalWorkspaceOpenOptions(80, 24, false, 100, showForegroundProcessName = false),
+                            TerminalWorkspaceOpenOptions.create { draft ->
+                                draft.columns = 80
+                                draft.rows = 24
+                                draft.treatAmbiguousAsWide = false
+                                draft.maxHistory = 100
+                                draft.showForegroundProcessName = false
+                            },
                         )
                     }
                 failingTabId = tabs.last().id

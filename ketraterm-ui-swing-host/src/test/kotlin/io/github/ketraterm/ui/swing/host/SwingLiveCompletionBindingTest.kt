@@ -271,7 +271,10 @@ class SwingLiveCompletionBindingTest {
                 fixture.popup.failure = failure
                 if (eligibility) {
                     assertTrue(fixture.terminal.isAutomaticShellSuggestionEligible())
-                    fixture.settings = fixture.settings.copy(smartSuggestionsEnabled = false)
+                    fixture.settings =
+                        fixture.settings.copy { draft ->
+                            draft.smartSuggestionsEnabled = false
+                        }
                     assertSame(failure, assertFails { fixture.terminal.reloadSettings() })
                 } else {
                     assertSame(failure, assertFails { fixture.terminal.clearScreen() })
@@ -280,7 +283,10 @@ class SwingLiveCompletionBindingTest {
                 fixture.popup.failure = null
                 if (eligibility) {
                     assertFalse(fixture.terminal.isAutomaticShellSuggestionEligible())
-                    fixture.settings = fixture.settings.copy(smartSuggestionsEnabled = true)
+                    fixture.settings =
+                        fixture.settings.copy { draft ->
+                            draft.smartSuggestionsEnabled = true
+                        }
                     fixture.terminal.reloadSettings()
                     assertTrue(fixture.terminal.isAutomaticShellSuggestionEligible())
                 } else {
@@ -949,7 +955,12 @@ class SwingLiveCompletionBindingTest {
         scope: CoroutineScope,
         dispatcher: CoroutineDispatcher,
     ) : AutoCloseable {
-        var settings = SwingSettings(smartSuggestionsEnabled = true, cursorBlinkMillis = 0, useSystemFallbackFonts = false)
+        var settings =
+            SwingSettings.create { draft ->
+                draft.smartSuggestionsEnabled = true
+                draft.cursorBlinkMillis = 0
+                draft.useSystemFallbackFonts = false
+            }
         val connector = MockConnector()
         val session =
             TerminalSession.create(

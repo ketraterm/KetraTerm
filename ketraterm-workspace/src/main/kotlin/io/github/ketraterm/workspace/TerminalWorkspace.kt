@@ -483,24 +483,24 @@ private object LocalPtyWorkspaceSessionFactory : TerminalWorkspaceSessionFactory
                 enabled = options.shellIntegrationEnabled,
             )
         return TerminalSessions.createLocalPty(
-            PtyOptions(
-                command = launchProfile.command,
-                environment = PtyOptions.defaultEnvironment() + launchProfile.environment,
-                workingDirectory = launchProfile.workingDirectory ?: DEFAULT_WORKING_DIRECTORY,
-                columns = options.columns,
-                rows = options.rows,
-                treatAmbiguousAsWide = options.treatAmbiguousAsWide,
-                inputPolicy =
+            PtyOptions.create { draft ->
+                draft.command = launchProfile.command
+                draft.environment = PtyOptions.defaultEnvironment() + launchProfile.environment
+                draft.workingDirectory = launchProfile.workingDirectory ?: DEFAULT_WORKING_DIRECTORY
+                draft.columns = options.columns
+                draft.rows = options.rows
+                draft.treatAmbiguousAsWide = options.treatAmbiguousAsWide
+                draft.inputPolicy =
                     PtyOptions
                         .defaultInputPolicy()
-                        .copy(pasteControlPolicy = options.pasteControlPolicy),
-                maxHistory = options.maxHistory,
-                eventListener = eventListener,
-                hostPolicy = options.hostPolicy,
-                startupCommand = launchProfile.startupCommand,
-                modeReportCapabilities = options.modeReportCapabilities,
-                shellIntegration = OscShellIntegration,
-            ),
+                        .copy(pasteControlPolicy = options.pasteControlPolicy)
+                draft.maxHistory = options.maxHistory
+                draft.eventListener = eventListener
+                draft.hostPolicy = options.hostPolicy
+                draft.startupCommand = launchProfile.startupCommand
+                draft.modeReportCapabilities = options.modeReportCapabilities
+                draft.shellIntegration = OscShellIntegration
+            },
         )
     }
 
@@ -524,21 +524,109 @@ private object LocalPtyWorkspaceSessionFactory : TerminalWorkspaceSessionFactory
  * @property showForegroundProcessName whether detected processes provide automatic title fallbacks.
  * @property modeReportCapabilities implemented host actions from TerminalHostModeCapability.
  */
-public data class TerminalWorkspaceOpenOptions(
-    val columns: Int,
-    val rows: Int,
-    val treatAmbiguousAsWide: Boolean,
-    val maxHistory: Int,
-    val pasteControlPolicy: PasteControlPolicy = PasteControlPolicy.PRESERVE,
-    val shellIntegrationEnabled: Boolean = true,
-    val hostPolicy: HostPolicy = HostPolicy(),
-    val showForegroundProcessName: Boolean = true,
-    val modeReportCapabilities: Int = 0,
+public class TerminalWorkspaceOpenOptions private constructor(
+    builder: Builder,
 ) {
+    /** Creates a validated snapshot with default values. */
+    public constructor() : this(Builder())
+
+    public val columns: Int = builder.columns
+    public val rows: Int = builder.rows
+    public val treatAmbiguousAsWide: Boolean = builder.treatAmbiguousAsWide
+    public val maxHistory: Int = builder.maxHistory
+    public val pasteControlPolicy: PasteControlPolicy = builder.pasteControlPolicy
+    public val shellIntegrationEnabled: Boolean = builder.shellIntegrationEnabled
+    public val hostPolicy: HostPolicy = builder.hostPolicy
+    public val showForegroundProcessName: Boolean = builder.showForegroundProcessName
+    public val modeReportCapabilities: Int = builder.modeReportCapabilities
+
+    /** Returns a detached mutable draft. Builders are caller-confined and never retained by snapshots. */
+    public fun toBuilder(): Builder = Builder(this)
+
+    /**
+     * Configures a fresh draft synchronously and returns a validated immutable snapshot.
+     * Exceptions propagate without changing this snapshot. Supplied services remain host-owned.
+     */
+    public fun copy(configure: java.util.function.Consumer<Builder>): TerminalWorkspaceOpenOptions =
+        toBuilder().also { configure.accept(it) }.build()
+
+    /** Mutable construction draft. Not thread-safe; [build] never retains this draft. */
+    public class Builder internal constructor(
+        source: TerminalWorkspaceOpenOptions? = null,
+    ) {
+        /** Draft value for [TerminalWorkspaceOpenOptions.columns]; validated when [build] is called. */
+        public var columns: Int = source?.columns ?: 80
+
+        /** Draft value for [TerminalWorkspaceOpenOptions.rows]; validated when [build] is called. */
+        public var rows: Int = source?.rows ?: 24
+
+        /** Draft value for [TerminalWorkspaceOpenOptions.treatAmbiguousAsWide]; validated when [build] is called. */
+        public var treatAmbiguousAsWide: Boolean = source?.treatAmbiguousAsWide ?: false
+
+        /** Draft value for [TerminalWorkspaceOpenOptions.maxHistory]; validated when [build] is called. */
+        public var maxHistory: Int = source?.maxHistory ?: 1000
+
+        /** Draft value for [TerminalWorkspaceOpenOptions.pasteControlPolicy]; validated when [build] is called. */
+        public var pasteControlPolicy: PasteControlPolicy = source?.pasteControlPolicy ?: PasteControlPolicy.PRESERVE
+
+        /** Draft value for [TerminalWorkspaceOpenOptions.shellIntegrationEnabled]; validated when [build] is called. */
+        public var shellIntegrationEnabled: Boolean = source?.shellIntegrationEnabled ?: true
+
+        /** Draft value for [TerminalWorkspaceOpenOptions.hostPolicy]; validated when [build] is called. */
+        public var hostPolicy: HostPolicy = source?.hostPolicy ?: HostPolicy()
+
+        /** Draft value for [TerminalWorkspaceOpenOptions.showForegroundProcessName]; validated when [build] is called. */
+        public var showForegroundProcessName: Boolean = source?.showForegroundProcessName ?: true
+
+        /** Draft value for [TerminalWorkspaceOpenOptions.modeReportCapabilities]; validated when [build] is called. */
+        public var modeReportCapabilities: Int = source?.modeReportCapabilities ?: 0
+
+        /** Validates and freezes current values; later draft changes cannot affect the result. */
+        public fun build(): TerminalWorkspaceOpenOptions = TerminalWorkspaceOpenOptions(this)
+    }
+
+    override fun equals(other: Any?): Boolean =
+        this === other ||
+            other is TerminalWorkspaceOpenOptions &&
+            columns == other.columns &&
+            rows == other.rows &&
+            treatAmbiguousAsWide == other.treatAmbiguousAsWide &&
+            maxHistory == other.maxHistory &&
+            pasteControlPolicy == other.pasteControlPolicy &&
+            shellIntegrationEnabled == other.shellIntegrationEnabled &&
+            hostPolicy == other.hostPolicy &&
+            showForegroundProcessName == other.showForegroundProcessName &&
+            modeReportCapabilities == other.modeReportCapabilities
+
+    override fun hashCode(): Int {
+        var result = 1
+        result = 31 * result + columns.hashCode()
+        result = 31 * result + rows.hashCode()
+        result = 31 * result + treatAmbiguousAsWide.hashCode()
+        result = 31 * result + maxHistory.hashCode()
+        result = 31 * result + pasteControlPolicy.hashCode()
+        result = 31 * result + shellIntegrationEnabled.hashCode()
+        result = 31 * result + hostPolicy.hashCode()
+        result = 31 * result + showForegroundProcessName.hashCode()
+        result = 31 * result + modeReportCapabilities.hashCode()
+        return result
+    }
+
     init {
         require(columns > 0) { "columns must be > 0, was $columns" }
         require(rows > 0) { "rows must be > 0, was $rows" }
         require(maxHistory >= 0) { "maxHistory must be >= 0, was $maxHistory" }
+    }
+
+    public companion object {
+        /** Creates a fresh caller-confined draft initialized to defaults. */
+        @JvmStatic
+        public fun builder(): Builder = Builder()
+
+        /** Configures a draft synchronously and returns one validated immutable snapshot. */
+        @JvmStatic
+        public fun create(configure: java.util.function.Consumer<Builder>): TerminalWorkspaceOpenOptions =
+            builder().also { configure.accept(it) }.build()
     }
 }
 

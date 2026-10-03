@@ -182,7 +182,12 @@ class SwingTerminalSuggestionContextTest {
     @ParameterizedTest
     @EnumSource(SwingShellSuggestionTrigger::class)
     fun `master toggle rejects every supplied and session request trigger`(trigger: SwingShellSuggestionTrigger) {
-        Fixture(settings = SwingSettings(smartSuggestionsEnabled = false)).use { fixture ->
+        Fixture(
+            settings =
+                SwingSettings.create { draft ->
+                    draft.smartSuggestionsEnabled = false
+                },
+        ).use { fixture ->
             onEdt {
                 fixture.request(request(), trigger)
                 fixture.terminal.requestActiveShellSuggestions(trigger)
@@ -235,7 +240,11 @@ class SwingTerminalSuggestionContextTest {
         val started = CompletableDeferred<Unit>()
         val cancelled = CompletableDeferred<Unit>()
         Fixture(
-            settings = SwingSettings(smartSuggestionsEnabled = true, shellSuggestionsEnabled = true),
+            settings =
+                SwingSettings.create { draft ->
+                    draft.smartSuggestionsEnabled = true
+                    draft.shellSuggestionsEnabled = true
+                },
             provider = { request ->
                 flow {
                     if (request.commandText == "first") {
@@ -273,7 +282,11 @@ class SwingTerminalSuggestionContextTest {
     fun `disabling automatic popup preserves an explicit session request`() {
         val release = CompletableDeferred<Unit>()
         Fixture(
-            settings = SwingSettings(smartSuggestionsEnabled = true, shellSuggestionsEnabled = true),
+            settings =
+                SwingSettings.create { draft ->
+                    draft.smartSuggestionsEnabled = true
+                    draft.shellSuggestionsEnabled = true
+                },
             provider = { request ->
                 flow {
                     release.await()
@@ -284,7 +297,10 @@ class SwingTerminalSuggestionContextTest {
             onEdt { fixture.terminal.requestActiveShellSuggestions() }
             fixture.awaitRequest()
             onEdt {
-                fixture.settings = fixture.settings.copy(shellSuggestionsEnabled = false)
+                fixture.settings =
+                    fixture.settings.copy { draft ->
+                        draft.shellSuggestionsEnabled = false
+                    }
                 fixture.terminal.reloadSettings()
             }
             release.complete(Unit)
@@ -371,7 +387,11 @@ class SwingTerminalSuggestionContextTest {
     fun `session requests keep context observation until a completed provider popup is hidden`(trigger: SwingShellSuggestionTrigger) {
         val finished = CompletableDeferred<Unit>()
         Fixture(
-            settings = SwingSettings(smartSuggestionsEnabled = true, shellSuggestionsEnabled = true),
+            settings =
+                SwingSettings.create { draft ->
+                    draft.smartSuggestionsEnabled = true
+                    draft.shellSuggestionsEnabled = true
+                },
             provider = { request ->
                 flow {
                     emit(listOf(suggestion(request)))
@@ -658,7 +678,11 @@ class SwingTerminalSuggestionContextTest {
     }
 
     private class Fixture(
-        var settings: SwingSettings = SwingSettings(smartSuggestionsEnabled = true, shellSuggestionsEnabled = false),
+        var settings: SwingSettings =
+            SwingSettings.create { draft ->
+                draft.smartSuggestionsEnabled = true
+                draft.shellSuggestionsEnabled = false
+            },
         bind: Boolean = true,
         provider: SwingShellSuggestionProvider = SwingShellSuggestionProvider { flowOf(listOf(suggestion(it))) },
         workerDispatcher: CoroutineDispatcher = Dispatchers.Default,
@@ -686,18 +710,18 @@ class SwingTerminalSuggestionContextTest {
                 SwingTerminal(
                     settingsProvider = { settings },
                     hostServices =
-                        SwingHostServices(
-                            uiDispatcher = uiDispatcher,
-                            shellSuggestionProvider = { request ->
+                        SwingHostServices.create { draft ->
+                            draft.uiDispatcher = uiDispatcher
+                            draft.shellSuggestionProvider = { request ->
                                 flow {
                                     requests += request
                                     emitAll(provider.suggestions(request))
                                 }
-                            },
-                            shellSuggestionHandler = { accepted += it },
-                            shellSuggestionFeedbackHandler = { feedback += it },
-                            shellSuggestionViewFactory = { listener -> view.apply { this.listener = listener } },
-                        ),
+                            }
+                            draft.shellSuggestionHandler = { accepted += it }
+                            draft.shellSuggestionFeedbackHandler = { feedback += it }
+                            draft.shellSuggestionViewFactory = { listener -> view.apply { this.listener = listener } }
+                        },
                 ).also { terminal ->
                     terminal.size = terminal.preferredGridSize(30, 4)
                     if (bind) terminal.bind(session)
@@ -734,7 +758,10 @@ class SwingTerminalSuggestionContextTest {
                 RequestEnd.DISPOSE -> terminal.dispose()
                 RequestEnd.SESSION_CLOSE -> session.close()
                 RequestEnd.MASTER_OFF -> {
-                    settings = settings.copy(smartSuggestionsEnabled = false)
+                    settings =
+                        settings.copy { draft ->
+                            draft.smartSuggestionsEnabled = false
+                        }
                     terminal.reloadSettings()
                 }
             }

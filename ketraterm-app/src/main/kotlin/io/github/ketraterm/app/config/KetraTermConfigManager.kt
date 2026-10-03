@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.github.ketraterm.workspace.config
+package io.github.ketraterm.app.config
 
 import io.github.ketraterm.host.TerminalClipboardPermission
 import io.github.ketraterm.host.TerminalTitlePermission
@@ -27,15 +27,15 @@ import java.util.*
 private const val SUGGESTION_LEARNING_PERSISTENCE_KEY = "suggestion_learning_persistence_enabled"
 
 /**
- * Manages loading and saving the [TerminalConfig] TOML file.
+ * Manages loading and saving the [KetraTermConfig] TOML file.
  *
  * It resolves standard OS-specific directories for config files unless overridden
  * by a system property or environment variable.
  *
  * @property configPath the path to the configuration TOML file on disk.
  */
-public class TerminalWorkspaceConfigManager(
-    public val configPath: Path,
+internal class KetraTermConfigManager(
+    val configPath: Path,
 ) {
     /**
      * Loads the configuration from the TOML file.
@@ -45,16 +45,16 @@ public class TerminalWorkspaceConfigManager(
      * gracefully to default settings with clipboard reads denied. Existing files
      * with a missing or invalid read permission retain the legacy Deny behavior.
      *
-     * @return the loaded [TerminalConfig] instance.
+     * @return the loaded [KetraTermConfig] instance.
      */
-    public fun load(): TerminalConfig {
+    fun load(): KetraTermConfig {
         if (Files.notExists(configPath)) {
-            val defaultConfig = TerminalConfig()
+            val defaultConfig = KetraTermConfig()
             saveDefaults(defaultConfig)
             return defaultConfig
         }
 
-        val default = TerminalConfig(clipboardRead = TerminalClipboardPermission.DENY)
+        val default = KetraTermConfig(clipboardRead = TerminalClipboardPermission.DENY)
         return try {
             val content = Files.readString(configPath)
             val parsed = TomlParser.parse(content)
@@ -77,36 +77,36 @@ public class TerminalWorkspaceConfigManager(
                 parseIntSetting(
                     raw = font["size"],
                     defaultValue = default.fontSize,
-                    min = TerminalConfig.FONT_SIZE_MIN,
-                    max = TerminalConfig.FONT_SIZE_MAX,
+                    min = KetraTermConfig.FONT_SIZE_MIN,
+                    max = KetraTermConfig.FONT_SIZE_MAX,
                 )
             val lineHeight =
                 parseFloatSetting(
                     raw = font["line_height"],
                     defaultValue = default.lineHeight,
-                    min = TerminalConfig.LINE_HEIGHT_MIN,
-                    max = TerminalConfig.LINE_HEIGHT_MAX,
+                    min = KetraTermConfig.LINE_HEIGHT_MIN,
+                    max = KetraTermConfig.LINE_HEIGHT_MAX,
                 )
             val columns =
                 parseIntSetting(
                     raw = window["columns"],
                     defaultValue = default.columns,
-                    min = TerminalConfig.COLUMNS_MIN,
-                    max = TerminalConfig.COLUMNS_MAX,
+                    min = KetraTermConfig.COLUMNS_MIN,
+                    max = KetraTermConfig.COLUMNS_MAX,
                 )
             val rows =
                 parseIntSetting(
                     raw = window["rows"],
                     defaultValue = default.rows,
-                    min = TerminalConfig.ROWS_MIN,
-                    max = TerminalConfig.ROWS_MAX,
+                    min = KetraTermConfig.ROWS_MIN,
+                    max = KetraTermConfig.ROWS_MAX,
                 )
             val cursorBlinkMillis =
                 parseIntSetting(
                     raw = behavior["cursor_blink_millis"],
                     defaultValue = default.cursorBlinkMillis,
-                    min = TerminalConfig.CURSOR_BLINK_MIN,
-                    max = TerminalConfig.CURSOR_BLINK_MAX,
+                    min = KetraTermConfig.CURSOR_BLINK_MIN,
+                    max = KetraTermConfig.CURSOR_BLINK_MAX,
                 )
             val useSystemFallbackFonts =
                 font["use_system_fallback_fonts"]?.toBooleanStrictOrNull()
@@ -141,8 +141,8 @@ public class TerminalWorkspaceConfigManager(
                 parseIntSetting(
                     raw = window["scrollback_lines"],
                     defaultValue = default.scrollbackLines,
-                    min = TerminalConfig.SCROLLBACK_MIN,
-                    max = TerminalConfig.SCROLLBACK_MAX,
+                    min = KetraTermConfig.SCROLLBACK_MIN,
+                    max = KetraTermConfig.SCROLLBACK_MAX,
                 )
             val clipboardWrite =
                 parseClipboardPermission(
@@ -172,7 +172,7 @@ public class TerminalWorkspaceConfigManager(
             val cleanCursorShape = if (cursorShape.isNotBlank()) cursorShape else default.cursorShape
             val cleanShellPath = if (shellPath.isNotBlank()) shellPath else default.shellPath
 
-            TerminalConfig(
+            KetraTermConfig(
                 theme = cleanTheme,
                 treatAmbiguousAsWide = treatAmbiguousAsWide,
                 fontFamily = cleanFontFamily,
@@ -233,7 +233,7 @@ public class TerminalWorkspaceConfigManager(
      * @throws IOException if the snapshot cannot be persisted.
      * @throws IllegalArgumentException if the startup command contains a line break.
      */
-    public fun save(config: TerminalConfig) {
+    fun save(config: KetraTermConfig) {
         require('\n' !in config.startupCommand && '\r' !in config.startupCommand) { "Startup command must be one line" }
         val destination = configPath.toAbsolutePath()
         val parent = destination.parent
@@ -247,7 +247,7 @@ public class TerminalWorkspaceConfigManager(
         }
     }
 
-    private fun saveDefaults(config: TerminalConfig) {
+    private fun saveDefaults(config: KetraTermConfig) {
         try {
             save(config)
         } catch (failure: IOException) {
@@ -255,7 +255,7 @@ public class TerminalWorkspaceConfigManager(
         }
     }
 
-    private fun generateToml(config: TerminalConfig): String =
+    private fun generateToml(config: KetraTermConfig): String =
         """
         # KetraTerm Terminal Emulator Configuration File
         # Power users can edit this file directly to customize behavior.
@@ -411,7 +411,7 @@ public class TerminalWorkspaceConfigManager(
             else -> defaultValue
         }
 
-    public companion object {
+    companion object {
         /**
          * Resolves the default configuration path on disk for this operating system.
          *
@@ -465,8 +465,8 @@ public class TerminalWorkspaceConfigManager(
         /**
          * Returns a manager configured with the OS-specific default configuration path.
          *
-         * @return a default [TerminalWorkspaceConfigManager] instance.
+         * @return a default [KetraTermConfigManager] instance.
          */
-        public fun getDefault(): TerminalWorkspaceConfigManager = TerminalWorkspaceConfigManager(getDefaultPath())
+        fun getDefault(): KetraTermConfigManager = KetraTermConfigManager(getDefaultPath())
     }
 }

@@ -17,7 +17,6 @@ package io.github.ketraterm.ui.swing.api
 
 import io.github.ketraterm.core.TerminalBuffers
 import io.github.ketraterm.input.api.TerminalInputEncoder
-import io.github.ketraterm.input.api.TerminalInputEncoderFactory
 import io.github.ketraterm.input.event.TerminalFocusEvent
 import io.github.ketraterm.input.event.TerminalKeyEvent
 import io.github.ketraterm.input.event.TerminalMouseEvent
@@ -63,7 +62,7 @@ class SwingTerminalCursorBlinkTest {
                 responseReader = terminal,
                 connector = NoOpConnector,
                 parser = NoOpParser,
-                inputEncoderFactory = TerminalInputEncoderFactory { _, _, _ -> object : TerminalInputEncoder by NoOpInputEncoder {} },
+                inputEncoderFactory = { _, _, _ -> object : TerminalInputEncoder by NoOpInputEncoder {} },
                 workerDispatcher = dispatcher,
             )
         session.renderPublisher.updateAndPublish(reader)
@@ -71,7 +70,11 @@ class SwingTerminalCursorBlinkTest {
             SwingUtilities.invokeAndWait {
                 val component =
                     SwingTerminal(settingsProvider = {
-                        SwingSettings(cursorBlinkMillis = 0, padding = SwingPadding(), shellIntegrationDecorationGutterWidth = 0)
+                        SwingSettings.create { draft ->
+                            draft.cursorBlinkMillis = 0
+                            draft.padding = SwingPadding()
+                            draft.shellIntegrationDecorationGutterWidth = 0
+                        }
                     })
                 val previousManager = RepaintManager.currentManager(component)
                 val rowRepaints = ArrayList<Int>()
@@ -121,18 +124,18 @@ class SwingTerminalCursorBlinkTest {
                 responseReader = terminal,
                 connector = NoOpConnector,
                 parser = NoOpParser,
-                inputEncoderFactory = TerminalInputEncoderFactory { _, _, _ -> object : TerminalInputEncoder by NoOpInputEncoder {} },
+                inputEncoderFactory = { _, _, _ -> object : TerminalInputEncoder by NoOpInputEncoder {} },
                 workerDispatcher = dispatcher,
             )
         session.use {
             SwingUtilities.invokeAndWait {
                 val settings =
-                    SwingSettings(
-                        cursorBlinkMillis = 0,
-                        cursorShape = TerminalRenderCursorShape.BAR,
-                        padding = SwingPadding(),
-                        shellIntegrationDecorationGutterWidth = 0,
-                    )
+                    SwingSettings.create { draft ->
+                        draft.cursorBlinkMillis = 0
+                        draft.cursorShape = TerminalRenderCursorShape.BAR
+                        draft.padding = SwingPadding()
+                        draft.shellIntegrationDecorationGutterWidth = 0
+                    }
                 val component = SwingTerminal(settingsProvider = { settings })
                 component.size = component.preferredGridSize(3, 1)
                 val cellWidth = component.width / 3
@@ -211,7 +214,9 @@ class SwingTerminalCursorBlinkTest {
         val component =
             SwingTerminal(
                 settingsProvider = {
-                    SwingSettings(cursorBlinkMillis = 0)
+                    SwingSettings.create { draft ->
+                        draft.cursorBlinkMillis = 0
+                    }
                 },
             )
         val frame = JFrame()
@@ -244,7 +249,7 @@ class SwingTerminalCursorBlinkTest {
                 responseReader = terminal,
                 connector = NoOpConnector,
                 parser = NoOpParser,
-                inputEncoderFactory = TerminalInputEncoderFactory { _, _, _ -> object : TerminalInputEncoder by NoOpInputEncoder {} },
+                inputEncoderFactory = { _, _, _ -> object : TerminalInputEncoder by NoOpInputEncoder {} },
                 workerDispatcher = dispatcher,
             )
         val component = SwingTerminal()

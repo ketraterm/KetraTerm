@@ -92,7 +92,13 @@ class SwingTerminalScrollbackTest {
                     updates.add(state.scrollbackOffset)
                 }
             }
-        return SwingTerminal(settingsProvider = settingsProvider, hostServices = hostServices.copy(viewportListener = listener)).also {
+        return SwingTerminal(
+            settingsProvider = settingsProvider,
+            hostServices =
+                hostServices.copy { draft ->
+                    draft.viewportListener = listener
+                },
+        ).also {
             components += it
             viewportUpdates[it] = updates
         }
@@ -340,9 +346,9 @@ class SwingTerminalScrollbackTest {
         val component =
             scrollTestTerminal(
                 hostServices =
-                    SwingHostServices(
-                        viewportListener = listener,
-                    ),
+                    SwingHostServices.create { draft ->
+                        draft.viewportListener = listener
+                    },
             )
 
         SwingUtilities.invokeAndWait {
@@ -552,9 +558,9 @@ class SwingTerminalScrollbackTest {
         val component =
             scrollTestTerminal(
                 settings =
-                    SwingSettings(
-                        padding = SwingPadding(0, 0, 0, 0),
-                    ),
+                    SwingSettings.create { draft ->
+                        draft.padding = SwingPadding(0, 0, 0, 0)
+                    },
             )
 
         SwingUtilities.invokeAndWait {
@@ -613,10 +619,10 @@ class SwingTerminalScrollbackTest {
             ).also(sessions::add)
         val settingsProvider =
             MutableSettingsProvider(
-                SwingSettings(
-                    padding = SwingPadding(0, 0, 0, 0),
-                    shellIntegrationPromptDotsVisible = false,
-                ),
+                SwingSettings.create { draft ->
+                    draft.padding = SwingPadding(0, 0, 0, 0)
+                    draft.shellIntegrationPromptDotsVisible = false
+                },
             )
         val component = createComponent(settingsProvider = settingsProvider)
 
@@ -631,7 +637,10 @@ class SwingTerminalScrollbackTest {
         assertEquals(3, connector.lastColumns.get())
         assertEquals(3, connector.lastRows.get())
 
-        settingsProvider.settings = settingsProvider.settings.copy(shellIntegrationPromptDotsVisible = true)
+        settingsProvider.settings =
+            settingsProvider.settings.copy { draft ->
+                draft.shellIntegrationPromptDotsVisible = true
+            }
         component.reloadSettings()
         drainEdt()
 
@@ -711,10 +720,10 @@ class SwingTerminalScrollbackTest {
                     ioDispatcher = dispatcher,
                 ).also(sessions::add)
         val settings =
-            SwingSettings(
-                padding = SwingPadding(0, 40, 8, 8),
-                shellIntegrationDecorationGutterWidth = 32,
-            )
+            SwingSettings.create { draft ->
+                draft.padding = SwingPadding(0, 40, 8, 8)
+                draft.shellIntegrationDecorationGutterWidth = 32
+            }
         val component = createComponent(settingsProvider = { settings })
 
         try {
@@ -784,12 +793,12 @@ class SwingTerminalScrollbackTest {
         val component =
             scrollTestTerminal(
                 settings =
-                    SwingSettings(
-                        padding = SwingPadding(0, 0, 0, 0),
-                        cursorBlinkMillis = 0,
-                        useSystemFallbackFonts = false,
-                        smartSuggestionsEnabled = true,
-                    ),
+                    SwingSettings.create { draft ->
+                        draft.padding = SwingPadding(0, 0, 0, 0)
+                        draft.cursorBlinkMillis = 0
+                        draft.useSystemFallbackFonts = false
+                        draft.smartSuggestionsEnabled = true
+                    },
             )
         val failure =
             if (cancelled) CancellationException("eligibility callback cancelled") else IllegalStateException("eligibility callback failed")
@@ -857,12 +866,12 @@ class SwingTerminalScrollbackTest {
             val component =
                 scrollTestTerminal(
                     settings =
-                        SwingSettings(
-                            padding = SwingPadding(0, 0, 0, 0),
-                            cursorBlinkMillis = 0,
-                            useSystemFallbackFonts = false,
-                            smartSuggestionsEnabled = true,
-                        ),
+                        SwingSettings.create { draft ->
+                            draft.padding = SwingPadding(0, 0, 0, 0)
+                            draft.cursorBlinkMillis = 0
+                            draft.useSystemFallbackFonts = false
+                            draft.smartSuggestionsEnabled = true
+                        },
                 )
             val unbindingListener =
                 SwingShellSuggestionEligibilityListener { eligible ->
@@ -1059,7 +1068,10 @@ class SwingTerminalScrollbackTest {
 
     private fun scrollTestTerminal(
         hostServices: SwingHostServices = SwingHostServices(),
-        settings: SwingSettings = SwingSettings(padding = SwingPadding(0, 0, 0, 0)),
+        settings: SwingSettings =
+            SwingSettings.create { draft ->
+                draft.padding = SwingPadding(0, 0, 0, 0)
+            },
     ): SwingTerminal =
         createComponent(
             settingsProvider = { settings },

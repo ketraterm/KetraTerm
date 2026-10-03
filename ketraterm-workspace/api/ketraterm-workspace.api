@@ -157,19 +157,11 @@ public final class io/github/ketraterm/workspace/TerminalWorkspaceListener$Defau
 }
 
 public final class io/github/ketraterm/workspace/TerminalWorkspaceOpenOptions {
-	public fun <init> (IIZILio/github/ketraterm/input/policy/PasteControlPolicy;ZLio/github/ketraterm/host/HostPolicy;ZI)V
-	public synthetic fun <init> (IIZILio/github/ketraterm/input/policy/PasteControlPolicy;ZLio/github/ketraterm/host/HostPolicy;ZIILkotlin/jvm/internal/DefaultConstructorMarker;)V
-	public final fun component1 ()I
-	public final fun component2 ()I
-	public final fun component3 ()Z
-	public final fun component4 ()I
-	public final fun component5 ()Lio/github/ketraterm/input/policy/PasteControlPolicy;
-	public final fun component6 ()Z
-	public final fun component7 ()Lio/github/ketraterm/host/HostPolicy;
-	public final fun component8 ()Z
-	public final fun component9 ()I
-	public final fun copy (IIZILio/github/ketraterm/input/policy/PasteControlPolicy;ZLio/github/ketraterm/host/HostPolicy;ZI)Lio/github/ketraterm/workspace/TerminalWorkspaceOpenOptions;
-	public static synthetic fun copy$default (Lio/github/ketraterm/workspace/TerminalWorkspaceOpenOptions;IIZILio/github/ketraterm/input/policy/PasteControlPolicy;ZLio/github/ketraterm/host/HostPolicy;ZIILjava/lang/Object;)Lio/github/ketraterm/workspace/TerminalWorkspaceOpenOptions;
+	public static final field Companion Lio/github/ketraterm/workspace/TerminalWorkspaceOpenOptions$Companion;
+	public fun <init> ()V
+	public static final fun builder ()Lio/github/ketraterm/workspace/TerminalWorkspaceOpenOptions$Builder;
+	public final fun copy (Ljava/util/function/Consumer;)Lio/github/ketraterm/workspace/TerminalWorkspaceOpenOptions;
+	public static final fun create (Ljava/util/function/Consumer;)Lio/github/ketraterm/workspace/TerminalWorkspaceOpenOptions;
 	public fun equals (Ljava/lang/Object;)Z
 	public final fun getColumns ()I
 	public final fun getHostPolicy ()Lio/github/ketraterm/host/HostPolicy;
@@ -181,7 +173,34 @@ public final class io/github/ketraterm/workspace/TerminalWorkspaceOpenOptions {
 	public final fun getShowForegroundProcessName ()Z
 	public final fun getTreatAmbiguousAsWide ()Z
 	public fun hashCode ()I
-	public fun toString ()Ljava/lang/String;
+	public final fun toBuilder ()Lio/github/ketraterm/workspace/TerminalWorkspaceOpenOptions$Builder;
+}
+
+public final class io/github/ketraterm/workspace/TerminalWorkspaceOpenOptions$Builder {
+	public final fun build ()Lio/github/ketraterm/workspace/TerminalWorkspaceOpenOptions;
+	public final fun getColumns ()I
+	public final fun getHostPolicy ()Lio/github/ketraterm/host/HostPolicy;
+	public final fun getMaxHistory ()I
+	public final fun getModeReportCapabilities ()I
+	public final fun getPasteControlPolicy ()Lio/github/ketraterm/input/policy/PasteControlPolicy;
+	public final fun getRows ()I
+	public final fun getShellIntegrationEnabled ()Z
+	public final fun getShowForegroundProcessName ()Z
+	public final fun getTreatAmbiguousAsWide ()Z
+	public final fun setColumns (I)V
+	public final fun setHostPolicy (Lio/github/ketraterm/host/HostPolicy;)V
+	public final fun setMaxHistory (I)V
+	public final fun setModeReportCapabilities (I)V
+	public final fun setPasteControlPolicy (Lio/github/ketraterm/input/policy/PasteControlPolicy;)V
+	public final fun setRows (I)V
+	public final fun setShellIntegrationEnabled (Z)V
+	public final fun setShowForegroundProcessName (Z)V
+	public final fun setTreatAmbiguousAsWide (Z)V
+}
+
+public final class io/github/ketraterm/workspace/TerminalWorkspaceOpenOptions$Companion {
+	public final fun builder ()Lio/github/ketraterm/workspace/TerminalWorkspaceOpenOptions$Builder;
+	public final fun create (Ljava/util/function/Consumer;)Lio/github/ketraterm/workspace/TerminalWorkspaceOpenOptions;
 }
 
 public final class io/github/ketraterm/workspace/TerminalWorkspaceTab {
@@ -196,136 +215,5 @@ public final class io/github/ketraterm/workspace/TerminalWorkspaceTab {
 	public final fun setColor (Ljava/lang/String;)V
 	public final fun setCustomTitle (Ljava/lang/String;)V
 	public final fun setShowForegroundProcessName (Z)V
-}
-
-public final class io/github/ketraterm/workspace/config/TerminalConfig {
-	public static final field COLUMNS_MAX I
-	public static final field COLUMNS_MIN I
-	public static final field CURSOR_BLINK_MAX I
-	public static final field CURSOR_BLINK_MIN I
-	public static final field Companion Lio/github/ketraterm/workspace/config/TerminalConfig$Companion;
-	public static final field DEFAULT_ACCEPT_SELECTED_SUGGESTION_WITH_ENTER Z
-	public static final field DEFAULT_AUDIBLE_BELL Z
-	public static final field DEFAULT_CLIPBOARD_MAX_DECODED_BYTES I
-	public static final field DEFAULT_COLUMNS I
-	public static final field DEFAULT_CURSOR_BLINK_MILLIS I
-	public static final field DEFAULT_CURSOR_SHAPE Ljava/lang/String;
-	public static final field DEFAULT_DESKTOP_NOTIFICATIONS_ENABLED Z
-	public static final field DEFAULT_FONT_SIZE I
-	public static final field DEFAULT_LINE_HEIGHT F
-	public static final field DEFAULT_PASTE_ON_MIDDLE_CLICK Z
-	public static final field DEFAULT_PERSISTENT_SUGGESTION_LEARNING_ENABLED Z
-	public static final field DEFAULT_ROWS I
-	public static final field DEFAULT_SCROLLBACK_LINES I
-	public static final field DEFAULT_SCROLL_ON_OUTPUT Z
-	public static final field DEFAULT_SHELL_REQUEST_RESIZE_WINDOW Z
-	public static final field DEFAULT_SHELL_REQUEST_WINDOW_MANIPULATION Z
-	public static final field DEFAULT_SHELL_SUGGESTIONS_ENABLED Z
-	public static final field DEFAULT_SHOW_FOREGROUND_PROCESS_NAME Z
-	public static final field DEFAULT_SMART_SUGGESTIONS_ENABLED Z
-	public static final field DEFAULT_THEME Ljava/lang/String;
-	public static final field DEFAULT_TREAT_AMBIGUOUS_AS_WIDE Z
-	public static final field DEFAULT_USE_SYSTEM_FALLBACK_FONTS Z
-	public static final field DEFAULT_VISUAL_BELL Z
-	public static final field FONT_SIZE_MAX I
-	public static final field FONT_SIZE_MIN I
-	public static final field LINE_HEIGHT_MAX F
-	public static final field LINE_HEIGHT_MIN F
-	public static final field ROWS_MAX I
-	public static final field ROWS_MIN I
-	public static final field SCROLLBACK_MAX I
-	public static final field SCROLLBACK_MIN I
-	public fun <init> ()V
-	public fun <init> (Ljava/lang/String;ZLjava/lang/String;IIIIZLjava/lang/String;Ljava/lang/String;Ljava/lang/String;ZZZLio/github/ketraterm/input/policy/PasteControlPolicy;IFZZZZZZZLio/github/ketraterm/host/TerminalClipboardPermission;Lio/github/ketraterm/host/TerminalClipboardPermission;ILio/github/ketraterm/host/TerminalTitlePermission;ZLjava/lang/String;Z)V
-	public synthetic fun <init> (Ljava/lang/String;ZLjava/lang/String;IIIIZLjava/lang/String;Ljava/lang/String;Ljava/lang/String;ZZZLio/github/ketraterm/input/policy/PasteControlPolicy;IFZZZZZZZLio/github/ketraterm/host/TerminalClipboardPermission;Lio/github/ketraterm/host/TerminalClipboardPermission;ILio/github/ketraterm/host/TerminalTitlePermission;ZLjava/lang/String;ZILkotlin/jvm/internal/DefaultConstructorMarker;)V
-	public final fun component1 ()Ljava/lang/String;
-	public final fun component10 ()Ljava/lang/String;
-	public final fun component11 ()Ljava/lang/String;
-	public final fun component12 ()Z
-	public final fun component13 ()Z
-	public final fun component14 ()Z
-	public final fun component15 ()Lio/github/ketraterm/input/policy/PasteControlPolicy;
-	public final fun component16 ()I
-	public final fun component17 ()F
-	public final fun component18 ()Z
-	public final fun component19 ()Z
-	public final fun component2 ()Z
-	public final fun component20 ()Z
-	public final fun component21 ()Z
-	public final fun component22 ()Z
-	public final fun component23 ()Z
-	public final fun component24 ()Z
-	public final fun component25 ()Lio/github/ketraterm/host/TerminalClipboardPermission;
-	public final fun component26 ()Lio/github/ketraterm/host/TerminalClipboardPermission;
-	public final fun component27 ()I
-	public final fun component28 ()Lio/github/ketraterm/host/TerminalTitlePermission;
-	public final fun component29 ()Z
-	public final fun component3 ()Ljava/lang/String;
-	public final fun component30 ()Ljava/lang/String;
-	public final fun component31 ()Z
-	public final fun component4 ()I
-	public final fun component5 ()I
-	public final fun component6 ()I
-	public final fun component7 ()I
-	public final fun component8 ()Z
-	public final fun component9 ()Ljava/lang/String;
-	public final fun copy (Ljava/lang/String;ZLjava/lang/String;IIIIZLjava/lang/String;Ljava/lang/String;Ljava/lang/String;ZZZLio/github/ketraterm/input/policy/PasteControlPolicy;IFZZZZZZZLio/github/ketraterm/host/TerminalClipboardPermission;Lio/github/ketraterm/host/TerminalClipboardPermission;ILio/github/ketraterm/host/TerminalTitlePermission;ZLjava/lang/String;Z)Lio/github/ketraterm/workspace/config/TerminalConfig;
-	public static synthetic fun copy$default (Lio/github/ketraterm/workspace/config/TerminalConfig;Ljava/lang/String;ZLjava/lang/String;IIIIZLjava/lang/String;Ljava/lang/String;Ljava/lang/String;ZZZLio/github/ketraterm/input/policy/PasteControlPolicy;IFZZZZZZZLio/github/ketraterm/host/TerminalClipboardPermission;Lio/github/ketraterm/host/TerminalClipboardPermission;ILio/github/ketraterm/host/TerminalTitlePermission;ZLjava/lang/String;ZILjava/lang/Object;)Lio/github/ketraterm/workspace/config/TerminalConfig;
-	public fun equals (Ljava/lang/Object;)Z
-	public final fun getAcceptSelectedSuggestionWithEnter ()Z
-	public final fun getAudibleBell ()Z
-	public final fun getClipboardMaxDecodedBytes ()I
-	public final fun getClipboardRead ()Lio/github/ketraterm/host/TerminalClipboardPermission;
-	public final fun getClipboardWrite ()Lio/github/ketraterm/host/TerminalClipboardPermission;
-	public final fun getColumns ()I
-	public final fun getCursorBlinkMillis ()I
-	public final fun getCursorShape ()Ljava/lang/String;
-	public final fun getDesktopNotificationsEnabled ()Z
-	public final fun getFontFamily ()Ljava/lang/String;
-	public final fun getFontSize ()I
-	public final fun getLineHeight ()F
-	public final fun getPasteControlPolicy ()Lio/github/ketraterm/input/policy/PasteControlPolicy;
-	public final fun getPasteOnMiddleClick ()Z
-	public final fun getPersistentSuggestionLearningEnabled ()Z
-	public final fun getRows ()I
-	public final fun getScrollOnOutput ()Z
-	public final fun getScrollbackLines ()I
-	public final fun getShellPath ()Ljava/lang/String;
-	public final fun getShellRequestResizeWindow ()Z
-	public final fun getShellRequestWindowManipulation ()Z
-	public final fun getShellSuggestionsEnabled ()Z
-	public final fun getShowForegroundProcessName ()Z
-	public final fun getSmartSuggestionsEnabled ()Z
-	public final fun getStartDirectory ()Ljava/lang/String;
-	public final fun getStartupCommand ()Ljava/lang/String;
-	public final fun getTheme ()Ljava/lang/String;
-	public final fun getTitlePermission ()Lio/github/ketraterm/host/TerminalTitlePermission;
-	public final fun getTreatAmbiguousAsWide ()Z
-	public final fun getUseSystemFallbackFonts ()Z
-	public final fun getVisualBell ()Z
-	public fun hashCode ()I
-	public fun toString ()Ljava/lang/String;
-}
-
-public final class io/github/ketraterm/workspace/config/TerminalConfig$Companion {
-	public final fun getDEFAULT_CLIPBOARD_READ ()Lio/github/ketraterm/host/TerminalClipboardPermission;
-	public final fun getDEFAULT_CLIPBOARD_WRITE ()Lio/github/ketraterm/host/TerminalClipboardPermission;
-	public final fun getDEFAULT_FONT_FAMILY ()Ljava/lang/String;
-	public final fun getDEFAULT_PASTE_CONTROL_POLICY ()Lio/github/ketraterm/input/policy/PasteControlPolicy;
-	public final fun getDEFAULT_SHELL_PATH ()Ljava/lang/String;
-	public final fun getDEFAULT_START_DIRECTORY ()Ljava/lang/String;
-	public final fun getDEFAULT_TITLE_PERMISSION ()Lio/github/ketraterm/host/TerminalTitlePermission;
-}
-
-public final class io/github/ketraterm/workspace/config/TerminalWorkspaceConfigManager {
-	public static final field Companion Lio/github/ketraterm/workspace/config/TerminalWorkspaceConfigManager$Companion;
-	public fun <init> (Ljava/nio/file/Path;)V
-	public final fun getConfigPath ()Ljava/nio/file/Path;
-	public final fun load ()Lio/github/ketraterm/workspace/config/TerminalConfig;
-	public final fun save (Lio/github/ketraterm/workspace/config/TerminalConfig;)V
-}
-
-public final class io/github/ketraterm/workspace/config/TerminalWorkspaceConfigManager$Companion {
-	public final fun getDefault ()Lio/github/ketraterm/workspace/config/TerminalWorkspaceConfigManager;
 }
 

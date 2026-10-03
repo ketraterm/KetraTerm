@@ -98,13 +98,12 @@ fun createTerminalView(session: TerminalSession): JComponent {
     val panel = JPanel(BorderLayout())
 
     // 1. Define custom, immutable settings (palette, fonts, etc.)
-    val settings = SwingSettings(
-        palette = TerminalTheme.ONE_DARK.createPalette(),
-        fontFamily = "Cascadia Mono",
-        fontSize = 15,
-        columns = 80,
-        rows = 24
-    )
+    val settings = SwingSettings.create {
+        it.palette = TerminalTheme.ONE_DARK.createPalette()
+        it.font = java.awt.Font("Cascadia Mono", java.awt.Font.PLAIN, 15)
+        it.columns = 80
+        it.rows = 24
+    }
     
     // 2. Instantiate the SwingTerminal component
     val terminalComponent = SwingTerminal(
@@ -130,8 +129,8 @@ import io.github.ketraterm.ui.swing.api.SwingHostServices
 import io.github.ketraterm.ui.swing.settings.TerminalClipboardHandler
 import io.github.ketraterm.ui.swing.settings.TerminalHyperlinkHandler
 
-val customServices = SwingHostServices(
-    clipboardHandler = object : TerminalClipboardHandler {
+val customServices = SwingHostServices.create {
+    it.clipboardHandler = object : TerminalClipboardHandler {
         override fun copyText(text: String) {
             println("Copying to custom clipboard: $text")
         }
@@ -139,10 +138,12 @@ val customServices = SwingHostServices(
         override fun readText(): String? {
             return "Pasted text"
         }
-    },
-    hyperlinkHandler = TerminalHyperlinkHandler { uri ->
+    }
+    it.hyperlinkHandler = TerminalHyperlinkHandler { uri ->
         println("User clicked hyperlink: $uri")
         true
     }
-)
+}
 ```
+
+See [configuration ownership and construction](../docs/library-configuration.md) for immutable updates and Kotlin/Java migration.

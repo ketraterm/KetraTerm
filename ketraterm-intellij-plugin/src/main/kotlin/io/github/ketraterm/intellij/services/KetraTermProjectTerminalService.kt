@@ -538,15 +538,15 @@ class KetraTermProjectTerminalService internal constructor(
     }
 
     private fun openOptions(settings: SwingSettings): TerminalWorkspaceOpenOptions =
-        TerminalWorkspaceOpenOptions(
-            columns = settings.columns,
-            rows = settings.rows,
-            treatAmbiguousAsWide = settings.treatAmbiguousAsWide,
-            maxHistory = settings.scrollbackLines,
-            pasteControlPolicy = settings.pasteControlPolicy,
-            hostPolicy = KetraTermIntellijSettings.getInstance().createHostPolicy(),
-            showForegroundProcessName = KetraTermIntellijSettings.getInstance().state.showForegroundProcessName,
-        )
+        TerminalWorkspaceOpenOptions.create { draft ->
+            draft.columns = settings.columns
+            draft.rows = settings.rows
+            draft.treatAmbiguousAsWide = settings.treatAmbiguousAsWide
+            draft.maxHistory = KetraTermIntellijSettings.getInstance().state.scrollbackLines
+            draft.pasteControlPolicy = settings.pasteControlPolicy
+            draft.hostPolicy = KetraTermIntellijSettings.getInstance().createHostPolicy()
+            draft.showForegroundProcessName = KetraTermIntellijSettings.getInstance().state.showForegroundProcessName
+        }
 
     private fun installCloseQueryListener(
         content: Content,

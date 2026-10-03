@@ -17,7 +17,6 @@ package io.github.ketraterm.ui.swing.render
 
 import io.github.ketraterm.core.TerminalBuffers
 import io.github.ketraterm.input.api.TerminalInputEncoder
-import io.github.ketraterm.input.api.TerminalInputEncoderFactory
 import io.github.ketraterm.input.event.TerminalFocusEvent
 import io.github.ketraterm.input.event.TerminalKeyEvent
 import io.github.ketraterm.input.event.TerminalMouseEvent
@@ -338,7 +337,11 @@ class SwingRenderFrameControllerTest {
         override val terminalFocused: Boolean = true,
     ) : SwingRenderFrameHost {
         override val renderCache = TerminalRenderCache(80, 24)
-        override val settings = SwingSettings(padding = SwingPadding(), shellIntegrationDecorationGutterWidth = 0)
+        override val settings =
+            SwingSettings.create { draft ->
+                draft.padding = SwingPadding()
+                draft.shellIntegrationDecorationGutterWidth = 0
+            }
         override val metrics =
             SwingMetrics(
                 cellWidth = 10,
@@ -475,7 +478,7 @@ class SwingRenderFrameControllerTest {
                 responseReader = terminal,
                 connector = NoOpConnector,
                 parser = NoOpParser,
-                inputEncoderFactory = TerminalInputEncoderFactory { _, _, _ -> object : TerminalInputEncoder by NoOpInputEncoder {} },
+                inputEncoderFactory = { _, _, _ -> object : TerminalInputEncoder by NoOpInputEncoder {} },
             )
         session.renderPublisher.updateAndPublish(frameReader ?: terminal as TerminalRenderFrameReader)
         return session

@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.github.ketraterm.workspace.config
+package io.github.ketraterm.app.config
 
 import io.github.ketraterm.host.TerminalClipboardPermission
 import io.github.ketraterm.host.TerminalTitlePermission
@@ -26,7 +26,7 @@ import java.nio.file.Path
 import java.util.*
 import kotlin.test.*
 
-class TerminalConfigTest {
+class KetraTermConfigTest {
     @TestFactory
     fun `string configuration values survive save and reload`(): List<DynamicTest> {
         val fields = listOf("theme", "fontFamily", "cursorShape", "shellPath", "startDirectory")
@@ -45,18 +45,18 @@ class TerminalConfigTest {
                 DynamicTest.dynamicTest("$field retains $kind") {
                     val expected =
                         when (field) {
-                            "theme" -> TerminalConfig(theme = value)
-                            "fontFamily" -> TerminalConfig(fontFamily = value)
-                            "cursorShape" -> TerminalConfig(cursorShape = value)
-                            "shellPath" -> TerminalConfig(shellPath = value)
-                            "startDirectory" -> TerminalConfig(startDirectory = value)
+                            "theme" -> KetraTermConfig(theme = value)
+                            "fontFamily" -> KetraTermConfig(fontFamily = value)
+                            "cursorShape" -> KetraTermConfig(cursorShape = value)
+                            "shellPath" -> KetraTermConfig(shellPath = value)
+                            "startDirectory" -> KetraTermConfig(startDirectory = value)
                             else -> error("Unknown configuration field")
                         }
                     val directory = Files.createTempDirectory("ketraterm-config-string-roundtrip")
                     val file = directory.resolve("config.toml")
                     val brokenFile = directory.resolve("config.toml.broken")
                     try {
-                        val manager = TerminalWorkspaceConfigManager(file)
+                        val manager = KetraTermConfigManager(file)
                         manager.save(expected)
                         assertEquals(expected, manager.load(), "saving an accepted string value must preserve the complete configuration")
                         assertFalse(Files.exists(brokenFile), "a generated configuration must be readable without recovery")
@@ -75,7 +75,7 @@ class TerminalConfigTest {
         val directory = Files.createTempDirectory("ketraterm-clipboard-migration")
         val file = directory.resolve("config.toml")
         try {
-            val manager = TerminalWorkspaceConfigManager(file)
+            val manager = KetraTermConfigManager(file)
             for ((raw, permission) in listOf(
                 "" to TerminalClipboardPermission.DENY,
                 "[security]\n" to TerminalClipboardPermission.DENY,
@@ -112,7 +112,7 @@ class TerminalConfigTest {
                 title_remote_permission = "deny"
                 """.trimIndent(),
             )
-            val manager = TerminalWorkspaceConfigManager(file)
+            val manager = KetraTermConfigManager(file)
             val loaded = manager.load()
             assertEquals(TerminalClipboardPermission.ALLOW, loaded.clipboardWrite)
             assertEquals(TerminalTitlePermission.ALLOW, loaded.titlePermission)
@@ -138,7 +138,7 @@ class TerminalConfigTest {
         val directory = Files.createTempDirectory("ketraterm-config-paste-migration")
         val file = directory.resolve("config.toml")
         try {
-            val manager = TerminalWorkspaceConfigManager(file)
+            val manager = KetraTermConfigManager(file)
             for (id in listOf("raw", "normalize-line-endings", "preserve", "strip-c0", "unknown")) {
                 Files.writeString(file, "[behavior]\npaste_sanitization = \" ${id.uppercase(Locale.ROOT)} \"\n")
                 val loaded = manager.load()
@@ -160,9 +160,9 @@ class TerminalConfigTest {
         val directory = Files.createTempDirectory("ketraterm-config-atomic")
         val destination = directory.resolve("config.toml")
         try {
-            val manager = TerminalWorkspaceConfigManager(destination)
-            manager.save(TerminalConfig())
-            val updated = TerminalConfig(fontSize = 28, columns = 160, smartSuggestionsEnabled = true)
+            val manager = KetraTermConfigManager(destination)
+            manager.save(KetraTermConfig())
+            val updated = KetraTermConfig(fontSize = 28, columns = 160, smartSuggestionsEnabled = true)
             manager.save(updated)
             assertEquals(updated, manager.load())
             Files.list(directory).use { assertEquals(listOf(destination), it.toList()) }
@@ -179,7 +179,7 @@ class TerminalConfigTest {
         val existing = Files.writeString(destination.resolve("existing"), "preserve me")
         try {
             assertFailsWith<IOException> {
-                TerminalWorkspaceConfigManager(destination).save(TerminalConfig())
+                KetraTermConfigManager(destination).save(KetraTermConfig())
             }
             assertEquals("preserve me", Files.readString(existing))
             Files.list(directory).use { assertEquals(listOf(destination), it.toList()) }
@@ -195,7 +195,7 @@ class TerminalConfigTest {
         val directory = Files.createTempDirectory("ketraterm-config-unreadable")
         val existing = Files.writeString(directory.resolve("existing"), "preserve me")
         try {
-            assertEquals(TerminalConfig(clipboardRead = TerminalClipboardPermission.DENY), TerminalWorkspaceConfigManager(directory).load())
+            assertEquals(KetraTermConfig(clipboardRead = TerminalClipboardPermission.DENY), KetraTermConfigManager(directory).load())
             assertEquals("preserve me", Files.readString(existing))
             assertFalse(Files.exists(directory.resolveSibling("${directory.fileName}.broken")))
         } finally {
@@ -208,9 +208,9 @@ class TerminalConfigTest {
     fun `unwritable missing config uses defaults at startup but explicit save fails`() {
         val blockedParent = Files.createTempFile("ketraterm-config-parent", ".file")
         try {
-            val manager = TerminalWorkspaceConfigManager(blockedParent.resolve("config.toml"))
-            assertEquals(TerminalConfig(), manager.load())
-            assertFailsWith<IOException> { manager.save(TerminalConfig(fontSize = 24)) }
+            val manager = KetraTermConfigManager(blockedParent.resolve("config.toml"))
+            assertEquals(KetraTermConfig(), manager.load())
+            assertFailsWith<IOException> { manager.save(KetraTermConfig(fontSize = 24)) }
             assertTrue(Files.isRegularFile(blockedParent))
         } finally {
             Files.deleteIfExists(blockedParent)
@@ -223,7 +223,7 @@ class TerminalConfigTest {
         val path = directory.resolve("config.toml")
         try {
             Files.writeString(path, "[behavior]\nshell_suggestions_enabled = true\npersistent_suggestion_learning_enabled = true\n")
-            val manager = TerminalWorkspaceConfigManager(path)
+            val manager = KetraTermConfigManager(path)
             val config = manager.load()
             assertFalse(config.smartSuggestionsEnabled)
             manager.save(config.copy(smartSuggestionsEnabled = true))
@@ -276,33 +276,33 @@ class TerminalConfigTest {
     }
 
     @Test
-    fun `test TerminalWorkspaceConfigManager path resolution`() {
+    fun `test KetraTermConfigManager path resolution`() {
         // Overrides
         // Clean default system property check (which might be set or not during tests, but we can verify our overrides work)
         System.setProperty("ketraterm.config.path", "/custom/sys/path.toml")
-        assertEquals(Path.of("/custom/sys/path.toml"), TerminalWorkspaceConfigManager.getDefaultPath(osName = "Windows 11"))
+        assertEquals(Path.of("/custom/sys/path.toml"), KetraTermConfigManager.getDefaultPath(osName = "Windows 11"))
         System.clearProperty("ketraterm.config.path")
 
         // Env override
         val env = mapOf("KetraTerm_CONFIG_PATH" to "/custom/env/path.toml")
-        assertEquals(Path.of("/custom/env/path.toml"), TerminalWorkspaceConfigManager.getDefaultPath(osName = "Windows 11", env = env))
+        assertEquals(Path.of("/custom/env/path.toml"), KetraTermConfigManager.getDefaultPath(osName = "Windows 11", env = env))
 
         // Windows resolution
         val winEnv = mapOf("APPDATA" to "C:\\Users\\User\\AppData\\Roaming")
-        val winPath = TerminalWorkspaceConfigManager.getDefaultPath(osName = "Windows 11", env = winEnv)
+        val winPath = KetraTermConfigManager.getDefaultPath(osName = "Windows 11", env = winEnv)
         assertEquals(Path.of("C:\\Users\\User\\AppData\\Roaming", "KetraTerm", "config.toml"), winPath)
 
         // Mac resolution
-        val macPath = TerminalWorkspaceConfigManager.getDefaultPath(osName = "macOS Big Sur", userHome = "/Users/username")
+        val macPath = KetraTermConfigManager.getDefaultPath(osName = "macOS Big Sur", userHome = "/Users/username")
         assertEquals(Path.of("/Users/username/Library/Application Support/KetraTerm/config.toml"), macPath)
 
         // Linux resolution
         val linuxEnv = mapOf("XDG_CONFIG_HOME" to "/home/username/.custom_config")
-        val linuxPath = TerminalWorkspaceConfigManager.getDefaultPath(osName = "Linux", env = linuxEnv)
+        val linuxPath = KetraTermConfigManager.getDefaultPath(osName = "Linux", env = linuxEnv)
         assertEquals(Path.of("/home/username/.custom_config/ketraterm/config.toml"), linuxPath)
 
         val linuxFallbackPath =
-            TerminalWorkspaceConfigManager.getDefaultPath(
+            KetraTermConfigManager.getDefaultPath(
                 osName = "Linux",
                 env = emptyMap(),
                 userHome = "/home/username",
@@ -311,10 +311,10 @@ class TerminalConfigTest {
     }
 
     @Test
-    fun `test TerminalWorkspaceConfigManager load default config if file does not exist`() {
+    fun `test KetraTermConfigManager load default config if file does not exist`() {
         val tempDir = Files.createTempDirectory("ketraterm-config-test")
         val configFile = tempDir.resolve("config.toml")
-        val manager = TerminalWorkspaceConfigManager(configFile)
+        val manager = KetraTermConfigManager(configFile)
 
         assertFalse(Files.exists(configFile))
         val config = manager.load()
@@ -356,13 +356,13 @@ class TerminalConfigTest {
     }
 
     @Test
-    fun `test TerminalWorkspaceConfigManager saves and loads custom config correctly`() {
+    fun `test KetraTermConfigManager saves and loads custom config correctly`() {
         val tempDir = Files.createTempDirectory("ketraterm-config-test-custom")
         val configFile = tempDir.resolve("config.toml")
-        val manager = TerminalWorkspaceConfigManager(configFile)
+        val manager = KetraTermConfigManager(configFile)
 
         val customConfig =
-            TerminalConfig(
+            KetraTermConfig(
                 theme = "nord",
                 smartSuggestionsEnabled = true,
                 treatAmbiguousAsWide = true,
@@ -406,10 +406,10 @@ class TerminalConfigTest {
     }
 
     @Test
-    fun `test TerminalWorkspaceConfigManager loads new suggestion learning persistence key`() {
+    fun `test KetraTermConfigManager loads new suggestion learning persistence key`() {
         val tempDir = Files.createTempDirectory("ketraterm-config-test-suggestion-learning-new")
         val configFile = tempDir.resolve("config.toml")
-        val manager = TerminalWorkspaceConfigManager(configFile)
+        val manager = KetraTermConfigManager(configFile)
 
         Files.writeString(
             configFile,
@@ -426,10 +426,10 @@ class TerminalConfigTest {
     }
 
     @Test
-    fun `test TerminalWorkspaceConfigManager clamps hand edited numeric values`() {
+    fun `test KetraTermConfigManager clamps hand edited numeric values`() {
         val tempDir = Files.createTempDirectory("ketraterm-config-test-clamped")
         val configFile = tempDir.resolve("config.toml")
-        val manager = TerminalWorkspaceConfigManager(configFile)
+        val manager = KetraTermConfigManager(configFile)
 
         Files.writeString(
             configFile,
@@ -456,12 +456,12 @@ class TerminalConfigTest {
 
         val loaded = manager.load()
 
-        assertEquals(TerminalConfig.COLUMNS_MAX, loaded.columns)
-        assertEquals(TerminalConfig.ROWS_MIN, loaded.rows)
-        assertEquals(TerminalConfig.SCROLLBACK_MAX, loaded.scrollbackLines)
-        assertEquals(TerminalConfig.FONT_SIZE_MIN, loaded.fontSize)
-        assertEquals(TerminalConfig.LINE_HEIGHT_MIN, loaded.lineHeight)
-        assertEquals(TerminalConfig.CURSOR_BLINK_MAX, loaded.cursorBlinkMillis)
+        assertEquals(KetraTermConfig.COLUMNS_MAX, loaded.columns)
+        assertEquals(KetraTermConfig.ROWS_MIN, loaded.rows)
+        assertEquals(KetraTermConfig.SCROLLBACK_MAX, loaded.scrollbackLines)
+        assertEquals(KetraTermConfig.FONT_SIZE_MIN, loaded.fontSize)
+        assertEquals(KetraTermConfig.LINE_HEIGHT_MIN, loaded.lineHeight)
+        assertEquals(KetraTermConfig.CURSOR_BLINK_MAX, loaded.cursorBlinkMillis)
         assertEquals(PasteControlPolicy.STRIP_C0_EXCEPT_TAB_CR_LF, loaded.pasteControlPolicy)
 
         Files.deleteIfExists(configFile)
@@ -472,7 +472,7 @@ class TerminalConfigTest {
     fun `invalid and removed permission values use field defaults and save canonical values`() {
         val directory = Files.createTempDirectory("ketraterm-config-security-defaults")
         val file = directory.resolve("config.toml")
-        val manager = TerminalWorkspaceConfigManager(file)
+        val manager = KetraTermConfigManager(file)
         try {
             for (value in listOf("invalid", "allowlist")) {
                 Files.writeString(
@@ -502,10 +502,10 @@ class TerminalConfigTest {
     }
 
     @Test
-    fun `test TerminalWorkspaceConfigManager clamps clipboard decoded byte boundaries`() {
+    fun `test KetraTermConfigManager clamps clipboard decoded byte boundaries`() {
         val tempDir = Files.createTempDirectory("ketraterm-config-test-clipboard-size")
         val configFile = tempDir.resolve("config.toml")
-        val manager = TerminalWorkspaceConfigManager(configFile)
+        val manager = KetraTermConfigManager(configFile)
 
         Files.writeString(
             configFile,
@@ -532,27 +532,27 @@ class TerminalConfigTest {
     }
 
     @Test
-    fun `test TerminalConfig rejects direct out of bounds values`() {
+    fun `test KetraTermConfig rejects direct out of bounds values`() {
         assertFailsWith<IllegalArgumentException> {
-            TerminalConfig(columns = TerminalConfig.COLUMNS_MIN - 1)
+            KetraTermConfig(columns = KetraTermConfig.COLUMNS_MIN - 1)
         }
         assertFailsWith<IllegalArgumentException> {
-            TerminalConfig(rows = TerminalConfig.ROWS_MAX + 1)
+            KetraTermConfig(rows = KetraTermConfig.ROWS_MAX + 1)
         }
         assertFailsWith<IllegalArgumentException> {
-            TerminalConfig(scrollbackLines = TerminalConfig.SCROLLBACK_MAX + 1)
+            KetraTermConfig(scrollbackLines = KetraTermConfig.SCROLLBACK_MAX + 1)
         }
         assertFailsWith<IllegalArgumentException> {
-            TerminalConfig(lineHeight = TerminalConfig.LINE_HEIGHT_MIN - 0.1f)
+            KetraTermConfig(lineHeight = KetraTermConfig.LINE_HEIGHT_MIN - 0.1f)
         }
     }
 
     @Test
-    fun `test TerminalWorkspaceConfigManager fallback on invalid format`() {
+    fun `test KetraTermConfigManager fallback on invalid format`() {
         val tempDir = Files.createTempDirectory("ketraterm-config-test-invalid")
         val configFile = tempDir.resolve("config.toml")
         val brokenFile = tempDir.resolve("config.toml.broken")
-        val manager = TerminalWorkspaceConfigManager(configFile)
+        val manager = KetraTermConfigManager(configFile)
 
         Files.writeString(configFile, "invalid toml syntax here [[[[")
 

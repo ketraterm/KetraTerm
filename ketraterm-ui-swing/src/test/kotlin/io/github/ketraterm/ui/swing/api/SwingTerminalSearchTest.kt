@@ -17,7 +17,6 @@ package io.github.ketraterm.ui.swing.api
 
 import io.github.ketraterm.core.TerminalBuffers
 import io.github.ketraterm.input.api.TerminalInputEncoder
-import io.github.ketraterm.input.api.TerminalInputEncoderFactory
 import io.github.ketraterm.input.event.TerminalFocusEvent
 import io.github.ketraterm.input.event.TerminalKeyEvent
 import io.github.ketraterm.input.event.TerminalMouseEvent
@@ -64,7 +63,7 @@ class SwingTerminalSearchTest {
                 responseReader = terminal,
                 connector = NoOpConnector,
                 parser = NoOpParser,
-                inputEncoderFactory = TerminalInputEncoderFactory { _, _, _ -> object : TerminalInputEncoder by NoOpInputEncoder {} },
+                inputEncoderFactory = { _, _, _ -> object : TerminalInputEncoder by NoOpInputEncoder {} },
                 workerDispatcher = dispatcher,
                 ioDispatcher = dispatcher,
             )
@@ -72,13 +71,13 @@ class SwingTerminalSearchTest {
             SwingUtilities.invokeAndWait {
                 val component =
                     SwingTerminal(settingsProvider = {
-                        SwingSettings(
-                            columns = columns,
-                            rows = 2,
-                            padding = SwingPadding(),
-                            shellIntegrationDecorationGutterWidth = 0,
-                            cursorBlinkMillis = 0,
-                        )
+                        SwingSettings.create { draft ->
+                            draft.columns = columns
+                            draft.rows = 2
+                            draft.padding = SwingPadding()
+                            draft.shellIntegrationDecorationGutterWidth = 0
+                            draft.cursorBlinkMillis = 0
+                        }
                     }, hostServices = SwingHostServices(), searchDispatcher = dispatcher)
                 try {
                     component.size = component.preferredGridSize(columns, 2)
@@ -213,13 +212,13 @@ class SwingTerminalSearchTest {
             }
             SwingUtilities.invokeAndWait {
                 val settings =
-                    SwingSettings(
-                        columns = 12,
-                        rows = 1,
-                        padding = SwingPadding(),
-                        shellIntegrationDecorationGutterWidth = 0,
-                        cursorBlinkMillis = 0,
-                    )
+                    SwingSettings.create { draft ->
+                        draft.columns = 12
+                        draft.rows = 1
+                        draft.padding = SwingPadding()
+                        draft.shellIntegrationDecorationGutterWidth = 0
+                        draft.cursorBlinkMillis = 0
+                    }
                 val component =
                     SwingTerminal(settingsProvider = { settings }, hostServices = SwingHostServices(), searchDispatcher = searchDispatcher)
                 try {
@@ -253,7 +252,9 @@ class SwingTerminalSearchTest {
         val session = testSession(reader)
         val component =
             SwingTerminal(settingsProvider = {
-                SwingSettings(padding = SwingPadding(0, 0, 0, 0))
+                SwingSettings.create { draft ->
+                    draft.padding = SwingPadding(0, 0, 0, 0)
+                }
             }, hostServices = SwingHostServices(), searchDispatcher = searchDispatcher)
 
         SwingUtilities.invokeAndWait {
@@ -278,7 +279,9 @@ class SwingTerminalSearchTest {
         val session = testSession(reader)
         val component =
             SwingTerminal(settingsProvider = {
-                SwingSettings(padding = SwingPadding(0, 0, 0, 0))
+                SwingSettings.create { draft ->
+                    draft.padding = SwingPadding(0, 0, 0, 0)
+                }
             }, hostServices = SwingHostServices(), searchDispatcher = searchDispatcher)
 
         SwingUtilities.invokeAndWait {
@@ -309,7 +312,7 @@ class SwingTerminalSearchTest {
                 responseReader = terminal,
                 connector = NoOpConnector,
                 parser = NoOpParser,
-                inputEncoderFactory = TerminalInputEncoderFactory { _, _, _ -> object : TerminalInputEncoder by inputEncoder {} },
+                inputEncoderFactory = { _, _, _ -> object : TerminalInputEncoder by inputEncoder {} },
                 workerDispatcher = Dispatchers.Unconfined,
                 ioDispatcher = Dispatchers.Unconfined,
             )

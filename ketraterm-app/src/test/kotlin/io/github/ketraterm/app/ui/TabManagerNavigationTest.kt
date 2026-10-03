@@ -15,10 +15,10 @@
  */
 package io.github.ketraterm.app.ui
 
+import io.github.ketraterm.app.config.KetraTermConfig
+import io.github.ketraterm.app.config.KetraTermConfigManager
 import io.github.ketraterm.app.config.KetraTermSettings
 import io.github.ketraterm.workspace.TerminalProfile
-import io.github.ketraterm.workspace.config.TerminalConfig
-import io.github.ketraterm.workspace.config.TerminalWorkspaceConfigManager
 import org.junit.jupiter.api.Tag
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.io.TempDir
@@ -50,8 +50,8 @@ class TabManagerNavigationTest {
                 listOf("/bin/sh")
             }
         val profile = TerminalProfile("navigation", "Navigation", command, workingDirectory = directory)
-        val configManager = TerminalWorkspaceConfigManager(directory.resolve("config.toml"))
-        configManager.save(TerminalConfig(cursorBlinkMillis = 0, showForegroundProcessName = false))
+        val configManager = KetraTermConfigManager(directory.resolve("config.toml"))
+        configManager.save(KetraTermConfig(cursorBlinkMillis = 0, showForegroundProcessName = false))
         val task =
             FutureTask {
                 val previousFocusManager = KeyboardFocusManager.getCurrentKeyboardFocusManager()

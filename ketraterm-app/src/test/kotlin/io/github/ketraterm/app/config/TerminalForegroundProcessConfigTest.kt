@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.github.ketraterm.workspace.config
+package io.github.ketraterm.app.config
 
 import org.junit.jupiter.api.io.TempDir
 import java.nio.file.Files
@@ -27,9 +27,9 @@ class TerminalForegroundProcessConfigTest {
     fun `process title setting round trips both values`(
         @TempDir directory: Path,
     ) {
-        val manager = TerminalWorkspaceConfigManager(directory.resolve("config.toml"))
+        val manager = KetraTermConfigManager(directory.resolve("config.toml"))
         for (enabled in listOf(false, true)) {
-            val config = TerminalConfig(showForegroundProcessName = enabled)
+            val config = KetraTermConfig(showForegroundProcessName = enabled)
             manager.save(config)
             assertEquals(config, manager.load())
         }
@@ -40,7 +40,7 @@ class TerminalForegroundProcessConfigTest {
         @TempDir directory: Path,
     ) {
         val file = directory.resolve("config.toml")
-        val manager = TerminalWorkspaceConfigManager(file)
+        val manager = KetraTermConfigManager(file)
         for (content in listOf("", "[behavior]\nshow_foreground_process_name = invalid")) {
             Files.writeString(file, content)
             assertTrue(manager.load().showForegroundProcessName)

@@ -6,6 +6,7 @@ Release notes for library consumers and embedders. Product-specific changes are 
 
 ### Improvements and fixes
 
+- Resolve D02/D03 with immutable configuration snapshots and named Kotlin/Java `create`/`copy` callbacks or builders for Swing settings/services, PTY options and workspace open options. Remove ineffective Swing scrollback/window-permission fields; standalone now owns its internal preferences and TOML persistence. Shared settings-control bounds live in Swing host support. PTY launch collections are defensively copied. This intentional pre-freeze constructor/copy/destructuring migration requires recompilation; see [configuration migration](docs/library-configuration.md).
 - Publish session `Running` only after connector startup returns successfully. Defer the outbound writer until readiness so observer keys, paste, and text replacement cannot write prematurely or fail-close a healthy session. Preserve startup reply ordering, shell readiness, start-once admission, and cleanup on startup failure or closure (D01).
 - Cancel native completion work when sessions stop. Complete popup hiding and eligibility updates despite host callback failures, preserve cancellation and suppress later failures. Commit Swing state before host notification and skip obsolete notifications after reentrant changes.
 - Expanded concrete implementation and retained-client compatibility checks; clarified complete cluster reads and isolated render-lease acquisition.

@@ -22,9 +22,9 @@ import com.intellij.util.xmlb.annotations.Property
 import io.github.ketraterm.host.*
 import io.github.ketraterm.input.policy.PasteControlPolicy
 import io.github.ketraterm.render.api.TerminalRenderCursorShape
+import io.github.ketraterm.ui.swing.host.SwingTerminalSettingsBounds
 import io.github.ketraterm.ui.swing.settings.SwingSettings
 import io.github.ketraterm.ui.swing.settings.TerminalTheme
-import io.github.ketraterm.workspace.config.TerminalConfig
 import kotlinx.collections.immutable.persistentListOf
 import java.awt.Font
 import java.util.*
@@ -47,7 +47,7 @@ import java.util.concurrent.CopyOnWriteArrayList
 )
 class KetraTermIntellijSettings :
     SerializablePersistentStateComponent<KetraTermIntellijSettings.State>(
-        State(clipboardRead = TerminalConfig.DEFAULT_CLIPBOARD_READ.name.lowercase(Locale.ROOT)),
+        State(clipboardRead = DEFAULT_CLIPBOARD_READ.name.lowercase(Locale.ROOT)),
     ) {
     private val stateLock = Any()
     private val changeListeners = CopyOnWriteArrayList<() -> Unit>()
@@ -219,29 +219,29 @@ class KetraTermIntellijSettings :
         @OptionTag
         @JvmField val fontSize: Int = DEFAULT_FONT_SIZE,
         @OptionTag
-        @JvmField val columns: Int = TerminalConfig.DEFAULT_COLUMNS,
+        @JvmField val columns: Int = DEFAULT_COLUMNS,
         @OptionTag
-        @JvmField val rows: Int = TerminalConfig.DEFAULT_ROWS,
+        @JvmField val rows: Int = DEFAULT_ROWS,
         @OptionTag
-        @JvmField val treatAmbiguousAsWide: Boolean = TerminalConfig.DEFAULT_TREAT_AMBIGUOUS_AS_WIDE,
+        @JvmField val treatAmbiguousAsWide: Boolean = DEFAULT_TREAT_AMBIGUOUS_AS_WIDE,
         @OptionTag
-        @JvmField val cursorBlinkMillis: Int = TerminalConfig.DEFAULT_CURSOR_BLINK_MILLIS,
+        @JvmField val cursorBlinkMillis: Int = DEFAULT_CURSOR_BLINK_MILLIS,
         @OptionTag
-        @JvmField val useSystemFallbackFonts: Boolean = TerminalConfig.DEFAULT_USE_SYSTEM_FALLBACK_FONTS,
+        @JvmField val useSystemFallbackFonts: Boolean = DEFAULT_USE_SYSTEM_FALLBACK_FONTS,
         @OptionTag
-        @JvmField val cursorShape: String = TerminalConfig.DEFAULT_CURSOR_SHAPE,
+        @JvmField val cursorShape: String = DEFAULT_CURSOR_SHAPE,
         @OptionTag
-        @JvmField val visualBell: Boolean = TerminalConfig.DEFAULT_VISUAL_BELL,
+        @JvmField val visualBell: Boolean = DEFAULT_VISUAL_BELL,
         @OptionTag
-        @JvmField val pasteOnMiddleClick: Boolean = TerminalConfig.DEFAULT_PASTE_ON_MIDDLE_CLICK,
+        @JvmField val pasteOnMiddleClick: Boolean = DEFAULT_PASTE_ON_MIDDLE_CLICK,
         @OptionTag
         @JvmField val overrideIdeShortcuts: Boolean = true,
         @OptionTag
-        @JvmField val scrollbackLines: Int = TerminalConfig.DEFAULT_SCROLLBACK_LINES,
+        @JvmField val scrollbackLines: Int = DEFAULT_SCROLLBACK_LINES,
         @OptionTag
-        @JvmField val lineHeight: Float = TerminalConfig.DEFAULT_LINE_HEIGHT,
+        @JvmField val lineHeight: Float = DEFAULT_LINE_HEIGHT,
         @OptionTag
-        @JvmField val shellPath: String = TerminalConfig.DEFAULT_SHELL_PATH,
+        @JvmField val shellPath: String = DEFAULT_SHELL_PATH,
         @OptionTag
         @JvmField val startDirectory: String = "",
         @OptionTag
@@ -251,31 +251,57 @@ class KetraTermIntellijSettings :
         @OptionTag
         @JvmField val defaultTabName: String = "Local",
         @OptionTag
-        @JvmField val smartSuggestionsEnabled: Boolean = TerminalConfig.DEFAULT_SMART_SUGGESTIONS_ENABLED,
+        @JvmField val smartSuggestionsEnabled: Boolean = DEFAULT_SMART_SUGGESTIONS_ENABLED,
         @OptionTag
-        @JvmField val shellSuggestionsEnabled: Boolean = TerminalConfig.DEFAULT_SHELL_SUGGESTIONS_ENABLED,
+        @JvmField val shellSuggestionsEnabled: Boolean = DEFAULT_SHELL_SUGGESTIONS_ENABLED,
         @OptionTag
-        @JvmField val acceptSelectedSuggestionWithEnter: Boolean = TerminalConfig.DEFAULT_ACCEPT_SELECTED_SUGGESTION_WITH_ENTER,
+        @JvmField val acceptSelectedSuggestionWithEnter: Boolean = DEFAULT_ACCEPT_SELECTED_SUGGESTION_WITH_ENTER,
         @OptionTag
         @JvmField val completionLearningPersistenceEnabled: Boolean = false,
         @OptionTag
         @JvmField val pasteSanitization: String = "preserve",
         @OptionTag
-        @JvmField val clipboardWrite: String = TerminalConfig.DEFAULT_CLIPBOARD_WRITE.name.lowercase(Locale.ROOT),
+        @JvmField val clipboardWrite: String = DEFAULT_CLIPBOARD_WRITE.name.lowercase(Locale.ROOT),
         // Keep Deny in XML even when every preference equals its serialization default.
         @Property(alwaysWrite = true)
         @JvmField val clipboardRead: String = "deny",
         @OptionTag
-        @JvmField val clipboardMaxDecodedBytes: Int = TerminalConfig.DEFAULT_CLIPBOARD_MAX_DECODED_BYTES,
+        @JvmField val clipboardMaxDecodedBytes: Int = DEFAULT_CLIPBOARD_MAX_DECODED_BYTES,
         @OptionTag
-        @JvmField val titlePermission: String = TerminalConfig.DEFAULT_TITLE_PERMISSION.name.lowercase(Locale.ROOT),
+        @JvmField val titlePermission: String = DEFAULT_TITLE_PERMISSION.name.lowercase(Locale.ROOT),
         @OptionTag
         @JvmField val scrollOnOutput: Boolean = true,
         @OptionTag
-        @JvmField val showForegroundProcessName: Boolean = TerminalConfig.DEFAULT_SHOW_FOREGROUND_PROCESS_NAME,
+        @JvmField val showForegroundProcessName: Boolean = DEFAULT_SHOW_FOREGROUND_PROCESS_NAME,
     )
 
     companion object {
+        internal const val DEFAULT_ACCEPT_SELECTED_SUGGESTION_WITH_ENTER: Boolean = true
+        internal const val DEFAULT_CLIPBOARD_MAX_DECODED_BYTES: Int = TerminalClipboardPolicy.DEFAULT_MAX_DECODED_BYTES
+        internal val DEFAULT_CLIPBOARD_READ: TerminalClipboardPermission = TerminalClipboardPermission.PROMPT
+        internal val DEFAULT_CLIPBOARD_WRITE: TerminalClipboardPermission = TerminalClipboardPermission.ALLOW
+        internal const val DEFAULT_COLUMNS: Int = 100
+        internal const val DEFAULT_CURSOR_BLINK_MILLIS: Int = 600
+        internal const val DEFAULT_CURSOR_SHAPE: String = "block"
+        internal const val DEFAULT_LINE_HEIGHT: Float = 1.0f
+        internal const val DEFAULT_PASTE_ON_MIDDLE_CLICK: Boolean = true
+        internal const val DEFAULT_ROWS: Int = 30
+        internal const val DEFAULT_SCROLLBACK_LINES: Int = 1000
+        internal val DEFAULT_SHELL_PATH: String get() =
+            if (System.getProperty("os.name").lowercase(Locale.ROOT).contains("windows")) {
+                "powershell.exe"
+            } else {
+                System.getenv("SHELL").takeIf { !it.isNullOrBlank() }
+                    ?: "/bin/bash"
+            }
+        internal const val DEFAULT_SHELL_SUGGESTIONS_ENABLED: Boolean = true
+        internal const val DEFAULT_SHOW_FOREGROUND_PROCESS_NAME: Boolean = true
+        internal const val DEFAULT_SMART_SUGGESTIONS_ENABLED: Boolean = false
+        internal val DEFAULT_TITLE_PERMISSION: TerminalTitlePermission = TerminalTitlePermission.ALLOW
+        internal const val DEFAULT_TREAT_AMBIGUOUS_AS_WIDE: Boolean = false
+        internal const val DEFAULT_USE_SYSTEM_FALLBACK_FONTS: Boolean = true
+        internal const val DEFAULT_VISUAL_BELL: Boolean = true
+
         /**
          * Theme id that derives colors from the active IntelliJ editor scheme.
          */
@@ -329,22 +355,22 @@ internal object KetraTermIntellijSettingsNormalizer {
             fontFamily = normalizeFontFamily(state.fontFamily),
             fallbackFontFamily = normalizeFontFamily(state.fallbackFontFamily),
             fontSize =
-                state.fontSize.coerceIn(TerminalConfig.FONT_SIZE_MIN, TerminalConfig.FONT_SIZE_MAX),
-            columns = state.columns.coerceIn(TerminalConfig.COLUMNS_MIN, TerminalConfig.COLUMNS_MAX),
-            rows = state.rows.coerceIn(TerminalConfig.ROWS_MIN, TerminalConfig.ROWS_MAX),
+                state.fontSize.coerceIn(SwingTerminalSettingsBounds.FONT_SIZE_MIN, SwingTerminalSettingsBounds.FONT_SIZE_MAX),
+            columns = state.columns.coerceIn(SwingTerminalSettingsBounds.COLUMNS_MIN, SwingTerminalSettingsBounds.COLUMNS_MAX),
+            rows = state.rows.coerceIn(SwingTerminalSettingsBounds.ROWS_MIN, SwingTerminalSettingsBounds.ROWS_MAX),
             cursorBlinkMillis =
                 state.cursorBlinkMillis.coerceIn(
-                    TerminalConfig.CURSOR_BLINK_MIN,
-                    TerminalConfig.CURSOR_BLINK_MAX,
+                    SwingTerminalSettingsBounds.CURSOR_BLINK_MIN,
+                    SwingTerminalSettingsBounds.CURSOR_BLINK_MAX,
                 ),
             cursorShape = normalizeCursorShape(state.cursorShape),
             scrollbackLines =
                 state.scrollbackLines.coerceIn(
-                    TerminalConfig.SCROLLBACK_MIN,
-                    TerminalConfig.SCROLLBACK_MAX,
+                    SwingTerminalSettingsBounds.SCROLLBACK_MIN,
+                    SwingTerminalSettingsBounds.SCROLLBACK_MAX,
                 ),
             lineHeight = coerceLineHeight(state.lineHeight),
-            shellPath = state.shellPath.trim().ifBlank { TerminalConfig.DEFAULT_SHELL_PATH },
+            shellPath = state.shellPath.trim().ifBlank { KetraTermIntellijSettings.DEFAULT_SHELL_PATH },
             startDirectory = state.startDirectory.trim(),
             environmentVariables = normalizeEnvironmentText(state.environmentVariables),
             defaultTabName = state.defaultTabName.trim().ifBlank { "Local" },
@@ -352,7 +378,7 @@ internal object KetraTermIntellijSettingsNormalizer {
             clipboardWrite =
                 normalizeClipboardPermission(
                     state.clipboardWrite,
-                    TerminalConfig.DEFAULT_CLIPBOARD_WRITE,
+                    KetraTermIntellijSettings.DEFAULT_CLIPBOARD_WRITE,
                 ),
             clipboardRead =
                 normalizeClipboardPermission(
@@ -363,7 +389,7 @@ internal object KetraTermIntellijSettingsNormalizer {
             titlePermission =
                 normalizeTitlePermission(
                     state.titlePermission,
-                    TerminalConfig.DEFAULT_TITLE_PERMISSION,
+                    KetraTermIntellijSettings.DEFAULT_TITLE_PERMISSION,
                 ),
         )
 
@@ -404,9 +430,9 @@ internal object KetraTermIntellijSettingsNormalizer {
 
     private fun coerceLineHeight(lineHeight: Float): Float =
         if (lineHeight.isFinite()) {
-            lineHeight.coerceIn(TerminalConfig.LINE_HEIGHT_MIN, TerminalConfig.LINE_HEIGHT_MAX)
+            lineHeight.coerceIn(SwingTerminalSettingsBounds.LINE_HEIGHT_MIN, SwingTerminalSettingsBounds.LINE_HEIGHT_MAX)
         } else {
-            TerminalConfig.DEFAULT_LINE_HEIGHT
+            KetraTermIntellijSettings.DEFAULT_LINE_HEIGHT
         }
 
     private fun normalizeClipboardPermission(
@@ -453,28 +479,25 @@ internal object KetraTermIntellijSettingsMapper {
 
         val palette = paletteForThemeId(state.themeId)
 
-        return SwingSettings(
-            font = JBFont.create(Font(fontFamily, Font.PLAIN, fontSize)),
-            fallbackFonts = persistentListOf(Font(fallbackFontFamily, Font.PLAIN, fontSize)),
-            columns = state.columns,
-            rows = state.rows,
-            palette = palette,
-            selectionBackground = palette.selectionBackground,
-            treatAmbiguousAsWide = state.treatAmbiguousAsWide,
-            cursorBlinkMillis = state.cursorBlinkMillis,
-            useSystemFallbackFonts = state.useSystemFallbackFonts,
-            visualBellEnabled = state.visualBell,
-            pasteControlPolicy = parsePasteSanitization(state.pasteSanitization),
-            cursorShape = parseCursorShape(state.cursorShape),
-            scrollbackLines = state.scrollbackLines,
-            lineHeight = state.lineHeight,
-            shellRequestResizeWindow = false,
-            shellRequestWindowManipulation = false,
-            smartSuggestionsEnabled = state.smartSuggestionsEnabled,
-            shellSuggestionsEnabled = state.shellSuggestionsEnabled,
-            acceptSelectedSuggestionWithEnter = state.acceptSelectedSuggestionWithEnter,
-            scrollOnOutput = state.scrollOnOutput,
-        )
+        return SwingSettings.create { draft ->
+            draft.font = JBFont.create(Font(fontFamily, Font.PLAIN, fontSize))
+            draft.fallbackFonts = persistentListOf(Font(fallbackFontFamily, Font.PLAIN, fontSize))
+            draft.columns = state.columns
+            draft.rows = state.rows
+            draft.palette = palette
+            draft.selectionBackground = palette.selectionBackground
+            draft.treatAmbiguousAsWide = state.treatAmbiguousAsWide
+            draft.cursorBlinkMillis = state.cursorBlinkMillis
+            draft.useSystemFallbackFonts = state.useSystemFallbackFonts
+            draft.visualBellEnabled = state.visualBell
+            draft.pasteControlPolicy = parsePasteSanitization(state.pasteSanitization)
+            draft.cursorShape = parseCursorShape(state.cursorShape)
+            draft.lineHeight = state.lineHeight
+            draft.smartSuggestionsEnabled = state.smartSuggestionsEnabled
+            draft.shellSuggestionsEnabled = state.shellSuggestionsEnabled
+            draft.acceptSelectedSuggestionWithEnter = state.acceptSelectedSuggestionWithEnter
+            draft.scrollOnOutput = state.scrollOnOutput
+        }
     }
 
     private fun paletteForThemeId(themeId: String) =

@@ -236,14 +236,14 @@ class SwingTerminalThreadingTest {
         val component =
             SwingTerminal(
                 hostServices =
-                    SwingHostServices(
-                        clipboardHandler =
+                    SwingHostServices.create { draft ->
+                        draft.clipboardHandler =
                             object : TerminalClipboardHandler {
                                 override fun copyText(text: String) = error("Unexpected clipboard write")
 
                                 override fun readText(): String = text
-                            },
-                    ),
+                            }
+                    },
             )
         try {
             session.start(columns = 3, rows = 1)
@@ -283,7 +283,10 @@ class SwingTerminalThreadingTest {
                 inputPolicy = TerminalInputPolicy(pasteLineEndingPolicy = PasteLineEndingPolicy.CARRIAGE_RETURN),
                 ioDispatcher = dispatcher,
             )
-        var settings = SwingSettings(pasteControlPolicy = PasteControlPolicy.STRIP_C0_EXCEPT_TAB_CR_LF)
+        var settings =
+            SwingSettings.create { draft ->
+                draft.pasteControlPolicy = PasteControlPolicy.STRIP_C0_EXCEPT_TAB_CR_LF
+            }
         val component = SwingTerminal(settingsProvider = { settings })
         val paste = TerminalPasteEvent("A\u0001\tB\r\nC\nD\rE")
         try {
@@ -299,7 +302,10 @@ class SwingTerminalThreadingTest {
                 session.encodePaste(paste)
                 dispatcher.scheduler.runCurrent()
                 assertEquals("\u001B[200~A\tB\r\nC\nD\rE\u001B[201~", output.toString(Charsets.UTF_8))
-                settings = settings.copy(pasteControlPolicy = PasteControlPolicy.PRESERVE)
+                settings =
+                    settings.copy { draft ->
+                        draft.pasteControlPolicy = PasteControlPolicy.PRESERVE
+                    }
                 component.reloadSettings()
                 output.reset()
                 session.encodePaste(paste)
@@ -338,14 +344,14 @@ class SwingTerminalThreadingTest {
                 ioDispatcher = dispatcher,
             )
         var settings =
-            SwingSettings(
-                palette =
+            SwingSettings.create { draft ->
+                draft.palette =
                     TerminalColorPalette(
                         defaultForeground = 0xff000000.toInt(),
                         defaultBackground = 0xffffffff.toInt(),
                         isDark = false,
-                    ),
-            )
+                    )
+            }
         val component = SwingTerminal(settingsProvider = { settings })
         val query = "\u001B[?996n".toByteArray(Charsets.US_ASCII)
         try {
@@ -355,7 +361,10 @@ class SwingTerminalThreadingTest {
                 session.onBytes(query, 0, query.size)
                 dispatcher.scheduler.runCurrent()
                 assertEquals("\u001B[?997;2n", replies.toString(Charsets.US_ASCII))
-                settings = settings.copy(palette = TerminalTheme.NORD.createPalette())
+                settings =
+                    settings.copy { draft ->
+                        draft.palette = TerminalTheme.NORD.createPalette()
+                    }
                 component.reloadSettings()
                 assertEquals("\u001B[?997;2n", replies.toString(Charsets.US_ASCII))
                 session.onBytes(query, 0, query.size)
@@ -373,7 +382,14 @@ class SwingTerminalThreadingTest {
     fun `currentSelection snapshots state after queued EDT changes`(change: String) {
         val session = testSession()
         session.renderPublisher.updateAndPublish(session)
-        val component = SwingTerminal(settingsProvider = { SwingSettings(columns = 3, rows = 1, cursorBlinkMillis = 0) })
+        val component =
+            SwingTerminal(settingsProvider = {
+                SwingSettings.create { draft ->
+                    draft.columns = 3
+                    draft.rows = 1
+                    draft.cursorBlinkMillis = 0
+                }
+            })
         val edtBlocked = CountDownLatch(1)
         val releaseEdt = CountDownLatch(1)
         val snapshotQueuedOrReturned = CountDownLatch(1)
@@ -467,7 +483,11 @@ class SwingTerminalThreadingTest {
         val component =
             edtCall {
                 SwingTerminal(settingsProvider = {
-                    SwingSettings(smartSuggestionsEnabled = true, cursorBlinkMillis = 0, useSystemFallbackFonts = false)
+                    SwingSettings.create { draft ->
+                        draft.smartSuggestionsEnabled = true
+                        draft.cursorBlinkMillis = 0
+                        draft.useSystemFallbackFonts = false
+                    }
                 })
             }
         var notifications = 0
@@ -546,9 +566,16 @@ class SwingTerminalThreadingTest {
             edtCall {
                 SwingTerminal(
                     settingsProvider = {
-                        SwingSettings(smartSuggestionsEnabled = true, cursorBlinkMillis = 0, useSystemFallbackFonts = false)
+                        SwingSettings.create { draft ->
+                            draft.smartSuggestionsEnabled = true
+                            draft.cursorBlinkMillis = 0
+                            draft.useSystemFallbackFonts = false
+                        }
                     },
-                    hostServices = SwingHostServices(viewportListener = viewportListener),
+                    hostServices =
+                        SwingHostServices.create { draft ->
+                            draft.viewportListener = viewportListener
+                        },
                 )
             }
         val eligibilityListener =
@@ -588,7 +615,12 @@ class SwingTerminalThreadingTest {
 
     @Test
     fun `reentrant disposal stops stale eligibility notification to later listeners`() {
-        var currentSettings = SwingSettings(smartSuggestionsEnabled = false, cursorBlinkMillis = 0, useSystemFallbackFonts = false)
+        var currentSettings =
+            SwingSettings.create { draft ->
+                draft.smartSuggestionsEnabled = false
+                draft.cursorBlinkMillis = 0
+                draft.useSystemFallbackFonts = false
+            }
         val firstChanges = ArrayList<Pair<Boolean, Boolean>>()
         val laterChanges = ArrayList<Pair<Boolean, Boolean>>()
         val session = focusSession(ByteArrayOutputStream())
@@ -610,7 +642,10 @@ class SwingTerminalThreadingTest {
                 component.addShellSuggestionEligibilityListener(laterListener)
                 component.cursorTimer.start()
                 assertTrue(component.cursorTimer.isRunning)
-                currentSettings = currentSettings.copy(smartSuggestionsEnabled = true)
+                currentSettings =
+                    currentSettings.copy { draft ->
+                        draft.smartSuggestionsEnabled = true
+                    }
 
                 component.reloadSettings()
 
@@ -651,18 +686,22 @@ class SwingTerminalThreadingTest {
             edtCall {
                 SwingTerminal(
                     settingsProvider = {
-                        SwingSettings(smartSuggestionsEnabled = true, cursorBlinkMillis = 0, useSystemFallbackFonts = false)
+                        SwingSettings.create { draft ->
+                            draft.smartSuggestionsEnabled = true
+                            draft.cursorBlinkMillis = 0
+                            draft.useSystemFallbackFonts = false
+                        }
                     },
                     hostServices =
-                        SwingHostServices(
-                            viewportListener =
+                        SwingHostServices.create { draft ->
+                            draft.viewportListener =
                                 TerminalViewportListener { _, _, _, _, _ ->
                                     if (failViewportUpdates) {
                                         notifications++
                                         throw failure
                                     }
-                                },
-                        ),
+                                }
+                        },
                 )
             }
         try {
@@ -722,18 +761,22 @@ class SwingTerminalThreadingTest {
             edtCall {
                 SwingTerminal(
                     settingsProvider = {
-                        SwingSettings(smartSuggestionsEnabled = true, cursorBlinkMillis = 0, useSystemFallbackFonts = false)
+                        SwingSettings.create { draft ->
+                            draft.smartSuggestionsEnabled = true
+                            draft.cursorBlinkMillis = 0
+                            draft.useSystemFallbackFonts = false
+                        }
                     },
                     hostServices =
-                        SwingHostServices(
-                            viewportListener =
+                        SwingHostServices.create { draft ->
+                            draft.viewportListener =
                                 TerminalViewportListener { _, _, _, _, _ ->
                                     if (failViewportUpdates) {
                                         events += "viewport"
                                         throw viewportFailure
                                     }
-                                },
-                        ),
+                                }
+                        },
                 )
             }
         try {
@@ -800,9 +843,16 @@ class SwingTerminalThreadingTest {
             edtCall {
                 SwingTerminal(
                     settingsProvider = {
-                        SwingSettings(smartSuggestionsEnabled = true, cursorBlinkMillis = 0, useSystemFallbackFonts = false)
+                        SwingSettings.create { draft ->
+                            draft.smartSuggestionsEnabled = true
+                            draft.cursorBlinkMillis = 0
+                            draft.useSystemFallbackFonts = false
+                        }
                     },
-                    hostServices = SwingHostServices(shellSuggestionViewFactory = { view }),
+                    hostServices =
+                        SwingHostServices.create { draft ->
+                            draft.shellSuggestionViewFactory = { view }
+                        },
                 )
             }
         try {
@@ -870,9 +920,16 @@ class SwingTerminalThreadingTest {
             edtCall {
                 SwingTerminal(
                     settingsProvider = {
-                        SwingSettings(smartSuggestionsEnabled = true, cursorBlinkMillis = 0, useSystemFallbackFonts = false)
+                        SwingSettings.create { draft ->
+                            draft.smartSuggestionsEnabled = true
+                            draft.cursorBlinkMillis = 0
+                            draft.useSystemFallbackFonts = false
+                        }
                     },
-                    hostServices = SwingHostServices(shellSuggestionViewFactory = { view }),
+                    hostServices =
+                        SwingHostServices.create { draft ->
+                            draft.shellSuggestionViewFactory = { view }
+                        },
                 )
             }
         try {
@@ -917,9 +974,16 @@ class SwingTerminalThreadingTest {
             edtCall {
                 SwingTerminal(
                     settingsProvider = {
-                        SwingSettings(smartSuggestionsEnabled = true, cursorBlinkMillis = 0, useSystemFallbackFonts = false)
+                        SwingSettings.create { draft ->
+                            draft.smartSuggestionsEnabled = true
+                            draft.cursorBlinkMillis = 0
+                            draft.useSystemFallbackFonts = false
+                        }
                     },
-                    hostServices = SwingHostServices(shellSuggestionViewFactory = { view }),
+                    hostServices =
+                        SwingHostServices.create { draft ->
+                            draft.shellSuggestionViewFactory = { view }
+                        },
                 )
             }
         try {
@@ -960,7 +1024,12 @@ class SwingTerminalThreadingTest {
     fun `disabling suggestions publishes ineligibility despite a custom view failure`(cancelled: Boolean) {
         val failure = if (cancelled) CancellationException("hide cancelled") else IllegalStateException("hide failed")
         var failUpdates = false
-        var currentSettings = SwingSettings(smartSuggestionsEnabled = true, cursorBlinkMillis = 0, useSystemFallbackFonts = false)
+        var currentSettings =
+            SwingSettings.create { draft ->
+                draft.smartSuggestionsEnabled = true
+                draft.cursorBlinkMillis = 0
+                draft.useSystemFallbackFonts = false
+            }
         val visibleDuringCallback = ArrayList<Boolean>()
         val eligibilityChanges = ArrayList<Boolean>()
         val view =
@@ -975,7 +1044,10 @@ class SwingTerminalThreadingTest {
             edtCall {
                 SwingTerminal(
                     settingsProvider = { currentSettings },
-                    hostServices = SwingHostServices(shellSuggestionViewFactory = { view }),
+                    hostServices =
+                        SwingHostServices.create { draft ->
+                            draft.shellSuggestionViewFactory = { view }
+                        },
                 )
             }
         try {
@@ -990,7 +1062,10 @@ class SwingTerminalThreadingTest {
                     eligibilityChanges += eligible
                     visibleDuringCallback += view.component.isVisible
                 }
-                currentSettings = currentSettings.copy(smartSuggestionsEnabled = false)
+                currentSettings =
+                    currentSettings.copy { draft ->
+                        draft.smartSuggestionsEnabled = false
+                    }
                 failUpdates = true
 
                 assertSame(failure, assertThrows(RuntimeException::class.java) { component.reloadSettings() })
@@ -1003,7 +1078,10 @@ class SwingTerminalThreadingTest {
                 assertTrue(failure.suppressed.isEmpty())
 
                 failUpdates = false
-                currentSettings = currentSettings.copy(smartSuggestionsEnabled = true)
+                currentSettings =
+                    currentSettings.copy { draft ->
+                        draft.smartSuggestionsEnabled = true
+                    }
                 component.reloadSettings()
                 assertTrue(component.isAutomaticShellSuggestionEligible())
                 assertEquals(listOf(false, true), eligibilityChanges)
@@ -1019,7 +1097,12 @@ class SwingTerminalThreadingTest {
 
     @Test
     fun `disabling suggestions hides the view before a reentrant viewport query from its empty update`() {
-        var currentSettings = SwingSettings(smartSuggestionsEnabled = true, cursorBlinkMillis = 0, useSystemFallbackFonts = false)
+        var currentSettings =
+            SwingSettings.create { draft ->
+                draft.smartSuggestionsEnabled = true
+                draft.cursorBlinkMillis = 0
+                draft.useSystemFallbackFonts = false
+            }
         var observeEmptyUpdates = false
         var emptyUpdates = 0
         var nonEmptyUpdates = 0
@@ -1056,12 +1139,12 @@ class SwingTerminalThreadingTest {
                 SwingTerminal(
                     settingsProvider = { currentSettings },
                     hostServices =
-                        SwingHostServices(
-                            shellSuggestionViewFactory = {
+                        SwingHostServices.create { draft ->
+                            draft.shellSuggestionViewFactory = {
                                 createdViews++
                                 view
-                            },
-                        ),
+                            }
+                        },
                 )
             }
         try {
@@ -1075,7 +1158,10 @@ class SwingTerminalThreadingTest {
                 assertTrue(terminalComponent.isAutomaticShellSuggestionEligible())
                 assertEquals(1, nonEmptyUpdates)
                 observeEmptyUpdates = true
-                currentSettings = currentSettings.copy(smartSuggestionsEnabled = false)
+                currentSettings =
+                    currentSettings.copy { draft ->
+                        draft.smartSuggestionsEnabled = false
+                    }
 
                 terminalComponent.reloadSettings()
 
@@ -1091,7 +1177,10 @@ class SwingTerminalThreadingTest {
                 )
 
                 observeEmptyUpdates = false
-                currentSettings = currentSettings.copy(smartSuggestionsEnabled = true)
+                currentSettings =
+                    currentSettings.copy { draft ->
+                        draft.smartSuggestionsEnabled = true
+                    }
                 terminalComponent.reloadSettings()
                 terminalComponent.showShellSuggestions(
                     SwingShellSuggestionRequest.EMPTY,
@@ -1197,9 +1286,9 @@ class SwingTerminalThreadingTest {
         val component =
             SwingTerminal(
                 hostServices =
-                    SwingHostServices(
-                        uiDispatcher = dispatcher,
-                    ),
+                    SwingHostServices.create { draft ->
+                        draft.uiDispatcher = dispatcher
+                    },
             )
         withEdtBlocked {
             runOffEdt {
@@ -1242,11 +1331,11 @@ class SwingTerminalThreadingTest {
                 if (calls.incrementAndGet() > 1) {
                     reloadCalledOnEdt.set(SwingUtilities.isEventDispatchThread())
                 }
-                SwingSettings(
-                    font = Font(Font.MONOSPACED, Font.PLAIN, 18),
-                    columns = 100,
-                    rows = 30,
-                )
+                SwingSettings.create { draft ->
+                    draft.font = Font(Font.MONOSPACED, Font.PLAIN, 18)
+                    draft.columns = 100
+                    draft.rows = 30
+                }
             })
 
         runOffEdt {
@@ -1308,7 +1397,9 @@ class SwingTerminalThreadingTest {
         val session = testSession()
         val component =
             SwingTerminal(settingsProvider = {
-                SwingSettings(treatAmbiguousAsWide = true)
+                SwingSettings.create { draft ->
+                    draft.treatAmbiguousAsWide = true
+                }
             })
 
         component.bind(session)
@@ -1324,7 +1415,9 @@ class SwingTerminalThreadingTest {
         var ambiguousAsWide = false
         val component =
             SwingTerminal(settingsProvider = {
-                SwingSettings(treatAmbiguousAsWide = ambiguousAsWide)
+                SwingSettings.create { draft ->
+                    draft.treatAmbiguousAsWide = ambiguousAsWide
+                }
             })
 
         component.bind(session)
@@ -1390,7 +1483,10 @@ class SwingTerminalThreadingTest {
                 session.onBytes(output, 0, output.size)
 
                 component.reloadSettings()
-                settings = settings.copy(visualBellEnabled = !settings.visualBellEnabled)
+                settings =
+                    settings.copy { draft ->
+                        draft.visualBellEnabled = !settings.visualBellEnabled
+                    }
                 component.reloadSettings()
 
                 session.readRenderFrame { frame ->
@@ -1422,7 +1518,11 @@ class SwingTerminalThreadingTest {
                     assertEquals(TerminalRenderCursorShape.BAR, frame.cursor.shape)
                     assertEquals(0xFF123456.toInt(), frame.palette.indexedColor(1))
                 }
-                settings = settings.copy(palette = TerminalTheme.NORD.createPalette(), cursorShape = TerminalRenderCursorShape.UNDERLINE)
+                settings =
+                    settings.copy { draft ->
+                        draft.palette = TerminalTheme.NORD.createPalette()
+                        draft.cursorShape = TerminalRenderCursorShape.UNDERLINE
+                    }
 
                 component.reloadSettings()
 
@@ -1441,7 +1541,10 @@ class SwingTerminalThreadingTest {
     fun `font size changes resize the grid but paint preferences do not`() {
         val connector = RecordingConnector()
         val session = testSession(connector)
-        var settings = SwingSettings(font = Font(Font.MONOSPACED, Font.PLAIN, 14))
+        var settings =
+            SwingSettings.create { draft ->
+                draft.font = Font(Font.MONOSPACED, Font.PLAIN, 14)
+            }
         val component = SwingTerminal(settingsProvider = { settings })
         try {
             edtCall {
@@ -1452,12 +1555,18 @@ class SwingTerminalThreadingTest {
             connector.reset()
             edtCall {
                 val originalGrid = component.visibleGridSize()
-                settings = settings.copy(selectionBackground = 0xFF123456.toInt())
+                settings =
+                    settings.copy { draft ->
+                        draft.selectionBackground = 0xFF123456.toInt()
+                    }
                 component.reloadSettings()
                 assertEquals(originalGrid, component.visibleGridSize())
                 assertEquals(0, connector.resizeCount.get())
 
-                settings = settings.copy(font = settings.font.deriveFont(28f))
+                settings =
+                    settings.copy { draft ->
+                        draft.font = settings.font.deriveFont(28f)
+                    }
                 component.reloadSettings()
                 assertTrue(component.visibleGridSize().width < originalGrid.width)
                 assertTrue(component.visibleGridSize().height < originalGrid.height)

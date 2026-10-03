@@ -15,29 +15,29 @@
  */
 package io.github.ketraterm.app.ui
 
+import io.github.ketraterm.app.config.KetraTermConfig
 import io.github.ketraterm.app.config.KetraTermSettings
 import io.github.ketraterm.workspace.TerminalProfileRegistry
-import io.github.ketraterm.workspace.config.TerminalConfig
 
 /** Owns the settings dialog's saved baseline; drafts use the shared validated configuration. */
 internal class SettingsModel(
     private val settings: KetraTermSettings,
     private val profileRegistry: TerminalProfileRegistry,
 ) {
-    var initialUiState: TerminalConfig = settings.config
+    var initialUiState: KetraTermConfig = settings.config
         private set
 
-    fun hasChanges(uiState: TerminalConfig): Boolean = uiState != initialUiState
+    fun hasChanges(uiState: KetraTermConfig): Boolean = uiState != initialUiState
 
     /** Validates and persists a complete draft; called by the dialog's save worker. */
-    fun applyChanges(uiState: TerminalConfig) {
+    fun applyChanges(uiState: KetraTermConfig) {
         val validated =
             uiState.copy(
                 shellPath =
                     if (profileRegistry.isValidShellPath(uiState.shellPath)) {
                         uiState.shellPath
                     } else {
-                        TerminalConfig.DEFAULT_SHELL_PATH
+                        KetraTermConfig.DEFAULT_SHELL_PATH
                     },
             )
         settings.update(validated)

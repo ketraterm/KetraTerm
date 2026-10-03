@@ -15,14 +15,14 @@
  */
 package io.github.ketraterm.app.ui
 
+import io.github.ketraterm.app.config.KetraTermConfig
+import io.github.ketraterm.app.config.KetraTermConfigManager
 import io.github.ketraterm.app.config.KetraTermSettings
 import io.github.ketraterm.host.TerminalClipboardPermission
 import io.github.ketraterm.input.policy.PasteControlPolicy
 import io.github.ketraterm.ui.swing.settings.SwingSettings
 import io.github.ketraterm.ui.swing.settings.TerminalTheme
 import io.github.ketraterm.workspace.TerminalProfileRegistry
-import io.github.ketraterm.workspace.config.TerminalConfig
-import io.github.ketraterm.workspace.config.TerminalWorkspaceConfigManager
 import org.junit.jupiter.api.Assumptions.assumeFalse
 import java.awt.Component
 import java.awt.Container
@@ -130,7 +130,7 @@ class SettingsDialogTest {
         val release = CountDownLatch(1)
         val closed = CountDownLatch(1)
         val savedOnEdt = AtomicBoolean(true)
-        val manager = TerminalWorkspaceConfigManager(path)
+        val manager = KetraTermConfigManager(path)
         val settings =
             KetraTermSettings(manager) { snapshot ->
                 savedOnEdt.set(SwingUtilities.isEventDispatchThread())
@@ -153,7 +153,7 @@ class SettingsDialogTest {
                 val fontSize =
                     components(dialog).filterIsInstance<JSpinner>().first {
                         val model = it.model as SpinnerNumberModel
-                        model.minimum == TerminalConfig.FONT_SIZE_MIN && model.maximum == TerminalConfig.FONT_SIZE_MAX
+                        model.minimum == KetraTermConfig.FONT_SIZE_MIN && model.maximum == KetraTermConfig.FONT_SIZE_MAX
                     }
                 fontSize.value = 24
                 button(dialog, "OK").doClick()
@@ -169,7 +169,7 @@ class SettingsDialogTest {
                 assertTrue(dialog.isDisplayable)
             }
             assertFalse(savedOnEdt.get())
-            assertEquals(TerminalConfig.DEFAULT_FONT_SIZE, settings.config.fontSize)
+            assertEquals(KetraTermConfig.DEFAULT_FONT_SIZE, settings.config.fontSize)
             release.countDown()
             assertTrue(closed.await(5, TimeUnit.SECONDS))
             assertEquals(24, settings.config.fontSize)
@@ -210,11 +210,11 @@ class SettingsDialogTest {
             onEdt {
                 button(dialog, "Reset to Defaults").doClick()
                 val theme = components(dialog).filterIsInstance<JComboBox<*>>().first { it.selectedItem is TerminalTheme }
-                assertEquals(TerminalTheme.fromId(TerminalConfig.DEFAULT_THEME), theme.selectedItem)
+                assertEquals(TerminalTheme.fromId(KetraTermConfig.DEFAULT_THEME), theme.selectedItem)
                 button(dialog, "OK").doClick()
             }
             assertTrue(closed.await(5, TimeUnit.SECONDS))
-            assertEquals(TerminalConfig.DEFAULT_THEME, settings.config.theme)
+            assertEquals(KetraTermConfig.DEFAULT_THEME, settings.config.theme)
             assertEquals(TerminalClipboardPermission.PROMPT, settings.config.clipboardRead)
             assertEquals(TerminalClipboardPermission.PROMPT, settings.createHostPolicy().clipboardPolicy.readPermission)
             assertEquals(TerminalClipboardPermission.ALLOW, settings.config.clipboardWrite)
@@ -268,16 +268,16 @@ class SettingsDialogTest {
 
     private fun withDialog(
         profileRegistry: TerminalProfileRegistry = TerminalProfileRegistry(executableExists = { false }),
-        shellPath: String = TerminalConfig.DEFAULT_SHELL_PATH,
-        fontFamily: String = TerminalConfig.DEFAULT_FONT_FAMILY,
+        shellPath: String = KetraTermConfig.DEFAULT_SHELL_PATH,
+        fontFamily: String = KetraTermConfig.DEFAULT_FONT_FAMILY,
         block: (KetraTermSettings, SettingsDialog, CountDownLatch) -> Unit,
     ) {
         assumeFalse(GraphicsEnvironment.isHeadless())
         val directory = Files.createTempDirectory("ketraterm-settings-dialog")
         val path = directory.resolve("config.toml")
-        val manager = TerminalWorkspaceConfigManager(path)
+        val manager = KetraTermConfigManager(path)
         manager.save(
-            TerminalConfig(
+            KetraTermConfig(
                 shellPath = shellPath,
                 fontFamily = fontFamily,
                 theme = TerminalTheme.TOKYO_NIGHT.id,

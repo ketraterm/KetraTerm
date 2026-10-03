@@ -82,9 +82,9 @@ public fun interface SwingTerminalHostKeyHandler {
  * These services are intentionally kept out of row painters. Rendering consumes
  * immutable settings and render-cache snapshots, while host integrations supply
  * scheduling, clipboard, and explicit hyperlink activation policy here.
- * Constructor, [copy], and destructuring signatures are part of the public ABI.
- * The construction shape is fixed; view-lifetime services such as suggestion
- * diagnostics are installed through additive EDT methods on [SwingTerminal].
+ * Use [create] and [copy] for selective construction and immutable updates.
+ * Service references remain host-owned; building or copying never starts or closes them.
+ * View-lifetime services such as suggestion diagnostics use EDT methods on [SwingTerminal].
  *
  * @property uiDispatcher scheduler for UI-thread component work.
  * @property clipboardHandler host clipboard adapter for copy and paste actions.
@@ -117,21 +117,134 @@ public fun interface SwingTerminalHostKeyHandler {
  * gesture; application mouse reporting takes precedence unless Shift is held.
  * @property fontResolver custom host font resolver policy.
  */
-public data class SwingHostServices
-    @JvmOverloads
-    constructor(
-        val uiDispatcher: TerminalUiDispatcher = SWING,
-        val clipboardHandler: TerminalClipboardHandler = TerminalClipboardHandler.SYSTEM,
-        val hyperlinkHandler: TerminalHyperlinkHandler = TerminalHyperlinkHandler.SYSTEM,
-        val hyperlinkDetector: SwingHyperlinkDetector = SwingHyperlinkDetector.NONE,
-        val viewportListener: TerminalViewportListener = TerminalViewportListener.NONE,
-        val scrollbarOverlayEnabled: Boolean = true,
-        val shellSuggestionProvider: SwingShellSuggestionProvider = SwingShellSuggestionProvider.NONE,
-        val shellSuggestionHandler: SwingShellSuggestionHandler = SwingShellSuggestionHandler.NONE,
-        val shellSuggestionFeedbackHandler: SwingShellSuggestionFeedbackHandler = SwingShellSuggestionFeedbackHandler.NONE,
-        val shellSuggestionKeymap: SwingShellSuggestionKeymap = SwingShellSuggestionKeymap.STANDARD,
-        val shellSuggestionViewFactory: SwingShellSuggestionViewFactory = SwingShellSuggestionViewFactory.DEFAULT,
-        val hostKeyHandler: SwingTerminalHostKeyHandler = SwingTerminalHostKeyHandler.NONE,
-        val contextMenuHandler: SwingTerminalContextMenuHandler = SwingTerminalContextMenuHandler.NONE,
-        val fontResolver: TerminalFontResolver? = null,
-    )
+public class SwingHostServices private constructor(
+    builder: Builder,
+) {
+    /** Creates a validated snapshot with default values. */
+    public constructor() : this(Builder())
+
+    public val uiDispatcher: TerminalUiDispatcher = builder.uiDispatcher
+    public val clipboardHandler: TerminalClipboardHandler = builder.clipboardHandler
+    public val hyperlinkHandler: TerminalHyperlinkHandler = builder.hyperlinkHandler
+    public val hyperlinkDetector: SwingHyperlinkDetector = builder.hyperlinkDetector
+    public val viewportListener: TerminalViewportListener = builder.viewportListener
+    public val scrollbarOverlayEnabled: Boolean = builder.scrollbarOverlayEnabled
+    public val shellSuggestionProvider: SwingShellSuggestionProvider = builder.shellSuggestionProvider
+    public val shellSuggestionHandler: SwingShellSuggestionHandler = builder.shellSuggestionHandler
+    public val shellSuggestionFeedbackHandler: SwingShellSuggestionFeedbackHandler = builder.shellSuggestionFeedbackHandler
+    public val shellSuggestionKeymap: SwingShellSuggestionKeymap = builder.shellSuggestionKeymap
+    public val shellSuggestionViewFactory: SwingShellSuggestionViewFactory = builder.shellSuggestionViewFactory
+    public val hostKeyHandler: SwingTerminalHostKeyHandler = builder.hostKeyHandler
+    public val contextMenuHandler: SwingTerminalContextMenuHandler = builder.contextMenuHandler
+    public val fontResolver: TerminalFontResolver? = builder.fontResolver
+
+    /** Returns a detached mutable draft. Builders are caller-confined and never retained by snapshots. */
+    public fun toBuilder(): Builder = Builder(this)
+
+    /**
+     * Configures a fresh draft synchronously and returns a validated immutable snapshot.
+     * Exceptions propagate without changing this snapshot. Supplied services remain host-owned.
+     */
+    public fun copy(configure: java.util.function.Consumer<Builder>): SwingHostServices = toBuilder().also { configure.accept(it) }.build()
+
+    /** Mutable construction draft. Not thread-safe; [build] never retains this draft. */
+    public class Builder internal constructor(
+        source: SwingHostServices? = null,
+    ) {
+        /** Draft value for [SwingHostServices.uiDispatcher]; validated when [build] is called. */
+        public var uiDispatcher: TerminalUiDispatcher = source?.uiDispatcher ?: SWING
+
+        /** Draft value for [SwingHostServices.clipboardHandler]; validated when [build] is called. */
+        public var clipboardHandler: TerminalClipboardHandler = source?.clipboardHandler ?: TerminalClipboardHandler.SYSTEM
+
+        /** Draft value for [SwingHostServices.hyperlinkHandler]; validated when [build] is called. */
+        public var hyperlinkHandler: TerminalHyperlinkHandler = source?.hyperlinkHandler ?: TerminalHyperlinkHandler.SYSTEM
+
+        /** Draft value for [SwingHostServices.hyperlinkDetector]; validated when [build] is called. */
+        public var hyperlinkDetector: SwingHyperlinkDetector = source?.hyperlinkDetector ?: SwingHyperlinkDetector.NONE
+
+        /** Draft value for [SwingHostServices.viewportListener]; validated when [build] is called. */
+        public var viewportListener: TerminalViewportListener = source?.viewportListener ?: TerminalViewportListener.NONE
+
+        /** Draft value for [SwingHostServices.scrollbarOverlayEnabled]; validated when [build] is called. */
+        public var scrollbarOverlayEnabled: Boolean = source?.scrollbarOverlayEnabled ?: true
+
+        /** Draft value for [SwingHostServices.shellSuggestionProvider]; validated when [build] is called. */
+        public var shellSuggestionProvider: SwingShellSuggestionProvider =
+            source?.shellSuggestionProvider ?: SwingShellSuggestionProvider.NONE
+
+        /** Draft value for [SwingHostServices.shellSuggestionHandler]; validated when [build] is called. */
+        public var shellSuggestionHandler: SwingShellSuggestionHandler = source?.shellSuggestionHandler ?: SwingShellSuggestionHandler.NONE
+
+        /** Draft value for [SwingHostServices.shellSuggestionFeedbackHandler]; validated when [build] is called. */
+        public var shellSuggestionFeedbackHandler: SwingShellSuggestionFeedbackHandler =
+            source?.shellSuggestionFeedbackHandler ?: SwingShellSuggestionFeedbackHandler.NONE
+
+        /** Draft value for [SwingHostServices.shellSuggestionKeymap]; validated when [build] is called. */
+        public var shellSuggestionKeymap: SwingShellSuggestionKeymap = source?.shellSuggestionKeymap ?: SwingShellSuggestionKeymap.STANDARD
+
+        /** Draft value for [SwingHostServices.shellSuggestionViewFactory]; validated when [build] is called. */
+        public var shellSuggestionViewFactory: SwingShellSuggestionViewFactory =
+            source?.shellSuggestionViewFactory ?: SwingShellSuggestionViewFactory.DEFAULT
+
+        /** Draft value for [SwingHostServices.hostKeyHandler]; validated when [build] is called. */
+        public var hostKeyHandler: SwingTerminalHostKeyHandler = source?.hostKeyHandler ?: SwingTerminalHostKeyHandler.NONE
+
+        /** Draft value for [SwingHostServices.contextMenuHandler]; validated when [build] is called. */
+        public var contextMenuHandler: SwingTerminalContextMenuHandler = source?.contextMenuHandler ?: SwingTerminalContextMenuHandler.NONE
+
+        /** Draft value for [SwingHostServices.fontResolver]; validated when [build] is called. */
+        public var fontResolver: TerminalFontResolver? = source?.fontResolver
+
+        /** Validates and freezes current values; later draft changes cannot affect the result. */
+        public fun build(): SwingHostServices = SwingHostServices(this)
+    }
+
+    override fun equals(other: Any?): Boolean =
+        this === other ||
+            other is SwingHostServices &&
+            uiDispatcher == other.uiDispatcher &&
+            clipboardHandler == other.clipboardHandler &&
+            hyperlinkHandler == other.hyperlinkHandler &&
+            hyperlinkDetector == other.hyperlinkDetector &&
+            viewportListener == other.viewportListener &&
+            scrollbarOverlayEnabled == other.scrollbarOverlayEnabled &&
+            shellSuggestionProvider == other.shellSuggestionProvider &&
+            shellSuggestionHandler == other.shellSuggestionHandler &&
+            shellSuggestionFeedbackHandler == other.shellSuggestionFeedbackHandler &&
+            shellSuggestionKeymap == other.shellSuggestionKeymap &&
+            shellSuggestionViewFactory == other.shellSuggestionViewFactory &&
+            hostKeyHandler == other.hostKeyHandler &&
+            contextMenuHandler == other.contextMenuHandler &&
+            fontResolver == other.fontResolver
+
+    override fun hashCode(): Int {
+        var result = 1
+        result = 31 * result + uiDispatcher.hashCode()
+        result = 31 * result + clipboardHandler.hashCode()
+        result = 31 * result + hyperlinkHandler.hashCode()
+        result = 31 * result + hyperlinkDetector.hashCode()
+        result = 31 * result + viewportListener.hashCode()
+        result = 31 * result + scrollbarOverlayEnabled.hashCode()
+        result = 31 * result + shellSuggestionProvider.hashCode()
+        result = 31 * result + shellSuggestionHandler.hashCode()
+        result = 31 * result + shellSuggestionFeedbackHandler.hashCode()
+        result = 31 * result + shellSuggestionKeymap.hashCode()
+        result = 31 * result + shellSuggestionViewFactory.hashCode()
+        result = 31 * result + hostKeyHandler.hashCode()
+        result = 31 * result + contextMenuHandler.hashCode()
+        result = 31 * result + fontResolver.hashCode()
+        return result
+    }
+
+    public companion object {
+        /** Creates a fresh caller-confined draft initialized to defaults. */
+        @JvmStatic
+        public fun builder(): Builder = Builder()
+
+        /** Configures a draft synchronously and returns one validated immutable snapshot. */
+        @JvmStatic
+        public fun create(configure: java.util.function.Consumer<Builder>): SwingHostServices =
+            builder().also { configure.accept(it) }.build()
+    }
+}

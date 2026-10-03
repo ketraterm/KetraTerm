@@ -24,9 +24,9 @@ import io.github.ketraterm.host.TerminalClipboardPolicy
 import io.github.ketraterm.host.TerminalTitlePermission
 import io.github.ketraterm.input.policy.PasteControlPolicy
 import io.github.ketraterm.render.api.TerminalRenderCursorShape
+import io.github.ketraterm.ui.swing.host.SwingTerminalSettingsBounds
 import io.github.ketraterm.ui.swing.settings.SwingPadding
 import io.github.ketraterm.ui.swing.settings.TerminalTheme
-import io.github.ketraterm.workspace.config.TerminalConfig
 import org.jdom.Element
 import org.junit.Assert.*
 import org.junit.Test
@@ -115,8 +115,8 @@ class KetraTermIntellijSettingsTest {
     fun `IDE host denies application window and column mode requests`() {
         val settings = KetraTermIntellijSettings()
         assertEquals(HostControlPolicy.DENY, settings.createHostPolicy().windowManipulationPolicy)
-        val swingSettings = KetraTermIntellijSettingsMapper.toSwingSettings(settings.state.copy(themeId = "nord"))
-        assertFalse(swingSettings.shellRequestResizeWindow)
+        settings.replaceState(settings.state.copy(themeId = "nord"))
+        assertEquals(HostControlPolicy.DENY, settings.createHostPolicy().windowManipulationPolicy)
     }
 
     @Test
@@ -165,7 +165,7 @@ class KetraTermIntellijSettingsTest {
         service.loadState(loaded)
         assertEquals(1, observed.size)
         assertEquals("nord", observed.single().themeId)
-        assertEquals(TerminalConfig.FONT_SIZE_MAX, observed.single().fontSize)
+        assertEquals(SwingTerminalSettingsBounds.FONT_SIZE_MAX, observed.single().fontSize)
         assertTrue(observed.single().smartSuggestionsEnabled)
         assertEquals(0L, service.stateModificationCount)
 
@@ -411,14 +411,13 @@ class KetraTermIntellijSettingsTest {
         )
         val settings = service.current()
 
-        assertEquals(TerminalConfig.COLUMNS_MAX, settings.columns)
-        assertEquals(TerminalConfig.ROWS_MIN, settings.rows)
-        assertEquals(TerminalConfig.FONT_SIZE_MAX, settings.font.size)
-        assertEquals(TerminalConfig.CURSOR_BLINK_MIN, settings.cursorBlinkMillis)
-        assertEquals(TerminalConfig.SCROLLBACK_MAX, settings.scrollbackLines)
-        assertEquals(TerminalConfig.DEFAULT_LINE_HEIGHT, settings.lineHeight)
-        assertFalse(settings.shellRequestResizeWindow)
-        assertFalse(settings.shellRequestWindowManipulation)
+        assertEquals(SwingTerminalSettingsBounds.COLUMNS_MAX, settings.columns)
+        assertEquals(SwingTerminalSettingsBounds.ROWS_MIN, settings.rows)
+        assertEquals(SwingTerminalSettingsBounds.FONT_SIZE_MAX, settings.font.size)
+        assertEquals(SwingTerminalSettingsBounds.CURSOR_BLINK_MIN, settings.cursorBlinkMillis)
+        assertEquals(SwingTerminalSettingsBounds.SCROLLBACK_MAX, service.state.scrollbackLines)
+        assertEquals(KetraTermIntellijSettings.DEFAULT_LINE_HEIGHT, settings.lineHeight)
+        assertEquals(HostControlPolicy.DENY, service.createHostPolicy().windowManipulationPolicy)
     }
 
     @Test
@@ -445,14 +444,14 @@ class KetraTermIntellijSettingsTest {
         assertEquals("tokyo-night", state.themeId)
         assertEquals(KetraTermIntellijSettings.DEFAULT_FONT_FAMILY, state.fontFamily)
         assertEquals(KetraTermIntellijSettings.DEFAULT_FONT_FAMILY, state.fallbackFontFamily)
-        assertEquals(TerminalConfig.FONT_SIZE_MIN, state.fontSize)
-        assertEquals(TerminalConfig.COLUMNS_MIN, state.columns)
-        assertEquals(TerminalConfig.ROWS_MAX, state.rows)
-        assertEquals(TerminalConfig.CURSOR_BLINK_MAX, state.cursorBlinkMillis)
+        assertEquals(SwingTerminalSettingsBounds.FONT_SIZE_MIN, state.fontSize)
+        assertEquals(SwingTerminalSettingsBounds.COLUMNS_MIN, state.columns)
+        assertEquals(SwingTerminalSettingsBounds.ROWS_MAX, state.rows)
+        assertEquals(SwingTerminalSettingsBounds.CURSOR_BLINK_MAX, state.cursorBlinkMillis)
         assertEquals("beam", state.cursorShape)
-        assertEquals(TerminalConfig.SCROLLBACK_MIN, state.scrollbackLines)
-        assertEquals(TerminalConfig.DEFAULT_LINE_HEIGHT, state.lineHeight)
-        assertEquals(TerminalConfig.DEFAULT_SHELL_PATH, state.shellPath)
+        assertEquals(SwingTerminalSettingsBounds.SCROLLBACK_MIN, state.scrollbackLines)
+        assertEquals(KetraTermIntellijSettings.DEFAULT_LINE_HEIGHT, state.lineHeight)
+        assertEquals(KetraTermIntellijSettings.DEFAULT_SHELL_PATH, state.shellPath)
         assertEquals("ONE=last\nTWO=second", state.environmentVariables)
         assertEquals("Local", state.defaultTabName)
     }

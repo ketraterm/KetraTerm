@@ -523,7 +523,10 @@ class SwingTerminalMouseControllerTest {
     }
 
     private class RecordingMouseHost(
-        override val settings: SwingSettings = SwingSettings(padding = SwingPadding(0, 0, 0, 0)),
+        override val settings: SwingSettings =
+            SwingSettings.create { draft ->
+                draft.padding = SwingPadding(0, 0, 0, 0)
+            },
         private val hyperlinkPressHandled: Boolean = false,
         private val scrollResult: Boolean = true,
         var mouseTrackingMode: MouseTrackingMode = MouseTrackingMode.OFF,

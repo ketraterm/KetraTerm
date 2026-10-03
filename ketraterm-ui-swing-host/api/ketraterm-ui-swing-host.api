@@ -203,3 +203,19 @@ public final class io/github/ketraterm/ui/swing/host/SwingTerminalSearchBar {
 	public final fun refreshColors ()V
 }
 
+public final class io/github/ketraterm/ui/swing/host/SwingTerminalSettingsBounds {
+	public static final field COLUMNS_MAX I
+	public static final field COLUMNS_MIN I
+	public static final field CURSOR_BLINK_MAX I
+	public static final field CURSOR_BLINK_MIN I
+	public static final field FONT_SIZE_MAX I
+	public static final field FONT_SIZE_MIN I
+	public static final field INSTANCE Lio/github/ketraterm/ui/swing/host/SwingTerminalSettingsBounds;
+	public static final field LINE_HEIGHT_MAX F
+	public static final field LINE_HEIGHT_MIN F
+	public static final field ROWS_MAX I
+	public static final field ROWS_MIN I
+	public static final field SCROLLBACK_MAX I
+	public static final field SCROLLBACK_MIN I
+}
+

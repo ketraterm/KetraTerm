@@ -58,11 +58,11 @@ class SwingTerminalCellBoundsTest {
             val dispatcher = StandardTestDispatcher()
             val session = TerminalSession.create(buffer, Connector, workerDispatcher = dispatcher, ioDispatcher = dispatcher)
             val settings =
-                SwingSettings(
-                    padding = SwingPadding(5, 7, 11, 13),
-                    alternateScreenPadding = SwingPadding(3, 4, 8, 10),
-                    shellIntegrationDecorationGutterWidth = 9,
-                )
+                SwingSettings.create { draft ->
+                    draft.padding = SwingPadding(5, 7, 11, 13)
+                    draft.alternateScreenPadding = SwingPadding(3, 4, 8, 10)
+                    draft.shellIntegrationDecorationGutterWidth = 9
+                }
             val terminal = SwingTerminal(settingsProvider = { settings })
             try {
                 terminal.size = terminal.preferredGridSize(10, 3)

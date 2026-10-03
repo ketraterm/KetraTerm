@@ -109,27 +109,29 @@ fun main() =
                 onEdt {
                     SwingTerminal(
                         SwingSettingsProvider {
-                            SwingSettings(
-                                columns = COLUMNS,
-                                rows = ROWS,
-                                padding = SwingPadding(),
-                                shellIntegrationDecorationGutterWidth = 0,
-                                osc8HyperlinkActivation = SwingHyperlinkActivation.DIRECT,
-                                osc8HyperlinkPresentation =
+                            SwingSettings.create { draft ->
+                                draft.columns = COLUMNS
+                                draft.rows = ROWS
+                                draft.padding = SwingPadding()
+                                draft.shellIntegrationDecorationGutterWidth = 0
+                                draft.osc8HyperlinkActivation = SwingHyperlinkActivation.DIRECT
+                                draft.osc8HyperlinkPresentation =
                                     SwingHyperlinkPresentation(
                                         normal = SwingHyperlinkStyle(underlineStyle = TerminalRenderUnderline.DOTTED),
-                                    ),
-                            )
+                                    )
+                            }
                         },
-                        SwingHostServices(hyperlinkDetector = detector, scrollbarOverlayEnabled = false),
+                        SwingHostServices.create { draft ->
+                            draft.hyperlinkDetector = detector
+                            draft.scrollbarOverlayEnabled = false
+                        },
                     ).apply { size = preferredSize }
                 }
             try {
                 onEdt {
                     val original = SwingSettings()
-                    val updated = original.copy(cursorBlinkMillis = 0)
-                    val (font, fallbackFonts) = updated
-                    check(font == original.font && fallbackFonts == original.fallbackFonts)
+                    val updated = original.copy { it.cursorBlinkMillis = 0 }
+                    check(updated.font == original.font && updated.fallbackFonts == original.fallbackFonts)
                     check(updated.cursorBlinkMillis == 0 && updated.padding == original.padding)
                     terminal.bind(session)
                     terminal.dispatchPointer(MouseEvent.MOUSE_MOVED)

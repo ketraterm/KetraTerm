@@ -2,7 +2,7 @@
 
 ## KetraTerm Workspace (`:ketraterm-workspace`)
 
-The `ketraterm-workspace` module provides a host-neutral session and tab manager for **KetraTerm Terminal**. It coordinates multiple active terminal sessions (tabs) under a unified workspace lifecycle, maps configurations onto file-based profiles, and implements standard TOML-backed settings persistence.
+The `ketraterm-workspace` module provides host-neutral session and tab management. It coordinates local sessions under a workspace lifecycle and launches host-supplied profiles and immutable options. Products own preference schemas and persistence.
 
 This module is designed to be completely decoupled from any specific UI toolkit, serving as the headless state controller for tabbed desktop terminal interfaces or IDE tool windows.
 
@@ -22,7 +22,7 @@ This module is designed to be completely decoupled from any specific UI toolkit,
 
 `TerminalWorkspace` manages a collection of tabs. Each tab wraps an active, running `TerminalSession` tied to a specific `TerminalProfile` launch configuration.
 
-The workspace owns a supervisor scope and one `TerminalSession.state` collection job per tab. Removing a tab cancels its job; closing the workspace cancels the scope. Local tab closure remains distinct from unexpected remote closure, and host callbacks run outside the workspace state lock.
+The workspace owns a supervisor scope and one lifecycle job per tab. Optional process-title and startup notifications are supervised separately: a failed observer is reported without stopping session-close observation. Removing a tab cancels its jobs; closing the workspace cancels the scope. Local tab closure remains distinct from unexpected remote closure, and host callbacks run outside the workspace state lock. Reentrant selection or closure supersedes an older pending selection notification.
 
 ```mermaid
 graph TD
@@ -35,8 +35,7 @@ graph TD
     Tab2 -->|owns| Session2["TerminalSession"]
     Tab2 -->|describes| Profile2["TerminalProfile"]
 
-    ConfigManager["TerminalWorkspaceConfigManager"] -->|loads/saves| Config["TerminalConfig"]
-    Workspace -.->|updates themes/modes from| Config
+    Host["Product host"] -->|supplies launch options| Workspace
 ```
 
 ### Clipboard read routing
@@ -46,14 +45,13 @@ graph TD
 ### Key Components
 * [TerminalWorkspace](src/main/kotlin/io/github/ketraterm/workspace/TerminalWorkspace.kt): The main lifecycle manager. Handles opening, selecting, closing, and applying settings updates to all open terminal tabs.
 * [TerminalProfile](src/main/kotlin/io/github/ketraterm/workspace/TerminalProfile.kt): Describes a launch configuration (command, display name, working directory, environment variables).
-* [TerminalWorkspaceConfigManager](src/main/kotlin/io/github/ketraterm/workspace/config/TerminalWorkspaceConfigManager.kt): Handles loading and saving TOML-based configurations from OS-specific directories, with automatic parsing backups and value clamping.
+* `TerminalWorkspaceOpenOptions`: Validated immutable launch options, built and updated through named configuration callbacks or Java builders.
 
 ---
 
 ## Sub-Documentation
 
-For detailed specifications on the persistency configuration format and resolution:
-* [profile-config-toml.md](docs/profile-config-toml.md) - TOML config blocks syntax, configuration properties list, and directory resolution hierarchies per OS.
+See [configuration ownership and construction](../docs/library-configuration.md). Standalone persistence is documented in the [application TOML guide](../ketraterm-app/docs/profile-config-toml.md).
 
 ---
 
@@ -70,7 +68,7 @@ its model.
 
 ## How to Use
 
-The following example shows how to load workspace configurations, register a workspace listener, and open multiple terminal tabs:
+Hosts own persisted preferences. Workspace accepts immutable launch options and does not choose a configuration path or schema. The following example registers a workspace listener and opens a terminal tab:
 
 ```kotlin
 import io.github.ketraterm.workspace.TerminalWorkspace
@@ -78,27 +76,22 @@ import io.github.ketraterm.workspace.TerminalWorkspaceListener
 import io.github.ketraterm.workspace.TerminalWorkspaceTab
 import io.github.ketraterm.workspace.TerminalWorkspaceOpenOptions
 import io.github.ketraterm.workspace.TerminalProfile
-import io.github.ketraterm.workspace.config.TerminalWorkspaceConfigManager
 import java.nio.file.Path
 
 fun main() {
-    // 1. Resolve configuration and load settings
-    val configManager = TerminalWorkspaceConfigManager.getDefault()
-    val config = configManager.load()
-
     // 2. Define a workspace listener to respond to tab lifecycle events
     val listener = object : TerminalWorkspaceListener {
         override fun tabOpened(tab: TerminalWorkspaceTab) {
             println("Tab opened: ${tab.id} - ${tab.title}")
         }
-        override fun tabClosed(id: String) {
-            println("Tab closed: $id")
+        override fun tabClosed(tabId: String) {
+            println("Tab closed: $tabId")
         }
-        override fun tabSelected(id: String) {
-            println("Active tab switched to: $id")
+        override fun tabSelected(tabId: String) {
+            println("Active tab switched to: $tabId")
         }
         override fun titleChanged(tab: TerminalWorkspaceTab, title: String) {}
-        override fun colorChanged(tab: TerminalWorkspaceTab, color: Int) {}
+        override fun colorChanged(tab: TerminalWorkspaceTab, color: String?) {}
         override fun bell(tab: TerminalWorkspaceTab) {}
     }
 
@@ -107,7 +100,7 @@ fun main() {
 
     // 4. Declare a launch profile (e.g. Git Shell)
     val gitProfile = TerminalProfile(
-        name = "git-shell",
+        id = "git-shell",
         displayName = "Git Repo Shell",
         command = listOf("bash"),
         environment = mapOf("GIT_PS1" to "true"),
@@ -115,12 +108,12 @@ fun main() {
     )
 
     // 5. Open a tab using the profile
-    val openOptions = TerminalWorkspaceOpenOptions(
-        columns = 80,
-        rows = 24,
-        maxHistory = config.scrollbackLines,
-        treatAmbiguousAsWide = config.treatAmbiguousAsWide
-    )
+    val openOptions = TerminalWorkspaceOpenOptions.create {
+        it.columns = 80
+        it.rows = 24
+        it.maxHistory = 1000
+        it.treatAmbiguousAsWide = false
+    }
     val tab = workspace.openTab(gitProfile, openOptions)
 }
 ```
@@ -140,10 +133,10 @@ class SwingTabAdapter(private val tabbedPane: JTabbedPane) : TerminalWorkspaceLi
     override fun tabOpened(tab: TerminalWorkspaceTab) {
         // Create Swing component and add tab
     }
-    override fun tabClosed(id: String) {}
-    override fun tabSelected(id: String) {}
+    override fun tabClosed(tabId: String) {}
+    override fun tabSelected(tabId: String) {}
     override fun titleChanged(tab: TerminalWorkspaceTab, title: String) {}
-    override fun colorChanged(tab: TerminalWorkspaceTab, color: Int) {}
+    override fun colorChanged(tab: TerminalWorkspaceTab, color: String?) {}
     override fun bell(tab: TerminalWorkspaceTab) {}
 }
 ```

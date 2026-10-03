@@ -39,7 +39,9 @@ class TerminalBidiRenderingTest {
         defaultTestSettings(
             foreground = TEST_WHITE,
             background = TEST_BLACK,
-        ).copy(shellIntegrationDecorationGutterWidth = 0)
+        ).copy { draft ->
+            draft.shellIntegrationDecorationGutterWidth = 0
+        }
     private val colors = intArrayOf(TEST_RED, TEST_GREEN, TEST_BLUE)
 
     @Test
@@ -238,7 +240,9 @@ class TerminalBidiRenderingTest {
             GridPainter().paint(
                 g,
                 cache,
-                settings.copy(textAntialiasing = textAntialiasing),
+                settings.copy { draft ->
+                    draft.textAntialiasing = textAntialiasing
+                },
                 metrics,
                 image.width,
                 image.height,

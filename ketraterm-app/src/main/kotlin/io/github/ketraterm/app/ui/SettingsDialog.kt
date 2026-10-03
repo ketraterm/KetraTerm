@@ -15,6 +15,7 @@
  */
 package io.github.ketraterm.app.ui
 
+import io.github.ketraterm.app.config.KetraTermConfig
 import io.github.ketraterm.app.config.KetraTermSettings
 import io.github.ketraterm.host.TerminalClipboardPermission
 import io.github.ketraterm.host.TerminalTitlePermission
@@ -26,7 +27,6 @@ import io.github.ketraterm.ui.swing.settings.TerminalTheme
 import io.github.ketraterm.workspace.TerminalProfile
 import io.github.ketraterm.workspace.TerminalProfileKind
 import io.github.ketraterm.workspace.TerminalProfileRegistry
-import io.github.ketraterm.workspace.config.TerminalConfig
 import java.awt.*
 import java.awt.event.MouseAdapter
 import java.awt.event.MouseEvent
@@ -160,21 +160,21 @@ internal class SettingsDialog(
             createComboBox(monospaceFamilies.toTypedArray(), currentFamily, 220)
         }
     private val fontSizeSpinner =
-        createSpinner(settings.config.fontSize, TerminalConfig.FONT_SIZE_MIN, TerminalConfig.FONT_SIZE_MAX, 1, 80)
+        createSpinner(settings.config.fontSize, KetraTermConfig.FONT_SIZE_MIN, KetraTermConfig.FONT_SIZE_MAX, 1, 80)
     private val lineHeightSpinner =
         createFloatSpinner(
             settings.config.lineHeight,
-            TerminalConfig.LINE_HEIGHT_MIN.toDouble(),
-            TerminalConfig.LINE_HEIGHT_MAX.toDouble(),
+            KetraTermConfig.LINE_HEIGHT_MIN.toDouble(),
+            KetraTermConfig.LINE_HEIGHT_MAX.toDouble(),
             0.1,
             80,
         )
     private val columnsSpinner =
-        createSpinner(settings.config.columns, TerminalConfig.COLUMNS_MIN, TerminalConfig.COLUMNS_MAX, 1, 80)
+        createSpinner(settings.config.columns, KetraTermConfig.COLUMNS_MIN, KetraTermConfig.COLUMNS_MAX, 1, 80)
     private val rowsSpinner =
-        createSpinner(settings.config.rows, TerminalConfig.ROWS_MIN, TerminalConfig.ROWS_MAX, 1, 80)
+        createSpinner(settings.config.rows, KetraTermConfig.ROWS_MIN, KetraTermConfig.ROWS_MAX, 1, 80)
     private val scrollbackSpinner =
-        createSpinner(settings.config.scrollbackLines, TerminalConfig.SCROLLBACK_MIN, TerminalConfig.SCROLLBACK_MAX, 100, 80)
+        createSpinner(settings.config.scrollbackLines, KetraTermConfig.SCROLLBACK_MIN, KetraTermConfig.SCROLLBACK_MAX, 100, 80)
     private val themeCombo = createComboBox(TerminalTheme.entries.toTypedArray(), settings.theme, 220)
 
     // Form Controls - Behavior
@@ -207,7 +207,7 @@ internal class SettingsDialog(
     private val showForegroundProcessNameCheckbox =
         JCheckBox("Show running process in tab titles", settings.config.showForegroundProcessName)
     private val cursorBlinkSpinner =
-        createSpinner(settings.config.cursorBlinkMillis, TerminalConfig.CURSOR_BLINK_MIN, TerminalConfig.CURSOR_BLINK_MAX, 50, 70)
+        createSpinner(settings.config.cursorBlinkMillis, KetraTermConfig.CURSOR_BLINK_MIN, KetraTermConfig.CURSOR_BLINK_MAX, 50, 70)
     private val cursorShapeCombo =
         createComboBox(arrayOf("block", "underline", "beam"), settings.config.cursorShape.lowercase(Locale.ROOT), 150)
 
@@ -737,43 +737,43 @@ internal class SettingsDialog(
     }
 
     private fun resetToDefaults() {
-        selectShell(TerminalConfig.DEFAULT_SHELL_PATH)
-        startDirectoryField.text = TerminalConfig.DEFAULT_START_DIRECTORY
+        selectShell(KetraTermConfig.DEFAULT_SHELL_PATH)
+        startDirectoryField.text = KetraTermConfig.DEFAULT_START_DIRECTORY
         startupCommandField.text = ""
-        audibleBellCheckbox.isSelected = TerminalConfig.DEFAULT_AUDIBLE_BELL
-        visualBellCheckbox.isSelected = TerminalConfig.DEFAULT_VISUAL_BELL
+        audibleBellCheckbox.isSelected = KetraTermConfig.DEFAULT_AUDIBLE_BELL
+        visualBellCheckbox.isSelected = KetraTermConfig.DEFAULT_VISUAL_BELL
 
-        fontFamilyCombo.selectedItem = TerminalConfig.DEFAULT_FONT_FAMILY
-        fontSizeSpinner.value = TerminalConfig.DEFAULT_FONT_SIZE
-        lineHeightSpinner.value = TerminalConfig.DEFAULT_LINE_HEIGHT.toDouble()
-        columnsSpinner.value = TerminalConfig.DEFAULT_COLUMNS
-        rowsSpinner.value = TerminalConfig.DEFAULT_ROWS
-        scrollbackSpinner.value = TerminalConfig.DEFAULT_SCROLLBACK_LINES
-        themeCombo.selectedItem = requireNotNull(TerminalTheme.fromId(TerminalConfig.DEFAULT_THEME))
+        fontFamilyCombo.selectedItem = KetraTermConfig.DEFAULT_FONT_FAMILY
+        fontSizeSpinner.value = KetraTermConfig.DEFAULT_FONT_SIZE
+        lineHeightSpinner.value = KetraTermConfig.DEFAULT_LINE_HEIGHT.toDouble()
+        columnsSpinner.value = KetraTermConfig.DEFAULT_COLUMNS
+        rowsSpinner.value = KetraTermConfig.DEFAULT_ROWS
+        scrollbackSpinner.value = KetraTermConfig.DEFAULT_SCROLLBACK_LINES
+        themeCombo.selectedItem = requireNotNull(TerminalTheme.fromId(KetraTermConfig.DEFAULT_THEME))
 
-        treatAmbiguousCheckbox.isSelected = TerminalConfig.DEFAULT_TREAT_AMBIGUOUS_AS_WIDE
-        useSystemFallbackCheckbox.isSelected = TerminalConfig.DEFAULT_USE_SYSTEM_FALLBACK_FONTS
-        pasteOnMiddleClickCheckbox.isSelected = TerminalConfig.DEFAULT_PASTE_ON_MIDDLE_CLICK
+        treatAmbiguousCheckbox.isSelected = KetraTermConfig.DEFAULT_TREAT_AMBIGUOUS_AS_WIDE
+        useSystemFallbackCheckbox.isSelected = KetraTermConfig.DEFAULT_USE_SYSTEM_FALLBACK_FONTS
+        pasteOnMiddleClickCheckbox.isSelected = KetraTermConfig.DEFAULT_PASTE_ON_MIDDLE_CLICK
         pasteSanitizationCombo.selectedItem =
             PASTE_SANITIZATION_OPTIONS.first {
-                it.policy == TerminalConfig.DEFAULT_PASTE_CONTROL_POLICY
+                it.policy == KetraTermConfig.DEFAULT_PASTE_CONTROL_POLICY
             }
-        shellRequestResizeWindowCheckbox.isSelected = TerminalConfig.DEFAULT_SHELL_REQUEST_RESIZE_WINDOW
-        shellRequestWindowManipulationCheckbox.isSelected = TerminalConfig.DEFAULT_SHELL_REQUEST_WINDOW_MANIPULATION
+        shellRequestResizeWindowCheckbox.isSelected = KetraTermConfig.DEFAULT_SHELL_REQUEST_RESIZE_WINDOW
+        shellRequestWindowManipulationCheckbox.isSelected = KetraTermConfig.DEFAULT_SHELL_REQUEST_WINDOW_MANIPULATION
         // TODO(host/profile): SUGGESTION_SETTINGS: Restore defaults only when these preferences are visible.
-        // smartSuggestionsCheckbox.isSelected = TerminalConfig.DEFAULT_SMART_SUGGESTIONS_ENABLED
-        // shellSuggestionsCheckbox.isSelected = TerminalConfig.DEFAULT_SHELL_SUGGESTIONS_ENABLED
-        // acceptSelectedSuggestionWithEnterCheckbox.isSelected = TerminalConfig.DEFAULT_ACCEPT_SELECTED_SUGGESTION_WITH_ENTER
-        // persistentSuggestionLearningCheckbox.isSelected = TerminalConfig.DEFAULT_PERSISTENT_SUGGESTION_LEARNING_ENABLED
-        scrollOnOutputCheckbox.isSelected = TerminalConfig.DEFAULT_SCROLL_ON_OUTPUT
-        showForegroundProcessNameCheckbox.isSelected = TerminalConfig.DEFAULT_SHOW_FOREGROUND_PROCESS_NAME
-        cursorBlinkSpinner.value = TerminalConfig.DEFAULT_CURSOR_BLINK_MILLIS
-        cursorShapeCombo.selectedItem = TerminalConfig.DEFAULT_CURSOR_SHAPE
+        // smartSuggestionsCheckbox.isSelected = KetraTermConfig.DEFAULT_SMART_SUGGESTIONS_ENABLED
+        // shellSuggestionsCheckbox.isSelected = KetraTermConfig.DEFAULT_SHELL_SUGGESTIONS_ENABLED
+        // acceptSelectedSuggestionWithEnterCheckbox.isSelected = KetraTermConfig.DEFAULT_ACCEPT_SELECTED_SUGGESTION_WITH_ENTER
+        // persistentSuggestionLearningCheckbox.isSelected = KetraTermConfig.DEFAULT_PERSISTENT_SUGGESTION_LEARNING_ENABLED
+        scrollOnOutputCheckbox.isSelected = KetraTermConfig.DEFAULT_SCROLL_ON_OUTPUT
+        showForegroundProcessNameCheckbox.isSelected = KetraTermConfig.DEFAULT_SHOW_FOREGROUND_PROCESS_NAME
+        cursorBlinkSpinner.value = KetraTermConfig.DEFAULT_CURSOR_BLINK_MILLIS
+        cursorShapeCombo.selectedItem = KetraTermConfig.DEFAULT_CURSOR_SHAPE
 
-        clipboardWriteCombo.selectedItem = TerminalConfig.DEFAULT_CLIPBOARD_WRITE
-        clipboardReadCombo.selectedItem = TerminalConfig.DEFAULT_CLIPBOARD_READ
-        clipboardMaxDecodedBytesSpinner.value = TerminalConfig.DEFAULT_CLIPBOARD_MAX_DECODED_BYTES
-        titlePermissionCheckbox.isSelected = TerminalConfig.DEFAULT_TITLE_PERMISSION == TerminalTitlePermission.ALLOW
+        clipboardWriteCombo.selectedItem = KetraTermConfig.DEFAULT_CLIPBOARD_WRITE
+        clipboardReadCombo.selectedItem = KetraTermConfig.DEFAULT_CLIPBOARD_READ
+        clipboardMaxDecodedBytesSpinner.value = KetraTermConfig.DEFAULT_CLIPBOARD_MAX_DECODED_BYTES
+        titlePermissionCheckbox.isSelected = KetraTermConfig.DEFAULT_TITLE_PERMISSION == TerminalTitlePermission.ALLOW
     }
 
     private fun applyChanges(closeAfterSave: Boolean = false) {
@@ -851,7 +851,7 @@ internal class SettingsDialog(
         applyButton.repaint()
     }
 
-    private fun getUiState(): TerminalConfig {
+    private fun getUiState(): KetraTermConfig {
         val selected = shellPathCombo.selectedItem
         val nextShellPath =
             if (selected is TerminalProfile) {
@@ -863,13 +863,13 @@ internal class SettingsDialog(
             theme = (themeCombo.selectedItem as TerminalTheme).id,
             treatAmbiguousAsWide = treatAmbiguousCheckbox.isSelected,
             fontFamily = fontFamilyCombo.selectedItem as? String ?: "",
-            fontSize = fontSizeSpinner.value as? Int ?: TerminalConfig.DEFAULT_FONT_SIZE,
-            columns = columnsSpinner.value as? Int ?: TerminalConfig.DEFAULT_COLUMNS,
-            rows = rowsSpinner.value as? Int ?: TerminalConfig.DEFAULT_ROWS,
-            cursorBlinkMillis = cursorBlinkSpinner.value as? Int ?: TerminalConfig.DEFAULT_CURSOR_BLINK_MILLIS,
+            fontSize = fontSizeSpinner.value as? Int ?: KetraTermConfig.DEFAULT_FONT_SIZE,
+            columns = columnsSpinner.value as? Int ?: KetraTermConfig.DEFAULT_COLUMNS,
+            rows = rowsSpinner.value as? Int ?: KetraTermConfig.DEFAULT_ROWS,
+            cursorBlinkMillis = cursorBlinkSpinner.value as? Int ?: KetraTermConfig.DEFAULT_CURSOR_BLINK_MILLIS,
             useSystemFallbackFonts = useSystemFallbackCheckbox.isSelected,
             cursorShape = cursorShapeCombo.selectedItem as? String ?: "",
-            shellPath = nextShellPath.ifBlank { TerminalConfig.DEFAULT_SHELL_PATH },
+            shellPath = nextShellPath.ifBlank { KetraTermConfig.DEFAULT_SHELL_PATH },
             startDirectory = startDirectoryField.text,
             startupCommand = startupCommandField.text,
             audibleBell = audibleBellCheckbox.isSelected,
@@ -877,8 +877,8 @@ internal class SettingsDialog(
             pasteOnMiddleClick = pasteOnMiddleClickCheckbox.isSelected,
             pasteControlPolicy =
                 (pasteSanitizationCombo.selectedItem as? PasteSanitizationOption)?.policy
-                    ?: TerminalConfig.DEFAULT_PASTE_CONTROL_POLICY,
-            scrollbackLines = scrollbackSpinner.value as? Int ?: TerminalConfig.DEFAULT_SCROLLBACK_LINES,
+                    ?: KetraTermConfig.DEFAULT_PASTE_CONTROL_POLICY,
+            scrollbackLines = scrollbackSpinner.value as? Int ?: KetraTermConfig.DEFAULT_SCROLLBACK_LINES,
             lineHeight = (lineHeightSpinner.value as Number).toFloat(),
             shellRequestResizeWindow = shellRequestResizeWindowCheckbox.isSelected,
             shellRequestWindowManipulation = shellRequestWindowManipulationCheckbox.isSelected,
@@ -891,7 +891,7 @@ internal class SettingsDialog(
             clipboardRead = clipboardReadCombo.selectedItem as TerminalClipboardPermission,
             clipboardMaxDecodedBytes =
                 clipboardMaxDecodedBytesSpinner.value as? Int
-                    ?: TerminalConfig.DEFAULT_CLIPBOARD_MAX_DECODED_BYTES,
+                    ?: KetraTermConfig.DEFAULT_CLIPBOARD_MAX_DECODED_BYTES,
             titlePermission =
                 if (titlePermissionCheckbox.isSelected) {
                     TerminalTitlePermission.ALLOW

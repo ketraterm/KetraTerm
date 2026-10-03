@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.github.ketraterm.workspace.config
+package io.github.ketraterm.app.config
 
 import org.junit.jupiter.api.io.TempDir
 import java.nio.file.Path
@@ -35,9 +35,9 @@ class TerminalStartupCommandConfigTest {
                 "echo 'trailing quote'",
                 "echo \\\\u0022 \\\\u005c #comment",
             )
-        val manager = TerminalWorkspaceConfigManager(directory.resolve("config.toml"))
+        val manager = KetraTermConfigManager(directory.resolve("config.toml"))
         for (command in commands) {
-            val config = TerminalConfig(startupCommand = command)
+            val config = KetraTermConfig(startupCommand = command)
             manager.save(config)
             assertEquals(config, manager.load(), command)
         }

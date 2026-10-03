@@ -91,19 +91,18 @@ fun main() {
     }
 
     // 2. Configure PTY Options
-    val options = PtyOptions(
-        command = emptyList(), // Automatically resolves platform default shell
-        columns = 80,
-        rows = 24,
-        maxHistory = 1000,
-        eventListener = listener
-    )
+    val options = PtyOptions.create {
+        it.columns = 80
+        it.rows = 24
+        it.maxHistory = 1000
+        it.eventListener = listener
+    }
 
     // 3. Start the local PTY session
     val session: TerminalSession = TerminalSessions.localPty(options)
 
     // 4. Send typing events
-    session.pasteText("echo 'Hello KetraTerm'\n")
+    session.encodePaste(io.github.ketraterm.input.event.TerminalPasteEvent("echo 'Hello KetraTerm'\n"))
 }
 ```
 
@@ -118,10 +117,10 @@ import io.github.ketraterm.pty.PtyOptions
 import io.github.ketraterm.pty.TerminalSessions
 import java.nio.file.Path
 
-val options = PtyOptions(
-    command = listOf("/usr/bin/git", "status"),
-    workingDirectory = Path.of("/my/repo/path"),
-    environment = mapOf("GIT_EDITOR" to "vim")
-)
+val options = PtyOptions.create {
+    it.command = listOf("/usr/bin/git", "status")
+    it.workingDirectory = Path.of("/my/repo/path")
+    it.environment = PtyOptions.defaultEnvironment() + ("GIT_EDITOR" to "vim")
+}
 val gitSession = TerminalSessions.localPty(options)
 ```

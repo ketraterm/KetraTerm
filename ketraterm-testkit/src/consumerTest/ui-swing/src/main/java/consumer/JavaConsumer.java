@@ -60,6 +60,27 @@ public final class JavaConsumer {
     }
 
     public static void verify() throws Exception {
+        var resolver = new io.github.ketraterm.ui.swing.api.TerminalFontResolver() {
+            public java.awt.Font resolveFallbackFont(int codePoint, int style, float size) { return null; }
+            public java.awt.Font resolveFallbackFont(String text, int style, float size) { return null; }
+        };
+        var custom = SwingHostServices.create(b -> b.setFontResolver(resolver));
+        var cleared = custom.copy(b -> b.setFontResolver(null));
+        if (custom.getFontResolver() != resolver || cleared.getFontResolver() != null)
+            throw new AssertionError("Selective host service construction and immutable clearing");
+        var settings = SwingSettings.create(b -> b.setLineHeight(1.25f));
+        try {
+            settings.getFallbackFonts().clear();
+            throw new AssertionError("Font snapshot is mutable from Java");
+        } catch (UnsupportedOperationException expected) {
+            // The public Java view is immutable too.
+        }
+        var settingsDraft = settings.toBuilder();
+        settingsDraft.setColumns(120);
+        var resized = settingsDraft.build();
+        settingsDraft.setColumns(90);
+        if (settings.getColumns() != 80 || resized.getColumns() != 120 || resized.getLineHeight() != 1.25f)
+            throw new AssertionError("Immutable settings snapshots");
         verifyClipboardReply();
         try (var metadata = SwingTerminal.class.getResourceAsStream("/META-INF/io.github.ketraterm_ketraterm-ui-swing.kotlin_module")) {
             if (metadata == null || metadata.readAllBytes().length == 0) throw new AssertionError("Missing Kotlin metadata");
@@ -70,11 +91,11 @@ public final class JavaConsumer {
             opened.incrementAndGet();
             return true;
         };
-        var services = new SwingHostServices(
-            TerminalUiDispatcher.SWING,
-            TerminalClipboardHandler.SYSTEM,
-            uri -> uri.equals("https://example.test/java") && action.open()
-        );
+        var services = SwingHostServices.create(draft -> {
+draft.setUiDispatcher(TerminalUiDispatcher.SWING);
+draft.setClipboardHandler(TerminalClipboardHandler.SYSTEM);
+draft.setHyperlinkHandler(uri -> uri.equals("https://example.test/java") && action.open());
+});
         SwingUtilities.invokeAndWait(() -> {
             new SwingTerminal().dispose();
             var terminal = new SwingTerminal(SwingSettings::new, services);

@@ -29,7 +29,11 @@ import java.util.concurrent.atomic.AtomicBoolean
 import javax.swing.SwingUtilities
 
 class SwingViewportControllerTest {
-    private val settings = SwingSettings(padding = SwingPadding(3, 5, 7, 11), shellIntegrationDecorationGutterWidth = 0)
+    private val settings =
+        SwingSettings.create { draft ->
+            draft.padding = SwingPadding(3, 5, 7, 11)
+            draft.shellIntegrationDecorationGutterWidth = 0
+        }
     private val metrics =
         SwingMetrics(
             cellWidth = 10,
@@ -43,7 +47,10 @@ class SwingViewportControllerTest {
 
     @Test
     fun `default alternate padding balances an odd primary inset`() {
-        val settings = SwingSettings(padding = SwingPadding(3, 5, 7, 10))
+        val settings =
+            SwingSettings.create { draft ->
+                draft.padding = SwingPadding(3, 5, 7, 10)
+            }
         assertEquals(SwingPadding(3, 15, 7, 16), settings.alternateScreenPadding)
         val controller = SwingViewportController(TerminalViewportListener.NONE) { _, _ -> }
         for (width in 1..250) {
@@ -76,10 +83,10 @@ class SwingViewportControllerTest {
         fun `alternate screen visible grid uses explicit alternate chrome instead of primary gutters`() {
             val controller = SwingViewportController(TerminalViewportListener.NONE) { _, _ -> }
             val settings =
-                SwingSettings(
-                    padding = SwingPadding(0, 4, 8, 12),
-                    alternateScreenPadding = SwingPadding(0, 8, 8, 8),
-                )
+                SwingSettings.create { draft ->
+                    draft.padding = SwingPadding(0, 4, 8, 12)
+                    draft.alternateScreenPadding = SwingPadding(0, 8, 8, 8)
+                }
 
             val primary =
                 controller.visibleGridSizeOnEdt(

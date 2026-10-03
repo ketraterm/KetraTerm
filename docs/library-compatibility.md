@@ -91,15 +91,15 @@ requires a separate compatibility decision.
 
 - Preserve JVM signatures, Kotlin metadata and documented behavior. A source
   change that recompiles successfully may still break an existing binary.
-- Configuration and value data classes retain their constructor, `copy`,
-  component and generated default-call shapes. Adding a defaulted primary
-  constructor property is a binary change. Add a separate API only when a real
-  requirement warrants it; do not introduce builders in anticipation of one.
-  `SwingSettings` and `SwingHostServices` keep their fixed immutable construction
-  shapes. View-lifetime additions, including suggestion diagnostics, use narrow
-  EDT attachment methods; native popup coordination uses an additive binding
-  overload. Existing compiled clients exercise the unchanged shapes without
-  replacing their retained binaries.
+- Value data classes retain their constructor, `copy`, component and generated
+  default-call shapes. Adding a defaulted primary constructor property is a
+  binary change. The D02/D03 pre-freeze migration replaces the growing
+  `SwingSettings`, `SwingHostServices`, `PtyOptions`, and workspace open options
+  with immutable snapshots and concrete construction drafts. Preserve their
+  `create(Consumer)`, `copy(Consumer)`, `builder`, `toBuilder`, `build`, default
+  constructor and existing property descriptors when adding fields. Small value
+  records retain their data-class contracts. View-lifetime integrations still
+  use EDT attachment/binding APIs. See [configuration construction](library-configuration.md).
 - Preserve old overloads and Kotlin default-call entry points. `@JvmOverloads`
   serves Java overloads; it does not make changes to Kotlin default arguments
   binary compatible.
@@ -133,6 +133,17 @@ requires a separate compatibility decision.
 
 The construction changes deliberately replace earlier development signatures:
 
+- D02/D03 removes nonempty constructors, generated copy/default-call and component
+  methods from the four growing configuration snapshots. Recompile with named
+  construction/update callbacks or Java builders. Swing's unused scrollback and
+  window-permission properties are removed; core creation and host policy own
+  those choices. Standalone preferences/TOML types leave the workspace publication
+  and become internal app implementation. Library consumers own their persistence.
+  Baseline tests and ABI checks passed before migration. Eight retained-client
+  upgrade cases then failed with `NoSuchMethodError`: Swing's three-argument
+  `SwingHostServices` constructor and PTY's Kotlin default constructor, in both
+  metadata modes and both runtimes. Only those two client/provenance pairs are
+  refreshed for this intentional break; the other eleven remain unchanged.
 - `TerminalBuffers.create` now returns `TerminalRenderBuffer`. Recompile callers;
   JVM descriptors include return types even when the new type extends the old one.
 - Custom session construction takes `TerminalInputEncoderFactory` instead of an
@@ -146,11 +157,11 @@ The construction changes deliberately replace earlier development signatures:
 
 The original five client/provenance pairs remain available in Git at `e37f5d7f`.
 Construction commit `025ccb1a` replaced the host and Swing clients for these
-intentional breaks. Parser, completion and PTY client bytes remain identical,
-although their provenance was refreshed. Eight additional clients establish
+intentional breaks. Parser and completion client bytes remain identical;
+D02/D03 additionally refreshes Swing and PTY as described above. Eight additional clients establish
 separate extension baselines. The current 52 positive upgrade cases verify these
-declared baselines; they do not demonstrate compatibility with the original host
-and Swing clients. This review accepts the current snapshots and retained clients
+declared baselines; they do not demonstrate compatibility with the original host,
+Swing or PTY clients. This review accepts the current snapshots and retained clients
 as a development baseline, subject to the open behavioral gaps in the final review.
 
 Published modules use strict explicit API mode and Kotlin's built-in ABI

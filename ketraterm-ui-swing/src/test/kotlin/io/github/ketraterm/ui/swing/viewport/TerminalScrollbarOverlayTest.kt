@@ -29,7 +29,10 @@ class TerminalScrollbarOverlayTest {
     @Test
     fun `thumb is painted inside the reserved right inset`() {
         val overlay = TerminalScrollbarOverlay()
-        val settings = SwingSettings(padding = SwingPadding(0, 4, 8, 10))
+        val settings =
+            SwingSettings.create { draft ->
+                draft.padding = SwingPadding(0, 4, 8, 10)
+            }
 
         val thumb = Rectangle()
         assertTrue(
@@ -51,7 +54,10 @@ class TerminalScrollbarOverlayTest {
     @Test
     fun `alternate screen uses small edge inset and hides thumb`() {
         val overlay = TerminalScrollbarOverlay()
-        val settings = SwingSettings(padding = SwingPadding(0, 4, 8, 10))
+        val settings =
+            SwingSettings.create { draft ->
+                draft.padding = SwingPadding(0, 4, 8, 10)
+            }
 
         assertTrue(
             overlay.containsGutter(
@@ -78,7 +84,10 @@ class TerminalScrollbarOverlayTest {
     @Test
     fun `dragging maps bottom origin thumb movement to terminal scrollback offset`() {
         val overlay = TerminalScrollbarOverlay()
-        val settings = SwingSettings(padding = SwingPadding(0, 4, 8, 10))
+        val settings =
+            SwingSettings.create { draft ->
+                draft.padding = SwingPadding(0, 4, 8, 10)
+            }
         var requestedOffset = -1
         var requestedAdjusting = false
 
@@ -118,7 +127,10 @@ class TerminalScrollbarOverlayTest {
     @Test
     fun `painting matches rounded thumb raster and restores caller graphics state`() {
         val overlay = TerminalScrollbarOverlay()
-        val settings = SwingSettings(padding = SwingPadding(0, 4, 8, 10))
+        val settings =
+            SwingSettings.create { draft ->
+                draft.padding = SwingPadding(0, 4, 8, 10)
+            }
         val palette = TerminalColorPalette(defaultForeground = Color.RED.rgb)
         val state = viewportState(scrollbackOffset = 4.0)
         val actual = BufferedImage(110, 108, BufferedImage.TYPE_INT_ARGB)
@@ -150,7 +162,10 @@ class TerminalScrollbarOverlayTest {
     @Test
     fun `hover and palette changes update retained thumb colors`() {
         val overlay = TerminalScrollbarOverlay()
-        val settings = SwingSettings(padding = SwingPadding(0, 4, 8, 10))
+        val settings =
+            SwingSettings.create { draft ->
+                draft.padding = SwingPadding(0, 4, 8, 10)
+            }
         val state = viewportState(scrollbackOffset = 4.0)
         val image = BufferedImage(110, 108, BufferedImage.TYPE_INT_ARGB)
         val graphics = image.createGraphics()
@@ -182,7 +197,10 @@ class TerminalScrollbarOverlayTest {
         val destination = Rectangle()
         val state = viewportState(scrollbackOffset = 4.0)
         for (rightInset in 1..3) {
-            val settings = SwingSettings(padding = SwingPadding(0, 4, 8, rightInset))
+            val settings =
+                SwingSettings.create { draft ->
+                    draft.padding = SwingPadding(0, 4, 8, rightInset)
+                }
             for (trackHeight in 1..23) {
                 assertTrue(
                     overlay.copyThumbBounds(
@@ -202,7 +220,10 @@ class TerminalScrollbarOverlayTest {
     @Test
     fun `thumb without travel retains current offset when pressed and released`() {
         val overlay = TerminalScrollbarOverlay()
-        val settings = SwingSettings(padding = SwingPadding(0, 4, 8, 1))
+        val settings =
+            SwingSettings.create { draft ->
+                draft.padding = SwingPadding(0, 4, 8, 1)
+            }
         val state = viewportState(scrollbackOffset = 4.0)
         var offset = -1
         assertTrue(

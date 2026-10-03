@@ -132,13 +132,12 @@ fun createTerminalView(session: TerminalSession): JComponent {
     val panel = JPanel(BorderLayout())
 
     // 1. Define custom, immutable settings (palette, fonts, etc.)
-    val settings = SwingSettings(
-        palette = TerminalTheme.ONE_DARK.createPalette(),
-        fontFamily = "Cascadia Mono",
-        fontSize = 15,
-        columns = 80,
-        rows = 24
-    )
+    val settings = SwingSettings.create {
+        it.palette = TerminalTheme.ONE_DARK.createPalette()
+        it.font = java.awt.Font("Cascadia Mono", java.awt.Font.PLAIN, 15)
+        it.columns = 80
+        it.rows = 24
+    }
     
     // 2. Instantiate the SwingTerminal component
     val terminalComponent = SwingTerminal(
@@ -164,8 +163,8 @@ import io.github.ketraterm.ui.swing.api.SwingHostServices
 import io.github.ketraterm.ui.swing.settings.TerminalClipboardHandler
 import io.github.ketraterm.ui.swing.settings.TerminalHyperlinkHandler
 
-val customServices = SwingHostServices(
-    clipboardHandler = object : TerminalClipboardHandler {
+val customServices = SwingHostServices.create {
+    it.clipboardHandler = object : TerminalClipboardHandler {
         override fun copyText(text: String) {
             println("Copying to custom clipboard: $text")
         }
@@ -173,12 +172,12 @@ val customServices = SwingHostServices(
         override fun readText(): String? {
             return "Pasted text"
         }
-    },
-    hyperlinkHandler = TerminalHyperlinkHandler { uri ->
+    }
+    it.hyperlinkHandler = TerminalHyperlinkHandler { uri ->
         println("User clicked hyperlink: $uri")
         true
     }
-)
+}
 ```
 
 ## Hyperlink detector contract and migration
@@ -347,10 +346,10 @@ painting.
 Hyperlink configuration uses the existing immutable DTOs:
 
 ```kotlin
-val settings = SwingSettings(
-    osc8HyperlinkPresentation = myPresentation, // null retains the built-in styles
-    osc8HyperlinkActivation = SwingHyperlinkActivation.DIRECT,
-)
+val settings = SwingSettings.create {
+    it.osc8HyperlinkPresentation = myPresentation // null retains the built-in styles
+    it.osc8HyperlinkActivation = SwingHyperlinkActivation.DIRECT
+}
 val terminal = SwingTerminal(settingsProvider = { settings })
 ```
 

@@ -118,16 +118,16 @@ class TerminalStartupCommandPtyTest {
             try {
                 TerminalSessions
                     .localPty(
-                        PtyOptions(
-                            command = launch.command,
-                            environment = PtyOptions.defaultEnvironment() + launch.environment,
-                            workingDirectory = directory,
-                            columns = 120,
-                            rows = 20,
-                            startupCommand = launch.startupCommand,
-                            shellIntegration = OscShellIntegration,
-                            eventListener = listener,
-                        ),
+                        PtyOptions.create { draft ->
+                            draft.command = launch.command
+                            draft.environment = PtyOptions.defaultEnvironment() + launch.environment
+                            draft.workingDirectory = directory
+                            draft.columns = 120
+                            draft.rows = 20
+                            draft.startupCommand = launch.startupCommand
+                            draft.shellIntegration = OscShellIntegration
+                            draft.eventListener = listener
+                        },
                     ).use { session ->
                         // The initial prompt submits startup; the next prompt proves that command finished.
                         withTimeout(20_000.milliseconds) { repeat(2) { prompts.receive() } }

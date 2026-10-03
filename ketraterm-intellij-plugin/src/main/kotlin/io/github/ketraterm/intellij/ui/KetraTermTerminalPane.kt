@@ -326,12 +326,14 @@ internal class KetraTermTerminalPane private constructor(
             val terminal =
                 SwingTerminal(
                     settingsProvider = {
-                        KetraTermIntellijSettings.current().copy(osc8HyperlinkPresentation = intellijOsc8HyperlinkPresentation())
+                        KetraTermIntellijSettings.current().copy { draft ->
+                            draft.osc8HyperlinkPresentation = intellijOsc8HyperlinkPresentation()
+                        }
                     },
                     hostServices =
-                        SwingHostServices(
-                            clipboardHandler = clipboard,
-                            hyperlinkDetector =
+                        SwingHostServices.create { draft ->
+                            draft.clipboardHandler = clipboard
+                            draft.hyperlinkDetector =
                                 IntellijTerminalHyperlinkDetector(
                                     project,
                                     tab.profile.workingDirectory ?: java.nio.file.Path
@@ -339,25 +341,25 @@ internal class KetraTermTerminalPane private constructor(
                                 ) { lineId ->
                                     val state = tab.session.shellIntegrationState
                                     if (lineId > 0L) state.commandWorkingDirectoryUri(state.commandRecordIdAtLine(lineId)) else null
-                                },
-                            viewportListener = scrollbarAdapter,
-                            scrollbarOverlayEnabled = false,
-                            shellSuggestionProvider = completionBinding.provider,
-                            shellSuggestionHandler = SwingShellSuggestionHandler.createDefault(tab.session),
-                            shellSuggestionFeedbackHandler = completionBinding.feedbackHandler,
-                            shellSuggestionKeymap = KetraTermShellSuggestionKeymap,
-                            shellSuggestionViewFactory = IntellijCompletionListViewFactory,
-                            uiDispatcher =
+                                }
+                            draft.viewportListener = scrollbarAdapter
+                            draft.scrollbarOverlayEnabled = false
+                            draft.shellSuggestionProvider = completionBinding.provider
+                            draft.shellSuggestionHandler = SwingShellSuggestionHandler.createDefault(tab.session)
+                            draft.shellSuggestionFeedbackHandler = completionBinding.feedbackHandler
+                            draft.shellSuggestionKeymap = KetraTermShellSuggestionKeymap
+                            draft.shellSuggestionViewFactory = IntellijCompletionListViewFactory
+                            draft.uiDispatcher =
                                 TerminalUiDispatcher { runnable ->
                                     ApplicationManager.getApplication().invokeLater(runnable)
-                                },
-                            fontResolver = IntellijTerminalFontResolver,
-                            hostKeyHandler = { event -> shortcutControllerRef[0]?.handleKeyPressed(event) == true },
-                            contextMenuHandler =
+                                }
+                            draft.fontResolver = IntellijTerminalFontResolver
+                            draft.hostKeyHandler = { event -> shortcutControllerRef[0]?.handleKeyPressed(event) == true }
+                            draft.contextMenuHandler =
                                 SwingTerminalContextMenuHandler { request ->
                                     paneRef[0]?.showContextMenu(request) == true
-                                },
-                        ),
+                                }
+                        },
                 ).apply {
                     setShellSuggestionFailureHandler { _, failure ->
                         reportShellSuggestionFailure(failure)

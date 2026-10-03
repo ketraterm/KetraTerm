@@ -378,7 +378,9 @@ class TerminalHyperlinkDiscoveryControllerTest {
                             true,
                             ids,
                             hover.hover,
-                            SwingSettings(hyperlinkActivationForeground = activationForeground),
+                            SwingSettings.create { draft ->
+                                draft.hyperlinkActivationForeground = activationForeground
+                            },
                             row = row,
                         )
                         for (column in 0 until cache.columns) {

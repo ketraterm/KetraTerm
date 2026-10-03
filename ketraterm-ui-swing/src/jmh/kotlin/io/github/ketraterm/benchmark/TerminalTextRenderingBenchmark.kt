@@ -90,11 +90,12 @@ open class TerminalTextRenderingBenchmark {
     @Setup(Level.Trial)
     open fun setup() {
         settings =
-            SwingSettings(
-                font = Font(Font.MONOSPACED, Font.PLAIN, 14),
-                useSystemFallbackFonts = false,
-                textAntialiasing = if (antialiased) RenderingHints.VALUE_TEXT_ANTIALIAS_ON else RenderingHints.VALUE_TEXT_ANTIALIAS_OFF,
-            )
+            SwingSettings.create { draft ->
+                draft.font = Font(Font.MONOSPACED, Font.PLAIN, 14)
+                draft.useSystemFallbackFonts = false
+                draft.textAntialiasing =
+                    if (antialiased) RenderingHints.VALUE_TEXT_ANTIALIAS_ON else RenderingHints.VALUE_TEXT_ANTIALIAS_OFF
+            }
         asciiGraphics = BufferedImage(500, 40, BufferedImage.TYPE_INT_ARGB).createGraphics()
         styledGraphics = BufferedImage(500, 40, BufferedImage.TYPE_INT_ARGB).createGraphics()
         batchGraphics = BufferedImage(135 * CELL_WIDTH, 40, BufferedImage.TYPE_INT_ARGB).createGraphics()
@@ -328,7 +329,11 @@ open class TerminalFontConfigurationBenchmark {
     open fun setup() {
         val font = Font(Font.MONOSPACED, Font.PLAIN, 14)
         settings =
-            SwingSettings(font = font, fallbackFonts = List(fallbackCount) { font }.toImmutableList(), useSystemFallbackFonts = false)
+            SwingSettings.create { draft ->
+                draft.font = font
+                draft.fallbackFonts = List(fallbackCount) { font }.toImmutableList()
+                draft.useSystemFallbackFonts = false
+            }
         fonts.update(settings.font, settings.fallbackFonts, settings.useSystemFallbackFonts)
         fonts.fontForCodePoint(0x10FFFF, Font.PLAIN)
     }

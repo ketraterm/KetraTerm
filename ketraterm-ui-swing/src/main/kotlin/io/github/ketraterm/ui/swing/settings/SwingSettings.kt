@@ -33,22 +33,20 @@ import java.util.*
  * Immutable Swing terminal UI settings.
  *
  * Padding and fallback collections are immutable values, so [copy] can safely
- * share them. Convert host-owned font lists with `toImmutableList()` before
- * constructing or copying settings. Padding reads never allocate defensive copies.
+ * share them. Host-owned font lists are copied into immutable storage at build time. Padding reads never allocate defensive copies.
  *
  * Hosts can replace this value and call
  * [io.github.ketraterm.ui.swing.api.SwingTerminal.reloadSettings] to rebuild metrics and repaint.
- * Constructor, [copy], and destructuring signatures are part of the public ABI.
- * The snapshot shape is fixed; view-lifetime integrations use additive EDT APIs
- * on [io.github.ketraterm.ui.swing.api.SwingTerminal].
+ * Use [create] for named construction and [copy] for immutable updates from Kotlin or Java.
+ * Builders are temporary caller-owned drafts; snapshots store validated values directly.
+ * Scrollback capacity and shell window permissions belong to core creation and host policy.
  *
  * @property font primary terminal font.
  * @property fallbackFonts ordered fonts used by the complex-text renderer when
  * [font] cannot display a Unicode scalar cell or grapheme cluster.
  * @property useSystemFallbackFonts whether the complex-text renderer may use
  * installed system fonts after [fallbackFonts] fail. System font discovery is
- * asynchronous and disabled by default to keep Swing startup and painting
- * responsive.
+ * asynchronous, keeping discovery work outside painting.
  * @property palette resolved terminal color palette.
  * @property columns initial preferred column count.
  * @property rows initial preferred row count.
@@ -105,10 +103,7 @@ import java.util.*
  * @property pasteControlPolicy paste payload transformation applied before
  * host-bound input emission.
  * @property cursorShape default cursor shape configured for the session.
- * @property scrollbackLines maximum scrollback lines retained by the terminal.
  * @property lineHeight finite positive vertical line height scaling factor.
- * @property shellRequestResizeWindow whether the terminal panel requests window resizing.
- * @property shellRequestWindowManipulation whether the terminal panel allows shell window manipulation.
  * @property smartSuggestionsEnabled master switch for all shell suggestion requests and presentation.
  * @property shellSuggestionsEnabled whether hosts may request shell suggestion
  * popups automatically. Explicit requests require only [smartSuggestionsEnabled].
@@ -116,319 +111,542 @@ import java.util.*
  * accepts an already-selected shell suggestion. Enter remains terminal input
  * when the popup has no selection.
  */
-public data class SwingSettings
-    @JvmOverloads
-    constructor(
-        val font: Font = defaultTerminalFont(),
-        val fallbackFonts: ImmutableList<Font> = defaultFallbackFonts(),
-        val useSystemFallbackFonts: Boolean = true,
-        val palette: TerminalColorPalette = defaultPalette(),
-        val columns: Int = 80,
-        val rows: Int = 24,
-        val treatAmbiguousAsWide: Boolean = false,
-        val cursorBlinkMillis: Int = 600,
-        val textAntialiasing: Any = RenderingHints.VALUE_TEXT_ANTIALIAS_LCD_HRGB,
-        val fractionalMetrics: Any = RenderingHints.VALUE_FRACTIONALMETRICS_OFF,
-        val hyperlinkActivationForeground: Int = DEFAULT_HYPERLINK_ACTIVATION_FOREGROUND,
-        val selectionBackground: Int = DEFAULT_SELECTION_BACKGROUND,
-        val searchMatchBackground: Int = DEFAULT_SEARCH_MATCH_BACKGROUND,
-        val searchActiveMatchBackground: Int = DEFAULT_SEARCH_ACTIVE_MATCH_BACKGROUND,
-        val visualBellEnabled: Boolean = true,
-        val visualBellColor: Int = DEFAULT_VISUAL_BELL_COLOR,
-        val visualBellDurationMillis: Int = DEFAULT_VISUAL_BELL_DURATION_MILLIS,
-        val visualBellEdgeThicknessPixels: Int = DEFAULT_VISUAL_BELL_EDGE_THICKNESS_PIXELS,
-        val shellIntegrationPromptDotsVisible: Boolean = true,
-        val shellIntegrationPromptDotColor: Int = DEFAULT_SHELL_INTEGRATION_PROMPT_DOT_COLOR,
-        val shellIntegrationFailedPromptDotColor: Int = DEFAULT_SHELL_INTEGRATION_FAILED_PROMPT_DOT_COLOR,
-        val shellIntegrationPromptDotDiameter: Int = 8,
-        val shellIntegrationDecorationGutterWidth: Int = 16,
-        val shellIntegrationFailedCommandRailsVisible: Boolean = true,
-        val shellIntegrationFailedCommandRailColor: Int = DEFAULT_SHELL_INTEGRATION_FAILED_COMMAND_RAIL_COLOR,
-        val shellIntegrationFailedCommandRailWidth: Int = 3,
-        val padding: SwingPadding = SwingPadding(0, 4, 4, 6),
-        val alternateScreenPadding: SwingPadding = balancedAlternatePadding(padding, shellIntegrationDecorationGutterWidth),
-        val pasteControlPolicy: PasteControlPolicy = PasteControlPolicy.PRESERVE,
-        val cursorShape: TerminalRenderCursorShape = TerminalRenderCursorShape.BLOCK,
-        val scrollbackLines: Int = 1000,
-        val lineHeight: Float = 1.0f,
-        val shellRequestResizeWindow: Boolean = false,
-        val shellRequestWindowManipulation: Boolean = false,
-        val smartSuggestionsEnabled: Boolean = false,
-        val shellSuggestionsEnabled: Boolean = true,
-        val acceptSelectedSuggestionWithEnter: Boolean = true,
-        val scrollOnOutput: Boolean = true,
-        val osc8HyperlinkPresentation: SwingHyperlinkPresentation? = null,
-        val osc8HyperlinkActivation: SwingHyperlinkActivation = SwingHyperlinkActivation.MODIFIER,
+public class SwingSettings private constructor(
+    builder: Builder,
+) {
+    /** Creates a validated snapshot with default values. */
+    public constructor() : this(Builder())
+
+    public val font: Font = builder.font
+    public val fallbackFonts: ImmutableList<Font> = builder.fallbackFonts.toImmutableList()
+    public val useSystemFallbackFonts: Boolean = builder.useSystemFallbackFonts
+    public val palette: TerminalColorPalette = builder.palette
+    public val columns: Int = builder.columns
+    public val rows: Int = builder.rows
+    public val treatAmbiguousAsWide: Boolean = builder.treatAmbiguousAsWide
+    public val cursorBlinkMillis: Int = builder.cursorBlinkMillis
+    public val textAntialiasing: Any = builder.textAntialiasing
+    public val fractionalMetrics: Any = builder.fractionalMetrics
+    public val hyperlinkActivationForeground: Int = builder.hyperlinkActivationForeground
+    public val selectionBackground: Int = builder.selectionBackground
+    public val searchMatchBackground: Int = builder.searchMatchBackground
+    public val searchActiveMatchBackground: Int = builder.searchActiveMatchBackground
+    public val visualBellEnabled: Boolean = builder.visualBellEnabled
+    public val visualBellColor: Int = builder.visualBellColor
+    public val visualBellDurationMillis: Int = builder.visualBellDurationMillis
+    public val visualBellEdgeThicknessPixels: Int = builder.visualBellEdgeThicknessPixels
+    public val shellIntegrationPromptDotsVisible: Boolean = builder.shellIntegrationPromptDotsVisible
+    public val shellIntegrationPromptDotColor: Int = builder.shellIntegrationPromptDotColor
+    public val shellIntegrationFailedPromptDotColor: Int = builder.shellIntegrationFailedPromptDotColor
+    public val shellIntegrationPromptDotDiameter: Int = builder.shellIntegrationPromptDotDiameter
+    public val shellIntegrationDecorationGutterWidth: Int = builder.shellIntegrationDecorationGutterWidth
+    public val shellIntegrationFailedCommandRailsVisible: Boolean = builder.shellIntegrationFailedCommandRailsVisible
+    public val shellIntegrationFailedCommandRailColor: Int = builder.shellIntegrationFailedCommandRailColor
+    public val shellIntegrationFailedCommandRailWidth: Int = builder.shellIntegrationFailedCommandRailWidth
+    public val padding: SwingPadding = builder.padding
+    public val alternateScreenPadding: SwingPadding =
+        builder.alternateScreenPadding ?: balancedAlternatePadding(builder.padding, builder.shellIntegrationDecorationGutterWidth)
+    public val pasteControlPolicy: PasteControlPolicy = builder.pasteControlPolicy
+    public val cursorShape: TerminalRenderCursorShape = builder.cursorShape
+    public val lineHeight: Float = builder.lineHeight
+    public val smartSuggestionsEnabled: Boolean = builder.smartSuggestionsEnabled
+    public val shellSuggestionsEnabled: Boolean = builder.shellSuggestionsEnabled
+    public val acceptSelectedSuggestionWithEnter: Boolean = builder.acceptSelectedSuggestionWithEnter
+    public val scrollOnOutput: Boolean = builder.scrollOnOutput
+    public val osc8HyperlinkPresentation: SwingHyperlinkPresentation? = builder.osc8HyperlinkPresentation
+    public val osc8HyperlinkActivation: SwingHyperlinkActivation = builder.osc8HyperlinkActivation
+
+    /** Returns a detached mutable draft. Builders are caller-confined and never retained by snapshots. */
+    public fun toBuilder(): Builder = Builder(this)
+
+    /**
+     * Configures a fresh draft synchronously and returns a validated immutable snapshot.
+     * Exceptions propagate without changing this snapshot. Supplied services remain host-owned.
+     */
+    public fun copy(configure: java.util.function.Consumer<Builder>): SwingSettings = toBuilder().also { configure.accept(it) }.build()
+
+    /** Mutable construction draft. Not thread-safe; [build] never retains this draft. */
+    public class Builder internal constructor(
+        source: SwingSettings? = null,
     ) {
-        @get:JvmSynthetic
-        internal val defaultHyperlinkPresentation =
-            SwingHyperlinkPresentation(
-                normal = SwingHyperlinkStyle(underlineStyle = TerminalRenderUnderline.NONE),
-                hovered = SwingHyperlinkStyle(underlineStyle = TerminalRenderUnderline.SINGLE, underlineThickness = 2),
-                active =
-                    SwingHyperlinkStyle(
-                        foregroundArgb = hyperlinkActivationForeground,
-                        underlineStyle = TerminalRenderUnderline.SINGLE,
-                        underlineThickness = 2,
-                    ),
-            )
+        /** Draft value for [SwingSettings.font]; validated when [build] is called. */
+        public var font: Font = source?.font ?: defaultTerminalFont()
 
-        @get:JvmSynthetic
-        internal val resolvedOsc8HyperlinkPresentation =
-            osc8HyperlinkPresentation ?: defaultHyperlinkPresentation.copy(
-                normal = SwingHyperlinkStyle(underlineStyle = TerminalRenderUnderline.DOTTED),
-                isVisible = true,
-            )
+        /** Draft value for [SwingSettings.fallbackFonts]; validated when [build] is called. */
+        public var fallbackFonts: List<Font> = source?.fallbackFonts ?: defaultFallbackFonts()
 
-        init {
-            require(columns > 0) { "columns must be > 0, was $columns" }
-            require(rows > 0) { "rows must be > 0, was $rows" }
-            require(cursorBlinkMillis >= 0) {
-                "cursorBlinkMillis must be >= 0, was $cursorBlinkMillis"
-            }
-            require(visualBellDurationMillis >= 0) {
-                "visualBellDurationMillis must be >= 0, was $visualBellDurationMillis"
-            }
-            require(visualBellEdgeThicknessPixels >= 0) {
-                "visualBellEdgeThicknessPixels must be >= 0, was $visualBellEdgeThicknessPixels"
-            }
-            require(scrollbackLines >= 0) {
-                "scrollbackLines must be >= 0, was $scrollbackLines"
-            }
-            require(lineHeight.isFinite() && lineHeight > 0f) {
-                "lineHeight must be finite and > 0, was $lineHeight"
-            }
-            require(RenderingHints.KEY_TEXT_ANTIALIASING.isCompatibleValue(textAntialiasing)) {
-                "textAntialiasing must be a compatible text antialiasing hint"
-            }
-            require(RenderingHints.KEY_FRACTIONALMETRICS.isCompatibleValue(fractionalMetrics)) {
-                "fractionalMetrics must be a compatible fractional metrics hint"
-            }
-            require(shellIntegrationPromptDotDiameter > 0) {
-                "shellIntegrationPromptDotDiameter must be > 0, was $shellIntegrationPromptDotDiameter"
-            }
-            require(shellIntegrationDecorationGutterWidth >= 0) {
-                "shellIntegrationDecorationGutterWidth must be >= 0, was $shellIntegrationDecorationGutterWidth"
-            }
-            require(shellIntegrationFailedCommandRailWidth > 0) {
-                "shellIntegrationFailedCommandRailWidth must be > 0, was $shellIntegrationFailedCommandRailWidth"
-            }
+        /** Draft value for [SwingSettings.useSystemFallbackFonts]; validated when [build] is called. */
+        public var useSystemFallbackFonts: Boolean = source?.useSystemFallbackFonts ?: true
+
+        /** Draft value for [SwingSettings.palette]; validated when [build] is called. */
+        public var palette: TerminalColorPalette = source?.palette ?: defaultPalette()
+
+        /** Draft value for [SwingSettings.columns]; validated when [build] is called. */
+        public var columns: Int = source?.columns ?: 80
+
+        /** Draft value for [SwingSettings.rows]; validated when [build] is called. */
+        public var rows: Int = source?.rows ?: 24
+
+        /** Draft value for [SwingSettings.treatAmbiguousAsWide]; validated when [build] is called. */
+        public var treatAmbiguousAsWide: Boolean = source?.treatAmbiguousAsWide ?: false
+
+        /** Draft value for [SwingSettings.cursorBlinkMillis]; validated when [build] is called. */
+        public var cursorBlinkMillis: Int = source?.cursorBlinkMillis ?: 600
+
+        /** Draft value for [SwingSettings.textAntialiasing]; validated when [build] is called. */
+        public var textAntialiasing: Any = source?.textAntialiasing ?: RenderingHints.VALUE_TEXT_ANTIALIAS_LCD_HRGB
+
+        /** Draft value for [SwingSettings.fractionalMetrics]; validated when [build] is called. */
+        public var fractionalMetrics: Any = source?.fractionalMetrics ?: RenderingHints.VALUE_FRACTIONALMETRICS_OFF
+
+        /** Draft value for [SwingSettings.hyperlinkActivationForeground]; validated when [build] is called. */
+        public var hyperlinkActivationForeground: Int = source?.hyperlinkActivationForeground ?: DEFAULT_HYPERLINK_ACTIVATION_FOREGROUND
+
+        /** Draft value for [SwingSettings.selectionBackground]; validated when [build] is called. */
+        public var selectionBackground: Int = source?.selectionBackground ?: DEFAULT_SELECTION_BACKGROUND
+
+        /** Draft value for [SwingSettings.searchMatchBackground]; validated when [build] is called. */
+        public var searchMatchBackground: Int = source?.searchMatchBackground ?: DEFAULT_SEARCH_MATCH_BACKGROUND
+
+        /** Draft value for [SwingSettings.searchActiveMatchBackground]; validated when [build] is called. */
+        public var searchActiveMatchBackground: Int = source?.searchActiveMatchBackground ?: DEFAULT_SEARCH_ACTIVE_MATCH_BACKGROUND
+
+        /** Draft value for [SwingSettings.visualBellEnabled]; validated when [build] is called. */
+        public var visualBellEnabled: Boolean = source?.visualBellEnabled ?: true
+
+        /** Draft value for [SwingSettings.visualBellColor]; validated when [build] is called. */
+        public var visualBellColor: Int = source?.visualBellColor ?: DEFAULT_VISUAL_BELL_COLOR
+
+        /** Draft value for [SwingSettings.visualBellDurationMillis]; validated when [build] is called. */
+        public var visualBellDurationMillis: Int = source?.visualBellDurationMillis ?: DEFAULT_VISUAL_BELL_DURATION_MILLIS
+
+        /** Draft value for [SwingSettings.visualBellEdgeThicknessPixels]; validated when [build] is called. */
+        public var visualBellEdgeThicknessPixels: Int = source?.visualBellEdgeThicknessPixels ?: DEFAULT_VISUAL_BELL_EDGE_THICKNESS_PIXELS
+
+        /** Draft value for [SwingSettings.shellIntegrationPromptDotsVisible]; validated when [build] is called. */
+        public var shellIntegrationPromptDotsVisible: Boolean = source?.shellIntegrationPromptDotsVisible ?: true
+
+        /** Draft value for [SwingSettings.shellIntegrationPromptDotColor]; validated when [build] is called. */
+        public var shellIntegrationPromptDotColor: Int =
+            source?.shellIntegrationPromptDotColor ?: DEFAULT_SHELL_INTEGRATION_PROMPT_DOT_COLOR
+
+        /** Draft value for [SwingSettings.shellIntegrationFailedPromptDotColor]; validated when [build] is called. */
+        public var shellIntegrationFailedPromptDotColor: Int =
+            source?.shellIntegrationFailedPromptDotColor ?: DEFAULT_SHELL_INTEGRATION_FAILED_PROMPT_DOT_COLOR
+
+        /** Draft value for [SwingSettings.shellIntegrationPromptDotDiameter]; validated when [build] is called. */
+        public var shellIntegrationPromptDotDiameter: Int = source?.shellIntegrationPromptDotDiameter ?: 8
+
+        /** Draft value for [SwingSettings.shellIntegrationDecorationGutterWidth]; validated when [build] is called. */
+        public var shellIntegrationDecorationGutterWidth: Int = source?.shellIntegrationDecorationGutterWidth ?: 16
+
+        /** Draft value for [SwingSettings.shellIntegrationFailedCommandRailsVisible]; validated when [build] is called. */
+        public var shellIntegrationFailedCommandRailsVisible: Boolean = source?.shellIntegrationFailedCommandRailsVisible ?: true
+
+        /** Draft value for [SwingSettings.shellIntegrationFailedCommandRailColor]; validated when [build] is called. */
+        public var shellIntegrationFailedCommandRailColor: Int =
+            source?.shellIntegrationFailedCommandRailColor ?: DEFAULT_SHELL_INTEGRATION_FAILED_COMMAND_RAIL_COLOR
+
+        /** Draft value for [SwingSettings.shellIntegrationFailedCommandRailWidth]; validated when [build] is called. */
+        public var shellIntegrationFailedCommandRailWidth: Int = source?.shellIntegrationFailedCommandRailWidth ?: 3
+
+        /** Draft value for [SwingSettings.padding]; validated when [build] is called. */
+        public var padding: SwingPadding = source?.padding ?: SwingPadding(0, 4, 4, 6)
+
+        /**
+         * Explicit alternate padding, or null to balance the final [padding] and gutter at build time.
+         * A copied draft retains the original resolved padding; set null to recalculate it.
+         */
+        public var alternateScreenPadding: SwingPadding? = source?.alternateScreenPadding
+
+        /** Draft value for [SwingSettings.pasteControlPolicy]; validated when [build] is called. */
+        public var pasteControlPolicy: PasteControlPolicy = source?.pasteControlPolicy ?: PasteControlPolicy.PRESERVE
+
+        /** Draft value for [SwingSettings.cursorShape]; validated when [build] is called. */
+        public var cursorShape: TerminalRenderCursorShape = source?.cursorShape ?: TerminalRenderCursorShape.BLOCK
+
+        /** Draft value for [SwingSettings.lineHeight]; validated when [build] is called. */
+        public var lineHeight: Float = source?.lineHeight ?: 1.0f
+
+        /** Draft value for [SwingSettings.smartSuggestionsEnabled]; validated when [build] is called. */
+        public var smartSuggestionsEnabled: Boolean = source?.smartSuggestionsEnabled ?: false
+
+        /** Draft value for [SwingSettings.shellSuggestionsEnabled]; validated when [build] is called. */
+        public var shellSuggestionsEnabled: Boolean = source?.shellSuggestionsEnabled ?: true
+
+        /** Draft value for [SwingSettings.acceptSelectedSuggestionWithEnter]; validated when [build] is called. */
+        public var acceptSelectedSuggestionWithEnter: Boolean = source?.acceptSelectedSuggestionWithEnter ?: true
+
+        /** Draft value for [SwingSettings.scrollOnOutput]; validated when [build] is called. */
+        public var scrollOnOutput: Boolean = source?.scrollOnOutput ?: true
+
+        /** Draft value for [SwingSettings.osc8HyperlinkPresentation]; validated when [build] is called. */
+        public var osc8HyperlinkPresentation: SwingHyperlinkPresentation? = source?.osc8HyperlinkPresentation
+
+        /** Draft value for [SwingSettings.osc8HyperlinkActivation]; validated when [build] is called. */
+        public var osc8HyperlinkActivation: SwingHyperlinkActivation = source?.osc8HyperlinkActivation ?: SwingHyperlinkActivation.MODIFIER
+
+        /** Validates and freezes current values; later draft changes cannot affect the result. */
+        public fun build(): SwingSettings = SwingSettings(this)
+    }
+
+    override fun equals(other: Any?): Boolean =
+        this === other ||
+            other is SwingSettings &&
+            font == other.font &&
+            fallbackFonts == other.fallbackFonts &&
+            useSystemFallbackFonts == other.useSystemFallbackFonts &&
+            palette == other.palette &&
+            columns == other.columns &&
+            rows == other.rows &&
+            treatAmbiguousAsWide == other.treatAmbiguousAsWide &&
+            cursorBlinkMillis == other.cursorBlinkMillis &&
+            textAntialiasing == other.textAntialiasing &&
+            fractionalMetrics == other.fractionalMetrics &&
+            hyperlinkActivationForeground == other.hyperlinkActivationForeground &&
+            selectionBackground == other.selectionBackground &&
+            searchMatchBackground == other.searchMatchBackground &&
+            searchActiveMatchBackground == other.searchActiveMatchBackground &&
+            visualBellEnabled == other.visualBellEnabled &&
+            visualBellColor == other.visualBellColor &&
+            visualBellDurationMillis == other.visualBellDurationMillis &&
+            visualBellEdgeThicknessPixels == other.visualBellEdgeThicknessPixels &&
+            shellIntegrationPromptDotsVisible == other.shellIntegrationPromptDotsVisible &&
+            shellIntegrationPromptDotColor == other.shellIntegrationPromptDotColor &&
+            shellIntegrationFailedPromptDotColor == other.shellIntegrationFailedPromptDotColor &&
+            shellIntegrationPromptDotDiameter == other.shellIntegrationPromptDotDiameter &&
+            shellIntegrationDecorationGutterWidth == other.shellIntegrationDecorationGutterWidth &&
+            shellIntegrationFailedCommandRailsVisible == other.shellIntegrationFailedCommandRailsVisible &&
+            shellIntegrationFailedCommandRailColor == other.shellIntegrationFailedCommandRailColor &&
+            shellIntegrationFailedCommandRailWidth == other.shellIntegrationFailedCommandRailWidth &&
+            padding == other.padding &&
+            alternateScreenPadding == other.alternateScreenPadding &&
+            pasteControlPolicy == other.pasteControlPolicy &&
+            cursorShape == other.cursorShape &&
+            lineHeight == other.lineHeight &&
+            smartSuggestionsEnabled == other.smartSuggestionsEnabled &&
+            shellSuggestionsEnabled == other.shellSuggestionsEnabled &&
+            acceptSelectedSuggestionWithEnter == other.acceptSelectedSuggestionWithEnter &&
+            scrollOnOutput == other.scrollOnOutput &&
+            osc8HyperlinkPresentation == other.osc8HyperlinkPresentation &&
+            osc8HyperlinkActivation == other.osc8HyperlinkActivation
+
+    override fun hashCode(): Int {
+        var result = 1
+        result = 31 * result + font.hashCode()
+        result = 31 * result + fallbackFonts.hashCode()
+        result = 31 * result + useSystemFallbackFonts.hashCode()
+        result = 31 * result + palette.hashCode()
+        result = 31 * result + columns.hashCode()
+        result = 31 * result + rows.hashCode()
+        result = 31 * result + treatAmbiguousAsWide.hashCode()
+        result = 31 * result + cursorBlinkMillis.hashCode()
+        result = 31 * result + textAntialiasing.hashCode()
+        result = 31 * result + fractionalMetrics.hashCode()
+        result = 31 * result + hyperlinkActivationForeground.hashCode()
+        result = 31 * result + selectionBackground.hashCode()
+        result = 31 * result + searchMatchBackground.hashCode()
+        result = 31 * result + searchActiveMatchBackground.hashCode()
+        result = 31 * result + visualBellEnabled.hashCode()
+        result = 31 * result + visualBellColor.hashCode()
+        result = 31 * result + visualBellDurationMillis.hashCode()
+        result = 31 * result + visualBellEdgeThicknessPixels.hashCode()
+        result = 31 * result + shellIntegrationPromptDotsVisible.hashCode()
+        result = 31 * result + shellIntegrationPromptDotColor.hashCode()
+        result = 31 * result + shellIntegrationFailedPromptDotColor.hashCode()
+        result = 31 * result + shellIntegrationPromptDotDiameter.hashCode()
+        result = 31 * result + shellIntegrationDecorationGutterWidth.hashCode()
+        result = 31 * result + shellIntegrationFailedCommandRailsVisible.hashCode()
+        result = 31 * result + shellIntegrationFailedCommandRailColor.hashCode()
+        result = 31 * result + shellIntegrationFailedCommandRailWidth.hashCode()
+        result = 31 * result + padding.hashCode()
+        result = 31 * result + alternateScreenPadding.hashCode()
+        result = 31 * result + pasteControlPolicy.hashCode()
+        result = 31 * result + cursorShape.hashCode()
+        result = 31 * result + lineHeight.hashCode()
+        result = 31 * result + smartSuggestionsEnabled.hashCode()
+        result = 31 * result + shellSuggestionsEnabled.hashCode()
+        result = 31 * result + acceptSelectedSuggestionWithEnter.hashCode()
+        result = 31 * result + scrollOnOutput.hashCode()
+        result = 31 * result + osc8HyperlinkPresentation.hashCode()
+        result = 31 * result + osc8HyperlinkActivation.hashCode()
+        return result
+    }
+
+    @get:JvmSynthetic
+    internal val defaultHyperlinkPresentation =
+        SwingHyperlinkPresentation(
+            normal = SwingHyperlinkStyle(underlineStyle = TerminalRenderUnderline.NONE),
+            hovered = SwingHyperlinkStyle(underlineStyle = TerminalRenderUnderline.SINGLE, underlineThickness = 2),
+            active =
+                SwingHyperlinkStyle(
+                    foregroundArgb = hyperlinkActivationForeground,
+                    underlineStyle = TerminalRenderUnderline.SINGLE,
+                    underlineThickness = 2,
+                ),
+        )
+
+    @get:JvmSynthetic
+    internal val resolvedOsc8HyperlinkPresentation =
+        osc8HyperlinkPresentation ?: defaultHyperlinkPresentation.copy(
+            normal = SwingHyperlinkStyle(underlineStyle = TerminalRenderUnderline.DOTTED),
+            isVisible = true,
+        )
+
+    init {
+        require(columns > 0) { "columns must be > 0, was $columns" }
+        require(rows > 0) { "rows must be > 0, was $rows" }
+        require(cursorBlinkMillis >= 0) {
+            "cursorBlinkMillis must be >= 0, was $cursorBlinkMillis"
         }
-
-        public companion object {
-            private fun balancedAlternatePadding(
-                padding: SwingPadding,
-                gutterWidth: Int,
-            ): SwingPadding {
-                val horizontal = padding.left.toLong() + gutterWidth + padding.right
-                require(horizontal in 0..Int.MAX_VALUE.toLong()) { "horizontal terminal padding is out of range" }
-                val left = horizontal.toInt() / 2
-                return SwingPadding(padding.top, left, padding.bottom, horizontal.toInt() - left)
-            }
-
-            private const val DEFAULT_FONT_SIZE = 16
-            private const val DEFAULT_HYPERLINK_ACTIVATION_FOREGROUND = 0xFF4DA3FF.toInt()
-            private const val DEFAULT_SELECTION_BACKGROUND = 0x66FFFFFF
-            private const val DEFAULT_SEARCH_MATCH_BACKGROUND = 0x55FFD54F
-            private const val DEFAULT_SEARCH_ACTIVE_MATCH_BACKGROUND = 0xAAFF8C00.toInt()
-            private const val DEFAULT_VISUAL_BELL_COLOR = 0x664DA3FF
-            private const val DEFAULT_VISUAL_BELL_DURATION_MILLIS = 240
-            private const val DEFAULT_VISUAL_BELL_EDGE_THICKNESS_PIXELS = 18
-            private const val DEFAULT_SHELL_INTEGRATION_PROMPT_DOT_COLOR = 0x8CFFFFFF.toInt()
-            private const val DEFAULT_SHELL_INTEGRATION_FAILED_PROMPT_DOT_COLOR = 0xFFE74856.toInt()
-            private const val DEFAULT_SHELL_INTEGRATION_FAILED_COMMAND_RAIL_COLOR = 0xFFE74856.toInt()
-            private val resolvedDefaultTerminalFont: Font by lazy(LazyThreadSafetyMode.PUBLICATION) {
-                Font(resolveDefaultFontFamily(), Font.PLAIN, DEFAULT_FONT_SIZE)
-            }
-
-            /**
-             * Returns the default terminal font used when hosts do not provide one.
-             *
-             * The preferred families match common modern Windows terminal defaults,
-             * with the logical monospaced font as a portable fallback.
-             *
-             * @return default terminal font.
-             */
-            @JvmStatic
-            public fun defaultTerminalFont(): Font = resolvedDefaultTerminalFont
-
-            /**
-             * Returns conservative logical and common platform fonts for complex
-             * script fallback. Color emoji fonts are preferred ahead of symbol fonts
-             * so emoji cells do not degrade to monochrome dingbat glyphs when a
-             * native color emoji family is installed.
-             *
-             * Hosts can replace this list with their own font resolver policy.
-             *
-             * @return list of fallback fonts.
-             */
-            @JvmStatic
-            public fun defaultFallbackFonts(): ImmutableList<Font> {
-                val installedFamilies =
-                    GraphicsEnvironment
-                        .getLocalGraphicsEnvironment()
-                        .availableFontFamilyNames
-                return fallbackFontFamiliesForInstalledFonts(installedFamilies)
-                    .map { family -> Font(family, Font.PLAIN, DEFAULT_FONT_SIZE) }
-                    .toImmutableList()
-            }
-
-            internal fun fallbackFontFamiliesForInstalledFonts(installedFamilies: Array<String>): List<String> {
-                val installedByLowercase = LinkedHashMap<String, String>(installedFamilies.size)
-                for (family in installedFamilies) {
-                    installedByLowercase.putIfAbsent(family.lowercase(Locale.ROOT), family)
-                }
-
-                val result = ArrayList<String>(DEFAULT_FALLBACK_FONT_FAMILY_CAPACITY)
-
-                fun addIfAbsent(family: String) {
-                    if (result.none { it.equals(family, ignoreCase = true) }) {
-                        result += family
-                    }
-                }
-
-                fun addInstalled(preferredFamily: String) {
-                    val installed = installedByLowercase[preferredFamily.lowercase(Locale.ROOT)]
-                    if (installed != null) addIfAbsent(installed)
-                }
-
-                for (family in preferredColorEmojiFallbackFamilies) {
-                    addInstalled(family)
-                }
-                addIfAbsent(Font.DIALOG)
-                addIfAbsent(Font.SANS_SERIF)
-                for (family in preferredTextFallbackFamilies) {
-                    addInstalled(family)
-                }
-                return result
-            }
-
-            /**
-             * Returns the default Swing terminal palette.
-             *
-             * Theme colors live in the Swing layer so the dependency-free render
-             * API can remain renderer-neutral.
-             *
-             * @return default terminal color palette.
-             */
-            @JvmStatic
-            public fun defaultPalette(): TerminalColorPalette = TerminalTheme.CAMPBELL.createPalette()
-
-            /**
-             * Resolves the font family name. If the requested font family name is installed on the
-             * system (case-insensitively), it returns the exact matched system font family name.
-             * Otherwise, it falls back to the first available font from the preferred default monospace
-             * font families chain.
-             *
-             * @param requestedFamily the name of the font family requested.
-             * @return the resolved font family name.
-             */
-            @JvmStatic
-            public fun resolveFontFamily(requestedFamily: String): String {
-                val installedFamilies =
-                    GraphicsEnvironment
-                        .getLocalGraphicsEnvironment()
-                        .availableFontFamilyNames
-                val matched = installedFamilies.firstOrNull { it.equals(requestedFamily, ignoreCase = true) }
-                return matched ?: resolveDefaultFontFamily()
-            }
-
-            private fun resolveDefaultFontFamily(): String = resolvedMonospaceFontFamilies.firstOrNull() ?: Font.MONOSPACED
-
-            /**
-             * Returns all installed font family names that are verified to be monospaced on the current system.
-             *
-             * @return list of monospaced font family names.
-             */
-            @JvmStatic
-            public fun getMonospaceFontFamilies(): List<String> = resolvedMonospaceFontFamilies
-
-            private val curatedMonospaceFontFamilies =
-                arrayOf(
-                    "Cascadia Mono",
-                    "Cascadia Code",
-                    "Consolas",
-                    "Menlo",
-                    "Monaco",
-                    "SF Mono",
-                    "JetBrains Mono",
-                    "Fira Code",
-                    "Source Code Pro",
-                    "Inconsolata",
-                    "Hack",
-                    "DejaVu Sans Mono",
-                    "Liberation Mono",
-                    "Ubuntu Mono",
-                    "Noto Sans Mono",
-                    "Noto Mono",
-                    "Lucida Console",
-                    "Courier New",
-                    "Courier",
-                    "FreeMono",
-                    Font.MONOSPACED,
-                )
-
-            private val resolvedMonospaceFontFamilies: List<String> by lazy(LazyThreadSafetyMode.PUBLICATION) {
-                val installed =
-                    GraphicsEnvironment
-                        .getLocalGraphicsEnvironment()
-                        .availableFontFamilyNames
-                val result = ArrayList<String>()
-                for (curated in curatedMonospaceFontFamilies) {
-                    val matched = installed.firstOrNull { it.equals(curated, ignoreCase = true) }
-                    if (matched != null) {
-                        result.add(matched)
-                    }
-                }
-                if (result.isEmpty()) {
-                    result.add(Font.MONOSPACED)
-                }
-                result
-            }
-
-            private const val DEFAULT_FALLBACK_FONT_FAMILY_CAPACITY = 16
-            private val preferredColorEmojiFallbackFamilies =
-                arrayOf(
-                    "Segoe UI Emoji",
-                    "Apple Color Emoji",
-                    "Noto Color Emoji",
-                    "Twemoji Mozilla",
-                    "EmojiOne Color",
-                    "JoyPixels",
-                    "Twitter Color Emoji",
-                )
-            private val preferredTextFallbackFamilies =
-                arrayOf(
-                    "Nirmala UI",
-                    "Segoe UI",
-                    "Segoe UI Symbol",
-                    "Segoe UI Historic",
-                    "Noto Sans Devanagari",
-                    "Noto Sans Bengali",
-                    "Noto Sans Tamil",
-                    "Noto Sans Khmer",
-                    "Noto Sans Sinhala",
-                    "Noto Serif Devanagari",
-                    "Noto Serif Bengali",
-                    "Noto Serif Tamil",
-                    "Noto Serif Khmer",
-                    "Noto Serif Sinhala",
-                    "Mangal",
-                    "Vrinda",
-                    "Latha",
-                    "Khmer UI",
-                    "Iskoola Pota",
-                    "Ebrima",
-                    "Leelawadee UI",
-                    "Nyala",
-                    "Abyssinica SIL",
-                    "Noto Sans Thai",
-                    "Noto Sans Ethiopic",
-                    "Noto Sans Runic",
-                    "Noto Sans CJK SC",
-                )
+        require(visualBellDurationMillis >= 0) {
+            "visualBellDurationMillis must be >= 0, was $visualBellDurationMillis"
+        }
+        require(visualBellEdgeThicknessPixels >= 0) {
+            "visualBellEdgeThicknessPixels must be >= 0, was $visualBellEdgeThicknessPixels"
+        }
+        require(lineHeight.isFinite() && lineHeight > 0f) {
+            "lineHeight must be finite and > 0, was $lineHeight"
+        }
+        require(RenderingHints.KEY_TEXT_ANTIALIASING.isCompatibleValue(textAntialiasing)) {
+            "textAntialiasing must be a compatible text antialiasing hint"
+        }
+        require(RenderingHints.KEY_FRACTIONALMETRICS.isCompatibleValue(fractionalMetrics)) {
+            "fractionalMetrics must be a compatible fractional metrics hint"
+        }
+        require(shellIntegrationPromptDotDiameter > 0) {
+            "shellIntegrationPromptDotDiameter must be > 0, was $shellIntegrationPromptDotDiameter"
+        }
+        require(shellIntegrationDecorationGutterWidth >= 0) {
+            "shellIntegrationDecorationGutterWidth must be >= 0, was $shellIntegrationDecorationGutterWidth"
+        }
+        require(shellIntegrationFailedCommandRailWidth > 0) {
+            "shellIntegrationFailedCommandRailWidth must be > 0, was $shellIntegrationFailedCommandRailWidth"
         }
     }
+
+    public companion object {
+        /** Creates a fresh caller-confined draft initialized to defaults. */
+        @JvmStatic
+        public fun builder(): Builder = Builder()
+
+        /** Configures a draft synchronously and returns one validated immutable snapshot. */
+        @JvmStatic
+        public fun create(configure: java.util.function.Consumer<Builder>): SwingSettings = builder().also { configure.accept(it) }.build()
+
+        private fun balancedAlternatePadding(
+            padding: SwingPadding,
+            gutterWidth: Int,
+        ): SwingPadding {
+            val horizontal = padding.left.toLong() + gutterWidth + padding.right
+            require(horizontal in 0..Int.MAX_VALUE.toLong()) { "horizontal terminal padding is out of range" }
+            val left = horizontal.toInt() / 2
+            return SwingPadding(padding.top, left, padding.bottom, horizontal.toInt() - left)
+        }
+
+        private const val DEFAULT_FONT_SIZE = 16
+        private const val DEFAULT_HYPERLINK_ACTIVATION_FOREGROUND = 0xFF4DA3FF.toInt()
+        private const val DEFAULT_SELECTION_BACKGROUND = 0x66FFFFFF
+        private const val DEFAULT_SEARCH_MATCH_BACKGROUND = 0x55FFD54F
+        private const val DEFAULT_SEARCH_ACTIVE_MATCH_BACKGROUND = 0xAAFF8C00.toInt()
+        private const val DEFAULT_VISUAL_BELL_COLOR = 0x664DA3FF
+        private const val DEFAULT_VISUAL_BELL_DURATION_MILLIS = 240
+        private const val DEFAULT_VISUAL_BELL_EDGE_THICKNESS_PIXELS = 18
+        private const val DEFAULT_SHELL_INTEGRATION_PROMPT_DOT_COLOR = 0x8CFFFFFF.toInt()
+        private const val DEFAULT_SHELL_INTEGRATION_FAILED_PROMPT_DOT_COLOR = 0xFFE74856.toInt()
+        private const val DEFAULT_SHELL_INTEGRATION_FAILED_COMMAND_RAIL_COLOR = 0xFFE74856.toInt()
+        private val resolvedDefaultTerminalFont: Font by lazy(LazyThreadSafetyMode.PUBLICATION) {
+            Font(resolveDefaultFontFamily(), Font.PLAIN, DEFAULT_FONT_SIZE)
+        }
+
+        /**
+         * Returns the default terminal font used when hosts do not provide one.
+         *
+         * The preferred families match common modern Windows terminal defaults,
+         * with the logical monospaced font as a portable fallback.
+         *
+         * @return default terminal font.
+         */
+        @JvmStatic
+        public fun defaultTerminalFont(): Font = resolvedDefaultTerminalFont
+
+        /**
+         * Returns conservative logical and common platform fonts for complex
+         * script fallback. Color emoji fonts are preferred ahead of symbol fonts
+         * so emoji cells do not degrade to monochrome dingbat glyphs when a
+         * native color emoji family is installed.
+         *
+         * Hosts can replace this list with their own font resolver policy.
+         *
+         * @return list of fallback fonts.
+         */
+        @JvmStatic
+        public fun defaultFallbackFonts(): ImmutableList<Font> {
+            val installedFamilies =
+                GraphicsEnvironment
+                    .getLocalGraphicsEnvironment()
+                    .availableFontFamilyNames
+            return fallbackFontFamiliesForInstalledFonts(installedFamilies)
+                .map { family -> Font(family, Font.PLAIN, DEFAULT_FONT_SIZE) }
+                .toImmutableList()
+        }
+
+        internal fun fallbackFontFamiliesForInstalledFonts(installedFamilies: Array<String>): List<String> {
+            val installedByLowercase = LinkedHashMap<String, String>(installedFamilies.size)
+            for (family in installedFamilies) {
+                installedByLowercase.putIfAbsent(family.lowercase(Locale.ROOT), family)
+            }
+
+            val result = ArrayList<String>(DEFAULT_FALLBACK_FONT_FAMILY_CAPACITY)
+
+            fun addIfAbsent(family: String) {
+                if (result.none { it.equals(family, ignoreCase = true) }) {
+                    result += family
+                }
+            }
+
+            fun addInstalled(preferredFamily: String) {
+                val installed = installedByLowercase[preferredFamily.lowercase(Locale.ROOT)]
+                if (installed != null) addIfAbsent(installed)
+            }
+
+            for (family in preferredColorEmojiFallbackFamilies) {
+                addInstalled(family)
+            }
+            addIfAbsent(Font.DIALOG)
+            addIfAbsent(Font.SANS_SERIF)
+            for (family in preferredTextFallbackFamilies) {
+                addInstalled(family)
+            }
+            return result
+        }
+
+        /**
+         * Returns the default Swing terminal palette.
+         *
+         * Theme colors live in the Swing layer so the dependency-free render
+         * API can remain renderer-neutral.
+         *
+         * @return default terminal color palette.
+         */
+        @JvmStatic
+        public fun defaultPalette(): TerminalColorPalette = TerminalTheme.CAMPBELL.createPalette()
+
+        /**
+         * Resolves the font family name. If the requested font family name is installed on the
+         * system (case-insensitively), it returns the exact matched system font family name.
+         * Otherwise, it falls back to the first available font from the preferred default monospace
+         * font families chain.
+         *
+         * @param requestedFamily the name of the font family requested.
+         * @return the resolved font family name.
+         */
+        @JvmStatic
+        public fun resolveFontFamily(requestedFamily: String): String {
+            val installedFamilies =
+                GraphicsEnvironment
+                    .getLocalGraphicsEnvironment()
+                    .availableFontFamilyNames
+            val matched = installedFamilies.firstOrNull { it.equals(requestedFamily, ignoreCase = true) }
+            return matched ?: resolveDefaultFontFamily()
+        }
+
+        private fun resolveDefaultFontFamily(): String = resolvedMonospaceFontFamilies.firstOrNull() ?: Font.MONOSPACED
+
+        /**
+         * Returns all installed font family names that are verified to be monospaced on the current system.
+         *
+         * @return list of monospaced font family names.
+         */
+        @JvmStatic
+        public fun getMonospaceFontFamilies(): List<String> = resolvedMonospaceFontFamilies
+
+        private val curatedMonospaceFontFamilies =
+            arrayOf(
+                "Cascadia Mono",
+                "Cascadia Code",
+                "Consolas",
+                "Menlo",
+                "Monaco",
+                "SF Mono",
+                "JetBrains Mono",
+                "Fira Code",
+                "Source Code Pro",
+                "Inconsolata",
+                "Hack",
+                "DejaVu Sans Mono",
+                "Liberation Mono",
+                "Ubuntu Mono",
+                "Noto Sans Mono",
+                "Noto Mono",
+                "Lucida Console",
+                "Courier New",
+                "Courier",
+                "FreeMono",
+                Font.MONOSPACED,
+            )
+
+        private val resolvedMonospaceFontFamilies: List<String> by lazy(LazyThreadSafetyMode.PUBLICATION) {
+            val installed =
+                GraphicsEnvironment
+                    .getLocalGraphicsEnvironment()
+                    .availableFontFamilyNames
+            val result = ArrayList<String>()
+            for (curated in curatedMonospaceFontFamilies) {
+                val matched = installed.firstOrNull { it.equals(curated, ignoreCase = true) }
+                if (matched != null) {
+                    result.add(matched)
+                }
+            }
+            if (result.isEmpty()) {
+                result.add(Font.MONOSPACED)
+            }
+            result
+        }
+
+        private const val DEFAULT_FALLBACK_FONT_FAMILY_CAPACITY = 16
+        private val preferredColorEmojiFallbackFamilies =
+            arrayOf(
+                "Segoe UI Emoji",
+                "Apple Color Emoji",
+                "Noto Color Emoji",
+                "Twemoji Mozilla",
+                "EmojiOne Color",
+                "JoyPixels",
+                "Twitter Color Emoji",
+            )
+        private val preferredTextFallbackFamilies =
+            arrayOf(
+                "Nirmala UI",
+                "Segoe UI",
+                "Segoe UI Symbol",
+                "Segoe UI Historic",
+                "Noto Sans Devanagari",
+                "Noto Sans Bengali",
+                "Noto Sans Tamil",
+                "Noto Sans Khmer",
+                "Noto Sans Sinhala",
+                "Noto Serif Devanagari",
+                "Noto Serif Bengali",
+                "Noto Serif Tamil",
+                "Noto Serif Khmer",
+                "Noto Serif Sinhala",
+                "Mangal",
+                "Vrinda",
+                "Latha",
+                "Khmer UI",
+                "Iskoola Pota",
+                "Ebrima",
+                "Leelawadee UI",
+                "Nyala",
+                "Abyssinica SIL",
+                "Noto Sans Thai",
+                "Noto Sans Ethiopic",
+                "Noto Sans Runic",
+                "Noto Sans CJK SC",
+            )
+    }
+}
 
 /**
  * Built-in terminal color themes with verified correct ANSI color mappings.

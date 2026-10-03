@@ -81,10 +81,11 @@ current reader, pins frames across publication, throws from callbacks and proves
 that all earlier leases release before their buffer can be recycled. Optional
 clients execute bounded directory access, persistence hydration/final flush,
 OSC metadata, profile defaults/copy and the supported completion host combinations.
-Compared with the original five client/provenance pairs at `e37f5d7f`, parser,
-completion and PTY client bytes remain identical, with refreshed provenance.
+Compared with the original five client/provenance pairs at `e37f5d7f`, parser
+and completion client bytes remain identical, with refreshed provenance.
 Construction commit `025ccb1a` deliberately replaced host and Swing clients after
-incompatible core/session construction changes. These eight additional clients
+incompatible core/session construction changes; D02/D03 later refreshes Swing and PTY.
+These eight additional clients
 establish extension baselines with their own source/artifact hashes. The 52 cases
 verify upgrades from these declared baselines, not compatibility with the original
 host and Swing callers. See the [migration and baseline decision](../../../docs/library-compatibility.md#verification-and-baseline-changes).
@@ -114,3 +115,11 @@ bodies; library classes resolve from the current publications. They cover
 representative executed boundaries; the tracked ABI checks cover the
 remaining reviewed declarations. This initial pre-v1 baseline establishes the
 upgrade mechanism and does not claim compatibility with earlier releases.
+
+D02/D03 deliberately refreshes only the Swing and PTY retained clients after
+their growing data-class configuration APIs become immutable snapshots with
+named construction/update callbacks. Before refresh, exactly eight upgrade
+cases fail at the removed constructor descriptors; the other eleven clients
+remain byte-for-byte unchanged. Source consumers now exercise Java late-field
+font resolver selection/clearing, settings drafts, detached snapshots, and
+workspace immutable updates. See [configuration migration](../../../docs/library-configuration.md).

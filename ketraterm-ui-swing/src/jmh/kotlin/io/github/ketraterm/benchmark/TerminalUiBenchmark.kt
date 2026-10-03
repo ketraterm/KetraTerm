@@ -198,12 +198,12 @@ open class SwingPaintBenchmark {
             component =
                 SwingTerminal(
                     SwingSettingsProvider {
-                        SwingSettings(
-                            columns = columns,
-                            rows = rows,
-                            cursorBlinkMillis = 0,
-                            useSystemFallbackFonts = false,
-                        )
+                        SwingSettings.create { draft ->
+                            draft.columns = columns
+                            draft.rows = rows
+                            draft.cursorBlinkMillis = 0
+                            draft.useSystemFallbackFonts = false
+                        }
                     },
                 )
             component.size = component.preferredSize

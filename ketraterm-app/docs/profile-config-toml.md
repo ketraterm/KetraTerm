@@ -1,6 +1,6 @@
 # Profile Configuration Syntax & Path Resolution
 
-The `ketraterm-workspace` module manages load-time user profiles, color themes, font preferences, and local environment setups stored in a standardized **TOML** configuration file.
+The standalone application manages load-time user profiles, color themes, font preferences, and local environment setups stored in a standardized **TOML** configuration file.
 
 ---
 
@@ -12,14 +12,14 @@ The configuration file is divided into clean blocks describing different parts o
 # Default KetraTerm configuration
 
 [window]
-columns = 80              # Grid columns (10..500)
-rows = 24                 # Grid rows (5..300)
-scrollback_lines = 1000   # Retained history size (0..100000)
+columns = 100             # Grid columns (10..1000)
+rows = 30                 # Grid rows (10..500)
+scrollback_lines = 1000   # Retained history size (0..1000000)
 
 [font]
 family = "Cascadia Mono"          # Monospace font family name
-size = 14                         # Font point size (8..72)
-line_height = 1.2                 # Line spacing multiplier (1.0..2.5)
+size = 16                         # Font point size (10..56)
+line_height = 1.0                 # Line spacing multiplier (0.7..1.5)
 use_system_fallback_fonts = true  # Enables fallback system font scan for missing glyphs
 
 [theme]
@@ -27,13 +27,13 @@ name = "one-dark"                 # Theme palette name (e.g. one-dark, dracula, 
 
 [behavior]
 cursor_shape = "block"            # cursor shape: block, underline, beam
-cursor_blink_millis = 500         # blink delay (0..5000, 0 means no blink)
+cursor_blink_millis = 600         # blink delay (0..10000, 0 means no blink)
 treat_ambiguous_as_wide = false   # sets East Asian Ambiguous width rendering policy
-audible_bell = false              # play audio beep sound on BEL
+audible_bell = true               # play audio beep sound on BEL
 visual_bell = true                # show a visual edge pulse on BEL
 paste_on_middle_click = true      # paste clipboard on mouse scroll wheel click
 paste_sanitization = "preserve"   # preserve or strip-c0; bracketed paste is protected in both
-shell_request_resize_window = true# permits running shell scripts to resize the window
+shell_request_resize_window = false # permits running shell scripts to resize the window
 shell_request_window_manipulation = false # permits shell scripts to move, minimize, maximize, raise, lower window
 
 [shell]
@@ -52,7 +52,7 @@ for the exact control-character and framing rules.
 Set **Startup command** in the standalone settings, or edit `[shell].startup_command`.
 For example, `startup_command = 'npm run dev'` starts the project task in each new
 terminal. For embedded quotes and Windows paths, the settings writer preserves the
-command using TOML triple-quoted strings. Leave the field blank to disable it.
+command using escaped TOML strings. Leave the field blank to disable it.
 The same encoder preserves quotes, backslashes, whitespace, and control characters
 in saved configuration strings; embedded line breaks are escaped onto one physical
 line. Startup commands retain their separate single-line restriction.

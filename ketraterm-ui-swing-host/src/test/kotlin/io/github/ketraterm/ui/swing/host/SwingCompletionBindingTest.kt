@@ -358,15 +358,18 @@ class SwingCompletionBindingTest {
         val binding = SwingCompletionBinding(session)
         val terminal =
             SwingTerminal(
-                settingsProvider = { SwingSettings(smartSuggestionsEnabled = true) },
+                settingsProvider = {
+                    SwingSettings.create { draft ->
+                        draft.smartSuggestionsEnabled = true
+                    }
+                },
                 hostServices =
-                    SwingHostServices(
-                        shellSuggestionProvider = binding.provider,
-                        shellSuggestionFeedbackHandler = binding.feedbackHandler,
-                        shellSuggestionViewFactory =
-                            view?.let { supplied -> SwingShellSuggestionViewFactory { supplied } }
-                                ?: SwingShellSuggestionViewFactory.DEFAULT,
-                    ),
+                    SwingHostServices.create { draft ->
+                        draft.shellSuggestionProvider = binding.provider
+                        draft.shellSuggestionFeedbackHandler = binding.feedbackHandler
+                        draft.shellSuggestionViewFactory = view?.let { supplied -> SwingShellSuggestionViewFactory { supplied } }
+                            ?: SwingShellSuggestionViewFactory.DEFAULT
+                    },
             )
 
         init {
