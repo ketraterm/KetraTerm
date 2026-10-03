@@ -195,10 +195,23 @@ class KetraTermIntellijSettingsTest {
         val firstFailure = IllegalStateException("pane refresh failed")
         val secondFailure = IllegalArgumentException("policy refresh failed")
         var observed = false
-        service.addChangeListener { throw firstFailure }
-        service.addChangeListener { throw firstFailure }
-        service.addChangeListener { throw secondFailure }
-        service.addChangeListener { observed = service.state.smartSuggestionsEnabled }
+        val attempted = mutableListOf<Int>()
+        service.addChangeListener {
+            attempted += 1
+            throw firstFailure
+        }
+        service.addChangeListener {
+            attempted += 2
+            throw firstFailure
+        }
+        service.addChangeListener {
+            attempted += 3
+            throw secondFailure
+        }
+        service.addChangeListener {
+            attempted += 4
+            observed = service.state.smartSuggestionsEnabled
+        }
 
         val actual =
             assertThrows(IllegalStateException::class.java) {
@@ -206,6 +219,7 @@ class KetraTermIntellijSettingsTest {
             }
 
         assertSame(firstFailure, actual)
+        assertEquals("Repeated failure identity must not interrupt remaining notifications", listOf(1, 2, 3, 4), attempted)
         assertEquals(listOf(secondFailure), actual.suppressed.toList())
         assertTrue(observed)
         assertTrue(service.state.smartSuggestionsEnabled)
@@ -217,10 +231,23 @@ class KetraTermIntellijSettingsTest {
             val service = KetraTermIntellijSettings()
             val failure = IllegalStateException("pane refresh failed")
             var observed = false
-            service.addChangeListener { throw failure }
-            service.addChangeListener { throw cancellation }
-            service.addChangeListener { throw cancellation }
-            service.addChangeListener { observed = service.state.smartSuggestionsEnabled }
+            val attempted = mutableListOf<Int>()
+            service.addChangeListener {
+                attempted += 1
+                throw failure
+            }
+            service.addChangeListener {
+                attempted += 2
+                throw cancellation
+            }
+            service.addChangeListener {
+                attempted += 3
+                throw cancellation
+            }
+            service.addChangeListener {
+                attempted += 4
+                observed = service.state.smartSuggestionsEnabled
+            }
 
             val actual =
                 assertThrows(CancellationException::class.java) {
@@ -228,6 +255,7 @@ class KetraTermIntellijSettingsTest {
                 }
 
             assertSame(cancellation, actual)
+            assertEquals("Repeated cancellation identity must not interrupt remaining notifications", listOf(1, 2, 3, 4), attempted)
             assertEquals(listOf(failure), actual.suppressed.toList())
             assertTrue(observed)
         }

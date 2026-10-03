@@ -142,6 +142,65 @@ class MouseEncoderTest {
     }
 
     @Test
+    fun `maximum accepted SGR cell coordinates convert to positive one based decimals`() {
+        assertMouseBytes(
+            esc("[<0;2147483648;2147483648M"),
+            press(column = Int.MAX_VALUE, row = Int.MAX_VALUE),
+        )
+    }
+
+    @Test
+    fun `maximum accepted SGR pixel coordinates convert to positive one based decimals`() {
+        assertMouseBytes(
+            esc("[<0;2147483648;2147483648M"),
+            pressPixel(pixelX = Int.MAX_VALUE, pixelY = Int.MAX_VALUE),
+            encoding = MouseEncodingMode.SGR_PIXELS,
+        )
+    }
+
+    @Test
+    fun `SGR pixel fallback preserves maximum accepted cell coordinates`() {
+        assertMouseBytes(
+            esc("[<0;2147483648;2147483648M"),
+            press(column = Int.MAX_VALUE, row = Int.MAX_VALUE),
+            encoding = MouseEncodingMode.SGR_PIXELS,
+        )
+    }
+
+    @Test
+    fun `maximum accepted URXVT cell coordinates convert to positive one based decimals`() {
+        assertMouseBytes(
+            esc("[32;2147483648;2147483648M"),
+            press(column = Int.MAX_VALUE, row = Int.MAX_VALUE),
+            encoding = MouseEncodingMode.URXVT,
+        )
+    }
+
+    @Test
+    fun `legacy clamp applies before maximum accepted coordinates overflow`() {
+        assertMouseBytes(
+            esc("[M") + bytes(32, 255, 255),
+            press(column = Int.MAX_VALUE, row = Int.MAX_VALUE),
+            encoding = MouseEncodingMode.DEFAULT,
+            policy = TerminalInputPolicy(mouseCoordinateLimitPolicy = MouseCoordinateLimitPolicy.CLAMP_TO_MAX),
+        )
+        assertMouseBytes(
+            bytes(),
+            press(column = Int.MAX_VALUE, row = Int.MAX_VALUE),
+            encoding = MouseEncodingMode.DEFAULT,
+        )
+    }
+
+    @Test
+    fun `UTF8 extended mouse suppresses maximum accepted cell coordinates`() {
+        assertMouseBytes(
+            bytes(),
+            press(column = Int.MAX_VALUE, row = Int.MAX_VALUE),
+            encoding = MouseEncodingMode.UTF8,
+        )
+    }
+
+    @Test
     fun `encodes legacy default buttons and releases`() {
         assertMouseBytes(esc("[M") + bytes(32, 33, 33), press(), encoding = MouseEncodingMode.DEFAULT)
         assertMouseBytes(

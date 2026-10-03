@@ -18,7 +18,6 @@ package io.github.ketraterm.workspace
 import io.github.ketraterm.core.TerminalBuffers
 import io.github.ketraterm.host.*
 import io.github.ketraterm.input.api.TerminalInputEncoder
-import io.github.ketraterm.input.api.TerminalInputEncoderFactory
 import io.github.ketraterm.input.event.TerminalFocusEvent
 import io.github.ketraterm.input.event.TerminalKeyEvent
 import io.github.ketraterm.input.event.TerminalMouseEvent
@@ -45,6 +44,7 @@ import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
+import org.junit.jupiter.api.Assertions.assertAll
 import kotlin.test.*
 import kotlin.time.Duration.Companion.milliseconds
 
@@ -252,6 +252,145 @@ class TerminalWorkspaceTest {
             }
             runCurrent()
         }
+
+    @Test
+    fun `reentrant tab close cannot select a removed tab`() = assertReentrantCloseSelection(closeRemainingTab = true)
+
+    @Test
+    fun `reentrant tab selection supersedes the outer close selection`() = assertReentrantCloseSelection(closeRemainingTab = false)
+
+    private fun assertReentrantCloseSelection(closeRemainingTab: Boolean) =
+        runTest {
+            val dispatcher = StandardTestDispatcher(testScheduler)
+            val selections = mutableListOf<String>()
+            lateinit var workspace: TerminalWorkspace
+            lateinit var first: TerminalWorkspaceTab
+            lateinit var closing: TerminalWorkspaceTab
+            var replacement: TerminalWorkspaceTab? = null
+            workspace =
+                TerminalWorkspace(
+                    listener =
+                        object : TerminalWorkspaceListener {
+                            override fun tabSelected(tabId: String) {
+                                selections += tabId
+                                assertEquals(
+                                    tabId,
+                                    workspace.selectedTab()?.id,
+                                    "selection notifications must describe current workspace state",
+                                )
+                            }
+
+                            override fun tabClosed(tabId: String) {
+                                if (tabId != closing.id) return
+                                if (closeRemainingTab) {
+                                    workspace.closeTab(first.id)
+                                } else {
+                                    workspace.selectTab(requireNotNull(replacement).id)
+                                }
+                            }
+                        },
+                    sessionFactory = { _, _, _ -> testSession(dispatcher = dispatcher) },
+                    workerDispatcher = dispatcher,
+                )
+            workspace.use {
+                val options = TerminalWorkspaceOpenOptions(80, 24, false, 100, showForegroundProcessName = false)
+                first = workspace.openTab(TerminalProfile("a", "First", listOf("mock-shell")), options)
+                closing = workspace.openTab(TerminalProfile("b", "Closing", listOf("mock-shell")), options)
+                if (!closeRemainingTab) {
+                    workspace.openTab(TerminalProfile("c", "Adjacent", listOf("mock-shell")), options)
+                    replacement = first
+                    workspace.selectTab(closing.id)
+                }
+                selections.clear()
+
+                workspace.closeTab(closing.id)
+
+                val selectedId = if (closeRemainingTab) null else requireNotNull(replacement).id
+                assertEquals(selectedId, workspace.selectedTab()?.id)
+                assertEquals(listOfNotNull(selectedId), selections, "reentrant selection supersedes the outer close notification")
+                if (closeRemainingTab) assertTrue(workspace.tabSnapshot().isEmpty())
+            }
+            runCurrent()
+        }
+
+    @Test
+    fun `process title listener failure preserves shell observation and remote closure delivery`() {
+        val failure = IllegalStateException("host title notification failed")
+        var lifecycleAssertionsCompleted = false
+        try {
+            runTest {
+                val dispatcher = StandardTestDispatcher(testScheduler)
+                val connector = RecordingConnector(foregroundName = "vim")
+                val state = TerminalShellIntegrationState()
+                val session =
+                    testSession(
+                        connector = connector,
+                        dispatcher = dispatcher,
+                        shellIntegration = TerminalShellIntegrationFactory.host(state),
+                    )
+                val directories = mutableListOf<String>()
+                val closedTabIds = mutableListOf<String>()
+                var titleFailureDelivered = false
+                TerminalWorkspace(
+                    listener =
+                        object : TerminalWorkspaceListener {
+                            override fun titleChanged(
+                                tab: TerminalWorkspaceTab,
+                                title: String,
+                            ) {
+                                if (title == "vim" && !titleFailureDelivered) {
+                                    titleFailureDelivered = true
+                                    throw failure
+                                }
+                            }
+
+                            override fun currentWorkingDirectoryChanged(
+                                tab: TerminalWorkspaceTab,
+                                uri: String,
+                            ) {
+                                directories += uri
+                            }
+
+                            override fun sessionClosed(
+                                tab: TerminalWorkspaceTab,
+                                exitCode: Int?,
+                                failure: Throwable?,
+                            ) {
+                                assertEquals(7, exitCode)
+                                assertNull(failure)
+                                closedTabIds += tab.id
+                            }
+                        },
+                    sessionFactory = { _, _, _ -> session },
+                    workerDispatcher = dispatcher,
+                ).use { workspace ->
+                    val tab =
+                        workspace.openTab(
+                            TerminalProfile("p1", "Profile", listOf("mock-shell")),
+                            TerminalWorkspaceOpenOptions(80, 24, false, 100),
+                        )
+                    runCurrent()
+                    assertTrue(titleFailureDelivered, "foreground metadata must exercise the failing host callback")
+                    assertFalse(session.isClosed, "a presentation callback must not terminate the terminal process")
+
+                    state.recordCurrentWorkingDirectory("file:///home/user/project")
+                    connector.simulateClosed(7)
+                    runCurrent()
+
+                    assertAll(
+                        { assertEquals(listOf("file:///home/user/project"), directories) },
+                        { assertEquals("file:///home/user/project", tab.currentWorkingDirectoryUri) },
+                        { assertEquals(listOf(tab.id), closedTabIds, "host notification failure must not detach lifecycle observation") },
+                    )
+                }
+                runCurrent()
+                lifecycleAssertionsCompleted = true
+            }
+        } catch (reported: Throwable) {
+            // Optional diagnostics may propagate; accept only the injected report after assertions and teardown.
+            if (reported !== failure || !lifecycleAssertionsCompleted || reported.suppressed.isNotEmpty()) throw reported
+        }
+    }
 
     @Test
     fun `process titles preserve custom application and directory precedence`() {
@@ -718,7 +857,7 @@ class TerminalWorkspaceTest {
 
         workspace.closeTab(tab.id)
 
-        assertEquals(emptyList<String>(), closeEvents)
+        assertEquals(emptyList(), closeEvents)
         assertEquals(0, workspace.sessionCollectionCount)
         workspace.close()
         assertFalse(workspace.isCoroutineScopeActive)
@@ -932,7 +1071,7 @@ class TerminalWorkspaceTest {
             responseReader = terminal,
             connector = connector,
             parser = NoOpParser,
-            inputEncoderFactory = TerminalInputEncoderFactory { _, _, _ -> object : TerminalInputEncoder by NoOpInputEncoder {} },
+            inputEncoderFactory = { _, _, _ -> object : TerminalInputEncoder by NoOpInputEncoder {} },
             workerDispatcher = dispatcher,
             ioDispatcher = dispatcher,
             shellIntegration = shellIntegration,

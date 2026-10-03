@@ -18,6 +18,8 @@ package io.github.ketraterm.workspace.config
 import io.github.ketraterm.host.TerminalClipboardPermission
 import io.github.ketraterm.host.TerminalTitlePermission
 import io.github.ketraterm.input.policy.PasteControlPolicy
+import org.junit.jupiter.api.DynamicTest
+import org.junit.jupiter.api.TestFactory
 import java.io.IOException
 import java.nio.file.Files
 import java.nio.file.Path
@@ -25,6 +27,46 @@ import java.util.*
 import kotlin.test.*
 
 class TerminalConfigTest {
+    @TestFactory
+    fun `string configuration values survive save and reload`(): List<DynamicTest> {
+        val fields = listOf("theme", "fontFamily", "cursorShape", "shellPath", "startDirectory")
+        val values =
+            listOf(
+                "quote-and-comment" to "/tmp/a\"#directory",
+                "backslash" to "C:\\Users\\someone\\project",
+                "unicode-and-literal-quotes" to "工程 'quoted' '''suffix'",
+                "newline" to "first\nsecond",
+            )
+        return fields.flatMap { field ->
+            values.map { (kind, value) ->
+                DynamicTest.dynamicTest("$field retains $kind") {
+                    val expected =
+                        when (field) {
+                            "theme" -> TerminalConfig(theme = value)
+                            "fontFamily" -> TerminalConfig(fontFamily = value)
+                            "cursorShape" -> TerminalConfig(cursorShape = value)
+                            "shellPath" -> TerminalConfig(shellPath = value)
+                            "startDirectory" -> TerminalConfig(startDirectory = value)
+                            else -> error("Unknown configuration field")
+                        }
+                    val directory = Files.createTempDirectory("ketraterm-config-string-roundtrip")
+                    val file = directory.resolve("config.toml")
+                    val brokenFile = directory.resolve("config.toml.broken")
+                    try {
+                        val manager = TerminalWorkspaceConfigManager(file)
+                        manager.save(expected)
+                        assertEquals(expected, manager.load(), "saving an accepted string value must preserve the complete configuration")
+                        assertFalse(Files.exists(brokenFile), "a generated configuration must be readable without recovery")
+                    } finally {
+                        Files.deleteIfExists(file)
+                        Files.deleteIfExists(brokenFile)
+                        Files.deleteIfExists(directory)
+                    }
+                }
+            }
+        }
+    }
+
     @Test
     fun `existing clipboard choices and omissions survive unrelated save and restart`() {
         val directory = Files.createTempDirectory("ketraterm-clipboard-migration")

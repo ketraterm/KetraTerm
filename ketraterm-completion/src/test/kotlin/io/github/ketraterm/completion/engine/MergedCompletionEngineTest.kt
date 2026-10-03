@@ -21,6 +21,8 @@ import io.github.ketraterm.completion.model.TerminalCommandSpecs
 import io.github.ketraterm.completion.model.TerminalCompletionValueDomain
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.toList
+import kotlinx.coroutines.test.StandardTestDispatcher
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import java.io.IOException
 import kotlin.test.*
@@ -38,14 +40,14 @@ class MergedCompletionEngineTest {
                     sources =
                         listOf(
                             entry(
-                                TerminalCompletionSource { _, _, _ ->
+                                { _, _, _ ->
                                     fastCompleted.complete(Unit)
                                     listOf(candidate("fast", source = "fast"))
                                 },
                                 priority = 0,
                             ),
                             entry(
-                                TerminalCompletionSource { _, _, _ ->
+                                { _, _, _ ->
                                     slowStarted.complete(Unit)
                                     releaseSlow.await()
                                     listOf(candidate("slow", source = "slow"))
@@ -78,7 +80,7 @@ class MergedCompletionEngineTest {
                     sources =
                         listOf(
                             entry(
-                                TerminalCompletionSource { _, _, _ ->
+                                { _, _, _ ->
                                     hostStarted.complete(Unit)
                                     releaseHost.await()
                                     listOf(
@@ -133,10 +135,61 @@ class MergedCompletionEngineTest {
         }
 
     @Test
+    @OptIn(ExperimentalCoroutinesApi::class)
+    fun `unexpected source failure cannot leave collection waiting for a missing completion`() =
+        runTest {
+            val releaseFailure = CompletableDeferred<Unit>()
+            val failure = AssertionError("host provider failed")
+            val reportedFailures = mutableListOf<Throwable>()
+            val uncaughtFailures = mutableListOf<Throwable>()
+            val emissions = mutableListOf<List<TerminalCompletionCandidate>>()
+            val scope =
+                CoroutineScope(
+                    SupervisorJob() + StandardTestDispatcher(testScheduler) +
+                        CoroutineExceptionHandler { _, thrown -> uncaughtFailures += thrown },
+                )
+            val engine =
+                TerminalCompletionEngines.fromSources(
+                    sources =
+                        listOf(
+                            entry(source(candidate("available")), 0),
+                            entry(
+                                { _, _, _ ->
+                                    releaseFailure.await()
+                                    throw failure
+                                },
+                                0,
+                            ),
+                        ),
+                    commandSpecs = emptyList(),
+                    sourceFailureHandler = TerminalCompletionSourceFailureHandler { _, _, thrown -> reportedFailures += thrown },
+                )
+            try {
+                val collection = scope.launch { engine.completions(request()).toList(emissions) }
+                runCurrent()
+                assertEquals(listOf("available"), emissions.last().map { it.replacementText })
+                assertFalse(collection.isCompleted)
+
+                releaseFailure.complete(Unit)
+                runCurrent()
+
+                // Isolation or propagation may finish the request; awaiting a vanished child may not.
+                assertTrue(collection.isCompleted, "A finished source must not strand the collection awaiting its result")
+                assertTrue(
+                    reportedFailures.any { it === failure } || uncaughtFailures.any { it === failure },
+                    "The original unexpected failure must remain observable",
+                )
+            } finally {
+                scope.cancel()
+                runCurrent()
+            }
+        }
+
+    @Test
     fun `path provider failure reaches the centralized source diagnostic`() =
         runBlocking {
             val failure = IOException("directory access failed")
-            val pathSource = TerminalCompletionSources.path(TerminalFileSystemProvider { throw failure })
+            val pathSource = TerminalCompletionSources.path { throw failure }
             val failureEvents = mutableListOf<RecordedSourceFailure>()
             val engine =
                 TerminalCompletionEngines.fromSources(
@@ -197,14 +250,14 @@ class MergedCompletionEngineTest {
                     sources =
                         listOf(
                             entry(
-                                TerminalCompletionSource { _, _, _ ->
+                                { _, _, _ ->
                                     cancelSource.await()
                                     throw CancellationException("isolated source cancelled")
                                 },
                                 priority = 0,
                             ),
                             entry(
-                                TerminalCompletionSource { _, _, _ ->
+                                { _, _, _ ->
                                     siblingStarted.complete(Unit)
                                     listOf(candidate("available", source = "sibling"))
                                 },
@@ -389,7 +442,7 @@ class MergedCompletionEngineTest {
                 TerminalCompletionEngines.fromSources(
                     listOf(
                         entry(
-                            TerminalCompletionSource { _, _, limit ->
+                            { _, _, limit ->
                                 collectionLimit = limit
                                 rawCandidates.take(limit)
                             },
@@ -415,7 +468,7 @@ class MergedCompletionEngineTest {
                     sources =
                         listOf(
                             entry(
-                                TerminalCompletionSource { _, _, limit ->
+                                { _, _, limit ->
                                     suppliedLimit = limit
                                     List(300) { candidate("candidate-$it", score = 300 - it) }
                                 },
@@ -440,7 +493,7 @@ class MergedCompletionEngineTest {
                     sources =
                         listOf(
                             entry(
-                                TerminalCompletionSource { _, _, limit ->
+                                { _, _, limit ->
                                     suppliedLimits += limit
                                     List(300) { index ->
                                         candidate(
@@ -452,7 +505,7 @@ class MergedCompletionEngineTest {
                                 0,
                             ),
                             entry(
-                                TerminalCompletionSource { _, _, limit ->
+                                { _, _, limit ->
                                     suppliedLimits += limit
                                     List(300) { index -> candidate("right-$index", score = 900 - index) }
                                 },
@@ -489,7 +542,7 @@ class MergedCompletionEngineTest {
                 }
             val engine =
                 TerminalCompletionEngines.fromSources(
-                    listOf(entry(TerminalCompletionSource { _, _, _ -> candidates }, priority = 0)),
+                    listOf(entry({ _, _, _ -> candidates }, priority = 0)),
                 )
 
             val actual = engine.complete(request())
@@ -814,7 +867,7 @@ class MergedCompletionEngineTest {
                 TerminalCompletionEngines.fromSources(
                     listOf(
                         entry(
-                            TerminalCompletionSource { _, _, _ ->
+                            { _, _, _ ->
                                 sourceCalls++
                                 listOf(candidate("unexpected"))
                             },

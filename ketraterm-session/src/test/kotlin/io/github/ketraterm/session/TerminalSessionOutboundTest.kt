@@ -17,6 +17,7 @@ package io.github.ketraterm.session
 
 import io.github.ketraterm.core.TerminalBuffers
 import io.github.ketraterm.input.TerminalInputEncoders
+import io.github.ketraterm.input.api.TerminalInputEncoder
 import io.github.ketraterm.input.api.TerminalInputEncoderFactory
 import io.github.ketraterm.input.event.TerminalKey
 import io.github.ketraterm.input.event.TerminalKeyEvent
@@ -28,6 +29,7 @@ import io.github.ketraterm.input.policy.PasteLineEndingPolicy
 import io.github.ketraterm.input.policy.TerminalInputPolicy
 import io.github.ketraterm.testkit.MockConnector
 import io.github.ketraterm.transport.TerminalConnector
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.asCoroutineDispatcher
 import kotlinx.coroutines.test.StandardTestDispatcher
@@ -270,6 +272,69 @@ class TerminalSessionOutboundTest {
                 assertEquals(1, delegate.closeCount)
                 assertFalse(session.isCoroutineScopeActive)
             }
+            assertEquals(1, delegate.closeCount)
+        }
+
+    @ParameterizedTest
+    @ValueSource(strings = ["connector", "encoder"])
+    fun `unexpected writer cancellation closes the session and retains its cause`(source: String) =
+        runTest {
+            val cancellation = CancellationException("host writer cancelled while the session is open")
+            val delegate = MockConnector()
+            var writes = 0
+            val connector =
+                object : TerminalConnector by delegate {
+                    override fun write(
+                        bytes: ByteArray,
+                        offset: Int,
+                        length: Int,
+                    ) {
+                        writes++
+                        if (source == "connector") throw cancellation
+                        delegate.write(bytes, offset, length)
+                    }
+                }
+            val factory =
+                if (source == "encoder") {
+                    TerminalInputEncoderFactory { modes, output, policy ->
+                        val encoder = TerminalInputEncoders.create(modes, output, policy)
+                        object : TerminalInputEncoder by encoder {
+                            override fun encodePaste(event: TerminalPasteEvent): Unit = throw cancellation
+                        }
+                    }
+                } else {
+                    null
+                }
+            val dispatcher = StandardTestDispatcher(testScheduler)
+            TerminalSession
+                .create(
+                    TerminalBuffers.create(10, 3),
+                    connector,
+                    inputEncoderFactory = factory,
+                    workerDispatcher = dispatcher,
+                    ioDispatcher = dispatcher,
+                ).use { session ->
+                    session.start(10, 3)
+                    if (source == "connector") {
+                        session.encodeKey(TerminalKeyEvent.codepoint('a'.code))
+                    } else {
+                        session.encodePaste(TerminalPasteEvent("paste"))
+                    }
+                    session.encodeKey(TerminalKeyEvent.codepoint('z'.code))
+                    runCurrent()
+
+                    assertTrue(session.isClosed, "an ended sole writer must not leave the session accepting unwritable input")
+                    assertSame(cancellation, session.failure)
+                    assertInstanceOf(TerminalSessionState.Closed::class.java, session.state.value)
+                    assertFalse(session.isCoroutineScopeActive)
+                    assertEquals(1, delegate.closeCount)
+                    assertEquals(if (source == "connector") 1 else 0, writes)
+                    assertArrayEquals(byteArrayOf(), delegate.writtenBytes)
+                    session.encodeKey(TerminalKeyEvent.codepoint('q'.code))
+                    runCurrent()
+                    assertEquals(if (source == "connector") 1 else 0, writes, "failed output must not be retried")
+                    assertArrayEquals(byteArrayOf(), delegate.writtenBytes)
+                }
             assertEquals(1, delegate.closeCount)
         }
 

@@ -4,6 +4,11 @@ This document catalogs every supported terminal feature, protocol, and capabilit
 
 For a detailed backlog of gaps and intentional non-goals, see the [Terminal Feature Gap Map](terminal-feature-gap-map.md).
 
+Known worker-lifecycle, extension-reentry and resource-bound defects are tracked
+under the [maintainability review](terminal-feature-gap-map.md#maintainability-review).
+Supported capabilities below do not imply those failure and boundary paths are
+already corrected; the review's regressions remain visible until their fixes.
+
 ---
 
 ## 1. Terminal Protocols & Control Sequences

@@ -361,4 +361,24 @@ class ScreenBufferTest {
         val current = buffer.popKittyKeyboardFlags(1, 0)
         assertEquals(0, current)
     }
+
+    @Test
+    fun `kitty keyboard counted pops reset flags when the retained stack is exhausted`() {
+        for (count in intArrayOf(0, 1, 31, 32, 33, 64)) {
+            val buffer = newBuffer()
+            var current = 0
+            repeat(33) { current = buffer.pushKittyKeyboardFlags(4, current) }
+
+            val expected = if (count < 32) 4 else 0
+            assertEquals(expected, buffer.popKittyKeyboardFlags(count, current), "count=$count")
+            assertEquals(expected, buffer.kittyKeyboardFlags, "count=$count")
+        }
+
+        val empty = newBuffer()
+        assertEquals(12, empty.popKittyKeyboardFlags(0, 12))
+        assertEquals(0, empty.popKittyKeyboardFlags(64, 12))
+        empty.pushKittyKeyboardFlags(5, 12)
+        empty.clearKittyKeyboardStack()
+        assertEquals(0, empty.popKittyKeyboardFlags(64, 5))
+    }
 }

@@ -2435,6 +2435,49 @@ class HostCommandAdapterTest {
             )
         }
 
+        @Test
+        fun `new OSC hyperlink admission reconciles a lowered retention limit`() {
+            val terminal = TerminalBuffers.create(width = 5, height = 1)
+            val registryEvents = mutableListOf<String>()
+            val hostEvents =
+                object : HostEventSink by HostEventSink.NONE {
+                    override fun hyperlinkRegistered(
+                        hyperlinkId: Int,
+                        uri: String,
+                        id: String?,
+                    ) {
+                        registryEvents += "registered:$hyperlinkId:$uri"
+                    }
+
+                    override fun hyperlinkRemoved(hyperlinkId: Int) {
+                        registryEvents += "removed:$hyperlinkId"
+                    }
+                }
+            val sink = HostCommandAdapter(terminal, hostEvents, HostPolicy(maxHyperlinkEntries = 4))
+            val parser = TerminalParsers.create(sink)
+            repeat(4) { index ->
+                parser.accept("\u001B]8;id=$index;https://example.com/$index\u0007X".encodeToByteArray())
+            }
+            val oldIds = IntArray(4) { column -> requireNotNull(terminal.getAttrAt(column, 0)).hyperlinkId }
+            oldIds.forEachIndexed { index, id -> assertEquals("https://example.com/$index", sink.hyperlinkUri(id)) }
+            registryEvents.clear()
+
+            sink.setHostPolicy(HostPolicy(maxHyperlinkEntries = 1))
+            parser.accept("\u001B]8;id=new;https://example.com/new\u0007N".encodeToByteArray())
+            val newId = requireNotNull(terminal.getAttrAt(4, 0)).hyperlinkId
+
+            assertAll(
+                { oldIds.forEach { id -> assertNull(sink.hyperlinkUri(id), "Retained old hyperlink $id exceeds the lowered limit") } },
+                { assertEquals("https://example.com/new", sink.hyperlinkUri(newId)) },
+                {
+                    assertEquals(
+                        oldIds.map { "removed:$it" } + "registered:$newId:https://example.com/new",
+                        registryEvents,
+                    )
+                },
+            )
+        }
+
         @ParameterizedTest(name = "reset from alternate screen = {0}")
         @ValueSource(booleans = [false, true])
         fun `RIS never rebinds hyperlinks retained by mode 47`(resetFromAlternate: Boolean) {
@@ -2613,6 +2656,25 @@ class HostCommandAdapterTest {
             assertAll(
                 { assertEquals("icon-only-base", f.sink.iconTitle) },
                 { assertEquals("window-stays", f.sink.windowTitle) },
+            )
+        }
+
+        @Test
+        fun `title stack restores current public core titles after direct host mutation`() {
+            val f = Fixture()
+            f.acceptAscii("\u001B]0;application-title\u0007")
+            f.terminal.setWindowTitle("host-window")
+            f.terminal.setIconTitle("host-icon")
+
+            f.acceptAscii("\u001B[22t\u001B]0;temporary-title\u0007\u001B[23t")
+
+            assertAll(
+                { assertEquals("host-window", f.terminal.windowTitle) },
+                { assertEquals("host-icon", f.terminal.iconTitle) },
+                { assertEquals("host-window", f.sink.windowTitle) },
+                { assertEquals("host-icon", f.sink.iconTitle) },
+                { assertEquals(listOf("application-title", "temporary-title", "host-window"), f.events.windowTitles) },
+                { assertEquals(listOf("application-title", "temporary-title", "host-icon"), f.events.iconTitles) },
             )
         }
 

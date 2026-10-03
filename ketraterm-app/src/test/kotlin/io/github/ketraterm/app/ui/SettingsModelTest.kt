@@ -147,11 +147,24 @@ class SettingsModelTest {
         try {
             val consumerFailure = IllegalStateException("Cannot refresh one pane")
             val otherConsumerFailure = IllegalArgumentException("Cannot refresh another pane")
-            settings.addChangeListener { throw consumerFailure }
-            settings.addChangeListener { throw consumerFailure }
-            settings.addChangeListener { throw otherConsumerFailure }
+            val attempted = mutableListOf<Int>()
+            settings.addChangeListener {
+                attempted += 1
+                throw consumerFailure
+            }
+            settings.addChangeListener {
+                attempted += 2
+                throw consumerFailure
+            }
+            settings.addChangeListener {
+                attempted += 3
+                throw otherConsumerFailure
+            }
             var notifications = 0
-            settings.addChangeListener { notifications++ }
+            settings.addChangeListener {
+                attempted += 4
+                notifications++
+            }
             val updated = settings.config.copy(fontSize = 24)
 
             model.applyChanges(updated)
@@ -159,6 +172,7 @@ class SettingsModelTest {
             assertEquals(updated, settings.config)
             assertEquals(updated, model.initialUiState)
             assertFalse(model.hasChanges(updated))
+            assertEquals(listOf(1, 2, 3, 4), attempted, "Repeated failure identity must not interrupt remaining notifications")
             assertEquals(1, notifications)
             assertSame(consumerFailure, observedFailures.poll(5, TimeUnit.SECONDS))
             assertEquals(listOf(otherConsumerFailure), consumerFailure.suppressedExceptions)

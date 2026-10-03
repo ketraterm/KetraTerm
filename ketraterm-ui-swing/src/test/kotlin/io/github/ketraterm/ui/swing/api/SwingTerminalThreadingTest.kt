@@ -842,6 +842,62 @@ class SwingTerminalThreadingTest {
         }
     }
 
+    @ParameterizedTest
+    @ValueSource(booleans = [false, true])
+    fun `reentrant custom view hiding or disposal supersedes an unfinished show`(dispose: Boolean) {
+        lateinit var terminal: SwingTerminal
+        var armed = true
+        var closes = 0
+        var updatesAfterClose = 0
+        val view =
+            object : SwingShellSuggestionView {
+                override val component = JPanel()
+
+                override fun update(snapshot: SwingShellSuggestionViewSnapshot) {
+                    if (closes > 0) updatesAfterClose++
+                    if (armed && snapshot.visibleSuggestions.isNotEmpty()) {
+                        armed = false
+                        if (dispose) terminal.dispose() else terminal.hideShellSuggestions()
+                    }
+                }
+
+                override fun close() {
+                    closes++
+                }
+            }
+        terminal =
+            edtCall {
+                SwingTerminal(
+                    settingsProvider = {
+                        SwingSettings(smartSuggestionsEnabled = true, cursorBlinkMillis = 0, useSystemFallbackFonts = false)
+                    },
+                    hostServices = SwingHostServices(shellSuggestionViewFactory = { view }),
+                )
+            }
+        try {
+            edtCall {
+                val suggestion = SwingShellSuggestion("test", 0, 0, "test", "COMMAND")
+                terminal.showShellSuggestions(SwingShellSuggestionRequest.EMPTY, listOf(suggestion))
+
+                assertAll(
+                    { assertFalse(armed, "The host view must perform the reentrant transition during show") },
+                    { assertFalse(view.component.isVisible, "An older show must not make the hidden or disposed view visible again") },
+                    { assertEquals(SwingShellSuggestionState.EMPTY, terminal.currentShellSuggestionState()) },
+                    { assertEquals(if (dispose) 1 else 0, closes) },
+                    { assertEquals(0, updatesAfterClose, "The disposed host view must not receive later presentation updates") },
+                    { assertEquals(!dispose, terminal.isCoroutineScopeActive) },
+                )
+
+                terminal.showShellSuggestions(SwingShellSuggestionRequest.EMPTY, listOf(suggestion))
+                assertEquals(!dispose, view.component.isVisible, "Hiding permits reuse; disposal rejects later show requests")
+                assertEquals(0, updatesAfterClose)
+            }
+        } finally {
+            edtCall { terminal.dispose() }
+            dispatcher.scheduler.runCurrent()
+        }
+    }
+
     @Test
     fun `unbind clears the session and permits rebinding after a custom view failure`() {
         val failure = IllegalStateException("hide failed")

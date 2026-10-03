@@ -16,25 +16,28 @@
 package io.github.ketraterm.ui.swing.host
 
 import io.github.ketraterm.core.TerminalBuffers
-import io.github.ketraterm.session.TerminalSession
+import io.github.ketraterm.session.*
 import io.github.ketraterm.transport.TerminalConnector
 import io.github.ketraterm.transport.TerminalConnectorListener
 import io.github.ketraterm.ui.swing.api.SwingHostServices
 import io.github.ketraterm.ui.swing.api.SwingTerminal
 import io.github.ketraterm.ui.swing.settings.SwingSettings
 import io.github.ketraterm.ui.swing.suggestion.*
-import kotlinx.coroutines.CompletableDeferred
-import kotlinx.coroutines.async
+import kotlinx.coroutines.*
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.toList
-import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.swing.Swing
+import kotlinx.coroutines.test.StandardTestDispatcher
+import kotlinx.coroutines.test.runCurrent
+import kotlinx.coroutines.test.runTest
+import javax.swing.JComponent
+import javax.swing.JPanel
 import javax.swing.SwingUtilities
-import kotlin.test.Test
-import kotlin.test.assertEquals
-import kotlin.test.assertFalse
-import kotlin.test.assertTrue
+import kotlin.test.*
 
+@OptIn(ExperimentalCoroutinesApi::class)
 class SwingCompletionBindingTest {
     @Test
     fun `empty binding rejects requests and feedback and installs no observation`() =
@@ -164,7 +167,132 @@ class SwingCompletionBindingTest {
         }
     }
 
-    private class Fixture : AutoCloseable {
+    @Test
+    fun `close releases automatic observation when popup hiding fails`() = verifyCloseFailure(IllegalStateException("host hiding failed"))
+
+    @Test
+    fun `close releases automatic observation when popup hiding is cancelled`() =
+        verifyCloseFailure(CancellationException("host hiding cancelled"))
+
+    @Test
+    fun `resource replacement releases obsolete observation when popup hiding fails`() =
+        verifyReplacementFailure(IllegalStateException("host hiding failed"))
+
+    @Test
+    fun `resource replacement releases obsolete observation when popup hiding is cancelled`() =
+        verifyReplacementFailure(CancellationException("host hiding cancelled"))
+
+    private fun verifyCloseFailure(failure: Exception) =
+        runTest {
+            val view = FailingHideView()
+            val fixture = Fixture(view, StandardTestDispatcher(testScheduler))
+            try {
+                val originalFocusListeners = withContext(Dispatchers.Swing) { fixture.terminal.focusListeners.toList() }
+                withContext(Dispatchers.Swing) {
+                    fixture.binding.update(resources(), true)
+                }
+                withContext(Dispatchers.Swing) { }
+                runCurrent()
+                assertEquals(1, fixture.commandLine.subscriptionCount.value, "Automatic observation must be active before close")
+                withContext(Dispatchers.Swing) {
+                    assertEquals(originalFocusListeners.size + 1, fixture.terminal.focusListeners.size)
+                    fixture.terminal.showShellSuggestions(request, listOf(suggestion))
+                    assertTrue(view.component.isVisible)
+                    view.failure = failure
+                    assertSame(failure, assertFailsWith<Exception> { fixture.binding.close() })
+                    assertFalse(fixture.binding.isEnabled)
+                    assertFalse(view.component.isVisible)
+                    assertEquals(SwingShellSuggestionState.EMPTY, fixture.terminal.currentShellSuggestionState())
+                    fixture.binding.close()
+                    assertEquals(
+                        originalFocusListeners,
+                        fixture.terminal.focusListeners.toList(),
+                        "Close must release its focus registration",
+                    )
+                    assertIs<TerminalSessionState.Created>(fixture.session.state.value, "Closing a view must preserve the host session")
+                }
+                withContext(Dispatchers.Swing) { }
+                runCurrent()
+                assertEquals(0, fixture.commandLine.subscriptionCount.value, "Close must release the shell-model subscription")
+                assertTrue(
+                    fixture.binding.provider
+                        .suggestions(request)
+                        .toList()
+                        .isEmpty(),
+                )
+            } finally {
+                withContext(Dispatchers.Swing) { view.failure = null }
+                fixture.close()
+                runCurrent()
+            }
+        }
+
+    private fun verifyReplacementFailure(failure: Exception) =
+        runTest {
+            val view = FailingHideView()
+            val fixture = Fixture(view, StandardTestDispatcher(testScheduler))
+            try {
+                var oldFeedback = 0
+                var replacementFeedback = 0
+                val replacement = resources { replacementFeedback++ }
+                val originalFocusListeners = withContext(Dispatchers.Swing) { fixture.terminal.focusListeners.toList() }
+                withContext(Dispatchers.Swing) {
+                    fixture.binding.update(resources { oldFeedback++ }, true)
+                }
+                withContext(Dispatchers.Swing) { }
+                runCurrent()
+                assertEquals(1, fixture.commandLine.subscriptionCount.value, "Automatic observation must be active before replacement")
+                withContext(Dispatchers.Swing) {
+                    fixture.terminal.showShellSuggestions(request, listOf(suggestion))
+                    assertTrue(view.component.isVisible)
+                    view.failure = failure
+                    assertSame(failure, assertFailsWith<Exception> { fixture.binding.update(replacement, false) })
+                    assertTrue(fixture.binding.isEnabled)
+                    assertFalse(view.component.isVisible)
+                    fixture.binding.feedbackHandler.onSuggestionFeedback(feedback())
+                    assertEquals(0, oldFeedback, "Obsolete automatic binding must not receive replacement feedback")
+                    assertEquals(1, replacementFeedback)
+                    assertEquals(
+                        originalFocusListeners,
+                        fixture.terminal.focusListeners.toList(),
+                        "Manual replacement must remove automatic observation",
+                    )
+                }
+                withContext(Dispatchers.Swing) { }
+                runCurrent()
+                assertEquals(0, fixture.commandLine.subscriptionCount.value, "Replacement must release the old shell-model subscription")
+                withContext(Dispatchers.Swing) {
+                    view.failure = null
+                    fixture.binding.update(replacement, true)
+                    assertEquals(
+                        originalFocusListeners.size + 1,
+                        fixture.terminal.focusListeners.size,
+                        "Recovery must install exactly one observer",
+                    )
+                    fixture.binding.update(replacement, false)
+                    assertEquals(originalFocusListeners, fixture.terminal.focusListeners.toList())
+                }
+            } finally {
+                withContext(Dispatchers.Swing) { view.failure = null }
+                fixture.close()
+                runCurrent()
+            }
+        }
+
+    private class FailingHideView : SwingShellSuggestionView {
+        override val component: JComponent = JPanel()
+        var failure: Exception? = null
+
+        override fun update(snapshot: SwingShellSuggestionViewSnapshot) {
+            if (snapshot == SwingShellSuggestionViewSnapshot.EMPTY) failure?.let { throw it }
+        }
+    }
+
+    private class Fixture(
+        view: SwingShellSuggestionView? = null,
+        dispatcher: CoroutineDispatcher? = null,
+    ) : AutoCloseable {
+        val commandLine = MutableStateFlow<TerminalShellCommandLineSnapshot?>(null)
         val session =
             TerminalSession.create(
                 TerminalBuffers.create(30, 4),
@@ -185,6 +313,9 @@ class SwingCompletionBindingTest {
 
                         override fun close() = Unit
                     },
+                workerDispatcher = dispatcher ?: Dispatchers.Default,
+                ioDispatcher = dispatcher ?: Dispatchers.IO,
+                shellIntegration = TerminalShellIntegrationFactory.host(TerminalShellIntegrationState(), commandLine),
             )
         val binding = SwingCompletionBinding(session)
         val terminal =
@@ -194,6 +325,9 @@ class SwingCompletionBindingTest {
                     SwingHostServices(
                         shellSuggestionProvider = binding.provider,
                         shellSuggestionFeedbackHandler = binding.feedbackHandler,
+                        shellSuggestionViewFactory =
+                            view?.let { supplied -> SwingShellSuggestionViewFactory { supplied } }
+                                ?: SwingShellSuggestionViewFactory.DEFAULT,
                     ),
             )
 
@@ -218,5 +352,11 @@ class SwingCompletionBindingTest {
         val suggestion = SwingShellSuggestion("git status", 0, 5, "test", "COMMAND")
 
         fun feedback() = SwingShellSuggestionFeedback(SwingShellSuggestionFeedbackKind.ACCEPTED, suggestion, 0, request)
+
+        fun resources(onFeedback: () -> Unit = {}) =
+            SwingCompletionResources(
+                provider = { flowOf(listOf(suggestion)) },
+                feedbackHandler = { onFeedback() },
+            )
     }
 }

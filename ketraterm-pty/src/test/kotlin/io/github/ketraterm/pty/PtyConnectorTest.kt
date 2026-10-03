@@ -218,6 +218,46 @@ class PtyConnectorTest {
     }
 
     @Test
+    fun `byte listener failure reports its cause and disposes the live process`() {
+        val failure = IllegalStateException("terminal byte consumer failed")
+        val input = GatedInputStream("output".ascii())
+        val output = RecordingOutputStream()
+        val process = TestProcess(input = input, output = output, blockWaitFor = true)
+        val connector = createConnector(process)
+        val listener =
+            object : RecordingListener() {
+                override fun onBytes(
+                    bytes: ByteArray,
+                    offset: Int,
+                    length: Int,
+                ) {
+                    super.onBytes(bytes, offset, length)
+                    throw failure
+                }
+            }
+        try {
+            connector.start(listener)
+            assertTrue(input.readEntered.await(10, TimeUnit.SECONDS), "reader did not reach process output")
+            input.release()
+            assertTrue(connector.joinReader(10_000), "reader did not finish its failing callback")
+            assertAll(
+                { assertEquals("output", listener.byteEvents.single().asciiText()) },
+                { assertEquals(listOf(failure), listener.errors, "a failed byte consumer must reach the transport failure boundary") },
+                { assertTrue(process.destroyed, "a failed reader must not leave the child running without output consumption") },
+                { assertEquals(1, process.destroyCount) },
+                { assertEquals(1, output.closeCount) },
+            )
+            assertTrue(connector.joinWatcher(10_000), "process disposal did not release its watcher")
+            connector.close()
+            assertEquals(1, process.destroyCount)
+            assertEquals(1, output.closeCount)
+        } finally {
+            input.release()
+            connector.close()
+        }
+    }
+
+    @Test
     fun `read failure preserves delivered output and the original cause through later process exit`() {
         val failure = IOException("read failed after output")
         val prefix = ByteArrayInputStream("before failure".ascii())

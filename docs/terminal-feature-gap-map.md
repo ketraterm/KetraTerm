@@ -16,6 +16,7 @@ The target is a modern, secure, xterm-compatible terminal pipeline for contempor
 - `TODO(render)`: render contracts or copied render data are missing.
 - `TODO(ui)`: reusable UI presentation, interaction, or rendering behavior is missing.
 - `TODO(input)`: host-bound keyboard/mouse/paste encoding is missing.
+- `TODO(completion)`: completion evaluation, ranking, learning, or source-work lifecycle is missing or incorrect.
 - `TODO(host/profile)`: product host integration, profile, or settings behavior is missing.
 - `TODO(policy)`: feature needs an explicit security or compatibility policy before implementation.
 
@@ -41,6 +42,11 @@ Correct-behavior regressions and their validation limits are indexed in the
 audit's [regression coverage](reviews/terminal-quality-audit-2026-09-27.md#regression-coverage).
 Tests may fail until their owning defects are fixed; adding coverage does not
 close these entries.
+
+The [2026-10-03 maintainability review](reviews/terminal-maintainability-review-2026-10-03.md)
+adds worker-termination, bounded-work and extension-lifecycle findings. Its
+[owner entries](#maintainability-review) distinguish reproduced defects from
+source evidence and unsettled contracts; M01–M03 take priority over new features.
 
 - `Done(ui)`: visually verify agy help-transition animation after removing frame-triggered resizing. Default alternate padding now redistributes the primary horizontal inset and preserves vertical insets; regressions cover physical resizing while alternate-screen content is active. The resize/clear defect is corrected, but animation parity is not established.
 
@@ -267,6 +273,37 @@ target resources remain host-owned. The final review records regression evidence
 and the completed follow-up to `104db318`.
 Both reviews retain their historical evidence. E04's independent renderer proposal
 remains outside scope.
+
+### Maintainability Review
+
+The [full review](reviews/terminal-maintainability-review-2026-10-03.md) records
+source evidence, regression identities, validation limits and correction groups.
+M01–M13 have correct-behavior regressions: 43 added cases include 33 failures and
+ten passing serialization controls. Source-only findings and API decisions below
+do not claim executed fault injection or measured performance. Existing A01–A15
+closures remain historical evidence for their tested paths.
+
+- **M01 — `TODO(core)`**: bound Kitty counted-pop work by the retained 32-entry stack and reset flags when it is exhausted, including after eviction. The small-count exhaustion regression fails; saturated-count work is source-confirmed and needs safe verification with the fix. Reconcile historical tests that preserve incorrect restoration.
+- **M02 — `TODO(session)`**: unexpected connector/encoder cancellation must terminate an active session whose essential writer exits, preserving the cause and avoiding partial-write retries. Two regressions currently leave the session open.
+- **M03 — `TODO(transport)`**: supervise exceptions from PTY byte delivery, report the original failure and dispose the process/streams once. The gated fake-process regression currently leaves the process alive.
+- **M04 — `TODO(completion)`**: a terminated source must complete result accounting or terminate collection. Unexpected provider errors currently strand the supervised collector; the deterministic regression permits isolation or propagation while preserving failure visibility.
+- **M05 — `TODO(ui)`**: completion resource replacement and close must detach observation despite throwing/cancelling popup callbacks. Four regressions expose retained focus observation and obsolete feedback.
+- **M06 — `TODO(ui)`**: a reentrant hide or disposal must supersede an unfinished suggestion show. Two regressions expose visibility restored by the obsolete outer transition.
+- **M07 — `TODO(host/profile)`**: optional foreground-title callbacks must not cancel essential workspace shell and session-close observation. A regression checks directory state/delivery and remote-close notification together, independently of whether the injected failure is reported or handled.
+- **M08 — `TODO(host/profile)`**: reentrant workspace tab callbacks must not publish removed or superseded selections. Two regressions require every selection notification to agree with authoritative workspace state.
+- **M09 — `TODO(core/render)`**: nested frame-read attempts must preserve the enclosing lease. Support nesting deliberately or reject it before mutation and document the rule; the public-reader regression accepts either safe outcome.
+- **M10 — `TODO(host)`**: title push/pop must read authoritative core titles after legal direct core mutation. The byte-stream regression exposes stale adapter title mirrors; retain stack and notification ownership in host.
+- **M11 — `TODO(input)`**: widen accepted maximum cell/pixel coordinates before one-based conversion and apply encoding-specific clamping/suppression before narrowing. Six exact-byte regressions fail; align pixel-coordinate documentation with zero-based events.
+- **M12 — `TODO(host/profile)`**: encode all accepted configuration strings consistently. Twenty round-trip cases cover five fields; quotes/comments and newlines fail in ten cases, while backslash and Unicode controls pass. Do not silently replace valid saved values with defaults.
+- **M13 — `TODO(host)`**: reconcile lowered OSC hyperlink limits under the serialized registry owner by the next admission. The byte-stream regression checks `4 → 1`, URI retirement and removal-before-registration ordering without requiring synchronous setter-time eviction.
+- **M14 — `TODO(host/profile)`**: standalone Ctrl+Tab must follow visible tab-strip order rather than `HashMap` iteration. Source-confirmed; real product navigation coverage for directions, wraparound and deletion remains required.
+- **M15 — `TODO(host/profile)`**: IntelliJ pane creation must release resources and service listeners when final reconciliation throws before pane registration. Source confirms missing rollback; IDE fault-injection coverage is outstanding.
+- **M16 — `TODO(render)`**: external frames inheriting the default palette getter construct storage on every cache acceptance. Share an immutable fallback and measure a representative external-frame path. Built-in core already caches its palette; surviving allocations and latency are unmeasured.
+- **M17 — `TODO(host/profile)`**: standalone command-output export performs filesystem writes on the EDT. Move writing into owned I/O work and verify completion, failure and cancellation with a gated writer; no latency measurement is claimed.
+- **M18 — `TODO(transport/policy)`**: settle repeated connector-start behavior in public KDoc. Secondary lifecycle prose requires idempotence while shipped PTY behavior/tests require start-once; this is a contract contradiction, not a reproduced startup failure.
+- **M19 — `TODO(session/policy)`**: settle post-close setter behavior and retained presentation publication. Current guards differ, but no normative general policy exists; choose supported/rejected/ignored mutations before adding policy-specific assertions.
+- **M20 — `TODO(host/profile/completion)`**: correct non-compiling workspace examples and stale completion debounce/view descriptions. Verify representative examples through source consumers and retain capability/status inventories only in the canonical maps.
+- **M21 — `TODO(parser)`**: remove unused `ParserState` UTF-8 fields and tests that assert fictional decoder state; preserve actual byte-stream reset, malformed-input and EOF coverage. This is maintenance debt, not a decoding defect.
 
 ### Release Verification
 
