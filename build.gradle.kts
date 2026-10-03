@@ -134,6 +134,7 @@ subprojects {
                 publications.withType<MavenPublication>().configureEach {
                     val publication = this
                     val publicationName = name.replaceFirstChar(Char::uppercaseChar)
+                    val artifactFileName = "${publication.artifactId}-${publication.version}"
                     val libraryJar = tasks.named("jar")
                     val pom = tasks.named<GenerateMavenPom>("generatePomFileFor${publicationName}Publication")
                     val metadata = tasks.named<GenerateModuleMetadata>("generateMetadataFileFor${publicationName}Publication")
@@ -141,8 +142,8 @@ subprojects {
                         dependsOn(pom, metadata)
                         into("${publication.groupId.replace('.', '/')}/${publication.artifactId}/${publication.version}") {
                             from(libraryJar)
-                            from(pom.map { it.destination }) { rename { "${publication.artifactId}-${publication.version}.pom" } }
-                            from(metadata.flatMap { it.outputFile }) { rename { "${publication.artifactId}-${publication.version}.module" } }
+                            from(pom.map { it.destination }) { rename { "$artifactFileName.pom" } }
+                            from(metadata.flatMap { it.outputFile }) { rename { "$artifactFileName.module" } }
                         }
                     }
                 }
