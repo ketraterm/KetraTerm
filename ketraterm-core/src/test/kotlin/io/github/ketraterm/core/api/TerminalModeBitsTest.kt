@@ -15,11 +15,35 @@
  */
 package io.github.ketraterm.core.api
 
+import io.github.ketraterm.core.TerminalBuffers
+import io.github.ketraterm.protocol.MouseEncodingMode
+import io.github.ketraterm.protocol.MouseTrackingMode
 import io.github.ketraterm.protocol.keyboard.KittyKeyboardProgressiveFlag
 import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.Test
 
 class TerminalModeBitsTest {
+    @Test
+    fun `published mouse numeric meanings remain compatible with existing packed readers`() {
+        val terminal = TerminalBuffers.create(2, 2)
+        val tracking = listOf("OFF", "X10", "NORMAL", "BUTTON_EVENT", "ANY_EVENT")
+        val encoding = listOf("DEFAULT", "UTF8", "SGR", "URXVT", "SGR_PIXELS")
+        for ((number, name) in tracking.withIndex()) {
+            val mode = MouseTrackingMode.valueOf(name)
+            assertEquals(number, mode.ordinal)
+            terminal.setMouseTrackingMode(mode)
+            assertEquals(number.toLong(), (terminal.getInputModeBits() ushr 20) and 15L)
+            assertEquals(number, TerminalInputState.mouseTrackingMode(number.toLong() shl 20))
+        }
+        for ((number, name) in encoding.withIndex()) {
+            val mode = MouseEncodingMode.valueOf(name)
+            assertEquals(number, mode.ordinal)
+            terminal.setMouseEncodingMode(mode)
+            assertEquals(number.toLong(), (terminal.getInputModeBits() ushr 24) and 7L)
+            assertEquals(number, TerminalInputState.mouseEncodingMode(number.toLong() shl 24))
+        }
+    }
+
     @Test
     fun `tests boolean flags`() {
         val bits = TerminalModeBits.APPLICATION_CURSOR_KEYS or TerminalModeBits.BRACKETED_PASTE

@@ -24,6 +24,13 @@ handshakes coordinate the headless smoke; it uses no timing assertions, private
 reflection, internal constructors or extra library dependencies. The Java smoke
 uses functional actions and public host wiring, without adapting coroutines.
 
+`extractSwingReadmeExample` also extracts the marked Kotlin usage fence directly
+from `ketraterm-ui-swing/README.md` into the staged Swing consumer. A missing or
+duplicate example fails extraction; API drift fails compilation in every compiler
+and metadata combination. The smoke invokes it on the EDT, rejects off-EDT use,
+disposes its returned view and verifies that the host-owned session stays open.
+It also checks the documented enabled default for system fallback fonts.
+
 The PTY consumer supplies an in-memory implementation of the exported pty4j
 process contract. It verifies Java construction, Kotlin constructor defaults,
 resize forwarding and connector-owned destruction without launching a native

@@ -15,6 +15,7 @@
  */
 package consumer
 
+import consumer.documentation.createTerminalView
 import io.github.ketraterm.core.TerminalBuffers
 import io.github.ketraterm.core.api.TerminalBuffer
 import io.github.ketraterm.core.api.TerminalRenderBuffer
@@ -110,6 +111,17 @@ fun main() =
             session.start(COLUMNS, ROWS)
             check(runCatching { connector.start(rejectedListener) }.exceptionOrNull() is IllegalStateException)
             withTimeout(20_000) { session.renderGeneration.first { it >= 0L } }
+            check(runCatching { createTerminalView(session) }.exceptionOrNull() is IllegalStateException)
+            onEdt {
+                check(SwingSettings().useSystemFallbackFonts)
+                val documentedView = createTerminalView(session)
+                try {
+                    check(documentedView.preferredSize.width > 0)
+                } finally {
+                    documentedView.dispose()
+                }
+            }
+            check(!session.isClosed && !connector.closed.get())
             val terminal =
                 onEdt {
                     SwingTerminal(

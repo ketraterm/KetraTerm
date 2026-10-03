@@ -16,6 +16,7 @@
 package io.github.ketraterm.host
 
 import io.github.ketraterm.core.api.TerminalBuffer
+import io.github.ketraterm.core.api.TerminalInputState
 import io.github.ketraterm.core.api.TerminalModeBits
 import io.github.ketraterm.core.model.CellColor
 import io.github.ketraterm.core.model.UnderlineStyle
@@ -167,7 +168,7 @@ public class HostCommandAdapter(
 
     override fun lineFeed() {
         terminal.newLine()
-        if (terminal.getModeSnapshot().isNewLineMode) {
+        if (TerminalInputState.isNewLineMode(terminal.getInputModeBits())) {
             terminal.carriageReturn()
         }
     }
@@ -606,7 +607,7 @@ public class HostCommandAdapter(
         applicationMode: Int,
     ) {
         if (flags < 0) return
-        val current = terminal.getModeSnapshot().kittyKeyboardFlags
+        val current = TerminalInputState.kittyKeyboardFlags(terminal.getInputModeBits())
         val next =
             when (applicationMode) {
                 KittyKeyboardFlagApplicationMode.REPLACE -> flags

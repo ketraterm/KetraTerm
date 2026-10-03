@@ -226,7 +226,14 @@ Guaranteed behavior:
 
 `TerminalModeController` is the public write surface for durable mode state.
 
-`TerminalModeReader.getModeSnapshot()` provides the common typed mode view.
+`TerminalModeReader.getModeSnapshot()` provides the fixed published typed subset
+listed by `TerminalModeSnapshot`, not every durable mode. The packed word exposes
+the fields in `TerminalModeBits` and the `TerminalInputState` decoding helpers;
+it additionally includes DECCOLM and xterm resources absent from the typed snapshot.
+Existing bit positions, widths, sentinels and mouse ordinal meanings are stable.
+Bits 37..62 hold xterm resources; only 19 and 63 are currently unassigned, and
+readers ignore them. Neither representation promises to hold every future mode;
+introduce a focused capability only when a new state family needs one.
 Xterm resource reads use `TerminalInputState.getInputModeBits()` with
 `keyModifierOption` and `keyFormatOption` to decode one coherent primitive snapshot.
 
@@ -442,7 +449,6 @@ These are intentional boundary choices, not accidental gaps:
 Likely to evolve before 1.0:
 
 - parser/input handoff docs
-- mode snapshot growth if more host-controlled flags are surfaced
 - parser-facing docs around charset ownership and Unicode ingestion
 
 The runtime semantics described in this document are the current intended

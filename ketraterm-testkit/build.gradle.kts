@@ -288,9 +288,32 @@ val consumerFixtureDirectory = layout.buildDirectory.dir("published-consumers")
 configure<com.diffplug.gradle.spotless.SpotlessExtension> {
     kotlinGradle { target("*.gradle.kts", "src/consumerTest/*.gradle.kts") }
 }
+val extractSwingReadmeExample =
+    tasks.register("extractSwingReadmeExample") {
+        val readme = rootProject.layout.projectDirectory.file("ketraterm-ui-swing/README.md")
+        val destination =
+            layout.buildDirectory.file(
+                "readme-example/ui-swing/src/main/kotlin/consumer/documentation/TerminalViewExample.kt",
+            )
+        inputs.file(readme)
+        outputs.file(destination)
+        doLast {
+            val example =
+                Regex("(?s)<!-- compiled-example:terminal-view -->\\s*```kotlin\\r?\\n(.*?)\\r?\\n```")
+                    .findAll(readme.asFile.readText())
+                    .single()
+                    .groupValues[1]
+            destination.get().asFile.apply {
+                parentFile.mkdirs()
+                writeText("package consumer.documentation\n\n$example\n")
+            }
+        }
+    }
 val preparePublishedConsumers =
     tasks.register<Sync>("preparePublishedConsumers") {
+        dependsOn(extractSwingReadmeExample)
         from("src/consumerTest")
+        from(layout.buildDirectory.dir("readme-example"))
         into(consumerFixtureDirectory)
         preserve { include("**/build/**", ".gradle/**") }
     }

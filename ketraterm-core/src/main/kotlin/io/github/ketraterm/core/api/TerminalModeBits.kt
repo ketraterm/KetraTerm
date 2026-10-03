@@ -22,6 +22,14 @@ package io.github.ketraterm.core.api
  * [TerminalInputState.getInputModeBits]. Core owns the values, while input and
  * rendering code may read them through the helper methods without depending on
  * core internals.
+ *
+ * Existing bit positions, field widths, sentinel values, and mouse ordinals are
+ * compatibility commitments. Mouse tracking values 0..4 mean OFF, X10, NORMAL,
+ * BUTTON_EVENT, ANY_EVENT; encoding values 0..4 mean DEFAULT, UTF8, SGR, URXVT,
+ * SGR_PIXELS. Existing values must not be reordered or repurposed.
+ * Bits 37..62 hold xterm resources decoded by [TerminalInputState] helpers;
+ * only bits 19 and 63 are currently unassigned. Readers ignore unassigned bits.
+ * This finite published subset is not an extensible inventory of all terminal state.
  */
 public object TerminalModeBits {
     // Bits 37..62 are reserved for XtermKeyResourceBits. Keep new fields disjoint.

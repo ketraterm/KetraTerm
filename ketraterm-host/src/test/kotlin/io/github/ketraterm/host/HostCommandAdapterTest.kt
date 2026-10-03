@@ -17,6 +17,8 @@ package io.github.ketraterm.host
 
 import io.github.ketraterm.core.TerminalBuffers
 import io.github.ketraterm.core.api.TerminalBuffer
+import io.github.ketraterm.core.api.TerminalInputState
+import io.github.ketraterm.core.api.TerminalModeSnapshot
 import io.github.ketraterm.core.model.CellColor
 import io.github.ketraterm.core.model.UnderlineStyle
 import io.github.ketraterm.parser.api.TerminalOutputParser
@@ -38,6 +40,57 @@ import org.junit.jupiter.params.provider.ValueSource
 
 @DisplayName("HostCommandAdapter")
 class HostCommandAdapterTest {
+    @Test
+    fun `line feeds use primitive mode reads across byte splits`() {
+        for (newline in listOf(false, true)) {
+            val bytes = (if (newline) "\u001B[20hAB\nC" else "AB\nC").encodeToByteArray()
+            for (split in 0..bytes.size) {
+                val backing = TerminalBuffers.create(10, 5)
+                val terminal = PrimitiveModeBuffer(backing)
+                val f = Fixture(terminal = terminal)
+                f.parser.accept(bytes, 0, split)
+                f.parser.accept(bytes, split, bytes.size - split)
+                f.end()
+                val column = if (newline) 0 else 2
+                assertEquals('C'.code, backing.getCodepointAt(column, 1), "newline=$newline split=$split")
+                assertEquals(column + 1, backing.cursorCol)
+                assertEquals(1, terminal.reads)
+            }
+        }
+    }
+
+    @Test
+    fun `Kitty replace set and clear use coherent primitive reads across byte splits`() {
+        val commands = listOf("\u001B[=9u" to 9, "\u001B[=2;2u" to 9, "\u001B[=1;3u" to 8, "\u001B[=0u" to 0)
+        for (split in 0..commands.maxOf { it.first.length }) {
+            val backing = TerminalBuffers.create(10, 5)
+            val terminal = PrimitiveModeBuffer(backing)
+            val f = Fixture(terminal = terminal)
+            for ((command, expected) in commands) {
+                val bytes = command.encodeToByteArray()
+                val boundary = split.coerceAtMost(bytes.size)
+                f.parser.accept(bytes, 0, boundary)
+                f.parser.accept(bytes, boundary, bytes.size - boundary)
+                assertEquals(expected, TerminalInputState.kittyKeyboardFlags(backing.getInputModeBits()), "command=$command split=$split")
+            }
+            f.end()
+            assertEquals(commands.size, terminal.reads)
+        }
+    }
+
+    private class PrimitiveModeBuffer(
+        private val backing: TerminalBuffer,
+    ) : TerminalBuffer by backing {
+        var reads = 0
+
+        override fun getInputModeBits(): Long {
+            reads++
+            return backing.getInputModeBits()
+        }
+
+        override fun getModeSnapshot(): TerminalModeSnapshot = error("Flag inspection must not request a full mode snapshot")
+    }
+
     @Test
     fun `output boundary distinguishes hard blank lines from cursor motion across byte chunks`() {
         val bytes = "\r\n\r\n\u001B[5;1H\u001B[H中".encodeToByteArray()

@@ -117,38 +117,34 @@ For detailed specifications on Swing painting and text pipelines:
 
 ## How to Use
 
-To place a functional, interactive terminal component in your Swing layout, instantiate `SwingTerminal` and bind it to your active `TerminalSession`:
+Call this function on the EDT with a started session, then add the returned component
+to your host's layout. The host retains the component so it can call `dispose()` on
+the EDT when the view closes. Disposal releases view work; it does not close the
+session. The host separately closes the session when the connection should end.
+The published-consumer gate extracts, compiles, and exercises this exact example.
 
+<!-- compiled-example:terminal-view -->
 ```kotlin
 import io.github.ketraterm.session.TerminalSession
 import io.github.ketraterm.ui.swing.api.SwingTerminal
 import io.github.ketraterm.ui.swing.settings.SwingSettings
 import io.github.ketraterm.ui.swing.settings.TerminalTheme
-import java.awt.BorderLayout
-import javax.swing.JComponent
-import javax.swing.JPanel
+import java.awt.Font
+import javax.swing.SwingUtilities
 
-fun createTerminalView(session: TerminalSession): JComponent {
-    val panel = JPanel(BorderLayout())
+fun createTerminalView(session: TerminalSession): SwingTerminal {
+    check(SwingUtilities.isEventDispatchThread()) { "Create terminal views on the EDT" }
 
-    // 1. Define custom, immutable settings (palette, fonts, etc.)
     val settings = SwingSettings.create {
         it.palette = TerminalTheme.ONE_DARK.createPalette()
-        it.font = java.awt.Font("Cascadia Mono", java.awt.Font.PLAIN, 15)
+        it.font = Font("Cascadia Mono", Font.PLAIN, 15)
         it.columns = 80
         it.rows = 24
     }
-    
-    // 2. Instantiate the SwingTerminal component
-    val terminalComponent = SwingTerminal(
-        settingsProvider = { settings }
-    )
-    
-    // 3. Bind the component to the active session
-    terminalComponent.bind(session)
-    
-    panel.add(terminalComponent, BorderLayout.CENTER)
-    return panel
+
+    return SwingTerminal(settingsProvider = { settings }).apply {
+        bind(session)
+    }
 }
 ```
 

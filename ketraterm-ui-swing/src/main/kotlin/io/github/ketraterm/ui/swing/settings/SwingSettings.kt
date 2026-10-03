@@ -45,7 +45,7 @@ import java.util.*
  * @property fallbackFonts ordered fonts used by the complex-text renderer when
  * [font] cannot display a Unicode scalar cell or grapheme cluster.
  * @property useSystemFallbackFonts whether the complex-text renderer may use
- * installed system fonts after [fallbackFonts] fail. System font discovery is
+ * installed system fonts after [fallbackFonts] fail (enabled by default). System font discovery is
  * asynchronous, keeping discovery work outside painting.
  * @property palette resolved terminal color palette.
  * @property columns initial preferred column count.
