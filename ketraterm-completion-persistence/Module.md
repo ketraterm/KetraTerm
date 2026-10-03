@@ -2,8 +2,8 @@
 
 ## KetraTerm Completion Persistence (`:ketraterm-completion-persistence`)
 
-The `ketraterm-completion-persistence` module provides optional local-file
-storage for compact exact-command completion-learning snapshots. Version 3
+The `ketraterm-completion-persistence` module provides shared product implementation
+of local-file storage for compact exact-command completion-learning snapshots. Version 3
 stores opaque ranking counters separately from optional positive plaintext replay rows.
 The file boundary rechecks replay eligibility, enforces byte/line/row bounds,
 uses a strict versioned codec, and replaces files atomically when supported.

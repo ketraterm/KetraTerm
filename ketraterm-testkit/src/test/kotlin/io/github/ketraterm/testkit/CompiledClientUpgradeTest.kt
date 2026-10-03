@@ -77,10 +77,6 @@ class CompiledClientUpgradeTest {
         "completion-host,pom,current",
         "completion-host,gradle,2.4.0",
         "completion-host,pom,2.4.0",
-        "completion-persistence,gradle,current",
-        "completion-persistence,pom,current",
-        "completion-persistence,gradle,2.4.0",
-        "completion-persistence,pom,2.4.0",
         "shell-integration,gradle,current",
         "shell-integration,pom,current",
         "shell-integration,gradle,2.4.0",
@@ -89,10 +85,6 @@ class CompiledClientUpgradeTest {
         "ui-swing-host,pom,current",
         "ui-swing-host,gradle,2.4.0",
         "ui-swing-host,pom,2.4.0",
-        "workspace,gradle,current",
-        "workspace,pom,current",
-        "workspace,gradle,2.4.0",
-        "workspace,pom,2.4.0",
     )
     fun `already compiled Kotlin and Java clients run against the current publication`(
         module: String,

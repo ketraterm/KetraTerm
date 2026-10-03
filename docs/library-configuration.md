@@ -1,10 +1,9 @@
 # Configuration ownership and construction
 
-`SwingSettings`, `SwingHostServices`, `PtyOptions`, and
-`TerminalWorkspaceOpenOptions` are immutable snapshots with named construction
+`SwingSettings`, `SwingHostServices`, and `PtyOptions` are immutable snapshots with named construction
 and update operations. Their public entry points do not enumerate every field.
-Small value records such as `SwingPadding` and launch profiles retain their
-intentional data-class contracts.
+Product-only workspace options use the same construction pattern. Small value
+records such as `SwingPadding` retain their intentional data-class contracts.
 
 ## Ownership
 
@@ -12,7 +11,7 @@ intentional data-class contracts.
 | --- | --- |
 | Fonts, colors, padding, cursor presentation, input interaction | `SwingSettings` |
 | Clipboard, font resolver, hyperlink and suggestion services | `SwingHostServices`; service lifetimes remain host-owned |
-| Scrollback capacity | Core creation, selected through `PtyOptions.maxHistory` or workspace open options |
+| Scrollback capacity | Core creation, selected through `PtyOptions.maxHistory` by local-session hosts |
 | Shell window permissions | Session `HostPolicy` and product window handling |
 | Standalone TOML schema, paths, load/save and defaults | Internal application `KetraTermConfig` and `KetraTermConfigManager` |
 | IntelliJ preferences, defaults and persistence | IntelliJ settings services |
@@ -86,15 +85,15 @@ mutation and immutable updates. A second model version added the existing real
 Kotlin/Java client bytecode ran against V2 without recompilation. The chosen
 single `Consumer<Builder>` callback works in both languages without overload
 ambiguity or an implicit receiver hiding caller variables. Production consumer
-fixtures exercise the actual four snapshots; PTY byte-response tests verify
-host mode-report capability propagation.
+fixtures exercise the three supported snapshots; product tests cover workspace
+options. PTY byte-response tests verify host mode-report capability propagation.
 
 This is an intentional pre-freeze source and binary migration: replace nonempty
 constructors with `create` callbacks, named-argument `copy` with update callbacks,
 and destructuring with getters. Zero-argument defaults remain available. Remove
 the three obsolete Swing fields and supply their values to the owners above.
-Applications importing workspace's product config must own their persistence;
-the standalone internal types are not replacement library APIs. Recompile clients.
+Embedding applications own their preferences and persistence; standalone's
+internal configuration types are not replacement library APIs. Recompile clients.
 
 Future fields add snapshot getters and draft accessors without changing factory,
 builder, or update descriptors. Preserve existing property types and defaults;

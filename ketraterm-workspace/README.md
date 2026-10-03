@@ -1,6 +1,6 @@
 # KetraTerm Workspace (`:ketraterm-workspace`)
 
-The `ketraterm-workspace` module provides host-neutral session and tab management. It coordinates local sessions under a workspace lifecycle and launches host-supplied profiles and immutable options. Products own preference schemas and persistence.
+The `ketraterm-workspace` module provides shared product implementation for host-neutral session and tab management. It coordinates local sessions under a workspace lifecycle and launches host-supplied profiles and immutable options. Products own preference schemas and persistence. See the [supported library boundary](../docs/library-compatibility.md#supported-boundary) for external embedding contracts.
 
 This module is designed to be completely decoupled from any specific UI toolkit, serving as the headless state controller for tabbed desktop terminal interfaces or IDE tool windows.
 

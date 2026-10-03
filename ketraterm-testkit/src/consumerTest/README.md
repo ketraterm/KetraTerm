@@ -7,9 +7,9 @@ Run from the repository root with JDK 25:
 ```
 
 This verification is also part of `:ketraterm-testkit:check` and the test CI
-matrix. Thirteen external projects cover all 17 publications through one declared
+matrix. Eleven external projects cover all 15 publications through one declared
 KetraTerm dependency per project, including direct core/render and optional
-completion-host/persistence, shell-integration, Swing-host and workspace roots.
+completion-host, shell-integration and Swing-host roots.
 Kotlin and Java sources compile and execute
 public APIs; the smoke programs verify parsed/grid text, collected completion
 results, Swing host integration and packaged Kotlin metadata.
@@ -59,16 +59,30 @@ Existing `TerminalLibraryConsumerCompilationTest` regressions separately check
 Java compilation against exported project API variants without the fixture's
 Kotlin plugin or testkit classpath.
 
+Workspace and completion persistence are product implementation modules, not
+supported Maven libraries. Their external fixtures and retained client pairs were
+deliberately retired when narrowing that support boundary; the remaining client
+binaries and provenance were preserved unchanged. Product and owner-module tests
+continue to verify those implementations. Historical reviews retain the earlier
+publication evidence.
+
+`verifyPublicationBoundary` rejects product, testkit and benchmark artifacts in
+the staged repository at the requested version, checks consistent library versions
+in every runtime graph, and prevents UI/native hosting dependencies from entering
+the parser/core consumers. The base Swing consumer must remain free of optional
+PTY, OSC, workspace and completion implementations. These checks run in all four
+source-consumer compiler/metadata combinations; they do not add upgrade cases.
+
 ## Compiled-client upgrades
 
 ```text
 ./gradlew :ketraterm-testkit:compiledClientUpgradeTest
 ```
 
-This check is included in `publishedConsumerTest`. It runs the thirteen tracked
+This check is included in `publishedConsumerTest`. It runs the eleven tracked
 `baseline/*.jar` clients against the current staged runtime publications in
 both metadata modes, using Maven stdlib 2.4.20 and 2.4.0, the latter matching
-IDEA 2026.2's boot runtime version (52 executions). This does not run the IDE's
+IDEA 2026.2's boot runtime version (44 executions). This does not run the IDE's
 packaged `util-8.jar`. Each classpath must resolve exactly the expected
 stdlib version. An isolated Java launcher checks the actually loaded Kotlin
 version and its code-source jar before invoking the retained main; no testkit
@@ -91,14 +105,14 @@ frames/readers exercise required operations and inherited defaults. The render
 client retains the original inline lease body, mixes it with Java calls to the
 current reader, pins frames across publication, throws from callbacks and proves
 that all earlier leases release before their buffer can be recycled. Optional
-clients execute bounded directory access, persistence hydration/final flush,
-OSC metadata, profile defaults/copy and the supported completion host combinations.
+clients execute bounded directory access, OSC metadata and the supported
+completion host combinations.
 Compared with the original five client/provenance pairs at `e37f5d7f`, parser
 and completion client bytes remain identical, with refreshed provenance.
 Construction commit `025ccb1a` deliberately replaced host and Swing clients after
 incompatible core/session construction changes; D02/D03 later refreshes Swing and PTY.
-These eight additional clients
-establish extension baselines with their own source/artifact hashes. The 52 cases
+Six additional retained clients
+establish extension baselines with their own source/artifact hashes. The 44 cases
 verify upgrades from these declared baselines, not compatibility with the original
 host and Swing callers. See the [migration and baseline decision](../../../docs/library-compatibility.md#verification-and-baseline-changes).
 
@@ -133,8 +147,8 @@ their growing data-class configuration APIs become immutable snapshots with
 named construction/update callbacks. Before refresh, exactly eight upgrade
 cases fail at the removed constructor descriptors; the other eleven clients
 remain byte-for-byte unchanged. Source consumers now exercise Java late-field
-font resolver selection/clearing, settings drafts, detached snapshots, and
-workspace immutable updates. See [configuration migration](../../../docs/library-configuration.md).
+font resolver selection/clearing, settings drafts and detached snapshots.
+See [configuration migration](../../../docs/library-configuration.md).
 
 D04/D05 deliberately refreshes only Swing and render-cache reader clients after
 recording eight expected linkage failures (both metadata modes and both runtimes).

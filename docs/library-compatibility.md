@@ -20,16 +20,39 @@ Public and protected declarations in each published library are part of the
 contract. Kotlin `internal` and private implementation details are excluded,
 except `@PublishedApi` declarations referenced by public inline functions:
 already-compiled Kotlin callers may link directly to them. Application,
-benchmark and testkit implementation APIs are not published library contracts.
+benchmark, testkit, workspace and completion-persistence implementation APIs are
+not supported library contracts.
 
-The root build explicitly selects the published libraries; a new Kotlin module
-is not published automatically. The selected artifacts include optional composed
-libraries, such as local PTY hosting, workspace, completion adapters and Swing
-host actions. Composition does not make every implementation helper an embedding
-API. Keep library-local helpers internal/private; cross-module visibility needs
-its own contract justification. The current selected libraries each have a real
-host or runtime boundary. App, benchmarks, testkit and the nested IntelliJ product
-build are outside this library publication set.
+One supported-module set selects all **15 Maven publications**, their ABI checks
+and the root public Dokka aggregation. New modules are not included automatically.
+
+| Offering | Supported modules |
+| --- | --- |
+| Headless pipeline and session | protocol, parser, core, host, input, render-api, render-cache, transport-api, session |
+| Embedded Swing view | ui-swing |
+| Optional local process and shell metadata | pty, shell-integration |
+| Optional completion engine and local filesystem support | completion, completion-host |
+| Optional Swing chrome and completion adapters | ui-swing-host |
+
+Module names above have the `ketraterm-` prefix. Optional libraries are selected
+by the consumer; the headless pipeline does not depend on Swing, PTY, the OSC
+producer, workspace or completion. Render-cache remains in session's runtime
+and public frame-read boundary.
+
+`ketraterm-workspace` and `ketraterm-completion-persistence` remain separate
+product modules bundled with standalone and the IntelliJ plugin. They are not
+published, covered by public ABI checks or included in public Dokka. Public
+declarations needed for product wiring do not make them supported embedding APIs.
+Removing their external
+support is an intentional pre-stable policy change: applications using those
+earlier development artifacts must own their workspace and persistence or retain
+the earlier revision. No compatible replacement or earlier 0.x compatibility is
+promised. App, benchmarks, testkit and the nested IntelliJ product build are also
+outside the library publication set.
+
+Publication does not make every implementation helper an embedding API. Keep
+library-local helpers internal/private; cross-module visibility needs its own
+contract justification.
 
 The reviewed extension points follow the existing module ownership:
 
@@ -40,8 +63,8 @@ The reviewed extension points follow the existing module ownership:
 | Transport and session | Ordered connectors, session assembly, serialized input and borrowed frame access |
 | Shell integration | Neutral host-owned metadata contracts in session; optional OSC producer in its own library |
 | Swing and Swing host | EDT component lifecycle, host services, immutable settings, suggestions and host-neutral actions |
-| Completion, host and persistence | Completion sources, evaluation and learning; separately owned filesystem access and sanitized persistence |
-| PTY and workspace | Local process lifecycle, profiles, local-session creation and workspace callbacks |
+| Completion and completion host | Completion sources, evaluation and in-memory learning; separately owned bounded local filesystem access |
+| PTY | Local process/connector lifecycle and convenience session creation |
 
 Use the module contracts for threading, ownership and coordinates. Grid reads,
 mutations and parser calls require external serialization; atomic mode reads
@@ -94,8 +117,9 @@ requires a separate compatibility decision.
 - Value data classes retain their constructor, `copy`, component and generated
   default-call shapes. Adding a defaulted primary constructor property is a
   binary change. The D02/D03 pre-freeze migration replaces the growing
-  `SwingSettings`, `SwingHostServices`, `PtyOptions`, and workspace open options
-  with immutable snapshots and concrete construction drafts. Preserve their
+  `SwingSettings`, `SwingHostServices` and `PtyOptions` with immutable snapshots
+  and concrete construction drafts; workspace options underwent the same
+  migration but are now product-only. Preserve the supported snapshots'
   `create(Consumer)`, `copy(Consumer)`, `builder`, `toBuilder`, `build`, default
   constructor and existing property descriptors when adding fields. Small value
   records retain their data-class contracts. View-lifetime integrations still
@@ -170,16 +194,22 @@ The original five client/provenance pairs remain available in Git at `e37f5d7f`.
 Construction commit `025ccb1a` replaced the host and Swing clients for these
 intentional breaks. Parser and completion client bytes remain identical;
 D02/D03 additionally refreshes Swing and PTY; D04/D05 refreshes Swing and
-render-cache as described above. Eight additional clients establish
-separate extension baselines. The current 52 positive upgrade cases verify these
-declared baselines; they do not demonstrate compatibility with the original host,
-Swing, PTY or pre-D05 render-cache clients. This review accepts the current snapshots and retained clients
-as a development baseline, subject to the open behavioral gaps in the final review.
+render-cache as described above. Eight additional clients established
+separate extension baselines, producing the historical thirteen-client suite.
+The support-boundary change removes the workspace and completion-persistence
+clients from current publication checks. Eleven retained clients now define
+**44 positive upgrade cases and two deliberate linkage-failure controls**.
+These check the remaining declared baselines; they do not demonstrate
+compatibility with the original host, Swing, PTY or pre-D05 render-cache clients.
+The current snapshots and retained clients form a development baseline, subject
+to the open behavioral gaps in the final review.
 
-Published modules use strict explicit API mode and Kotlin's built-in ABI
+Supported modules use strict explicit API mode and Kotlin's built-in ABI
 validator over the actual Maven publication jars, with no package allowlist.
-Each module tracks `api/<module>.api`; `checkKotlinAbi` also runs with its `check`
-task. The repository test workflow checks all published APIs and formatting.
+Each supported module tracks `api/<module>.api`; `checkKotlinAbi` also runs with
+its `check` task. The same selection controls public Dokka, so product modules
+and testkit cannot enter the root API documentation. Product implementation
+still receives ordinary compilation, tests and formatting checks.
 
 ```text
 ./gradlew spotlessApply

@@ -27,6 +27,7 @@ Release notes for library consumers and embedders. Product-specific changes are 
 
 ### API changes
 
+- Restricted Maven publication, ABI validation and aggregated Dokka to the 15 supported libraries. Workspace and completion persistence remain bundled product modules; their external support is withdrawn before stable release. Retired their external consumer baselines and corrected the shell-integration Dokka header. See [supported boundaries](docs/library-compatibility.md#supported-boundary).
 - Added independently usable Kotlin/Java terminal libraries with configurable host integration. See [library contracts](docs/library-configuration.md).
 - Replaced `PasteSanitizationPolicy` with `PasteControlPolicy`. Newline handling remains host-owned; persisted legacy paste settings migrate automatically.
 - Clipboard/title integrations now use `TerminalClipboardPolicy.writePermission` and `TerminalTitlePolicy.permission`. Removed origin-specific APIs and clipboard `ALLOWLIST`; old split permission settings fall back to the new defaults.

@@ -1,4 +1,4 @@
-# ketraterm-shell-integration
+# Module ketraterm-shell-integration
 
 Optional implementation of `TerminalShellIntegrationFactory` for accepted OSC
 7/133 metadata. It depends on session contracts; session, PTY, and Swing do not

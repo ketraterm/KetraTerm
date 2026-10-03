@@ -157,9 +157,9 @@ Hosts are responsible for choosing whether and where persistence is enabled. `Te
 persisted hydration snapshot and accepts live feedback events, but it is not a completion source and never contributes a second visible candidate. Completion components never
 read files, scan raw shell history, spawn shells, or talk to UI frameworks.
 
-Optional disk I/O belongs to the separately published
-`ketraterm-completion-persistence` module. Its
-`TerminalCompletionLearningCoordinator` owns the public fixed-path lifecycle. Learning mutates its bounded in-memory
+Embedding hosts own optional disk I/O. KetraTerm's products use the separate,
+product-only `ketraterm-completion-persistence` module. Its
+`TerminalCompletionLearningCoordinator` owns the product's fixed-path lifecycle. Learning mutates its bounded in-memory
 store synchronously; one conflated worker hydrates once, observes last-value enablement, and checkpoints the latest dirty
 snapshot every 30 seconds. The file store persists opaque evidence and only
 positive, policy-approved replay rows, rechecking replay eligibility before encoding. It
