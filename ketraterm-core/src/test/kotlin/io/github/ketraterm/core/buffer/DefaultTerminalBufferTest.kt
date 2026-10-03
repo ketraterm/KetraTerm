@@ -347,11 +347,11 @@ class DefaultTerminalBufferTest {
         buffer.reset()
 
         // Verify primary stack is cleared
-        assertFalse(state.primaryBuffer.hasSavedInitialFlags)
+        assertEquals(0, state.primaryBuffer.kittyKeyboardDepth)
         assertEquals(0, state.primaryBuffer.kittyKeyboardFlags)
 
         // Verify alt stack is cleared
-        assertFalse(state.altBuffer.hasSavedInitialFlags)
+        assertEquals(0, state.altBuffer.kittyKeyboardDepth)
         assertEquals(0, state.altBuffer.kittyKeyboardFlags)
 
         // Verify modes
@@ -370,11 +370,11 @@ class DefaultTerminalBufferTest {
         buffer.softReset()
 
         // Verify primary stack is cleared
-        assertFalse(state.primaryBuffer.hasSavedInitialFlags)
+        assertEquals(0, state.primaryBuffer.kittyKeyboardDepth)
         assertEquals(0, state.primaryBuffer.kittyKeyboardFlags)
 
         // Verify alt stack is cleared
-        assertFalse(state.altBuffer.hasSavedInitialFlags)
+        assertEquals(0, state.altBuffer.kittyKeyboardDepth)
         assertEquals(0, state.altBuffer.kittyKeyboardFlags)
 
         // Verify modes
@@ -414,6 +414,6 @@ class DefaultTerminalBufferTest {
 
         // Pop on primary
         buffer.popKittyKeyboardFlags(1)
-        assertEquals(1, state.modes.kittyKeyboardFlags)
+        assertEquals(0, state.modes.kittyKeyboardFlags)
     }
 }

@@ -498,15 +498,15 @@ class TerminalModeControllerImplTest {
         assertEquals(8, state.modes.kittyKeyboardFlags)
         assertEquals(8, state.activeBuffer.kittyKeyboardFlags)
 
-        // Pop on primary
+        // Pop on primary exhausts its stack.
         modeController.popKittyKeyboardFlags(1)
-        assertEquals(9, state.modes.kittyKeyboardFlags)
-        assertEquals(9, state.activeBuffer.kittyKeyboardFlags)
+        assertEquals(0, state.modes.kittyKeyboardFlags)
+        assertEquals(0, state.activeBuffer.kittyKeyboardFlags)
 
-        // Pop to baseline
+        // Repeated empty pops stay reset.
         modeController.popKittyKeyboardFlags(1)
-        assertEquals(9, state.modes.kittyKeyboardFlags)
-        assertEquals(9, state.activeBuffer.kittyKeyboardFlags)
+        assertEquals(0, state.modes.kittyKeyboardFlags)
+        assertEquals(0, state.activeBuffer.kittyKeyboardFlags)
     }
 
     @Test

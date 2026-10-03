@@ -278,12 +278,12 @@ remains outside scope.
 
 The [full review](reviews/terminal-maintainability-review-2026-10-03.md) records
 source evidence, regression identities, validation limits and correction groups.
-M01–M13 have correct-behavior regressions: 43 added cases include 33 failures and
-ten passing serialization controls. Source-only findings and API decisions below
+The original M01–M13 baseline recorded 43 correct-behavior regressions: 33 failures
+and ten passing serialization controls. Source-only findings and API decisions below
 do not claim executed fault injection or measured performance. Existing A01–A15
 closures remain historical evidence for their tested paths.
 
-- **M01 — `TODO(core)`**: bound Kitty counted-pop work by the retained 32-entry stack and reset flags when it is exhausted, including after eviction. The small-count exhaustion regression fails; saturated-count work is source-confirmed and needs safe verification with the fix. Reconcile historical tests that preserve incorrect restoration.
+- **M01 — `DONE(core)`**: counted Kitty pops use constant work over retained depth and reset flags on exact exhaustion or underflow, including after eviction. Removed the stale initial-flags fallback and corrected historical restoration expectations. Core regressions cover partial pops, nonpositive counts, reuse, reset and `Int.MAX_VALUE`; real parser/host byte streams cover saturated/overflow counts, every split, continued text processing, screen isolation and response denial. The original count-32 regression now passes; the core/host baseline's unrelated M09, M10 and M13 failures remain unchanged.
 - **M02 — `TODO(session)`**: unexpected connector/encoder cancellation must terminate an active session whose essential writer exits, preserving the cause and avoiding partial-write retries. Two regressions currently leave the session open.
 - **M03 — `TODO(transport)`**: supervise exceptions from PTY byte delivery, report the original failure and dispose the process/streams once. The gated fake-process regression currently leaves the process alive.
 - **M04 — `TODO(completion)`**: a terminated source must complete result accounting or terminate collection. Unexpected provider errors currently strand the supervised collector; the deterministic regression permits isolation or propagation while preserving failure visibility.

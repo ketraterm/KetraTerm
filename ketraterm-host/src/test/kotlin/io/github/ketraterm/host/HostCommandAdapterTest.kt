@@ -947,15 +947,56 @@ class HostCommandAdapterTest {
             f.acceptAscii("\u001B[>8u")
             assertEquals(8, f.terminal.getModeSnapshot().kittyKeyboardFlags)
 
-            // 3. Pop 1 count: CSI < 1 u
+            // 3. Pop 1 count exhausts the stack: CSI < 1 u
             f.acceptAscii("\u001B[<1u")
-            assertEquals(9, f.terminal.getModeSnapshot().kittyKeyboardFlags)
+            assertEquals(0, f.terminal.getModeSnapshot().kittyKeyboardFlags)
 
             // 4. Push 8, then pop using default count (omitted parameter) which defaults to 1: CSI < u
             f.acceptAscii("\u001B[>8u")
             assertEquals(8, f.terminal.getModeSnapshot().kittyKeyboardFlags)
             f.acceptAscii("\u001B[<u")
+            assertEquals(0, f.terminal.getModeSnapshot().kittyKeyboardFlags)
+        }
+
+        @Test
+        fun `Kitty counted pops reset exhausted stacks across every byte split`() {
+            for (count in listOf("", "0", "31", "32", "33", "2147483647", "99999999999999999999")) {
+                val bytes = "\u001B[<${count}u\u001B[?uX".encodeToByteArray()
+                for (split in 0..bytes.size) {
+                    val f = Fixture()
+                    f.acceptAscii("\u001B[=9u")
+                    repeat(33) { f.acceptAscii("\u001B[>8u") }
+                    f.parser.accept(bytes, 0, split)
+                    f.parser.accept(bytes, split, bytes.size - split)
+                    f.end()
+
+                    val expected = if (count in listOf("", "0", "31")) 8 else 0
+                    assertAll(
+                        "count=$count split=$split",
+                        { assertEquals(expected, f.terminal.getModeSnapshot().kittyKeyboardFlags) },
+                        { assertEquals("\u001B[?${expected}u", f.drainResponses()) },
+                        { assertEquals('X'.code, f.terminal.getCodepointAt(0, 0)) },
+                    )
+                }
+            }
+        }
+
+        @Test
+        fun `Kitty saturated pops affect only the active screen and respect response denial`() {
+            val policy = HostPolicy(terminalResponsePolicy = HostControlPolicy.DENY)
+            val f = Fixture(hostPolicy = policy)
+            f.acceptAscii("\u001B[>1u\u001B[>9u\u001B[?1049h\u001B[>8u")
+            f.acceptAscii("\u001B[<2147483647u\u001B[?u")
+            assertEquals(0, f.terminal.getModeSnapshot().kittyKeyboardFlags)
+            assertEquals("", f.drainResponses())
+
+            f.acceptAscii("\u001B[?1049l")
             assertEquals(9, f.terminal.getModeSnapshot().kittyKeyboardFlags)
+            f.acceptAscii("\u001B[<u")
+            assertEquals(1, f.terminal.getModeSnapshot().kittyKeyboardFlags)
+            f.acceptAscii("\u001B[<2147483647u\u001B[?u")
+            assertEquals(0, f.terminal.getModeSnapshot().kittyKeyboardFlags)
+            assertEquals("", f.drainResponses())
         }
 
         @Test

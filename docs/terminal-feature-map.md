@@ -279,7 +279,7 @@ Verification and retained audit oracles are recorded in the
 - **Kitty Keyboard Protocol**: High-fidelity key encoding supporting progressive flags:
   - Disambiguate escape codes (`1`).
   - Report all keys as escape codes (`8`).
-  - Supports flag application modes: Replace (`1`), Set (`2`), and Clear (`3`), with a bounded mode push/pop stack.
+  - Supports flag application modes: Replace (`1`), Set (`2`), and Clear (`3`). Each screen has a 32-entry push/pop stack with oldest-entry eviction; counted pops take constant work and reset flags on exact exhaustion or underflow, including after eviction and for saturated counts.
   - The input vocabulary and Kitty encoder implement event types (`2`), alternate keys (`4`), and associated text (`16`), including text-only key code `0`; these flags remain unadvertised until a rich host can truthfully provide complete lifecycle, layout, and IME metadata.
   - The Swing adapter reports press/repeat/release for AWT-visible non-text physical keys using preallocated key-state storage. Its `KEY_TYPED` printable path intentionally does not invent physical identity or release metadata. A release missed across focus loss can make the next press appear as a repeat; the portable host does not advertise event-type flag `2`.
   - Native rich-input backends are explicitly deferred. Portable Swing and IntelliJ-hosted Swing sessions advertise only flags `1` and `8` until a backend can provide complete physical-key, layout, and IME metadata.

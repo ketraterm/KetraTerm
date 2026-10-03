@@ -176,13 +176,17 @@ public interface TerminalModeController {
     /**
      * Pushes the current Kitty keyboard progressive-enhancement flags to the stack,
      * and sets the new active flags.
+     * Each screen retains at most 32 entries, evicting the oldest when full.
      *
      * @param flags Kitty keyboard flags to push and activate.
      */
     public fun pushKittyKeyboardFlags(flags: Int)
 
     /**
-     * Pops the Kitty keyboard flags from the stack up to [count] times.
+     * Pops up to [count] entries from the active screen's Kitty keyboard stack.
+     * A positive count that empties the stack (or finds it empty) resets all flags
+     * to zero. Otherwise, restores the last popped flags. Work is independent of
+     * [count]; nonpositive counts leave flags and stack unchanged.
      *
      * @param count Number of times to pop from the stack.
      */

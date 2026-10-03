@@ -250,6 +250,12 @@ Guaranteed behavior:
 - mode setters that home or otherwise alter cursor physics cancel `pendingWrap`;
   input, reporting, presentation, palette, and other non-cursor modes preserve it
 - public mode reads are immutable snapshots
+- Kitty keyboard stacks are screen-local and retain at most 32 saved entries,
+  evicting the oldest on overflow. Positive counted pops reset flags when the
+  retained stack becomes empty, including exact exhaustion; partial pops restore
+  the last popped flags. Nonpositive core counts are no-ops. Counted-pop work is
+  constant regardless of the requested count. Soft and hard reset clear both
+  stacks. Callers serialize these operations with other core mutation.
 - input reads all xterm resources from the same atomic primitive mode word;
   resource helpers decode that word directly without additional snapshot fields
 - resource setters reject invalid IDs/values before mutation; family resets
