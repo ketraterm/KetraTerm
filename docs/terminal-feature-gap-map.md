@@ -44,9 +44,12 @@ Tests may fail until their owning defects are fixed; adding coverage does not
 close these entries.
 
 The [2026-10-03 maintainability review](reviews/terminal-maintainability-review-2026-10-03.md)
-adds worker-termination, bounded-work and extension-lifecycle findings. Its
-[owner entries](#maintainability-review) distinguish reproduced defects from
-source evidence and unsettled contracts; M01–M03 take priority over new features.
+records the corrected worker-termination, bounded-work and extension-lifecycle
+findings under its [owner entries](#maintainability-review). The subsequent
+[API adoption and evolution review](reviews/terminal-api-evolution-review-2026-10-03.md)
+reproduces a startup-readiness defect and tracks remaining pre-freeze ownership,
+construction and host-adoption decisions. D01 takes priority over new features;
+G02/G03 remain deferred by the current work scope.
 
 - `Done(ui)`: visually verify agy help-transition animation after removing frame-triggered resizing. Default alternate padding now redistributes the primary horizontal inset and preserves vertical insets; regressions cover physical resizing while alternate-screen content is active. The resize/clear defect is corrected, but animation parity is not established.
 
@@ -304,6 +307,26 @@ closures remain historical evidence for their tested paths.
 - **M19 — `DONE(session/policy)`**: closure freezes terminal state after admitted work/EOF; late setters/input are ignored and resize rejects. Local, remote and pre-start closure tests verify retained reads and unchanged collaborators.
 - **M20 — `DONE(host/profile/completion)`**: workspace examples compile; completion documentation reflects Flow debounce and JList presentation.
 - **M21 — `DONE(parser)`**: removed unused decoder fields and their implementation-only tests; real byte-stream reset, malformed-input, chunking and EOF coverage remains.
+
+### API Adoption and Evolution
+
+The [2026-10-03 review](reviews/terminal-api-evolution-review-2026-10-03.md)
+examines the corrected API at `f632fbe3`. D identifiers track design/adoption
+work, including one reproduced defect; they do not reopen resolved A/M findings.
+The development compatibility baseline passes but is not a stable API freeze.
+Group configuration work and publication work to avoid repeated migrations;
+the review records the execution order and acceptance criteria.
+
+- **D01 — `TODO(session)`**: align `Running` publication, transport readiness and input admission. Three deterministic observer-input regressions fail: key writes before connector startup; paste/replacement fail-close a healthy session. Preserve startup replies, shell readiness, repeat-start rejection and reentrant closure.
+- **D02 — `TODO(ui/host/profile)`**: remove ineffective scrollback/window-permission fields from Swing settings and relocate standalone preferences/TOML policy out of the public workspace schema. Keep actual session/UI policy and shared bounds with their effective owners.
+- **D03 — `TODO(ui/transport/host/profile/policy)`**: settle selective Kotlin/Java construction and immutable copy/update for growing settings/services and propagated launch options. Rehearse a concrete additive option; do not replace every value record with a builder. Revisit A02's fixed-shape decision before stable freeze.
+- **D04 — `TODO(session/render)`**: decide and enforce consumer-versus-producer authority for shell projections and published frames. Current session properties expose recording/clearing and publication mutators to readers. Preserve borrowed primitive reads and per-frame allocation behavior.
+- **D05 — `TODO(render/policy)`**: reduce the inline lease ABI to necessary acquire/release semantics instead of freezing buffer arrays, indices, counters and locks. Preserve non-local returns, failures and concurrent readers; deliberately refresh affected development clients after implementation and local measurement.
+- **D06 — `TODO(session/ui/host/profile)`**: add a runnable external host assembly that proves ordered proprietary shell decoding, metadata/editing/readiness, native completion requests/acceptance, styling and lifecycle together. Verify byte splits, anchors, cancellation and disposal without workspace or optional OSC dependencies; retain minimal default and headless examples.
+- **D07 — `TODO(ui/host/profile/policy)`**: settle narrow host overrides for reusable suggestion capacity/triggering and chrome styling. Shared adapters currently embed IntelliJ source labels; search-color refresh uses fixed dark colors. Move product knowledge to composition and use D03's construction route for any required policy.
+- **D08 — `TODO(core/policy)`**: define packed modes and the data snapshot as their published subsets, not a promise to contain every future mode. Only bits 19/63 remain free; preserve existing numeric/ordinal meanings and atomic primitive input reads. Add future families only when implemented.
+- **D09 — `TODO(ui)`**: correct and continuously compile the actual Swing README usage example; compilation against the published artifact fails on removed font constructor arguments. Align fallback-font KDoc with its enabled default. Include EDT and view/session lifetime ownership in the executable example.
+- **D10 — `TODO(host)`**: replace full mode-snapshot construction for line-feed and Kitty flag inspection with existing packed-state helpers. Source construction is confirmed; escaping allocation and latency remain unmeasured. No broad adapter refactor is required.
 
 ### Release Verification
 

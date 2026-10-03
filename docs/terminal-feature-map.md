@@ -4,10 +4,13 @@ This document catalogs every supported terminal feature, protocol, and capabilit
 
 For a detailed backlog of gaps and intentional non-goals, see the [Terminal Feature Gap Map](terminal-feature-gap-map.md).
 
-Known worker-lifecycle, extension-reentry and resource-bound defects are tracked
-under the [maintainability review](terminal-feature-gap-map.md#maintainability-review).
-Supported capabilities below do not imply those failure and boundary paths are
-already corrected; the review's regressions remain visible until their fixes.
+Corrected worker-lifecycle, extension-reentry and resource-bound findings remain
+indexed under the [maintainability review](terminal-feature-gap-map.md#maintainability-review).
+Session startup correctness and remaining pre-freeze ownership, construction and
+host-adoption work are tracked under
+[API adoption and evolution](terminal-feature-gap-map.md#api-adoption-and-evolution).
+Supported capabilities and a passing development compatibility baseline do not
+constitute a stable API freeze.
 
 ---
 

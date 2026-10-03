@@ -50,6 +50,69 @@ import kotlin.time.Duration.Companion.milliseconds
 @OptIn(ExperimentalCoroutinesApi::class)
 class TerminalSessionTest {
     @ParameterizedTest
+    @ValueSource(strings = ["key", "paste", "replacement"])
+    fun `input from a running state observer cannot reach an unstarted connector`(input: String) =
+        runTest {
+            val recorded = MockConnector()
+            var transportStarted = false
+            var runningObservedAfterTransportStart: Boolean? = null
+            val writesBeforeTransportStart = mutableListOf<ByteArray>()
+            val connector =
+                object : TerminalConnector by recorded {
+                    override fun start(listener: io.github.ketraterm.transport.TerminalConnectorListener) {
+                        transportStarted = true
+                        recorded.start(listener)
+                    }
+
+                    override fun write(
+                        bytes: ByteArray,
+                        offset: Int,
+                        length: Int,
+                    ) {
+                        if (!transportStarted) writesBeforeTransportStart += bytes.copyOfRange(offset, offset + length)
+                        recorded.write(bytes, offset, length)
+                    }
+                }
+            val dispatcher = UnconfinedTestDispatcher(testScheduler)
+            TerminalSession
+                .create(
+                    terminal = TerminalBuffers.create(10, 3),
+                    connector = connector,
+                    workerDispatcher = dispatcher,
+                    ioDispatcher = dispatcher,
+                ).use { session ->
+                    backgroundScope.launch(dispatcher) {
+                        session.state.first { it === TerminalSessionState.Running }
+                        runningObservedAfterTransportStart = transportStarted
+                        when (input) {
+                            "key" -> session.encodeKey(TerminalKeyEvent.codepoint('x'.code))
+                            "paste" -> session.encodePaste(TerminalPasteEvent("x"))
+                            "replacement" -> session.encodeTextReplacement(TerminalTextReplacementEvent(0, 0, "x"))
+                        }
+                    }
+
+                    session.start(10, 3)
+                    runCurrent()
+
+                    session.encodeKey(TerminalKeyEvent.codepoint('y'.code))
+                    runCurrent()
+                    assertAll(
+                        { assertEquals(true, runningObservedAfterTransportStart, "Running must mean the connector has started") },
+                        { assertTrue(writesBeforeTransportStart.isEmpty(), "No native write may precede connector startup") },
+                        { assertFalse(session.isClosed, "Input accepted in Running must not fail an otherwise healthy session") },
+                        { assertEquals(1, recorded.startCount) },
+                        {
+                            assertEquals(
+                                "xy",
+                                recorded.writtenBytes.decodeToString(),
+                                "Running and later input must both be accepted in order",
+                            )
+                        },
+                    )
+                }
+        }
+
+    @ParameterizedTest
     @ValueSource(strings = ["running", "resize"])
     fun `reentrant shutdown during startup cannot start a disposed connector`(stage: String) =
         runTest {
