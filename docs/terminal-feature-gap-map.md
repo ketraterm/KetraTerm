@@ -48,7 +48,7 @@ records the corrected worker-termination, bounded-work and extension-lifecycle
 findings under its [owner entries](#maintainability-review). The subsequent
 [API adoption and evolution review](reviews/terminal-api-evolution-review-2026-10-03.md)
 reproduces a startup-readiness defect and tracks remaining pre-freeze ownership,
-construction and host-adoption decisions. D01 takes priority over new features;
+construction and host-adoption decisions. D01 is resolved below;
 G02/G03 remain deferred by the current work scope.
 
 - `Done(ui)`: visually verify agy help-transition animation after removing frame-triggered resizing. Default alternate padding now redistributes the primary horizontal inset and preserves vertical insets; regressions cover physical resizing while alternate-screen content is active. The resize/clear defect is corrected, but animation parity is not established.
@@ -317,7 +317,7 @@ The development compatibility baseline passes but is not a stable API freeze.
 Group configuration work and publication work to avoid repeated migrations;
 the review records the execution order and acceptance criteria.
 
-- **D01 — `TODO(session)`**: align `Running` publication, transport readiness and input admission. Three deterministic observer-input regressions fail: key writes before connector startup; paste/replacement fail-close a healthy session. Preserve startup replies, shell readiness, repeat-start rejection and reentrant closure.
+- **D01 — `DONE(session)`**: `Running` and input admission follow successful connector startup; the writer starts only afterward, preserving bounded startup replies ahead of later input. Start-once claiming is independent of readiness. Baseline: 301 session tests, with the three observer-input cases failing (key writes prematurely; paste/replacement close the session). All 311 session tests now pass, covering startup reply ordering, shell readiness/modes, repeat-start rejection, startup failure/closure, concurrent lifecycle calls, and reentrant cleanup. Root and IntelliJ test suites pass; the Swing palette-reply fixture now starts its session, retaining exact-byte assertions. Historical audit evidence is unchanged.
 - **D02 — `TODO(ui/host/profile)`**: remove ineffective scrollback/window-permission fields from Swing settings and relocate standalone preferences/TOML policy out of the public workspace schema. Keep actual session/UI policy and shared bounds with their effective owners.
 - **D03 — `TODO(ui/transport/host/profile/policy)`**: settle selective Kotlin/Java construction and immutable copy/update for growing settings/services and propagated launch options. Rehearse a concrete additive option; do not replace every value record with a builder. Revisit A02's fixed-shape decision before stable freeze.
 - **D04 — `TODO(session/render)`**: decide and enforce consumer-versus-producer authority for shell projections and published frames. Current session properties expose recording/clearing and publication mutators to readers. Preserve borrowed primitive reads and per-frame allocation behavior.

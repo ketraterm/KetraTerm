@@ -6,6 +6,7 @@ Release notes for library consumers and embedders. Product-specific changes are 
 
 ### Improvements and fixes
 
+- Publish session `Running` only after connector startup returns successfully. Defer the outbound writer until readiness so observer keys, paste, and text replacement cannot write prematurely or fail-close a healthy session. Preserve startup reply ordering, shell readiness, start-once admission, and cleanup on startup failure or closure (D01).
 - Cancel native completion work when sessions stop. Complete popup hiding and eligibility updates despite host callback failures, preserve cancellation and suppress later failures. Commit Swing state before host notification and skip obsolete notifications after reentrant changes.
 - Expanded concrete implementation and retained-client compatibility checks; clarified complete cluster reads and isolated render-lease acquisition.
 - Added native completion popup anchoring, optional host controller coordination, and provider diagnostics while preserving existing Swing configuration signatures.

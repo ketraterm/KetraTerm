@@ -349,6 +349,7 @@ class SwingTerminalThreadingTest {
         val component = SwingTerminal(settingsProvider = { settings })
         val query = "\u001B[?996n".toByteArray(Charsets.US_ASCII)
         try {
+            session.start(3, 1)
             edtCall {
                 component.bind(session)
                 session.onBytes(query, 0, query.size)

@@ -43,11 +43,12 @@ class TerminalStartupCommandTest {
             object : TerminalConnector by delegate {
                 override fun start(listener: TerminalConnectorListener) {
                     delegate.start(listener)
-                    delegate.feedFromHost(PROMPT.toByteArray())
+                    delegate.feedFromHost((PROMPT + "\u001B[?2004h\u001B[5n").toByteArray())
+                    assertEquals("", delegate.writtenBytes.decodeToString(), "Writes must wait for connector startup to complete")
                 }
             }
         session(connector).use { session ->
-            assertEquals("echo ready\r", delegate.writtenBytes.decodeToString())
+            assertEquals("\u001B[0n\u001B[200~echo ready\u001B[201~\r", delegate.writtenBytes.decodeToString())
             assertEquals(TerminalStartupCommandStatus.SUBMITTED, session.startupCommandStatus?.value)
         }
     }

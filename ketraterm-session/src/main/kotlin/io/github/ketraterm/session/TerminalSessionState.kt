@@ -19,14 +19,14 @@ package io.github.ketraterm.session
  * Observable lifecycle state of a [TerminalSession].
  *
  * A session transitions monotonically from [Created] to [Running] and then to
- * [Closed]. Closing before startup transitions directly from [Created] to
+ * [Closed]. Closing before or during startup transitions directly from [Created] to
  * [Closed].
  */
 public sealed interface TerminalSessionState {
-    /** The session has been created but its connector has not started. */
+    /** Connector startup has not completed; input is ignored, including during startup. */
     public data object Created : TerminalSessionState
 
-    /** The connector has started and the session accepts terminal input. */
+    /** Connector startup returned successfully; input is accepted until shutdown begins. */
     public data object Running : TerminalSessionState
 
     /**

@@ -172,8 +172,8 @@ public class TerminalSession private constructor(
 
     private val mutationLock: Any get() = runtime.mutationLock
     private var processingOutput = false
-    private var connectorStarted = false
     private val connectorLifecycleLock = Any()
+    private var startAttempted = false
     private val closingEvent = AtomicReference<TerminalSessionCloseEvent?>(null)
     private val startupSubmission = startupCommand?.let(::StartupCommandSubmission)
 
@@ -223,7 +223,7 @@ public class TerminalSession private constructor(
                 length: Int,
             ) {
                 if (isSessionClosed()) throw CancellationException("Terminal session closed")
-                check(connectorStarted) { "Output is unavailable before session start" }
+                check(state.value === TerminalSessionState.Running) { "Output is unavailable before session start" }
                 sessionJob.ensureActive()
                 connector.write(bytes, offset, length)
             }
@@ -233,7 +233,7 @@ public class TerminalSession private constructor(
         createInputEncoder(
             object : TerminalInputState {
                 override fun getInputModeBits(): Long {
-                    check(connectorStarted) { "Modes are unavailable before session start" }
+                    check(state.value === TerminalSessionState.Running) { "Modes are unavailable before session start" }
                     return bulkInputModeBits
                 }
             },
@@ -309,18 +309,21 @@ public class TerminalSession private constructor(
     internal val isCoroutineScopeActive: Boolean
         get() = sessionJob.isActive
 
+    private val outboundJob: Job
+
     init {
-        sessionScope.launch(ioDispatcher) {
-            try {
-                outboundWriter.run()
-            } catch (cancelled: CancellationException) {
-                // Only session termination may stop this essential worker without failure.
-                if (!isSessionClosed()) failWrite(cancelled)
-                throw cancelled
-            } catch (failure: Exception) {
-                failWrite(failure)
+        outboundJob =
+            sessionScope.launch(ioDispatcher, start = CoroutineStart.LAZY) {
+                try {
+                    outboundWriter.run()
+                } catch (cancelled: CancellationException) {
+                    // Only session termination may stop this essential worker without failure.
+                    if (!isSessionClosed()) failWrite(cancelled)
+                    throw cancelled
+                } catch (failure: Exception) {
+                    failWrite(failure)
+                }
             }
-        }
         sessionScope.launch {
             renderRequests.consumeEach {
                 drainRenderRequests()
@@ -430,7 +433,14 @@ public class TerminalSession private constructor(
 
     /**
      * Starts the connector after resizing core and transport to [columns] x
-     * [rows].
+     * [rows]. This synchronous call permits one attempt. Concurrent or reentrant
+     * attempts throw [IllegalStateException], as does starting a closed session.
+     *
+     * State remains [TerminalSessionState.Created] and input is ignored until
+     * [TerminalConnector.start] returns successfully. Startup output is consumed
+     * synchronously, but replies wait in the bounded outbound queue. If shutdown
+     * has not begun, [TerminalSessionState.Running] then admits input and the
+     * writer starts, preserving queued replies ahead of later input.
      *
      * Startup failure closes owned resources, retains the failure in [state],
      * and rethrows it with any cleanup failures suppressed.
@@ -445,9 +455,10 @@ public class TerminalSession private constructor(
         require(columns > 0) { "columns must be positive, got $columns" }
         require(rows > 0) { "rows must be positive, got $rows" }
         synchronized(connectorLifecycleLock) {
-            check(!isSessionClosed() && mutableState.compareAndSet(TerminalSessionState.Created, TerminalSessionState.Running)) {
+            check(!isSessionClosed() && !startAttempted) {
                 "session already started or closed"
             }
+            startAttempted = true
 
             try {
                 if (isSessionClosed()) return
@@ -458,8 +469,8 @@ public class TerminalSession private constructor(
                 connector.resize(columns, rows)
                 if (!isSessionClosed()) {
                     connector.start(this)
-                    synchronized(mutationLock) {
-                        connectorStarted = true
+                    if (!isSessionClosed()) {
+                        mutableState.compareAndSet(TerminalSessionState.Created, TerminalSessionState.Running)
                     }
                 }
             } catch (failure: Throwable) {
@@ -467,6 +478,7 @@ public class TerminalSession private constructor(
                 throw failure
             }
         }
+        outboundJob.start()
         try {
             submitStartupCommand()
         } catch (failure: OutboundCapacityException) {
@@ -756,7 +768,7 @@ public class TerminalSession private constructor(
         val submission = startupSubmission
         if (submission?.status?.value == TerminalStartupCommandStatus.WAITING) {
             synchronized(mutationLock) {
-                if (!connectorStarted || processingOutput || runtime.shellIntegration?.promptReady?.value != true) return
+                if (processingOutput || runtime.shellIntegration?.promptReady?.value != true) return
                 outboundWriter.submit {
                     if (isAcceptingInput()) {
                         renderReader.readRenderFrame { frame ->

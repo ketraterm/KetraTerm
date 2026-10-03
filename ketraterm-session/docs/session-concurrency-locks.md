@@ -34,6 +34,17 @@ A slow connector backpressures bulk encoding on the I/O worker. Producers can co
 
 ## Acceptance and lifecycle
 
+Startup claims one attempt under the connector lifecycle monitor, independently
+of observable readiness. State remains `Created` and user input is ignored until
+`connector.start` returns successfully. Synchronous startup output is parsed and
+its replies enter the bounded queue, but the writer remains unstarted. Session
+then publishes `Running` before starting the writer, so even reentrant observers
+can admit keys, paste, or replacement without reaching an unready connector.
+Replies already queued precede that input. Startup failure or closure discards
+the queue, cancels the unstarted writer, and never publishes `Running`. Reentrant
+closure from a `Running` observer closes the already-started connector; it cannot
+cause another start. Concurrent startup and connector disposal remain serialized.
+
 Input methods return after admission, not transport completion. For ordinary input this includes encoding/copying; for paste and replacement it includes source retention and mode/policy capture. Startup `SUBMITTED` also means queue acceptance. Each connector `write` synchronously consumes or copies the supplied bytes. Custom encoder factories receive the same session-owned output paths and create independent admission and bulk instances; their calls and policy updates are serialized per instance, while the two instances may run concurrently. Rejected policy updates leave the session policy and reported Backarrow default unchanged.
 
 `state` retains `Created`, `Running`, or `Closed`. Budget exhaustion and outbound worker failure use `Closed.event.failure`, close the connector, discard pending output, and cancel session children. A failed transport write or bulk encoder may already have sent a prefix; no bytes are retried.

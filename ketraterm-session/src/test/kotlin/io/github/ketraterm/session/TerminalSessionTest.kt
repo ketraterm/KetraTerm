@@ -50,6 +50,222 @@ import kotlin.time.Duration.Companion.milliseconds
 @OptIn(ExperimentalCoroutinesApi::class)
 class TerminalSessionTest {
     @ParameterizedTest
+    @ValueSource(strings = ["start", "close"])
+    fun `concurrent startup and lifecycle operations remain serialized`(operation: String) =
+        runTest {
+            val recorded = MockConnector()
+            val entered = CountDownLatch(1)
+            val release = CountDownLatch(1)
+            val connector =
+                object : TerminalConnector by recorded {
+                    override fun start(listener: io.github.ketraterm.transport.TerminalConnectorListener) {
+                        recorded.start(listener)
+                        entered.countDown()
+                        check(release.await(SESSION_THREAD_TIMEOUT_SECONDS, TimeUnit.SECONDS)) { "Startup was not released" }
+                    }
+                }
+            val dispatcher = StandardTestDispatcher(testScheduler)
+            TerminalSession
+                .create(
+                    TerminalBuffers.create(10, 3),
+                    connector,
+                    workerDispatcher = dispatcher,
+                    ioDispatcher = dispatcher,
+                ).use { session ->
+                    SessionTestThread("session-start") { session.start(10, 3) }.use { starter ->
+                        try {
+                            assertTrue(entered.await(SESSION_THREAD_TIMEOUT_SECONDS, TimeUnit.SECONDS))
+                            assertSame(TerminalSessionState.Created, session.state.value)
+                            session.encodeKey(TerminalKeyEvent.codepoint('x'.code))
+                            session.encodePaste(TerminalPasteEvent("x"))
+                            session.encodeTextReplacement(TerminalTextReplacementEvent(0, 0, "x"))
+                            SessionTestThread("session-$operation") {
+                                if (operation == "start") {
+                                    assertThrows(IllegalStateException::class.java) { session.start(10, 3) }
+                                } else {
+                                    session.close()
+                                }
+                            }.use { contender ->
+                                try {
+                                    contender.awaitBlockedBy(starter)
+                                    assertEquals(0, recorded.closeCount)
+                                    if (operation == "close") assertTrue(session.isClosed)
+                                } finally {
+                                    release.countDown()
+                                }
+                                starter.awaitCompletion()
+                                contender.awaitCompletion()
+                            }
+                        } finally {
+                            release.countDown()
+                        }
+                    }
+                    runCurrent()
+                    assertEquals(1, recorded.startCount)
+                    assertEquals("", recorded.writtenBytes.asciiText())
+                    if (operation == "start") {
+                        assertSame(TerminalSessionState.Running, session.state.value)
+                    } else {
+                        assertTrue((session.state.value as TerminalSessionState.Closed).event.locallyRequested)
+                        assertEquals(1, recorded.closeCount)
+                        assertFalse(session.isCoroutineScopeActive)
+                    }
+                }
+        }
+
+    @ParameterizedTest
+    @ValueSource(strings = ["close", "remote", "error", "throw"])
+    fun `termination during connector startup never publishes running or writes queued replies`(termination: String) =
+        runTest {
+            val recorded = MockConnector()
+            val failure = IllegalStateException("startup failed")
+            var runningObserved = false
+            lateinit var session: TerminalSession
+            val connector =
+                object : TerminalConnector by recorded {
+                    override fun start(listener: io.github.ketraterm.transport.TerminalConnectorListener) {
+                        recorded.start(listener)
+                        recorded.feedFromHost("\u001B[5n".ascii())
+                        when (termination) {
+                            "close" -> session.close()
+                            "remote" -> listener.onClosed(7)
+                            "error" -> listener.onError(failure)
+                            "throw" -> throw failure
+                        }
+                    }
+                }
+            val dispatcher = UnconfinedTestDispatcher(testScheduler)
+            session =
+                TerminalSession.create(
+                    TerminalBuffers.create(10, 3),
+                    connector,
+                    workerDispatcher = dispatcher,
+                    ioDispatcher = dispatcher,
+                )
+            session.use {
+                backgroundScope.launch(dispatcher) {
+                    session.state.first { it === TerminalSessionState.Running }
+                    runningObserved = true
+                }
+                if (termination == "throw") {
+                    assertSame(failure, assertThrows(IllegalStateException::class.java) { session.start(10, 3) })
+                } else {
+                    session.start(10, 3)
+                }
+                runCurrent()
+                assertFalse(runningObserved)
+                val event = (session.state.value as TerminalSessionState.Closed).event
+                assertEquals(termination == "close", event.locallyRequested)
+                assertEquals(if (termination == "remote") 7 else null, event.exitCode)
+                assertSame(if (termination == "error" || termination == "throw") failure else null, event.failure)
+                assertEquals("", recorded.writtenBytes.asciiText())
+                assertEquals(1, recorded.closeCount)
+                assertFalse(session.isCoroutineScopeActive)
+                assertThrows(IllegalStateException::class.java) { session.start(10, 3) }
+                assertEquals(1, recorded.startCount)
+            }
+        }
+
+    @ParameterizedTest
+    @ValueSource(strings = ["resize", "start", "running"])
+    fun `reentrant start is rejected throughout startup`(stage: String) =
+        runTest {
+            val recorded = MockConnector()
+            var rejected = false
+            lateinit var session: TerminalSession
+
+            fun attemptAgain() {
+                assertThrows(IllegalStateException::class.java) { session.start(10, 3) }
+                rejected = true
+            }
+            val connector =
+                object : TerminalConnector by recorded {
+                    override fun resize(
+                        columns: Int,
+                        rows: Int,
+                    ) {
+                        recorded.resize(columns, rows)
+                        if (stage == "resize") attemptAgain()
+                    }
+
+                    override fun start(listener: io.github.ketraterm.transport.TerminalConnectorListener) {
+                        recorded.start(listener)
+                        if (stage == "start") attemptAgain()
+                    }
+                }
+            val dispatcher = UnconfinedTestDispatcher(testScheduler)
+            session =
+                TerminalSession.create(
+                    TerminalBuffers.create(10, 3),
+                    connector,
+                    workerDispatcher = dispatcher,
+                    ioDispatcher = dispatcher,
+                )
+            session.use {
+                if (stage == "running") {
+                    backgroundScope.launch(dispatcher) {
+                        session.state.first { it === TerminalSessionState.Running }
+                        attemptAgain()
+                    }
+                }
+                session.start(10, 3)
+                assertTrue(rejected)
+                assertEquals(1, recorded.startCount)
+                assertSame(TerminalSessionState.Running, session.state.value)
+            }
+        }
+
+    @Test
+    fun `startup output replies wait for connector start to return and precede observer input`() =
+        runTest {
+            val recorded = MockConnector()
+            var starting = true
+            val earlyWrites = mutableListOf<ByteArray>()
+            lateinit var session: TerminalSession
+            val connector =
+                object : TerminalConnector by recorded {
+                    override fun start(listener: io.github.ketraterm.transport.TerminalConnectorListener) {
+                        recorded.start(listener)
+                        recorded.feedFromHost("\u001B[5n".ascii())
+                        session.encodeKey(TerminalKeyEvent.codepoint('x'.code))
+                        session.encodePaste(TerminalPasteEvent("x"))
+                        session.encodeTextReplacement(TerminalTextReplacementEvent(0, 0, "x"))
+                        starting = false
+                    }
+
+                    override fun write(
+                        bytes: ByteArray,
+                        offset: Int,
+                        length: Int,
+                    ) {
+                        if (starting) earlyWrites += bytes.copyOfRange(offset, offset + length)
+                        recorded.write(bytes, offset, length)
+                    }
+                }
+            val dispatcher = UnconfinedTestDispatcher(testScheduler)
+            session =
+                TerminalSession.create(
+                    TerminalBuffers.create(10, 3),
+                    connector,
+                    workerDispatcher = dispatcher,
+                    ioDispatcher = dispatcher,
+                )
+            session.use {
+                backgroundScope.launch(dispatcher) {
+                    session.state.first { it === TerminalSessionState.Running }
+                    session.encodePaste(TerminalPasteEvent("y"))
+                }
+                session.start(10, 3)
+                runCurrent()
+                assertAll(
+                    { assertTrue(earlyWrites.isEmpty(), "Startup replies must wait for transport readiness") },
+                    { assertEquals("\u001B[0ny", recorded.writtenBytes.asciiText()) },
+                    { assertSame(TerminalSessionState.Running, session.state.value) },
+                )
+            }
+        }
+
+    @ParameterizedTest
     @ValueSource(strings = ["key", "paste", "replacement"])
     fun `input from a running state observer cannot reach an unstarted connector`(input: String) =
         runTest {
@@ -130,6 +346,7 @@ class TerminalSessionTest {
                     }
 
                     override fun start(listener: io.github.ketraterm.transport.TerminalConnectorListener) {
+                        assertEquals(0, recorded.closeCount, "A disposed connector must never be started")
                         starts++
                         recorded.start(listener)
                     }
@@ -149,7 +366,7 @@ class TerminalSessionTest {
             }
             session.use {
                 session.start(10, 3)
-                assertEquals(0, starts)
+                assertEquals(if (stage == "running") 1 else 0, starts)
                 assertEquals(1, recorded.closeCount)
                 assertTrue((session.state.value as TerminalSessionState.Closed).event.locallyRequested)
                 assertFalse(session.isCoroutineScopeActive)
