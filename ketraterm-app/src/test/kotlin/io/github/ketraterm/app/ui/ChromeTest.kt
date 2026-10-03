@@ -23,6 +23,19 @@ import kotlin.test.assertTrue
 
 class ChromeTest {
     @Test
+    fun searchColorsFollowEveryBuiltInTheme() {
+        TerminalTheme.entries.forEach { theme ->
+            Chrome.applyPalette(theme.createPalette())
+            val colors = Chrome.searchColors()
+            assertEquals(Chrome.popupBackground, colors.panelBackground)
+            assertEquals(Chrome.controlBackground, colors.textFieldBackground)
+            assertContrast(theme, "search query", colors.foreground, colors.textFieldBackground)
+            assertContrast(theme, "search count", colors.counterForeground, colors.panelBackground)
+            assertContrast(theme, "selected search toggle", colors.buttonSelectedForeground, colors.buttonSelectedBackground)
+        }
+    }
+
+    @Test
     fun builtInThemesDeriveReadableTabText() {
         TerminalTheme.entries.forEach { theme ->
             Chrome.applyPalette(theme.createPalette())

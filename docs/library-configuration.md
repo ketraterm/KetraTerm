@@ -58,6 +58,25 @@ Default alternate padding derives from the final primary padding and gutter.
 A copied builder retains the resolved alternate padding; assign null to request
 recalculation. Rendering reads resolved values without consulting a builder.
 
+## Optional host chrome and labels
+
+`SwingTerminalSearchColors` uses the same synchronous `create`/`copy` and builder
+pattern for prepared search colors. Build on the host theme's owning thread;
+dynamic `Color` subclasses are sampled into detached ARGB values. Pass the result
+to `searchBar.refreshColors(colors)`. EDT calls apply immediately; other calls
+enqueue the immutable snapshot. Refresh preserves the query and visibility;
+no-argument refresh and reopening retain the last supplied colors. Defaults keep
+the original dark styling. Theme observation and snapshot replacement belong to
+the host, with no theme callback during painting.
+
+`SwingCompletionSuggestionProvider(engine, contextProvider, sourceLabels)` takes
+an exact source-ID-to-label map. It copies and bounds labels at construction;
+blank values fail with `IllegalArgumentException`. Unknown IDs use neutral
+humanization, without removing product prefixes. Display labels never change
+source IDs, ranking or feedback. IntelliJ supplies its product labels at registry
+composition; standalone needs no overrides. Published Kotlin and Java consumers
+exercise both APIs alongside the existing host-owned suggestion target.
+
 ## Prototype and migration evidence
 
 Before changing production APIs, an isolated Kotlin/Java prototype exercised

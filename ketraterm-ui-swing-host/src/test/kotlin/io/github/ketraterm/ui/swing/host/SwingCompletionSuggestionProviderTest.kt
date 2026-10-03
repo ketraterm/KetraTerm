@@ -30,6 +30,24 @@ import kotlin.test.*
 
 class SwingCompletionSuggestionProviderTest {
     @Test
+    fun `host source labels are detached bounded and do not alter source identity`() =
+        runBlocking {
+            val labels = mutableMapOf("product-source" to "x".repeat(126) + "😀suffix")
+            val engine =
+                TerminalCompletionEngine {
+                    flowOf(listOf(TerminalCompletionCandidate("value", 0, 1, "product-source", TerminalCompletionCandidateKind.ARGUMENT)))
+                }
+            val provider = SwingCompletionSuggestionProvider(engine, { SwingCompletionContext.EMPTY }, labels)
+            labels["product-source"] = "changed"
+            val suggestion = provider.suggestions(request("x", cursorOffset = 1)).last().single()
+            assertEquals("product-source", suggestion.source)
+            assertEquals("x".repeat(126) + "…", suggestion.sourceDisplayText)
+            assertFailsWith<IllegalArgumentException> {
+                SwingCompletionSuggestionProvider(engine, { SwingCompletionContext.EMPTY }, mapOf("product-source" to "  "))
+            }
+        }
+
+    @Test
     fun `context is captured once off EDT and retained for progressive results`() =
         runBlocking {
             val initial = SwingCompletionContext(profileId = "bash", workingDirectoryUri = "file:///first")
@@ -154,12 +172,12 @@ class SwingCompletionSuggestionProviderTest {
                     "Built-in",
                     "Learned",
                     "Learned",
-                    "Git",
-                    "Gradle",
-                    "Project",
+                    "Intellij git branch",
+                    "Intellij gradle task",
+                    "Intellij project file",
                     "Path",
-                    "Git",
-                    "Custom source",
+                    "Intellij git status path",
+                    "Intellij custom source",
                     "Legitimate provider",
                     "Pathology",
                 ),

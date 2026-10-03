@@ -25,7 +25,9 @@ import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.project.DumbAwareAction
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.ui.Messages
+import com.intellij.ui.JBColor
 import com.intellij.ui.components.JBScrollBar
+import com.intellij.util.ui.UIUtil
 import io.github.ketraterm.intellij.services.KetraTermCompletionService
 import io.github.ketraterm.intellij.services.captureCleanupFailure
 import io.github.ketraterm.intellij.settings.KetraTermIntellijSettings
@@ -38,6 +40,7 @@ import kotlinx.coroutines.CancellationException
 import java.awt.Adjustable
 import java.awt.BorderLayout
 import javax.swing.JPanel
+import javax.swing.UIManager
 
 /**
  * IntelliJ-hosted pane that binds one workspace tab to one reusable terminal component.
@@ -74,7 +77,7 @@ internal class KetraTermTerminalPane private constructor(
     fun reloadSettings() {
         terminal.reloadSettings()
         component.background = terminal.background
-        searchBar.refreshColors()
+        searchBar.refreshColors(searchColors())
         tab.session.setHostPolicy(KetraTermIntellijSettings.getInstance().createHostPolicy())
         reconcileCompletion()
     }
@@ -293,6 +296,28 @@ internal class KetraTermTerminalPane private constructor(
     }
 
     companion object {
+        private fun searchColors(): SwingTerminalSearchColors =
+            SwingTerminalSearchColors.create {
+                val foreground = UIUtil.getLabelForeground()
+                val background = UIUtil.getPanelBackground()
+                val accent =
+                    UIManager.getColor("Component.focusColor")
+                        ?: JBColor(0x3574F0, 0x548AF7)
+                it.panelBackground = background
+                it.panelBorder = JBColor.border()
+                it.foreground = foreground
+                it.counterForeground = UIUtil.getContextHelpForeground()
+                it.textFieldBackground = UIManager.getColor("TextField.background") ?: background
+                it.textFieldBorder = JBColor.border()
+                it.textFieldFocusBorder = accent
+                it.textFieldPlaceholder = UIUtil.getContextHelpForeground()
+                it.searchIconForeground = foreground
+                it.buttonHoverBackground = UIManager.getColor("ActionButton.hoverBackground") ?: background
+                it.buttonPressedBackground = UIManager.getColor("ActionButton.pressedBackground") ?: accent
+                it.buttonSelectedBackground = UIUtil.getListSelectionBackground(true)
+                it.buttonSelectedForeground = UIUtil.getListSelectionForeground(true)
+            }
+
         private val LOG = Logger.getInstance(KetraTermTerminalPane::class.java)
 
         internal fun reportShellSuggestionFailure(failure: Exception) {
@@ -371,7 +396,7 @@ internal class KetraTermTerminalPane private constructor(
             try {
                 scrollbarAdapter.attach(terminal)
                 terminal.bind(tab.session)
-                searchBar = SwingTerminalSearchBar(terminal)
+                searchBar = SwingTerminalSearchBar(terminal).apply { refreshColors(searchColors()) }
                 clipboardReadPrompt =
                     SwingClipboardReadPrompt { message, decide ->
                         IntellijMessageDialogs.showModeless(project, message, decide)

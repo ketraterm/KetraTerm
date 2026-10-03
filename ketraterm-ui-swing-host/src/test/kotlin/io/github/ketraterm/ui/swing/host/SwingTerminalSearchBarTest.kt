@@ -22,8 +22,11 @@ import io.github.ketraterm.ui.swing.api.SwingTerminal
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
+import java.awt.Color
 import java.awt.Component
 import java.awt.Container
+import java.awt.image.BufferedImage
+import javax.swing.JComponent
 import javax.swing.JLabel
 import javax.swing.JTextField
 import javax.swing.SwingUtilities
@@ -31,8 +34,107 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
+import kotlin.time.Duration.Companion.milliseconds
 
 class SwingTerminalSearchBarTest {
+    @Test
+    fun offEdtColorRefreshIsOrderedAndSurvivesReopening() {
+        lateinit var terminal: SwingTerminal
+        lateinit var bar: SwingTerminalSearchBar
+        SwingUtilities.invokeAndWait {
+            terminal = SwingTerminal()
+            bar = SwingTerminalSearchBar(terminal)
+            assertEquals(Color(0xFFE8EAED.toInt(), true), bar.component.foreground)
+        }
+        try {
+            bar.refreshColors(SwingTerminalSearchColors.create { it.foreground = Color.BLUE })
+            bar.refreshColors(SwingTerminalSearchColors.create { it.foreground = Color.RED })
+            SwingUtilities.invokeAndWait {
+                assertEquals(Color.RED, bar.component.foreground)
+                bar.open()
+                bar.close()
+                bar.open()
+                assertEquals(Color.RED, bar.component.foreground)
+            }
+        } finally {
+            SwingUtilities.invokeAndWait {
+                bar.close()
+                terminal.dispose()
+            }
+        }
+    }
+
+    @Test
+    fun colorsFreezeDraftsAndDynamicHostColors() {
+        var argb = 0x12345678
+        val hostColor =
+            object : Color(0) {
+                override fun getRGB(): Int = argb
+            }
+        val draft = SwingTerminalSearchColors.builder()
+        draft.panelBackground = hostColor
+        val frozen = draft.build()
+        argb = 0x76543210
+        draft.panelBackground = Color.RED
+        assertEquals(0x12345678, frozen.panelBackground.rgb)
+        assertEquals(0x12345678, frozen.copy { it.foreground = Color.BLUE }.panelBackground.rgb)
+    }
+
+    @Test
+    fun hostColorsRefreshPaintedChromeWithoutResettingSearch() {
+        SwingUtilities.invokeAndWait {
+            val terminal = SwingTerminal()
+            val bar = SwingTerminalSearchBar(terminal)
+
+            fun descendants(component: Component): List<Component> =
+                listOf(component) + if (component is Container) component.components.flatMap(::descendants) else emptyList()
+
+            fun pixel(
+                component: JComponent,
+                x: Int,
+                y: Int,
+            ): Int {
+                component.setSize(300, 40)
+                val image = BufferedImage(300, 40, BufferedImage.TYPE_INT_ARGB)
+                val graphics = image.createGraphics()
+                try {
+                    component.paint(graphics)
+                } finally {
+                    graphics.dispose()
+                }
+                return image.getRGB(x, y)
+            }
+            try {
+                bar.open()
+                val field = descendants(bar.component).filterIsInstance<JTextField>().single()
+                field.text = "retained query"
+                val colors =
+                    SwingTerminalSearchColors.create {
+                        it.panelBackground = Color.WHITE
+                        it.foreground = Color.BLACK
+                        it.textFieldBackground = Color.YELLOW
+                        it.counterForeground = Color.BLUE
+                    }
+                bar.refreshColors(colors)
+                assertEquals(Color.BLACK, field.foreground)
+                assertEquals(Color.BLACK, field.caretColor)
+                assertEquals(Color.YELLOW.rgb, pixel(field, 5, 20))
+                assertEquals(Color.WHITE.rgb, pixel(bar.component.components.single() as JComponent, 150, 35))
+                assertEquals(Color.BLUE, descendants(bar.component).filterIsInstance<JLabel>().single().foreground)
+                val updated = colors.copy { it.textFieldBackground = Color.GREEN }
+                bar.refreshColors(updated)
+                bar.refreshColors()
+                assertEquals(Color.GREEN.rgb, pixel(field, 5, 20))
+                assertEquals(Color.YELLOW, colors.textFieldBackground)
+                assertEquals("retained query", field.text)
+                assertTrue(bar.isOpen())
+            } finally {
+                bar.close()
+                terminal.dispose()
+            }
+        }
+    }
+
     @Test
     fun counterObservesBackgroundCompletionWithoutAnotherKeyPress() {
         val buffer = TerminalBuffers.create(80, 24)
@@ -53,7 +155,7 @@ class SwingTerminalSearchBarTest {
             }
             val result =
                 runBlocking {
-                    withTimeout(10_000) { terminal.searchState.first { it.query == "needle" && !it.isSearching } }
+                    withTimeout(10_000.milliseconds) { terminal.searchState.first { it.query == "needle" && !it.isSearching } }
                 }
             assertEquals(1, result.resultCount)
             SwingUtilities.invokeAndWait {

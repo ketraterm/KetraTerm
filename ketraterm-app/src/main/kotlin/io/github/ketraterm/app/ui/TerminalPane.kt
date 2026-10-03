@@ -53,7 +53,7 @@ internal class TerminalPane private constructor(
     fun reloadSettings() {
         terminal.reloadSettings()
         component.background = terminal.background
-        searchBar.refreshColors()
+        searchBar.refreshColors(Chrome.searchColors())
         tab.session.setHostPolicy(settings.createHostPolicy())
         completionBinding.update(
             completionResources.takeIf { settings.config.smartSuggestionsEnabled },
@@ -158,7 +158,7 @@ internal class TerminalPane private constructor(
                 ownedTerminal = terminal
                 terminal.bind(tab.session)
 
-                val searchBar = SwingTerminalSearchBar(terminal)
+                val searchBar = SwingTerminalSearchBar(terminal).apply { refreshColors(Chrome.searchColors()) }
                 ownedSearchBar = searchBar
                 val clipboardReadPrompt =
                     SwingClipboardReadPrompt { message, decide ->

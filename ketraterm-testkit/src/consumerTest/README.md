@@ -24,6 +24,11 @@ handshakes coordinate the headless smoke; it uses no timing assertions, private
 reflection, internal constructors or extra library dependencies. The Java smoke
 uses functional actions and public host wiring, without adapting coroutines.
 
+The Swing-host consumer also supplies product source labels and switches prepared
+search colors through Kotlin and Java construction/update APIs. It retains the
+existing host-owned suggestion target; these styling and labeling needs do not
+require new popup timing or capacity controls.
+
 `extractSwingReadmeExample` also extracts the marked Kotlin usage fence directly
 from `ketraterm-ui-swing/README.md` into the staged Swing consumer. A missing or
 duplicate example fails extraction; API drift fails compilation in every compiler

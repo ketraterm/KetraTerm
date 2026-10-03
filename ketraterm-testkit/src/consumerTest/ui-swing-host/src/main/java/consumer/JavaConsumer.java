@@ -18,9 +18,28 @@ package consumer;
 import io.github.ketraterm.session.TerminalShellCommandLineSnapshot;
 import io.github.ketraterm.ui.swing.host.SwingDialogRequest;
 import io.github.ketraterm.ui.swing.host.SwingShellSuggestionTarget;
+import io.github.ketraterm.ui.swing.host.SwingTerminalSearchColors;
+import io.github.ketraterm.ui.swing.host.SwingCompletionSuggestionProvider;
+import io.github.ketraterm.ui.swing.host.SwingCompletionContext;
+import io.github.ketraterm.completion.api.TerminalCompletionEngine;
+import java.awt.Color;
 import java.util.List;
+import java.util.Map;
 
 public final class JavaConsumer {
+    public static SwingCompletionSuggestionProvider labeledProvider(TerminalCompletionEngine engine) {
+        return new SwingCompletionSuggestionProvider(engine, () -> SwingCompletionContext.EMPTY, Map.of("host", "Product source"));
+    }
+
+    public static SwingTerminalSearchColors lightSearchColors() {
+        var original = SwingTerminalSearchColors.create(b -> b.setForeground(Color.BLACK));
+        var light = original.copy(b -> b.setPanelBackground(Color.WHITE));
+        if (!light.getForeground().equals(Color.BLACK) || original.getPanelBackground().equals(Color.WHITE)) {
+            throw new AssertionError("Immutable host colors");
+        }
+        return light;
+    }
+
     public static final class NativeTarget implements SwingShellSuggestionTarget {
         public TerminalShellCommandLineSnapshot requested;
         public int hides;

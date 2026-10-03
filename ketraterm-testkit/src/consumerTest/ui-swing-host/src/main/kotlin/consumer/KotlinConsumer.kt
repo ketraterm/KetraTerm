@@ -24,6 +24,7 @@ import io.github.ketraterm.ui.swing.host.*
 import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionRequest
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.*
+import java.awt.Color
 import javax.swing.SwingUtilities
 
 private class Connector : TerminalConnector {
@@ -55,10 +56,21 @@ fun main() =
                 check(request.commandLine == "git st")
                 flowOf(listOf(TerminalCompletionCandidate("status", 4, 6, "host", TerminalCompletionCandidateKind.SUBCOMMAND)))
             }
-        val provider = SwingCompletionSuggestionProvider(engine)
+        val provider = SwingCompletionSuggestionProvider(engine, { SwingCompletionContext.EMPTY }, mapOf("host" to "Product source"))
         // A host-owned controller consumes our provider without automatic coordination.
         val results = provider.suggestions(SwingShellSuggestionRequest("git st", 6, 6, 0)).single()
         check(results.single().replacementText == "status" && results.single().replacementStartOffset == 4)
+        check(results.single().source == "host" && results.single().sourceDisplayText == "Product source")
+        check(
+            JavaConsumer
+                .labeledProvider(
+                    engine,
+                ).suggestions(SwingShellSuggestionRequest("git st", 6, 6, 0))
+                .single()
+                .single()
+                .sourceDisplayText ==
+                "Product source",
+        )
         val buffer = TerminalBuffers.create(80, 3, 0)
         val connector = Connector()
         val scope = CoroutineScope(SupervisorJob())
@@ -66,9 +78,21 @@ fun main() =
             TerminalSession.create(buffer, buffer, connector).use { session ->
                 SwingUtilities.invokeAndWait {
                     val terminal = SwingTerminal()
+                    val searchBar = SwingTerminalSearchBar(terminal)
                     val target = JavaConsumer.NativeTarget()
                     val binding = SwingLiveCompletionBinding(session, scope, { false })
                     try {
+                        val light = JavaConsumer.lightSearchColors()
+                        searchBar.refreshColors(light)
+                        check(searchBar.component.foreground == Color.BLACK)
+                        searchBar.refreshColors(
+                            light.copy {
+                                it.foreground = Color.WHITE
+                                it.panelBackground = Color.BLACK
+                            },
+                        )
+                        searchBar.refreshColors()
+                        check(searchBar.component.foreground == Color.WHITE)
                         terminal.bind(session)
                         binding.attach(terminal, target)
                         target.requestSuggestions(TerminalShellCommandLineSnapshot("git st", 6, 6, 0))
@@ -76,6 +100,7 @@ fun main() =
                         binding.close()
                         check(target.hides > 0 && target.requested == null && !connector.closed)
                     } finally {
+                        searchBar.close()
                         binding.close()
                         terminal.dispose()
                     }

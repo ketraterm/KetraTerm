@@ -17,6 +17,7 @@ package io.github.ketraterm.intellij.services
 
 import com.intellij.ide.trustedProjects.TrustedProjects
 import com.intellij.ide.trustedProjects.TrustedProjectsListener
+import com.intellij.ide.ui.LafManagerListener
 import com.intellij.openapi.Disposable
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.components.Service
@@ -104,6 +105,10 @@ class KetraTermProjectTerminalService internal constructor(
 
     init {
         KetraTermIntellijSettings.getInstance().addChangeListener(settingsChangedListener)
+        ApplicationManager.getApplication().messageBus.connect(this).subscribe(
+            LafManagerListener.TOPIC,
+            LafManagerListener { reloadOpenTerminalSettings() },
+        )
         ApplicationManager.getApplication().messageBus.connect(this).subscribe(
             EditorColorsManager.TOPIC,
             EditorColorsListener {

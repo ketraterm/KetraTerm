@@ -2,6 +2,7 @@
 
 ## [Unreleased]
 
+- Search controls follow the selected theme.
 - Fixed typing or pasting during terminal startup causing premature writes or closing the terminal.
 - Improved cleanup of completion popups when terminals close or suggestions are disabled.
 - Improved window-state reporting while terminal output is active.

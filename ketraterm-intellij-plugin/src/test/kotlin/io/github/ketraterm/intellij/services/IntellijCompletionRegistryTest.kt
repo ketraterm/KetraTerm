@@ -89,7 +89,7 @@ class IntellijCompletionRegistryTest {
             var loads = 0
             val source =
                 TerminalCompletionSources.valueDomain(
-                    sourceId = "test-branch",
+                    sourceId = "intellij-git-branch",
                     domain = TerminalCompletionValueDomain.GIT_BRANCH,
                     valuesProvider = { _, _ ->
                         loads++
@@ -105,7 +105,8 @@ class IntellijCompletionRegistryTest {
             val resources =
                 registry.createResources(context(additionalSources = listOf(TerminalCompletionSourceEntry(source, 20))))
 
-            resources.provider.suggestions(request("git switch m")).last()
+            val suggestions = resources.provider.suggestions(request("git switch m")).last()
+            assertEquals("Git", suggestions.first { it.source == "intellij-git-branch" }.sourceDisplayText)
 
             assertEquals(1, loads)
             registry.closeAndFlush()
