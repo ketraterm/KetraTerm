@@ -42,6 +42,8 @@ import java.util.concurrent.atomic.AtomicInteger
  * UI products adapt this model to visual containers such as Swing tabs or IDE
  * tool-window contents. This class does not know about UI widgets, painting,
  * input events, or platform actions.
+ * Optional process-title and startup-notification observers report failures
+ * through the JVM logger and stop independently of essential session observation.
  */
 public class TerminalWorkspace internal constructor(
     private val listener: TerminalWorkspaceListener,
@@ -67,6 +69,7 @@ public class TerminalWorkspace internal constructor(
         CoroutineScope(workspaceJob + workerDispatcher + CoroutineName("terminal-workspace"))
     private val nextTabNumber = AtomicInteger(1)
     private var selectedTabId: String? = null
+    private var selectionRevision = 0L
     private var closed = false
 
     internal val isCoroutineScopeActive: Boolean
@@ -143,34 +146,40 @@ public class TerminalWorkspace internal constructor(
 
             val stateJob =
                 workspaceScope.launch {
-                    val processTitleJob =
-                        launch {
-                            tab.processTitleEnabled.collectLatest { enabled ->
-                                if (enabled) session.foregroundProcessName.collect(tab::updateForegroundProcessName)
-                            }
-                        }
-                    val startupJob =
-                        session.startupCommandStatus?.let { status ->
-                            launch {
-                                if (status.first { it != TerminalStartupCommandStatus.WAITING } ==
-                                    TerminalStartupCommandStatus.CANCELLED_BY_INPUT
-                                ) {
-                                    listener.startupCommandCancelled(tab)
+                    supervisorScope {
+                        val processTitleJob =
+                            launch(presentationFailureHandler) {
+                                tab.processTitleEnabled.collectLatest { enabled ->
+                                    if (enabled) session.foregroundProcessName.collect(tab::updateForegroundProcessName)
                                 }
                             }
-                        }
-                    try {
-                        val closed = session.state.filterIsInstance<TerminalSessionState.Closed>().first()
-                        startupJob?.cancel()
-                        processTitleJob.cancelAndJoin()
-                        tab.updateForegroundProcessName(null)
-                        if (!closed.event.locallyRequested) {
-                            tabBySession(session)?.let {
-                                listener.sessionClosed(it, closed.event.exitCode, closed.event.failure)
+                        val startupJob =
+                            session.startupCommandStatus?.let { status ->
+                                launch(presentationFailureHandler) {
+                                    if (status.first { it != TerminalStartupCommandStatus.WAITING } ==
+                                        TerminalStartupCommandStatus.CANCELLED_BY_INPUT
+                                    ) {
+                                        listener.startupCommandCancelled(tab)
+                                    }
+                                }
                             }
+                        try {
+                            val closed = session.state.filterIsInstance<TerminalSessionState.Closed>().first()
+                            startupJob?.cancel()
+                            processTitleJob.cancelAndJoin()
+                            var failure = captureCleanupFailure(null) { tab.updateForegroundProcessName(null) }
+                            failure =
+                                captureCleanupFailure(failure) {
+                                    if (!closed.event.locallyRequested) {
+                                        tabBySession(session)?.let {
+                                            listener.sessionClosed(it, closed.event.exitCode, closed.event.failure)
+                                        }
+                                    }
+                                }
+                            failure?.let { throw it }
+                        } finally {
+                            synchronized(stateLock) { shellMetadataRegistrations.remove(id) }?.close()
                         }
-                    } finally {
-                        synchronized(stateLock) { shellMetadataRegistrations.remove(id) }?.close()
                     }
                 }
             synchronized(stateLock) {
@@ -206,6 +215,7 @@ public class TerminalWorkspace internal constructor(
         synchronized(stateLock) {
             require(tabByIdLocked(id) != null) { "unknown terminal tab id: $id" }
             selectedTabId = id
+            selectionRevision++
         }
         listener.tabSelected(id)
     }
@@ -214,6 +224,7 @@ public class TerminalWorkspace internal constructor(
      * Closes an existing tab and its session.
      * Attempts session cleanup and every close/selection notification even when
      * a callback throws. Rethrows the first failure with later failures suppressed.
+     * Reentrant selection or closure supersedes this call's pending selection notification.
      *
      * @param id tab id.
      */
@@ -227,15 +238,19 @@ public class TerminalWorkspace internal constructor(
                 if (selectedTabId == id) {
                     selectedTabId = tabs.getOrNull(index.coerceAtMost(tabs.lastIndex))?.id
                 }
-                Triple(tab, selectedTabId, shellMetadataRegistrations.remove(id))
+                Triple(tab, ++selectionRevision, shellMetadataRegistrations.remove(id))
             }
-        val (tab, nextSelectedTabId, shellMetadataRegistration) = result
+        val (tab, revision, shellMetadataRegistration) = result
         var failure: Throwable? = null
         failure = captureCleanupFailure(failure) { shellMetadataRegistration?.close() }
         failure = captureCleanupFailure(failure) { tab.showForegroundProcessName = false }
         failure = captureCleanupFailure(failure) { tab.session.close() }
         failure = captureCleanupFailure(failure) { listener.tabClosed(id) }
-        failure = captureCleanupFailure(failure) { nextSelectedTabId?.let(listener::tabSelected) }
+        failure =
+            captureCleanupFailure(failure) {
+                val nextSelectedTabId = synchronized(stateLock) { selectedTabId.takeIf { selectionRevision == revision } }
+                nextSelectedTabId?.let(listener::tabSelected)
+            }
         failure?.let { throw it }
     }
 
@@ -438,6 +453,12 @@ public class TerminalWorkspace internal constructor(
 
     private companion object {
         private const val INITIAL_TAB_CAPACITY = 4
+        private val presentationFailureHandler =
+            CoroutineExceptionHandler { _, failure ->
+                System
+                    .getLogger(TerminalWorkspace::class.java.name)
+                    .log(System.Logger.Level.WARNING, "Workspace presentation observer failed", failure)
+            }
     }
 }
 

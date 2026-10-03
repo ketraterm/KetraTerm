@@ -268,15 +268,15 @@ parser. A small non-whitespace threshold plus common trigger characters keeps
 typing responsive, while the merged engine parses once and suppresses invalid
 operator, command, option, path, and value-domain requests authoritatively.
 
-Swing hosts share `SwingLiveCompletionBinding` and one EDT-confined
-one-shot `Timer` for debouncing. `SwingTerminal` owns exactly one replaceable
+Swing hosts share `SwingLiveCompletionBinding`, whose lifecycle-bound Flow
+debounces refreshes on the EDT. `SwingTerminal` owns exactly one replaceable
 `suggestionJob`; a new request or popup hide cancels it. The provider and engine
 remain suspending end to end. Provider construction and flow collection execute
 off the EDT, and progressive rankings are conflated before the latest immutable
 snapshot is published back to Swing.
 
-Presentation is intentionally platform-owned. The standalone host custom-paints
-a compact completion list; the IntelliJ plugin owns a separate native `JBList`.
+Presentation is intentionally platform-owned. The reusable Swing view uses a
+`JList`; the IntelliJ plugin owns a separate native `JBList`.
 Both consume `SwingShellSuggestionViewSnapshot` and the same authoritative
 display text, detail, source label, semantic accent role, and matched ranges.
 The Swing adapter maps the products' stable source identities through one private

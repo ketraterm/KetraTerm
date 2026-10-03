@@ -40,6 +40,44 @@ import kotlin.test.*
 @OptIn(ExperimentalCoroutinesApi::class)
 class SwingCompletionBindingTest {
     @Test
+    fun `popup callback can close or supersede resource replacement without restarting observation`() =
+        runTest {
+            for (close in listOf(false, true)) {
+                var onHide: (() -> Unit)? = null
+                val view =
+                    object : SwingShellSuggestionView {
+                        override val component = JPanel()
+
+                        override fun update(snapshot: SwingShellSuggestionViewSnapshot) {
+                            if (snapshot == SwingShellSuggestionViewSnapshot.EMPTY) {
+                                val callback = onHide
+                                onHide = null
+                                callback?.invoke()
+                            }
+                        }
+                    }
+                Fixture(view, StandardTestDispatcher(testScheduler)).use { fixture ->
+                    withContext(Dispatchers.Swing) {
+                        val originalListeners = fixture.terminal.focusListeners.toList()
+                        fixture.binding.update(resources(), true)
+                        fixture.terminal.showShellSuggestions(request, listOf(suggestion))
+                        val replacement = resources()
+                        onHide = {
+                            if (close) fixture.binding.close() else fixture.binding.update(replacement, false)
+                        }
+                        fixture.binding.update(replacement, true)
+                        assertEquals(!close, fixture.binding.isEnabled)
+                        assertEquals(originalListeners, fixture.terminal.focusListeners.toList())
+                    }
+                    withContext(Dispatchers.Swing) { }
+                    runCurrent()
+                    assertEquals(0, fixture.commandLine.subscriptionCount.value)
+                }
+                runCurrent()
+            }
+        }
+
+    @Test
     fun `empty binding rejects requests and feedback and installs no observation`() =
         runBlocking {
             Fixture().use { fixture ->

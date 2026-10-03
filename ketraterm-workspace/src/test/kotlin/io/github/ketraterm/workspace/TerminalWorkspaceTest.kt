@@ -314,8 +314,18 @@ class TerminalWorkspaceTest {
         }
 
     @Test
-    fun `process title listener failure preserves shell observation and remote closure delivery`() {
-        val failure = IllegalStateException("host title notification failed")
+    fun `process title listener failure preserves shell observation and remote closure delivery`() =
+        verifyProcessTitleFailure(IllegalStateException("host title notification failed"))
+
+    @Test
+    fun `process title listener error preserves shell observation and remote closure delivery`() =
+        verifyProcessTitleFailure(AssertionError("host title notification failed"))
+
+    @Test
+    fun `process title listener cancellation preserves shell observation and remote closure delivery`() =
+        verifyProcessTitleFailure(kotlinx.coroutines.CancellationException("host title notification cancelled"))
+
+    private fun verifyProcessTitleFailure(failure: Throwable) {
         var lifecycleAssertionsCompleted = false
         try {
             runTest {

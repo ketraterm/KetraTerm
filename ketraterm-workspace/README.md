@@ -20,7 +20,7 @@ This module is designed to be completely decoupled from any specific UI toolkit,
 
 `TerminalWorkspace` manages a collection of tabs. Each tab wraps an active, running `TerminalSession` tied to a specific `TerminalProfile` launch configuration.
 
-The workspace owns a supervisor scope and one `TerminalSession.state` collection job per tab. Removing a tab cancels its job; closing the workspace cancels the scope. Local tab closure remains distinct from unexpected remote closure, and host callbacks run outside the workspace state lock.
+The workspace owns a supervisor scope and one lifecycle job per tab. Optional process-title and startup notifications are supervised separately: a failed observer is reported without stopping session-close observation. Removing a tab cancels its jobs; closing the workspace cancels the scope. Local tab closure remains distinct from unexpected remote closure, and host callbacks run outside the workspace state lock. Reentrant selection or closure supersedes an older pending selection notification.
 
 ```mermaid
 graph TD
@@ -89,14 +89,14 @@ fun main() {
         override fun tabOpened(tab: TerminalWorkspaceTab) {
             println("Tab opened: ${tab.id} - ${tab.title}")
         }
-        override fun tabClosed(id: String) {
-            println("Tab closed: $id")
+        override fun tabClosed(tabId: String) {
+            println("Tab closed: $tabId")
         }
-        override fun tabSelected(id: String) {
-            println("Active tab switched to: $id")
+        override fun tabSelected(tabId: String) {
+            println("Active tab switched to: $tabId")
         }
         override fun titleChanged(tab: TerminalWorkspaceTab, title: String) {}
-        override fun colorChanged(tab: TerminalWorkspaceTab, color: Int) {}
+        override fun colorChanged(tab: TerminalWorkspaceTab, color: String?) {}
         override fun bell(tab: TerminalWorkspaceTab) {}
     }
 
@@ -105,7 +105,7 @@ fun main() {
 
     // 4. Declare a launch profile (e.g. Git Shell)
     val gitProfile = TerminalProfile(
-        name = "git-shell",
+        id = "git-shell",
         displayName = "Git Repo Shell",
         command = listOf("bash"),
         environment = mapOf("GIT_PS1" to "true"),
@@ -138,10 +138,10 @@ class SwingTabAdapter(private val tabbedPane: JTabbedPane) : TerminalWorkspaceLi
     override fun tabOpened(tab: TerminalWorkspaceTab) {
         // Create Swing component and add tab
     }
-    override fun tabClosed(id: String) {}
-    override fun tabSelected(id: String) {}
+    override fun tabClosed(tabId: String) {}
+    override fun tabSelected(tabId: String) {}
     override fun titleChanged(tab: TerminalWorkspaceTab, title: String) {}
-    override fun colorChanged(tab: TerminalWorkspaceTab, color: Int) {}
+    override fun colorChanged(tab: TerminalWorkspaceTab, color: String?) {}
     override fun bell(tab: TerminalWorkspaceTab) {}
 }
 ```

@@ -27,6 +27,7 @@ internal class SwingShellSuggestionController(
     private var selectedIndex: Int = NO_SELECTION
     private var viewportStartIndex: Int = 0
     private var request: SwingShellSuggestionRequest = SwingShellSuggestionRequest.EMPTY
+    private var presentationRevision = 0L
 
     private val view: SwingShellSuggestionView =
         viewFactory.create(
@@ -70,6 +71,7 @@ internal class SwingShellSuggestionController(
             hide()
             return false
         }
+        val revision = ++presentationRevision
         val sameRequest = this.request == request
         val selectedOutcome =
             this.suggestions
@@ -85,14 +87,18 @@ internal class SwingShellSuggestionController(
                 ?.takeIf { it >= 0 }
                 ?: selectedIndex.takeIf { it in this.suggestions.indices }
                 ?: NO_SELECTION
-        updateViewport()
         view.component.isVisible = true
+        if (presentationRevision != revision) return false
+        updateViewport()
+        if (presentationRevision != revision) return false
         host.revalidate()
+        if (presentationRevision != revision) return false
         host.repaint()
-        return true
+        return presentationRevision == revision
     }
 
     fun hide(): Boolean {
+        presentationRevision++
         if (!view.component.isVisible && suggestions.isEmpty()) return false
         suggestions = emptyList()
         selectedIndex = NO_SELECTION

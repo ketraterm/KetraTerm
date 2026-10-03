@@ -28,6 +28,35 @@ class SwingShellSuggestionControllerTest {
     private val source = JPanel()
 
     @Test
+    fun `reentrant replacement owns the popup state and publication`() =
+        onEdt {
+            val host = RecordingSuggestionHost()
+            lateinit var controller: SwingShellSuggestionController
+            var replace = true
+            val replacement = suggestions(2)
+            val replacementRequest = request(anchorColumn = 8, anchorRow = 3)
+            val view =
+                object : SwingShellSuggestionView {
+                    override val component = JPanel()
+
+                    override fun update(snapshot: SwingShellSuggestionViewSnapshot) {
+                        assertTrue(controller.state().visible, "State must be committed before notifying the host view")
+                        if (replace) {
+                            replace = false
+                            assertTrue(controller.show(replacementRequest, replacement, 1))
+                        }
+                    }
+                }
+            controller = SwingShellSuggestionController(host, viewFactory = { view })
+            assertFalse(controller.show(request(), suggestions(3), 0), "The outer show was superseded")
+            assertSame(replacement[1], controller.state().selectedSuggestion)
+            assertEquals(8, controller.state().anchorColumn)
+            assertEquals(3, controller.state().anchorRow)
+            assertEquals(1, host.revalidations)
+            assertEquals(1, host.repaints)
+        }
+
+    @Test
     fun `master off rejects keyboard and pointer acceptance of an existing popup`() =
         onEdt {
             val host = RecordingSuggestionHost()

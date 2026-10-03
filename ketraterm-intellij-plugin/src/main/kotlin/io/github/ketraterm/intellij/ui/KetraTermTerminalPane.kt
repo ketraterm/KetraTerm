@@ -306,6 +306,8 @@ internal class KetraTermTerminalPane private constructor(
 
         /**
          * Creates and binds a pane for [tab].
+         * Until return, this factory owns acquired UI resources and releases them
+         * on failure. The caller retains ownership of the workspace session.
          *
          * @param tab workspace tab whose session should be rendered.
          * @return bound terminal pane.
@@ -361,40 +363,56 @@ internal class KetraTermTerminalPane private constructor(
                         reportShellSuggestionFailure(failure)
                     }
                 }
-            scrollbarAdapter.attach(terminal)
-            terminal.bind(tab.session)
-
-            val searchBar = SwingTerminalSearchBar(terminal)
-            val clipboardReadPrompt =
-                SwingClipboardReadPrompt { message, decide ->
-                    IntellijMessageDialogs.showModeless(project, message, decide)
-                }
-            val terminalArea = SwingTerminalOverlayPane(terminal, searchBar.component)
-            val component =
-                JPanel(BorderLayout()).apply {
-                    border = null
-                    background = terminal.background
-                    terminal.border = null
-                    add(terminalArea, BorderLayout.CENTER)
-                    add(scrollbar, BorderLayout.EAST)
-                }
-
-            tab.session.requestRender(scrollbackOffset = 0)
-            return KetraTermTerminalPane(
-                tab = tab,
-                terminal = terminal,
-                component = component,
-                searchBar = searchBar,
-                hostActions = hostActions,
-                project = project,
-                completionBinding = completionBinding,
-                clipboardReadPrompt = clipboardReadPrompt,
-            ).also { pane ->
-                pane.shortcutController = KetraTermTerminalShortcutController(pane)
-                shortcutControllerRef[0] = pane.shortcutController
-                paneRef[0] = pane
+            var searchBar: SwingTerminalSearchBar? = null
+            var clipboardReadPrompt: SwingClipboardReadPrompt? = null
+            var pane: KetraTermTerminalPane? = null
+            try {
+                scrollbarAdapter.attach(terminal)
+                terminal.bind(tab.session)
+                searchBar = SwingTerminalSearchBar(terminal)
+                clipboardReadPrompt =
+                    SwingClipboardReadPrompt { message, decide ->
+                        IntellijMessageDialogs.showModeless(project, message, decide)
+                    }
+                val terminalArea = SwingTerminalOverlayPane(terminal, searchBar.component)
+                val component =
+                    JPanel(BorderLayout()).apply {
+                        border = null
+                        background = terminal.background
+                        terminal.border = null
+                        add(terminalArea, BorderLayout.CENTER)
+                        add(scrollbar, BorderLayout.EAST)
+                    }
+                tab.session.requestRender(scrollbackOffset = 0)
+                val created =
+                    KetraTermTerminalPane(
+                        tab = tab,
+                        terminal = terminal,
+                        component = component,
+                        searchBar = searchBar,
+                        hostActions = hostActions,
+                        project = project,
+                        completionBinding = completionBinding,
+                        clipboardReadPrompt = clipboardReadPrompt,
+                    )
+                pane = created
+                created.shortcutController = KetraTermTerminalShortcutController(created)
+                shortcutControllerRef[0] = created.shortcutController
+                paneRef[0] = created
                 completionBinding.attach(terminal)
-                pane.reconcileCompletion()
+                created.reconcileCompletion()
+                return created
+            } catch (failure: Throwable) {
+                val created = pane
+                if (created != null) {
+                    captureCleanupFailure(failure, created::close)
+                } else {
+                    captureCleanupFailure(failure) { clipboardReadPrompt?.close() }
+                    captureCleanupFailure(failure, completionBinding::close)
+                    captureCleanupFailure(failure) { searchBar?.close() }
+                    captureCleanupFailure(failure, terminal::dispose)
+                }
+                throw failure
             }
         }
     }
