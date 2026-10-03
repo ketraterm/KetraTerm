@@ -42,6 +42,7 @@ internal class CoreTerminalRenderFrame(
         viewportRows: Int,
         block: () -> T,
     ): T {
+        check(!isValid) { "Render frame reads on the same buffer must not be nested" }
         require(viewportRows > 0) { "viewportRows must be > 0, was $viewportRows" }
         resolvedScrollbackOffset = state.clampScrollbackOffset(scrollbackOffset)
         resolvedRows = viewportRows.coerceAtMost(state.dimensions.height + resolvedScrollbackOffset)

@@ -209,24 +209,13 @@ internal class TabManager(
     }
 
     private fun switchToNextTab() {
-        val nextTabId = getNeighborTabId(forward = true) ?: return
+        val nextTabId = tabBar.neighborId(forward = true) ?: return
         selectTab(nextTabId)
     }
 
     private fun switchToPrevTab() {
-        val prevTabId = getNeighborTabId(forward = false) ?: return
+        val prevTabId = tabBar.neighborId(forward = false) ?: return
         selectTab(prevTabId)
-    }
-
-    private fun getNeighborTabId(forward: Boolean): String? {
-        val currentId = tabBar.selectedId() ?: return null
-        val tabIds = tabRoots.keys.toList()
-        if (tabIds.size <= 1) return null
-        val currentIndex = tabIds.indexOf(currentId)
-        if (currentIndex == -1) return null
-        val step = if (forward) 1 else -1
-        val nextIndex = (currentIndex + step + tabIds.size) % tabIds.size
-        return tabIds[nextIndex]
     }
 
     /**

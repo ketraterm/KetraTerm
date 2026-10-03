@@ -235,6 +235,20 @@ internal class TabBar(
 
     fun selectedId(): String? = selectedId
 
+    /** Adjacent tab in display order, wrapping at either end; no neighbor for fewer than two tabs. */
+    fun neighborId(forward: Boolean): String? {
+        if (entries.size < 2) return null
+        val index = entries.indexOfFirst { it.id == selectedId }
+        if (index < 0) return null
+        val nextIndex =
+            if (forward) {
+                if (index == entries.lastIndex) 0 else index + 1
+            } else {
+                if (index == 0) entries.lastIndex else index - 1
+            }
+        return entries[nextIndex].id
+    }
+
     fun selectedTitle(): String? = entries.find { it.id == selectedId }?.title
 
     private fun scrollToVisible(index: Int) {

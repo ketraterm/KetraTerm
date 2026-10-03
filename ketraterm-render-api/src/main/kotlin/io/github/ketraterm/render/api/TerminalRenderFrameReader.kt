@@ -21,6 +21,9 @@ package io.github.ketraterm.render.api
  * The frame passed to the consumer is valid only during the callback.
  * Implementations may hold a terminal mutation lock while invoking the consumer.
  * Consumers must copy anything they need before returning.
+ * Readers need not support reentrant reads on the same instance. An unsupported
+ * nested read must throw [IllegalStateException] before disturbing the enclosing
+ * frame; that frame remains valid until its own callback returns.
  *
  * A reader instance identifies one source's generation namespace for incremental
  * consumers. Use a new reader for unrelated terminal content, or explicitly reset

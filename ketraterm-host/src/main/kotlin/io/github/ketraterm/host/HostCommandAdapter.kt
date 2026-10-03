@@ -97,16 +97,16 @@ public class HostCommandAdapter(
     private var currentWorkingDirectory: String? = null
 
     /**
-     * The current window title reported by the shell or application.
+     * The current authoritative core window title. Read under the same serialization as core mutation.
      */
-    public var windowTitle: String = ""
-        private set
+    public val windowTitle: String
+        get() = terminal.windowTitle
 
     /**
-     * The current icon title reported by the shell or application.
+     * The current authoritative core icon title. Read under the same serialization as core mutation.
      */
-    public var iconTitle: String = ""
-        private set
+    public val iconTitle: String
+        get() = terminal.iconTitle
 
     /**
      * The URI of the currently active hyperlink (OSC 8), or `null` if none.
@@ -1075,13 +1075,11 @@ public class HostCommandAdapter(
     private fun popTitle(stack: ArrayDeque<String>): String? = if (stack.isEmpty()) null else stack.removeLast()
 
     private fun updateIconTitle(title: String) {
-        iconTitle = title
         terminal.setIconTitle(title)
         hostEvents.iconTitleChanged(title)
     }
 
     private fun updateWindowTitle(title: String) {
-        windowTitle = title
         terminal.setWindowTitle(title)
         hostEvents.windowTitleChanged(title)
     }

@@ -30,6 +30,34 @@ import org.junit.jupiter.params.provider.ValueSource
 
 class CoreTerminalRenderFrameTest {
     @Test
+    fun `all nested read variants reject before entering and release after callback failure`() {
+        val buffer = TerminalBuffers.create(width = 4, height = 2)
+        val other = TerminalBuffers.create(width = 3, height = 1)
+        val failure = IllegalArgumentException("consumer failed")
+        var escaped: TerminalRenderFrame? = null
+        assertSame(
+            failure,
+            assertThrows(IllegalArgumentException::class.java) {
+                buffer.readRenderFrame { outer ->
+                    escaped = outer
+                    val forbidden = TerminalRenderFrameConsumer { fail<Unit>("Nested consumer must not be called") }
+                    assertThrows(IllegalStateException::class.java) { buffer.readRenderFrame(forbidden) }
+                    assertThrows(IllegalStateException::class.java) { buffer.readRenderFrame(1, forbidden) }
+                    assertThrows(IllegalStateException::class.java) { buffer.readRenderFrame(1, 1, forbidden) }
+                    assertThrows(IllegalStateException::class.java) { buffer.readRenderFrameForAbsoluteRange(0, 1, forbidden) }
+                    assertEquals(2, outer.rows)
+                    assertEquals(0, outer.scrollbackOffset)
+                    other.readRenderFrame { assertEquals(3, it.columns) }
+                    assertEquals(4, outer.columns)
+                    throw failure
+                }
+            },
+        )
+        assertThrows(IllegalStateException::class.java) { requireNotNull(escaped).rows }
+        buffer.readRenderFrame { assertEquals(2, it.rows) }
+    }
+
+    @Test
     fun `nested render read attempt preserves the enclosing borrowed frame`() {
         val buffer = TerminalBuffers.create(width = 4, height = 2, maxHistory = 2)
         buffer.writeText("past")

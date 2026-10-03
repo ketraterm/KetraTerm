@@ -2707,6 +2707,9 @@ class HostCommandAdapterTest {
             f.terminal.setWindowTitle("host-window")
             f.terminal.setIconTitle("host-icon")
 
+            assertEquals("host-window", f.sink.windowTitle)
+            assertEquals("host-icon", f.sink.iconTitle)
+
             f.acceptAscii("\u001B[22t\u001B]0;temporary-title\u0007\u001B[23t")
 
             assertAll(

@@ -54,6 +54,10 @@ need instead of the full facade.
 
 ### Render frame generations
 
+Core frame reads require external serialization with mutation and are not
+reentrant on the same buffer. A nested read throws `IllegalStateException`
+before changing the enclosing frame; callback failure releases the lease.
+
 `TerminalReader.palette` exposes the current immutable effective palette without
 allocating or acquiring a render frame. Callers serialize reads with mutation;
 retained values remain safe after releasing synchronization. Unchanged indexed

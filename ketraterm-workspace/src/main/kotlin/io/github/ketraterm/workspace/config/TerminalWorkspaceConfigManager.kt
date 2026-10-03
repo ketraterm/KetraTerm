@@ -231,8 +231,10 @@ public class TerminalWorkspaceConfigManager(
      * The filesystem must support atomic replacement; there is no destructive fallback.
      *
      * @throws IOException if the snapshot cannot be persisted.
+     * @throws IllegalArgumentException if the startup command contains a line break.
      */
     public fun save(config: TerminalConfig) {
+        require('\n' !in config.startupCommand && '\r' !in config.startupCommand) { "Startup command must be one line" }
         val destination = configPath.toAbsolutePath()
         val parent = destination.parent
         Files.createDirectories(parent)
@@ -261,12 +263,12 @@ public class TerminalWorkspaceConfigManager(
 
         [shell]
         # Command or path to the shell executable to run
-        path = "${config.shellPath}"
+        path = ${TomlParser.quoteString(config.shellPath)}
         # Initial working directory when opening a new tab
-        start_directory = "${config.startDirectory}"
+        start_directory = ${TomlParser.quoteString(config.startDirectory)}
         # Optional command line to run once after shell readiness; blank disables it.
         # Requires interactive PowerShell, Bash, zsh, or fish. Use a script for multiline programs.
-        startup_command = ${TomlParser.quoteSingleLineString(config.startupCommand)}
+        startup_command = ${TomlParser.quoteString(config.startupCommand)}
 
         [window]
         # Preferred default terminal size in columns and rows
@@ -277,7 +279,7 @@ public class TerminalWorkspaceConfigManager(
 
         [font]
         # Primary monospace font family
-        family = "${config.fontFamily}"
+        family = ${TomlParser.quoteString(config.fontFamily)}
         # Font size in points
         size = ${config.fontSize}
         # Line height multiplier
@@ -288,7 +290,7 @@ public class TerminalWorkspaceConfigManager(
         [theme]
         # Resolved terminal color palette theme.
         # Supported themes: campbell, one-dark, nord, tokyo-night, everforest
-        name = "${config.theme}"
+        name = ${TomlParser.quoteString(config.theme)}
 
         [behavior]
         # Whether East Asian Ambiguous characters should occupy two terminal cells in width policy
@@ -296,7 +298,7 @@ public class TerminalWorkspaceConfigManager(
         # Cursor blink period in milliseconds
         cursor_blink_millis = ${config.cursorBlinkMillis}
         # Style of the text cursor (block, underline, beam)
-        cursor_shape = "${config.cursorShape}"
+        cursor_shape = ${TomlParser.quoteString(config.cursorShape)}
         # Play a system beep when the terminal receives a BEL character
         audible_bell = ${config.audibleBell}
         # Show a visual edge pulse when the terminal receives a BEL character

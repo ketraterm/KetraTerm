@@ -26,6 +26,8 @@ import io.github.ketraterm.render.api.TerminalRenderFrameReader
  *
  * All borrowed frame reads and core mutations require external serialization.
  * This contract adds no synchronization or ownership transfer to [TerminalBuffer].
+ * The standard buffer rejects nested frame reads on the same instance with
+ * [IllegalStateException], before changing the enclosing frame's viewport or validity.
  */
 public interface TerminalRenderBuffer :
     TerminalBuffer,

@@ -98,13 +98,25 @@ internal object TomlParser {
         return value
     }
 
-    /** Quotes one physical line without interpreting shell backslashes, quotes, or comment characters. */
-    fun quoteSingleLineString(value: String): String {
-        require('\n' !in value && '\r' !in value) { "Startup command must be one line" }
-        if ("'''" !in value && !value.endsWith('\'')) return "'''$value'''"
-        // Unicode escapes avoid ambiguous quote runs at the closing delimiter.
-        val escaped = value.replace("\\", "\\u005c").replace("\"", "\\u0022")
-        return "\"\"\"$escaped\"\"\""
+    /** Encodes a value on one physical TOML line, preserving controls and significant whitespace. */
+    fun quoteString(value: String): String {
+        if ("'''" !in value && !value.endsWith('\'') && value.none { it < ' ' || it == '\u007F' }) return "'''$value'''"
+        return buildString {
+            append("\"\"\"")
+            for (character in value) {
+                when {
+                    // Escape quotes so the parser cannot mistake a quote run for the closing delimiter.
+                    character == '"' -> append("\\u0022")
+                    character == '\\' -> append("\\\\")
+                    character < ' ' || character == '\u007F' -> {
+                        append("\\u")
+                        append(character.code.toString(16).padStart(4, '0'))
+                    }
+                    else -> append(character)
+                }
+            }
+            append("\"\"\"")
+        }
     }
 
     private fun decodeBasicString(value: String): String =

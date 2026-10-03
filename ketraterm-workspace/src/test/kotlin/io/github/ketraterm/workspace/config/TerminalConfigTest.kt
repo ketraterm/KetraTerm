@@ -36,6 +36,9 @@ class TerminalConfigTest {
                 "backslash" to "C:\\Users\\someone\\project",
                 "unicode-and-literal-quotes" to "工程 'quoted' '''suffix'",
                 "newline" to "first\nsecond",
+                "controls-and-delimiters" to " \t\r\n\u0000\u0008\u000C\u001B\u007F'''\"\"\"#=\\u0022😀 ",
+                "trailing-double-quote" to "quoted\"",
+                "leading-newline" to "\nvalue",
             )
         return fields.flatMap { field ->
             values.map { (kind, value) ->

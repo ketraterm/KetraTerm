@@ -291,12 +291,12 @@ closures remain historical evidence for their tested paths.
 - **M06 — `DONE(ui)`**: popup state is committed before view callbacks, and reentrant transitions supersede unfinished shows.
 - **M07 — `DONE(host/profile)`**: optional workspace observers are supervised independently of shell and session-close observation.
 - **M08 — `DONE(host/profile)`**: reentrant tab selection or closure supersedes pending selection notifications.
-- **M09 — `TODO(core/render)`**: nested frame-read attempts must preserve the enclosing lease. Support nesting deliberately or reject it before mutation and document the rule; the public-reader regression accepts either safe outcome.
-- **M10 — `TODO(host)`**: title push/pop must read authoritative core titles after legal direct core mutation. The byte-stream regression exposes stale adapter title mirrors; retain stack and notification ownership in host.
+- **M09 — `DONE(core/render)`**: core rejects nested frame reads before changing the enclosing lease; reentry and callback-failure contracts are documented and tested.
+- **M10 — `DONE(host)`**: adapter title getters and stacks read authoritative core titles; host retains stacks and notifications.
 - **M11 — `TODO(input)`**: widen accepted maximum cell/pixel coordinates before one-based conversion and apply encoding-specific clamping/suppression before narrowing. Six exact-byte regressions fail; align pixel-coordinate documentation with zero-based events.
-- **M12 — `TODO(host/profile)`**: encode all accepted configuration strings consistently. Twenty round-trip cases cover five fields; quotes/comments and newlines fail in ten cases, while backslash and Unicode controls pass. Do not silently replace valid saved values with defaults.
+- **M12 — `DONE(host/profile)`**: one TOML string encoder preserves accepted configuration values, including line breaks, controls, quotes, and backslashes.
 - **M13 — `TODO(host)`**: reconcile lowered OSC hyperlink limits under the serialized registry owner by the next admission. The byte-stream regression checks `4 → 1`, URI retirement and removal-before-registration ordering without requiring synchronous setter-time eviction.
-- **M14 — `TODO(host/profile)`**: standalone Ctrl+Tab must follow visible tab-strip order rather than `HashMap` iteration. Source-confirmed; real product navigation coverage for directions, wraparound and deletion remains required.
+- **M14 — `DONE(host/profile)`**: standalone Ctrl+Tab uses tab-bar order; PTY-backed product tests verify both directions, wraparound, deletion, and empty/single-tab behavior.
 - **M15 — `DONE(host/profile)`**: IntelliJ pane creation rolls back acquired UI resources and service listeners; IDE fixtures verify failure, cancellation, and suppressed cleanup errors.
 - **M16 — `TODO(render)`**: external frames inheriting the default palette getter construct storage on every cache acceptance. Share an immutable fallback and measure a representative external-frame path. Built-in core already caches its palette; surviving allocations and latency are unmeasured.
 - **M17 — `TODO(host/profile)`**: standalone command-output export performs filesystem writes on the EDT. Move writing into owned I/O work and verify completion, failure and cancellation with a gated writer; no latency measurement is claimed.
