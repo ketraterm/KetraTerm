@@ -30,11 +30,11 @@ import io.github.ketraterm.completion.spec.PathCommandSpecCandidateProjector
 import io.github.ketraterm.completion.spec.SpecCompletionSource
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.channelFlow
-import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.supervisorScope
 
 /** Coordinates bounded source collection and delegates deterministic fusion to [GlobalCompletionRanker]. */
 internal class MergedCompletionEngine(
@@ -151,7 +151,7 @@ internal class MergedCompletionEngine(
 
             val completions = Channel<SourceCompletion>(sources.size)
             try {
-                supervisorScope {
+                coroutineScope {
                     for (localSourceIndex in sources.indices) {
                         val entry = sources[localSourceIndex]
                         val sourceIndex = localSourceIndex + hostSourceIndexOffset
@@ -162,21 +162,24 @@ internal class MergedCompletionEngine(
                                         source = entry.source,
                                         request = request,
                                         context = completionContext,
-                                    )
+                                    ).also { coroutineContext.ensureActive() }
                                 } catch (cancellation: CancellationException) {
-                                    if (!coroutineContext.isActive) throw cancellation
+                                    this@coroutineScope.ensureActive()
                                     emptyList()
-                                } catch (failure: Exception) {
+                                } catch (failure: Throwable) {
                                     reportSourceFailure(sourceIndex, entry, failure)
+                                    if (failure !is Exception) throw failure
                                     emptyList()
                                 }
-                            completions.send(
-                                SourceCompletion(
-                                    sourceIndex = sourceIndex,
-                                    priority = entry.priority,
-                                    candidates = candidates,
-                                ),
-                            )
+                            // One slot per source allows even a self-cancelled child to report without suspension.
+                            completions
+                                .trySend(
+                                    SourceCompletion(
+                                        sourceIndex = sourceIndex,
+                                        priority = entry.priority,
+                                        candidates = candidates,
+                                    ),
+                                ).getOrThrow()
                         }
                     }
 

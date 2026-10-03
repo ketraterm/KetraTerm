@@ -28,6 +28,9 @@ public object TerminalCompletionEngines {
      *
      * Provider-local ranks are fused by projected command outcome with bounded
      * source priors, command-line context, and learned statistics.
+     * Source exceptions are reported and contribute empty results; unexpected
+     * errors are reported, fail collection, and cancel sibling sources. Source-local
+     * cancellation contributes an empty result; request cancellation cancels all work.
      *
      * @param sources prioritized source registrations.
      * @param commandSpecs immutable command catalog used to classify the active
@@ -35,8 +38,7 @@ public object TerminalCompletionEngines {
      * the engine is alive.
      * @param learningStore optional shared in-memory learning store. The engine
      * reads its immutable published snapshot and performs no host I/O.
-     * @param sourceFailureHandler diagnostic sink for isolated non-cancellation
-     * source failures.
+     * @param sourceFailureHandler diagnostic sink for non-cancellation source failures.
      * @return merged completion engine.
      */
     @JvmStatic

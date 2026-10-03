@@ -215,6 +215,121 @@ class MergedCompletionEngineTest {
         }
 
     @Test
+    @OptIn(ExperimentalCoroutinesApi::class)
+    fun `unexpected source or diagnostic errors terminate collection and cancel siblings`() =
+        runTest {
+            for (origin in listOf("source", "diagnostic")) {
+                for (failure in listOf(AssertionError("provider assertion"), LinkageError("provider linkage"))) {
+                    val siblingStarted = CompletableDeferred<Unit>()
+                    val siblingCancelled = CompletableDeferred<Unit>()
+                    val releaseFailure = CompletableDeferred<Unit>()
+                    val emissions = mutableListOf<List<TerminalCompletionCandidate>>()
+                    val reportedFailures = mutableListOf<Throwable>()
+                    var collectedFailure: Throwable? = null
+                    val engine =
+                        TerminalCompletionEngines.fromSources(
+                            sources =
+                                listOf(
+                                    entry(source(candidate("available")), 0),
+                                    entry({ _, _, _ ->
+                                        siblingStarted.complete(Unit)
+                                        try {
+                                            awaitCancellation()
+                                        } finally {
+                                            siblingCancelled.complete(Unit)
+                                        }
+                                    }, 0),
+                                    entry({ _, _, _ ->
+                                        releaseFailure.await()
+                                        if (origin == "source") throw failure
+                                        throw IOException("operational failure")
+                                    }, 0),
+                                ),
+                            commandSpecs = emptyList(),
+                            sourceFailureHandler =
+                                TerminalCompletionSourceFailureHandler { _, _, reported ->
+                                    reportedFailures += reported
+                                    if (origin == "diagnostic") throw failure
+                                },
+                        )
+                    val collection =
+                        launch {
+                            try {
+                                engine.completions(request()).toList(emissions)
+                            } catch (thrown: Throwable) {
+                                collectedFailure = thrown
+                            }
+                        }
+                    try {
+                        runCurrent()
+                        assertTrue(siblingStarted.isCompleted)
+                        assertEquals(listOf("available"), emissions.last().map { it.replacementText })
+                        releaseFailure.complete(Unit)
+                        runCurrent()
+
+                        assertTrue(collection.isCompleted, "origin=$origin failure=$failure")
+                        val propagatedFailure = assertNotNull(collectedFailure)
+                        assertEquals(failure::class, propagatedFailure::class)
+                        // Coroutine stacktrace recovery may copy a throwable, retaining the original as its cause.
+                        assertTrue(generateSequence(propagatedFailure) { it.cause }.any { it === failure })
+                        if (origin == "source") assertSame(failure, reportedFailures.single())
+                        assertTrue(siblingCancelled.isCompleted, "the request must finish sibling cleanup")
+                    } finally {
+                        collection.cancelAndJoin()
+                    }
+                }
+            }
+        }
+
+    @Test
+    @OptIn(ExperimentalCoroutinesApi::class)
+    fun `source cancelling its own job completes accounting without losing sibling results`() =
+        runTest {
+            for (suspendAfterCancel in listOf(false, true)) {
+                val cancelledSourceFinished = CompletableDeferred<Unit>()
+                val releaseSibling = CompletableDeferred<Unit>()
+                val failures = mutableListOf<Throwable>()
+                val emissions = mutableListOf<List<TerminalCompletionCandidate>>()
+                val engine =
+                    TerminalCompletionEngines.fromSources(
+                        sources =
+                            listOf(
+                                entry({ _, _, _ ->
+                                    try {
+                                        currentCoroutineContext().cancel(CancellationException("source cancelled itself"))
+                                        if (suspendAfterCancel) yield()
+                                        listOf(candidate("cancelled-result"))
+                                    } finally {
+                                        cancelledSourceFinished.complete(Unit)
+                                    }
+                                }, 0),
+                                entry({ _, _, _ ->
+                                    releaseSibling.await()
+                                    listOf(candidate("available"))
+                                }, 0),
+                            ),
+                        commandSpecs = emptyList(),
+                        sourceFailureHandler = TerminalCompletionSourceFailureHandler { _, _, failure -> failures += failure },
+                    )
+                val collection = launch { engine.completions(request()).toList(emissions) }
+                try {
+                    runCurrent()
+                    assertTrue(cancelledSourceFinished.isCompleted)
+                    assertFalse(collection.isCompleted)
+                    releaseSibling.complete(Unit)
+                    runCurrent()
+
+                    assertTrue(collection.isCompleted, "suspendAfterCancel=$suspendAfterCancel")
+                    assertEquals(listOf("available"), emissions.last().map { it.replacementText })
+                    assertTrue(emissions.flatten().none { it.replacementText == "cancelled-result" })
+                    assertTrue(failures.isEmpty(), "source cancellation is not an operational failure")
+                } finally {
+                    collection.cancelAndJoin()
+                }
+            }
+        }
+
+    @Test
     fun `malformed candidate ranges are filtered before ranking and publication`() =
         runBlocking {
             val commandLine = "echo \uD83D\uDE02"

@@ -465,13 +465,15 @@ position without gaining access to ranking state.
 
 Source collection uses one cold structured `channelFlow`. The engine parses
 once, resolves one context, evaluates its internal spec source directly, launches
-one child per host source under a supervisor, and serially incorporates
+one child per host source in a regular coroutine scope, and serially incorporates
 completed-source events in the parent. Each changed
 global ranking is emitted immediately, so a slow Git or index source cannot
 block a fast spec, learned, or direct-path result. Individual sources remain
-ordinary suspending functions and never own scopes or child jobs. A non-cancellation source failure is reported through
-`TerminalCompletionSourceFailureHandler` and contributes an empty result; request cancellation reaches every child,
-and source declaration order remains the deterministic final-fusion tie-breaker.
+ordinary suspending functions and never own scopes or child jobs. Non-cancellation source failures are reported through
+`TerminalCompletionSourceFailureHandler`: ordinary exceptions contribute an empty result, while unexpected errors
+fail collection and cancel siblings. Independent source cancellation contributes an empty result even if the child
+has cancelled its own job; the channel reserves one result slot per source so accounting never needs to suspend.
+Request cancellation reaches every child. Source declaration order remains the deterministic final-fusion tie-breaker.
 Host adapters therefore propagate operational failures, including abnormal filesystem access, through their source.
 Only normal absence or unsupported host context becomes an empty provider result; adapters do not duplicate diagnostic
 callbacks or silently convert failures into "no matches."

@@ -286,7 +286,7 @@ closures remain historical evidence for their tested paths.
 - **M01 — `DONE(core)`**: Kitty pops have bounded work and reset flags on stack exhaustion. Regressions pass.
 - **M02 — `DONE(session)`**: unexpected writer cancellation closes the session, retaining the cause without retrying output. Regressions pass.
 - **M03 — `DONE(transport)`**: PTY byte-listener exceptions report the original failure and dispose the process and streams once. Regressions pass.
-- **M04 — `TODO(completion)`**: a terminated source must complete result accounting or terminate collection. Unexpected provider errors currently strand the supervised collector; the deterministic regression permits isolation or propagation while preserving failure visibility.
+- **M04 — `DONE(completion)`**: unexpected source errors are reported and terminate collection with sibling cancellation; independently cancelled sources complete accounting. Regressions pass.
 - **M05 — `TODO(ui)`**: completion resource replacement and close must detach observation despite throwing/cancelling popup callbacks. Four regressions expose retained focus observation and obsolete feedback.
 - **M06 — `TODO(ui)`**: a reentrant hide or disposal must supersede an unfinished suggestion show. Two regressions expose visibility restored by the obsolete outer transition.
 - **M07 — `TODO(host/profile)`**: optional foreground-title callbacks must not cancel essential workspace shell and session-close observation. A regression checks directory state/delivery and remote-close notification together, independently of whether the injected failure is reported or handled.
