@@ -27,6 +27,32 @@ public fun interface TerminalShellIntegrationFactory {
 
     public companion object {
         /**
+         * Selects a host-owned versioned projection that supports atomic conditional
+         * edit admission. Publish through [commandLine] so model updates and the
+         * final revision check share its guard. [state] and [promptReady] retain
+         * the same ownership as in the StateFlow overload.
+         */
+        @JvmStatic
+        @JvmOverloads
+        public fun host(
+            state: TerminalShellIntegrationView,
+            commandLine: TerminalShellCommandLineState,
+            promptReady: StateFlow<Boolean> = MutableStateFlow(false).asStateFlow(),
+        ): TerminalShellIntegrationFactory =
+            TerminalShellIntegrationFactory {
+                object : TerminalShellIntegration {
+                    override val state = state
+                    override val promptReady = promptReady
+                    override val commandLineChanges = commandLine.changes
+
+                    override fun activeCommandLine(): TerminalShellCommandLineSnapshot? = commandLine.value
+
+                    override fun <T> withCommandLine(action: (Long, TerminalShellCommandLineSnapshot?) -> T): T =
+                        commandLine.withCommandLine(action)
+                }
+            }
+
+        /**
          * Selects a host-owned shell model without installing any protocol recorder.
          *
          * The host publishes semantic prompt/command/directory updates to [state],
@@ -44,6 +70,8 @@ public fun interface TerminalShellIntegrationFactory {
          *
          * Closing a session stops its observation without clearing [state] or
          * cancelling the host's flows. Use a distinct projection per session.
+         * This StateFlow-only overload supports observation, not atomic conditional
+         * edits; use [TerminalShellCommandLineState] for that capability.
          */
         @JvmStatic
         @JvmOverloads

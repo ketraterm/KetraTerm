@@ -57,7 +57,8 @@ import kotlin.time.TimeSource
  * text replacement retain their source and admission-time modes/policy for
  * background encoding, bounded to 16 operations and 16 * 1024 * 1024 combined
  * UTF-16/deletion units, including active work. One writer preserves order.
- * Returning from input methods means acceptance, not transport completion. Queue
+ * [submitInput] and [submitBytes] report admission, not transport completion; the
+ * encoder interface methods discard that result. Queue
  * exhaustion or outbound worker failure closes the session with [failure]; closing a
  * session discards pending output. Custom encoders bind to session-owned mode
  * sources and output sinks through [TerminalInputEncoderFactory].
@@ -212,6 +213,9 @@ public class TerminalSession private constructor(
                 CoroutineName("terminal-session-${SESSION_COUNTER.getAndIncrement()}"),
         )
     private val outboundWriter = OutboundWriter(connector, outboundWriteLock)
+    private val editContextOwner = Any()
+    private var inputRevision = 0L // Protected by outboundWriteLock.
+    private var outputRevision = 0L // Protected by mutationLock; includes resize.
     private val inputEncoder =
         createInputEncoder(
             object : TerminalInputState {
@@ -452,6 +456,65 @@ public class TerminalSession private constructor(
     }
 
     /**
+     * Captures a conditional-edit context from the selected authoritative shell
+     * producer. Returns null before start, during shutdown, while the writer has
+     * pending/active work, when editing is unavailable, or for a producer without
+     * atomic revision support (including the legacy StateFlow-only host factory).
+     *
+     * Capture at request time, before asynchronous suggestion work. The host must
+     * publish unavailable editing state while its own pending input makes the
+     * model untrustworthy; queue idleness is not acknowledgement by a remote shell.
+     */
+    public fun captureCommandEdit(): TerminalCommandEditContext? =
+        synchronized(mutationLock) {
+            runtime.shellIntegration?.withCommandLine { revision, snapshot ->
+                synchronized(outboundWriteLock) {
+                    if (!isAcceptingInput() || snapshot == null || !outboundWriter.isIdle()) {
+                        null
+                    } else {
+                        TerminalCommandEditContext(snapshot, editContextOwner, inputRevision, outputRevision, revision)
+                    }
+                }
+            }
+        }
+
+    /**
+     * Atomically validates [expected] and admits the complete semantic [events].
+     * Checks session identity, cancellation, producer revision/snapshot and all
+     * intervening input/output/resize under mutation, producer and admission
+     * serialization. Rejection sends no prefix and does not consume capacity.
+     * Success uses the same bounds, mode/policy capture and writer as [submitInput].
+     *
+     * The caller owns editor semantics: translate valid caret/deletion spans to
+     * events before calling. This method does not infer shell editing units from
+     * UTF-16 offsets. Cancel obsolete requests through [TerminalCommandEditContext.cancel].
+     * Cancellation/shutdown overlapping admission may win or lose; acceptance is
+     * not transport completion or a remote execution acknowledgement.
+     */
+    public fun submitInput(
+        expected: TerminalCommandEditContext,
+        events: List<TerminalInputEvent>,
+    ): TerminalInputAdmission =
+        finishAdmission {
+            synchronized(mutationLock) {
+                runtime.shellIntegration?.withCommandLine { revision, snapshot ->
+                    synchronized(outboundWriteLock) {
+                        inputRejection() ?: when {
+                            expected.isCancelled -> TerminalInputAdmission.CANCELLED
+                            expected.owner !== editContextOwner || expected.inputRevision != inputRevision ||
+                                expected.outputRevision != outputRevision || expected.shellRevision != revision ||
+                                expected.commandLine != snapshot -> TerminalInputAdmission.STALE_CONTEXT
+                            else -> {
+                                enqueueCompoundInput(events)
+                                TerminalInputAdmission.ACCEPTED
+                            }
+                        }
+                    }
+                } ?: synchronized(outboundWriteLock) { inputRejection() ?: TerminalInputAdmission.UNSUPPORTED_CONTEXT }
+            }
+        }
+
+    /**
      * Starts the connector after resizing core and transport to [columns] x
      * [rows]. This synchronous call permits one attempt. Concurrent or reentrant
      * attempts throw [IllegalStateException], as does starting a closed session.
@@ -552,6 +615,7 @@ public class TerminalSession private constructor(
         val result =
             synchronized(mutationLock) {
                 check(!isSessionClosed()) { "session is closed" }
+                outputRevision++
                 val (scrollbackOffset, historySize) = terminal.resize(columns, rows, oldScrollbackOffset)
                 var resizedViewport: TerminalViewportResizeResult? = null
                 renderReader.readRenderFrame { frame ->
@@ -662,96 +726,193 @@ public class TerminalSession private constructor(
         }
     }
 
-    /**
-     * Accepts a complete input operation for ordered background writing unless closed.
-     *
-     * Input before [start] is ignored.
-     */
-    private inline fun withInputLock(crossinline block: TerminalInputEncoder.() -> Unit) {
-        try {
-            outboundWriter.submit {
-                if (isAcceptingInput()) inputEncoder.block()
+    private fun inputRejection(): TerminalInputAdmission? =
+        when {
+            isSessionClosed() -> TerminalInputAdmission.CLOSED
+            state.value !== TerminalSessionState.Running -> TerminalInputAdmission.NOT_RUNNING
+            else -> null
+        }
+
+    private inline fun admitInput(block: () -> Unit): TerminalInputAdmission =
+        finishAdmission {
+            synchronized(outboundWriteLock) {
+                inputRejection() ?: run {
+                    block()
+                    TerminalInputAdmission.ACCEPTED
+                }
             }
+        }
+
+    private inline fun finishAdmission(block: () -> TerminalInputAdmission): TerminalInputAdmission {
+        try {
+            val result = block()
+            if (result == TerminalInputAdmission.ACCEPTED) outboundWriter.signalPending()
+            return result
         } catch (failure: OutboundCapacityException) {
             failWrite(failure)
-        }
-    }
-
-    override fun encodeKey(event: TerminalKeyEvent) {
-        withInputLock {
-            if (event.type != TerminalKeyEventType.RELEASE) startupSubmission?.cancel(TerminalStartupCommandStatus.CANCELLED_BY_INPUT)
-            encodeKey(event)
+            return TerminalInputAdmission.CAPACITY_EXCEEDED
         }
     }
 
     /**
-     * Accepts a paste for background encoding and writing unless closed.
-     * Captures modes and policy at admission; retains the immutable source text
-     * within the session bulk budget. Custom encoders use the same writer path.
+     * Copies exactly [length] bytes starting at [offset] into the ordered writer.
+     * The caller must keep the range stable until return and may then reuse it.
+     * Bytes are neither decoded nor sanitized, encoded, or framed as paste.
+     * Use [submitInput] for keyboard, mouse, IME, or paste semantics.
      *
-     * Input before [start] is ignored.
+     * Concurrent producers are serialized at admission with keys, bulk input,
+     * startup commands and parser replies. Empty ranges succeed only while
+     * running and do not cancel startup. The byte queue is bounded to 8 MiB;
+     * exceeding its remaining capacity fails the session without admitting any
+     * of this range. Admission is not write completion: close discards pending
+     * work and may interrupt an active write. Resize is synchronous and has no
+     * position in this byte queue; it is not a flush or write barrier.
+     *
+     * @throws IllegalArgumentException for invalid slices, even before start or
+     * after close. Validation is overflow-safe and does not change the session.
      */
-    override fun encodePaste(event: TerminalPasteEvent) {
-        withTextInput(event.text.length.toLong(), cancelStartup = event.text.isNotEmpty()) {
-            encodePaste(event)
+    @JvmOverloads
+    public fun submitBytes(
+        bytes: ByteArray,
+        offset: Int = 0,
+        length: Int = bytes.size - offset,
+    ): TerminalInputAdmission {
+        bytes.checkBounds(offset, length)
+        return admitInput {
+            outboundWriter.submit(signal = false) { outboundWriter.append(bytes, offset, length) }
+            if (length != 0) {
+                inputRevision++
+                startupSubmission?.cancel(TerminalStartupCommandStatus.CANCELLED_BY_INPUT)
+            }
         }
     }
 
     /**
-     * Accepts a complete text replacement with admission-time modes and policy.
-     * The standard encoder streams it on the I/O worker within the bulk budget.
+     * Admits one immutable semantic event with explicit lifecycle/capacity feedback.
+     * Keys, focus and mouse encode synchronously into the byte queue. Paste and
+     * replacement retain source text and admission-time modes/policy for the
+     * background encoder within the shared bulk budget (16 operations and
+     * 16,777,216 UTF-16/deletion units, including active work).
      *
-     * Delete, Backspace, and paste bytes cannot interleave with keyboard input
-     * or parser/core responses from this session.
-     *
-     * @param event deletion counts and replacement text.
+     * Mode/policy suppression and empty input still return ACCEPTED while running;
+     * that result promises admission, not emitted bytes or transport completion.
+     * Encoder argument failures propagate with staged bytes rolled back. Background
+     * encoding/transport failures close the session through [state] and [failure].
+     * Existing [TerminalInputEncoder] methods use this path and discard the result.
+     * Mouse coordinates and replacement counts retain their event conventions.
      */
-    override fun encodeTextReplacement(event: TerminalTextReplacementEvent) {
-        val workUnits = event.replacementText.length.toLong() + event.deleteAfterCursorCount + event.deleteBeforeCursorCount
-        withTextInput(workUnits, cancelStartup = true) {
-            encodeTextReplacement(event)
+    public fun submitInput(event: TerminalInputEvent): TerminalInputAdmission =
+        when (event) {
+            is TerminalPasteEvent, is TerminalTextReplacementEvent ->
+                admitInput {
+                    val workUnits = event.workUnits()
+                    enqueueTextInput(workUnits, event.cancelsStartup()) { encodeEvent(event) }
+                    if (workUnits != 0L) inputRevision++
+                }
+            else ->
+                admitInput {
+                    outboundWriter.submit(signal = false) { inputEncoder.encodeEvent(event) }
+                    inputRevision++
+                    if (event.cancelsStartup()) startupSubmission?.cancel(TerminalStartupCommandStatus.CANCELLED_BY_INPUT)
+                }
+        }
+
+    /**
+     * Admits [events] as one indivisible outbound operation, copying the list before
+     * return. Keep the list stable during the call; event values are immutable.
+     * All events use one admission-time mode/policy snapshot on the background
+     * encoder. Later keys, bytes and replies cannot interleave even when this
+     * operation spans native writes. Closure/failure may still interrupt its prefix.
+     *
+     * At most 256 events fit in one compound operation. It shares the bulk budget
+     * with paste/replacement, counting each event's retained text and deletion
+     * work with a minimum of one unit. Over-budget batches fail closed before any event is
+     * admitted. An empty batch is an accepted no-op only while running.
+     *
+     * This overload guarantees byte ordering only. Use a captured command-edit
+     * context with the conditional overload to validate a shell revision.
+     * Observe [state] to cancel response-dependent work on termination.
+     */
+    public fun submitInput(events: List<TerminalInputEvent>): TerminalInputAdmission = admitInput { enqueueCompoundInput(events) }
+
+    private fun enqueueCompoundInput(events: List<TerminalInputEvent>) {
+        if (events.size > MAX_COMPOUND_INPUT_EVENTS) throw OutboundCapacityException("Terminal input exceeds 256 events")
+        if (events.isNotEmpty()) {
+            val owned = events.toTypedArray()
+            var workUnits = 0L
+            var cancelStartup = false
+            for (event in owned) {
+                workUnits += maxOf(1L, event.workUnits())
+                cancelStartup = cancelStartup || event.cancelsStartup()
+            }
+            enqueueTextInput(workUnits, cancelStartup) {
+                for (event in owned) encodeEvent(event)
+            }
+            inputRevision++
         }
     }
 
-    private inline fun withTextInput(
+    private fun TerminalInputEvent.workUnits(): Long =
+        when (this) {
+            is TerminalKeyEvent -> associatedText?.length?.toLong() ?: 0L
+            is TerminalPasteEvent -> text.length.toLong()
+            is TerminalTextReplacementEvent -> replacementText.length.toLong() + deleteAfterCursorCount + deleteBeforeCursorCount
+            is TerminalFocusEvent, is TerminalMouseEvent -> 0L
+        }
+
+    private fun TerminalInputEvent.cancelsStartup(): Boolean =
+        when (this) {
+            is TerminalKeyEvent -> type != TerminalKeyEventType.RELEASE
+            is TerminalPasteEvent -> text.isNotEmpty()
+            is TerminalTextReplacementEvent -> true
+            is TerminalFocusEvent, is TerminalMouseEvent -> false
+        }
+
+    private fun TerminalInputEncoder.encodeEvent(event: TerminalInputEvent) {
+        when (event) {
+            is TerminalKeyEvent -> encodeKey(event)
+            is TerminalPasteEvent -> encodePaste(event)
+            is TerminalTextReplacementEvent -> encodeTextReplacement(event)
+            is TerminalFocusEvent -> encodeFocus(event)
+            is TerminalMouseEvent -> encodeMouse(event)
+        }
+    }
+
+    private inline fun enqueueTextInput(
         workUnits: Long,
         cancelStartup: Boolean,
         crossinline encode: TerminalInputEncoder.() -> Unit,
     ) {
-        try {
-            synchronized(outboundWriteLock) {
-                if (!isAcceptingInput()) return
-                if (cancelStartup) startupSubmission?.cancel(TerminalStartupCommandStatus.CANCELLED_BY_INPUT)
-                if (workUnits == 0L) return
-                val modeBits = terminal.getInputModeBits()
-                val policy = inputPolicy
-                outboundWriter.submitBulk(workUnits) {
-                    bulkInputModeBits = modeBits
-                    bulkInputEncoder.setInputPolicy(policy)
-                    bulkInputEncoder.encode()
-                }
+        if (workUnits != 0L) {
+            val modeBits = terminal.getInputModeBits()
+            val policy = inputPolicy
+            outboundWriter.submitBulk(workUnits, signal = false) {
+                bulkInputModeBits = modeBits
+                bulkInputEncoder.setInputPolicy(policy)
+                bulkInputEncoder.encode()
             }
-        } catch (failure: OutboundCapacityException) {
-            failWrite(failure)
         }
+        if (cancelStartup) startupSubmission?.cancel(TerminalStartupCommandStatus.CANCELLED_BY_INPUT)
     }
 
-    /**
-     * Encodes a focus event and queues it for background writing unless closed.
-     *
-     * Input before [start] is ignored.
-     */
+    override fun encodeKey(event: TerminalKeyEvent) {
+        submitInput(event)
+    }
+
+    override fun encodePaste(event: TerminalPasteEvent) {
+        submitInput(event)
+    }
+
+    override fun encodeTextReplacement(event: TerminalTextReplacementEvent) {
+        submitInput(event)
+    }
+
     override fun encodeFocus(event: TerminalFocusEvent) {
-        withInputLock { encodeFocus(event) }
+        submitInput(event)
     }
 
-    /**
-     * Encodes a mouse event and queues it for background writing unless closed.
-     *
-     * Input before [start] is ignored.
-     */
     override fun encodeMouse(event: TerminalMouseEvent) {
-        withInputLock { encodeMouse(event) }
+        submitInput(event)
     }
 
     /**
@@ -768,6 +929,7 @@ public class TerminalSession private constructor(
         try {
             synchronized(mutationLock) {
                 if (isSessionClosed()) return
+                if (length != 0) outputRevision++
                 processingOutput = true
                 try {
                     parser.accept(bytes, offset, length)
@@ -794,6 +956,7 @@ public class TerminalSession private constructor(
                         renderReader.readRenderFrame { frame ->
                             if (frame.activeBuffer == TerminalRenderBufferKind.PRIMARY) {
                                 submission.submit(inputEncoder)
+                                if (submission.status.value == TerminalStartupCommandStatus.SUBMITTED) inputRevision++
                             }
                         }
                     }
@@ -1107,6 +1270,7 @@ public class TerminalSession private constructor(
         private val SESSION_COUNTER =
             AtomicInteger(1)
         private const val RESPONSE_BUFFER_SIZE: Int = 1024
+        private const val MAX_COMPOUND_INPUT_EVENTS: Int = 256
         private const val NO_RENDER_GENERATION: Long = -1L
         private const val NO_SHELL_COMMAND_LINE_REVISION: Long = -1L
         internal const val RENDER_PUBLICATION_INTERVAL_MS: Long = 16L

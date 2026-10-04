@@ -23,8 +23,9 @@ import kotlinx.coroutines.flow.StateFlow
  * Selected producer of a terminal's shell metadata and active editing context.
  *
  * A session owns observation, not the producer's lifetime. Implementations must
- * not start background jobs during construction. [commandLineChanges] is cold;
- * the session shares its collection and cancels it when no consumer needs it.
+ * not start background jobs during construction. [commandLineChanges] supports
+ * independent subscriptions; the session shares its collection and cancels it
+ * when no consumer needs it.
  * [state] is the bounded terminal-facing projection of the producer's model.
  * Only that producer may write it; OSC reports never supplement a host model.
  *
@@ -44,6 +45,20 @@ public interface TerminalShellIntegration {
 
     /** Current immutable editing context, or null when unavailable; must be safe from any thread. */
     public fun activeCommandLine(): TerminalShellCommandLineSnapshot?
+
+    /**
+     * Runs a short conditional-edit action under the producer's revision guard.
+     * The revision must change for every authoritative editing update, including
+     * changes away from and back to an equal snapshot. The callback must finish
+     * before another producer update can become visible.
+     *
+     * Session calls this with terminal mutation serialized, before acquiring its
+     * input admission monitor. Implementations must not acquire terminal state
+     * while holding an independent producer guard. Do not invoke external listeners
+     * under that guard. Return null without invoking [action] when this atomic
+     * capability is unsupported; ordinary [activeCommandLine] reads still work.
+     */
+    public fun <T> withCommandLine(action: (revision: Long, snapshot: TerminalShellCommandLineSnapshot?) -> T): T? = null
 
     /** Optional OSC 133 interpretation, called at the marker's exact output position. */
     public fun observeShellMarker(event: ShellIntegrationEvent): Unit = Unit

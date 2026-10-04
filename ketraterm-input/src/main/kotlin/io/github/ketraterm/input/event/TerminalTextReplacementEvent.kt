@@ -33,7 +33,7 @@ public data class TerminalTextReplacementEvent(
     val deleteAfterCursorCount: Int,
     val deleteBeforeCursorCount: Int,
     val replacementText: String,
-) {
+) : TerminalInputEvent {
     init {
         require(deleteAfterCursorCount >= 0) {
             "deleteAfterCursorCount must be >= 0, was $deleteAfterCursorCount"

@@ -37,7 +37,7 @@ public data class TerminalMouseEvent(
     val modifiers: Int = TerminalModifiers.NONE,
     val pixelX: Int = -1,
     val pixelY: Int = -1,
-) {
+) : TerminalInputEvent {
     init {
         require(column >= 0) { "column must be non-negative: $column" }
         require(row >= 0) { "row must be non-negative: $row" }

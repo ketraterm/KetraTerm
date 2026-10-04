@@ -23,4 +23,4 @@ package io.github.ketraterm.input.event
  */
 public data class TerminalFocusEvent(
     val focused: Boolean,
-)
+) : TerminalInputEvent

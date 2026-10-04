@@ -16,10 +16,8 @@
 package io.github.ketraterm.input.event
 
 /**
- * Paste event accepted by the terminal input encoder.
- *
- * @property text pasted text before any future host paste policy is applied.
+ * Immutable normalized input accepted by an encoder. Sessions can admit a
+ * bounded list of these events as one ordered operation. Byte encoding and
+ * mode-dependent suppression remain the responsibility of the input encoder.
  */
-public data class TerminalPasteEvent(
-    val text: String,
-) : TerminalInputEvent
+public sealed interface TerminalInputEvent

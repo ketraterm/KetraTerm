@@ -36,6 +36,28 @@ import java.nio.charset.StandardCharsets
 @OptIn(ExperimentalCoroutinesApi::class)
 class OscShellIntegrationTest {
     @Test
+    fun `OSC command context supports conditional admission and rejects later output`() {
+        val connector = MockConnector()
+        createStartedSession(connector, columns = 30, rows = 4).use { session ->
+            connector.feedFromHost("\u001b]133;A\u0007$ \u001b]133;B\u0007git s".ascii())
+            val expected = checkNotNull(session.captureCommandEdit())
+            assertEquals("git s", expected.commandLine.commandText)
+            val edit =
+                listOf(
+                    io.github.ketraterm.input.event
+                        .TerminalTextReplacementEvent(0, 1, "status"),
+                )
+            assertEquals(io.github.ketraterm.session.TerminalInputAdmission.ACCEPTED, session.submitInput(expected, edit))
+            assertEquals("\u007fstatus", connector.writtenBytes.toString(Charsets.UTF_8))
+            connector.feedFromHost("\u007fstatus".ascii())
+            val next = checkNotNull(session.captureCommandEdit())
+            connector.feedFromHost("\u001b[?2004h".ascii())
+            assertEquals(io.github.ketraterm.session.TerminalInputAdmission.STALE_CONTEXT, session.submitInput(next, edit))
+            assertEquals("\u007fstatus", connector.writtenBytes.toString(Charsets.UTF_8))
+        }
+    }
+
+    @Test
     fun `OSC 133 markers populate shared shell integration state`() {
         val connector = MockConnector()
         val session = createStartedSession(connector, columns = 10, rows = 4)

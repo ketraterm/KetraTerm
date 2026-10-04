@@ -221,14 +221,15 @@ internal class SwingShellSuggestionController(
         val index = selectedIndex
         val acceptedRequest = request
         hide()
-        host.invalidateSuggestions()
-        host.suggestionHandler.onSuggestionAccepted(
-            SwingShellSuggestionAcceptance(
-                suggestion = suggestion,
-                index = index,
-                request = acceptedRequest,
-            ),
-        )
+        val admitted =
+            host.acceptSuggestion(
+                SwingShellSuggestionAcceptance(
+                    suggestion = suggestion,
+                    index = index,
+                    request = acceptedRequest,
+                ),
+            )
+        if (!admitted) return true
         host.suggestionFeedbackHandler.onSuggestionFeedback(
             SwingShellSuggestionFeedback(
                 kind = SwingShellSuggestionFeedbackKind.ACCEPTED,
@@ -337,4 +338,11 @@ internal interface SwingShellSuggestionHost {
     fun invalidateSuggestions()
 
     fun isSuggestionContextCurrent(): Boolean
+
+    /** Returns false when the built-in session handler rejects final admission. */
+    fun acceptSuggestion(acceptance: SwingShellSuggestionAcceptance): Boolean {
+        invalidateSuggestions()
+        suggestionHandler.onSuggestionAccepted(acceptance)
+        return true
+    }
 }

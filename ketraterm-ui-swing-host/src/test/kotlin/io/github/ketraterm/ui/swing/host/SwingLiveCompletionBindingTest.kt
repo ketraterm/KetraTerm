@@ -18,6 +18,7 @@ package io.github.ketraterm.ui.swing.host
 import io.github.ketraterm.core.TerminalBuffers
 import io.github.ketraterm.session.*
 import io.github.ketraterm.testkit.MockConnector
+import io.github.ketraterm.transport.TerminalConnector
 import io.github.ketraterm.ui.swing.api.SwingTerminal
 import io.github.ketraterm.ui.swing.settings.SwingSettings
 import io.github.ketraterm.ui.swing.suggestion.*
@@ -76,9 +77,20 @@ class SwingLiveCompletionBindingTest {
 
     @Test
     fun `remote session failure cancels an outstanding host popup request without another shell edit`() =
+        assertFailureCancelsPopup(writeFailure = false)
+
+    @Test
+    fun `writer failure cancels an outstanding host popup request without another shell edit`() =
+        assertFailureCancelsPopup(writeFailure = true)
+
+    private fun assertFailureCancelsPopup(writeFailure: Boolean) =
         runTest {
             val dispatcher = StandardTestDispatcher(testScheduler)
-            val fixture = withContext(Dispatchers.Swing) { NativePopupFixture(backgroundScope, dispatcher) }
+            val failure = IllegalStateException("connector failure")
+            val fixture =
+                withContext(Dispatchers.Swing) {
+                    NativePopupFixture(backgroundScope, dispatcher, if (writeFailure) failure else null)
+                }
             try {
                 settleSwingBinding()
                 assertEquals(1, fixture.source.subscriptionCount.value)
@@ -87,14 +99,17 @@ class SwingLiveCompletionBindingTest {
                 settleSwingBinding()
                 withContext(Dispatchers.Swing) { fixture.binding.cancelAndHide() }
                 settleSwingBinding()
-                val failure = IllegalStateException("remote connector failure")
                 val requestJob =
                     withContext(Dispatchers.Swing) {
                         fixture.binding.refreshNow()
                         val request = assertNotNull(fixture.popup.requestJob)
                         assertTrue(fixture.popup.visible)
                         assertTrue(request.isActive)
-                        fixture.connector.simulateCrash(failure)
+                        if (writeFailure) {
+                            assertEquals(TerminalInputAdmission.ACCEPTED, fixture.session.submitBytes("\u001b[24~e".toByteArray()))
+                        } else {
+                            fixture.connector.simulateCrash(failure)
+                        }
                         request
                     }
                 settleSwingBinding()
@@ -922,13 +937,23 @@ class SwingLiveCompletionBindingTest {
     private class NativePopupFixture(
         scope: CoroutineScope,
         dispatcher: CoroutineDispatcher,
+        writeFailure: Exception? = null,
     ) : AutoCloseable {
         val source = MutableStateFlow<TerminalShellCommandLineSnapshot?>(null)
         val connector = MockConnector()
         val session =
             TerminalSession.create(
                 TerminalBuffers.create(30, 4),
-                connector,
+                object : TerminalConnector by connector {
+                    override fun write(
+                        bytes: ByteArray,
+                        offset: Int,
+                        length: Int,
+                    ) {
+                        if (writeFailure != null) throw writeFailure
+                        connector.write(bytes, offset, length)
+                    }
+                },
                 workerDispatcher = dispatcher,
                 ioDispatcher = dispatcher,
                 shellIntegration = TerminalShellIntegrationFactory.host(TerminalShellIntegrationState(), source),

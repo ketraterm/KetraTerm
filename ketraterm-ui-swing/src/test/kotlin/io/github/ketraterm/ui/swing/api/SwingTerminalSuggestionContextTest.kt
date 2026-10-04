@@ -16,10 +16,7 @@
 package io.github.ketraterm.ui.swing.api
 
 import io.github.ketraterm.core.TerminalBuffers
-import io.github.ketraterm.session.TerminalSession
-import io.github.ketraterm.session.TerminalShellCommandLineSnapshot
-import io.github.ketraterm.session.TerminalShellIntegrationFactory
-import io.github.ketraterm.session.TerminalShellIntegrationState
+import io.github.ketraterm.session.*
 import io.github.ketraterm.transport.TerminalConnector
 import io.github.ketraterm.transport.TerminalConnectorListener
 import io.github.ketraterm.ui.swing.settings.SwingSettings
@@ -27,6 +24,8 @@ import io.github.ketraterm.ui.swing.suggestion.*
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.test.StandardTestDispatcher
+import kotlinx.coroutines.test.runCurrent
+import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.params.ParameterizedTest
 import org.junit.jupiter.params.provider.EnumSource
@@ -45,6 +44,104 @@ import kotlin.time.Duration.Companion.milliseconds
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class SwingTerminalSuggestionContextTest {
+    @ParameterizedTest
+    @ValueSource(strings = ["fresh", "metadata", "aba", "close", "span"])
+    fun `session handler reports acceptance only for a valid admitted edit`(change: String) =
+        runTest {
+            val output = java.io.ByteArrayOutputStream()
+            val connector =
+                object : TerminalConnector by NoOpConnector {
+                    override fun write(
+                        bytes: ByteArray,
+                        offset: Int,
+                        length: Int,
+                    ) {
+                        output.write(bytes, offset, length)
+                    }
+                }
+            val provider =
+                SwingShellSuggestionProvider { request ->
+                    flowOf(
+                        listOf(
+                            if (change == "span") {
+                                suggestion(request).copy(replacementStartOffset = 1)
+                            } else {
+                                suggestion(request)
+                            },
+                        ),
+                    )
+                }
+            Fixture(
+                sessionHandler = true,
+                connector = connector,
+                provider = provider,
+                ioDispatcher = StandardTestDispatcher(testScheduler),
+            ).use { fixture ->
+                fixture.session.start(30, 4)
+                if (change == "span") fixture.editableSource.value = TerminalShellCommandLineSnapshot("e\u0301", 2, 2, 0)
+                onEdt { fixture.terminal.requestActiveShellSuggestions() }
+                fixture.view.awaitVisible()
+                onEdt {
+                    fixture.terminal.addShellSuggestionInvalidationListener {
+                        when (change) {
+                            "metadata" -> fixture.editableSource.value = snapshot().copy(cursorOffset = 1)
+                            "aba" -> {
+                                fixture.editableSource.value = null
+                                fixture.editableSource.value = snapshot()
+                            }
+                            "close" -> fixture.session.close()
+                        }
+                    }
+                    fixture.view.listener.onSuggestionClicked(0)
+                }
+                runCurrent()
+                assertEquals(if (change == "fresh") "\u007f\u007f\u007f\u007f\u007freplacement" else "", output.toString(Charsets.UTF_8))
+                assertEquals(if (change == "fresh") 1 else 0, fixture.feedback.size)
+            }
+        }
+
+    @Test
+    fun `default session handler rejects legacy observation only sources`() {
+        Fixture(sessionHandler = true, versionedModel = false).use { fixture ->
+            fixture.session.start(30, 4)
+            onEdt {
+                fixture.terminal.requestActiveShellSuggestions()
+                assertFalse(fixture.terminal.currentShellSuggestionState().visible)
+                assertTrue(fixture.requests.isEmpty())
+            }
+        }
+    }
+
+    @Test
+    fun `default acceptance rejects input admitted by the final invalidation callback`() =
+        runTest {
+            val output = java.io.ByteArrayOutputStream()
+            val connector =
+                object : TerminalConnector by NoOpConnector {
+                    override fun write(
+                        bytes: ByteArray,
+                        offset: Int,
+                        length: Int,
+                    ) {
+                        output.write(bytes, offset, length)
+                    }
+                }
+            Fixture(sessionHandler = true, connector = connector, ioDispatcher = StandardTestDispatcher(testScheduler)).use { fixture ->
+                fixture.session.start(30, 4)
+                onEdt { fixture.terminal.requestActiveShellSuggestions() }
+                fixture.view.awaitVisible()
+                onEdt {
+                    fixture.terminal.addShellSuggestionInvalidationListener {
+                        fixture.session.submitBytes("x".toByteArray())
+                    }
+                    fixture.view.listener.onSuggestionClicked(0)
+                }
+                runCurrent()
+                assertEquals("x", output.toString(Charsets.UTF_8))
+                assertTrue(fixture.feedback.isEmpty())
+            }
+        }
+
     @Test
     fun `failure diagnostics reject off EDT and disposed configuration`() {
         Fixture().use { fixture ->
@@ -687,14 +784,25 @@ class SwingTerminalSuggestionContextTest {
         provider: SwingShellSuggestionProvider = SwingShellSuggestionProvider { flowOf(listOf(suggestion(it))) },
         workerDispatcher: CoroutineDispatcher = Dispatchers.Default,
         uiDispatcher: TerminalUiDispatcher = TerminalUiDispatcher.SWING,
+        sessionHandler: Boolean = false,
+        versionedModel: Boolean = sessionHandler,
+        connector: TerminalConnector = NoOpConnector,
+        ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
     ) : AutoCloseable {
         val source = MutableStateFlow<TerminalShellCommandLineSnapshot?>(snapshot())
+        val editableSource = TerminalShellCommandLineState(snapshot())
         val session =
             TerminalSession.create(
                 terminal = TerminalBuffers.create(width = 30, height = 4),
-                connector = NoOpConnector,
-                shellIntegration = TerminalShellIntegrationFactory.host(TerminalShellIntegrationState(), source),
+                connector = connector,
+                shellIntegration =
+                    if (versionedModel) {
+                        TerminalShellIntegrationFactory.host(TerminalShellIntegrationState(), editableSource)
+                    } else {
+                        TerminalShellIntegrationFactory.host(TerminalShellIntegrationState(), source)
+                    },
                 workerDispatcher = workerDispatcher,
+                ioDispatcher = ioDispatcher,
             )
         val replacementSession =
             TerminalSession.create(
@@ -718,7 +826,12 @@ class SwingTerminalSuggestionContextTest {
                                     emitAll(provider.suggestions(request))
                                 }
                             }
-                            draft.shellSuggestionHandler = { accepted += it }
+                            draft.shellSuggestionHandler =
+                                if (sessionHandler) {
+                                    SwingShellSuggestionHandler.createDefault(session)
+                                } else {
+                                    SwingShellSuggestionHandler { accepted += it }
+                                }
                             draft.shellSuggestionFeedbackHandler = { feedback += it }
                             draft.shellSuggestionViewFactory = { listener -> view.apply { this.listener = listener } }
                         },

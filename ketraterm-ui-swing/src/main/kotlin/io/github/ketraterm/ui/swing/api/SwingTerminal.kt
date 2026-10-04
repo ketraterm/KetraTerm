@@ -24,10 +24,7 @@ import io.github.ketraterm.input.event.TerminalPasteEvent
 import io.github.ketraterm.protocol.MouseTrackingMode
 import io.github.ketraterm.render.api.TerminalRenderBufferKind
 import io.github.ketraterm.render.cache.TerminalRenderCache
-import io.github.ketraterm.session.TerminalSession
-import io.github.ketraterm.session.TerminalSessionState
-import io.github.ketraterm.session.TerminalShellCommandLineSnapshot
-import io.github.ketraterm.session.TerminalShellIntegrationCommandRecord
+import io.github.ketraterm.session.*
 import io.github.ketraterm.ui.swing.cleanupSwingResources
 import io.github.ketraterm.ui.swing.input.*
 import io.github.ketraterm.ui.swing.preserveSwingFailure
@@ -1516,6 +1513,9 @@ public class SwingTerminal
          * suggestions are delivered to [SwingHostServices.shellSuggestionHandler]
          * with the same [request] so host adapters can apply and learn from the
          * exact command-line replacement range that produced each suggestion.
+         * Host-managed collection requires a custom handler that retains its own
+         * session edit context; the default session handler cannot accept these
+         * suggestions without a context captured before provider work.
          *
          * This is an explicit display request, so it is independent of the
          * automatic-popup setting, but requires [SwingSettings.smartSuggestionsEnabled].
@@ -1544,6 +1544,7 @@ public class SwingTerminal
                     }
                     suggestionJob?.cancel(CancellationException("Explicit suggestions replaced provider request"))
                     suggestionJob = null
+                    activeSuggestionContext?.editContext?.cancel()
                     activeSuggestionContext = null
                     activeSuggestionIsAutomatic = false
                     getOrCreateShellSuggestionController().show(request, snapshot, selectedIndex)
@@ -1566,8 +1567,10 @@ public class SwingTerminal
          * Empty provider results hide the current popup.
          *
          * The host owns this supplied context and must replace the request or call
-         * [hideShellSuggestions] when it becomes stale. This method does not compare
-         * it with the bound session's shell model. Calls on the EDT take effect
+         * [hideShellSuggestions] when it becomes stale. The default session handler
+         * additionally requires a matching, revisioned session editing model and
+         * checks it atomically at admission. Custom handlers own their validation.
+         * Calls on the EDT take effect
          * immediately; calls from other threads dispatch asynchronously to the EDT.
          *
          * @param commandText visible command-line text known to the host.
@@ -1846,6 +1849,21 @@ public class SwingTerminal
                     }
 
                     override fun isSuggestionContextCurrent(): Boolean = activeSuggestionContext?.isCurrent(session) != false
+
+                    override fun acceptSuggestion(acceptance: SwingShellSuggestionAcceptance): Boolean {
+                        val handler = hostServices.shellSuggestionHandler
+                        val expected = activeSuggestionContext?.editContext
+                        // Acceptance keeps its context across invalidation callbacks; those
+                        // callbacks can admit competing input, which final admission rejects.
+                        activeSuggestionContext = null
+                        invalidateSuggestions()
+                        return if (handler is SessionShellSuggestionHandler) {
+                            !disposed && session === handler.session && handler.accept(acceptance, expected)
+                        } else {
+                            handler.onSuggestionAccepted(acceptance)
+                            true
+                        }
+                    }
                 },
                 hostServices.shellSuggestionViewFactory,
             ).also {
@@ -1862,15 +1880,31 @@ public class SwingTerminal
             if (!prepareShellSuggestionRequestOnEdt(automatic)) return
             cancelAndHideShellSuggestionsOnEdt("Shell suggestion request replaced")
             activeSuggestionIsAutomatic = automatic
-            activeSuggestionContext = context
+            val requestContext =
+                if (hostServices.shellSuggestionHandler is SessionShellSuggestionHandler) {
+                    val boundSession = session ?: return
+                    val edit = boundSession.captureCommandEdit() ?: return
+                    val snapshot = edit.commandLine
+                    if (snapshot.commandText != request.commandText ||
+                        snapshot.cursorOffset != request.cursorOffset ||
+                        snapshot.cursorColumn != request.anchorColumn ||
+                        snapshot.cursorRow != request.anchorRow
+                    ) {
+                        return
+                    }
+                    SessionSuggestionContext(boundSession, snapshot, edit)
+                } else {
+                    context
+                }
+            activeSuggestionContext = requestContext
             val requestJob =
                 componentScope.launch(start = CoroutineStart.LAZY) {
                     val contextObservation =
-                        context?.let {
+                        requestContext?.let {
                             launch {
                                 combine(it.session.activeShellCommandLineRevision, it.session.state) { _, _ -> }
                                     .collect {
-                                        if (!context.isCurrent(session)) {
+                                        if (!requestContext.isCurrent(session)) {
                                             cancelAndHideShellSuggestionsOnEdt("Active shell command changed")
                                         }
                                     }
@@ -1883,7 +1917,7 @@ public class SwingTerminal
                             .conflate()
                             .collect { suggestions ->
                                 this@launch.ensureActive()
-                                if (context != null && !context.isCurrent(session)) {
+                                if (requestContext != null && !requestContext.isCurrent(session)) {
                                     cancelAndHideShellSuggestionsOnEdt("Active shell command changed")
                                     return@collect
                                 }
@@ -1894,6 +1928,7 @@ public class SwingTerminal
                             }
                         if (shellSuggestionController?.state()?.visible != true) {
                             contextObservation?.cancel()
+                            activeSuggestionContext?.editContext?.cancel()
                             activeSuggestionContext = null
                         }
                     } catch (cancellation: CancellationException) {
@@ -1903,7 +1938,7 @@ public class SwingTerminal
                         throw cancellation
                     } catch (exception: Exception) {
                         this@launch.ensureActive()
-                        if (context != null && !context.isCurrent(session)) {
+                        if (requestContext != null && !requestContext.isCurrent(session)) {
                             cancelAndHideShellSuggestionsOnEdt("Active shell command changed")
                             return@launch
                         }
@@ -2236,6 +2271,7 @@ public class SwingTerminal
         private fun cancelAndHideShellSuggestionsOnEdt(reason: String) {
             suggestionJob?.cancel(CancellationException(reason))
             suggestionJob = null
+            activeSuggestionContext?.editContext?.cancel()
             activeSuggestionContext = null
             activeSuggestionIsAutomatic = false
             shellSuggestionController?.hide()
@@ -2415,6 +2451,7 @@ public class SwingTerminal
         private class SessionSuggestionContext(
             val session: TerminalSession,
             private val snapshot: TerminalShellCommandLineSnapshot,
+            val editContext: TerminalCommandEditContext? = null,
         ) {
             fun isCurrent(boundSession: TerminalSession?): Boolean =
                 boundSession === session &&

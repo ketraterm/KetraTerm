@@ -22,6 +22,9 @@ import io.github.ketraterm.parser.api.TerminalOutputParserFactory;
 import io.github.ketraterm.parser.api.TerminalParsers;
 import io.github.ketraterm.render.api.TerminalRenderFrameReader;
 import io.github.ketraterm.session.TerminalSession;
+import io.github.ketraterm.session.TerminalCommandEditContext;
+import io.github.ketraterm.session.TerminalInputAdmission;
+import io.github.ketraterm.input.event.TerminalPasteEvent;
 import io.github.ketraterm.transport.TerminalConnector;
 import io.github.ketraterm.host.TerminalClipboardReadRequest;
 import io.github.ketraterm.host.TerminalClipboardReadAuditEvent;
@@ -41,6 +44,12 @@ import java.util.concurrent.atomic.AtomicInteger;
 import javax.swing.SwingUtilities;
 
 public final class JavaConsumer {
+    public static void verifyConditionalAdmission(TerminalSession session, TerminalCommandEditContext expected) {
+        if (!expected.getCommandLine().getCommandText().equals("help") || expected.isCancelled()
+            || session.submitInput(expected, java.util.List.of()) != TerminalInputAdmission.ACCEPTED)
+            throw new AssertionError("Java conditional admission must validate the captured command");
+    }
+
     public static TerminalInputEncoderFactory inputEncoderFactory() {
         return TerminalInputEncoders::create;
     }
@@ -53,6 +62,13 @@ public final class JavaConsumer {
         var buffer = TerminalBuffers.create(80, 3);
         TerminalRenderFrameReader reader = buffer;
         try (var session = TerminalSession.create(buffer, reader, connector)) {
+            byte[] trigger = "\033[24~e".getBytes(StandardCharsets.US_ASCII);
+            if (session.submitBytes(trigger) != TerminalInputAdmission.NOT_RUNNING
+                || session.submitBytes(trigger, 1) != TerminalInputAdmission.NOT_RUNNING
+                || session.submitBytes(trigger, 0, trigger.length) != TerminalInputAdmission.NOT_RUNNING
+                || session.submitInput(new TerminalPasteEvent("x")) != TerminalInputAdmission.NOT_RUNNING
+                || session.submitInput(java.util.List.of(new TerminalPasteEvent("x"))) != TerminalInputAdmission.NOT_RUNNING)
+                throw new AssertionError("Java admission overloads must reject before startup");
             session.readRenderFrame(frame -> {
                 if (frame.getColumns() != 80 || frame.getRows() != 3) throw new AssertionError("Java render capability");
             });

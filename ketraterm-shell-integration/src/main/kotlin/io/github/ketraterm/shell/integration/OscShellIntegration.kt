@@ -236,6 +236,9 @@ private class OscShellIntegrationSession(
      */
     override fun activeCommandLine(): TerminalShellCommandLineSnapshot? = context.withTerminalState { activeCommandLineLocked() }
 
+    override fun <T> withCommandLine(action: (Long, TerminalShellCommandLineSnapshot?) -> T): T =
+        context.withTerminalState { action(activeCommandLineContextRevision, activeCommandLineLocked()) }
+
     private fun activeCommandLineLocked(): TerminalShellCommandLineSnapshot? {
         if (!promptStartedForCommandText || promptEndLineId == NO_LINE_ID) return null
 

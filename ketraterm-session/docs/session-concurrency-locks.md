@@ -1,6 +1,6 @@
 # Session concurrency and locking invariants
 
-The session consumes borrowed inbound bytes and performs parser/core mutation synchronously. Ordinary input encoding and core-response copying also run on the producer. Paste and text replacement retain their source and admission-time modes/policy for background encoding. One session child coroutine performs all connector writes on the injected I/O dispatcher.
+The session consumes borrowed inbound bytes and performs parser/core mutation synchronously. Ordinary input encoding, exact host-byte copying and core-response copying also run on the producer. Paste, text replacement and compound semantic input retain their source and admission-time modes/policy for background encoding. One session child coroutine performs all connector writes on the injected I/O dispatcher.
 
 ## Retained monitors
 
@@ -14,6 +14,29 @@ There is no inbound monitor. `TerminalConnector` guarantees serial, ordered deli
 
 ## Admission and ordering
 
+`submitBytes(bytes, offset, length)` copies the selected range before returning.
+The caller must not mutate it during submission and may reuse it immediately
+afterward. Offsets/counts are validated with overflow-safe arithmetic before
+lifecycle checks; invalid slices throw `IllegalArgumentException` without changing
+the session. The default length is the remaining range from `offset`. Exact bytes
+are trusted host input, never decoded, sanitized or framed as paste. Keyboard,
+mouse, IME and paste producers should continue to use semantic events.
+
+`submitInput(event)` admits one existing immutable `TerminalInputEvent`.
+`submitInput(events)` copies a stable caller-supplied list and reserves one bulk
+operation for the complete sequence. All its events encode with one mode/policy
+snapshot; their bytes cannot interleave with any later input or reply. Ordinary
+admission does not validate shell editing state; use the conditional overload below.
+
+Both APIs return `TerminalInputAdmission`: `ACCEPTED`, `NOT_RUNNING`, `CLOSED`, or
+`CAPACITY_EXCEEDED`. The latter closes the session through its existing failure
+channel and publishes none of the rejected operation. Empty and mode/policy-
+suppressed input is accepted while running; acceptance does not promise bytes.
+Existing `encode*` methods delegate to this admission path and discard the result.
+Concurrent producers are ordered by admission under the outbound monitor, not
+by wall-clock call start. Writer wake-up follows release of that monitor, even
+with an eager I/O dispatcher.
+
 1. The connector invokes `onBytes` in stream order; parsing runs under mutation serialization.
 2. The session drains all available core-response bytes under mutation and outbound serialization into one queue transaction. The 1 KiB core-response scratch is copied before reuse.
 3. Ready startup input is encoded and queued as one operation, including its final Enter, after replies.
@@ -24,18 +47,59 @@ There is no inbound monitor. `TerminalConnector` guarantees serial, ordered deli
 
 Produced and consumed byte counters locate bulk operations without per-key markers. They count committed ring bytes, excluding bulk bytes; their difference is bounded by the ring budget. A non-suspending drain keeps active bulk references out of the coroutine continuation while it waits for new work.
 
+## Conditional command edits
+
+`captureCommandEdit()` captures the selected producer's authoritative snapshot and
+revision together with session input/output revisions. It returns null unless the
+session is running, editing is available, the writer is idle, and the producer
+supports synchronized revision checks. Capture before calculating or requesting
+suggestions, then pass the same context to `submitInput(expected, events)`.
+
+Final admission holds mutation serialization, the producer's revision guard, then
+outbound serialization through validation and reservation. Intervening nonempty
+input, output, resize, or any host-model assignment invalidates the context,
+including equal assignments and changes away from and back to the same text.
+Rejection returns `STALE_CONTEXT`, `UNSUPPORTED_CONTEXT`, `CANCELLED`, or the usual
+lifecycle result without reserving capacity or sending an edit prefix. A valid
+edit uses the same bounded compound queue as ordinary input. Revisions conservatively
+invalidate on mode-suppressed semantic input too; there is no attempt to infer
+whether input will affect the shell editor.
+
+For a host-owned model, replace the StateFlow-only projection with
+`TerminalShellCommandLineState` and pass it to `TerminalShellIntegrationFactory.host`.
+Every `value` assignment advances its guarded revision. The legacy overload remains
+readable but cannot provide conditional edit contexts. Custom producers may implement
+`withCommandLine`; their guard must cover the entire callback, with notifications
+outside the guard and no reverse acquisition of the session mutation monitor.
+The optional OSC producer uses session mutation serialization for its checks.
+
+The host still decides when its editing model is trustworthy: publish null while
+input is pending in the host or shell, and publish authoritative snapshots after
+the associated output. An idle local writer is not acknowledgement that a remote
+shell processed its input. This contract cannot make an inaccurate model safe.
+`expected.cancel()` permanently rejects subsequent checks, but a cancellation racing
+final admission can lose and cannot retract accepted bytes. Observe closed session
+state for failure; acceptance remains distinct from writing and shell execution.
+
+The default session-backed Swing suggestion handler captures before provider work
+and conditionally admits the validated grapheme replacement at acceptance. It emits
+accepted feedback only on admission. Host-managed popups must capture their own
+context and use the conditional API; directly invoking this default handler without
+a captured Swing request throws `IllegalStateException`. Custom suggestion handlers
+retain responsibility for their editing and feedback behavior.
+
 ## Bounds and backpressure
 
 The ring starts at 16 KiB and grows on demand to an 8 MiB hard limit. The writer has one additional 16 KiB scratch buffer. Growth temporarily retains the old ring while copying; less than 16 MiB of ring storage is live during growth. No per-key payload objects or request list are retained. Coroutine wake-ups can allocate; rendering does not enqueue output merely because a frame is painted.
 
-Bulk input has two shared limits: 16 outstanding operations and 16,777,216 work units, including active work. One unit is one retained UTF-16 code unit or one requested deletion action. Accounting uses Long arithmetic before summing replacement/deletion counts. Text contributes at most 32 MiB of source character storage; encoded expansion is streamed through fixed encoder scratch, not materialized into a full byte array. The operation limit also bounds per-request overhead. Empty paste and replacement events without text or deletions need no reservation. These limits accommodate pastes larger than the ordinary byte queue while bounding retained data and pending encoding work.
+Bulk input has two shared limits: 16 outstanding operations and 16,777,216 work units, including active work. One unit is one retained UTF-16 code unit or one requested deletion action. Each compound contains at most 256 events and charges at least one unit per event, including otherwise empty/suppressed events; associated key text counts too. Accounting uses Long arithmetic before summing replacement/deletion counts. Text contributes at most 32 MiB of source character storage; encoded expansion is streamed through fixed encoder scratch, not materialized into a full byte array. The operation/event limits also bound retained reference overhead. Empty lists, standalone empty paste and replacement events without text or deletions need no reservation. These limits accommodate pastes larger than the ordinary byte queue while bounding retained data and pending encoding work.
 
 A slow connector backpressures bulk encoding on the I/O worker. Producers can continue accepting input under their remaining budgets. Non-suspending input APIs fail the session if a reservation or complete byte transaction cannot fit; they never wait for queue capacity or silently drop an accepted operation. Rejected admission publishes none of that operation. A later transport failure or close can interrupt an already writing operation.
 
 ## Acceptance and lifecycle
 
 Startup claims one attempt under the connector lifecycle monitor, independently
-of observable readiness. State remains `Created` and user input is ignored until
+of observable readiness. State remains `Created` and input admission returns `NOT_RUNNING` until
 `connector.start` returns successfully. Synchronous startup output is parsed and
 its replies enter the bounded queue, but the writer remains unstarted. Session
 then publishes `Running` before starting the writer, so even reentrant observers
@@ -48,6 +112,20 @@ cause another start. Concurrent startup and connector disposal remain serialized
 Input methods return after admission, not transport completion. For ordinary input this includes encoding/copying; for paste and replacement it includes source retention and mode/policy capture. Startup `SUBMITTED` also means queue acceptance. Each connector `write` synchronously consumes or copies the supplied bytes. Custom encoder factories receive the same session-owned output paths and create independent admission and bulk instances; their calls and policy updates are serialized per instance, while the two instances may run concurrently. Rejected policy updates leave the session policy and reported Backarrow default unchanged.
 
 `state` retains `Created`, `Running`, or `Closed`. Budget exhaustion and outbound worker failure use `Closed.event.failure`, close the connector, discard pending output, and cancel session children. A failed transport write or bulk encoder may already have sent a prefix; no bytes are retried.
+
+Response-dependent hosts must observe `state` and cancel their request when it
+becomes `Closed`, including when closure occurs immediately after acceptance.
+They must not start waiting after a rejected admission. Cancellation of a host
+wait does not retract accepted output; this API has no per-operation cancellation
+or write-completion receipt. Local/remote closure discards pending work rather
+than draining it. Admission overlapping shutdown may return `ACCEPTED` even
+though its bytes are discarded; calls that observe shutdown return `CLOSED`.
+
+Resize follows mutation serialization and calls the connector synchronously.
+It has no position in the outbound byte queue and provides no flush barrier:
+an already accepted input operation can be written after a later resize returns.
+Shutdown may interrupt active output; only an already entered connector call can
+finish. Closed-session presentation remains a separate contract.
 
 The writer is essential even though session children are supervised. A connector or bulk encoder throwing `CancellationException` while the session remains open triggers the same failure shutdown, retaining that exception before it is rethrown. Cancellation after a termination event has already been claimed preserves that first event, even while connector cleanup is still running and the session job remains active. Cleanup failures are suppressed on the original failure; no replacement writer is started.
 
