@@ -14,13 +14,15 @@
  * limitations under the License.
  */
 import org.gradle.api.artifacts.component.ModuleComponentIdentifier
+import java.security.MessageDigest
 
 plugins {
+    id("java-base")
     kotlin("jvm") apply false
 }
 
 fun sha256(file: File): String =
-    java.security.MessageDigest
+    MessageDigest
         .getInstance("SHA-256")
         .digest(file.readBytes())
         .joinToString("") { "%02x".format(it) }
@@ -29,10 +31,7 @@ val metadataMode = providers.gradleProperty("metadataMode").get()
 require(metadataMode in setOf("gradle", "pom"))
 val runtimeKotlinVersion = providers.gradleProperty("runtimeKotlinVersion")
 val runtimeName = runtimeKotlinVersion.getOrElse("current")
-subprojects {
-    val consumerName = name
-    apply(plugin = "org.jetbrains.kotlin.jvm")
-    layout.buildDirectory.set(layout.projectDirectory.dir("build/$metadataMode/${providers.gradleProperty("kotlinVersion").get()}"))
+allprojects {
     configurations.configureEach { resolutionStrategy.cacheChangingModulesFor(0, "seconds") }
     repositories {
         exclusiveContent {
@@ -53,9 +52,72 @@ subprojects {
         }
         mavenCentral()
     }
+}
+val bomOnly = configurations.create("bomOnly")
+val alignedLibraries = configurations.create("alignedLibraries")
+val headlessSession = configurations.create("headlessSession")
+listOf(bomOnly, alignedLibraries, headlessSession).forEach {
+    it.isCanBeConsumed = false
+    it.attributes.attribute(Usage.USAGE_ATTRIBUTE, objects.named(Usage.JAVA_RUNTIME))
+}
+val supportedLibraries =
+    providers
+        .gradleProperty("supportedLibraryNames")
+        .get()
+        .split(",")
+        .toSet()
+val libraryVersion = providers.gradleProperty("libraryVersion").get()
+dependencies {
+    add(bomOnly.name, platform("io.github.ketraterm:ketraterm-bom:$libraryVersion"))
+    add(alignedLibraries.name, platform("io.github.ketraterm:ketraterm-bom:$libraryVersion"))
+    supportedLibraries.forEach { add(alignedLibraries.name, "io.github.ketraterm:$it") }
+    add(headlessSession.name, platform("io.github.ketraterm:ketraterm-bom:$libraryVersion"))
+    add(headlessSession.name, "io.github.ketraterm:ketraterm-headless")
+}
+val verifyBom =
+    tasks.register("verifyBom") {
+        inputs.files(bomOnly, alignedLibraries, headlessSession)
+        doLast {
+            check(bomOnly.files.isEmpty()) { "The BOM pulled runtime libraries without a consumer selecting them" }
+            val libraries =
+                alignedLibraries.incoming.resolutionResult.allComponents
+                    .mapNotNull { it.id as? ModuleComponentIdentifier }
+                    .filter { it.group == "io.github.ketraterm" && it.module != "ketraterm-bom" }
+            check(libraries.map { it.module }.toSet() == supportedLibraries)
+            check(libraries.all { it.version == libraryVersion }) { "The BOM did not align versionless library dependencies" }
+            val headlessLibraries =
+                headlessSession.incoming.resolutionResult.allComponents
+                    .mapNotNull { it.id as? ModuleComponentIdentifier }
+                    .filter { it.group == "io.github.ketraterm" && it.module != "ketraterm-bom" }
+            check(
+                headlessLibraries.map { it.module }.toSet() ==
+                    setOf(
+                        "ketraterm-protocol",
+                        "ketraterm-parser",
+                        "ketraterm-core",
+                        "ketraterm-host",
+                        "ketraterm-input",
+                        "ketraterm-render-api",
+                        "ketraterm-render-cache",
+                        "ketraterm-transport-api",
+                        "ketraterm-session",
+                        "ketraterm-headless",
+                    ),
+            ) { "A single session dependency must supply the headless pipeline without optional integrations" }
+        }
+    }
+subprojects {
+    val consumerName = name
+    apply(plugin = "org.jetbrains.kotlin.jvm")
+    layout.buildDirectory.set(layout.projectDirectory.dir("build/$metadataMode/${providers.gradleProperty("kotlinVersion").get()}"))
     extensions.configure<org.jetbrains.kotlin.gradle.dsl.KotlinJvmProjectExtension> { jvmToolchain(25) }
     // The only library dependency: missing exports must not be repaired by the fixture.
-    val libraryName = if (name == "host-spi") "host" else name
+    val libraryName =
+        when (name) {
+            "host-spi" -> "headless"
+            "ui-swing" -> "swing"
+            else -> name
+        }
     dependencies { add("implementation", "io.github.ketraterm:ketraterm-$libraryName:${providers.gradleProperty("libraryVersion").get()}") }
     runtimeKotlinVersion.orNull?.let { version ->
         configurations.named("runtimeClasspath") {
@@ -160,6 +222,7 @@ subprojects {
 
 val verifyPublicationBoundary =
     tasks.register("verifyPublicationBoundary") {
+        dependsOn(verifyBom)
         val requestedVersion = providers.gradleProperty("libraryVersion")
         val repository = providers.gradleProperty("libraryRepository").map { file(uri(it)) }
         val runtimes = subprojects.associate { it.name to it.configurations.named("runtimeClasspath") }

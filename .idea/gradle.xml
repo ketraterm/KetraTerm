@@ -11,10 +11,12 @@
             <option value="$PROJECT_DIR$" />
             <option value="$PROJECT_DIR$/ketraterm-app" />
             <option value="$PROJECT_DIR$/ketraterm-benchmarks" />
+            <option value="$PROJECT_DIR$/ketraterm-bom" />
             <option value="$PROJECT_DIR$/ketraterm-completion" />
             <option value="$PROJECT_DIR$/ketraterm-completion-host" />
             <option value="$PROJECT_DIR$/ketraterm-completion-persistence" />
             <option value="$PROJECT_DIR$/ketraterm-core" />
+            <option value="$PROJECT_DIR$/ketraterm-headless" />
             <option value="$PROJECT_DIR$/ketraterm-host" />
             <option value="$PROJECT_DIR$/ketraterm-input" />
             <option value="$PROJECT_DIR$/ketraterm-parser" />
@@ -24,6 +26,7 @@
             <option value="$PROJECT_DIR$/ketraterm-render-cache" />
             <option value="$PROJECT_DIR$/ketraterm-session" />
             <option value="$PROJECT_DIR$/ketraterm-shell-integration" />
+            <option value="$PROJECT_DIR$/ketraterm-swing" />
             <option value="$PROJECT_DIR$/ketraterm-testkit" />
             <option value="$PROJECT_DIR$/ketraterm-transport-api" />
             <option value="$PROJECT_DIR$/ketraterm-ui-swing" />
@@ -41,10 +44,12 @@
                   <project path="$PROJECT_DIR$" />
                   <project path="$PROJECT_DIR$/ketraterm-app" />
                   <project path="$PROJECT_DIR$/ketraterm-benchmarks" />
+                  <project path="$PROJECT_DIR$/ketraterm-bom" />
                   <project path="$PROJECT_DIR$/ketraterm-completion" />
                   <project path="$PROJECT_DIR$/ketraterm-completion-host" />
                   <project path="$PROJECT_DIR$/ketraterm-completion-persistence" />
                   <project path="$PROJECT_DIR$/ketraterm-core" />
+                  <project path="$PROJECT_DIR$/ketraterm-headless" />
                   <project path="$PROJECT_DIR$/ketraterm-host" />
                   <project path="$PROJECT_DIR$/ketraterm-input" />
                   <project path="$PROJECT_DIR$/ketraterm-parser" />
@@ -54,6 +59,7 @@
                   <project path="$PROJECT_DIR$/ketraterm-render-cache" />
                   <project path="$PROJECT_DIR$/ketraterm-session" />
                   <project path="$PROJECT_DIR$/ketraterm-shell-integration" />
+                  <project path="$PROJECT_DIR$/ketraterm-swing" />
                   <project path="$PROJECT_DIR$/ketraterm-testkit" />
                   <project path="$PROJECT_DIR$/ketraterm-transport-api" />
                   <project path="$PROJECT_DIR$/ketraterm-ui-swing" />
@@ -71,10 +77,12 @@
             <option value="$PROJECT_DIR$" />
             <option value="$PROJECT_DIR$/ketraterm-app" />
             <option value="$PROJECT_DIR$/ketraterm-benchmarks" />
+            <option value="$PROJECT_DIR$/ketraterm-bom" />
             <option value="$PROJECT_DIR$/ketraterm-completion" />
             <option value="$PROJECT_DIR$/ketraterm-completion-host" />
             <option value="$PROJECT_DIR$/ketraterm-completion-persistence" />
             <option value="$PROJECT_DIR$/ketraterm-core" />
+            <option value="$PROJECT_DIR$/ketraterm-headless" />
             <option value="$PROJECT_DIR$/ketraterm-host" />
             <option value="$PROJECT_DIR$/ketraterm-input" />
             <option value="$PROJECT_DIR$/ketraterm-intellij-plugin" />
@@ -85,6 +93,7 @@
             <option value="$PROJECT_DIR$/ketraterm-render-cache" />
             <option value="$PROJECT_DIR$/ketraterm-session" />
             <option value="$PROJECT_DIR$/ketraterm-shell-integration" />
+            <option value="$PROJECT_DIR$/ketraterm-swing" />
             <option value="$PROJECT_DIR$/ketraterm-testkit" />
             <option value="$PROJECT_DIR$/ketraterm-transport-api" />
             <option value="$PROJECT_DIR$/ketraterm-ui-swing" />

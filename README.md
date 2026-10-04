@@ -122,6 +122,48 @@ remain separate from that boundary.
 
 ---
 
+## Using the libraries
+
+Select the entry point you need; Maven and Gradle include its required dependencies
+transitively. You do not need to declare the pipeline modules individually.
+
+| Use | Direct dependency |
+| --- | --- |
+| Headless terminal pipeline and session with a host-owned transport | `ketraterm-headless` |
+| Embedded Swing terminal, including its session and headless pipeline | `ketraterm-swing` |
+| Optional local PTY process hosting | `ketraterm-pty` |
+| Optional built-in OSC shell integration | `ketraterm-shell-integration` |
+| Optional completion and Swing host adapters | `ketraterm-ui-swing-host` |
+
+`ketraterm-headless` and `ketraterm-swing` are dependency-only entry points; they
+introduce no extra runtime code. Individual modules remain available for custom
+pipelines and advanced use.
+
+Use `ketraterm-bom` to align whichever libraries you select. The BOM contains
+version constraints, not runtime dependencies. It does not install every library.
+Development snapshots use Sonatype's snapshot repository:
+
+```kotlin
+repositories {
+    mavenCentral()
+    maven("https://central.sonatype.com/repository/maven-snapshots/") {
+        content { includeGroup("io.github.ketraterm") }
+        mavenContent { snapshotsOnly() }
+    }
+}
+dependencies {
+    implementation(platform("io.github.ketraterm:ketraterm-bom:0.4.0-SNAPSHOT"))
+    implementation("io.github.ketraterm:ketraterm-swing")
+    // Add only the optional integrations your host needs.
+    implementation("io.github.ketraterm:ketraterm-pty")
+}
+```
+
+For headless use, replace the Swing and PTY dependencies with
+`io.github.ketraterm:ketraterm-headless`. Hosts supplying their own transport,
+shell metadata or completion can omit our corresponding optional libraries.
+See [supported boundaries and Maven BOM usage](docs/library-compatibility.md#supported-boundary).
+
 ## Development & Verification
 
 ### Prerequisites
@@ -129,6 +171,10 @@ remain separate from that boundary.
 * **Gradle**: use the included wrapper (`gradlew` / `gradlew.bat`).
 
 ### Command Reference
+* **Verify Library Publication** (build-local artifacts; no upload):
+  ```bash
+  ./gradlew publicationChecks
+  ```
 * **Run All Tests**:
   ```bash
   ./gradlew test
