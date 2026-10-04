@@ -20,39 +20,30 @@ import io.github.ketraterm.render.cache.TerminalRenderCache
 import io.github.ketraterm.ui.swing.input.hyperlinkNavigationModifierMask
 import io.github.ketraterm.ui.swing.render.painter.TerminalTextRunStyle
 import io.github.ketraterm.ui.swing.settings.SwingSettings
-import kotlinx.coroutines.CoroutineDispatcher
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.cancel
-import org.junit.jupiter.api.AfterEach
+import kotlinx.coroutines.test.StandardTestDispatcher
+import kotlinx.coroutines.test.TestScope
+import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.params.ParameterizedTest
 import org.junit.jupiter.params.provider.CsvSource
 import java.awt.Cursor
 import java.awt.event.MouseEvent
-import java.util.concurrent.CountDownLatch
-import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicInteger
 import javax.swing.JButton
 import javax.swing.SwingUtilities
-import kotlin.coroutines.CoroutineContext
 
+@OptIn(ExperimentalCoroutinesApi::class)
 class TerminalHyperlinkDiscoveryControllerTest {
-    private val scopes = ArrayList<CoroutineScope>()
-
-    @AfterEach
-    fun closeScopes() {
-        SwingUtilities.invokeAndWait { scopes.forEach { it.cancel() } }
-    }
-
     @ParameterizedTest
     @CsvSource("true, 0", "true, 1", "true, 2", "false, 0", "false, 1", "false, 2")
     fun `editing a wrapped url removes its entire old action before detection finishes`(
         stableLineIds: Boolean,
         changedRow: Int,
-    ) {
+    ) = runDiscoveryTest {
         val originalRows = arrayOf("https://example.com/abcd", "abcdefghijklmnopqrstuvwx", "old", "https://other.example")
         val changedRows = originalRows.copyOf().apply { this[changedRow] = this[changedRow].dropLast(1) + "z" }
         val originalUrl = originalRows.take(3).joinToString("")
@@ -71,8 +62,6 @@ class TerminalHyperlinkDiscoveryControllerTest {
             )
         contentSource.publish(frame(1L))
         val opened = ArrayList<String>()
-        val firstDetection = CountDownLatch(1)
-        val nextDetection = CountDownLatch(1)
         val host =
             TestDiscoveryHost(
                 contentSource,
@@ -86,44 +75,41 @@ class TerminalHyperlinkDiscoveryControllerTest {
                     }
                 },
             )
-        host.onHyperlinksChanged = { firstDetection.countDown() }
-        val controller = TerminalHyperlinkDiscoveryController(host, testScope())
+        val controller = TerminalHyperlinkDiscoveryController(host, backgroundScope, StandardTestDispatcher(testScheduler))
         try {
-            SwingUtilities.invokeAndWait { controller.scheduleForFrame() }
-            awaitRepaintAndDrainEdt(firstDetection)
-            SwingUtilities.invokeAndWait {
-                assertTrue(controller.openDiscoveredHyperlink(controller.hyperlinkIdAt(0, 0, cache), cache))
-                assertEquals(listOf(originalUrl), opened)
-                opened.clear()
-                host.onHyperlinksChanged = {
-                    if (controller.hyperlinkIdAt(0, 0, cache) < 0) nextDetection.countDown()
-                }
-                for (generation in 2L..3L) {
-                    contentSource.publish(frame(generation))
-                    controller.scheduleForFrame()
-                    for (row in 0..2) {
-                        for (column in changedRows[row].indices) {
-                            assertEquals(0, controller.hyperlinkIdAt(row, column, cache), "stale URL at $row:$column")
-                        }
-                        assertFalse(controller.openDiscoveredHyperlink(controller.hyperlinkIdAt(row, 0, cache), cache))
-                    }
-                    assertTrue(controller.openDiscoveredHyperlink(controller.hyperlinkIdAt(3, 0, cache), cache))
-                }
-                assertEquals(listOf(originalRows[3], originalRows[3]), opened, "Unrelated links remain usable")
-                opened.clear()
-            }
-            awaitRepaintAndDrainEdt(nextDetection)
-            SwingUtilities.invokeAndWait {
-                val id = controller.hyperlinkIdAt(0, 0, cache)
-                assertTrue(id < 0)
+            controller.scheduleForFrame()
+            testScheduler.runCurrent()
+            assertTrue(host.repaintCount > 0)
+
+            assertTrue(controller.openDiscoveredHyperlink(controller.hyperlinkIdAt(0, 0, cache), cache))
+            assertEquals(listOf(originalUrl), opened)
+            opened.clear()
+            for (generation in 2L..3L) {
+                contentSource.publish(frame(generation))
+                controller.scheduleForFrame()
                 for (row in 0..2) {
-                    assertEquals(id, controller.hyperlinkIdAt(row, 0, cache))
-                    assertTrue(controller.openDiscoveredHyperlink(id, cache))
+                    for (column in changedRows[row].indices) {
+                        assertEquals(0, controller.hyperlinkIdAt(row, column, cache), "stale URL at $row:$column")
+                    }
+                    assertFalse(controller.openDiscoveredHyperlink(controller.hyperlinkIdAt(row, 0, cache), cache))
                 }
-                assertEquals(List(3) { changedUrl }, opened)
+                assertTrue(controller.openDiscoveredHyperlink(controller.hyperlinkIdAt(3, 0, cache), cache))
             }
+            assertEquals(listOf(originalRows[3], originalRows[3]), opened, "Unrelated links remain usable")
+            opened.clear()
+
+            testScheduler.runCurrent()
+            assertTrue(host.repaintCount > 0)
+
+            val id = controller.hyperlinkIdAt(0, 0, cache)
+            assertTrue(id < 0)
+            for (row in 0..2) {
+                assertEquals(id, controller.hyperlinkIdAt(row, 0, cache))
+                assertTrue(controller.openDiscoveredHyperlink(id, cache))
+            }
+            assertEquals(List(3) { changedUrl }, opened)
         } finally {
-            SwingUtilities.invokeAndWait { controller.dispose() }
+            controller.dispose()
         }
     }
 
@@ -132,7 +118,7 @@ class TerminalHyperlinkDiscoveryControllerTest {
     fun `changed logical line context invalidates links even outside the edited row`(
         stableLineIds: Boolean,
         splitLine: Boolean,
-    ) {
+    ) = runDiscoveryTest {
         val prefix = "context".padEnd(24)
         val url = "https://example.com"
         val cache = TerminalRenderCache(24, 2)
@@ -148,7 +134,6 @@ class TerminalHyperlinkDiscoveryControllerTest {
             ),
         )
         var opened = false
-        val published = CountDownLatch(1)
         val host =
             TestDiscoveryHost(
                 contentSource,
@@ -169,31 +154,30 @@ class TerminalHyperlinkDiscoveryControllerTest {
                     }
                 },
             )
-        host.onHyperlinksChanged = { published.countDown() }
-        val controller = TerminalHyperlinkDiscoveryController(host, testScope())
+        val controller = TerminalHyperlinkDiscoveryController(host, backgroundScope, StandardTestDispatcher(testScheduler))
         try {
-            SwingUtilities.invokeAndWait { controller.scheduleForFrame() }
-            awaitRepaintAndDrainEdt(published)
-            SwingUtilities.invokeAndWait {
-                assertTrue(controller.hyperlinkIdAt(1, 0, cache) < 0)
-                contentSource.publish(
-                    StaticTextFrame(
-                        frameGeneration = 2L,
-                        structureGeneration = 1L,
-                        rowTexts = arrayOf(if (splitLine) prefix else "changed".padEnd(24), url),
-                        lineIds = lineIds,
-                        lineGenerations = longArrayOf(2L, 1L),
-                        wrappedRows = booleanArrayOf(!splitLine, false),
-                    ),
-                )
-                controller.scheduleForFrame()
-                assertEquals(0, controller.hyperlinkIdAt(1, 0, cache))
-                assertFalse(controller.openDiscoveredHyperlink(controller.hyperlinkIdAt(1, 0, cache), cache))
-                assertFalse(opened)
-                controller.dispose()
-            }
+            controller.scheduleForFrame()
+            testScheduler.runCurrent()
+            assertTrue(host.repaintCount > 0)
+
+            assertTrue(controller.hyperlinkIdAt(1, 0, cache) < 0)
+            contentSource.publish(
+                StaticTextFrame(
+                    frameGeneration = 2L,
+                    structureGeneration = 1L,
+                    rowTexts = arrayOf(if (splitLine) prefix else "changed".padEnd(24), url),
+                    lineIds = lineIds,
+                    lineGenerations = longArrayOf(2L, 1L),
+                    wrappedRows = booleanArrayOf(!splitLine, false),
+                ),
+            )
+            controller.scheduleForFrame()
+            assertEquals(0, controller.hyperlinkIdAt(1, 0, cache))
+            assertFalse(controller.openDiscoveredHyperlink(controller.hyperlinkIdAt(1, 0, cache), cache))
+            assertFalse(opened)
+            controller.dispose()
         } finally {
-            SwingUtilities.invokeAndWait { controller.dispose() }
+            controller.dispose()
         }
     }
 
@@ -202,7 +186,7 @@ class TerminalHyperlinkDiscoveryControllerTest {
     fun `frame carry keeps wrapped hover and activation intact without merging distinct links`(
         stableLineIds: Boolean,
         scroll: Boolean,
-    ) {
+    ) = runDiscoveryTest {
         val cache = TerminalRenderCache(24, 4)
         val contentSource = TerminalHyperlinkTestSource(cache)
         val rows = arrayOf("go https://example.com/ab", "cdefghijklmnopqrstuvwxyz", "012345 end")
@@ -232,7 +216,6 @@ class TerminalHyperlinkDiscoveryControllerTest {
                 opened++
                 true
             }
-        val repaintObserved = CountDownLatch(1)
         val host =
             TestDiscoveryHost(
                 contentSource,
@@ -244,9 +227,8 @@ class TerminalHyperlinkDiscoveryControllerTest {
                         add(request.hyperlink(1, 55, 58, sharedAction))
                     }
                 },
-                repaintObserved,
             )
-        val controller = TerminalHyperlinkDiscoveryController(host, testScope())
+        val controller = TerminalHyperlinkDiscoveryController(host, backgroundScope, StandardTestDispatcher(testScheduler))
         val repaints = ArrayList<CellSelection>()
         val hoverHost =
             object : TerminalHyperlinkHost {
@@ -283,555 +265,546 @@ class TerminalHyperlinkDiscoveryControllerTest {
         val style = TerminalTextRunStyle()
         val activationForeground = 0xFF4DA3FF.toInt()
         try {
-            SwingUtilities.invokeAndWait {
-                hover.handleMouseMoved(MouseEvent(source, MouseEvent.MOUSE_MOVED, 0L, hyperlinkNavigationModifierMask, 4, 1, 0, false))
-                assertEquals(0, hover.hoveredHyperlinkId)
-                controller.scheduleForFrame()
-            }
-            awaitRepaintAndDrainEdt(repaintObserved)
-            SwingUtilities.invokeAndWait {
-                assertTrue(hover.hoveredHyperlinkId < 0, "Async detection must activate hover without another mouse event")
-                assertTrue(hover.hyperlinkActivationHover)
-                repeat(3) { iteration ->
-                    contentSource.publish(frame(iteration + 2L))
-                    controller.scheduleForFrame()
-                    val ids = controller.hyperlinkIdsFor(cache)
-                    val firstRow = if (scroll) 0 else 1
-                    val offset = cache.rowOffset(firstRow)
-                    val linkId = ids[offset + 3]
-                    assertTrue(linkId < 0)
-                    for (index in 3 until 54) {
-                        assertEquals(linkId, ids[offset + index], "cell $index after carry $iteration")
-                    }
-                    assertEquals(0, ids[offset + 2])
-                    assertEquals(0, ids[offset + 54])
-                    val otherId = ids[offset + 55]
-                    assertTrue(otherId < 0)
-                    assertNotEquals(linkId, otherId, "Distinct matches may share one action")
-                    assertTrue(controller.openDiscoveredHyperlink(otherId, cache))
-                    assertEquals(1, detectorCalls.get())
+            hover.handleMouseMoved(MouseEvent(source, MouseEvent.MOUSE_MOVED, 0L, hyperlinkNavigationModifierMask, 4, 1, 0, false))
+            assertEquals(0, hover.hoveredHyperlinkId)
+            controller.scheduleForFrame()
 
-                    hover.clearHyperlinkHover()
-                    repaints.clear()
-                    val expectedSpans =
-                        listOf(
-                            CellSelection(3, firstRow, cache.columns, firstRow),
-                            CellSelection(
-                                0,
-                                firstRow + 1,
-                                cache.columns,
-                                firstRow + 1,
-                            ),
-                            CellSelection(0, firstRow + 2, 6, firstRow + 2),
-                        )
-                    for (row in firstRow..firstRow + 2) {
-                        hover.handleMouseMoved(
-                            MouseEvent(source, MouseEvent.MOUSE_MOVED, 0L, hyperlinkNavigationModifierMask, 4, row, 0, false),
-                        )
-                        assertEquals(linkId, hover.hoveredHyperlinkId)
-                        assertTrue(hover.hyperlinkActivationHover)
-                        assertEquals(firstRow, hover.segmentRow(0))
-                        assertEquals(3, hover.segmentStartColumn(0))
-                        assertEquals(firstRow + 2, hover.segmentRow(hover.hoveredSegmentCount - 1))
-                        assertEquals(6, hover.segmentEndColumn(hover.hoveredSegmentCount - 1))
-                        val click =
-                            MouseEvent(
-                                source,
-                                MouseEvent.MOUSE_PRESSED,
-                                0L,
-                                hyperlinkNavigationModifierMask,
-                                4,
-                                row,
-                                1,
-                                false,
-                                MouseEvent.BUTTON1,
-                            )
-                        assertTrue(hover.handleMousePressed(click))
-                        val release =
-                            MouseEvent(
-                                source,
-                                MouseEvent.MOUSE_RELEASED,
-                                0L,
-                                hyperlinkNavigationModifierMask,
-                                4,
-                                row,
-                                1,
-                                false,
-                                MouseEvent.BUTTON1,
-                            )
-                        assertTrue(hover.handleMouseReleased(release))
-                        assertTrue(release.isConsumed)
-                    }
-                    assertEquals(
-                        expectedSpans,
-                        repaints,
-                        "Moving between segments with unchanged activation must not repaint the group",
+            testScheduler.runCurrent()
+            assertTrue(host.repaintCount > 0)
+
+            assertTrue(hover.hoveredHyperlinkId < 0, "Async detection must activate hover without another mouse event")
+            assertTrue(hover.hyperlinkActivationHover)
+            repeat(3) { iteration ->
+                contentSource.publish(frame(iteration + 2L))
+                controller.scheduleForFrame()
+                val ids = controller.hyperlinkIdsFor(cache)
+                val firstRow = if (scroll) 0 else 1
+                val offset = cache.rowOffset(firstRow)
+                val linkId = ids[offset + 3]
+                assertTrue(linkId < 0)
+                for (index in 3 until 54) {
+                    assertEquals(linkId, ids[offset + index], "cell $index after carry $iteration")
+                }
+                assertEquals(0, ids[offset + 2])
+                assertEquals(0, ids[offset + 54])
+                val otherId = ids[offset + 55]
+                assertTrue(otherId < 0)
+                assertNotEquals(linkId, otherId, "Distinct matches may share one action")
+                assertTrue(controller.openDiscoveredHyperlink(otherId, cache))
+                assertEquals(1, detectorCalls.get())
+
+                hover.clearHyperlinkHover()
+                repaints.clear()
+                val expectedSpans =
+                    listOf(
+                        CellSelection(3, firstRow, cache.columns, firstRow),
+                        CellSelection(
+                            0,
+                            firstRow + 1,
+                            cache.columns,
+                            firstRow + 1,
+                        ),
+                        CellSelection(0, firstRow + 2, 6, firstRow + 2),
                     )
-                    hover.updateHyperlinkActivationHover(false)
-                    assertFalse(hover.hyperlinkActivationHover)
-                    assertEquals(expectedSpans + expectedSpans, repaints)
-                    hover.updateHyperlinkActivationHover(true)
+                for (row in firstRow..firstRow + 2) {
+                    hover.handleMouseMoved(
+                        MouseEvent(source, MouseEvent.MOUSE_MOVED, 0L, hyperlinkNavigationModifierMask, 4, row, 0, false),
+                    )
+                    assertEquals(linkId, hover.hoveredHyperlinkId)
                     assertTrue(hover.hyperlinkActivationHover)
-                    assertEquals(expectedSpans + expectedSpans + expectedSpans, repaints)
-                    for (row in firstRow..firstRow + 2) {
-                        style.configureRow(
-                            true,
-                            ids,
-                            hover.hover,
-                            SwingSettings.create { draft ->
-                                draft.hyperlinkActivationForeground = activationForeground
-                            },
-                            row = row,
+                    assertEquals(firstRow, hover.segmentRow(0))
+                    assertEquals(3, hover.segmentStartColumn(0))
+                    assertEquals(firstRow + 2, hover.segmentRow(hover.hoveredSegmentCount - 1))
+                    assertEquals(6, hover.segmentEndColumn(hover.hoveredSegmentCount - 1))
+                    val click =
+                        MouseEvent(
+                            source,
+                            MouseEvent.MOUSE_PRESSED,
+                            0L,
+                            hyperlinkNavigationModifierMask,
+                            4,
+                            row,
+                            1,
+                            false,
+                            MouseEvent.BUTTON1,
                         )
-                        for (column in 0 until cache.columns) {
-                            val index = cache.rowOffset(row) + column
-                            style.begin(cache, cache.palette, cache.rowOffset(row), column)
-                            assertEquals(ids[index] == linkId, style.hovered)
-                            val expectedForeground =
-                                if (ids[index] == linkId) activationForeground else cache.palette.defaultForeground
-                            assertEquals(expectedForeground, style.foreground)
-                        }
+                    assertTrue(hover.handleMousePressed(click))
+                    val release =
+                        MouseEvent(
+                            source,
+                            MouseEvent.MOUSE_RELEASED,
+                            0L,
+                            hyperlinkNavigationModifierMask,
+                            4,
+                            row,
+                            1,
+                            false,
+                            MouseEvent.BUTTON1,
+                        )
+                    assertTrue(hover.handleMouseReleased(release))
+                    assertTrue(release.isConsumed)
+                }
+                assertEquals(
+                    expectedSpans,
+                    repaints,
+                    "Moving between segments with unchanged activation must not repaint the group",
+                )
+                hover.updateHyperlinkActivationHover(false)
+                assertFalse(hover.hyperlinkActivationHover)
+                assertEquals(expectedSpans + expectedSpans, repaints)
+                hover.updateHyperlinkActivationHover(true)
+                assertTrue(hover.hyperlinkActivationHover)
+                assertEquals(expectedSpans + expectedSpans + expectedSpans, repaints)
+                for (row in firstRow..firstRow + 2) {
+                    style.configureRow(
+                        true,
+                        ids,
+                        hover.hover,
+                        SwingSettings.create { draft ->
+                            draft.hyperlinkActivationForeground = activationForeground
+                        },
+                        row = row,
+                    )
+                    for (column in 0 until cache.columns) {
+                        val index = cache.rowOffset(row) + column
+                        style.begin(cache, cache.palette, cache.rowOffset(row), column)
+                        assertEquals(ids[index] == linkId, style.hovered)
+                        val expectedForeground =
+                            if (ids[index] == linkId) activationForeground else cache.palette.defaultForeground
+                        assertEquals(expectedForeground, style.foreground)
                     }
                 }
-                assertEquals(12, opened, "Every carried segment and the separate match must retain its action")
             }
+            assertEquals(12, opened, "Every carried segment and the separate match must retain its action")
         } finally {
-            SwingUtilities.invokeAndWait { controller.dispose() }
+            controller.dispose()
         }
     }
 
     @Test
-    fun `scheduled analysis publishes discovered url overlay`() {
-        val cache = TerminalRenderCache(24, 1)
-        val contentSource = TerminalHyperlinkTestSource(cache)
-        contentSource.publish(StaticTextFrame(1L, 1L, arrayOf("https://example.com"), longArrayOf(1L)))
-        val opened = AtomicBoolean(false)
-        val repaintObserved = CountDownLatch(1)
-        val host =
-            TestDiscoveryHost(
-                contentSource,
-                renderCache = cache,
-                hyperlinkDetector =
-                    { request ->
-                        buildList {
-                            assertEquals("https://example.com\n", request.lineText(0))
-                            add(
-                                request.hyperlink(
-                                    lineIndex = 0,
-                                    startOffset = 0,
-                                    endOffset = "https://example.com".length,
-                                    action =
-                                        {
-                                            opened.set(true)
-                                            true
-                                        },
-                                ),
-                            )
-                        }
-                    },
-                repaintObserved = repaintObserved,
-            )
-        val controller = TerminalHyperlinkDiscoveryController(host, testScope())
-
-        SwingUtilities.invokeAndWait {
-            controller.scheduleForFrame()
-        }
-
-        awaitRepaintAndDrainEdt(repaintObserved)
-
-        val ids = controller.hyperlinkIdsFor(cache)
-        assertEquals(-1, ids[0])
-        assertEquals(-1, ids["https://example.com".lastIndex])
-        assertEquals(0, ids["https://example.com".length])
-        assertTrue(controller.isDiscoveredHyperlinkResolvable(-1, cache))
-        assertTrue(controller.openDiscoveredHyperlink(-1, cache))
-        assertTrue(opened.get())
-    }
-
-    @Test
-    fun `scroll preserves discovered links for matching visible row identities before rescan`() {
-        val cache = TerminalRenderCache(24, 3)
-        val contentSource = TerminalHyperlinkTestSource(cache)
-        contentSource.publish(
-            StaticTextFrame(
-                frameGeneration = 1L,
-                structureGeneration = 1L,
-                rowTexts = arrayOf("alpha", "https://example.com", "omega"),
-                lineIds = longArrayOf(0L, 0L, 0L),
-            ),
-        )
-        val opened = AtomicBoolean(false)
-        val detectorCalls = AtomicInteger()
-        val repaintObserved = CountDownLatch(1)
-        val host =
-            TestDiscoveryHost(
-                contentSource,
-                renderCache = cache,
-                hyperlinkDetector =
-                    { request ->
-                        buildList {
-                            detectorCalls.incrementAndGet()
-                            add(
-                                request.hyperlink(
-                                    lineIndex = 1,
-                                    startOffset = 0,
-                                    endOffset = "https://example.com".length,
-                                    action =
-                                        {
-                                            opened.set(true)
-                                            true
-                                        },
-                                ),
-                            )
-                        }
-                    },
-                repaintObserved = repaintObserved,
-            )
-        val controller = TerminalHyperlinkDiscoveryController(host, testScope())
-
-        SwingUtilities.invokeAndWait {
-            controller.scheduleForFrame()
-        }
-        awaitRepaintAndDrainEdt(repaintObserved)
-        assertEquals(1, detectorCalls.get())
-
-        contentSource.publish(
-            StaticTextFrame(
-                frameGeneration = 2L,
-                structureGeneration = 2L,
-                rowTexts = arrayOf("new", "alpha", "https://example.com"),
-                scrollbackOffset = 1,
-                lineIds = longArrayOf(0L, 0L, 0L),
-            ),
-        )
-        val carry = scheduleForFrameAndReadIds(controller, cache, detectorCalls)
-
-        assertEquals(0, carry.ids[cache.rowOffset(1)])
-        assertEquals(-1, carry.ids[cache.rowOffset(2)])
-        assertEquals(-1, carry.ids[cache.rowOffset(2) + "https://example.com".lastIndex])
-        assertEquals(1, carry.detectorCalls)
-        assertTrue(controller.openDiscoveredHyperlink(-1, cache))
-        assertTrue(opened.get())
-    }
-
-    @Test
-    fun `scroll carries discovered links across repeated render-cache row shifts without detector rescan`() {
-        val cache = TerminalRenderCache(24, 3)
-        val contentSource = TerminalHyperlinkTestSource(cache)
-        contentSource.publish(
-            StaticTextFrame(
-                frameGeneration = 1L,
-                structureGeneration = 1L,
-                rowTexts = arrayOf("https://example.com", "alpha", "omega"),
-                lineIds = longArrayOf(0L, 0L, 0L),
-            ),
-        )
-        val urlScans = AtomicInteger()
-        val repaintObserved = CountDownLatch(1)
-        val host =
-            TestDiscoveryHost(
-                contentSource,
-                renderCache = cache,
-                hyperlinkDetector =
-                    { request ->
-                        buildList {
-                            for (lineIndex in 0 until request.lineCount) {
-                                if (request.lineText(lineIndex) != "https://example.com\n") continue
-                                urlScans.incrementAndGet()
+    fun `scheduled analysis publishes discovered url overlay`() =
+        runDiscoveryTest {
+            val cache = TerminalRenderCache(24, 1)
+            val contentSource = TerminalHyperlinkTestSource(cache)
+            contentSource.publish(StaticTextFrame(1L, 1L, arrayOf("https://example.com"), longArrayOf(1L)))
+            val opened = AtomicBoolean(false)
+            val host =
+                TestDiscoveryHost(
+                    contentSource,
+                    renderCache = cache,
+                    hyperlinkDetector =
+                        { request ->
+                            buildList {
+                                assertEquals("https://example.com\n", request.lineText(0))
                                 add(
                                     request.hyperlink(
-                                        lineIndex = lineIndex,
+                                        lineIndex = 0,
+                                        startOffset = 0,
+                                        endOffset = "https://example.com".length,
+                                        action =
+                                            {
+                                                opened.set(true)
+                                                true
+                                            },
+                                    ),
+                                )
+                            }
+                        },
+                )
+            val controller = TerminalHyperlinkDiscoveryController(host, backgroundScope, StandardTestDispatcher(testScheduler))
+
+            controller.scheduleForFrame()
+
+            testScheduler.runCurrent()
+            assertTrue(host.repaintCount > 0)
+
+            val ids = controller.hyperlinkIdsFor(cache)
+            assertEquals(-1, ids[0])
+            assertEquals(-1, ids["https://example.com".lastIndex])
+            assertEquals(0, ids["https://example.com".length])
+            assertTrue(controller.isDiscoveredHyperlinkResolvable(-1, cache))
+            assertTrue(controller.openDiscoveredHyperlink(-1, cache))
+            assertTrue(opened.get())
+        }
+
+    @Test
+    fun `scroll preserves discovered links for matching visible row identities before rescan`() =
+        runDiscoveryTest {
+            val cache = TerminalRenderCache(24, 3)
+            val contentSource = TerminalHyperlinkTestSource(cache)
+            contentSource.publish(
+                StaticTextFrame(
+                    frameGeneration = 1L,
+                    structureGeneration = 1L,
+                    rowTexts = arrayOf("alpha", "https://example.com", "omega"),
+                    lineIds = longArrayOf(0L, 0L, 0L),
+                ),
+            )
+            val opened = AtomicBoolean(false)
+            val detectorCalls = AtomicInteger()
+            val host =
+                TestDiscoveryHost(
+                    contentSource,
+                    renderCache = cache,
+                    hyperlinkDetector =
+                        { request ->
+                            buildList {
+                                detectorCalls.incrementAndGet()
+                                add(
+                                    request.hyperlink(
+                                        lineIndex = 1,
+                                        startOffset = 0,
+                                        endOffset = "https://example.com".length,
+                                        action =
+                                            {
+                                                opened.set(true)
+                                                true
+                                            },
+                                    ),
+                                )
+                            }
+                        },
+                )
+            val controller = TerminalHyperlinkDiscoveryController(host, backgroundScope, StandardTestDispatcher(testScheduler))
+
+            controller.scheduleForFrame()
+
+            testScheduler.runCurrent()
+            assertTrue(host.repaintCount > 0)
+            assertEquals(1, detectorCalls.get())
+
+            contentSource.publish(
+                StaticTextFrame(
+                    frameGeneration = 2L,
+                    structureGeneration = 2L,
+                    rowTexts = arrayOf("new", "alpha", "https://example.com"),
+                    scrollbackOffset = 1,
+                    lineIds = longArrayOf(0L, 0L, 0L),
+                ),
+            )
+            val carry = scheduleForFrameAndReadIds(controller, cache, detectorCalls)
+
+            assertEquals(0, carry.ids[cache.rowOffset(1)])
+            assertEquals(-1, carry.ids[cache.rowOffset(2)])
+            assertEquals(-1, carry.ids[cache.rowOffset(2) + "https://example.com".lastIndex])
+            assertEquals(1, carry.detectorCalls)
+            assertTrue(controller.openDiscoveredHyperlink(-1, cache))
+            assertTrue(opened.get())
+        }
+
+    @Test
+    fun `scroll carries discovered links across repeated render-cache row shifts without detector rescan`() =
+        runDiscoveryTest {
+            val cache = TerminalRenderCache(24, 3)
+            val contentSource = TerminalHyperlinkTestSource(cache)
+            contentSource.publish(
+                StaticTextFrame(
+                    frameGeneration = 1L,
+                    structureGeneration = 1L,
+                    rowTexts = arrayOf("https://example.com", "alpha", "omega"),
+                    lineIds = longArrayOf(0L, 0L, 0L),
+                ),
+            )
+            val urlScans = AtomicInteger()
+            val host =
+                TestDiscoveryHost(
+                    contentSource,
+                    renderCache = cache,
+                    hyperlinkDetector =
+                        { request ->
+                            buildList {
+                                for (lineIndex in 0 until request.lineCount) {
+                                    if (request.lineText(lineIndex) != "https://example.com\n") continue
+                                    urlScans.incrementAndGet()
+                                    add(
+                                        request.hyperlink(
+                                            lineIndex = lineIndex,
+                                            startOffset = 0,
+                                            endOffset = "https://example.com".length,
+                                            action = SwingHyperlinkAction.NONE,
+                                        ),
+                                    )
+                                }
+                            }
+                        },
+                )
+            val controller = TerminalHyperlinkDiscoveryController(host, backgroundScope, StandardTestDispatcher(testScheduler))
+
+            controller.scheduleForFrame()
+
+            testScheduler.runCurrent()
+            assertTrue(host.repaintCount > 0)
+
+            contentSource.publish(
+                StaticTextFrame(
+                    frameGeneration = 2L,
+                    structureGeneration = 2L,
+                    rowTexts = arrayOf("new-1", "https://example.com", "alpha"),
+                    scrollbackOffset = 1,
+                    lineIds = longArrayOf(0L, 0L, 0L),
+                ),
+            )
+            var carry = scheduleForFrameAndReadIds(controller, cache, urlScans)
+            assertEquals(-1, carry.ids[cache.rowOffset(1)])
+            assertEquals(1, carry.detectorCalls)
+
+            contentSource.publish(
+                StaticTextFrame(
+                    frameGeneration = 3L,
+                    structureGeneration = 3L,
+                    rowTexts = arrayOf("new-2", "new-1", "https://example.com"),
+                    scrollbackOffset = 2,
+                    lineIds = longArrayOf(0L, 0L, 0L),
+                ),
+            )
+            carry = scheduleForFrameAndReadIds(controller, cache, urlScans)
+
+            assertEquals(0, carry.ids[cache.rowOffset(1)])
+            assertEquals(-1, carry.ids[cache.rowOffset(2)])
+            assertEquals(-1, carry.ids[cache.rowOffset(2) + "https://example.com".lastIndex])
+            assertEquals(1, carry.detectorCalls)
+        }
+
+    @Test
+    fun `scroll carries discovered links when render-cache overscan row count changes`() =
+        runDiscoveryTest {
+            val cache = TerminalRenderCache(24, 3)
+            val contentSource = TerminalHyperlinkTestSource(cache)
+            contentSource.publish(
+                StaticTextFrame(
+                    frameGeneration = 1L,
+                    structureGeneration = 1L,
+                    rowTexts = arrayOf("alpha", "https://example.com", "omega"),
+                    lineIds = longArrayOf(0L, 0L, 0L),
+                ),
+            )
+            val detectorCalls = AtomicInteger()
+            val host =
+                TestDiscoveryHost(
+                    contentSource,
+                    renderCache = cache,
+                    hyperlinkDetector =
+                        { request ->
+                            buildList {
+                                detectorCalls.incrementAndGet()
+                                add(
+                                    request.hyperlink(
+                                        lineIndex = 1,
                                         startOffset = 0,
                                         endOffset = "https://example.com".length,
                                         action = SwingHyperlinkAction.NONE,
                                     ),
                                 )
                             }
-                        }
-                    },
-                repaintObserved = repaintObserved,
-            )
-        val controller = TerminalHyperlinkDiscoveryController(host, testScope())
+                        },
+                )
+            val controller = TerminalHyperlinkDiscoveryController(host, backgroundScope, StandardTestDispatcher(testScheduler))
 
-        SwingUtilities.invokeAndWait {
             controller.scheduleForFrame()
+
+            testScheduler.runCurrent()
+            assertTrue(host.repaintCount > 0)
+
+            contentSource.publish(
+                StaticTextFrame(
+                    frameGeneration = 2L,
+                    structureGeneration = 2L,
+                    rowTexts = arrayOf("new", "alpha", "https://example.com", "omega"),
+                    scrollbackOffset = 1,
+                    lineIds = longArrayOf(0L, 0L, 0L, 0L),
+                ),
+            )
+            val carry = scheduleForFrameAndReadIds(controller, cache, detectorCalls)
+
+            assertEquals(0, carry.ids[cache.rowOffset(1)])
+            assertEquals(-1, carry.ids[cache.rowOffset(2)])
+            assertEquals(-1, carry.ids[cache.rowOffset(2) + "https://example.com".lastIndex])
+            assertEquals(1, carry.detectorCalls)
         }
-        awaitRepaintAndDrainEdt(repaintObserved)
-
-        contentSource.publish(
-            StaticTextFrame(
-                frameGeneration = 2L,
-                structureGeneration = 2L,
-                rowTexts = arrayOf("new-1", "https://example.com", "alpha"),
-                scrollbackOffset = 1,
-                lineIds = longArrayOf(0L, 0L, 0L),
-            ),
-        )
-        var carry = scheduleForFrameAndReadIds(controller, cache, urlScans)
-        assertEquals(-1, carry.ids[cache.rowOffset(1)])
-        assertEquals(1, carry.detectorCalls)
-
-        contentSource.publish(
-            StaticTextFrame(
-                frameGeneration = 3L,
-                structureGeneration = 3L,
-                rowTexts = arrayOf("new-2", "new-1", "https://example.com"),
-                scrollbackOffset = 2,
-                lineIds = longArrayOf(0L, 0L, 0L),
-            ),
-        )
-        carry = scheduleForFrameAndReadIds(controller, cache, urlScans)
-
-        assertEquals(0, carry.ids[cache.rowOffset(1)])
-        assertEquals(-1, carry.ids[cache.rowOffset(2)])
-        assertEquals(-1, carry.ids[cache.rowOffset(2) + "https://example.com".lastIndex])
-        assertEquals(1, carry.detectorCalls)
-    }
 
     @Test
-    fun `scroll carries discovered links when render-cache overscan row count changes`() {
-        val cache = TerminalRenderCache(24, 3)
-        val contentSource = TerminalHyperlinkTestSource(cache)
-        contentSource.publish(
-            StaticTextFrame(
-                frameGeneration = 1L,
-                structureGeneration = 1L,
-                rowTexts = arrayOf("alpha", "https://example.com", "omega"),
-                lineIds = longArrayOf(0L, 0L, 0L),
-            ),
-        )
-        val detectorCalls = AtomicInteger()
-        val repaintObserved = CountDownLatch(1)
-        val host =
-            TestDiscoveryHost(
-                contentSource,
-                renderCache = cache,
-                hyperlinkDetector =
-                    { request ->
-                        buildList {
-                            detectorCalls.incrementAndGet()
-                            add(
-                                request.hyperlink(
-                                    lineIndex = 1,
-                                    startOffset = 0,
-                                    endOffset = "https://example.com".length,
-                                    action = SwingHyperlinkAction.NONE,
-                                ),
-                            )
-                        }
-                    },
-                repaintObserved = repaintObserved,
+    fun `retained history restores a discovered link on the first displayed frame`() =
+        runDiscoveryTest {
+            val cache = TerminalRenderCache(24, 2)
+            val contentSource = TerminalHyperlinkTestSource(cache)
+            contentSource.publish(
+                StaticTextFrame(
+                    frameGeneration = 1L,
+                    structureGeneration = 1L,
+                    rowTexts = arrayOf("https://example.com", "alpha"),
+                    lineIds = longArrayOf(0L, 0L),
+                ),
             )
-        val controller = TerminalHyperlinkDiscoveryController(host, testScope())
+            val urlScans = AtomicInteger()
+            val host =
+                TestDiscoveryHost(
+                    contentSource,
+                    renderCache = cache,
+                    hyperlinkDetector =
+                        { request ->
+                            buildList {
+                                for (lineIndex in 0 until request.lineCount) {
+                                    if (request.lineText(lineIndex) != "https://example.com\n") continue
+                                    urlScans.incrementAndGet()
+                                    add(
+                                        request.hyperlink(
+                                            lineIndex = lineIndex,
+                                            startOffset = 0,
+                                            endOffset = "https://example.com".length,
+                                            action = SwingHyperlinkAction.NONE,
+                                        ),
+                                    )
+                                }
+                            }
+                        },
+                )
+            val controller = TerminalHyperlinkDiscoveryController(host, backgroundScope, StandardTestDispatcher(testScheduler))
 
-        SwingUtilities.invokeAndWait {
             controller.scheduleForFrame()
+
+            testScheduler.runCurrent()
+            assertTrue(host.repaintCount > 0)
+
+            contentSource.publish(
+                StaticTextFrame(
+                    frameGeneration = 2L,
+                    structureGeneration = 2L,
+                    rowTexts = arrayOf("beta", "gamma"),
+                    historySize = 12,
+                    lineIds = longArrayOf(0L, 0L),
+                ),
+            )
+            var carry = scheduleForFrameAndReadIds(controller, cache, urlScans)
+            assertEquals(0, carry.ids[cache.rowOffset(0)])
+
+            contentSource.publish(
+                StaticTextFrame(
+                    frameGeneration = 3L,
+                    structureGeneration = 3L,
+                    rowTexts = arrayOf("https://example.com", "alpha"),
+                    lineIds = longArrayOf(0L, 0L),
+                ),
+            )
+            carry = scheduleForFrameAndReadIds(controller, cache, urlScans)
+
+            assertEquals(-1, carry.ids[cache.rowOffset(0)])
+            assertEquals(1, carry.detectorCalls)
         }
-        awaitRepaintAndDrainEdt(repaintObserved)
-
-        contentSource.publish(
-            StaticTextFrame(
-                frameGeneration = 2L,
-                structureGeneration = 2L,
-                rowTexts = arrayOf("new", "alpha", "https://example.com", "omega"),
-                scrollbackOffset = 1,
-                lineIds = longArrayOf(0L, 0L, 0L, 0L),
-            ),
-        )
-        val carry = scheduleForFrameAndReadIds(controller, cache, detectorCalls)
-
-        assertEquals(0, carry.ids[cache.rowOffset(1)])
-        assertEquals(-1, carry.ids[cache.rowOffset(2)])
-        assertEquals(-1, carry.ids[cache.rowOffset(2) + "https://example.com".lastIndex])
-        assertEquals(1, carry.detectorCalls)
-    }
 
     @Test
-    fun `retained history restores a discovered link on the first displayed frame`() {
-        val cache = TerminalRenderCache(24, 2)
-        val contentSource = TerminalHyperlinkTestSource(cache)
-        contentSource.publish(
-            StaticTextFrame(
-                frameGeneration = 1L,
-                structureGeneration = 1L,
-                rowTexts = arrayOf("https://example.com", "alpha"),
-                lineIds = longArrayOf(0L, 0L),
-            ),
-        )
-        val urlScans = AtomicInteger()
-        val repaintObserved = CountDownLatch(1)
-        val host =
-            TestDiscoveryHost(
-                contentSource,
-                renderCache = cache,
-                hyperlinkDetector =
-                    { request ->
-                        buildList {
-                            for (lineIndex in 0 until request.lineCount) {
-                                if (request.lineText(lineIndex) != "https://example.com\n") continue
-                                urlScans.incrementAndGet()
+    fun `scroll preserves discovered links when generation changes but text stays identical`() =
+        runDiscoveryTest {
+            val cache = TerminalRenderCache(24, 2)
+            val contentSource = TerminalHyperlinkTestSource(cache)
+            contentSource.publish(
+                StaticTextFrame(
+                    frameGeneration = 1L,
+                    structureGeneration = 1L,
+                    rowTexts = arrayOf("https://example.com", "omega"),
+                    lineIds = longArrayOf(10L, 11L),
+                ),
+            )
+            val detectorCalls = AtomicInteger()
+            val host =
+                TestDiscoveryHost(
+                    contentSource,
+                    renderCache = cache,
+                    hyperlinkDetector =
+                        { request ->
+                            buildList {
+                                detectorCalls.incrementAndGet()
                                 add(
                                     request.hyperlink(
-                                        lineIndex = lineIndex,
+                                        lineIndex = 0,
                                         startOffset = 0,
                                         endOffset = "https://example.com".length,
                                         action = SwingHyperlinkAction.NONE,
                                     ),
                                 )
                             }
-                        }
-                    },
-                repaintObserved = repaintObserved,
-            )
-        val controller = TerminalHyperlinkDiscoveryController(host, testScope())
+                        },
+                )
+            val controller = TerminalHyperlinkDiscoveryController(host, backgroundScope, StandardTestDispatcher(testScheduler))
 
-        SwingUtilities.invokeAndWait {
             controller.scheduleForFrame()
+
+            testScheduler.runCurrent()
+            assertTrue(host.repaintCount > 0)
+
+            contentSource.publish(
+                StaticTextFrame(
+                    frameGeneration = 2L,
+                    structureGeneration = 2L,
+                    rowTexts = arrayOf("new", "https://example.com"),
+                    lineIds = longArrayOf(9L, 10L),
+                    scrollbackOffset = 1,
+                    lineGenerations = longArrayOf(1L, 2L),
+                ),
+            )
+            val carry = scheduleForFrameAndReadIds(controller, cache, detectorCalls)
+
+            assertEquals(-1, carry.ids[cache.rowOffset(1)])
+            assertEquals(1, carry.detectorCalls)
         }
-        awaitRepaintAndDrainEdt(repaintObserved)
-
-        contentSource.publish(
-            StaticTextFrame(
-                frameGeneration = 2L,
-                structureGeneration = 2L,
-                rowTexts = arrayOf("beta", "gamma"),
-                historySize = 12,
-                lineIds = longArrayOf(0L, 0L),
-            ),
-        )
-        var carry = scheduleForFrameAndReadIds(controller, cache, urlScans)
-        assertEquals(0, carry.ids[cache.rowOffset(0)])
-
-        contentSource.publish(
-            StaticTextFrame(
-                frameGeneration = 3L,
-                structureGeneration = 3L,
-                rowTexts = arrayOf("https://example.com", "alpha"),
-                lineIds = longArrayOf(0L, 0L),
-            ),
-        )
-        carry = scheduleForFrameAndReadIds(controller, cache, urlScans)
-
-        assertEquals(-1, carry.ids[cache.rowOffset(0)])
-        assertEquals(1, carry.detectorCalls)
-    }
 
     @Test
-    fun `scroll preserves discovered links when generation changes but text stays identical`() {
-        val cache = TerminalRenderCache(24, 2)
-        val contentSource = TerminalHyperlinkTestSource(cache)
-        contentSource.publish(
-            StaticTextFrame(
-                frameGeneration = 1L,
-                structureGeneration = 1L,
-                rowTexts = arrayOf("https://example.com", "omega"),
-                lineIds = longArrayOf(10L, 11L),
-            ),
-        )
-        val detectorCalls = AtomicInteger()
-        val repaintObserved = CountDownLatch(1)
-        val host =
-            TestDiscoveryHost(
-                contentSource,
-                renderCache = cache,
-                hyperlinkDetector =
-                    { request ->
-                        buildList {
-                            detectorCalls.incrementAndGet()
-                            add(
-                                request.hyperlink(
-                                    lineIndex = 0,
-                                    startOffset = 0,
-                                    endOffset = "https://example.com".length,
-                                    action = SwingHyperlinkAction.NONE,
-                                ),
-                            )
-                        }
-                    },
-                repaintObserved = repaintObserved,
+    fun `preserved discovered links do not overwrite current OSC8 ids`() =
+        runDiscoveryTest {
+            val cache = TerminalRenderCache(24, 2)
+            val contentSource = TerminalHyperlinkTestSource(cache)
+            contentSource.publish(
+                StaticTextFrame(
+                    frameGeneration = 1L,
+                    structureGeneration = 1L,
+                    rowTexts = arrayOf("https://example.com", "omega"),
+                    lineIds = longArrayOf(0L, 0L),
+                ),
             )
-        val controller = TerminalHyperlinkDiscoveryController(host, testScope())
+            val host =
+                TestDiscoveryHost(
+                    contentSource,
+                    renderCache = cache,
+                    hyperlinkDetector =
+                        { request ->
+                            buildList {
+                                add(
+                                    request.hyperlink(
+                                        lineIndex = 0,
+                                        startOffset = 0,
+                                        endOffset = "https://example.com".length,
+                                        action = SwingHyperlinkAction.NONE,
+                                    ),
+                                )
+                            }
+                        },
+                )
+            val controller = TerminalHyperlinkDiscoveryController(host, backgroundScope, StandardTestDispatcher(testScheduler))
 
-        SwingUtilities.invokeAndWait {
             controller.scheduleForFrame()
-        }
-        awaitRepaintAndDrainEdt(repaintObserved)
 
-        contentSource.publish(
-            StaticTextFrame(
-                frameGeneration = 2L,
-                structureGeneration = 2L,
-                rowTexts = arrayOf("new", "https://example.com"),
-                lineIds = longArrayOf(9L, 10L),
-                scrollbackOffset = 1,
-                lineGenerations = longArrayOf(1L, 2L),
-            ),
-        )
-        val carry = scheduleForFrameAndReadIds(controller, cache, detectorCalls)
+            testScheduler.runCurrent()
+            assertTrue(host.repaintCount > 0)
 
-        assertEquals(-1, carry.ids[cache.rowOffset(1)])
-        assertEquals(1, carry.detectorCalls)
-    }
-
-    @Test
-    fun `preserved discovered links do not overwrite current OSC8 ids`() {
-        val cache = TerminalRenderCache(24, 2)
-        val contentSource = TerminalHyperlinkTestSource(cache)
-        contentSource.publish(
-            StaticTextFrame(
-                frameGeneration = 1L,
-                structureGeneration = 1L,
-                rowTexts = arrayOf("https://example.com", "omega"),
-                lineIds = longArrayOf(0L, 0L),
-            ),
-        )
-        val repaintObserved = CountDownLatch(1)
-        val host =
-            TestDiscoveryHost(
-                contentSource,
-                renderCache = cache,
-                hyperlinkDetector =
-                    { request ->
-                        buildList {
-                            add(
-                                request.hyperlink(
-                                    lineIndex = 0,
-                                    startOffset = 0,
-                                    endOffset = "https://example.com".length,
-                                    action = SwingHyperlinkAction.NONE,
-                                ),
-                            )
-                        }
-                    },
-                repaintObserved = repaintObserved,
+            contentSource.publish(
+                StaticTextFrame(
+                    frameGeneration = 2L,
+                    structureGeneration = 2L,
+                    rowTexts = arrayOf("new", "https://example.com"),
+                    lineIds = longArrayOf(0L, 0L),
+                    scrollbackOffset = 1,
+                    hyperlinkIds =
+                        arrayOf(
+                            IntArray(24),
+                            IntArray(24).apply { this[0] = 7 },
+                        ),
+                ),
             )
-        val controller = TerminalHyperlinkDiscoveryController(host, testScope())
+            val ids = scheduleForFrameAndReadIds(controller, cache).ids
 
-        SwingUtilities.invokeAndWait {
-            controller.scheduleForFrame()
+            assertEquals(7, ids[cache.rowOffset(1)])
+            assertEquals(-1, ids[cache.rowOffset(1) + 1])
+            assertFalse(controller.isDiscoveredHyperlinkResolvable(7, cache))
         }
-        awaitRepaintAndDrainEdt(repaintObserved)
-
-        contentSource.publish(
-            StaticTextFrame(
-                frameGeneration = 2L,
-                structureGeneration = 2L,
-                rowTexts = arrayOf("new", "https://example.com"),
-                lineIds = longArrayOf(0L, 0L),
-                scrollbackOffset = 1,
-                hyperlinkIds =
-                    arrayOf(
-                        IntArray(24),
-                        IntArray(24).apply { this[0] = 7 },
-                    ),
-            ),
-        )
-        val ids = scheduleForFrameAndReadIds(controller, cache).ids
-
-        assertEquals(7, ids[cache.rowOffset(1)])
-        assertEquals(-1, ids[cache.rowOffset(1) + 1])
-        assertFalse(controller.isDiscoveredHyperlinkResolvable(7, cache))
-    }
 
     @Test
     fun `snapshot joins soft-wrapped rows into one logical filter line`() {
@@ -1042,34 +1015,26 @@ class TerminalHyperlinkDiscoveryControllerTest {
         cache: TerminalRenderCache,
         detectorCalls: AtomicInteger? = null,
     ): FrameScheduleResult {
-        var ids = IntArray(0)
-        var calls = 0
-        SwingUtilities.invokeAndWait {
-            controller.scheduleForFrame()
-            ids = controller.hyperlinkIdsFor(cache).copyOf(cache.rows * cache.columns)
-            calls = detectorCalls?.get() ?: 0
-        }
-        return FrameScheduleResult(ids, calls)
+        controller.scheduleForFrame()
+        // Keep analysis queued while checking what the first displayed frame can already reuse.
+        return FrameScheduleResult(
+            controller.hyperlinkIdsFor(cache).copyOf(cache.rows * cache.columns),
+            detectorCalls?.get() ?: 0,
+        )
     }
 
-    private fun awaitRepaintAndDrainEdt(repaintObserved: CountDownLatch) {
-        assertTrue(repaintObserved.await(3, TimeUnit.SECONDS))
-        SwingUtilities.invokeAndWait {
+    /** Advances both coroutine lanes on the EDT and drains cancellation there before runTest reports failures. */
+    private fun runDiscoveryTest(test: TestScope.() -> Unit) =
+        runTest {
+            SwingUtilities.invokeAndWait {
+                try {
+                    test()
+                } finally {
+                    backgroundScope.cancel()
+                    testScheduler.runCurrent()
+                }
+            }
         }
-    }
-
-    private fun testScope(): CoroutineScope =
-        CoroutineScope(
-            SupervisorJob() +
-                object : CoroutineDispatcher() {
-                    override fun dispatch(
-                        context: CoroutineContext,
-                        block: Runnable,
-                    ) {
-                        SwingUtilities.invokeLater(block)
-                    }
-                },
-        ).also(scopes::add)
 
     private class FrameScheduleResult(
         val ids: IntArray,
@@ -1080,11 +1045,15 @@ class TerminalHyperlinkDiscoveryControllerTest {
         override val hyperlinkSource: TerminalRenderFrameReader,
         override val renderCache: TerminalRenderCache,
         override val hyperlinkDetector: SwingHyperlinkDetector,
-        private val repaintObserved: CountDownLatch = CountDownLatch(0),
     ) : TerminalHyperlinkDiscoveryHost {
         var onHyperlinksChanged: () -> Unit = {}
+        var repaintCount = 0
+            private set
 
-        override fun hyperlinksChanged() = onHyperlinksChanged()
+        override fun hyperlinksChanged() {
+            assertTrue(SwingUtilities.isEventDispatchThread())
+            onHyperlinksChanged()
+        }
 
         override fun repaintHyperlinkSpan(
             startRow: Int,
@@ -1092,7 +1061,8 @@ class TerminalHyperlinkDiscoveryControllerTest {
             endRow: Int,
             endColumn: Int,
         ) {
-            repaintObserved.countDown()
+            assertTrue(SwingUtilities.isEventDispatchThread())
+            repaintCount++
         }
     }
 

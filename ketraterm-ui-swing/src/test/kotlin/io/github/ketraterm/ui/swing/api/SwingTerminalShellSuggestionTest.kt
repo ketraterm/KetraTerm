@@ -199,21 +199,24 @@ class SwingTerminalShellSuggestionTest {
                     },
             )
 
-        SwingUtilities.invokeAndWait {
-            component.size = component.preferredGridSize(12, 4)
-            component.requestShellSuggestions("first", 5, 0, 0)
-        }
-        runBlocking { firstStarted.await() }
-        SwingUtilities.invokeAndWait { component.requestShellSuggestions("second", 6, 0, 0) }
-        runBlocking { firstCancelled.await() }
-        val update = view.awaitUpdate()
+        try {
+            SwingUtilities.invokeAndWait {
+                component.size = component.preferredGridSize(12, 4)
+                component.requestShellSuggestions("first", 5, 0, 0)
+            }
+            runBlocking { withTimeout(5_000.milliseconds) { firstStarted.await() } }
+            SwingUtilities.invokeAndWait { component.requestShellSuggestions("second", 6, 0, 0) }
+            runBlocking { withTimeout(5_000.milliseconds) { firstCancelled.await() } }
+            val update = view.awaitUpdate()
 
-        SwingUtilities.invokeAndWait {
-            val state = component.currentShellSuggestionState()
-            assertTrue(state.visible)
-            assertEquals(2, state.count)
-            assertTrue(update.onEdt)
-            component.dispose()
+            SwingUtilities.invokeAndWait {
+                val state = component.currentShellSuggestionState()
+                assertTrue(state.visible)
+                assertEquals(2, state.count)
+                assertTrue(update.onEdt)
+            }
+        } finally {
+            SwingUtilities.invokeAndWait { component.dispose() }
         }
     }
 
@@ -815,28 +818,33 @@ class SwingTerminalShellSuggestionTest {
                     },
             )
 
-        SwingUtilities.invokeAndWait {
-            component.addShellSuggestionEligibilityListener { eligible ->
-                eligibilityDuringCallback += component.currentShellSuggestionState().visible
-                assertEquals(eligible, component.isAutomaticShellSuggestionEligible())
+        try {
+            SwingUtilities.invokeAndWait {
+                component.addShellSuggestionEligibilityListener { eligible ->
+                    eligibilityDuringCallback += component.currentShellSuggestionState().visible
+                    assertEquals(eligible, component.isAutomaticShellSuggestionEligible())
+                }
+                component.requestShellSuggestions("git s", 5, 5, 0)
             }
-            component.requestShellSuggestions("git s", 5, 5, 0)
-        }
-        runBlocking { providerStarted.await() }
+            runBlocking { withTimeout(5_000.milliseconds) { providerStarted.await() } }
 
-        currentSettings =
-            SwingSettings.create { draft ->
-                draft.smartSuggestionsEnabled = true
-                draft.shellSuggestionsEnabled = false
+            SwingUtilities.invokeAndWait {
+                currentSettings =
+                    SwingSettings.create { draft ->
+                        draft.smartSuggestionsEnabled = true
+                        draft.shellSuggestionsEnabled = false
+                    }
+                component.reloadSettings()
             }
-        SwingUtilities.invokeAndWait { component.reloadSettings() }
-        runBlocking { providerCancelled.await() }
+            runBlocking { withTimeout(5_000.milliseconds) { providerCancelled.await() } }
 
-        SwingUtilities.invokeAndWait {
-            assertFalse(component.isAutomaticShellSuggestionEligible())
-            assertFalse(component.currentShellSuggestionState().visible)
-            assertEquals(listOf(false), eligibilityDuringCallback)
-            component.dispose()
+            SwingUtilities.invokeAndWait {
+                assertFalse(component.isAutomaticShellSuggestionEligible())
+                assertFalse(component.currentShellSuggestionState().visible)
+                assertEquals(listOf(false), eligibilityDuringCallback)
+            }
+        } finally {
+            SwingUtilities.invokeAndWait { component.dispose() }
         }
     }
 
