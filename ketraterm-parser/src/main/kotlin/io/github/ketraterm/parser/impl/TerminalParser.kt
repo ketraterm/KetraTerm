@@ -16,6 +16,7 @@
 package io.github.ketraterm.parser.impl
 
 import io.github.ketraterm.parser.ansi.*
+import io.github.ketraterm.parser.api.TerminalCustomOscHandler
 import io.github.ketraterm.parser.api.TerminalOutputParser
 import io.github.ketraterm.parser.runtime.ParserState
 import io.github.ketraterm.parser.spi.TerminalCommandSink
@@ -46,7 +47,9 @@ internal class TerminalParser(
     private val sink: TerminalCommandSink,
     private val state: ParserState = ParserState(),
     clipboardWriteLimitBytes: () -> Int = { 0 },
+    customOscHandler: TerminalCustomOscHandler? = null,
 ) : TerminalOutputParser {
+    private var inCustomOscCallback = false
     private val utf8Decoder = Utf8Decoder()
     private val printableProcessor = PrintableProcessor(sink)
 
@@ -56,6 +59,17 @@ internal class TerminalParser(
             dispatcher = AnsiCommandDispatcher,
             printableSink = PrintableProcessorActionSink(printableProcessor),
             clipboardWriteLimitBytes = clipboardWriteLimitBytes,
+            customOscHandler =
+                customOscHandler?.let { handler ->
+                    TerminalCustomOscHandler { command, payload, offset, length ->
+                        inCustomOscCallback = true
+                        try {
+                            handler.handle(command, payload, offset, length)
+                        } finally {
+                            inCustomOscCallback = false
+                        }
+                    }
+                },
         )
 
     /**
@@ -72,6 +86,7 @@ internal class TerminalParser(
         offset: Int,
         length: Int,
     ) {
+        checkCustomOscReentry()
         require(offset >= 0) { "offset must be non-negative: $offset" }
         require(length >= 0) { "length must be non-negative: $length" }
         require(offset <= bytes.size) { "offset out of range: $offset" }
@@ -94,9 +109,14 @@ internal class TerminalParser(
      * Exposed for tests and for adapters that already chunk at byte granularity.
      */
     override fun acceptByte(byteValue: Int) {
+        checkCustomOscReentry()
         require(byteValue in 0..255) { "byteValue out of range: $byteValue" }
         acceptByteInternal(byteValue)
         flushPrintableForRender()
+    }
+
+    private fun checkCustomOscReentry() {
+        check(!inCustomOscCallback) { "Parser operations cannot reenter a custom OSC callback" }
     }
 
     private fun acceptByteInternal(byteValue: Int) {
@@ -115,6 +135,7 @@ internal class TerminalParser(
      * force pending printable state out.
      */
     override fun endOfInput() {
+        checkCustomOscReentry()
         val utf8Result = utf8Decoder.flushEndOfInput()
         emitUtf8Output(utf8Result)
         printableProcessor.flush(state)
@@ -136,6 +157,7 @@ internal class TerminalParser(
      * command sequence such as RIS/DECSTR.
      */
     override fun reset() {
+        checkCustomOscReentry()
         utf8Decoder.reset()
         printableProcessor.reset(state)
         state.resetAll()

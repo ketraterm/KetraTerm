@@ -47,4 +47,18 @@ public object TerminalParsers {
         sink: TerminalCommandSink,
         clipboardWriteLimitBytes: () -> Int = { 0 },
     ): TerminalOutputParser = TerminalParser(sink, clipboardWriteLimitBytes = clipboardWriteLimitBytes)
+
+    /**
+     * Creates a parser with a host-owned handler for unsupported OSC commands.
+     *
+     * The sink and clipboard budget have the same contracts as the two-argument overload.
+     * Use a session's parser factory to retain its assembled sink and live clipboard budget.
+     * [customOscHandler] defines payload ownership, bounds, ordering, and failure behavior.
+     */
+    @JvmStatic
+    public fun create(
+        sink: TerminalCommandSink,
+        clipboardWriteLimitBytes: () -> Int,
+        customOscHandler: TerminalCustomOscHandler,
+    ): TerminalOutputParser = TerminalParser(sink, clipboardWriteLimitBytes = clipboardWriteLimitBytes, customOscHandler = customOscHandler)
 }

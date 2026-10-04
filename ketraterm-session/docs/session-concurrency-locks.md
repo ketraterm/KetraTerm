@@ -131,6 +131,38 @@ The writer is essential even though session children are supervised. A connector
 
 Local close claims termination and calls `connector.close` before taking cleanup locks. It does not join the writer while a native call is blocked. Remote close cancels pending writes too. A connector must tolerate concurrent close; session cancellation alone cannot interrupt an arbitrary native call. The ring is cleared/released and pending bulk references are dropped on cleanup. While open, active bulk work remains charged to the budgets until its callback returns. The bulk sink checks closure/cancellation before every chunk; a racing native call already entered can finish, and pure encoding between writes is bounded by admitted work. Writer scratch is cleared when its call returns and the coroutine unwinds. `Closed` is published after cleanup and final frame publication have been attempted.
 
+## Closed-session presentation
+
+Closure freezes terminal state after admitted mutation and parser EOF.
+`resize` and `resizeViewport` still reject closure.
+`tryResizeViewport` returns null when closure wins admission; invalid dimensions and collaborator failures still throw.
+An admitted core reflow can finish during closure.
+The connector resize lock serializes connector resize with disposal.
+Close takes that lock before cleanup, without holding the mutation lock.
+Resize takes mutation, then the connector resize lock.
+It never acquires the startup lifecycle lock while holding mutation.
+An active connector resize must return before connector disposal can proceed.
+
+Swing waits for completed `Closed` state before projecting retained frames.
+Its view preserves terminal columns, row identities, attributes, palette, and the final active buffer.
+Width changes clip columns; they never reflow terminal content.
+Height changes show a bottom-anchored window across retained history and grid rows.
+Presentation offsets count rows above that window, including hidden final grid rows.
+A scrolled view preserves its top row where the new bounds permit.
+Font changes preserve cell coordinates and selection.
+Mouse input selects and scrolls locally, even when the final terminal modes request application tracking.
+An alternate buffer retains only its final grid; closure does not restore the primary buffer.
+View changes use synchronized retained reads and leave session publication generation unchanged.
+Disposal cancels view work and releases the binding without restarting or closing the transport.
+
+The focused JMH benchmark measures frozen ASCII projection and cache updates.
+It excludes session creation, Swing dispatch, painting, and platform costs.
+On Windows with Temurin 25.0.3, two forks used three one-second warmups and five one-second measurements.
+Normalized allocation was 0.005 B/update unchanged and 0.243 B/update while scrolling.
+Allocation rates stayed at 0.006–0.007 MB/s with no GC events.
+These small measurements include JVM/harness overhead; they do not establish exact zero allocation or a complete Swing frame budget.
+Run `RetainedFrameViewportBenchmark` with `-prof gc` to reproduce this scope.
+
 ## Selected shell integration
 
 Session selects one `TerminalShellIntegrationFactory` before starting output.
@@ -166,6 +198,24 @@ the session rechecks readiness and primary-buffer state before queue admission.
 User input, closure, or submission ends readiness observation. Host flows and
 metadata remain host-owned after session closure; active editing becomes
 unavailable through the closed session.
+
+## Ordered custom OSC handling
+
+Install `TerminalCustomOscHandler` through `parserFactory` and pass its supplied sink and clipboard budget to `TerminalParsers.create`.
+The parser completes preceding output before the callback and consumes later bytes after it returns.
+The callback can read the session frame and publish host metadata with the matching line identity.
+The host owns protocol interpretation, permissions, retained copies, and handler cleanup.
+This path works with a host-owned shell model or with no shell producer.
+
+Built-in OSC commands keep their existing host services and policy gates.
+They never fall through to the custom handler, including malformed and denied requests.
+See the handler KDoc for the borrowed payload, collection bound, and string recovery contract.
+Custom callbacks must not wait for UI work, mutate the session, or close it.
+Parser reentry and recursive session output throw before mutation.
+Unhandled parser or callback failures stop the input call and propagate unchanged, including cancellation.
+The connector must stop delivery and report the failure through its listener's `onError` callback.
+The session then closes and retains the original cause. PTY connectors provide this failure routing.
+A concurrent close waits for admitted parsing; EOF discards any incomplete OSC.
 
 ## Clipboard read lifetime and output commitment
 

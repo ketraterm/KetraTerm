@@ -72,6 +72,11 @@ import kotlin.math.floor
  * selection and stop selection dragging. Selection uses physical cell coordinates;
  * unchanged grid dimensions preserve it.
  *
+ * After closure, the view preserves the final grid, active buffer, palette, and selection.
+ * Width changes clip columns without reflow. Height changes show a bottom-anchored window
+ * over retained rows. Scrolling includes grid rows hidden above a shorter view.
+ * Font changes affect only presentation. No transport work or session restart occurs.
+ *
  * A focused terminal paints the application's cursor shape and blink state.
  * Without keyboard focus blocks become steady outlines; bars and underlines stay steady, preserving application
  * cursor visibility and viewport clipping. Focus never changes the session's cursor style.
@@ -97,6 +102,7 @@ public class SwingTerminal
         ) : this(settingsProvider, hostServices, Dispatchers.Default)
 
         private var session: TerminalSession? = null
+        private var retainedViewport: RetainedFrameViewport? = null
         private var disposed: Boolean = false
         private var settings: SwingSettings = settingsProvider.currentSettings()
         private var metrics: SwingMetrics = buildMetrics(settings)
@@ -437,11 +443,13 @@ public class SwingTerminal
                     override val settings: SwingSettings get() = this@SwingTerminal.settings
                     override val metrics: SwingMetrics get() = this@SwingTerminal.metrics
                     override val renderCache: TerminalRenderCache get() = this@SwingTerminal.renderCache
-                    override val session: TerminalInputEncoder? get() = this@SwingTerminal.session
+                    override val session: TerminalInputEncoder? get() = this@SwingTerminal.session?.takeUnless { it.isClosed }
 
                     override fun mouseTrackingMode(): MouseTrackingMode =
                         MouseTrackingMode.entries[
-                            TerminalInputState.mouseTrackingMode(this@SwingTerminal.session?.getInputModeBits() ?: 0L),
+                            TerminalInputState.mouseTrackingMode(
+                                this@SwingTerminal.session?.takeUnless { it.isClosed }?.getInputModeBits() ?: 0L,
+                            ),
                         ]
 
                     override fun encodeMouse(event: TerminalMouseEvent) {
@@ -1163,6 +1171,7 @@ public class SwingTerminal
             bindingJob?.cancel(CancellationException("Terminal session binding replaced"))
             mouseController.resetWheelInput()
             this.session = session
+            retainedViewport = null
             resetRenderCaches()
             updateMinimizedStateFromAncestor()
             applySettingsToSession(session, settings)
@@ -1183,6 +1192,14 @@ public class SwingTerminal
             resizeSessionToVisibleGridOnEdt()
             bindingJob =
                 componentScope.launch {
+                    launch {
+                        session.state.filterIsInstance<TerminalSessionState.Closed>().take(1).collect {
+                            if (this@SwingTerminal.session === session) {
+                                mouseController.resetWheelInput()
+                                renderFrameController.handlePublishedFrame()
+                            }
+                        }
+                    }
                     launch {
                         session.renderGeneration
                             .filter { it >= 0L }
@@ -1230,6 +1247,7 @@ public class SwingTerminal
                 { cancelAndHideShellSuggestionsOnEdt("Terminal session unbound") },
                 {
                     session = null
+                    retainedViewport = null
                     resetRenderCaches()
                 },
                 ::resetScrollbackState,
@@ -1423,7 +1441,12 @@ public class SwingTerminal
             if (!SwingUtilities.isEventDispatchThread()) return false
             if (!renderCache.hasFrame) return false
             val firstAbsoluteRow = renderCache.discardedCount
-            val lastAbsoluteRow = renderCache.discardedCount + renderCache.historySize + renderCache.rows - 1L
+            var lastAbsoluteRow = renderCache.discardedCount + renderCache.historySize + renderCache.rows - 1L
+            if (session?.state?.value is TerminalSessionState.Closed) {
+                session?.readRenderFrame {
+                    lastAbsoluteRow = it.discardedCount + it.historySize + it.rows - 1L
+                }
+            }
             selectionController.selectAbsoluteRows(firstAbsoluteRow, lastAbsoluteRow, renderCache.columns)
             repaint()
             return true
@@ -2325,12 +2348,11 @@ public class SwingTerminal
             publishViewportState(renderCache.historySize)
             lastResizedColumns = columns
             lastResizedRows = rows
-            selectionController.clearSelection()
-
             // Animation is finished above, so resize anchoring is always row-exact.
             val oldOffset = viewportController.requestedOffset
 
-            val resizedViewport = boundSession.resizeViewport(columns, rows, oldOffset)
+            val resizedViewport = boundSession.tryResizeViewport(columns, rows, oldOffset) ?: return true
+            selectionController.clearSelection()
             viewportController.anchorAfterResize(
                 resizedViewport.scrollbackOffset,
                 resizedViewport.historySize,
@@ -2365,9 +2387,30 @@ public class SwingTerminal
         }
 
         private fun refreshRenderCacheFromSession(session: TerminalSession) {
-            session.readPublishedFrame { published ->
-                renderCache.updateFrom(published)
-            } ?: return
+            val closed = session.state.value is TerminalSessionState.Closed
+            scrollbarOverlay.retainedOutput = closed
+            if (closed) {
+                val viewport = retainedViewport ?: RetainedFrameViewport(session).also { retainedViewport = it }
+                viewport.visibleRows = visibleGridRows()
+                val previousHistory = renderCache.historySize
+                renderCache.updateFrom(viewport, viewportController.requestedOffset, requestedRenderRows())
+                if (previousHistory != renderCache.historySize) {
+                    val offset =
+                        if (viewportController.requestedOffset == 0) {
+                            0
+                        } else {
+                            (viewportController.requestedOffset.toLong() + renderCache.historySize - previousHistory)
+                                .coerceIn(0L, renderCache.historySize.toLong())
+                                .toInt()
+                        }
+                    viewportController.anchorAfterResize(offset, renderCache.historySize, renderCache.discardedCount)
+                    renderCache.updateFrom(viewport, offset, requestedRenderRows())
+                }
+            } else {
+                session.readPublishedFrame { published ->
+                    renderCache.updateFrom(published)
+                } ?: return
+            }
             hyperlinkDiscoveryController.scheduleForFrame()
         }
 
@@ -2401,6 +2444,14 @@ public class SwingTerminal
         }
 
         private fun requestRenderFromSession(session: TerminalSession) {
+            if (session.state.value is TerminalSessionState.Closed) {
+                refreshRenderCacheFromSession(session)
+                refreshShellIntegrationDecorations(session)
+                searchController.updateViewportHighlights()
+                publishViewportState(renderCache.historySize)
+                repaint()
+                return
+            }
             session.requestRender(
                 scrollbackOffset = viewportController.requestedOffset,
                 viewportRows = requestedRenderRows(),

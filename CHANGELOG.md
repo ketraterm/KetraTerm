@@ -6,6 +6,9 @@ Release notes for library consumers and embedders. Product-specific changes are 
 
 ### Improvements and fixes
 
+- Swing can bind and resize after session exit. It projects retained rows without reflow, preserves selection across font changes, and keeps transport closed.
+- Added `TerminalSession.tryResizeViewport` for explicit resize admission during closure. Strict resize APIs retain their rejection contract.
+
 - Added headless and Swing dependencies and a Maven BOM to align library versions.
 
 - Preserve application cursor shapes in unfocused Swing terminals: blocks become thin hollow outlines, while bars and underlines remain steady. Device-aligned beams and underlines keep thickness consistent across panes at fractional display scales. Focus restores application blinking; cursor visibility, wide-cell ownership, bidi placement, and blinking-text behavior are preserved.
@@ -27,6 +30,8 @@ Release notes for library consumers and embedders. Product-specific changes are 
 - Expanded CSI commands to 32 parameters and bounded grapheme retention to 32 codepoints. Excess parameters reject the command; excess grapheme continuations are discarded without creating extra cells.
 
 ### API changes
+
+- Added `TerminalCustomOscHandler` through `TerminalParsers.create` for bounded, ordered host OSC handling. Session factories preserve host services and existing transport failure routing.
 
 - Added `TerminalSession.submitBytes` and `submitInput` for ordered byte and semantic input, with explicit acceptance or rejection results.
 - Added conditional command edits through `TerminalShellCommandLineState` to reject edits when the command context changes.

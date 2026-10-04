@@ -26,6 +26,8 @@ public interface TerminalConnectorListener {
      * Connectors may reuse [bytes] after this callback returns.
      * Connectors must invoke this callback serially and in stream order for one
      * started listener.
+     * If this callback throws, stop delivery and report the original exception through [onError], including cancellation.
+     * Local closure can suppress that report. Never retry a failed byte range.
      *
      * @param bytes byte array containing the received data.
      * @param offset starting index of valid data in the byte array.

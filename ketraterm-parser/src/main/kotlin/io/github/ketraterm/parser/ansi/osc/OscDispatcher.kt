@@ -16,6 +16,7 @@
 package io.github.ketraterm.parser.ansi.osc
 
 import io.github.ketraterm.parser.ansi.ControlStringPolicy
+import io.github.ketraterm.parser.api.TerminalCustomOscHandler
 import io.github.ketraterm.parser.spi.TerminalCommandSink
 import io.github.ketraterm.parser.utf8.Utf8DecodeResult
 import io.github.ketraterm.parser.utf8.Utf8Decoder
@@ -32,6 +33,7 @@ internal class OscDispatcher {
         length: Int,
         overflowed: Boolean,
         payloadLimit: Int = ControlStringPolicy.MAX_PAYLOAD_BYTES,
+        customOscHandler: TerminalCustomOscHandler? = null,
     ) {
         if (length <= 0) {
             return
@@ -43,7 +45,7 @@ internal class OscDispatcher {
         }
 
         val command = ControlStringPolicy.oscCommand(payload, commandEnd)
-        val limit = if (command == 52) payloadLimit else ControlStringPolicy.oscLimit(command)
+        val limit = if (command == 52) payloadLimit else ControlStringPolicy.oscLimit(command, customOscHandler != null)
         if (limit == 0) return
         if (overflowed || length > limit) {
             if (command == 8) sink.endHyperlink()
@@ -144,6 +146,7 @@ internal class OscDispatcher {
                     }
                 }
             }
+            else -> customOscHandler?.handle(command, payload, commandEnd + 1, length - commandEnd - 1)
         }
     }
 

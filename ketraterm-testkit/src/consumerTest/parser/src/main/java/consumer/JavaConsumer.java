@@ -47,6 +47,13 @@ public final class JavaConsumer {
         parser.endOfInput();
         sink.showNotification("title", "!", NotificationLevel.INFO);
         if (!output.toString().equals("Java!")) throw new AssertionError(output);
+        var custom = TerminalParsers.create(sink, () -> 0, (command, payload, offset, length) -> {
+            if (command != 1341) throw new AssertionError("Custom command number");
+            output.append(new String(payload, offset, length, StandardCharsets.UTF_8));
+        });
+        var customBytes = "\033]1341;custom\007".getBytes(StandardCharsets.UTF_8);
+        custom.accept(customBytes, 0, customBytes.length);
+        if (!output.toString().equals("Java!custom")) throw new AssertionError(output);
         try (var metadata = TerminalParsers.class.getResourceAsStream("/META-INF/io.github.ketraterm_ketraterm-parser.kotlin_module")) {
             if (metadata == null || metadata.readAllBytes().length == 0) throw new AssertionError("Missing Kotlin metadata");
         }

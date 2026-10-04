@@ -82,6 +82,35 @@ class TerminalScrollbarOverlayTest {
     }
 
     @Test
+    fun `retained alternate output exposes its presentation scroll range`() {
+        val overlay = TerminalScrollbarOverlay().also { it.retainedOutput = true }
+        val settings = SwingSettings.create { it.alternateScreenPadding = SwingPadding(0, 4, 8, 10) }
+        val thumb = Rectangle()
+        assertTrue(
+            overlay.copyThumbBounds(
+                settings = settings,
+                activeBuffer = TerminalRenderBufferKind.ALTERNATE,
+                componentWidth = 110,
+                componentHeight = 108,
+                state = viewportState(scrollbackOffset = 4.0),
+                destination = thumb,
+            ),
+        )
+        assertTrue(thumb.width > 0 && thumb.height > 0)
+        overlay.retainedOutput = false
+        assertFalse(
+            overlay.copyThumbBounds(
+                settings = settings,
+                activeBuffer = TerminalRenderBufferKind.ALTERNATE,
+                componentWidth = 110,
+                componentHeight = 108,
+                state = viewportState(scrollbackOffset = 4.0),
+                destination = thumb,
+            ),
+        )
+    }
+
+    @Test
     fun `dragging maps bottom origin thumb movement to terminal scrollback offset`() {
         val overlay = TerminalScrollbarOverlay()
         val settings =

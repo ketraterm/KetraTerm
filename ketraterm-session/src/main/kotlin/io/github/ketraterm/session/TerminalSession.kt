@@ -194,6 +194,7 @@ public class TerminalSession private constructor(
     private val mutationLock: Any get() = runtime.mutationLock
     private var processingOutput = false
     private val connectorLifecycleLock = Any()
+    private val connectorResizeLock = Any()
     private var startAttempted = false
     private val closingEvent = AtomicReference<TerminalSessionCloseEvent?>(null)
     private val startupSubmission = startupCommand?.let(::StartupCommandSubmission)
@@ -501,8 +502,10 @@ public class TerminalSession private constructor(
                     synchronized(outboundWriteLock) {
                         inputRejection() ?: when {
                             expected.isCancelled -> TerminalInputAdmission.CANCELLED
-                            expected.owner !== editContextOwner || expected.inputRevision != inputRevision ||
-                                expected.outputRevision != outputRevision || expected.shellRevision != revision ||
+                            expected.owner !== editContextOwner ||
+                                expected.inputRevision != inputRevision ||
+                                expected.outputRevision != outputRevision ||
+                                expected.shellRevision != revision ||
                                 expected.commandLine != snapshot -> TerminalInputAdmission.STALE_CONTEXT
                             else -> {
                                 enqueueCompoundInput(events)
@@ -608,20 +611,45 @@ public class TerminalSession private constructor(
         columns: Int,
         rows: Int,
         oldScrollbackOffset: Int = 0,
-    ): TerminalViewportResizeResult {
+    ): TerminalViewportResizeResult = checkNotNull(tryResizeViewport(columns, rows, oldScrollbackOffset)) { "session is closed" }
+
+    /**
+     * Attempts the same terminal reflow as [resizeViewport].
+     *
+     * Returns null when closure wins admission. Terminal state and the connector then remain unchanged.
+     * Presentation owners can continue to read retained frames.
+     * Invalid dimensions fail validation first. Other failures propagate to the caller.
+     *
+     * Calls serialize with terminal mutation. An admitted core resize can finish during closure.
+     * Connector resize and disposal share a separate lock. Closure prevents new connector resize calls.
+     * This method is synchronous and can block in the connector.
+     *
+     * @param columns positive terminal column count.
+     * @param rows positive terminal row count.
+     * @param oldScrollbackOffset whole-row offset above the live screen, or zero.
+     * @return the complete resize anchor, or null if closure has begun.
+     */
+    public fun tryResizeViewport(
+        columns: Int,
+        rows: Int,
+        oldScrollbackOffset: Int = 0,
+    ): TerminalViewportResizeResult? {
         require(columns > 0) { "columns must be positive, got $columns" }
         require(rows > 0) { "rows must be positive, got $rows" }
+        if (isSessionClosed()) return null
 
         val result =
             synchronized(mutationLock) {
-                check(!isSessionClosed()) { "session is closed" }
+                if (isSessionClosed()) return null
                 outputRevision++
                 val (scrollbackOffset, historySize) = terminal.resize(columns, rows, oldScrollbackOffset)
                 var resizedViewport: TerminalViewportResizeResult? = null
                 renderReader.readRenderFrame { frame ->
                     resizedViewport = TerminalViewportResizeResult(scrollbackOffset, historySize, frame.discardedCount)
                 }
-                connector.resize(columns, rows)
+                synchronized(connectorResizeLock) {
+                    if (!isSessionClosed()) connector.resize(columns, rows)
+                }
                 checkNotNull(resizedViewport) { "Render reader did not expose the resized terminal frame" }
             }
         invalidateRender()
@@ -917,6 +945,9 @@ public class TerminalSession private constructor(
 
     /**
      * Consumes host bytes synchronously, mutating parser/core before returning.
+     * Output callbacks must not reenter this operation.
+     * Parser or callback failures stop the input call and propagate unchanged.
+     * The connector must stop delivery and report the failure through [onError].
      */
     override fun onBytes(
         bytes: ByteArray,
@@ -929,6 +960,7 @@ public class TerminalSession private constructor(
         try {
             synchronized(mutationLock) {
                 if (isSessionClosed()) return
+                check(!processingOutput) { "Output callbacks must not reenter the session" }
                 if (length != 0) outputRevision++
                 processingOutput = true
                 try {
@@ -1234,7 +1266,11 @@ public class TerminalSession private constructor(
         }
 
         try {
-            cleanup { synchronized(connectorLifecycleLock) { connector.close() } }
+            cleanup {
+                synchronized(connectorLifecycleLock) {
+                    synchronized(connectorResizeLock) { connector.close() }
+                }
+            }
             cleanup { clipboardReads?.close() }
             cleanup { outboundWriter.close() }
             cleanup {
@@ -1359,6 +1395,9 @@ public class TerminalSession private constructor(
          * @param shellIntegration sole shell metadata producer; null leaves shell features unavailable.
          * @param inputEncoderFactory creates independent admission and bulk encoders bound to session-owned output.
          * @param parserFactory customizes parsing using the assembled host sink and its live clipboard budget.
+         * Pass both to [TerminalParsers.create] when adding a custom OSC handler.
+         * Its callback runs under mutation serialization and may read frames before later output.
+         * It must not call mutating session APIs or close the session.
          * @throws IllegalArgumentException when [startupCommand] is supplied without [shellIntegration].
          * @throws IllegalArgumentException when the initial render frame is absent or has incompatible dimensions,
          * or the input factory reuses one encoder instance.

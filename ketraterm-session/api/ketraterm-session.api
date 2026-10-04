@@ -137,6 +137,8 @@ public final class io/github/ketraterm/session/TerminalSession : io/github/ketra
 	public final fun submitInput (Lio/github/ketraterm/input/event/TerminalInputEvent;)Lio/github/ketraterm/session/TerminalInputAdmission;
 	public final fun submitInput (Lio/github/ketraterm/session/TerminalCommandEditContext;Ljava/util/List;)Lio/github/ketraterm/session/TerminalInputAdmission;
 	public final fun submitInput (Ljava/util/List;)Lio/github/ketraterm/session/TerminalInputAdmission;
+	public final fun tryResizeViewport (III)Lio/github/ketraterm/session/TerminalViewportResizeResult;
+	public static synthetic fun tryResizeViewport$default (Lio/github/ketraterm/session/TerminalSession;IIIILjava/lang/Object;)Lio/github/ketraterm/session/TerminalViewportResizeResult;
 }
 
 public final class io/github/ketraterm/session/TerminalSession$Companion {

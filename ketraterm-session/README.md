@@ -116,6 +116,18 @@ It exposes the live query, primitive-copy and observation contract without recor
 or clear operations. The existing producer state implements that role directly;
 the host retains its own `shellState` to publish. See [reader ownership and ABI](../docs/render-reader-ownership.md).
 
+For host OSC protocols, use the parser extension through normal session assembly:
+
+```kotlin
+parserFactory = TerminalOutputParserFactory { sink, clipboardBudget ->
+    TerminalParsers.create(sink, clipboardBudget, hostCustomOscHandler)
+}
+```
+
+The host handler can capture anchors through the session frame reader before later bytes arrive.
+See the [ordered callback contract](docs/session-concurrency-locks.md#ordered-custom-osc-handling).
+IntelliJ protocol interpretation remains in the host adapter.
+
 Preserve stream order: process the matching output, capture stable primary-buffer
 line identities, publish the semantic update, then deliver later bytes. For
 example, a host prompt-start callback can capture its anchor with:

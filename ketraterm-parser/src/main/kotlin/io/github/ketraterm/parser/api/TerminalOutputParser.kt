@@ -24,8 +24,8 @@ import io.github.ketraterm.parser.spi.TerminalCommandSink
  * arbitrary chunk boundaries, and emit semantic terminal operations to a [TerminalCommandSink].
  *
  * Factory-created parsers require serialized, non-reentrant calls, including reset and
- * end-of-input. Sink callbacks run synchronously on the calling thread; supplied byte
- * ranges are consumed before returning and may then be reused. Sink exceptions propagate
+ * end-of-input. Sink and custom OSC callbacks run synchronously on the calling thread.
+ * Supplied byte ranges are consumed before returning and may then be reused. Callback exceptions propagate
  * to the caller; stop processing that stream after a failed callback rather than assuming
  * parser and sink state remain aligned.
  */

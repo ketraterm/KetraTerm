@@ -50,6 +50,35 @@ import javax.swing.SwingUtilities
 
 class SwingTerminalCommandNavigationTest {
     @Test
+    fun `closed command navigation uses presentation rows and retains older output after growth`() {
+        val session = commandSession(CommandFrameReader())
+        session.close()
+        SwingUtilities.invokeAndWait {
+            val component =
+                SwingTerminal(settingsProvider = {
+                    SwingSettings.create { it.padding = SwingPadding(0, 0, 0, 0) }
+                })
+            try {
+                component.size = component.preferredGridSize(12, 1)
+                component.bind(session)
+                component.scrollToPreviousCommand()
+                assertEquals(2, component.viewportState().renderOffset)
+                val latest = session.shellIntegrationState.latestCommandRecordId()
+                assertTrue(component.selectCommandOutput(latest))
+                assertEquals(1, component.viewportState().renderOffset)
+                val first = session.shellIntegrationState.previousCommandRecordId(latest)
+                component.size = component.preferredGridSize(12, 20)
+                component.componentListeners.forEach {
+                    it.componentResized(java.awt.event.ComponentEvent(component, java.awt.event.ComponentEvent.COMPONENT_RESIZED))
+                }
+                assertEquals("row3", component.commandOutputText(first))
+            } finally {
+                component.dispose()
+            }
+        }
+    }
+
+    @Test
     fun `host prompt updates repaint and clear marker hover without another render frame`() {
         SwingUtilities.invokeAndWait {
             HostModelFixture().use { fixture ->

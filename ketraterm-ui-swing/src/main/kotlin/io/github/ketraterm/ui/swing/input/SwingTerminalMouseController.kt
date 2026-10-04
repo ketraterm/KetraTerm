@@ -108,7 +108,9 @@ internal class SwingTerminalMouseController(
             handleMouseTracking(event, TerminalMouseEventType.WHEEL)
             return
         }
-        val alternateScreen = host.renderCache.activeBuffer == TerminalRenderBufferKind.ALTERNATE
+        val alternateScreen =
+            host.renderCache.activeBuffer == TerminalRenderBufferKind.ALTERNATE &&
+                (host.session != null || host.renderCache.historySize == 0)
         selectWheelRoute(if (alternateScreen) WheelRoute.ALTERNATE else WheelRoute.VIEWPORT)
         val delta = wheelScrollLines(event)
         if (!delta.isFinite() || delta == 0.0) {

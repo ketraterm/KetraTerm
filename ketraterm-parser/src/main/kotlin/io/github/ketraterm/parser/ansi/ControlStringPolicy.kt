@@ -36,13 +36,16 @@ internal object ControlStringPolicy {
         return (dataStart + encodedBytes).coerceAtMost(Int.MAX_VALUE - 8L).toInt()
     }
 
-    /** Zero means unsupported: stop collecting without decoding or dispatching the body. */
-    fun oscLimit(command: Int): Int =
+    /** Zero stops collection. An installed custom handler shares the ordinary envelope limit. */
+    fun oscLimit(
+        command: Int,
+        customHandlerPresent: Boolean = false,
+    ): Int =
         when (command) {
             0, 1, 2, 4, 7, 8, 9, 52, 133, 777 -> MAX_PAYLOAD_BYTES
             // Three implemented dynamic-color targets, with room for color syntax and whitespace.
             10, 11, 12 -> MAX_DYNAMIC_COLOR_BYTES
-            else -> 0
+            else -> if (command >= 0 && customHandlerPresent) MAX_PAYLOAD_BYTES else 0
         }
 
     fun dcsLimit(
