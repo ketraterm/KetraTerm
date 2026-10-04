@@ -332,5 +332,7 @@ the review records the execution order and acceptance criteria.
 
 ### Release Verification
 
+- `DONE(host/profile)`: Maven library publication has dependency-only headless and Swing entry points, one constraints-only BOM, a verified build-local repository, and formatting/ABI/test/consumer gates on Central upload. Snapshot destination and signing follow the publisher configuration. Authenticated upload and Central namespace snapshot enablement require account configuration; broader G02 product delivery remains open. See [library dependency setup](../README.md#using-the-libraries).
+
 - `TODO(host/profile)`: gate binary and plugin delivery on verification of the exact release revision, including native PTY coverage, package checks, Plugin Verifier for supported IDEs, and installed-product smoke tests. Current binary publishing is independent of the test workflow; ordinary CI omits native PTY opt-in and plugin package checks. Include the IDE 2026.3 bundled-JNA module visibility change identified in the embedding review; the plugin currently relies on IDE-native dependencies while testing only 2026.2. See audit G02.
 - `TODO(policy)`: define measured allocation/latency budgets for warm terminal paths, changing content, history growth, and platform painting; keep examples executable and performance claims scoped to evidence. The audit's short Windows paint smoke is not a release baseline. See audit G03.

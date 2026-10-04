@@ -40,21 +40,23 @@ jobs:
         shell: bash
         run: |
           if [[ "${GITHUB_REF}" == refs/tags/v* ]]; then
+            test "${GITHUB_REF#refs/tags/v}" = "$(tr -d '\r\n' < VERSION)" || {
+              echo "Release tag must match VERSION" >&2
+              exit 1
+            }
             echo "RELEASE=true" >> "$GITHUB_ENV"
           else
             echo "RELEASE=false" >> "$GITHUB_ENV"
           fi
 
       - name: Verify Quality and Run Tests
-        run: xvfb-run -a ./gradlew spotlessCheck test --no-daemon
+        run: xvfb-run -a ./gradlew spotlessCheck checkKotlinAbi test --no-daemon
 
       - name: Verify Local Publication
         env:
-          ORG_GRADLE_PROJECT_mavenCentralUsername: ${{ secrets.MAVEN_CENTRAL_USERNAME }}
-          ORG_GRADLE_PROJECT_mavenCentralPassword: ${{ secrets.MAVEN_CENTRAL_PASSWORD }}
           ORG_GRADLE_PROJECT_signingInMemoryKey: ${{ secrets.SIGNING_IN_MEMORY_KEY }}
           ORG_GRADLE_PROJECT_signingInMemoryKeyPassword: ${{ secrets.SIGNING_IN_MEMORY_KEY_PASSWORD }}
-        run: ./gradlew publishToMavenLocal --no-daemon
+        run: xvfb-run -a ./gradlew publicationChecks --no-daemon
 
       - name: Publish to Maven Central
         env:
@@ -62,4 +64,4 @@ jobs:
           ORG_GRADLE_PROJECT_mavenCentralPassword: ${{ secrets.MAVEN_CENTRAL_PASSWORD }}
           ORG_GRADLE_PROJECT_signingInMemoryKey: ${{ secrets.SIGNING_IN_MEMORY_KEY }}
           ORG_GRADLE_PROJECT_signingInMemoryKeyPassword: ${{ secrets.SIGNING_IN_MEMORY_KEY_PASSWORD }}
-        run: ./gradlew publishToMavenCentral --no-daemon
+        run: xvfb-run -a ./gradlew publishToMavenCentral --no-daemon

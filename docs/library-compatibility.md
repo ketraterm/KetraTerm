@@ -23,8 +23,44 @@ already-compiled Kotlin callers may link directly to them. Application,
 benchmark, testkit, workspace and completion-persistence implementation APIs are
 not supported library contracts.
 
-One supported-module set selects all **15 Maven publications**, their ABI checks
+One supported-module set selects all **15 JVM library publications**, their ABI checks
 and the root public Dokka aggregation. New modules are not included automatically.
+The additional constraints-only `ketraterm-bom` aligns these versions without
+pulling libraries in. It also aligns the two dependency-only entry points. Select
+`ketraterm-headless` for a headless pipeline and session or
+`ketraterm-swing` for a Swing terminal; their required pipeline dependencies
+are transitive. See [Gradle setup and optional integrations](../README.md#using-the-libraries).
+
+Maven consumers import the BOM under `dependencyManagement`, then declare selected
+libraries without versions:
+
+```xml
+<dependencyManagement>
+  <dependencies>
+    <dependency>
+      <groupId>io.github.ketraterm</groupId>
+      <artifactId>ketraterm-bom</artifactId>
+      <version>0.4.0-SNAPSHOT</version>
+      <type>pom</type>
+      <scope>import</scope>
+    </dependency>
+  </dependencies>
+</dependencyManagement>
+<dependencies>
+  <dependency>
+    <groupId>io.github.ketraterm</groupId>
+    <artifactId>ketraterm-swing</artifactId>
+    <type>pom</type>
+  </dependency>
+</dependencies>
+```
+
+The dependency-only entry points use POM packaging; Maven needs `type` set to
+`pom`. Individual JVM libraries use the default JAR type.
+
+For snapshots, also configure a Maven repository at
+`https://central.sonatype.com/repository/maven-snapshots/` with snapshots enabled
+and releases disabled. Releases resolve from Maven Central without that repository.
 
 | Offering | Supported modules |
 | --- | --- |

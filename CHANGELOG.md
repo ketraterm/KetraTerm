@@ -6,6 +6,8 @@ Release notes for library consumers and embedders. Product-specific changes are 
 
 ### Improvements and fixes
 
+- Added dependency-only headless and Swing entry points, a constraints-only Maven BOM aligning them with the 15 supported libraries and build-local publication verification. Central uploads now require formatting, public ABI, tests and external-consumer checks; release tags must match `VERSION`.
+
 - Cancel pending completion work and close popups when sessions stop or suggestions are disabled.
 - Preserve application cursor shapes in unfocused Swing terminals: blocks become thin hollow outlines, while bars and underlines remain steady. Device-aligned beams and underlines keep thickness consistent across panes at fractional display scales. Focus restores application blinking; cursor visibility, wide-cell ownership, bidi placement, and blinking-text behavior are preserved.
 - Reworked hyperlink retention and discovery to preserve prepared links through scrolling and focus changes, keep ordered filters from consuming unused rows, and validate hover and activation against the displayed occurrence. Hosts can configure OSC 8 styles and direct or modifier activation through immutable Swing settings; link cursors reflect activation eligibility.

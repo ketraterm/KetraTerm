@@ -20,6 +20,9 @@ plugins {
 
 rootProject.name = "KetraTerm"
 include(
+    ":ketraterm-bom",
+    ":ketraterm-headless",
+    ":ketraterm-swing",
     ":ketraterm-core",
     ":ketraterm-render-api",
     ":ketraterm-parser",

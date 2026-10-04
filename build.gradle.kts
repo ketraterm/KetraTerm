@@ -29,30 +29,53 @@ plugins {
 extra["kotlinxCoroutinesVersion"] = "1.10.2"
 
 // One boundary for Maven publication, public ABI checks and aggregated API documentation.
-val publishedLibraryNames = setOf(
-    "ketraterm-protocol",
-    "ketraterm-parser",
-    "ketraterm-core",
-    "ketraterm-host",
-    "ketraterm-input",
-    "ketraterm-completion",
-    "ketraterm-completion-host",
-    "ketraterm-render-api",
-    "ketraterm-render-cache",
-    "ketraterm-transport-api",
-    "ketraterm-session",
-    "ketraterm-shell-integration",
-    "ketraterm-ui-swing",
-    "ketraterm-ui-swing-host",
-    "ketraterm-pty",
-)
+val publishedLibraryNames =
+    setOf(
+        "ketraterm-protocol",
+        "ketraterm-parser",
+        "ketraterm-core",
+        "ketraterm-host",
+        "ketraterm-input",
+        "ketraterm-completion",
+        "ketraterm-completion-host",
+        "ketraterm-render-api",
+        "ketraterm-render-cache",
+        "ketraterm-transport-api",
+        "ketraterm-session",
+        "ketraterm-shell-integration",
+        "ketraterm-ui-swing",
+        "ketraterm-ui-swing-host",
+        "ketraterm-pty",
+    )
+extra["publishedLibraryNames"] = publishedLibraryNames
+val publishedEntryPointNames = setOf("ketraterm-headless", "ketraterm-swing")
+val publishedDependencyNames = publishedLibraryNames + publishedEntryPointNames
+extra["publishedDependencyNames"] = publishedDependencyNames
+extra["publishedEntryPointNames"] = publishedEntryPointNames
 
-// Stage the real publication's runtime jar and generated metadata, without invoking
-// release signing or remote publishing. Consumer fixtures resolve only this repository.
-val consumerRepository = layout.buildDirectory.dir("library-consumer-repository")
-val prepareLibraryConsumerRepository = tasks.register<Sync>("prepareLibraryConsumerRepository") {
-    into(consumerRepository)
+val publicationRepository = layout.buildDirectory.dir("library-publication-repository")
+val cleanLibraryPublicationRepository =
+    tasks.register<Delete>("cleanLibraryPublicationRepository") {
+        delete(publicationRepository)
+    }
+
+configure<com.diffplug.gradle.spotless.SpotlessExtension> {
+    kotlinGradle {
+        target("*.gradle.kts")
+        ktlint("1.3.1")
+    }
 }
+val prepareLibraryPublicationRepository =
+    tasks.register("prepareLibraryPublicationRepository") {
+        group = "publishing"
+        description = "Publishes all supported artifacts to a build-local Maven repository."
+    }
+val publicationChecks =
+    tasks.register("publicationChecks") {
+        group = "verification"
+        description = "Checks formatting, tests, public ABI, consumers and packaged Maven artifacts."
+        dependsOn("spotlessCheck", ":ketraterm-testkit:publishedConsumerTest", ":ketraterm-testkit:publicationVerificationTest")
+    }
 
 repositories {
     mavenCentral()
@@ -62,13 +85,14 @@ dependencies {
     publishedLibraryNames.forEach { dokka(project(":$it")) }
 }
 
-val versionFile = rootProject.file("VERSION")
-val baseVersion = if (versionFile.exists()) {
-    versionFile.readText().trim()
-} else {
-    "0.1.0"
-}
-val isRelease = System.getenv("RELEASE") == "true"
+val baseVersion =
+    providers
+        .fileContents(layout.projectDirectory.file("VERSION"))
+        .asText
+        .get()
+        .trim()
+require(baseVersion.isNotEmpty() && !baseVersion.endsWith("-SNAPSHOT")) { "VERSION must contain the base release version" }
+val isRelease = providers.environmentVariable("RELEASE").getOrElse("false") == "true"
 val projectVersion = if (isRelease) baseVersion else "$baseVersion-SNAPSHOT"
 
 subprojects {
@@ -86,8 +110,8 @@ subprojects {
     }
 
     plugins.withId("org.jetbrains.kotlin.jvm") {
+        publicationChecks.configure { dependsOn(tasks.named("test")) }
         if (name in publishedLibraryNames) {
-            plugins.apply("com.vanniktech.maven.publish")
 
             extensions.configure<org.jetbrains.kotlin.gradle.dsl.KotlinJvmProjectExtension> {
                 explicitApi()
@@ -102,56 +126,101 @@ subprojects {
                 }
             }
 
-            extensions.configure<com.vanniktech.maven.publish.MavenPublishBaseExtension> {
-                publishToMavenCentral(automaticRelease = true)
-                signAllPublications()
-
-                pom {
-                    name.set(project.name)
-                    description.set("ketraterm terminal emulator library - subproject ${project.name}")
-                    url.set("https://github.com/ketraterm/ketraterm")
-                    licenses {
-                        license {
-                            name.set("The Apache License, Version 2.0")
-                            url.set("https://www.apache.org/licenses/LICENSE-2.0.txt")
-                        }
-                    }
-                    developers {
-                        developer {
-                            id.set("gsargsyan")
-                            name.set("Gagik Sargsyan")
-                        }
-                    }
-                    scm {
-                        connection.set("scm:git:git://github.com/ketraterm/ketraterm.git")
-                        developerConnection.set("scm:git:ssh://github.com/ketraterm/ketraterm.git")
-                        url.set("https://github.com/ketraterm/ketraterm")
-                    }
-                }
-            }
-
-            extensions.configure<PublishingExtension> {
-                publications.withType<MavenPublication>().configureEach {
-                    val publication = this
-                    val publicationName = name.replaceFirstChar(Char::uppercaseChar)
-                    val artifactFileName = "${publication.artifactId}-${publication.version}"
-                    val libraryJar = tasks.named("jar")
-                    val pom = tasks.named<GenerateMavenPom>("generatePomFileFor${publicationName}Publication")
-                    val metadata = tasks.named<GenerateModuleMetadata>("generateMetadataFileFor${publicationName}Publication")
-                    prepareLibraryConsumerRepository.configure {
-                        dependsOn(pom, metadata)
-                        into("${publication.groupId.replace('.', '/')}/${publication.artifactId}/${publication.version}") {
-                            from(libraryJar)
-                            from(pom.map { it.destination }) { rename { "$artifactFileName.pom" } }
-                            from(metadata.flatMap { it.outputFile }) { rename { "$artifactFileName.module" } }
-                        }
-                    }
-                }
-            }
+            publicationChecks.configure { dependsOn(tasks.named("checkKotlinAbi")) }
         }
     }
 
+    if (name in publishedDependencyNames || name == "ketraterm-bom") {
+        plugins.apply("com.vanniktech.maven.publish")
+        val localPublicationTask = "$path:publishAllPublicationsToPublicationValidationRepository"
+        prepareLibraryPublicationRepository.configure { dependsOn(localPublicationTask) }
+
+        if (name in publishedEntryPointNames) {
+            plugins.withId("java-library") {
+                extensions.configure<JavaPluginExtension> {
+                    toolchain.languageVersion.set(JavaLanguageVersion.of(25))
+                }
+                // Dependency bundles publish their Java dependency variants without empty jars.
+                listOf("apiElements", "runtimeElements").forEach { variant ->
+                    configurations.named(variant) { outgoing.artifacts.clear() }
+                }
+                tasks.named("jar") { enabled = false }
+                extensions.configure<com.vanniktech.maven.publish.MavenPublishBaseExtension> {
+                    configure(
+                        com.vanniktech.maven.publish.JavaLibrary(
+                            javadocJar =
+                                com.vanniktech.maven.publish.JavadocJar
+                                    .None(),
+                            sourcesJar =
+                                com.vanniktech.maven.publish.SourcesJar
+                                    .None(),
+                        ),
+                    )
+                }
+                extensions.configure<PublishingExtension> {
+                    publications.withType<MavenPublication>().configureEach { pom.packaging = "pom" }
+                }
+            }
+        }
+
+        extensions.configure<com.vanniktech.maven.publish.MavenPublishBaseExtension> {
+            publishToMavenCentral(automaticRelease = true)
+            signAllPublications()
+
+            pom {
+                name.set(project.name)
+                description.set(
+                    when (project.name) {
+                        "ketraterm-bom" -> "Version alignment for KetraTerm libraries and dependency entry points"
+                        "ketraterm-headless" -> "KetraTerm headless terminal pipeline and session dependencies"
+                        "ketraterm-swing" -> "KetraTerm embedded Swing terminal dependencies"
+                        else -> "KetraTerm terminal library: ${project.name}"
+                    },
+                )
+                url.set("https://github.com/ketraterm/KetraTerm")
+                licenses {
+                    license {
+                        name.set("The Apache License, Version 2.0")
+                        url.set("https://www.apache.org/licenses/LICENSE-2.0.txt")
+                    }
+                }
+                developers {
+                    developer {
+                        id.set("gsargsyan")
+                        name.set("Gagik Sargsyan")
+                    }
+                }
+                scm {
+                    connection.set("scm:git:https://github.com/ketraterm/KetraTerm.git")
+                    developerConnection.set("scm:git:ssh://git@github.com/ketraterm/KetraTerm.git")
+                    url.set("https://github.com/ketraterm/KetraTerm")
+                }
+            }
+        }
+
+        extensions.configure<PublishingExtension> {
+            repositories.maven {
+                name = "publicationValidation"
+                url = publicationRepository.get().asFile.toURI()
+            }
+        }
+        tasks.withType<PublishToMavenRepository>().configureEach {
+            if (name.endsWith("ToPublicationValidationRepository")) {
+                dependsOn(cleanLibraryPublicationRepository)
+            } else {
+                dependsOn(publicationChecks)
+            }
+        }
+        tasks
+            .matching {
+                it.name in setOf("publishToMavenCentral", "publishAndReleaseToMavenCentral", "prepareMavenCentralPublishing")
+            }.configureEach {
+                dependsOn(publicationChecks)
+            }
+    }
+
     plugins.apply("com.diffplug.spotless")
+    publicationChecks.configure { dependsOn(tasks.named("spotlessCheck")) }
     plugins.apply("org.jetbrains.dokka")
 
     plugins.withId("org.jetbrains.dokka") {
@@ -176,6 +245,3 @@ subprojects {
         }
     }
 }
-
-
-

@@ -252,7 +252,7 @@ registerCursorWrapModelProfile(
 )
 
 tasks.test {
-    useJUnitPlatform { excludeTags("compiled-client-upgrade") }
+    useJUnitPlatform { excludeTags("compiled-client-upgrade", "publication-verification") }
 }
 
 // Compile consumer fixtures against each module's exported API variant, not testkit's classpath.
@@ -325,7 +325,7 @@ fun JavaExec.configureConsumerBuild(
         org.jetbrains.kotlin.gradle.plugin
             .getKotlinPluginVersion(logger),
 ) {
-    dependsOn(preparePublishedConsumers, rootProject.tasks.named("prepareLibraryConsumerRepository"))
+    dependsOn(preparePublishedConsumers, rootProject.tasks.named("prepareLibraryPublicationRepository"))
     javaLauncher.set(javaToolchains.launcherFor { languageVersion.set(JavaLanguageVersion.of(25)) })
     classpath = files(rootProject.file("gradle/wrapper/gradle-wrapper.jar"))
     mainClass.set("org.gradle.wrapper.GradleWrapperMain")
@@ -338,9 +338,32 @@ fun JavaExec.configureConsumerBuild(
         "--max-workers=2",
         "-PkotlinVersion=$kotlinCompilerVersion",
         "-PlibraryVersion=${project.version}",
-        "-PlibraryRepository=${rootProject.layout.buildDirectory.dir("library-consumer-repository").get().asFile.toURI()}",
+        "-PlibraryRepository=${rootProject.layout.buildDirectory.dir("library-publication-repository").get().asFile.toURI()}",
         "-PmetadataMode=$metadata",
+        "-PsupportedLibraryNames=${(rootProject.extra["publishedDependencyNames"] as Set<*>).joinToString(",")}",
         verificationTask,
+    )
+}
+
+tasks.register<Test>("publicationVerificationTest") {
+    group = "verification"
+    description = "Verifies the complete Maven repository, including the BOM and packaged sources/documentation."
+    dependsOn(rootProject.tasks.named("prepareLibraryPublicationRepository"), tasks.testClasses)
+    testClassesDirs =
+        sourceSets.test
+            .get()
+            .output.classesDirs
+    classpath = sourceSets.test.get().runtimeClasspath
+    useJUnitPlatform { includeTags("publication-verification") }
+    val repository = rootProject.layout.buildDirectory.dir("library-publication-repository")
+    inputs.dir(repository)
+    systemProperty("publication.repository", repository.get().asFile.absolutePath)
+    systemProperty("publication.version", project.version.toString())
+    systemProperty("publication.libraries", (rootProject.extra["publishedLibraryNames"] as Set<*>).joinToString(","))
+    systemProperty("publication.entryPoints", (rootProject.extra["publishedEntryPointNames"] as Set<*>).joinToString(","))
+    systemProperty(
+        "publication.signed",
+        providers.gradleProperty("signingInMemoryKey").isPresent || providers.environmentVariable("RELEASE").getOrElse("false") == "true",
     )
 }
 
@@ -389,7 +412,7 @@ val compiledClientUpgradeTest =
         val runtimes = consumerFixtureDirectory.map { it.dir("upgrade-classpaths") }
         inputs.dir(baseline)
         inputs.dir(runtimes)
-        inputs.dir(rootProject.layout.buildDirectory.dir("library-consumer-repository"))
+        inputs.dir(rootProject.layout.buildDirectory.dir("library-publication-repository"))
         systemProperty("ketraterm.compiledClientBaseline", baseline.asFile.absolutePath)
         systemProperty("ketraterm.compiledClientRuntimes", runtimes.get().asFile.absolutePath)
         systemProperty(
