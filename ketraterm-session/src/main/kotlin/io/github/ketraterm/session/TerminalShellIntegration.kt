@@ -16,6 +16,7 @@
 package io.github.ketraterm.session
 
 import io.github.ketraterm.protocol.ShellIntegrationEvent
+import io.github.ketraterm.render.api.TerminalRenderBufferKind
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.StateFlow
 
@@ -65,6 +66,17 @@ public interface TerminalShellIntegration {
 
     /** Optional accepted OSC 7 interpretation. Hosts keep their own directory authority. */
     public fun observeWorkingDirectory(uri: String): Unit = Unit
+
+    /**
+     * Reports a local clear after the active screen and history have been erased.
+     * Called synchronously under session mutation serialization, before later output.
+     * Invalidate producer-owned anchors for [buffer]; preserve metadata for the other buffer.
+     * Old line identities cannot resolve after this callback.
+     * Host models keep ownership of their text, metadata, and notifications.
+     * Do not block on UI work, mutate the session, or close it.
+     * Exceptions propagate to the clear caller after the grid has changed.
+     */
+    public fun bufferCleared(buffer: TerminalRenderBufferKind): Unit = Unit
 
     /** Optional synchronous finalization after a parser batch, before startup submission. */
     public fun outputProcessed(): Unit = Unit

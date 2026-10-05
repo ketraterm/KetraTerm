@@ -24,6 +24,34 @@ import org.junit.jupiter.api.Test
 
 class TerminalSearchScanTest {
     @Test
+    fun `clear during a scan rejects all results from the old history`() =
+        runTest {
+            val terminal = TerminalBuffers.create(6, 1, maxHistory = 99)
+            repeat(100) {
+                terminal.writeText("needle")
+                terminal.carriageReturn()
+                terminal.newLine()
+            }
+            val source = terminal as TerminalRenderFrameReader
+            var reads = 0
+            val reader =
+                object : TerminalRenderFrameReader by source {
+                    override fun readRenderFrameForAbsoluteRange(
+                        startAbsoluteRow: Long,
+                        endAbsoluteRow: Long,
+                        consumer: TerminalRenderFrameConsumer,
+                    ) {
+                        source.readRenderFrameForAbsoluteRange(startAbsoluteRow, endAbsoluteRow, consumer)
+                        if (++reads == 1) {
+                            terminal.eraseEntireScreen()
+                            terminal.eraseScreenAndHistory()
+                        }
+                    }
+                }
+            assertNull(TerminalSearchScan().scan(reader, TerminalSearchModel(), "needle", false))
+        }
+
+    @Test
     fun `eviction during a pass removes matches from discarded rows without restarting the pass`() =
         runTest {
             val terminal = TerminalBuffers.create(6, 1, maxHistory = 99)

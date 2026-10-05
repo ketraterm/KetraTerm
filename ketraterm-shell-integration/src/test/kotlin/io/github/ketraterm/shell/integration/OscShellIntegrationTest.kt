@@ -36,6 +36,46 @@ import java.nio.charset.StandardCharsets
 @OptIn(ExperimentalCoroutinesApi::class)
 class OscShellIntegrationTest {
     @Test
+    fun `local clear discards OSC anchors and editing context then accepts a new prompt`() {
+        val connector = MockConnector()
+        createStartedSession(connector, columns = 30, rows = 4).use { session ->
+            connector.feedFromHost("\u001b]7;file:///work\u0007\u001b]133;A\u0007$ \u001b]133;B\u0007old".ascii())
+            val expected = requireNotNull(session.captureCommandEdit())
+            assertTrue(session.shellIntegrationState.recordCount() > 0)
+            assertTrue(session.clearBuffer())
+            assertEquals(0, session.shellIntegrationState.recordCount())
+            assertNull(session.activeShellCommandLine())
+            assertEquals("file:///work", session.currentWorkingDirectoryUri())
+            assertEquals(io.github.ketraterm.session.TerminalInputAdmission.STALE_CONTEXT, session.submitInput(expected, emptyList()))
+            connector.feedFromHost("\u001b]133;D;0\u0007".ascii())
+            assertEquals(0, session.shellIntegrationState.recordCount())
+            connector.feedFromHost("\r\n\u001b]133;A\u0007$ \u001b]133;B\u0007new".ascii())
+            assertEquals("new", session.activeShellCommandLine()?.commandText)
+            assertTrue(session.shellDecorations().promptStarts.any { it })
+            assertTrue(connector.writtenBytes.isEmpty())
+        }
+    }
+
+    @Test
+    fun `alternate clear retains primary shell metadata`() {
+        val connector = MockConnector()
+        createStartedSession(connector, columns = 30, rows = 4).use { session ->
+            connector.feedFromHost("\u001b]133;A\u0007$ \u001b]133;B\u0007run\u001b]133;C\u0007".ascii())
+            val record = session.shellIntegrationState.latestCommandRecordId()
+            val anchor = session.shellIntegrationState.commandAnchorLineId(record)
+            connector.feedFromHost("\u001b[?1049halt".ascii())
+            assertTrue(session.clearBuffer())
+            assertEquals(anchor, session.shellIntegrationState.commandAnchorLineId(record))
+            assertTrue(session.shellIntegrationState.hasRunningCommand())
+            connector.feedFromHost("\u001b[?1049l\u001b]133;D;0\u0007".ascii())
+            assertEquals(
+                TerminalShellIntegrationCommandLifecycle.SUCCEEDED,
+                session.shellIntegrationState.commandMetadata(record)?.lifecycle,
+            )
+        }
+    }
+
+    @Test
     fun `OSC command context supports conditional admission and rejects later output`() {
         val connector = MockConnector()
         createStartedSession(connector, columns = 30, rows = 4).use { session ->

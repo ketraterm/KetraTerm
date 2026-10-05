@@ -923,6 +923,51 @@ public class TerminalSession private constructor(
         if (cancelStartup) startupSubmission?.cancel(TerminalStartupCommandStatus.CANCELLED_BY_INPUT)
     }
 
+    /**
+     * Clears the active screen and its history without sending input to the connector.
+     *
+     * Call from any thread outside a frame lease or output callback.
+     * The mutation lock orders this operation with output and resize.
+     * Admission succeeds before start and while running. Closure returns false without changing retained output.
+     * An operation admitted before closure can finish.
+     *
+     * The cursor position, modes, pen, margins, tab stops, saved cursor, and inactive buffer remain unchanged.
+     * Pending wrap is cancelled. Blank cells use the current erase attributes.
+     * New line identities invalidate old anchors. Applied frames invalidate selection and refresh search.
+     * The selected shell producer receives [TerminalShellIntegration.bufferCleared] under mutation serialization.
+     * Host-owned metadata remains host-owned; its old line identities no longer resolve.
+     *
+     * This operation has no position in the outbound queue and does not wait for pending writes.
+     * Parser state remains intact, including incomplete escape sequences and UTF-8 input.
+     * Collaborator failures propagate after any completed mutation; render invalidation still runs.
+     *
+     * @return true when clearing was admitted, or false when closure has begun.
+     * @throws IllegalStateException on reentry from an output or clear callback.
+     */
+    public fun clearBuffer(): Boolean {
+        try {
+            synchronized(mutationLock) {
+                if (isSessionClosed()) return false
+                check(!processingOutput) { "Output callbacks must not reenter the session" }
+                outputRevision++
+                processingOutput = true
+                try {
+                    terminal.eraseBuffer()
+                    var buffer: TerminalRenderBufferKind? = null
+                    renderReader.readRenderFrame { frame -> buffer = frame.activeBuffer }
+                    runtime.shellIntegration?.bufferCleared(
+                        checkNotNull(buffer) { "Render reader did not expose the cleared terminal frame" },
+                    )
+                } finally {
+                    processingOutput = false
+                }
+            }
+            return true
+        } finally {
+            invalidateRender()
+        }
+    }
+
     override fun encodeKey(event: TerminalKeyEvent) {
         submitInput(event)
     }

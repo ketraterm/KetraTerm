@@ -14,6 +14,7 @@ public abstract interface class io/github/ketraterm/core/api/TerminalBuffer : io
 }
 
 public final class io/github/ketraterm/core/api/TerminalBuffer$DefaultImpls {
+	public static fun eraseBuffer (Lio/github/ketraterm/core/api/TerminalBuffer;)V
 	public static fun getInputModeBits (Lio/github/ketraterm/core/api/TerminalBuffer;)J
 	public static synthetic fun resize$default (Lio/github/ketraterm/core/api/TerminalBuffer;IIIILjava/lang/Object;)Lkotlin/Pair;
 }
@@ -284,6 +285,7 @@ public abstract interface class io/github/ketraterm/core/api/TerminalRenderBuffe
 }
 
 public final class io/github/ketraterm/core/api/TerminalRenderBuffer$DefaultImpls {
+	public static fun eraseBuffer (Lio/github/ketraterm/core/api/TerminalRenderBuffer;)V
 	public static fun getInputModeBits (Lio/github/ketraterm/core/api/TerminalRenderBuffer;)J
 	public static fun readRenderFrame (Lio/github/ketraterm/core/api/TerminalRenderBuffer;IILio/github/ketraterm/render/api/TerminalRenderFrameConsumer;)V
 	public static fun readRenderFrame (Lio/github/ketraterm/core/api/TerminalRenderBuffer;ILio/github/ketraterm/render/api/TerminalRenderFrameConsumer;)V
@@ -342,6 +344,7 @@ public abstract interface class io/github/ketraterm/core/api/TerminalWriter {
 	public abstract fun deleteCharacters (I)V
 	public abstract fun deleteColumns (I)V
 	public abstract fun deleteLines (I)V
+	public fun eraseBuffer ()V
 	public abstract fun eraseCharacters (I)V
 	public abstract fun eraseCurrentLine ()V
 	public abstract fun eraseEntireScreen ()V
@@ -392,6 +395,7 @@ public abstract interface class io/github/ketraterm/core/api/TerminalWriter {
 }
 
 public final class io/github/ketraterm/core/api/TerminalWriter$DefaultImpls {
+	public static fun eraseBuffer (Lio/github/ketraterm/core/api/TerminalWriter;)V
 	public static synthetic fun setPenAttributes$default (Lio/github/ketraterm/core/api/TerminalWriter;IIZZZLio/github/ketraterm/core/model/UnderlineStyle;ZZZZZIILjava/lang/Object;)V
 	public static synthetic fun setPenColors$default (Lio/github/ketraterm/core/api/TerminalWriter;Lio/github/ketraterm/core/model/CellColor;Lio/github/ketraterm/core/model/CellColor;Lio/github/ketraterm/core/model/CellColor;ZZZLio/github/ketraterm/core/model/UnderlineStyle;ZZZZZILjava/lang/Object;)V
 	public static synthetic fun updatePenColors$default (Lio/github/ketraterm/core/api/TerminalWriter;Lio/github/ketraterm/core/model/CellColor;Lio/github/ketraterm/core/model/CellColor;Lio/github/ketraterm/core/model/CellColor;Ljava/lang/Boolean;Ljava/lang/Boolean;Ljava/lang/Boolean;Lio/github/ketraterm/core/model/UnderlineStyle;Ljava/lang/Boolean;Ljava/lang/Boolean;Ljava/lang/Boolean;Ljava/lang/Boolean;Ljava/lang/Boolean;ILjava/lang/Object;)V

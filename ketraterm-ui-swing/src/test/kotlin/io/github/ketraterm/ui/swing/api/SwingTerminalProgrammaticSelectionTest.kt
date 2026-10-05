@@ -369,6 +369,28 @@ class SwingTerminalProgrammaticSelectionTest {
         }
 
     @Test
+    fun `local clear invalidates visible and retained selection ranges`() =
+        fixture("one\r\ntwo\r\nthree", closed = false) {
+            publish()
+            assertTrue(view.selectAll())
+            val saved = requireNotNull(view.currentSelectionRange())
+            var cleared = 0
+            view.addSelectionListener { previous, current ->
+                if (previous != null && current == null) cleared++
+            }
+            assertTrue(session.clearBuffer())
+            assertFalse(view.setSelection(saved))
+            publish()
+            assertNull(view.currentSelectionRange())
+            assertEquals(1, cleared)
+            assertFalse(view.setSelection(saved))
+            feed("new")
+            publish()
+            assertTrue(view.selectAll())
+            assertEquals("new", copiedText().trim())
+        }
+
+    @Test
     fun `new selection operations reject access outside the EDT`() {
         val view = edt { SwingTerminal() }
         try {

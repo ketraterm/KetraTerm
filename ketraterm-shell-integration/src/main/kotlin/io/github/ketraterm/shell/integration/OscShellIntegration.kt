@@ -69,6 +69,19 @@ private class OscShellIntegrationSession(
         state.recordCurrentWorkingDirectory(uri)
     }
 
+    override fun bufferCleared(buffer: TerminalRenderBufferKind) {
+        if (buffer != TerminalRenderBufferKind.PRIMARY) return
+        readinessPromptStarted = false
+        mutablePromptReady.value = false
+        promptEndLineId = NO_LINE_ID
+        promptEndColumn = 0
+        promptStartedForCommandText = false
+        promptStartLineId = NO_LINE_ID
+        promptStartColumn = 0
+        activeCommandLineContextRevision++
+        state.clear()
+    }
+
     override fun outputProcessed() {
         if (readinessPromptStarted) context.readRenderFrame(readinessFrameConsumer)
     }

@@ -70,4 +70,7 @@ fun main() {
         })
     }
     check(checkNotNull(ownedCopy).contentEquals(expected))
+    buffer.eraseBuffer()
+    check(buffer.getCodepointAt(0, 0) == 0)
+    JavaConsumer.erase(buffer)
 }

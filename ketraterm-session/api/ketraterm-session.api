@@ -59,6 +59,7 @@ public final class io/github/ketraterm/session/TerminalSession : io/github/ketra
 	public final synthetic fun acquirePublishedFrame ()Lio/github/ketraterm/render/cache/TerminalRenderCache;
 	public final fun activeShellCommandLine ()Lio/github/ketraterm/session/TerminalShellCommandLineSnapshot;
 	public final fun captureCommandEdit ()Lio/github/ketraterm/session/TerminalCommandEditContext;
+	public final fun clearBuffer ()Z
 	public fun close ()V
 	public static final fun create (Lio/github/ketraterm/core/api/TerminalBuffer;Lio/github/ketraterm/render/api/TerminalRenderFrameReader;Lio/github/ketraterm/transport/TerminalConnector;)Lio/github/ketraterm/session/TerminalSession;
 	public static final fun create (Lio/github/ketraterm/core/api/TerminalBuffer;Lio/github/ketraterm/render/api/TerminalRenderFrameReader;Lio/github/ketraterm/transport/TerminalConnector;Lio/github/ketraterm/host/HostEventSink;)Lio/github/ketraterm/session/TerminalSession;
@@ -244,6 +245,7 @@ public final class io/github/ketraterm/session/TerminalShellCommandLineState {
 
 public abstract interface class io/github/ketraterm/session/TerminalShellIntegration {
 	public abstract fun activeCommandLine ()Lio/github/ketraterm/session/TerminalShellCommandLineSnapshot;
+	public fun bufferCleared (Lio/github/ketraterm/render/api/TerminalRenderBufferKind;)V
 	public abstract fun getCommandLineChanges ()Lkotlinx/coroutines/flow/Flow;
 	public abstract fun getPromptReady ()Lkotlinx/coroutines/flow/StateFlow;
 	public abstract fun getState ()Lio/github/ketraterm/session/TerminalShellIntegrationView;
@@ -254,6 +256,7 @@ public abstract interface class io/github/ketraterm/session/TerminalShellIntegra
 }
 
 public final class io/github/ketraterm/session/TerminalShellIntegration$DefaultImpls {
+	public static fun bufferCleared (Lio/github/ketraterm/session/TerminalShellIntegration;Lio/github/ketraterm/render/api/TerminalRenderBufferKind;)V
 	public static fun observeShellMarker (Lio/github/ketraterm/session/TerminalShellIntegration;Lio/github/ketraterm/protocol/ShellIntegrationEvent;)V
 	public static fun observeWorkingDirectory (Lio/github/ketraterm/session/TerminalShellIntegration;Ljava/lang/String;)V
 	public static fun outputProcessed (Lio/github/ketraterm/session/TerminalShellIntegration;)V

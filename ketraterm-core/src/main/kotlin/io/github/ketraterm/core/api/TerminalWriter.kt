@@ -423,6 +423,17 @@ public interface TerminalWriter {
     public fun eraseScreenAndHistory()
 
     /**
+     * Erases the active screen and history with the current erase attributes.
+     * Preserves the cursor position, pen, modes, margins, tabs, saved cursor, and inactive buffer.
+     * Cancels pending wrap and replaces erased line identities.
+     * The caller must serialize access with all other terminal operations.
+     */
+    public fun eraseBuffer() {
+        eraseEntireScreen()
+        eraseScreenAndHistory()
+    }
+
+    /**
      * Clears the visible screen and homes the cursor (equivalent to ED 2 + CUP).
      *
      * Scrollback history is preserved. This matches what the shell `clear` command sends.

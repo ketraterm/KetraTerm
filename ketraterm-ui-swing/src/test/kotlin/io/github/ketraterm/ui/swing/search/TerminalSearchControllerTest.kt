@@ -52,6 +52,39 @@ class TerminalSearchControllerTest {
     }
 
     @Test
+    fun `local clear invalidates search before the replacement scan finishes`() {
+        val session =
+            TerminalSession.create(
+                TerminalBuffers.create(10, 2, 10),
+                NoOpConnector,
+                workerDispatcher = dispatcher,
+                ioDispatcher = dispatcher,
+            )
+        val host = RecordingSearchHost(session, columns = 10, rows = 2)
+        val controller = TerminalSearchController(host, scope, dispatcher)
+        session.use {
+            session.start(10, 2)
+            val bytes = "needle\r\nneedle\r\nneedle".toByteArray()
+            session.onBytes(bytes, 0, bytes.size)
+            SwingUtilities.invokeAndWait {
+                host.renderCache.updateFrom(session)
+                controller.search("needle")
+                dispatcher.scheduler.runCurrent()
+                assertEquals(3, controller.state().resultCount)
+                assertTrue(session.clearBuffer())
+                host.renderCache.updateFrom(session)
+                controller.refreshForFrame()
+                assertEquals(0, controller.state().resultCount)
+                assertFalse(controller.findNext())
+                assertEquals(0, controller.viewportHighlights.segmentCount)
+                dispatcher.scheduler.runCurrent()
+                assertEquals("needle", controller.state().query)
+                assertEquals(0, controller.state().resultCount)
+            }
+        }
+    }
+
+    @Test
     fun `content generation rollover adds and removes matches including empty results`() {
         val reader = SearchFrameReader(liveLines = listOf("absent"))
         val session = testSession(reader)
@@ -653,6 +686,7 @@ class TerminalSearchControllerTest {
         cursorColumn: Int,
     ) : TerminalRenderFrame {
         override val historySize: Int = historyLines.size
+        override val historyContentGeneration: Long = 0
         override val structureGeneration: Long = 1
         override val activeBuffer: TerminalRenderBufferKind = TerminalRenderBufferKind.PRIMARY
         override val cursor: TerminalRenderCursor =

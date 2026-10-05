@@ -131,6 +131,43 @@ The writer is essential even though session children are supervised. A connector
 
 Local close claims termination and calls `connector.close` before taking cleanup locks. It does not join the writer while a native call is blocked. Remote close cancels pending writes too. A connector must tolerate concurrent close; session cancellation alone cannot interrupt an arbitrary native call. The ring is cleared/released and pending bulk references are dropped on cleanup. While open, active bulk work remains charged to the budgets until its callback returns. The bulk sink checks closure/cancellation before every chunk; a racing native call already entered can finish, and pure encoding between writes is bounded by admitted work. Writer scratch is cleared when its call returns and the coroutine unwinds. `Closed` is published after cleanup and final frame publication have been attempted.
 
+## Local buffer clear
+
+`clearBuffer()` synchronously clears the active screen and its history under mutation serialization.
+It returns true before start or while running.
+It returns false once closure wins admission and preserves the retained final output.
+An admitted clear can finish during closure.
+Concurrent calls follow lock admission order, not call start time.
+
+The cursor position, modes, pen, margins, tab stops, saved cursor, and inactive buffer remain unchanged.
+Pending wrap is cancelled.
+Blank cells use the current erase attributes.
+This is a library convention, not a terminal control sequence.
+Ctrl+L remains application input.
+
+The operation uses `TerminalWriter.eraseBuffer` without resetting the parser or sending connector input.
+The built-in core reuses its storage arena and releases erased cluster references.
+Incomplete escape sequences and UTF-8 decoding continue with later bytes.
+Clearing has no position in the outbound queue and does not flush accepted input.
+Conditional command-edit contexts become stale.
+
+New line identities and the history generation invalidate erased ranges.
+Swing clears affected selections and search results when it applies the changed frame.
+Search keeps the query and rejects scans that cross history replacement.
+Normal synchronized-output publication rules still apply.
+
+The selected producer receives `bufferCleared` after mutation and before later output.
+The callback runs under mutation serialization, outside the frame lease.
+Producer failures propagate after the committed clear; render invalidation still runs.
+The OSC producer drops primary anchors and editing extraction state while preserving the directory.
+Alternate clearing leaves primary shell metadata intact.
+
+Host-owned models remain authoritative and are not reset by the session.
+Their old line identities no longer resolve.
+Hosts must clear or reanchor their terminal projection when they perform this operation.
+A custom producer can implement `bufferCleared` to update that projection in output order.
+Host editor text can remain valid because local clearing does not change the shell's input.
+
 ## Closed-session presentation
 
 Closure freezes terminal state after admitted mutation and parser EOF.
