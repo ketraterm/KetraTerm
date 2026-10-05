@@ -34,6 +34,7 @@ internal class OscDispatcher {
         overflowed: Boolean,
         payloadLimit: Int = ControlStringPolicy.MAX_PAYLOAD_BYTES,
         customOscHandler: TerminalCustomOscHandler? = null,
+        customOscPayloadLimitBytes: Int = ControlStringPolicy.MAX_PAYLOAD_BYTES,
     ) {
         if (length <= 0) {
             return
@@ -45,7 +46,11 @@ internal class OscDispatcher {
         }
 
         val command = ControlStringPolicy.oscCommand(payload, commandEnd)
-        val limit = if (command == 52) payloadLimit else ControlStringPolicy.oscLimit(command, customOscHandler != null)
+        val limit =
+            when (command) {
+                52 -> payloadLimit
+                else -> ControlStringPolicy.oscLimit(command, if (customOscHandler != null) customOscPayloadLimitBytes else 0)
+            }
         if (limit == 0) return
         if (overflowed || length > limit) {
             if (command == 8) sink.endHyperlink()

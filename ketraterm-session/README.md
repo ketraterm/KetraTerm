@@ -120,7 +120,12 @@ For host OSC protocols, use the parser extension through normal session assembly
 
 ```kotlin
 parserFactory = TerminalOutputParserFactory { sink, clipboardBudget ->
-    TerminalParsers.create(sink, clipboardBudget, hostCustomOscHandler)
+    TerminalParsers.create(
+        sink,
+        clipboardBudget,
+        customOscPayloadLimitBytes = 64 * 1024,
+        customOscHandler = hostCustomOscHandler,
+    )
 }
 ```
 

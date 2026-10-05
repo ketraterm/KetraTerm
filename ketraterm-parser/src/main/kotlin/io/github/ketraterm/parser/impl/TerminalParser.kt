@@ -48,6 +48,7 @@ internal class TerminalParser(
     private val state: ParserState = ParserState(),
     clipboardWriteLimitBytes: () -> Int = { 0 },
     customOscHandler: TerminalCustomOscHandler? = null,
+    customOscPayloadLimitBytes: Int = ControlStringPolicy.MAX_PAYLOAD_BYTES,
 ) : TerminalOutputParser {
     private var inCustomOscCallback = false
     private val utf8Decoder = Utf8Decoder()
@@ -59,6 +60,7 @@ internal class TerminalParser(
             dispatcher = AnsiCommandDispatcher,
             printableSink = PrintableProcessorActionSink(printableProcessor),
             clipboardWriteLimitBytes = clipboardWriteLimitBytes,
+            customOscPayloadLimitBytes = customOscPayloadLimitBytes,
             customOscHandler =
                 customOscHandler?.let { handler ->
                     TerminalCustomOscHandler { command, payload, offset, length ->

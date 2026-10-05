@@ -27,6 +27,18 @@ import java.util.concurrent.CancellationException
 
 class CustomOscHandlerTest {
     @Test
+    fun `host can admit a custom OSC envelope above the default limit`() {
+        val body = "é".repeat(3000)
+        var actual: String? = null
+        val parser =
+            TerminalParsers.create(RecordingTerminalCommandSink(), { 0 }, 6005) { _, payload, offset, length ->
+                actual = payload.decodeToString(offset, offset + length)
+            }
+        parser.accept("\u001b]1341;$body\u0007".encodeToByteArray())
+        assertEquals(body, actual)
+    }
+
+    @Test
     fun `custom OSC is delivered between surrounding commands`() {
         val sink = RecordingTerminalCommandSink()
         val parser =

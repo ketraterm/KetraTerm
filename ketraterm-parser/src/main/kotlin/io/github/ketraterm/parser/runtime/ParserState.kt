@@ -142,7 +142,7 @@ internal class ParserState(
     // -------------------------------------------------------------------------
     //
     // Payload invariant:
-    // - payloadBuffer is parser-owned scratch storage; only eligible clipboard writes can grow it.
+    // - payloadBuffer is parser-owned scratch storage; eligible clipboard writes and custom OSC can grow it.
     // - reset/completion/overflow releases growth and reuses initialPayloadBuffer.
     // - payloadLength bytes are valid.
     // - bytes beyond payloadLength are garbage.
@@ -185,7 +185,7 @@ internal class ParserState(
         clipboardDataStart = -1
     }
 
-    /** Stops collecting and releases temporary clipboard storage without losing its header. */
+    /** Stops collecting and releases temporary payload storage without losing its header. */
     fun discardOverflowedPayload() {
         payloadOverflowed = true
         payloadBuffer = initialPayloadBuffer

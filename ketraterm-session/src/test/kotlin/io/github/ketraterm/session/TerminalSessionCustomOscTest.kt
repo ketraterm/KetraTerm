@@ -134,13 +134,13 @@ class TerminalSessionCustomOscTest {
                         },
                     parserFactory =
                         TerminalOutputParserFactory { sink, budget ->
-                            TerminalParsers.create(sink, budget) { command, _, _, _ -> custom += command }
+                            TerminalParsers.create(sink, budget, 12000) { command, _, _, _ -> custom += command }
                         },
                 ).use { session ->
                     session.start(10, 2)
                     val text = "x".repeat(6000)
                     val write = "\u001b]52;c;" + Base64.getEncoder().encodeToString(text.encodeToByteArray()) + "\u0007"
-                    connector.feedFromHost("$write\u001b]52;c;?\u0007\u001b]1341;ok\u0007".encodeToByteArray())
+                    connector.feedFromHost("$write\u001b]52;c;?\u0007\u001b]1341;$text\u0007".encodeToByteArray())
                     runCurrent()
                     assertEquals(listOf(text), writes)
                     assertEquals(1, reads)

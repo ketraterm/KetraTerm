@@ -39,7 +39,8 @@ public fun interface TerminalCustomOscHandler {
      * Offsets are zero-based byte indices; [length] can be zero. No decoding or UTF-8 validation occurs.
      * The host must validate the body before acting on it.
      *
-     * The complete envelope, including decimal digits and the separator, has a 4096-byte limit.
+     * The complete envelope includes decimal digits and the separator. Its default limit is 4096 bytes.
+     * [TerminalParsers.create] can set a different limit. The command header retains its separate 4096-byte ceiling.
      * Overflow rejects the entire command. Malformed numbers, cancelled strings, and incomplete EOF input produce no callback.
      * BEL and ESC backslash terminate OSC. Ordinary C0 controls and DEL are ignored by the existing string rules.
      * Raw C1 bytes remain payload bytes in the UTF-8 parser.

@@ -54,6 +54,14 @@ public final class JavaConsumer {
         var customBytes = "\033]1341;custom\007".getBytes(StandardCharsets.UTF_8);
         custom.accept(customBytes, 0, customBytes.length);
         if (!output.toString().equals("Java!custom")) throw new AssertionError(output);
+        var body = "x".repeat(5000);
+        var configured = TerminalParsers.create(sink, () -> 0, 5005, (command, payload, offset, length) -> {
+            if (!new String(payload, offset, length, StandardCharsets.UTF_8).equals(body)) throw new AssertionError("Custom body");
+            output.append('!');
+        });
+        var configuredBytes = ("\033]1341;" + body + "\007").getBytes(StandardCharsets.UTF_8);
+        configured.accept(configuredBytes, 0, configuredBytes.length);
+        if (!output.toString().equals("Java!custom!")) throw new AssertionError(output);
         try (var metadata = TerminalParsers.class.getResourceAsStream("/META-INF/io.github.ketraterm_ketraterm-parser.kotlin_module")) {
             if (metadata == null || metadata.readAllBytes().length == 0) throw new AssertionError("Missing Kotlin metadata");
         }

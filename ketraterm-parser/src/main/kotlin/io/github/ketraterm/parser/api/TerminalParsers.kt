@@ -15,6 +15,7 @@
  */
 package io.github.ketraterm.parser.api
 
+import io.github.ketraterm.parser.ansi.ControlStringPolicy
 import io.github.ketraterm.parser.impl.TerminalParser
 import io.github.ketraterm.parser.spi.TerminalCommandSink
 
@@ -60,5 +61,37 @@ public object TerminalParsers {
         sink: TerminalCommandSink,
         clipboardWriteLimitBytes: () -> Int,
         customOscHandler: TerminalCustomOscHandler,
-    ): TerminalOutputParser = TerminalParser(sink, clipboardWriteLimitBytes = clipboardWriteLimitBytes, customOscHandler = customOscHandler)
+    ): TerminalOutputParser = create(sink, clipboardWriteLimitBytes, ControlStringPolicy.MAX_PAYLOAD_BYTES, customOscHandler)
+
+    /**
+     * Creates a parser with a fixed host limit for unsupported OSC commands.
+     *
+     * [customOscPayloadLimitBytes] counts collected bytes, including decimal digits and the first semicolon.
+     * Introducers, terminators, and ignored controls do not count. The default overload uses 4096 bytes.
+     * The command header, including its semicolon, always has a separate 4096-byte ceiling.
+     * Built-in OSC and DCS limits remain unchanged, including the independent clipboard budget.
+     *
+     * Storage grows on demand after a valid custom header. The parser releases growth when the command ends or overflows.
+     * Cancellation, reset, EOF, and callback failure also release growth. Host copies and decoding require separate storage.
+     * [customOscHandler] defines the remaining ownership, ordering, and failure contracts.
+     *
+     * @throws IllegalArgumentException if [customOscPayloadLimitBytes] is outside `1..Int.MAX_VALUE - 8`.
+     */
+    @JvmStatic
+    public fun create(
+        sink: TerminalCommandSink,
+        clipboardWriteLimitBytes: () -> Int,
+        customOscPayloadLimitBytes: Int,
+        customOscHandler: TerminalCustomOscHandler,
+    ): TerminalOutputParser {
+        require(customOscPayloadLimitBytes in 1..Int.MAX_VALUE - 8) {
+            "customOscPayloadLimitBytes must be in 1..Int.MAX_VALUE - 8, got $customOscPayloadLimitBytes"
+        }
+        return TerminalParser(
+            sink,
+            clipboardWriteLimitBytes = clipboardWriteLimitBytes,
+            customOscHandler = customOscHandler,
+            customOscPayloadLimitBytes = customOscPayloadLimitBytes,
+        )
+    }
 }

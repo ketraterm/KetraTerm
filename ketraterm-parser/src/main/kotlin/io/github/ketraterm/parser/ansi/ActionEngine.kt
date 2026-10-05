@@ -37,6 +37,7 @@ internal class ActionEngine(
     private val printableSink: PrintableActionSink,
     private val clipboardWriteLimitBytes: () -> Int = { 0 },
     private val customOscHandler: TerminalCustomOscHandler? = null,
+    private val customOscPayloadLimitBytes: Int = ControlStringPolicy.MAX_PAYLOAD_BYTES,
 ) {
     private val oscDispatcher = OscDispatcher()
 
@@ -332,7 +333,9 @@ internal class ActionEngine(
         if (!putPayloadByte(state, byteValue)) return
         if (!state.payloadHeaderComplete && byteValue == ';'.code) {
             state.payloadCode = ControlStringPolicy.oscCommand(state.payloadBuffer, state.payloadLength - 1)
-            selectPayloadLimit(state, ControlStringPolicy.oscLimit(state.payloadCode, customOscHandler != null))
+            val builtInLimit = ControlStringPolicy.oscLimit(state.payloadCode)
+            val custom = builtInLimit == 0 && state.payloadCode >= 0 && customOscHandler != null
+            selectPayloadLimit(state, if (custom) customOscPayloadLimitBytes else builtInLimit, allowGrowth = custom)
         } else if (state.payloadCode == 52) {
             if (state.clipboardDataStart < 0 && byteValue == ';'.code) {
                 state.clipboardDataStart = state.payloadLength
@@ -352,6 +355,7 @@ internal class ActionEngine(
                 overflowed = state.payloadOverflowed,
                 payloadLimit = state.payloadLimit,
                 customOscHandler = customOscHandler,
+                customOscPayloadLimitBytes = customOscPayloadLimitBytes,
             )
         } finally {
             state.clearPayloadState()
@@ -373,9 +377,10 @@ internal class ActionEngine(
     private fun selectPayloadLimit(
         state: ParserState,
         limit: Int,
+        allowGrowth: Boolean = false,
     ) {
         state.payloadHeaderComplete = true
-        state.payloadLimit = minOf(state.payloadLimit, limit)
+        state.payloadLimit = if (allowGrowth) limit else minOf(state.payloadLimit, limit)
         if (state.payloadLimit > 0 && state.payloadLength > state.payloadLimit) state.payloadOverflowed = true
     }
 

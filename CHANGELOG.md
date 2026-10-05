@@ -31,7 +31,7 @@ Release notes for library consumers and embedders. Product-specific changes are 
 
 ### API changes
 
-- Added `TerminalCustomOscHandler` through `TerminalParsers.create` for bounded, ordered host OSC handling. Session factories preserve host services and existing transport failure routing.
+- Added `TerminalCustomOscHandler` through `TerminalParsers.create` for bounded, ordered host OSC handling. Hosts can configure the envelope limit; the default is 4 KiB. Session factories preserve host services and existing transport failure routing.
 
 - Added `TerminalSession.submitBytes` and `submitInput` for ordered byte and semantic input, with explicit acceptance or rejection results.
 - Added conditional command edits through `TerminalShellCommandLineState` to reject edits when the command context changes.
