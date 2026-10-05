@@ -77,8 +77,10 @@ internal class TerminalSearchController(
     fun findPrevious(): Boolean = activateRelativeResult(-1)
 
     fun refreshForFrame() {
-        if (highlights != null && (
-                searchedBuffer != host.renderCache.activeBuffer || searchedColumns != host.renderCache.columns ||
+        if (highlights != null &&
+            (
+                searchedBuffer != host.renderCache.activeBuffer ||
+                    searchedColumns != host.renderCache.columns ||
                     searchedHistoryContentGeneration != host.renderCache.historyContentGeneration
             )
         ) {
@@ -143,7 +145,9 @@ internal class TerminalSearchController(
                 try {
                     val result = withContext(analysisDispatcher) { scanner.scan(session, model, requestQuery, requestIgnoreCase) }
                     if (requestEpoch != epoch || host.session !== session) return@launch
-                    if (result == null || result.columns != host.renderCache.columns || result.buffer != host.renderCache.activeBuffer ||
+                    if (result == null ||
+                        result.columns != host.renderCache.columns ||
+                        result.buffer != host.renderCache.activeBuffer ||
                         requestHistoryContentGeneration != host.renderCache.historyContentGeneration
                     ) {
                         highlights = null
