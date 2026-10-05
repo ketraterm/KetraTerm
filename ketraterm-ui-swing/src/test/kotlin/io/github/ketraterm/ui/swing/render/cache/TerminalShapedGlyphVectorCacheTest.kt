@@ -36,17 +36,18 @@ class TerminalShapedGlyphVectorCacheTest {
     private val fonts = FontCache().apply { update(font, emptyList(), useSystemFallbackFonts = false) }
     private val context = FontRenderContext(null, false, false)
 
-    @Test
-    fun `same style Hebrew glyphs retain their individual visual cells`() {
+    @ParameterizedTest
+    @ValueSource(ints = [8, 12, 24])
+    fun `same style Hebrew glyphs retain their individual visual cells`(cellWidth: Int) {
         val cache = TerminalShapedGlyphVectorCache()
-        val vector = cache.shape("אבג", intArrayOf(0, 1, 2), columns = 3, rtl = true)
+        val vector = cache.shape("אבג", intArrayOf(0, 1, 2), columns = 3, cellWidth = cellWidth, rtl = true)
 
         assertEquals(3, vector.numGlyphs)
         for (glyph in 0 until vector.numGlyphs) {
             val visualColumn = 2 - vector.getGlyphCharIndex(glyph)
-            assertEquals(visualColumn * CELL_WIDTH.toDouble(), vector.getGlyphPosition(glyph).x, 0.0)
+            assertEquals(visualColumn * cellWidth.toDouble(), vector.getGlyphPosition(glyph).x, 0.0)
         }
-        assertEquals(3 * CELL_WIDTH.toDouble(), vector.getGlyphPosition(vector.numGlyphs).x, 0.0)
+        assertEquals(3 * cellWidth.toDouble(), vector.getGlyphPosition(vector.numGlyphs).x, 0.0)
     }
 
     @ParameterizedTest

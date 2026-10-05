@@ -49,17 +49,23 @@ import kotlin.test.assertTrue
  */
 class TerminalTextPainterTest {
     @ParameterizedTest
-    @ValueSource(strings = ["AAA", "ééé", "אבג"])
-    fun `spacing aligns glyphs with expanded cells and refreshes retained layouts`(text: String) {
+    @CsvSource("AAA, 1.0", "ééé, 1.0", "אבג, 1.0", "AAA, 0.5", "ééé, 0.5", "אבג, 0.5")
+    fun `spacing aligns glyphs with expanded cells and refreshes retained layouts`(
+        text: String,
+        opacity: Float,
+    ) {
         val original = fixture(width = 160)
         val spaced = fixture(width = 160, settings = original.settings.copy { it.columnSpacing = 4 })
         val cache = renderCache(TestRenderFrame.text(text))
+        val composite = AlphaComposite.SrcOver.derive(opacity)
         try {
+            original.g.composite = composite
+            spaced.g.composite = composite
             original.paintRow(cache)
             spaced.paintRow(cache)
             original.g.composite = AlphaComposite.Clear
             original.g.fillRect(0, 0, 160, 40)
-            original.g.composite = AlphaComposite.SrcOver
+            original.g.composite = composite
             val actual = original.copy(settings = spaced.settings, metrics = spaced.metrics)
             actual.paintRow(cache)
             assertContentEquals(
@@ -68,12 +74,20 @@ class TerminalTextPainterTest {
             )
             for (column in text.indices) {
                 assertTrue(
-                    spaced.image.containsColorInRange(
-                        TEST_RED,
+                    spaced.image.containsPaintedPixelInRange(
                         column * spaced.metrics.cellWidth,
                         (column + 1) * spaced.metrics.cellWidth,
                     ),
+                    "No glyph coverage in visual column $column for $text at opacity $opacity",
                 )
+            }
+            for (y in 0 until spaced.image.height) {
+                for (x in 0 until spaced.image.width) {
+                    val pixel = spaced.image.getRGB(x, y)
+                    if (pixel ushr 24 != 0) {
+                        assertEquals(TEST_RED and 0x00FF_FFFF, pixel and 0x00FF_FFFF, "Glyph color at ($x,$y)")
+                    }
+                }
             }
         } finally {
             original.g.dispose()
