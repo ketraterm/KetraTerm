@@ -300,6 +300,8 @@ Verification and retained audit oracles are recorded in the
 
 ## 7. Embedding & Swing UI
 
+- **Interaction and Column Spacing**: Hosts can configure mouse reporting, copy on selection, middle-button paste, and extra logical pixels per cell through `SwingSettings`. Defaults preserve existing behavior. Clipboard gestures use the supplied service and normal paste policy. Settings reload updates the view; a started button gesture retains its routing. Spacing shares cell geometry across painting, selection, hit testing, and resizing. Live grids resize normally; closed grids retain their cells. Preferences, persistence, and product controls remain host responsibilities. See the public settings KDoc.
+
 - **Local Buffer Clear**: `TerminalSession.clearBuffer` clears the active screen and history without connector input. Independent core callers can use `TerminalWriter.eraseBuffer` with external serialization. Cursor position, modes, and inactive content remain unchanged. Closure returns false. Applied frames invalidate selection and search; the selected shell producer receives ordered notification. See the [clear contract](../ketraterm-session/docs/session-concurrency-locks.md#local-buffer-clear).
 
 

@@ -31,6 +31,8 @@ Release notes for library consumers and embedders. Product-specific changes are 
 
 ### API changes
 
+- Added Swing settings for mouse reporting, copy on selection, middle-button paste, and extra column spacing. Defaults preserve existing behavior. Hosts retain clipboard and preference ownership.
+
 - Added `TerminalSession.clearBuffer` and the core `TerminalWriter.eraseBuffer` operation for local screen and history clearing. Both preserve the cursor, modes, and inactive buffer. The session returns false after closure. Selection, search, and OSC anchors invalidate after clearing.
 
 - Added native Swing selection ranges with read, set, restore, clear, and removable listener operations. Stale restoration rejects replaced layouts and bindings. Grid resize still clears selection.

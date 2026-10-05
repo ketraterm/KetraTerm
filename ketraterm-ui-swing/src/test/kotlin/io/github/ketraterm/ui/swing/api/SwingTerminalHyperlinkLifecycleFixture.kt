@@ -51,6 +51,7 @@ internal class SwingTerminalHyperlinkLifecycleFixture(
     private var menuRequest: SwingTerminalContextMenuRequest? = null
     private var copiedText: String? = null
     private var pointer: Point? = Point(gutterWidth + 1, 1)
+    private var mouseReportingEnabled = true
     private var osc8Activation = SwingHyperlinkActivation.MODIFIER
     private val shellState = TerminalShellIntegrationState()
     private val session =
@@ -67,6 +68,7 @@ internal class SwingTerminalHyperlinkLifecycleFixture(
             SwingTerminal(
                 settingsProvider = {
                     SwingSettings.create { draft ->
+                        draft.mouseReportingEnabled = mouseReportingEnabled
                         draft.columns = 40
                         draft.rows = 2
                         draft.padding = SwingPadding()
@@ -221,6 +223,12 @@ internal class SwingTerminalHyperlinkLifecycleFixture(
             image.getRGB(gutterWidth, metrics.underlineY, URL.length * metrics.cellWidth, 1, null, 0, URL.length * metrics.cellWidth)
         }
 
+    fun allowMouseReporting(enabled: Boolean) =
+        onEdt {
+            mouseReportingEnabled = enabled
+            terminal.reloadSettings()
+        }
+
     fun setMouseReporting(enabled: Boolean) = writeOutput("\u001b[?1003" + if (enabled) "h" else "l")
 
     fun markFirstRowAsPrompt() {
@@ -308,6 +316,9 @@ internal class SwingTerminalHyperlinkLifecycleFixture(
         val event =
             MouseEvent(terminal, MouseEvent.MOUSE_PRESSED, 0L, 0, gutterWidth + 1, 1, gutterWidth + 1, 1, 1, true, MouseEvent.BUTTON3)
         for (listener in terminal.mouseListeners) listener.mousePressed(event)
+        val released =
+            MouseEvent(terminal, MouseEvent.MOUSE_RELEASED, 0L, 0, gutterWidth + 1, 1, gutterWidth + 1, 1, 1, false, MouseEvent.BUTTON3)
+        for (listener in terminal.mouseListeners) listener.mouseReleased(released)
         return checkNotNull(menuRequest) { "The host did not receive the context-menu request" }.hyperlink
     }
 

@@ -35,6 +35,37 @@ internal class SwingTerminalMouseController(
     private var wheelRoute = WheelRoute.NONE
     private var wheelSession: TerminalInputEncoder? = null
     private var shiftDown = false
+    private var pressedButtons = 0
+    private var gestureTracked = false
+    private var gestureSession: TerminalInputEncoder? = null
+    private var middlePaste = false
+
+    val hasPressedButtons: Boolean get() = pressedButtons != 0
+
+    fun resetInput() {
+        resetWheelInput()
+        pressedButtons = 0
+        gestureTracked = false
+        gestureSession = null
+        middlePaste = false
+        shiftDown = false
+    }
+
+    private fun beginGesture(event: MouseEvent) {
+        val bit = buttonBit(event.button)
+        if (bit == 0) return
+        if (pressedButtons == 0) {
+            gestureTracked = isMouseTrackingIntercepted()
+            gestureSession = host.session
+        }
+        pressedButtons = pressedButtons or bit
+    }
+
+    private fun endGesture(event: MouseEvent) {
+        pressedButtons = pressedButtons and buttonBit(event.button).inv()
+        if (event.button == MouseEvent.BUTTON2) middlePaste = false
+        if (pressedButtons == 0) gestureSession = null
+    }
 
     fun resetWheelInput() {
         alternateWheelAccumulator.reset()
@@ -52,21 +83,36 @@ internal class SwingTerminalMouseController(
             override fun mousePressed(event: MouseEvent) {
                 updatePointerModifiers(event.modifiersEx)
                 host.requestFocusInWindow()
+                beginGesture(event)
                 if (handleContextMenu(event)) return
                 if (!host.renderCache.hasFrame) return
                 if (host.handlePromptMarkerMousePressed(event)) return
                 if (handleMouseTracking(event, TerminalMouseEventType.PRESS)) return
+                if (SwingUtilities.isMiddleMouseButton(event) && host.settings.middleClickPaste) {
+                    middlePaste = true
+                    event.consume()
+                    if (host.session != null) host.pasteClipboardText()
+                    return
+                }
                 if (host.handleHyperlinkMousePressed(event)) return
                 host.handleSelectionMousePressed(event)
             }
 
             override fun mouseReleased(event: MouseEvent) {
                 updatePointerModifiers(event.modifiersEx)
-                if (handleContextMenu(event)) return
-                if (!host.renderCache.hasFrame) return
-                if (handleMouseTracking(event, TerminalMouseEventType.RELEASE)) return
-                host.handleHyperlinkMouseReleased(event)
-                host.handleSelectionMouseReleased(event)
+                try {
+                    if (handleContextMenu(event)) return
+                    if (!host.renderCache.hasFrame) return
+                    if (handleMouseTracking(event, TerminalMouseEventType.RELEASE)) return
+                    if (SwingUtilities.isMiddleMouseButton(event) && middlePaste) {
+                        event.consume()
+                        return
+                    }
+                    host.handleHyperlinkMouseReleased(event)
+                    host.handleSelectionMouseReleased(event)
+                } finally {
+                    endGesture(event)
+                }
             }
 
             override fun mouseExited(event: MouseEvent) {
@@ -155,7 +201,12 @@ internal class SwingTerminalMouseController(
         return changed
     }
 
-    fun isMouseTrackingIntercepted(): Boolean = !shiftDown && host.mouseTrackingMode() != MouseTrackingMode.OFF
+    fun isMouseTrackingIntercepted(): Boolean =
+        if (pressedButtons != 0) {
+            gestureTracked && host.session === gestureSession && host.mouseTrackingMode() != MouseTrackingMode.OFF
+        } else {
+            host.settings.mouseReportingEnabled && !shiftDown && host.mouseTrackingMode() != MouseTrackingMode.OFF
+        }
 
     private fun handleContextMenu(event: MouseEvent): Boolean {
         if (!event.isPopupTrigger) return false
@@ -252,6 +303,8 @@ internal class SwingTerminalMouseController(
 
     private companion object {
         private const val MAX_WHEEL_STEPS_PER_EVENT = 64
+
+        private fun buttonBit(button: Int): Int = if (button in MouseEvent.BUTTON1..MouseEvent.BUTTON3) 1 shl button else 0
 
         private fun unpackCellColumn(packed: Long): Int = (packed ushr 32).toInt()
 

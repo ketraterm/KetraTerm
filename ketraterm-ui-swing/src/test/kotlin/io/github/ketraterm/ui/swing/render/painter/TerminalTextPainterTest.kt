@@ -49,6 +49,39 @@ import kotlin.test.assertTrue
  */
 class TerminalTextPainterTest {
     @ParameterizedTest
+    @ValueSource(strings = ["AAA", "ééé", "אבג"])
+    fun `spacing aligns glyphs with expanded cells and refreshes retained layouts`(text: String) {
+        val original = fixture(width = 160)
+        val spaced = fixture(width = 160, settings = original.settings.copy { it.columnSpacing = 4 })
+        val cache = renderCache(TestRenderFrame.text(text))
+        try {
+            original.paintRow(cache)
+            spaced.paintRow(cache)
+            original.g.composite = AlphaComposite.Clear
+            original.g.fillRect(0, 0, 160, 40)
+            original.g.composite = AlphaComposite.SrcOver
+            val actual = original.copy(settings = spaced.settings, metrics = spaced.metrics)
+            actual.paintRow(cache)
+            assertContentEquals(
+                spaced.image.getRGB(0, 0, 160, 40, null, 0, 160),
+                original.image.getRGB(0, 0, 160, 40, null, 0, 160),
+            )
+            for (column in text.indices) {
+                assertTrue(
+                    spaced.image.containsColorInRange(
+                        TEST_RED,
+                        column * spaced.metrics.cellWidth,
+                        (column + 1) * spaced.metrics.cellWidth,
+                    ),
+                )
+            }
+        } finally {
+            original.g.dispose()
+            spaced.g.dispose()
+        }
+    }
+
+    @ParameterizedTest
     @CsvSource("ABC, אבג", "אבג, ABC", "אבA, Aאב")
     fun freshSourceDoesNotReuseOldBidiClassification(
         previousText: String,

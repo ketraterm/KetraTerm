@@ -54,6 +54,10 @@ open class TerminalTextRenderingBenchmark {
     @JvmField
     var antialiased: Boolean = false
 
+    @Param("0", "3")
+    @JvmField
+    var columnSpacing: Int = 0
+
     private lateinit var settings: SwingSettings
     private lateinit var metrics: SwingMetrics
     private lateinit var context: FontRenderContext
@@ -93,6 +97,7 @@ open class TerminalTextRenderingBenchmark {
             SwingSettings.create { draft ->
                 draft.font = Font(Font.MONOSPACED, Font.PLAIN, 14)
                 draft.useSystemFallbackFonts = false
+                draft.columnSpacing = columnSpacing
                 draft.textAntialiasing =
                     if (antialiased) RenderingHints.VALUE_TEXT_ANTIALIAS_ON else RenderingHints.VALUE_TEXT_ANTIALIAS_OFF
             }
@@ -106,7 +111,7 @@ open class TerminalTextRenderingBenchmark {
             graphics.font = settings.font
             graphics.color = Color.WHITE
         }
-        metrics = SwingMetrics.from(asciiGraphics.getFontMetrics(settings.font))
+        metrics = SwingMetrics.from(asciiGraphics.getFontMetrics(settings.font), settings.lineHeight, settings.columnSpacing)
         context = asciiGraphics.fontRenderContext
         asciiCache = TerminalRenderCache(asciiChars.size, 1).apply { accept(TerminalRenderBenchmarkFrame(listOf(String(asciiChars)))) }
         val attrs =

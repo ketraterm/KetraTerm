@@ -99,6 +99,17 @@ public final class JavaConsumer {
     }
 
     public static void verify() throws Exception {
+        var interactionSettings = SwingSettings.create(draft -> {
+            draft.setMouseReportingEnabled(false);
+            draft.setCopyOnSelection(true);
+            draft.setMiddleClickPaste(true);
+            draft.setColumnSpacing(3);
+        });
+        var copiedSettings = interactionSettings.toBuilder().build();
+        if (copiedSettings.getMouseReportingEnabled() || !copiedSettings.getCopyOnSelection()
+            || !copiedSettings.getMiddleClickPaste() || copiedSettings.getColumnSpacing() != 3
+            || !interactionSettings.equals(copiedSettings))
+            throw new AssertionError("Java interaction settings did not survive copying");
         var resolver = new io.github.ketraterm.ui.swing.api.TerminalFontResolver() {
             public java.awt.Font resolveFallbackFont(int codePoint, int style, float size) { return null; }
             public java.awt.Font resolveFallbackFont(String text, int style, float size) { return null; }

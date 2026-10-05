@@ -67,6 +67,8 @@ open class TerminalSelectionBenchmark {
 
                     override fun scrollViewportByRows(deltaRows: Int): Boolean = error("not used")
 
+                    override fun copySelection(): Unit = error("not used")
+
                     override fun repaint() = Unit
 
                     override fun requestFocusInWindow(): Boolean = error("not used")

@@ -494,7 +494,9 @@ public final class io/github/ketraterm/ui/swing/settings/SwingSettings {
 	public fun equals (Ljava/lang/Object;)Z
 	public final fun getAcceptSelectedSuggestionWithEnter ()Z
 	public final fun getAlternateScreenPadding ()Lio/github/ketraterm/ui/swing/settings/SwingPadding;
+	public final fun getColumnSpacing ()I
 	public final fun getColumns ()I
+	public final fun getCopyOnSelection ()Z
 	public final fun getCursorBlinkMillis ()I
 	public final fun getCursorShape ()Lio/github/ketraterm/render/api/TerminalRenderCursorShape;
 	public final fun getFallbackFonts ()Lkotlinx/collections/immutable/ImmutableList;
@@ -502,7 +504,9 @@ public final class io/github/ketraterm/ui/swing/settings/SwingSettings {
 	public final fun getFractionalMetrics ()Ljava/lang/Object;
 	public final fun getHyperlinkActivationForeground ()I
 	public final fun getLineHeight ()F
+	public final fun getMiddleClickPaste ()Z
 	public static final fun getMonospaceFontFamilies ()Ljava/util/List;
+	public final fun getMouseReportingEnabled ()Z
 	public final fun getOsc8HyperlinkActivation ()Lio/github/ketraterm/ui/swing/api/SwingHyperlinkActivation;
 	public final fun getOsc8HyperlinkPresentation ()Lio/github/ketraterm/ui/swing/api/SwingHyperlinkPresentation;
 	public final fun getPadding ()Lio/github/ketraterm/ui/swing/settings/SwingPadding;
@@ -539,7 +543,9 @@ public final class io/github/ketraterm/ui/swing/settings/SwingSettings$Builder {
 	public final fun build ()Lio/github/ketraterm/ui/swing/settings/SwingSettings;
 	public final fun getAcceptSelectedSuggestionWithEnter ()Z
 	public final fun getAlternateScreenPadding ()Lio/github/ketraterm/ui/swing/settings/SwingPadding;
+	public final fun getColumnSpacing ()I
 	public final fun getColumns ()I
+	public final fun getCopyOnSelection ()Z
 	public final fun getCursorBlinkMillis ()I
 	public final fun getCursorShape ()Lio/github/ketraterm/render/api/TerminalRenderCursorShape;
 	public final fun getFallbackFonts ()Ljava/util/List;
@@ -547,6 +553,8 @@ public final class io/github/ketraterm/ui/swing/settings/SwingSettings$Builder {
 	public final fun getFractionalMetrics ()Ljava/lang/Object;
 	public final fun getHyperlinkActivationForeground ()I
 	public final fun getLineHeight ()F
+	public final fun getMiddleClickPaste ()Z
+	public final fun getMouseReportingEnabled ()Z
 	public final fun getOsc8HyperlinkActivation ()Lio/github/ketraterm/ui/swing/api/SwingHyperlinkActivation;
 	public final fun getOsc8HyperlinkPresentation ()Lio/github/ketraterm/ui/swing/api/SwingHyperlinkPresentation;
 	public final fun getPadding ()Lio/github/ketraterm/ui/swing/settings/SwingPadding;
@@ -576,7 +584,9 @@ public final class io/github/ketraterm/ui/swing/settings/SwingSettings$Builder {
 	public final fun getVisualBellEnabled ()Z
 	public final fun setAcceptSelectedSuggestionWithEnter (Z)V
 	public final fun setAlternateScreenPadding (Lio/github/ketraterm/ui/swing/settings/SwingPadding;)V
+	public final fun setColumnSpacing (I)V
 	public final fun setColumns (I)V
+	public final fun setCopyOnSelection (Z)V
 	public final fun setCursorBlinkMillis (I)V
 	public final fun setCursorShape (Lio/github/ketraterm/render/api/TerminalRenderCursorShape;)V
 	public final fun setFallbackFonts (Ljava/util/List;)V
@@ -584,6 +594,8 @@ public final class io/github/ketraterm/ui/swing/settings/SwingSettings$Builder {
 	public final fun setFractionalMetrics (Ljava/lang/Object;)V
 	public final fun setHyperlinkActivationForeground (I)V
 	public final fun setLineHeight (F)V
+	public final fun setMiddleClickPaste (Z)V
+	public final fun setMouseReportingEnabled (Z)V
 	public final fun setOsc8HyperlinkActivation (Lio/github/ketraterm/ui/swing/api/SwingHyperlinkActivation;)V
 	public final fun setOsc8HyperlinkPresentation (Lio/github/ketraterm/ui/swing/api/SwingHyperlinkPresentation;)V
 	public final fun setPadding (Lio/github/ketraterm/ui/swing/settings/SwingPadding;)V

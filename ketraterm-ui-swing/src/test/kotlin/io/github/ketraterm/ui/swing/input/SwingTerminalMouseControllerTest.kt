@@ -36,6 +36,49 @@ import java.awt.event.MouseWheelEvent
 class SwingTerminalMouseControllerTest {
     private val source = Canvas()
 
+    @Test
+    fun `reporting changes take effect after a complete gesture`() {
+        val host = RecordingMouseHost(mouseTrackingMode = MouseTrackingMode.NORMAL)
+        val controller = SwingTerminalMouseController(host)
+        controller.mouseListener.mousePressed(mousePressed(MouseEvent.BUTTON1, InputEvent.BUTTON1_DOWN_MASK))
+        host.settings = host.settings.copy { it.mouseReportingEnabled = false }
+        controller.mouseListener.mouseReleased(mouseReleased())
+        assertEquals(listOf(TerminalMouseEventType.PRESS, TerminalMouseEventType.RELEASE), host.mouseReports.map { it.type })
+        controller.mouseListener.mousePressed(mousePressed(MouseEvent.BUTTON1, InputEvent.BUTTON1_DOWN_MASK))
+        host.settings = host.settings.copy { it.mouseReportingEnabled = true }
+        controller.mouseMotionListener.mouseDragged(mouseDragged())
+        controller.mouseListener.mouseReleased(mouseReleased())
+        assertEquals(2, host.mouseReports.size)
+        assertEquals(1, host.selectionPressCount)
+        assertEquals(1, host.selectionDragCount)
+        assertEquals(1, host.selectionReleaseCount)
+    }
+
+    @Test
+    fun `middle paste uses local routing and occurs once per press`() {
+        val host = RecordingMouseHost(session = RecordingInputEncoder())
+        host.settings = host.settings.copy { it.middleClickPaste = true }
+        val controller = SwingTerminalMouseController(host)
+        val press = mousePressed(MouseEvent.BUTTON2, InputEvent.BUTTON2_DOWN_MASK)
+        controller.mouseListener.mousePressed(press)
+        controller.mouseListener.mouseReleased(MouseEvent(source, MouseEvent.MOUSE_RELEASED, 0, 0, 20, 30, 1, false, MouseEvent.BUTTON2))
+        assertTrue(press.isConsumed)
+        assertEquals(1, host.pasteCount)
+        assertEquals(0, host.selectionPressCount)
+        host.mouseTrackingMode = MouseTrackingMode.NORMAL
+        controller.mouseListener.mousePressed(mousePressed(MouseEvent.BUTTON2, InputEvent.BUTTON2_DOWN_MASK))
+        assertEquals(1, host.pasteCount)
+        assertEquals(TerminalMouseButton.MIDDLE, host.mouseReports.single().button)
+        controller.resetInput()
+        controller.mouseListener.mousePressed(mousePressed(MouseEvent.BUTTON2, InputEvent.BUTTON2_DOWN_MASK or InputEvent.SHIFT_DOWN_MASK))
+        assertEquals(2, host.pasteCount)
+        controller.resetInput()
+        host.session = null
+        host.mouseTrackingMode = MouseTrackingMode.OFF
+        controller.mouseListener.mousePressed(mousePressed(MouseEvent.BUTTON2, InputEvent.BUTTON2_DOWN_MASK))
+        assertEquals(2, host.pasteCount)
+    }
+
     @Nested
     inner class PressRouting {
         @ParameterizedTest
@@ -523,7 +566,7 @@ class SwingTerminalMouseControllerTest {
     }
 
     private class RecordingMouseHost(
-        override val settings: SwingSettings =
+        override var settings: SwingSettings =
             SwingSettings.create { draft ->
                 draft.padding = SwingPadding(0, 0, 0, 0)
             },
@@ -546,6 +589,12 @@ class SwingTerminalMouseControllerTest {
             TerminalRenderCache(80, 24).also {
                 it.updateFrom(FakeFrameReader(FakeFrame(historySize = 0, rows = 24)))
             }
+
+        var pasteCount = 0
+
+        override fun pasteClipboardText() {
+            pasteCount++
+        }
 
         var scrollCount = 0
         var requestFocusInWindowCount = 0

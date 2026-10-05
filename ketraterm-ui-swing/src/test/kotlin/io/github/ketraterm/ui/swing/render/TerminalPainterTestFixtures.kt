@@ -53,7 +53,7 @@ internal fun testMetrics(
 ): SwingMetrics {
     val g = image.createGraphics()
     try {
-        return SwingMetrics.from(g.getFontMetrics(settings.font))
+        return SwingMetrics.from(g.getFontMetrics(settings.font), settings.lineHeight, settings.columnSpacing)
     } finally {
         g.dispose()
     }

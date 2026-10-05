@@ -63,6 +63,16 @@ private const val ROWS = 3
 
 fun main() =
     runBlocking {
+        val interactionSettings =
+            SwingSettings.create {
+                it.mouseReportingEnabled = false
+                it.copyOnSelection = true
+                it.middleClickPaste = true
+                it.columnSpacing = 3
+            }
+        check(interactionSettings == interactionSettings.copy {})
+        check(interactionSettings.columnSpacing == 3 && interactionSettings.middleClickPaste && interactionSettings.copyOnSelection)
+        check(!interactionSettings.mouseReportingEnabled)
         JavaConsumer.verify()
         JavaConsumer.verifySessionConstruction(ConsumerConnector())
         val selection = checkNotNull(TerminalClipboardSelection.parse("cp"))

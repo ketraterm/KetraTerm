@@ -174,11 +174,12 @@ public class SwingTerminal
 
                 override fun mouseReleased(event: MouseEvent) {
                     if (handleScrollbarOverlayReleased(event)) return
-                    if (isInScrollbarOverlayGutter(event)) {
+                    if (isInScrollbarOverlayGutter(event) && !mouseController.hasPressedButtons) {
                         event.consume()
                         return
                     }
                     mouseController.mouseListener.mouseReleased(event)
+                    refreshHyperlinkHover()
                 }
 
                 override fun mouseExited(event: MouseEvent) {
@@ -240,6 +241,10 @@ public class SwingTerminal
                     override fun scrollViewportByRows(deltaRows: Int): Boolean = viewportController.scrollByRows(deltaRows)
 
                     override fun repaint() = this@SwingTerminal.repaint()
+
+                    override fun copySelection() {
+                        copySelectionToClipboard()
+                    }
 
                     override fun requestFocusInWindow(): Boolean = this@SwingTerminal.requestFocusInWindow()
                 },
@@ -451,6 +456,10 @@ public class SwingTerminal
                                 this@SwingTerminal.session?.takeUnless { it.isClosed }?.getInputModeBits() ?: 0L,
                             ),
                         ]
+
+                    override fun pasteClipboardText() {
+                        this@SwingTerminal.pasteClipboardText()
+                    }
 
                     override fun encodeMouse(event: TerminalMouseEvent) {
                         this@SwingTerminal.session?.encodeMouse(event)
@@ -1037,6 +1046,7 @@ public class SwingTerminal
                 visualBellController::stop,
                 viewportController::finishScroll,
                 selectionController::stopSelectionDrag,
+                mouseController::resetInput,
                 { clearPointerHover() },
                 ::detachAncestorWindow,
                 { super.removeNotify() },
@@ -1170,7 +1180,7 @@ public class SwingTerminal
             selectionController.deferChanges {
                 if (disposed) return@deferChanges
                 bindingJob?.cancel(CancellationException("Terminal session binding replaced"))
-                mouseController.resetWheelInput()
+                mouseController.resetInput()
                 this.session = session
                 retainedViewport = null
                 resetRenderCaches()
@@ -1196,7 +1206,7 @@ public class SwingTerminal
                         launch {
                             session.state.filterIsInstance<TerminalSessionState.Closed>().take(1).collect {
                                 if (this@SwingTerminal.session === session) {
-                                    mouseController.resetWheelInput()
+                                    mouseController.resetInput()
                                     renderFrameController.handlePublishedFrame()
                                 }
                             }
@@ -1245,7 +1255,7 @@ public class SwingTerminal
                         bindingJob = null
                         job?.cancel(CancellationException("Terminal session unbound"))
                     },
-                    mouseController::resetWheelInput,
+                    mouseController::resetInput,
                     { cancelAndHideShellSuggestionsOnEdt("Terminal session unbound") },
                     {
                         session = null
@@ -1308,7 +1318,14 @@ public class SwingTerminal
             if (next == previous) return
 
             val nextMetrics =
-                if (next.font != previous.font || next.lineHeight != previous.lineHeight) buildMetrics(next) else metrics
+                if (next.font != previous.font || next.lineHeight != previous.lineHeight || next.columnSpacing != previous.columnSpacing) {
+                    buildMetrics(next)
+                } else {
+                    metrics
+                }
+            if (nextMetrics != metrics) {
+                gridPixelExtent(renderCache.columns, nextMetrics.cellWidth, 0)
+            }
             val geometryChanged =
                 nextMetrics != metrics ||
                     next.padding != previous.padding ||
@@ -1344,6 +1361,7 @@ public class SwingTerminal
             }
             updateAutomaticSuggestionEligibilityOnEdt()
             if (next.osc8HyperlinkPresentation != previous.osc8HyperlinkPresentation ||
+                next.mouseReportingEnabled != previous.mouseReportingEnabled ||
                 next.osc8HyperlinkActivation != previous.osc8HyperlinkActivation
             ) {
                 reconcileHyperlinksOnEdt()
@@ -1964,12 +1982,15 @@ public class SwingTerminal
         /**
          * Pastes text from the host clipboard into the active terminal session.
          *
+         * Call on the EDT. Clipboard callbacks run synchronously and propagate their failures.
+         * Unbound and closed sessions do not read the clipboard.
+         *
          * @return `true` if clipboard text was read and sent to the session, `false` otherwise.
          */
         public fun pasteClipboardText(): Boolean {
+            val boundSession = session?.takeUnless { it.isClosed } ?: return false
             val text = hostServices.clipboardHandler.readText() ?: return false
-            if (text.isEmpty()) return false
-            val boundSession = session ?: return false
+            if (text.isEmpty() || session !== boundSession || boundSession.isClosed) return false
             invalidateShellSuggestionsOnEdt()
             boundSession.encodePaste(TerminalPasteEvent(text))
             return true
@@ -2428,6 +2449,9 @@ public class SwingTerminal
          * Must be called on the EDT because it reads the current settings and
          * font metrics. Primary-screen chrome is the default for initial sizing.
          *
+         * Both dimensions must be positive. The complete size must fit the integer pixel range.
+         *
+         * @throws IllegalArgumentException if a dimension or the complete size is out of range.
          * @param columns requested number of terminal columns.
          * @param rows requested number of terminal rows.
          * @param activeBuffer screen whose chrome insets should be included.
@@ -2440,8 +2464,8 @@ public class SwingTerminal
             activeBuffer: TerminalRenderBufferKind = TerminalRenderBufferKind.PRIMARY,
         ): Dimension =
             Dimension(
-                columns * metrics.cellWidth + SwingTerminalChrome.horizontalInset(settings, activeBuffer),
-                rows * metrics.cellHeight + SwingTerminalChrome.verticalInset(settings, activeBuffer),
+                gridPixelExtent(columns, metrics.cellWidth, SwingTerminalChrome.horizontalInset(settings, activeBuffer)),
+                gridPixelExtent(rows, metrics.cellHeight, SwingTerminalChrome.verticalInset(settings, activeBuffer)),
             )
 
         private fun resizeSessionToVisibleGridOnEdt(publishWhenUnchanged: Boolean = true): Boolean {
@@ -2611,9 +2635,25 @@ public class SwingTerminal
             return layoutChanged or originChanged
         }
 
+        private fun gridPixelExtent(
+            cells: Int,
+            cellSize: Int,
+            inset: Int,
+        ): Int {
+            require(cells > 0) { "grid dimensions must be positive" }
+            val extent = cells.toLong() * cellSize + inset
+            require(extent in 1..Int.MAX_VALUE.toLong()) { "grid size exceeds the integer pixel range" }
+            return extent.toInt()
+        }
+
         private fun buildMetrics(settings: SwingSettings): SwingMetrics {
             val metricsSource: FontMetrics = getFontMetrics(settings.font)
-            return SwingMetrics.from(metricsSource, settings.lineHeight)
+            val result = SwingMetrics.from(metricsSource, settings.lineHeight, settings.columnSpacing)
+            for (buffer in TerminalRenderBufferKind.entries) {
+                gridPixelExtent(settings.columns, result.cellWidth, SwingTerminalChrome.horizontalInset(settings, buffer))
+                gridPixelExtent(settings.rows, result.cellHeight, SwingTerminalChrome.verticalInset(settings, buffer))
+            }
+            return result
         }
 
         private fun runOnEdt(action: Runnable) {

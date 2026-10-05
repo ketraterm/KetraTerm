@@ -50,6 +50,8 @@ internal interface TerminalSelectionHost {
     fun repaint()
 
     fun requestFocusInWindow(): Boolean
+
+    fun copySelection()
 }
 
 internal class TerminalSelectionController(
@@ -60,6 +62,7 @@ internal class TerminalSelectionController(
     private var rangeSnapshot: TerminalSelectionRange? = null
     private var notifiedRange: TerminalSelectionRange? = null
     private var notificationDepth = 0
+    private var copyOnMouseRelease = false
 
     fun deferChanges(action: () -> Unit) {
         notificationDepth++
@@ -289,6 +292,7 @@ internal class TerminalSelectionController(
 
     fun stopSelectionDrag() {
         selectingWithMouse = false
+        copyOnMouseRelease = false
         selectionAutoscrollTimer.stop()
     }
 
@@ -297,6 +301,7 @@ internal class TerminalSelectionController(
         host.requestFocusInWindow()
 
         selectingWithMouse = true
+        copyOnMouseRelease = host.settings.copyOnSelection
         selectionIsBlock = event.isAltDown && event.clickCount < 2
         lastSelectionDragX = event.x
         lastSelectionDragY = event.y
@@ -359,8 +364,10 @@ internal class TerminalSelectionController(
 
     fun handleSelectionMouseReleased(event: MouseEvent) {
         if (SwingUtilities.isLeftMouseButton(event)) {
+            val copy = selectingWithMouse && copyOnMouseRelease && currentRange()?.isEmpty == false
             stopSelectionDrag()
             event.consume()
+            if (copy) host.copySelection()
         }
     }
 

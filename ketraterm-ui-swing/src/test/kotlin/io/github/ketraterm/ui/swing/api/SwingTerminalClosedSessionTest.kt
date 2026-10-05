@@ -152,6 +152,10 @@ class SwingTerminalClosedSessionTest {
                 assertEquals(expected, clipboard.text.trimEnd())
                 assertFalse(component.copyCellBounds(8, 0, Rectangle()), "narrow views clip columns")
 
+                settings = settings.copy { it.columnSpacing = 4 }
+                component.reloadSettings()
+                assertTrue(component.copySelectionToClipboard())
+                assertEquals(expected, clipboard.text.trimEnd())
                 settings = settings.copy { it.font = it.font.deriveFont(24f) }
                 component.reloadSettings()
                 assertTrue(component.copySelectionToClipboard())
