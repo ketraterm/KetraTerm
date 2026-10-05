@@ -69,6 +69,19 @@ private class OscShellIntegrationSession(
         state.recordCurrentWorkingDirectory(uri)
     }
 
+    override fun bufferCleared(buffer: TerminalRenderBufferKind) {
+        if (buffer != TerminalRenderBufferKind.PRIMARY) return
+        readinessPromptStarted = false
+        mutablePromptReady.value = false
+        promptEndLineId = NO_LINE_ID
+        promptEndColumn = 0
+        promptStartedForCommandText = false
+        promptStartLineId = NO_LINE_ID
+        promptStartColumn = 0
+        activeCommandLineContextRevision++
+        state.clear()
+    }
+
     override fun outputProcessed() {
         if (readinessPromptStarted) context.readRenderFrame(readinessFrameConsumer)
     }
@@ -235,6 +248,9 @@ private class OscShellIntegrationSession(
      * @return active command-line snapshot, or `null` when unavailable.
      */
     override fun activeCommandLine(): TerminalShellCommandLineSnapshot? = context.withTerminalState { activeCommandLineLocked() }
+
+    override fun <T> withCommandLine(action: (Long, TerminalShellCommandLineSnapshot?) -> T): T =
+        context.withTerminalState { action(activeCommandLineContextRevision, activeCommandLineLocked()) }
 
     private fun activeCommandLineLocked(): TerminalShellCommandLineSnapshot? {
         if (!promptStartedForCommandText || promptEndLineId == NO_LINE_ID) return null

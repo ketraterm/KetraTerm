@@ -27,6 +27,20 @@ import java.awt.event.KeyEvent
 
 class SwingTerminalHyperlinkLifecycleTest {
     @Test
+    fun `reporting setting refreshes a stationary hyperlink without changing terminal modes`() {
+        SwingTerminalHyperlinkLifecycleFixture().use { fixture ->
+            fixture.awaitHyperlink()
+            fixture.movePointer(1)
+            fixture.setMouseReporting(true)
+            assertEquals(Cursor.DEFAULT_CURSOR, fixture.cursorType())
+            fixture.allowMouseReporting(false)
+            assertEquals(Cursor.HAND_CURSOR, fixture.cursorType())
+            fixture.allowMouseReporting(true)
+            assertEquals(Cursor.DEFAULT_CURSOR, fixture.cursorType())
+        }
+    }
+
+    @Test
     fun `OSC8 activation setting updates stationary feedback and actual click eligibility`() {
         SwingTerminalHyperlinkLifecycleFixture().use { fixture ->
             fixture.awaitHyperlink()

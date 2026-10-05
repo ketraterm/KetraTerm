@@ -36,6 +36,8 @@ internal interface SwingTerminalMouseHost {
 
     fun encodeMouse(event: TerminalMouseEvent)
 
+    fun pasteClipboardText()
+
     fun cellAt(
         x: Int,
         y: Int,

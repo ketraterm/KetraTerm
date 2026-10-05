@@ -81,24 +81,24 @@ producer to parsed host events. With the low-level constructor, the caller owns
 its custom parser and host-event wiring; an already-built parser is not wrapped.
 
 An IDE that already owns shell integration can pass its semantic metadata and
-editing/readiness flows directly:
+versioned editing projection and readiness flow directly:
 
 ```kotlin
-import io.github.ketraterm.session.TerminalShellCommandLineSnapshot
+import io.github.ketraterm.session.TerminalShellCommandLineState
 import io.github.ketraterm.session.TerminalShellIntegrationFactory
 import io.github.ketraterm.session.TerminalShellIntegrationState
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 
 val shellState = TerminalShellIntegrationState()
-val commandLine = MutableStateFlow<TerminalShellCommandLineSnapshot?>(null)
+val commandLine = TerminalShellCommandLineState()
 val promptReady = MutableStateFlow(false)
 val session = TerminalSession.create(
     terminal = terminal,
     connector = connector,
     shellIntegration = TerminalShellIntegrationFactory.host(
         state = shellState,
-        commandLine = commandLine.asStateFlow(),
+        commandLine = commandLine,
         promptReady = promptReady.asStateFlow(),
     ),
 )
@@ -115,6 +115,23 @@ Consumers receive `session.shellIntegrationState: TerminalShellIntegrationView`.
 It exposes the live query, primitive-copy and observation contract without record
 or clear operations. The existing producer state implements that role directly;
 the host retains its own `shellState` to publish. See [reader ownership and ABI](../docs/render-reader-ownership.md).
+
+For host OSC protocols, use the parser extension through normal session assembly:
+
+```kotlin
+parserFactory = TerminalOutputParserFactory { sink, clipboardBudget ->
+    TerminalParsers.create(
+        sink,
+        clipboardBudget,
+        customOscPayloadLimitBytes = 64 * 1024,
+        customOscHandler = hostCustomOscHandler,
+    )
+}
+```
+
+The host handler can capture anchors through the session frame reader before later bytes arrive.
+See the [ordered callback contract](docs/session-concurrency-locks.md#ordered-custom-osc-handling).
+IntelliJ protocol interpretation remains in the host adapter.
 
 Preserve stream order: process the matching output, capture stable primary-buffer
 line identities, publish the semantic update, then deliver later bytes. For
@@ -143,6 +160,18 @@ Publish `commandLine` snapshots with complete known text, a UTF-16 cursor offset
 and zero-based live-grid anchors after matching output/geometry changes. `null`
 is authoritative. Standard suggestions consume this source; revision observation
 is shared only while collected. The host owns source lifetime and text bounds.
+Every assignment advances a synchronized revision, including equal snapshots.
+Keep the projection null while pending input makes its state untrustworthy.
+The legacy StateFlow-only overload remains readable but does not support
+conditional editing.
+
+Capture `session.captureCommandEdit()` before requesting asynchronous suggestions.
+Use its `commandLine` to calculate a valid semantic replacement, then call
+`session.submitInput(expected, events)` with that same context. Only `ACCEPTED`
+permits admission feedback; stale or cancelled contexts send no edit prefix.
+An idle writer does not acknowledge remote shell processing. See the
+[conditional edit contract](docs/session-concurrency-locks.md#conditional-command-edits)
+for model synchronization, cancellation and custom popup integration.
 
 Publish `promptReady` only while the live primary prompt can accept a startup
 command. It is separate from initialization and editing availability. A supplied

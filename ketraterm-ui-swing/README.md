@@ -19,7 +19,7 @@ A reusable, premium-tier Swing terminal component built in Kotlin/JVM 25.
 
 The module is built on three core design philosophies:
 1. **Complete Protocol Ignorance:** The UI has zero knowledge of ANSI, VT, ESC, OSC, or DCS bytes. It never parses stream protocols or executes grid mutation rules.
-2. **Data-Driven Decoupling:** The UI collects `TerminalSession.renderGeneration`, leases the published front cache, and bulk-copies primitive state into its EDT-owned cache.
+2. **Data-Driven Decoupling:** The UI collects `TerminalSession.renderGeneration`, leases the published front cache, and bulk-copies primitive state into its EDT-owned cache while the session is open. After closure, it projects synchronized retained reads into that cache.
 3. **EDT Isolation & Swing Safety:** The Swing component state belongs strictly to the Event Dispatch Thread (EDT). Background rendering and I/O processes interact only through thread-safe snapshot mechanisms.
 
 ```mermaid
@@ -76,6 +76,16 @@ The cursor uses the existing shared cursor/text blink timer. Inactive cursors ig
 `requestActiveShellSuggestions()` uses the bound session's selected command source, including a host-owned source. It defaults to an explicit request; automatic observers pass `SwingShellSuggestionTrigger.AUTOMATIC`. Pending results and acceptance are checked against that session and command context, and context observation stops when the request and popup end.
 
 For context kept outside the session, call `requestShellSuggestions(commandText, cursorOffset, anchorColumn, anchorRow, trigger = SwingShellSuggestionTrigger.EXPLICIT)`. The default trigger remains automatic. Both methods use the same cancellable provider pipeline and require the master suggestion setting; explicit requests remain available when automatic popups are disabled. With directly supplied context, the host must replace the request or call `hideShellSuggestions()` when its editor state changes. `showShellSuggestions()` remains available when the host owns provider collection itself.
+
+The default session-backed handler additionally requires a synchronized revisioned
+command source: use `TerminalShellCommandLineState` with the host factory, or the
+optional OSC producer. StateFlow-only host models remain readable but cannot admit
+conditional edits. The view captures before provider work and revalidates at queue
+admission; rejected edits produce no prefix or accepted feedback. Hosts using
+`showShellSuggestions()` or invoking handlers directly must provide a custom handler,
+capture `session.captureCommandEdit()` before provider work, and apply through
+`session.submitInput(expected, events)`. The default session handler rejects such
+uncaptured acceptance. See the [conditional edit contract](../ketraterm-session/docs/session-concurrency-locks.md#conditional-command-edits).
 
 Choose controller and presentation ownership independently:
 

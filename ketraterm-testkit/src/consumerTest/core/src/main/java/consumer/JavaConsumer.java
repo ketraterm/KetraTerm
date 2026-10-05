@@ -42,6 +42,9 @@ public final class JavaConsumer {
         @Override public TerminalLine getLine(int row) { return row == 0 ? line : empty; }
         @Override public int getCodepointAt(int column, int row) { return row == 0 ? line.getCodepoint(column) : 0; }
     }
+    public static void erase(io.github.ketraterm.core.api.TerminalWriter writer) {
+        writer.eraseBuffer();
+    }
     public static void verify() {
         TerminalReader reader = new Reader();
         if (reader.getCodepointAt(0, 0) != 'J' || reader.getCodepointAt(Integer.MAX_VALUE, 0) != 0
@@ -50,4 +53,3 @@ public final class JavaConsumer {
         if (reader.getPalette() != reader.getPalette()) throw new AssertionError("Retained immutable palette");
     }
 }
-

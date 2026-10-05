@@ -35,7 +35,7 @@ public abstract interface class io/github/ketraterm/input/api/TerminalInputEncod
 	public abstract fun create (Lio/github/ketraterm/core/api/TerminalInputState;Lio/github/ketraterm/protocol/host/TerminalHostOutput;Lio/github/ketraterm/input/policy/TerminalInputPolicy;)Lio/github/ketraterm/input/api/TerminalInputEncoder;
 }
 
-public final class io/github/ketraterm/input/event/TerminalFocusEvent {
+public final class io/github/ketraterm/input/event/TerminalFocusEvent : io/github/ketraterm/input/event/TerminalInputEvent {
 	public fun <init> (Z)V
 	public final fun component1 ()Z
 	public final fun copy (Z)Lio/github/ketraterm/input/event/TerminalFocusEvent;
@@ -44,6 +44,9 @@ public final class io/github/ketraterm/input/event/TerminalFocusEvent {
 	public final fun getFocused ()Z
 	public fun hashCode ()I
 	public fun toString ()Ljava/lang/String;
+}
+
+public abstract interface class io/github/ketraterm/input/event/TerminalInputEvent {
 }
 
 public final class io/github/ketraterm/input/event/TerminalKey : java/lang/Enum {
@@ -170,7 +173,7 @@ public final class io/github/ketraterm/input/event/TerminalKey : java/lang/Enum 
 	public static fun values ()[Lio/github/ketraterm/input/event/TerminalKey;
 }
 
-public final class io/github/ketraterm/input/event/TerminalKeyEvent {
+public final class io/github/ketraterm/input/event/TerminalKeyEvent : io/github/ketraterm/input/event/TerminalInputEvent {
 	public static final field Companion Lio/github/ketraterm/input/event/TerminalKeyEvent$Companion;
 	public static final field NO_CODEPOINT I
 	public static final field TEXT_ONLY_CODEPOINT I
@@ -257,7 +260,7 @@ public final class io/github/ketraterm/input/event/TerminalMouseButton : java/la
 	public static fun values ()[Lio/github/ketraterm/input/event/TerminalMouseButton;
 }
 
-public final class io/github/ketraterm/input/event/TerminalMouseEvent {
+public final class io/github/ketraterm/input/event/TerminalMouseEvent : io/github/ketraterm/input/event/TerminalInputEvent {
 	public fun <init> (IILio/github/ketraterm/input/event/TerminalMouseButton;Lio/github/ketraterm/input/event/TerminalMouseEventType;III)V
 	public synthetic fun <init> (IILio/github/ketraterm/input/event/TerminalMouseButton;Lio/github/ketraterm/input/event/TerminalMouseEventType;IIIILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun component1 ()I
@@ -291,7 +294,7 @@ public final class io/github/ketraterm/input/event/TerminalMouseEventType : java
 	public static fun values ()[Lio/github/ketraterm/input/event/TerminalMouseEventType;
 }
 
-public final class io/github/ketraterm/input/event/TerminalPasteEvent {
+public final class io/github/ketraterm/input/event/TerminalPasteEvent : io/github/ketraterm/input/event/TerminalInputEvent {
 	public fun <init> (Ljava/lang/String;)V
 	public final fun component1 ()Ljava/lang/String;
 	public final fun copy (Ljava/lang/String;)Lio/github/ketraterm/input/event/TerminalPasteEvent;
@@ -302,7 +305,7 @@ public final class io/github/ketraterm/input/event/TerminalPasteEvent {
 	public fun toString ()Ljava/lang/String;
 }
 
-public final class io/github/ketraterm/input/event/TerminalTextReplacementEvent {
+public final class io/github/ketraterm/input/event/TerminalTextReplacementEvent : io/github/ketraterm/input/event/TerminalInputEvent {
 	public fun <init> (IILjava/lang/String;)V
 	public final fun component1 ()I
 	public final fun component2 ()I

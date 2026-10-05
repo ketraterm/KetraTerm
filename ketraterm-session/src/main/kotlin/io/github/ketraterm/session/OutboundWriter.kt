@@ -46,7 +46,10 @@ internal class OutboundWriter(
     private var writing = false
 
     /** Returns after copying a complete operation, never after waiting for transport I/O. */
-    inline fun submit(crossinline block: () -> Unit) {
+    inline fun submit(
+        signal: Boolean = true,
+        crossinline block: () -> Unit,
+    ) {
         val wake =
             synchronized(lock) {
                 if (closed) return
@@ -61,7 +64,7 @@ internal class OutboundWriter(
                 producedBytes += size - previousSize
                 previousSize == 0 && size != 0
             }
-        if (wake) ready.trySend(Unit)
+        if (wake && signal) ready.trySend(Unit)
     }
 
     /**
@@ -72,6 +75,7 @@ internal class OutboundWriter(
      */
     fun submitBulk(
         workUnits: Long,
+        signal: Boolean = true,
         write: () -> Unit,
     ) {
         require(workUnits >= 0)
@@ -84,8 +88,17 @@ internal class OutboundWriter(
             pendingBulkUnits += workUnits
             pendingBulkOperations++
         }
-        ready.trySend(Unit)
+        if (signal) ready.trySend(Unit)
     }
+
+    /** Signals deferred admissions after the caller releases its outer admission monitor. */
+    fun signalPending() {
+        val pending = synchronized(lock) { !closed && (size != 0 || pendingWrites.isNotEmpty()) }
+        if (pending) ready.trySend(Unit)
+    }
+
+    /** A pending write is not yet reflected by a command model captured by a new request. */
+    fun isIdle(): Boolean = synchronized(lock) { !writing && size == 0 && pendingWrites.isEmpty() }
 
     /**
      * Reserves the sole owned reply slot, separately from ordinary/bulk input.

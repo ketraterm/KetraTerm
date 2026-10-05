@@ -48,7 +48,7 @@ public data class TerminalKeyEvent(
     val associatedText: String? = null,
     val modifiers: Int = TerminalModifiers.NONE,
     val type: TerminalKeyEventType = TerminalKeyEventType.PRESS,
-) {
+) : TerminalInputEvent {
     init {
         require(TerminalModifiers.isValid(modifiers)) {
             "invalid modifier bitmask: $modifiers"

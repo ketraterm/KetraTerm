@@ -32,6 +32,7 @@ Input does not own:
 The public input surface is:
 
 - `TerminalInputEncoder`, the facade for encoding one normalized input event
+- `TerminalInputEvent`, the sealed common vocabulary for immutable semantic events
 - `TerminalKeyEvent`, `TerminalPasteEvent`, `TerminalTextReplacementEvent`,
   `TerminalFocusEvent`, and `TerminalMouseEvent`, the normalized event models
 - `TerminalInputPolicy`, the compatibility and safety policy for ambiguous
@@ -148,6 +149,14 @@ operation. Its Delete, Backspace, and paste phases cannot interleave with other
 session input or parser/core responses. The default encoder coalesces repeated
 deletion sequences through a bounded reusable buffer; replacement text still
 uses the configured paste policy.
+
+Sessions additionally expose admission-returning `submitInput(event)` and
+`submitInput(events)` methods. A bounded compound list uses one captured mode/policy
+snapshot and one writer reservation, preserving semantic encoding for every event.
+The encoder interface remains synchronous and returns `Unit`; it does not own
+session admission or transport completion. Exact host bytes use session
+`submitBytes`, with copied ownership and no decoding or paste transformation.
+See the [session admission contract](../../ketraterm-session/docs/session-concurrency-locks.md#admission-and-ordering).
 
 ## Keyboard Contract
 

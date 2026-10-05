@@ -38,12 +38,14 @@ internal class TerminalSearchScan {
         var columns = 0
         var buffer = TerminalRenderBufferKind.PRIMARY
         var generation = 0L
+        var historyContentGeneration = 0L
         reader.readRenderFrame { frame ->
             first = frame.discardedCount
             last = first + frame.historySize + frame.rows - 1L
             columns = frame.columns
             buffer = frame.activeBuffer
             generation = frame.contentGeneration
+            historyContentGeneration = frame.historyContentGeneration
         }
         model.begin(query, ignoreCase, first, { context.ensureActive() }, validateRows = true)
         var next = first
@@ -54,7 +56,11 @@ internal class TerminalSearchScan {
             val copiedFirst = copy.firstAbsoluteRow
             val copiedLast = copy.lastAbsoluteRow
             val cache = copy.cache
-            if (copied && (cache.columns != columns || cache.activeBuffer != buffer)) return null
+            if (copied &&
+                (cache.columns != columns || cache.activeBuffer != buffer || cache.historyContentGeneration != historyContentGeneration)
+            ) {
+                return null
+            }
             if (copied) lastGeneration = cache.contentGeneration
             if (copiedFirst > next) model.discardPendingLine()
             if (copiedFirst > last) break
@@ -69,11 +75,11 @@ internal class TerminalSearchScan {
         reader.readRenderFrame { frame ->
             retainedFirst = frame.discardedCount
             lastGeneration = frame.contentGeneration
-            valid = frame.columns == columns && frame.activeBuffer == buffer
+            valid = frame.columns == columns && frame.activeBuffer == buffer && frame.historyContentGeneration == historyContentGeneration
         }
         if (!valid) return null
         highlights.discardBefore(retainedFirst) { context.ensureActive() }
-        return Result(highlights, columns, buffer, lastGeneration, generation != lastGeneration)
+        return Result(highlights, columns, buffer, lastGeneration, historyContentGeneration, generation != lastGeneration)
     }
 
     internal class Result(
@@ -81,6 +87,7 @@ internal class TerminalSearchScan {
         val columns: Int,
         val buffer: TerminalRenderBufferKind,
         val generation: Long,
+        val historyContentGeneration: Long,
         val changedDuringScan: Boolean,
     )
 }

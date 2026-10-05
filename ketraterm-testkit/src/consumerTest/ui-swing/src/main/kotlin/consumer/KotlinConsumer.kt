@@ -25,8 +25,10 @@ import io.github.ketraterm.host.TerminalClipboardReadOutcome
 import io.github.ketraterm.host.TerminalClipboardReadRequest
 import io.github.ketraterm.protocol.TerminalClipboardSelection
 import io.github.ketraterm.render.api.TerminalRenderUnderline
+import io.github.ketraterm.session.TerminalInputAdmission
 import io.github.ketraterm.session.TerminalSession
 import io.github.ketraterm.session.TerminalShellCommandLineSnapshot
+import io.github.ketraterm.session.TerminalShellCommandLineState
 import io.github.ketraterm.session.TerminalShellIntegrationFactory
 import io.github.ketraterm.session.TerminalShellIntegrationState
 import io.github.ketraterm.transport.TerminalConnector
@@ -37,7 +39,6 @@ import io.github.ketraterm.ui.swing.settings.SwingSettings
 import io.github.ketraterm.ui.swing.settings.SwingSettingsProvider
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.flow.MutableSharedFlow
-import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.onCompletion
 import kotlinx.coroutines.flow.onSubscription
@@ -62,6 +63,16 @@ private const val ROWS = 3
 
 fun main() =
     runBlocking {
+        val interactionSettings =
+            SwingSettings.create {
+                it.mouseReportingEnabled = false
+                it.copyOnSelection = true
+                it.middleClickPaste = true
+                it.columnSpacing = 3
+            }
+        check(interactionSettings == interactionSettings.copy {})
+        check(interactionSettings.columnSpacing == 3 && interactionSettings.middleClickPaste && interactionSettings.copyOnSelection)
+        check(!interactionSettings.mouseReportingEnabled)
         JavaConsumer.verify()
         JavaConsumer.verifySessionConstruction(ConsumerConnector())
         val selection = checkNotNull(TerminalClipboardSelection.parse("cp"))
@@ -85,7 +96,7 @@ fun main() =
         val closedConnector = ConsumerConnector().apply { close() }
         check(runCatching { closedConnector.start(rejectedListener) }.exceptionOrNull() is IllegalStateException)
         val detector = ConsumerHyperlinkDetector()
-        val commandLine = MutableStateFlow<TerminalShellCommandLineSnapshot?>(TerminalShellCommandLineSnapshot("help", 4, 4, 0))
+        val commandLine = TerminalShellCommandLineState(TerminalShellCommandLineSnapshot("help", 4, 4, 0))
         val shellProducer = TerminalShellIntegrationState()
         val shell = TerminalShellIntegrationFactory.host(shellProducer, commandLine)
         val backing = TerminalBuffers.create(COLUMNS, ROWS)
@@ -109,6 +120,19 @@ fun main() =
             commandLine.value = null
             check(session.activeShellCommandLine() == null)
             session.start(COLUMNS, ROWS)
+            check(session.submitBytes(byteArrayOf(), offset = 0) == io.github.ketraterm.session.TerminalInputAdmission.ACCEPTED)
+            check(session.submitInput(emptyList()) == io.github.ketraterm.session.TerminalInputAdmission.ACCEPTED)
+            commandLine.value = TerminalShellCommandLineSnapshot("help", 4, 4, 0)
+            val edit = checkNotNull(session.captureCommandEdit())
+            JavaConsumer.verifyConditionalAdmission(session, edit)
+            check(session.submitInput(edit, emptyList()) == TerminalInputAdmission.ACCEPTED)
+            commandLine.value = commandLine.value
+            check(session.submitInput(edit, emptyList()) == TerminalInputAdmission.STALE_CONTEXT)
+            val cancelled = checkNotNull(session.captureCommandEdit())
+            cancelled.cancel()
+            check(cancelled.isCancelled)
+            check(session.submitInput(cancelled, emptyList()) == TerminalInputAdmission.CANCELLED)
+            commandLine.value = null
             check(runCatching { connector.start(rejectedListener) }.exceptionOrNull() is IllegalStateException)
             withTimeout(20_000) { session.renderGeneration.first { it >= 0L } }
             check(runCatching { createTerminalView(session) }.exceptionOrNull() is IllegalStateException)
@@ -168,6 +192,12 @@ fun main() =
                 }
                 check(firstCell() == URL[0].code)
                 onEdt {
+                    JavaConsumer.verifySelection(terminal)
+                    val range = checkNotNull(terminal.createSelectionRange(1, 0L, 4, 0L, isBlock = true))
+                    check(terminal.setSelection(range))
+                    check(terminal.currentSelectionRange()?.isBlock == true)
+                    terminal.clearSelection()
+                    check(terminal.currentSelectionRange() == null)
                     val bounds = Rectangle()
                     check(terminal.copyCellBounds(0, 0, bounds) && bounds.width > 0 && bounds.height > 0)
                     check(terminal.cursor.type == Cursor.HAND_CURSOR)

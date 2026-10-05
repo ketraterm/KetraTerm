@@ -296,8 +296,28 @@ class PtyConnectorTest {
 
     @Test
     fun `parser failure closes its session with the original cause and finalizes once`() {
-        val failure = IllegalStateException("parser failed after consuming a prefix")
-        val input = GatedInputStream("abc".ascii())
+        verifyParserFailure(customOsc = false, cancelled = false)
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = [false, true])
+    fun `custom OSC failure closes its session with the original cause and finalizes once`(cancelled: Boolean) {
+        verifyParserFailure(customOsc = true, cancelled = cancelled)
+    }
+
+    private fun verifyParserFailure(
+        customOsc: Boolean,
+        cancelled: Boolean,
+    ) {
+        val failure =
+            if (cancelled) {
+                CancellationException(
+                    "host callback cancelled",
+                )
+            } else {
+                IllegalStateException("parser failed after consuming a prefix")
+            }
+        val input = GatedInputStream((if (customOsc) "a\u001b]1341;fail\u0007later" else "abc").ascii())
         val output = RecordingOutputStream()
         val process = TestProcess(input = input, output = output, blockWaitFor = true)
         val connector = createConnector(process)
@@ -308,15 +328,24 @@ class PtyConnectorTest {
                 connector = connector,
                 parserFactory =
                     TerminalOutputParserFactory { sink, limit ->
-                        val parser = TerminalParsers.create(sink, limit)
+                        val parser =
+                            if (customOsc) {
+                                TerminalParsers.create(sink, limit) { _, _, _, _ -> throw failure }
+                            } else {
+                                TerminalParsers.create(sink, limit)
+                            }
                         object : TerminalOutputParser by parser {
                             override fun accept(
                                 bytes: ByteArray,
                                 offset: Int,
                                 length: Int,
                             ) {
-                                parser.accept(bytes, offset, 1)
-                                throw failure
+                                if (customOsc) {
+                                    parser.accept(bytes, offset, length)
+                                } else {
+                                    parser.accept(bytes, offset, 1)
+                                    throw failure
+                                }
                             }
 
                             override fun endOfInput() {

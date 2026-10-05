@@ -16,6 +16,7 @@
 package io.github.ketraterm.session
 
 import io.github.ketraterm.protocol.ShellIntegrationEvent
+import io.github.ketraterm.render.api.TerminalRenderBufferKind
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.StateFlow
 
@@ -23,8 +24,9 @@ import kotlinx.coroutines.flow.StateFlow
  * Selected producer of a terminal's shell metadata and active editing context.
  *
  * A session owns observation, not the producer's lifetime. Implementations must
- * not start background jobs during construction. [commandLineChanges] is cold;
- * the session shares its collection and cancels it when no consumer needs it.
+ * not start background jobs during construction. [commandLineChanges] supports
+ * independent subscriptions; the session shares its collection and cancels it
+ * when no consumer needs it.
  * [state] is the bounded terminal-facing projection of the producer's model.
  * Only that producer may write it; OSC reports never supplement a host model.
  *
@@ -45,11 +47,36 @@ public interface TerminalShellIntegration {
     /** Current immutable editing context, or null when unavailable; must be safe from any thread. */
     public fun activeCommandLine(): TerminalShellCommandLineSnapshot?
 
+    /**
+     * Runs a short conditional-edit action under the producer's revision guard.
+     * The revision must change for every authoritative editing update, including
+     * changes away from and back to an equal snapshot. The callback must finish
+     * before another producer update can become visible.
+     *
+     * Session calls this with terminal mutation serialized, before acquiring its
+     * input admission monitor. Implementations must not acquire terminal state
+     * while holding an independent producer guard. Do not invoke external listeners
+     * under that guard. Return null without invoking [action] when this atomic
+     * capability is unsupported; ordinary [activeCommandLine] reads still work.
+     */
+    public fun <T> withCommandLine(action: (revision: Long, snapshot: TerminalShellCommandLineSnapshot?) -> T): T? = null
+
     /** Optional OSC 133 interpretation, called at the marker's exact output position. */
     public fun observeShellMarker(event: ShellIntegrationEvent): Unit = Unit
 
     /** Optional accepted OSC 7 interpretation. Hosts keep their own directory authority. */
     public fun observeWorkingDirectory(uri: String): Unit = Unit
+
+    /**
+     * Reports a local clear after the active screen and history have been erased.
+     * Called synchronously under session mutation serialization, before later output.
+     * Invalidate producer-owned anchors for [buffer]; preserve metadata for the other buffer.
+     * Old line identities cannot resolve after this callback.
+     * Host models keep ownership of their text, metadata, and notifications.
+     * Do not block on UI work, mutate the session, or close it.
+     * Exceptions propagate to the clear caller after the grid has changed.
+     */
+    public fun bufferCleared(buffer: TerminalRenderBufferKind): Unit = Unit
 
     /** Optional synchronous finalization after a parser batch, before startup submission. */
     public fun outputProcessed(): Unit = Unit

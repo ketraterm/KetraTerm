@@ -149,6 +149,40 @@ public class SwingSettings private constructor(
     public val pasteControlPolicy: PasteControlPolicy = builder.pasteControlPolicy
     public val cursorShape: TerminalRenderCursorShape = builder.cursorShape
     public val lineHeight: Float = builder.lineHeight
+
+    /**
+     * Adds logical pixels to each cell's horizontal advance without scaling the font.
+     * Defaults to zero and must be nonnegative. Wide characters occupy two expanded cells.
+     * Painting and hit testing use the expanded width. Text retains its existing alignment within each cell.
+     * At a fixed component width, extra spacing reduces the visible column count.
+     * Live sessions resize normally. Closed sessions preserve their final grid and clip columns.
+     * Component construction and settings reload reject geometry that exceeds the integer pixel range.
+     */
+    public val columnSpacing: Int = builder.columnSpacing
+
+    /**
+     * Allows application mouse reports from this view. Defaults to true.
+     * Disabling preserves terminal modes and permits local selection, links, and menus.
+     * Shift forces local interaction. A started button gesture retains its route until release.
+     * Wheel-to-arrow input in the alternate buffer remains independent of this setting.
+     */
+    public val mouseReportingEnabled: Boolean = builder.mouseReportingEnabled
+
+    /**
+     * Copies a nonempty selection once when a local primary-button gesture completes.
+     * Defaults to false and uses the supplied clipboard handler.
+     * The gesture captures this value at press. Programmatic changes never trigger copying.
+     * Clipboard callbacks run on the EDT. Failures propagate after gesture cleanup.
+     */
+    public val copyOnSelection: Boolean = builder.copyOnSelection
+
+    /**
+     * Pastes through the supplied clipboard handler on a local middle-button press.
+     * Defaults to false. Application mouse tracking takes priority unless Shift forces local input.
+     * Uses the normal paste policy and bracketed-paste handling. Closed sessions do not read the clipboard.
+     * Clipboard callbacks run on the EDT and propagate failures.
+     */
+    public val middleClickPaste: Boolean = builder.middleClickPaste
     public val smartSuggestionsEnabled: Boolean = builder.smartSuggestionsEnabled
     public val shellSuggestionsEnabled: Boolean = builder.shellSuggestionsEnabled
     public val acceptSelectedSuggestionWithEnter: Boolean = builder.acceptSelectedSuggestionWithEnter
@@ -265,8 +299,20 @@ public class SwingSettings private constructor(
         /** Draft value for [SwingSettings.cursorShape]; validated when [build] is called. */
         public var cursorShape: TerminalRenderCursorShape = source?.cursorShape ?: TerminalRenderCursorShape.BLOCK
 
+        /** Draft value for [SwingSettings.mouseReportingEnabled]. */
+        public var mouseReportingEnabled: Boolean = source?.mouseReportingEnabled ?: true
+
+        /** Draft value for [SwingSettings.copyOnSelection]. */
+        public var copyOnSelection: Boolean = source?.copyOnSelection ?: false
+
+        /** Draft value for [SwingSettings.middleClickPaste]. */
+        public var middleClickPaste: Boolean = source?.middleClickPaste ?: false
+
         /** Draft value for [SwingSettings.lineHeight]; validated when [build] is called. */
         public var lineHeight: Float = source?.lineHeight ?: 1.0f
+
+        /** Draft value for [SwingSettings.columnSpacing]; validated when [build] is called. */
+        public var columnSpacing: Int = source?.columnSpacing ?: 0
 
         /** Draft value for [SwingSettings.smartSuggestionsEnabled]; validated when [build] is called. */
         public var smartSuggestionsEnabled: Boolean = source?.smartSuggestionsEnabled ?: false
@@ -323,7 +369,11 @@ public class SwingSettings private constructor(
             alternateScreenPadding == other.alternateScreenPadding &&
             pasteControlPolicy == other.pasteControlPolicy &&
             cursorShape == other.cursorShape &&
+            columnSpacing == other.columnSpacing &&
             lineHeight == other.lineHeight &&
+            mouseReportingEnabled == other.mouseReportingEnabled &&
+            copyOnSelection == other.copyOnSelection &&
+            middleClickPaste == other.middleClickPaste &&
             smartSuggestionsEnabled == other.smartSuggestionsEnabled &&
             shellSuggestionsEnabled == other.shellSuggestionsEnabled &&
             acceptSelectedSuggestionWithEnter == other.acceptSelectedSuggestionWithEnter &&
@@ -363,7 +413,11 @@ public class SwingSettings private constructor(
         result = 31 * result + alternateScreenPadding.hashCode()
         result = 31 * result + pasteControlPolicy.hashCode()
         result = 31 * result + cursorShape.hashCode()
+        result = 31 * result + columnSpacing
         result = 31 * result + lineHeight.hashCode()
+        result = 31 * result + mouseReportingEnabled.hashCode()
+        result = 31 * result + copyOnSelection.hashCode()
+        result = 31 * result + middleClickPaste.hashCode()
         result = 31 * result + smartSuggestionsEnabled.hashCode()
         result = 31 * result + shellSuggestionsEnabled.hashCode()
         result = 31 * result + acceptSelectedSuggestionWithEnter.hashCode()
@@ -405,6 +459,7 @@ public class SwingSettings private constructor(
         require(visualBellEdgeThicknessPixels >= 0) {
             "visualBellEdgeThicknessPixels must be >= 0, was $visualBellEdgeThicknessPixels"
         }
+        require(columnSpacing >= 0) { "columnSpacing must be nonnegative" }
         require(lineHeight.isFinite() && lineHeight > 0f) {
             "lineHeight must be finite and > 0, was $lineHeight"
         }

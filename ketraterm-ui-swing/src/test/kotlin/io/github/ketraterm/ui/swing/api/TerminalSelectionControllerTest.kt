@@ -35,6 +35,31 @@ import javax.swing.SwingUtilities
 class TerminalSelectionControllerTest {
     @ParameterizedTest
     @ValueSource(booleans = [false, true])
+    fun `copy occurs only when a nonempty local gesture completes`(enabled: Boolean) {
+        SwingUtilities.invokeAndWait {
+            val cache = TerminalRenderCache(10, 1)
+            cache.accept(FakeFrame("abcdefghij"))
+            val host = FakeSelectionHost(cache)
+            host.settings = host.settings.copy { it.copyOnSelection = enabled }
+            val controller = TerminalSelectionController(host)
+            controller.updateFrame(cache)
+            val button = JButton()
+            controller.handleSelectionMousePressed(selectionMouseEvent(button, MouseEvent.MOUSE_PRESSED, 5, 5, alt = false))
+            controller.handleSelectionMouseDragged(selectionMouseEvent(button, MouseEvent.MOUSE_DRAGGED, 45, 5, alt = false))
+            assertEquals(0, host.copies)
+            host.settings = host.settings.copy { it.copyOnSelection = !enabled }
+            controller.handleSelectionMouseReleased(selectionMouseEvent(button, MouseEvent.MOUSE_RELEASED, 45, 5, alt = false))
+            controller.handleSelectionMouseReleased(selectionMouseEvent(button, MouseEvent.MOUSE_RELEASED, 45, 5, alt = false))
+            assertEquals(if (enabled) 1 else 0, host.copies)
+            controller.clearSelection()
+            controller.selectAbsoluteRows(0, 0, 10)
+            controller.handleSelectionMouseReleased(selectionMouseEvent(button, MouseEvent.MOUSE_RELEASED, 45, 5, alt = false))
+            assertEquals(if (enabled) 1 else 0, host.copies)
+        }
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = [false, true])
     fun `backward projection reuse preserves direction across clipping and invisible viewports`(block: Boolean) {
         SwingUtilities.invokeAndWait {
             val lines = listOf("abcdefgh", "ijklmnop", "qrstuvwx")
@@ -177,7 +202,7 @@ class TerminalSelectionControllerTest {
         override val renderCache: TerminalRenderCache,
     ) : TerminalSelectionHost {
         private val bidiLayout = TerminalBidiLayout()
-        override val settings =
+        override var settings =
             SwingSettings.create { draft ->
                 draft.padding = SwingPadding(0, 0, 0, 0)
             }
@@ -194,6 +219,12 @@ class TerminalSelectionControllerTest {
         override val contentYOffset = 0.0
         override val componentWidth = 100
         override val componentHeight = 200
+
+        var copies = 0
+
+        override fun copySelection() {
+            copies++
+        }
 
         var cellAtCallCount = 0
         var cellAtX = -1

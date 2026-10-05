@@ -444,23 +444,32 @@ public fun interface SwingShellSuggestionHandler {
          * The default handler is Unicode-aware: it computes grapheme-cluster
          * counts for generated Delete and Backspace events before pasting the
          * accepted suggestion replacement.
+         * When [session] is a TerminalSession, Swing must capture a versioned
+         * editing context at request time. The handler rejects stale/unsupported
+         * edits and emits acceptance feedback only after successful admission.
+         * Direct invocation of that session-backed handler throws IllegalStateException;
+         * host-managed requests must use conditional session admission themselves.
          *
          * @param session active input encoder used to submit the replacement event.
          * @return standard replacement suggestion handler.
          */
         @JvmStatic
         public fun createDefault(session: TerminalInputEncoder): SwingShellSuggestionHandler =
-            SwingShellSuggestionHandler { acceptance ->
-                val request = acceptance.request
-                val replacement = acceptance.suggestion.replacementFor(request) ?: return@SwingShellSuggestionHandler
+            if (session is io.github.ketraterm.session.TerminalSession) {
+                SessionShellSuggestionHandler(session)
+            } else {
+                SwingShellSuggestionHandler { acceptance ->
+                    val request = acceptance.request
+                    val replacement = acceptance.suggestion.replacementFor(request) ?: return@SwingShellSuggestionHandler
 
-                session.encodeTextReplacement(
-                    TerminalTextReplacementEvent(
-                        deleteAfterCursorCount = replacement.deleteAfterCursorCount,
-                        deleteBeforeCursorCount = replacement.deleteBeforeCursorCount,
-                        replacementText = replacement.replacementText,
-                    ),
-                )
+                    session.encodeTextReplacement(
+                        TerminalTextReplacementEvent(
+                            deleteAfterCursorCount = replacement.deleteAfterCursorCount,
+                            deleteBeforeCursorCount = replacement.deleteBeforeCursorCount,
+                            replacementText = replacement.replacementText,
+                        ),
+                    )
+                }
             }
     }
 }

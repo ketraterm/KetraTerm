@@ -22,4 +22,4 @@ package io.github.ketraterm.input.event
  */
 public data class TerminalPasteEvent(
     val text: String,
-)
+) : TerminalInputEvent

@@ -30,6 +30,7 @@ import kotlin.math.roundToInt
  * EDT-owned overlay scrollbar painted inside the terminal's reserved right inset.
  */
 internal class TerminalScrollbarOverlay {
+    var retainedOutput: Boolean = false
     private val thumb = Rectangle()
     private var foregroundRgb = -1
     private var normalThumbColor = Color(0, 0, 0, THUMB_ALPHA)
@@ -206,7 +207,8 @@ internal class TerminalScrollbarOverlay {
         viewportHeightPixels: Int,
         destination: Rectangle,
     ): Boolean {
-        if (activeBuffer == TerminalRenderBufferKind.ALTERNATE ||
+        if (activeBuffer == TerminalRenderBufferKind.ALTERNATE &&
+            !retainedOutput ||
             componentWidth <= 0 ||
             historySize <= 0 ||
             visualScrollRangePixels <= 0 ||
@@ -240,7 +242,8 @@ internal class TerminalScrollbarOverlay {
         componentHeight: Int,
         state: TerminalViewportState,
     ): Int {
-        if (activeBuffer == TerminalRenderBufferKind.ALTERNATE ||
+        if (activeBuffer == TerminalRenderBufferKind.ALTERNATE &&
+            !retainedOutput ||
             state.historySize <= 0 ||
             SwingTerminalChrome.right(settings, activeBuffer) <= 0
         ) {

@@ -21,6 +21,44 @@ import org.junit.jupiter.api.Test
 
 class BufferWriterContractTest {
     @Test
+    fun `eraseBuffer clears retained clusters and preserves cursor and modes`() {
+        val buffer = TerminalBuffers.create(width = 10, height = 2, maxHistory = 4)
+        buffer.setBracketedPasteEnabled(true)
+        buffer.clearAllTabStops()
+        val cluster = intArrayOf('e'.code, 0x0301)
+        repeat(6) {
+            buffer.writeCluster(cluster, cluster.size)
+            buffer.carriageReturn()
+            buffer.newLine()
+        }
+        buffer.positionCursor(9, 1)
+        buffer.writeText("X")
+        val modes = buffer.getInputModeBits()
+        buffer.eraseBuffer()
+        assertEquals(0, buffer.historySize)
+        assertEquals(9, buffer.cursorCol)
+        assertEquals(1, buffer.cursorRow)
+        assertEquals(modes, buffer.getInputModeBits())
+        repeat(2) { row ->
+            repeat(10) { column ->
+                assertEquals(0, buffer.getCodepointAt(column, row))
+                assertFalse(buffer.getLine(row).isCluster(column))
+            }
+        }
+        buffer.writeText("Y")
+        assertEquals(0, buffer.historySize)
+        assertEquals('Y'.code, buffer.getCodepointAt(9, 1))
+        buffer.positionCursor(0, 0)
+        buffer.horizontalTab()
+        assertEquals(9, buffer.cursorCol)
+        buffer.eraseBuffer()
+        buffer.writeCluster(cluster, cluster.size)
+        val copied = IntArray(2)
+        assertEquals(2, buffer.getLine(0).readCluster(9, copied))
+        assertArrayEquals(cluster, copied)
+    }
+
+    @Test
     fun `clearAll_resetsTabStopsToDefault`() {
         val buffer = TerminalBuffers.create(width = 12, height = 2)
         buffer.clearAllTabStops()

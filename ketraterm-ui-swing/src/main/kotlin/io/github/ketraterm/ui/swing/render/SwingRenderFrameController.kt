@@ -52,7 +52,7 @@ internal class SwingRenderFrameController(
         val boundSession = host.session ?: return
         val blinkVisibilityChanged = host.resetCursorBlinkForFrame()
         host.refreshRenderCacheFromSession(boundSession)
-        if (!host.renderCache.hasFrame) return
+        if (host.session !== boundSession || !host.renderCache.hasFrame) return
         val viewportChanged = host.clampViewport(host.renderCache.historySize, host.renderCache.discardedCount)
         val followUpRenderRequired =
             viewportChanged ||

@@ -22,6 +22,9 @@ import io.github.ketraterm.parser.api.TerminalOutputParserFactory;
 import io.github.ketraterm.parser.api.TerminalParsers;
 import io.github.ketraterm.render.api.TerminalRenderFrameReader;
 import io.github.ketraterm.session.TerminalSession;
+import io.github.ketraterm.session.TerminalCommandEditContext;
+import io.github.ketraterm.session.TerminalInputAdmission;
+import io.github.ketraterm.input.event.TerminalPasteEvent;
 import io.github.ketraterm.transport.TerminalConnector;
 import io.github.ketraterm.host.TerminalClipboardReadRequest;
 import io.github.ketraterm.host.TerminalClipboardReadAuditEvent;
@@ -41,6 +44,35 @@ import java.util.concurrent.atomic.AtomicInteger;
 import javax.swing.SwingUtilities;
 
 public final class JavaConsumer {
+    public static void verifySelection(SwingTerminal terminal) {
+        var events = new AtomicInteger();
+        io.github.ketraterm.ui.swing.api.TerminalSelectionListener listener = (previous, current) -> {
+            if (!SwingUtilities.isEventDispatchThread()) throw new AssertionError("Selection callback requires EDT");
+            events.incrementAndGet();
+        };
+        terminal.addSelectionListener(listener);
+        try {
+            var range = terminal.createSelectionRange(0, 0L, 5, 0L);
+            if (range == null || range.isEmpty() || !terminal.setSelection(range))
+                throw new AssertionError("Java range assignment failed");
+            var saved = terminal.currentSelectionRange();
+            if (saved == null || saved.getCaretColumn() != 5 || saved.getAnchorAbsoluteRow() != 0L)
+                throw new AssertionError("Java selection snapshot differs");
+            terminal.clearSelection();
+            if (!terminal.setSelection(saved)) throw new AssertionError("Java selection restoration failed");
+            terminal.clearSelection();
+            if (events.get() != 4) throw new AssertionError("Java selection events differ");
+        } finally {
+            terminal.removeSelectionListener(listener);
+        }
+    }
+
+    public static void verifyConditionalAdmission(TerminalSession session, TerminalCommandEditContext expected) {
+        if (!expected.getCommandLine().getCommandText().equals("help") || expected.isCancelled()
+            || session.submitInput(expected, java.util.List.of()) != TerminalInputAdmission.ACCEPTED)
+            throw new AssertionError("Java conditional admission must validate the captured command");
+    }
+
     public static TerminalInputEncoderFactory inputEncoderFactory() {
         return TerminalInputEncoders::create;
     }
@@ -53,6 +85,13 @@ public final class JavaConsumer {
         var buffer = TerminalBuffers.create(80, 3);
         TerminalRenderFrameReader reader = buffer;
         try (var session = TerminalSession.create(buffer, reader, connector)) {
+            byte[] trigger = "\033[24~e".getBytes(StandardCharsets.US_ASCII);
+            if (session.submitBytes(trigger) != TerminalInputAdmission.NOT_RUNNING
+                || session.submitBytes(trigger, 1) != TerminalInputAdmission.NOT_RUNNING
+                || session.submitBytes(trigger, 0, trigger.length) != TerminalInputAdmission.NOT_RUNNING
+                || session.submitInput(new TerminalPasteEvent("x")) != TerminalInputAdmission.NOT_RUNNING
+                || session.submitInput(java.util.List.of(new TerminalPasteEvent("x"))) != TerminalInputAdmission.NOT_RUNNING)
+                throw new AssertionError("Java admission overloads must reject before startup");
             session.readRenderFrame(frame -> {
                 if (frame.getColumns() != 80 || frame.getRows() != 3) throw new AssertionError("Java render capability");
             });
@@ -60,6 +99,17 @@ public final class JavaConsumer {
     }
 
     public static void verify() throws Exception {
+        var interactionSettings = SwingSettings.create(draft -> {
+            draft.setMouseReportingEnabled(false);
+            draft.setCopyOnSelection(true);
+            draft.setMiddleClickPaste(true);
+            draft.setColumnSpacing(3);
+        });
+        var copiedSettings = interactionSettings.toBuilder().build();
+        if (copiedSettings.getMouseReportingEnabled() || !copiedSettings.getCopyOnSelection()
+            || !copiedSettings.getMiddleClickPaste() || copiedSettings.getColumnSpacing() != 3
+            || !interactionSettings.equals(copiedSettings))
+            throw new AssertionError("Java interaction settings did not survive copying");
         var resolver = new io.github.ketraterm.ui.swing.api.TerminalFontResolver() {
             public java.awt.Font resolveFallbackFont(int codePoint, int style, float size) { return null; }
             public java.awt.Font resolveFallbackFont(String text, int style, float size) { return null; }

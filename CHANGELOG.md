@@ -6,14 +6,16 @@ Release notes for library consumers and embedders. Product-specific changes are 
 
 ### Improvements and fixes
 
-- Added dependency-only headless and Swing entry points, a constraints-only Maven BOM aligning them with the 15 supported libraries and build-local publication verification. Central uploads now require formatting, public ABI, tests and external-consumer checks; release tags must match `VERSION`.
+- Swing can bind and resize after session exit. It projects retained rows without reflow, preserves selection across font changes, and keeps transport closed.
+- Added `TerminalSession.tryResizeViewport` for explicit resize admission during closure. Strict resize APIs retain their rejection contract.
 
-- Cancel pending completion work and close popups when sessions stop or suggestions are disabled.
+- Added headless and Swing dependencies and a Maven BOM to align library versions.
+
 - Preserve application cursor shapes in unfocused Swing terminals: blocks become thin hollow outlines, while bars and underlines remain steady. Device-aligned beams and underlines keep thickness consistent across panes at fractional display scales. Focus restores application blinking; cursor visibility, wide-cell ownership, bidi placement, and blinking-text behavior are preserved.
 - Reworked hyperlink retention and discovery to preserve prepared links through scrolling and focus changes, keep ordered filters from consuming unused rows, and validate hover and activation against the displayed occurrence. Hosts can configure OSC 8 styles and direct or modifier activation through immutable Swing settings; link cursors reflect activation eligibility.
 - Stopped frame-triggered terminal resizing on buffer switches. Default alternate-screen padding now shares the primary horizontal inset equally and preserves vertical insets, so physical resizing retains the same grid dimensions in either buffer. Explicit alternate-padding overrides remain supported.
-- Made shell metadata updates independent of transport output. Swing observes the selected model, and workspace/product command learning uses exact semantic completion snapshots; observer registrations end with their view/tab lifetime.
-- Discarded stale shell suggestions when editing context changes or the session closes, including pending results and acceptance. Dismissing suggestions cancels provider work, and ineligible automatic requests leave explicit requests untouched.
+- Shell metadata now updates without transport output, including command completion events.
+- Discarded stale suggestions when the command context changes. Closing the session or disabling suggestions cancels pending requests and closes popups.
 - Restored focus notifications for terminal applications that request them.
 - Moved terminal search off the Swing event thread. Results update during output, preserve the active match where possible, and discard stale highlights.
 - Reduced allocations when painting unchanged selections. Search and hyperlink detection now ignore artificial padding at wide-character wraps; grid resizing clears selections to prevent copying unrelated text.
@@ -29,7 +31,17 @@ Release notes for library consumers and embedders. Product-specific changes are 
 
 ### API changes
 
-- Restricted Maven publication, ABI validation and aggregated Dokka to the 15 supported libraries. Workspace and completion persistence remain bundled product modules; their external support is withdrawn before stable release. Retired their external consumer baselines and corrected the shell-integration Dokka header. See [supported boundaries](docs/library-compatibility.md#supported-boundary).
+- Added Swing settings for mouse reporting, copy on selection, middle-button paste, and extra column spacing. Defaults preserve existing behavior. Hosts retain clipboard and preference ownership.
+
+- Added `TerminalSession.clearBuffer` and the core `TerminalWriter.eraseBuffer` operation for local screen and history clearing. Both preserve the cursor, modes, and inactive buffer. The session returns false after closure. Selection, search, and OSC anchors invalidate after clearing.
+
+- Added native Swing selection ranges with read, set, restore, clear, and removable listener operations. Stale restoration rejects replaced layouts and bindings. Grid resize still clears selection.
+
+- Added `TerminalCustomOscHandler` through `TerminalParsers.create` for bounded, ordered host OSC handling. Hosts can configure the envelope limit; the default is 4 KiB. Session factories preserve host services and existing transport failure routing.
+
+- Added `TerminalSession.submitBytes` and `submitInput` for ordered byte and semantic input, with explicit acceptance or rejection results.
+- Added conditional command edits through `TerminalShellCommandLineState` to reject edits when the command context changes.
+- Published the supported libraries separately. Workspace and completion persistence remain product modules. See [supported boundaries](docs/library-compatibility.md#supported-boundary).
 - Added independently usable Kotlin/Java terminal libraries with configurable host integration. See [library contracts](docs/library-configuration.md).
 - Replaced `PasteSanitizationPolicy` with `PasteControlPolicy`. Newline handling remains host-owned; persisted legacy paste settings migrate automatically.
 - Clipboard/title integrations now use `TerminalClipboardPolicy.writePermission` and `TerminalTitlePolicy.permission`. Removed origin-specific APIs and clipboard `ALLOWLIST`; old split permission settings fall back to the new defaults.

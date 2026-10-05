@@ -30,6 +30,9 @@ fun main() {
         check(session.currentWorkingDirectoryUri() == "file:///tmp")
         val command = checkNotNull(session.activeShellCommandLine())
         check(command.commandText == "git status" && command.cursorOffset == 10)
+        check(session.clearBuffer())
+        check(session.activeShellCommandLine() == null)
+        JavaConsumer.clear(session)
     }
     check(connector.closes == 1)
 }

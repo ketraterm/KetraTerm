@@ -1,3 +1,7 @@
+public abstract interface class io/github/ketraterm/parser/api/TerminalCustomOscHandler {
+	public abstract fun handle (I[BII)V
+}
+
 public abstract interface class io/github/ketraterm/parser/api/TerminalOutputParser {
 	public abstract fun accept ([BII)V
 	public static synthetic fun accept$default (Lio/github/ketraterm/parser/api/TerminalOutputParser;[BIIILjava/lang/Object;)V
@@ -18,6 +22,8 @@ public final class io/github/ketraterm/parser/api/TerminalParsers {
 	public static final field INSTANCE Lio/github/ketraterm/parser/api/TerminalParsers;
 	public static final fun create (Lio/github/ketraterm/parser/spi/TerminalCommandSink;)Lio/github/ketraterm/parser/api/TerminalOutputParser;
 	public static final fun create (Lio/github/ketraterm/parser/spi/TerminalCommandSink;Lkotlin/jvm/functions/Function0;)Lio/github/ketraterm/parser/api/TerminalOutputParser;
+	public static final fun create (Lio/github/ketraterm/parser/spi/TerminalCommandSink;Lkotlin/jvm/functions/Function0;ILio/github/ketraterm/parser/api/TerminalCustomOscHandler;)Lio/github/ketraterm/parser/api/TerminalOutputParser;
+	public static final fun create (Lio/github/ketraterm/parser/spi/TerminalCommandSink;Lkotlin/jvm/functions/Function0;Lio/github/ketraterm/parser/api/TerminalCustomOscHandler;)Lio/github/ketraterm/parser/api/TerminalOutputParser;
 	public static synthetic fun create$default (Lio/github/ketraterm/parser/spi/TerminalCommandSink;Lkotlin/jvm/functions/Function0;ILjava/lang/Object;)Lio/github/ketraterm/parser/api/TerminalOutputParser;
 }
 

@@ -30,8 +30,10 @@ public final class JavaConsumer {
         @Override public void resize(int columns, int rows) { if (columns <= 0 || rows <= 0) throw new AssertionError("Geometry"); }
         @Override public void close() { closes++; }
     }
+    public static void clear(io.github.ketraterm.session.TerminalSession session) {
+        if (!session.clearBuffer()) throw new AssertionError("Open session clear");
+    }
     public static void verify() {
         if (factory() == null) throw new AssertionError("Exported factory");
     }
 }
-

@@ -30,6 +30,59 @@ import kotlin.test.*
 
 class SwingSettingsTest {
     @Test
+    fun columnSpacingDefaultsToZero() {
+        assertEquals(0, SwingSettings().columnSpacing)
+    }
+
+    @Test
+    fun spacingUsesOneGeometryAndRejectsOverflowBeforeApplyingSettings() {
+        SwingUtilities.invokeAndWait {
+            var settings =
+                SwingSettings.create {
+                    it.columns = 10
+                    it.rows = 2
+                }
+            val component = SwingTerminal(settingsProvider = { settings })
+            try {
+                val original = component.preferredGridSize(10, 2)
+                component.size = original
+                val originalFont = component.font
+                settings = settings.copy { it.columnSpacing = 3 }
+                assertEquals(3, settings.toBuilder().build().columnSpacing)
+                component.reloadSettings()
+                assertEquals(originalFont, component.font)
+                assertEquals(original.width + 30, component.preferredGridSize(10, 2).width)
+                assertEquals(original.height, component.preferredGridSize(10, 2).height)
+                assertTrue(component.visibleGridSize().width < 10)
+                assertFailsWith<IllegalArgumentException> { settings.copy { it.columnSpacing = -1 } }
+                assertFailsWith<IllegalArgumentException> { component.preferredGridSize(Int.MAX_VALUE, 1) }
+                val expanded = component.preferredGridSize(10, 2)
+                settings = settings.copy { it.columnSpacing = Int.MAX_VALUE }
+                assertFailsWith<IllegalArgumentException> { component.reloadSettings() }
+                assertEquals(expanded, component.preferredGridSize(10, 2))
+            } finally {
+                component.dispose()
+            }
+        }
+    }
+
+    @Test
+    fun spacingDoesNotChangeVerticalMetricsOrCursorStroke() {
+        val metrics = Canvas().getFontMetrics(Font(Font.MONOSPACED, Font.PLAIN, 14))
+        val original = SwingMetrics.from(metrics)
+        val expanded = SwingMetrics.from(metrics, columnSpacing = 10)
+        assertEquals(original.copy(cellWidth = original.cellWidth + 10), expanded)
+    }
+
+    @Test
+    fun interactionSettingsPreserveExistingDefaults() {
+        val settings = SwingSettings()
+        assertEquals(true, settings.mouseReportingEnabled)
+        assertEquals(false, settings.copyOnSelection)
+        assertEquals(false, settings.middleClickPaste)
+    }
+
+    @Test
     fun builderSnapshotsAreDetachedAndFailedUpdatesLeaveTheOriginalValid() {
         val fonts = mutableListOf(Font(Font.MONOSPACED, Font.PLAIN, 14))
         val builder = SwingSettings.builder()

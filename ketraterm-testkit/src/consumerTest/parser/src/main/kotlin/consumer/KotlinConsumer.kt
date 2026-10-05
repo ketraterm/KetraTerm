@@ -27,4 +27,19 @@ fun main() {
     parser.endOfInput()
     sink.showNotification("title", "!", NotificationLevel.INFO)
     check(output.toString() == "Kotlin!")
+    val custom =
+        TerminalParsers.create(sink, { 0 }) { command, payload, offset, length ->
+            check(command == 1341)
+            output.append(payload.decodeToString(offset, offset + length))
+        }
+    custom.accept("\u001b]1341;custom\u0007".encodeToByteArray())
+    check(output.toString() == "Kotlin!custom")
+    val body = "x".repeat(5000)
+    val configured =
+        TerminalParsers.create(sink, { 0 }, 5005) { _, payload, offset, length ->
+            check(payload.decodeToString(offset, offset + length) == body)
+            output.append('!')
+        }
+    configured.accept("\u001b]1341;$body\u0007".encodeToByteArray())
+    check(output.toString() == "Kotlin!custom!")
 }

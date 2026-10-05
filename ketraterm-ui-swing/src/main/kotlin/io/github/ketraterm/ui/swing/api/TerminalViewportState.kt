@@ -23,6 +23,10 @@ package io.github.ketraterm.ui.swing.api
  * scrollback history. Hosts that use top-origin scrollbars can invert this
  * value in their adapter without changing terminal rendering policy.
  *
+ * After session closure, zero identifies the bottom of the retained presentation.
+ * The history size includes final grid rows hidden above a shorter component.
+ * These presentation coordinates do not change the session's grid or history.
+ *
  * @property historySize number of rows available above the live viewport.
  * @property scrollbackOffset precise visual offset from the live viewport.
  * Fractional values exist only during smooth animation between integer row

@@ -59,8 +59,13 @@ internal data class SwingMetrics(
         fun from(
             fontMetrics: FontMetrics,
             lineHeight: Float = 1.0f,
+            columnSpacing: Int = 0,
         ): SwingMetrics {
-            val cellWidth = maxOf(1, fontMetrics.charWidth('W'))
+            require(columnSpacing >= 0) { "columnSpacing must be nonnegative" }
+            val fontWidth = maxOf(1, fontMetrics.charWidth('W'))
+            val expandedWidth = fontWidth.toLong() + columnSpacing
+            require(expandedWidth <= Int.MAX_VALUE) { "cell width exceeds the integer pixel range" }
+            val cellWidth = expandedWidth.toInt()
             val originalHeight = fontMetrics.height
             val cellHeight = maxOf(1, (originalHeight * lineHeight).toInt())
             val baseline = (fontMetrics.ascent + (cellHeight - originalHeight) / 2).coerceIn(0, cellHeight)
@@ -73,7 +78,7 @@ internal data class SwingMetrics(
                 underlineY = underlineY,
                 strikethroughY = strikethroughY,
                 overlineY = 0,
-                cursorStrokeWidth = maxOf(1, cellWidth / 8),
+                cursorStrokeWidth = maxOf(1, fontWidth / 8),
             )
         }
     }

@@ -24,10 +24,7 @@ import io.github.ketraterm.input.event.TerminalPasteEvent
 import io.github.ketraterm.protocol.MouseTrackingMode
 import io.github.ketraterm.render.api.TerminalRenderBufferKind
 import io.github.ketraterm.render.cache.TerminalRenderCache
-import io.github.ketraterm.session.TerminalSession
-import io.github.ketraterm.session.TerminalSessionState
-import io.github.ketraterm.session.TerminalShellCommandLineSnapshot
-import io.github.ketraterm.session.TerminalShellIntegrationCommandRecord
+import io.github.ketraterm.session.*
 import io.github.ketraterm.ui.swing.cleanupSwingResources
 import io.github.ketraterm.ui.swing.input.*
 import io.github.ketraterm.ui.swing.preserveSwingFailure
@@ -75,6 +72,11 @@ import kotlin.math.floor
  * selection and stop selection dragging. Selection uses physical cell coordinates;
  * unchanged grid dimensions preserve it.
  *
+ * After closure, the view preserves the final grid, active buffer, palette, and selection.
+ * Width changes clip columns without reflow. Height changes show a bottom-anchored window
+ * over retained rows. Scrolling includes grid rows hidden above a shorter view.
+ * Font changes affect only presentation. No transport work or session restart occurs.
+ *
  * A focused terminal paints the application's cursor shape and blink state.
  * Without keyboard focus blocks become steady outlines; bars and underlines stay steady, preserving application
  * cursor visibility and viewport clipping. Focus never changes the session's cursor style.
@@ -100,6 +102,7 @@ public class SwingTerminal
         ) : this(settingsProvider, hostServices, Dispatchers.Default)
 
         private var session: TerminalSession? = null
+        private var retainedViewport: RetainedFrameViewport? = null
         private var disposed: Boolean = false
         private var settings: SwingSettings = settingsProvider.currentSettings()
         private var metrics: SwingMetrics = buildMetrics(settings)
@@ -171,11 +174,12 @@ public class SwingTerminal
 
                 override fun mouseReleased(event: MouseEvent) {
                     if (handleScrollbarOverlayReleased(event)) return
-                    if (isInScrollbarOverlayGutter(event)) {
+                    if (isInScrollbarOverlayGutter(event) && !mouseController.hasPressedButtons) {
                         event.consume()
                         return
                     }
                     mouseController.mouseListener.mouseReleased(event)
+                    refreshHyperlinkHover()
                 }
 
                 override fun mouseExited(event: MouseEvent) {
@@ -237,6 +241,10 @@ public class SwingTerminal
                     override fun scrollViewportByRows(deltaRows: Int): Boolean = viewportController.scrollByRows(deltaRows)
 
                     override fun repaint() = this@SwingTerminal.repaint()
+
+                    override fun copySelection() {
+                        copySelectionToClipboard()
+                    }
 
                     override fun requestFocusInWindow(): Boolean = this@SwingTerminal.requestFocusInWindow()
                 },
@@ -440,12 +448,18 @@ public class SwingTerminal
                     override val settings: SwingSettings get() = this@SwingTerminal.settings
                     override val metrics: SwingMetrics get() = this@SwingTerminal.metrics
                     override val renderCache: TerminalRenderCache get() = this@SwingTerminal.renderCache
-                    override val session: TerminalInputEncoder? get() = this@SwingTerminal.session
+                    override val session: TerminalInputEncoder? get() = this@SwingTerminal.session?.takeUnless { it.isClosed }
 
                     override fun mouseTrackingMode(): MouseTrackingMode =
                         MouseTrackingMode.entries[
-                            TerminalInputState.mouseTrackingMode(this@SwingTerminal.session?.getInputModeBits() ?: 0L),
+                            TerminalInputState.mouseTrackingMode(
+                                this@SwingTerminal.session?.takeUnless { it.isClosed }?.getInputModeBits() ?: 0L,
+                            ),
                         ]
+
+                    override fun pasteClipboardText() {
+                        this@SwingTerminal.pasteClipboardText()
+                    }
 
                     override fun encodeMouse(event: TerminalMouseEvent) {
                         this@SwingTerminal.session?.encodeMouse(event)
@@ -1032,6 +1046,7 @@ public class SwingTerminal
                 visualBellController::stop,
                 viewportController::finishScroll,
                 selectionController::stopSelectionDrag,
+                mouseController::resetInput,
                 { clearPointerHover() },
                 ::detachAncestorWindow,
                 { super.removeNotify() },
@@ -1161,98 +1176,110 @@ public class SwingTerminal
             }
         }
 
-        private fun bindOnEdt(session: TerminalSession) {
-            if (disposed) return
-            bindingJob?.cancel(CancellationException("Terminal session binding replaced"))
-            mouseController.resetWheelInput()
-            this.session = session
-            resetRenderCaches()
-            updateMinimizedStateFromAncestor()
-            applySettingsToSession(session, settings)
-            resetScrollbackState()
-            selectionController.clearSelection()
-            searchController.reset(renderCache.rows)
-            cancelAndHideShellSuggestionsOnEdt("Terminal session binding replaced")
-            shellIntegrationDecorations.reset()
-            if (hostServices.scrollbarOverlayEnabled) scrollbarOverlay.handleExited()
-            visualGeometry.reset()
-            selectionController.stopSelectionDrag()
-            visualBellController.stop()
-            lastResizedColumns = NO_RESIZE_DIMENSION
-            lastResizedRows = NO_RESIZE_DIMENSION
-            renderFrameController.reset()
-            clearPointerHover()
-            hyperlinkDiscoveryController.reset()
-            resizeSessionToVisibleGridOnEdt()
-            bindingJob =
-                componentScope.launch {
-                    launch {
-                        session.renderGeneration
-                            .filter { it >= 0L }
-                            .collect {
+        private fun bindOnEdt(session: TerminalSession) =
+            selectionController.deferChanges {
+                if (disposed) return@deferChanges
+                bindingJob?.cancel(CancellationException("Terminal session binding replaced"))
+                mouseController.resetInput()
+                this.session = session
+                retainedViewport = null
+                resetRenderCaches()
+                updateMinimizedStateFromAncestor()
+                applySettingsToSession(session, settings)
+                resetScrollbackState()
+                selectionController.resetBinding()
+                searchController.reset(renderCache.rows)
+                cancelAndHideShellSuggestionsOnEdt("Terminal session binding replaced")
+                shellIntegrationDecorations.reset()
+                if (hostServices.scrollbarOverlayEnabled) scrollbarOverlay.handleExited()
+                visualGeometry.reset()
+                selectionController.stopSelectionDrag()
+                visualBellController.stop()
+                lastResizedColumns = NO_RESIZE_DIMENSION
+                lastResizedRows = NO_RESIZE_DIMENSION
+                renderFrameController.reset()
+                clearPointerHover()
+                hyperlinkDiscoveryController.reset()
+                resizeSessionToVisibleGridOnEdt()
+                bindingJob =
+                    componentScope.launch {
+                        launch {
+                            session.state.filterIsInstance<TerminalSessionState.Closed>().take(1).collect {
                                 if (this@SwingTerminal.session === session) {
+                                    mouseController.resetInput()
                                     renderFrameController.handlePublishedFrame()
                                 }
                             }
-                    }
-                    combine(session.shellIntegrationState.revision, session.state) { _, state -> state }
-                        .takeWhile { it !is TerminalSessionState.Closed }
-                        .collect {
-                            if (this@SwingTerminal.session !== session || session.isClosed || !renderCache.hasFrame) return@collect
-                            if (refreshShellIntegrationDecorations(session)) {
-                                if (hoveredPromptMarkerRow != NO_PROMPT_MARKER_ROW &&
-                                    !shellIntegrationDecorations.hasPromptStartAt(hoveredPromptMarkerRow)
-                                ) {
-                                    updateHoveredPromptMarker(NO_PROMPT_MARKER_ROW)
-                                }
-                                renderFrameController.repaintFrame(forceFullRepaint = true)
-                            }
                         }
+                        launch {
+                            session.renderGeneration
+                                .filter { it >= 0L }
+                                .collect {
+                                    if (this@SwingTerminal.session === session) {
+                                        renderFrameController.handlePublishedFrame()
+                                    }
+                                }
+                        }
+                        combine(session.shellIntegrationState.revision, session.state) { _, state -> state }
+                            .takeWhile { it !is TerminalSessionState.Closed }
+                            .collect {
+                                if (this@SwingTerminal.session !== session || session.isClosed || !renderCache.hasFrame) return@collect
+                                if (refreshShellIntegrationDecorations(session)) {
+                                    if (hoveredPromptMarkerRow != NO_PROMPT_MARKER_ROW &&
+                                        !shellIntegrationDecorations.hasPromptStartAt(hoveredPromptMarkerRow)
+                                    ) {
+                                        updateHoveredPromptMarker(NO_PROMPT_MARKER_ROW)
+                                    }
+                                    renderFrameController.repaintFrame(forceFullRepaint = true)
+                                }
+                            }
+                    }
+                var publishedFrameAvailable = false
+                session.readPublishedFrame {
+                    publishedFrameAvailable = true
                 }
-            var publishedFrameAvailable = false
-            session.readPublishedFrame {
-                publishedFrameAvailable = true
+                if (publishedFrameAvailable) {
+                    renderFrameController.handlePublishedFrame()
+                }
+                requestRenderFromSession(session)
+                reconcileHyperlinksOnEdt()
+                publishViewportState(renderCache.historySize)
+                repaint()
             }
-            if (publishedFrameAvailable) {
-                renderFrameController.handlePublishedFrame()
-            }
-            requestRenderFromSession(session)
-            reconcileHyperlinksOnEdt()
-            publishViewportState(renderCache.historySize)
-            repaint()
-        }
 
-        private fun unbindOnEdt() {
-            cleanupSwingResources(
-                {
-                    val job = bindingJob
-                    bindingJob = null
-                    job?.cancel(CancellationException("Terminal session unbound"))
-                },
-                mouseController::resetWheelInput,
-                { cancelAndHideShellSuggestionsOnEdt("Terminal session unbound") },
-                {
-                    session = null
-                    resetRenderCaches()
-                },
-                ::resetScrollbackState,
-                selectionController::clearSelection,
-                { searchController.reset(renderCache.rows) },
-                shellIntegrationDecorations::reset,
-                { if (hostServices.scrollbarOverlayEnabled) scrollbarOverlay.handleExited() },
-                visualGeometry::reset,
-                selectionController::stopSelectionDrag,
-                {
-                    lastResizedColumns = NO_RESIZE_DIMENSION
-                    lastResizedRows = NO_RESIZE_DIMENSION
-                    renderFrameController.reset()
-                },
-                { clearPointerHover() },
-                hyperlinkDiscoveryController::reset,
-                { publishViewportState(0) },
-                ::repaint,
-            )
-        }
+        private fun unbindOnEdt() =
+            selectionController.deferChanges {
+                cleanupSwingResources(
+                    {
+                        val job = bindingJob
+                        bindingJob = null
+                        job?.cancel(CancellationException("Terminal session unbound"))
+                    },
+                    mouseController::resetInput,
+                    { cancelAndHideShellSuggestionsOnEdt("Terminal session unbound") },
+                    {
+                        session = null
+                        retainedViewport = null
+                        resetRenderCaches()
+                    },
+                    ::resetScrollbackState,
+                    selectionController::resetBinding,
+                    { searchController.reset(renderCache.rows) },
+                    shellIntegrationDecorations::reset,
+                    { if (hostServices.scrollbarOverlayEnabled) scrollbarOverlay.handleExited() },
+                    visualGeometry::reset,
+                    selectionController::stopSelectionDrag,
+                    {
+                        lastResizedColumns = NO_RESIZE_DIMENSION
+                        lastResizedRows = NO_RESIZE_DIMENSION
+                        renderFrameController.reset()
+                    },
+                    { clearPointerHover() },
+                    hyperlinkDiscoveryController::reset,
+                    { publishViewportState(0) },
+                    ::repaint,
+                )
+            }
 
         private fun disposeOnEdt() {
             if (disposed) return
@@ -1271,6 +1298,7 @@ public class SwingTerminal
                     suggestionJob = null
                     job?.cancel(CancellationException("Swing terminal disposed"))
                 },
+                selectionController::removeListeners,
                 suggestionInvalidationListeners::clear,
                 suggestionEligibilityListeners::clear,
                 { suggestionFailureHandler = SwingShellSuggestionFailureHandler.LOGGING },
@@ -1290,7 +1318,14 @@ public class SwingTerminal
             if (next == previous) return
 
             val nextMetrics =
-                if (next.font != previous.font || next.lineHeight != previous.lineHeight) buildMetrics(next) else metrics
+                if (next.font != previous.font || next.lineHeight != previous.lineHeight || next.columnSpacing != previous.columnSpacing) {
+                    buildMetrics(next)
+                } else {
+                    metrics
+                }
+            if (nextMetrics != metrics) {
+                gridPixelExtent(renderCache.columns, nextMetrics.cellWidth, 0)
+            }
             val geometryChanged =
                 nextMetrics != metrics ||
                     next.padding != previous.padding ||
@@ -1326,6 +1361,7 @@ public class SwingTerminal
             }
             updateAutomaticSuggestionEligibilityOnEdt()
             if (next.osc8HyperlinkPresentation != previous.osc8HyperlinkPresentation ||
+                next.mouseReportingEnabled != previous.mouseReportingEnabled ||
                 next.osc8HyperlinkActivation != previous.osc8HyperlinkActivation
             ) {
                 reconcileHyperlinksOnEdt()
@@ -1355,6 +1391,118 @@ public class SwingTerminal
             }
             if (!renderCache.hasFrame) return null
             return selectionController.getViewportSelection(renderCache)
+        }
+
+        /**
+         * Returns the complete retained selection on the EDT, or null.
+         *
+         * This describes the last applied frame and includes eviction observed there.
+         * The immutable range includes offscreen rows and may be saved for restoration.
+         * Unchanged ranges reuse their snapshot. Object identity is not an API guarantee.
+         * Unbound and disposed components return null.
+         *
+         * @throws IllegalStateException outside the EDT.
+         */
+        public fun currentSelectionRange(): TerminalSelectionRange? {
+            check(SwingUtilities.isEventDispatchThread()) { "selection access requires the EDT" }
+            if (disposed || session == null) return null
+            return selectionController.currentRange()
+        }
+
+        /**
+         * Creates a range in the current binding and layout without changing selection.
+         *
+         * Use absolute retained rows and half-open cell edges, as defined by
+         * [TerminalSelectionRange]. Both endpoint rows must remain retained.
+         * Returns null for unavailable bindings, pending layout changes, or coordinates beyond current bounds.
+         * Empty ranges are valid and clear selection when applied.
+         * This reads metadata only; it does not scroll, focus, or send input.
+         *
+         * @throws IllegalArgumentException for negative coordinates.
+         * @throws IllegalStateException outside the EDT or after disposal.
+         */
+        @JvmOverloads
+        public fun createSelectionRange(
+            anchorColumn: Int,
+            anchorAbsoluteRow: Long,
+            caretColumn: Int,
+            caretAbsoluteRow: Long,
+            isBlock: Boolean = false,
+        ): TerminalSelectionRange? {
+            checkSelectionAccess()
+            require(anchorColumn >= 0 && caretColumn >= 0) { "selection columns must be nonnegative" }
+            require(anchorAbsoluteRow >= 0 && caretAbsoluteRow >= 0) { "selection rows must be nonnegative" }
+            val boundSession = session ?: return null
+            var range: TerminalSelectionRange? = null
+            boundSession.readRenderFrame { frame ->
+                range = selectionController.createRange(frame, anchorColumn, anchorAbsoluteRow, caretColumn, caretAbsoluteRow, isBlock)
+            }
+            return range
+        }
+
+        /**
+         * Sets or restores a complete range on the EDT.
+         *
+         * Returns false for another binding, an invalidated layout, or evicted endpoints.
+         * Validation and application share one frame lease. Rejection does not apply
+         * the requested range or change the current selection.
+         * Successful assignment ends mouse dragging without scrolling, focusing,
+         * sending input, or copying text. Closed sessions support this operation.
+         *
+         * @throws IllegalStateException outside the EDT or after disposal.
+         */
+        public fun setSelection(range: TerminalSelectionRange): Boolean {
+            checkSelectionAccess()
+            val boundSession = session ?: return false
+            var accepted = false
+            boundSession.readRenderFrame { frame ->
+                accepted = selectionController.setRange(range, frame)
+            }
+            selectionController.publishChange()
+            return accepted
+        }
+
+        /**
+         * Clears selection and stops mouse dragging on the EDT.
+         *
+         * This leaves terminal content, input, viewport, focus, and clipboard unchanged.
+         * Repeated clearing and clearing an unbound component are harmless.
+         *
+         * @throws IllegalStateException outside the EDT or after disposal.
+         */
+        public fun clearSelection() {
+            checkSelectionAccess()
+            selectionController.clearSelection()
+        }
+
+        /**
+         * Registers a synchronous EDT observer without an initial callback.
+         *
+         * Registering the same listener instance twice has no effect.
+         * Listeners survive rebinding and are released on disposal, after the final
+         * selection clear. See [TerminalSelectionListener] for delivery semantics.
+         *
+         * @throws IllegalStateException outside the EDT or after disposal.
+         */
+        public fun addSelectionListener(listener: TerminalSelectionListener) {
+            checkSelectionAccess()
+            selectionController.addListener(listener)
+        }
+
+        /**
+         * Removes a selection observer on the EDT.
+         *
+         * Removal is harmless when absent or after disposal.
+         * @throws IllegalStateException outside the EDT.
+         */
+        public fun removeSelectionListener(listener: TerminalSelectionListener) {
+            check(SwingUtilities.isEventDispatchThread()) { "selection access requires the EDT" }
+            selectionController.removeListener(listener)
+        }
+
+        private fun checkSelectionAccess() {
+            check(SwingUtilities.isEventDispatchThread()) { "selection access requires the EDT" }
+            check(!disposed) { "Swing terminal is disposed" }
         }
 
         /**
@@ -1426,7 +1574,12 @@ public class SwingTerminal
             if (!SwingUtilities.isEventDispatchThread()) return false
             if (!renderCache.hasFrame) return false
             val firstAbsoluteRow = renderCache.discardedCount
-            val lastAbsoluteRow = renderCache.discardedCount + renderCache.historySize + renderCache.rows - 1L
+            var lastAbsoluteRow = renderCache.discardedCount + renderCache.historySize + renderCache.rows - 1L
+            if (session?.state?.value is TerminalSessionState.Closed) {
+                session?.readRenderFrame {
+                    lastAbsoluteRow = it.discardedCount + it.historySize + it.rows - 1L
+                }
+            }
             selectionController.selectAbsoluteRows(firstAbsoluteRow, lastAbsoluteRow, renderCache.columns)
             repaint()
             return true
@@ -1516,6 +1669,9 @@ public class SwingTerminal
          * suggestions are delivered to [SwingHostServices.shellSuggestionHandler]
          * with the same [request] so host adapters can apply and learn from the
          * exact command-line replacement range that produced each suggestion.
+         * Host-managed collection requires a custom handler that retains its own
+         * session edit context; the default session handler cannot accept these
+         * suggestions without a context captured before provider work.
          *
          * This is an explicit display request, so it is independent of the
          * automatic-popup setting, but requires [SwingSettings.smartSuggestionsEnabled].
@@ -1544,6 +1700,7 @@ public class SwingTerminal
                     }
                     suggestionJob?.cancel(CancellationException("Explicit suggestions replaced provider request"))
                     suggestionJob = null
+                    activeSuggestionContext?.editContext?.cancel()
                     activeSuggestionContext = null
                     activeSuggestionIsAutomatic = false
                     getOrCreateShellSuggestionController().show(request, snapshot, selectedIndex)
@@ -1566,8 +1723,10 @@ public class SwingTerminal
          * Empty provider results hide the current popup.
          *
          * The host owns this supplied context and must replace the request or call
-         * [hideShellSuggestions] when it becomes stale. This method does not compare
-         * it with the bound session's shell model. Calls on the EDT take effect
+         * [hideShellSuggestions] when it becomes stale. The default session handler
+         * additionally requires a matching, revisioned session editing model and
+         * checks it atomically at admission. Custom handlers own their validation.
+         * Calls on the EDT take effect
          * immediately; calls from other threads dispatch asynchronously to the EDT.
          *
          * @param commandText visible command-line text known to the host.
@@ -1789,9 +1948,16 @@ public class SwingTerminal
         /**
          * Copies the current terminal text selection to the host clipboard.
          *
+         * Off-EDT callers wait for the EDT to read selection and copy text.
+         *
          * @return `true` if selection was successfully copied to clipboard, `false` otherwise.
          */
         public fun copySelectionToClipboard(): Boolean {
+            if (!SwingUtilities.isEventDispatchThread()) {
+                var copied = false
+                SwingUtilities.invokeAndWait { copied = copySelectionToClipboard() }
+                return copied
+            }
             val boundSession = session ?: return false
             val selectedText = selectionController.getSelectedText(boundSession) ?: return false
             hostServices.clipboardHandler.copyText(selectedText)
@@ -1816,12 +1982,15 @@ public class SwingTerminal
         /**
          * Pastes text from the host clipboard into the active terminal session.
          *
+         * Call on the EDT. Clipboard callbacks run synchronously and propagate their failures.
+         * Unbound and closed sessions do not read the clipboard.
+         *
          * @return `true` if clipboard text was read and sent to the session, `false` otherwise.
          */
         public fun pasteClipboardText(): Boolean {
+            val boundSession = session?.takeUnless { it.isClosed } ?: return false
             val text = hostServices.clipboardHandler.readText() ?: return false
-            if (text.isEmpty()) return false
-            val boundSession = session ?: return false
+            if (text.isEmpty() || session !== boundSession || boundSession.isClosed) return false
             invalidateShellSuggestionsOnEdt()
             boundSession.encodePaste(TerminalPasteEvent(text))
             return true
@@ -1846,6 +2015,21 @@ public class SwingTerminal
                     }
 
                     override fun isSuggestionContextCurrent(): Boolean = activeSuggestionContext?.isCurrent(session) != false
+
+                    override fun acceptSuggestion(acceptance: SwingShellSuggestionAcceptance): Boolean {
+                        val handler = hostServices.shellSuggestionHandler
+                        val expected = activeSuggestionContext?.editContext
+                        // Acceptance keeps its context across invalidation callbacks; those
+                        // callbacks can admit competing input, which final admission rejects.
+                        activeSuggestionContext = null
+                        invalidateSuggestions()
+                        return if (handler is SessionShellSuggestionHandler) {
+                            !disposed && session === handler.session && handler.accept(acceptance, expected)
+                        } else {
+                            handler.onSuggestionAccepted(acceptance)
+                            true
+                        }
+                    }
                 },
                 hostServices.shellSuggestionViewFactory,
             ).also {
@@ -1862,15 +2046,31 @@ public class SwingTerminal
             if (!prepareShellSuggestionRequestOnEdt(automatic)) return
             cancelAndHideShellSuggestionsOnEdt("Shell suggestion request replaced")
             activeSuggestionIsAutomatic = automatic
-            activeSuggestionContext = context
+            val requestContext =
+                if (hostServices.shellSuggestionHandler is SessionShellSuggestionHandler) {
+                    val boundSession = session ?: return
+                    val edit = boundSession.captureCommandEdit() ?: return
+                    val snapshot = edit.commandLine
+                    if (snapshot.commandText != request.commandText ||
+                        snapshot.cursorOffset != request.cursorOffset ||
+                        snapshot.cursorColumn != request.anchorColumn ||
+                        snapshot.cursorRow != request.anchorRow
+                    ) {
+                        return
+                    }
+                    SessionSuggestionContext(boundSession, snapshot, edit)
+                } else {
+                    context
+                }
+            activeSuggestionContext = requestContext
             val requestJob =
                 componentScope.launch(start = CoroutineStart.LAZY) {
                     val contextObservation =
-                        context?.let {
+                        requestContext?.let {
                             launch {
                                 combine(it.session.activeShellCommandLineRevision, it.session.state) { _, _ -> }
                                     .collect {
-                                        if (!context.isCurrent(session)) {
+                                        if (!requestContext.isCurrent(session)) {
                                             cancelAndHideShellSuggestionsOnEdt("Active shell command changed")
                                         }
                                     }
@@ -1883,7 +2083,7 @@ public class SwingTerminal
                             .conflate()
                             .collect { suggestions ->
                                 this@launch.ensureActive()
-                                if (context != null && !context.isCurrent(session)) {
+                                if (requestContext != null && !requestContext.isCurrent(session)) {
                                     cancelAndHideShellSuggestionsOnEdt("Active shell command changed")
                                     return@collect
                                 }
@@ -1894,6 +2094,7 @@ public class SwingTerminal
                             }
                         if (shellSuggestionController?.state()?.visible != true) {
                             contextObservation?.cancel()
+                            activeSuggestionContext?.editContext?.cancel()
                             activeSuggestionContext = null
                         }
                     } catch (cancellation: CancellationException) {
@@ -1903,7 +2104,7 @@ public class SwingTerminal
                         throw cancellation
                     } catch (exception: Exception) {
                         this@launch.ensureActive()
-                        if (context != null && !context.isCurrent(session)) {
+                        if (requestContext != null && !requestContext.isCurrent(session)) {
                             cancelAndHideShellSuggestionsOnEdt("Active shell command changed")
                             return@launch
                         }
@@ -2236,6 +2437,7 @@ public class SwingTerminal
         private fun cancelAndHideShellSuggestionsOnEdt(reason: String) {
             suggestionJob?.cancel(CancellationException(reason))
             suggestionJob = null
+            activeSuggestionContext?.editContext?.cancel()
             activeSuggestionContext = null
             activeSuggestionIsAutomatic = false
             shellSuggestionController?.hide()
@@ -2247,6 +2449,9 @@ public class SwingTerminal
          * Must be called on the EDT because it reads the current settings and
          * font metrics. Primary-screen chrome is the default for initial sizing.
          *
+         * Both dimensions must be positive. The complete size must fit the integer pixel range.
+         *
+         * @throws IllegalArgumentException if a dimension or the complete size is out of range.
          * @param columns requested number of terminal columns.
          * @param rows requested number of terminal rows.
          * @param activeBuffer screen whose chrome insets should be included.
@@ -2259,8 +2464,8 @@ public class SwingTerminal
             activeBuffer: TerminalRenderBufferKind = TerminalRenderBufferKind.PRIMARY,
         ): Dimension =
             Dimension(
-                columns * metrics.cellWidth + SwingTerminalChrome.horizontalInset(settings, activeBuffer),
-                rows * metrics.cellHeight + SwingTerminalChrome.verticalInset(settings, activeBuffer),
+                gridPixelExtent(columns, metrics.cellWidth, SwingTerminalChrome.horizontalInset(settings, activeBuffer)),
+                gridPixelExtent(rows, metrics.cellHeight, SwingTerminalChrome.verticalInset(settings, activeBuffer)),
             )
 
         private fun resizeSessionToVisibleGridOnEdt(publishWhenUnchanged: Boolean = true): Boolean {
@@ -2289,17 +2494,17 @@ public class SwingTerminal
             publishViewportState(renderCache.historySize)
             lastResizedColumns = columns
             lastResizedRows = rows
-            selectionController.clearSelection()
-
             // Animation is finished above, so resize anchoring is always row-exact.
             val oldOffset = viewportController.requestedOffset
 
-            val resizedViewport = boundSession.resizeViewport(columns, rows, oldOffset)
+            val resizedViewport = boundSession.tryResizeViewport(columns, rows, oldOffset) ?: return true
+            selectionController.clearSelection(notify = false)
             viewportController.anchorAfterResize(
                 resizedViewport.scrollbackOffset,
                 resizedViewport.historySize,
                 resizedViewport.discardedCount,
             )
+            selectionController.publishChange()
             return true
         }
 
@@ -2329,10 +2534,33 @@ public class SwingTerminal
         }
 
         private fun refreshRenderCacheFromSession(session: TerminalSession) {
-            session.readPublishedFrame { published ->
-                renderCache.updateFrom(published)
-            } ?: return
+            val closed = session.state.value is TerminalSessionState.Closed
+            scrollbarOverlay.retainedOutput = closed
+            if (closed) {
+                val viewport = retainedViewport ?: RetainedFrameViewport(session).also { retainedViewport = it }
+                viewport.visibleRows = visibleGridRows()
+                val previousHistory = renderCache.historySize
+                renderCache.updateFrom(viewport, viewportController.requestedOffset, requestedRenderRows())
+                if (previousHistory != renderCache.historySize) {
+                    val offset =
+                        if (viewportController.requestedOffset == 0) {
+                            0
+                        } else {
+                            (viewportController.requestedOffset.toLong() + renderCache.historySize - previousHistory)
+                                .coerceIn(0L, renderCache.historySize.toLong())
+                                .toInt()
+                        }
+                    viewportController.anchorAfterResize(offset, renderCache.historySize, renderCache.discardedCount)
+                    renderCache.updateFrom(viewport, offset, requestedRenderRows())
+                }
+            } else {
+                session.readPublishedFrame { published ->
+                    renderCache.updateFrom(published)
+                } ?: return
+            }
+            selectionController.updateFrame(renderCache)
             hyperlinkDiscoveryController.scheduleForFrame()
+            selectionController.publishChange()
         }
 
         private fun reconcileHyperlinksOnEdt() {
@@ -2365,6 +2593,14 @@ public class SwingTerminal
         }
 
         private fun requestRenderFromSession(session: TerminalSession) {
+            if (session.state.value is TerminalSessionState.Closed) {
+                refreshRenderCacheFromSession(session)
+                refreshShellIntegrationDecorations(session)
+                searchController.updateViewportHighlights()
+                publishViewportState(renderCache.historySize)
+                repaint()
+                return
+            }
             session.requestRender(
                 scrollbackOffset = viewportController.requestedOffset,
                 viewportRows = requestedRenderRows(),
@@ -2399,9 +2635,25 @@ public class SwingTerminal
             return layoutChanged or originChanged
         }
 
+        private fun gridPixelExtent(
+            cells: Int,
+            cellSize: Int,
+            inset: Int,
+        ): Int {
+            require(cells > 0) { "grid dimensions must be positive" }
+            val extent = cells.toLong() * cellSize + inset
+            require(extent in 1..Int.MAX_VALUE.toLong()) { "grid size exceeds the integer pixel range" }
+            return extent.toInt()
+        }
+
         private fun buildMetrics(settings: SwingSettings): SwingMetrics {
             val metricsSource: FontMetrics = getFontMetrics(settings.font)
-            return SwingMetrics.from(metricsSource, settings.lineHeight)
+            val result = SwingMetrics.from(metricsSource, settings.lineHeight, settings.columnSpacing)
+            for (buffer in TerminalRenderBufferKind.entries) {
+                gridPixelExtent(settings.columns, result.cellWidth, SwingTerminalChrome.horizontalInset(settings, buffer))
+                gridPixelExtent(settings.rows, result.cellHeight, SwingTerminalChrome.verticalInset(settings, buffer))
+            }
+            return result
         }
 
         private fun runOnEdt(action: Runnable) {
@@ -2415,6 +2667,7 @@ public class SwingTerminal
         private class SessionSuggestionContext(
             val session: TerminalSession,
             private val snapshot: TerminalShellCommandLineSnapshot,
+            val editContext: TerminalCommandEditContext? = null,
         ) {
             fun isCurrent(boundSession: TerminalSession?): Boolean =
                 boundSession === session &&
