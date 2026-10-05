@@ -182,6 +182,12 @@ fun main() =
                 }
                 check(firstCell() == URL[0].code)
                 onEdt {
+                    JavaConsumer.verifySelection(terminal)
+                    val range = checkNotNull(terminal.createSelectionRange(1, 0L, 4, 0L, isBlock = true))
+                    check(terminal.setSelection(range))
+                    check(terminal.currentSelectionRange()?.isBlock == true)
+                    terminal.clearSelection()
+                    check(terminal.currentSelectionRange() == null)
                     val bounds = Rectangle()
                     check(terminal.copyCellBounds(0, 0, bounds) && bounds.width > 0 && bounds.height > 0)
                     check(terminal.cursor.type == Cursor.HAND_CURSOR)

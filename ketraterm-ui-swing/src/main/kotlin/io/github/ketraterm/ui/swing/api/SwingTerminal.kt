@@ -1166,108 +1166,110 @@ public class SwingTerminal
             }
         }
 
-        private fun bindOnEdt(session: TerminalSession) {
-            if (disposed) return
-            bindingJob?.cancel(CancellationException("Terminal session binding replaced"))
-            mouseController.resetWheelInput()
-            this.session = session
-            retainedViewport = null
-            resetRenderCaches()
-            updateMinimizedStateFromAncestor()
-            applySettingsToSession(session, settings)
-            resetScrollbackState()
-            selectionController.clearSelection()
-            searchController.reset(renderCache.rows)
-            cancelAndHideShellSuggestionsOnEdt("Terminal session binding replaced")
-            shellIntegrationDecorations.reset()
-            if (hostServices.scrollbarOverlayEnabled) scrollbarOverlay.handleExited()
-            visualGeometry.reset()
-            selectionController.stopSelectionDrag()
-            visualBellController.stop()
-            lastResizedColumns = NO_RESIZE_DIMENSION
-            lastResizedRows = NO_RESIZE_DIMENSION
-            renderFrameController.reset()
-            clearPointerHover()
-            hyperlinkDiscoveryController.reset()
-            resizeSessionToVisibleGridOnEdt()
-            bindingJob =
-                componentScope.launch {
-                    launch {
-                        session.state.filterIsInstance<TerminalSessionState.Closed>().take(1).collect {
-                            if (this@SwingTerminal.session === session) {
-                                mouseController.resetWheelInput()
-                                renderFrameController.handlePublishedFrame()
-                            }
-                        }
-                    }
-                    launch {
-                        session.renderGeneration
-                            .filter { it >= 0L }
-                            .collect {
+        private fun bindOnEdt(session: TerminalSession) =
+            selectionController.deferChanges {
+                if (disposed) return@deferChanges
+                bindingJob?.cancel(CancellationException("Terminal session binding replaced"))
+                mouseController.resetWheelInput()
+                this.session = session
+                retainedViewport = null
+                resetRenderCaches()
+                updateMinimizedStateFromAncestor()
+                applySettingsToSession(session, settings)
+                resetScrollbackState()
+                selectionController.resetBinding()
+                searchController.reset(renderCache.rows)
+                cancelAndHideShellSuggestionsOnEdt("Terminal session binding replaced")
+                shellIntegrationDecorations.reset()
+                if (hostServices.scrollbarOverlayEnabled) scrollbarOverlay.handleExited()
+                visualGeometry.reset()
+                selectionController.stopSelectionDrag()
+                visualBellController.stop()
+                lastResizedColumns = NO_RESIZE_DIMENSION
+                lastResizedRows = NO_RESIZE_DIMENSION
+                renderFrameController.reset()
+                clearPointerHover()
+                hyperlinkDiscoveryController.reset()
+                resizeSessionToVisibleGridOnEdt()
+                bindingJob =
+                    componentScope.launch {
+                        launch {
+                            session.state.filterIsInstance<TerminalSessionState.Closed>().take(1).collect {
                                 if (this@SwingTerminal.session === session) {
+                                    mouseController.resetWheelInput()
                                     renderFrameController.handlePublishedFrame()
                                 }
                             }
-                    }
-                    combine(session.shellIntegrationState.revision, session.state) { _, state -> state }
-                        .takeWhile { it !is TerminalSessionState.Closed }
-                        .collect {
-                            if (this@SwingTerminal.session !== session || session.isClosed || !renderCache.hasFrame) return@collect
-                            if (refreshShellIntegrationDecorations(session)) {
-                                if (hoveredPromptMarkerRow != NO_PROMPT_MARKER_ROW &&
-                                    !shellIntegrationDecorations.hasPromptStartAt(hoveredPromptMarkerRow)
-                                ) {
-                                    updateHoveredPromptMarker(NO_PROMPT_MARKER_ROW)
-                                }
-                                renderFrameController.repaintFrame(forceFullRepaint = true)
-                            }
                         }
+                        launch {
+                            session.renderGeneration
+                                .filter { it >= 0L }
+                                .collect {
+                                    if (this@SwingTerminal.session === session) {
+                                        renderFrameController.handlePublishedFrame()
+                                    }
+                                }
+                        }
+                        combine(session.shellIntegrationState.revision, session.state) { _, state -> state }
+                            .takeWhile { it !is TerminalSessionState.Closed }
+                            .collect {
+                                if (this@SwingTerminal.session !== session || session.isClosed || !renderCache.hasFrame) return@collect
+                                if (refreshShellIntegrationDecorations(session)) {
+                                    if (hoveredPromptMarkerRow != NO_PROMPT_MARKER_ROW &&
+                                        !shellIntegrationDecorations.hasPromptStartAt(hoveredPromptMarkerRow)
+                                    ) {
+                                        updateHoveredPromptMarker(NO_PROMPT_MARKER_ROW)
+                                    }
+                                    renderFrameController.repaintFrame(forceFullRepaint = true)
+                                }
+                            }
+                    }
+                var publishedFrameAvailable = false
+                session.readPublishedFrame {
+                    publishedFrameAvailable = true
                 }
-            var publishedFrameAvailable = false
-            session.readPublishedFrame {
-                publishedFrameAvailable = true
+                if (publishedFrameAvailable) {
+                    renderFrameController.handlePublishedFrame()
+                }
+                requestRenderFromSession(session)
+                reconcileHyperlinksOnEdt()
+                publishViewportState(renderCache.historySize)
+                repaint()
             }
-            if (publishedFrameAvailable) {
-                renderFrameController.handlePublishedFrame()
-            }
-            requestRenderFromSession(session)
-            reconcileHyperlinksOnEdt()
-            publishViewportState(renderCache.historySize)
-            repaint()
-        }
 
-        private fun unbindOnEdt() {
-            cleanupSwingResources(
-                {
-                    val job = bindingJob
-                    bindingJob = null
-                    job?.cancel(CancellationException("Terminal session unbound"))
-                },
-                mouseController::resetWheelInput,
-                { cancelAndHideShellSuggestionsOnEdt("Terminal session unbound") },
-                {
-                    session = null
-                    retainedViewport = null
-                    resetRenderCaches()
-                },
-                ::resetScrollbackState,
-                selectionController::clearSelection,
-                { searchController.reset(renderCache.rows) },
-                shellIntegrationDecorations::reset,
-                { if (hostServices.scrollbarOverlayEnabled) scrollbarOverlay.handleExited() },
-                visualGeometry::reset,
-                selectionController::stopSelectionDrag,
-                {
-                    lastResizedColumns = NO_RESIZE_DIMENSION
-                    lastResizedRows = NO_RESIZE_DIMENSION
-                    renderFrameController.reset()
-                },
-                { clearPointerHover() },
-                hyperlinkDiscoveryController::reset,
-                { publishViewportState(0) },
-                ::repaint,
-            )
-        }
+        private fun unbindOnEdt() =
+            selectionController.deferChanges {
+                cleanupSwingResources(
+                    {
+                        val job = bindingJob
+                        bindingJob = null
+                        job?.cancel(CancellationException("Terminal session unbound"))
+                    },
+                    mouseController::resetWheelInput,
+                    { cancelAndHideShellSuggestionsOnEdt("Terminal session unbound") },
+                    {
+                        session = null
+                        retainedViewport = null
+                        resetRenderCaches()
+                    },
+                    ::resetScrollbackState,
+                    selectionController::resetBinding,
+                    { searchController.reset(renderCache.rows) },
+                    shellIntegrationDecorations::reset,
+                    { if (hostServices.scrollbarOverlayEnabled) scrollbarOverlay.handleExited() },
+                    visualGeometry::reset,
+                    selectionController::stopSelectionDrag,
+                    {
+                        lastResizedColumns = NO_RESIZE_DIMENSION
+                        lastResizedRows = NO_RESIZE_DIMENSION
+                        renderFrameController.reset()
+                    },
+                    { clearPointerHover() },
+                    hyperlinkDiscoveryController::reset,
+                    { publishViewportState(0) },
+                    ::repaint,
+                )
+            }
 
         private fun disposeOnEdt() {
             if (disposed) return
@@ -1286,6 +1288,7 @@ public class SwingTerminal
                     suggestionJob = null
                     job?.cancel(CancellationException("Swing terminal disposed"))
                 },
+                selectionController::removeListeners,
                 suggestionInvalidationListeners::clear,
                 suggestionEligibilityListeners::clear,
                 { suggestionFailureHandler = SwingShellSuggestionFailureHandler.LOGGING },
@@ -1370,6 +1373,118 @@ public class SwingTerminal
             }
             if (!renderCache.hasFrame) return null
             return selectionController.getViewportSelection(renderCache)
+        }
+
+        /**
+         * Returns the complete retained selection on the EDT, or null.
+         *
+         * This describes the last applied frame and includes eviction observed there.
+         * The immutable range includes offscreen rows and may be saved for restoration.
+         * Unchanged ranges reuse their snapshot. Object identity is not an API guarantee.
+         * Unbound and disposed components return null.
+         *
+         * @throws IllegalStateException outside the EDT.
+         */
+        public fun currentSelectionRange(): TerminalSelectionRange? {
+            check(SwingUtilities.isEventDispatchThread()) { "selection access requires the EDT" }
+            if (disposed || session == null) return null
+            return selectionController.currentRange()
+        }
+
+        /**
+         * Creates a range in the current binding and layout without changing selection.
+         *
+         * Use absolute retained rows and half-open cell edges, as defined by
+         * [TerminalSelectionRange]. Both endpoint rows must remain retained.
+         * Returns null for unavailable bindings, pending layout changes, or coordinates beyond current bounds.
+         * Empty ranges are valid and clear selection when applied.
+         * This reads metadata only; it does not scroll, focus, or send input.
+         *
+         * @throws IllegalArgumentException for negative coordinates.
+         * @throws IllegalStateException outside the EDT or after disposal.
+         */
+        @JvmOverloads
+        public fun createSelectionRange(
+            anchorColumn: Int,
+            anchorAbsoluteRow: Long,
+            caretColumn: Int,
+            caretAbsoluteRow: Long,
+            isBlock: Boolean = false,
+        ): TerminalSelectionRange? {
+            checkSelectionAccess()
+            require(anchorColumn >= 0 && caretColumn >= 0) { "selection columns must be nonnegative" }
+            require(anchorAbsoluteRow >= 0 && caretAbsoluteRow >= 0) { "selection rows must be nonnegative" }
+            val boundSession = session ?: return null
+            var range: TerminalSelectionRange? = null
+            boundSession.readRenderFrame { frame ->
+                range = selectionController.createRange(frame, anchorColumn, anchorAbsoluteRow, caretColumn, caretAbsoluteRow, isBlock)
+            }
+            return range
+        }
+
+        /**
+         * Sets or restores a complete range on the EDT.
+         *
+         * Returns false for another binding, an invalidated layout, or evicted endpoints.
+         * Validation and application share one frame lease. Rejection does not apply
+         * the requested range or change the current selection.
+         * Successful assignment ends mouse dragging without scrolling, focusing,
+         * sending input, or copying text. Closed sessions support this operation.
+         *
+         * @throws IllegalStateException outside the EDT or after disposal.
+         */
+        public fun setSelection(range: TerminalSelectionRange): Boolean {
+            checkSelectionAccess()
+            val boundSession = session ?: return false
+            var accepted = false
+            boundSession.readRenderFrame { frame ->
+                accepted = selectionController.setRange(range, frame)
+            }
+            selectionController.publishChange()
+            return accepted
+        }
+
+        /**
+         * Clears selection and stops mouse dragging on the EDT.
+         *
+         * This leaves terminal content, input, viewport, focus, and clipboard unchanged.
+         * Repeated clearing and clearing an unbound component are harmless.
+         *
+         * @throws IllegalStateException outside the EDT or after disposal.
+         */
+        public fun clearSelection() {
+            checkSelectionAccess()
+            selectionController.clearSelection()
+        }
+
+        /**
+         * Registers a synchronous EDT observer without an initial callback.
+         *
+         * Registering the same listener instance twice has no effect.
+         * Listeners survive rebinding and are released on disposal, after the final
+         * selection clear. See [TerminalSelectionListener] for delivery semantics.
+         *
+         * @throws IllegalStateException outside the EDT or after disposal.
+         */
+        public fun addSelectionListener(listener: TerminalSelectionListener) {
+            checkSelectionAccess()
+            selectionController.addListener(listener)
+        }
+
+        /**
+         * Removes a selection observer on the EDT.
+         *
+         * Removal is harmless when absent or after disposal.
+         * @throws IllegalStateException outside the EDT.
+         */
+        public fun removeSelectionListener(listener: TerminalSelectionListener) {
+            check(SwingUtilities.isEventDispatchThread()) { "selection access requires the EDT" }
+            selectionController.removeListener(listener)
+        }
+
+        private fun checkSelectionAccess() {
+            check(SwingUtilities.isEventDispatchThread()) { "selection access requires the EDT" }
+            check(!disposed) { "Swing terminal is disposed" }
         }
 
         /**
@@ -1815,9 +1930,16 @@ public class SwingTerminal
         /**
          * Copies the current terminal text selection to the host clipboard.
          *
+         * Off-EDT callers wait for the EDT to read selection and copy text.
+         *
          * @return `true` if selection was successfully copied to clipboard, `false` otherwise.
          */
         public fun copySelectionToClipboard(): Boolean {
+            if (!SwingUtilities.isEventDispatchThread()) {
+                var copied = false
+                SwingUtilities.invokeAndWait { copied = copySelectionToClipboard() }
+                return copied
+            }
             val boundSession = session ?: return false
             val selectedText = selectionController.getSelectedText(boundSession) ?: return false
             hostServices.clipboardHandler.copyText(selectedText)
@@ -2352,12 +2474,13 @@ public class SwingTerminal
             val oldOffset = viewportController.requestedOffset
 
             val resizedViewport = boundSession.tryResizeViewport(columns, rows, oldOffset) ?: return true
-            selectionController.clearSelection()
+            selectionController.clearSelection(notify = false)
             viewportController.anchorAfterResize(
                 resizedViewport.scrollbackOffset,
                 resizedViewport.historySize,
                 resizedViewport.discardedCount,
             )
+            selectionController.publishChange()
             return true
         }
 
@@ -2411,7 +2534,9 @@ public class SwingTerminal
                     renderCache.updateFrom(published)
                 } ?: return
             }
+            selectionController.updateFrame(renderCache)
             hyperlinkDiscoveryController.scheduleForFrame()
+            selectionController.publishChange()
         }
 
         private fun reconcileHyperlinksOnEdt() {

@@ -15,9 +15,12 @@
  */
 package io.github.ketraterm.ui.swing.api
 
+import io.github.ketraterm.render.api.TerminalRenderBufferKind
+import io.github.ketraterm.render.api.TerminalRenderFrame
 import io.github.ketraterm.render.cache.TerminalRenderCache
 import io.github.ketraterm.ui.swing.settings.SwingMetrics
 import io.github.ketraterm.ui.swing.settings.SwingSettings
+import kotlinx.coroutines.CancellationException
 import java.awt.event.MouseEvent
 import javax.swing.SwingUtilities
 import javax.swing.Timer
@@ -54,6 +57,179 @@ internal class TerminalSelectionController(
 ) {
     private val selectionTextExtractor = TerminalSelectionTextExtractor()
     private var viewportSelection: CellSelection? = null
+    private var rangeSnapshot: TerminalSelectionRange? = null
+    private var notifiedRange: TerminalSelectionRange? = null
+    private var notificationDepth = 0
+
+    fun deferChanges(action: () -> Unit) {
+        notificationDepth++
+        var failure: Throwable? = null
+        try {
+            action()
+        } catch (error: Throwable) {
+            failure = error
+            throw error
+        } finally {
+            notificationDepth--
+            try {
+                publishChange()
+            } catch (error: Throwable) {
+                val first = failure ?: throw error
+                if (first !== error) first.addSuppressed(error)
+            }
+        }
+    }
+
+    private var listeners = emptyArray<ListenerRegistration>()
+    private var context: Any = Any()
+    private var buffer: TerminalRenderBufferKind? = null
+    private var historyGeneration = 0L
+    private var columns = 0
+
+    fun resetBinding() {
+        context = Any()
+        buffer = null
+        clearSelection(notify = false)
+    }
+
+    fun updateFrame(frame: TerminalRenderCache) {
+        if (buffer != frame.activeBuffer || historyGeneration != frame.historyContentGeneration || columns != frame.columns) {
+            context = Any()
+            clearSelection(notify = false)
+        }
+        buffer = frame.activeBuffer
+        historyGeneration = frame.historyContentGeneration
+        columns = frame.columns
+        val firstRow = frame.discardedCount
+        val anchor = selectionAnchorAbsoluteRow ?: return
+        val caret = selectionCaretAbsoluteRow ?: return
+        if (maxOf(anchor, caret) < firstRow) {
+            clearSelection(notify = false)
+            return
+        }
+        if (anchor < firstRow) {
+            selectionAnchorAbsoluteRow = firstRow
+            if (!selectionIsBlock) selectionAnchorColumn = 0
+        }
+        if (caret < firstRow) {
+            selectionCaretAbsoluteRow = firstRow
+            if (!selectionIsBlock) selectionCaretColumn = 0
+        }
+    }
+
+    fun createRange(
+        frame: TerminalRenderFrame,
+        anchorColumn: Int,
+        anchorAbsoluteRow: Long,
+        caretColumn: Int,
+        caretAbsoluteRow: Long,
+        isBlock: Boolean,
+    ): TerminalSelectionRange? {
+        require(anchorColumn >= 0 && caretColumn >= 0) { "selection columns must be nonnegative" }
+        require(anchorAbsoluteRow >= 0 && caretAbsoluteRow >= 0) { "selection rows must be nonnegative" }
+        val activeBuffer = buffer ?: return null
+        if (!matchesLayout(frame) ||
+            anchorColumn > columns ||
+            caretColumn > columns ||
+            !retainsRow(frame, anchorAbsoluteRow) ||
+            !retainsRow(frame, caretAbsoluteRow)
+        ) {
+            return null
+        }
+        return TerminalSelectionRange(anchorColumn, anchorAbsoluteRow, caretColumn, caretAbsoluteRow, isBlock, activeBuffer, context)
+    }
+
+    fun setRange(
+        range: TerminalSelectionRange,
+        frame: TerminalRenderFrame,
+    ): Boolean {
+        if (range.context !== context ||
+            !matchesLayout(frame) ||
+            !retainsRow(frame, range.anchorAbsoluteRow) ||
+            !retainsRow(frame, range.caretAbsoluteRow)
+        ) {
+            return false
+        }
+        stopSelectionDrag()
+        if (range.isEmpty) {
+            clearSelection(notify = false)
+        } else {
+            selectionAnchorColumn = range.anchorColumn
+            selectionAnchorAbsoluteRow = range.anchorAbsoluteRow
+            selectionCaretColumn = range.caretColumn
+            selectionCaretAbsoluteRow = range.caretAbsoluteRow
+            selectionIsBlock = range.isBlock
+        }
+        return true
+    }
+
+    private fun matchesLayout(frame: TerminalRenderFrame): Boolean =
+        buffer == frame.activeBuffer && historyGeneration == frame.historyContentGeneration && columns == frame.columns
+
+    private fun retainsRow(
+        frame: TerminalRenderFrame,
+        row: Long,
+    ): Boolean = row >= frame.discardedCount && row - frame.discardedCount < frame.historySize.toLong() + frame.rows
+
+    fun currentRange(): TerminalSelectionRange? {
+        val anchor = selectionAnchorAbsoluteRow ?: return null
+        val caret = selectionCaretAbsoluteRow ?: return null
+        val activeBuffer = buffer ?: return null
+        if (selectionAnchorColumn == selectionCaretColumn && (selectionIsBlock || anchor == caret)) return null
+        val previous = rangeSnapshot
+        if (previous != null &&
+            previous.context === context &&
+            previous.anchorColumn == selectionAnchorColumn &&
+            previous.anchorAbsoluteRow == anchor &&
+            previous.caretColumn == selectionCaretColumn &&
+            previous.caretAbsoluteRow == caret &&
+            previous.isBlock == selectionIsBlock
+        ) {
+            return previous
+        }
+        return TerminalSelectionRange(
+            selectionAnchorColumn,
+            anchor,
+            selectionCaretColumn,
+            caret,
+            selectionIsBlock,
+            activeBuffer,
+            context,
+        ).also { rangeSnapshot = it }
+    }
+
+    fun addListener(listener: TerminalSelectionListener) {
+        if (listeners.none { it.listener === listener }) listeners += ListenerRegistration(listener)
+    }
+
+    fun removeListener(listener: TerminalSelectionListener) {
+        listeners = listeners.filterNot { it.listener === listener }.toTypedArray()
+    }
+
+    fun removeListeners() {
+        listeners = emptyArray()
+    }
+
+    fun publishChange() {
+        if (notificationDepth != 0) return
+        val current = currentRange()
+        val previous = notifiedRange
+        if (current === previous) return
+        notifiedRange = current
+        host.repaint()
+        val delivery = listeners
+        for (listener in delivery) {
+            if (notifiedRange !== current) break
+            if (listeners.any { it === listener }) {
+                try {
+                    listener.listener.selectionChanged(previous, current)
+                } catch (error: Exception) {
+                    if (error is CancellationException) throw error
+                    LOGGER.log(System.Logger.Level.WARNING, "Selection listener failed", error)
+                }
+            }
+        }
+    }
 
     // Alt can change during a drag after its anchor row has left the viewport.
     // Retain both cell coordinates; selectionAnchorColumn is a half-open edge.
@@ -82,11 +258,13 @@ internal class TerminalSelectionController(
             handleSelectionAutoscrollTick()
         }
 
-    fun clearSelection() {
+    fun clearSelection(notify: Boolean = true) {
         stopSelectionDrag()
         selectionAnchorAbsoluteRow = null
         selectionCaretAbsoluteRow = null
         viewportSelection = null
+        rangeSnapshot = null
+        if (notify) publishChange()
     }
 
     fun selectAbsoluteRows(
@@ -106,6 +284,7 @@ internal class TerminalSelectionController(
         selectionAnchorColumn = 0
         selectionCaretAbsoluteRow = endAbsoluteRow
         selectionCaretColumn = columns
+        publishChange()
     }
 
     fun stopSelectionDrag() {
@@ -161,6 +340,7 @@ internal class TerminalSelectionController(
         updateSelectionAutoscroll()
         host.repaint()
         event.consume()
+        publishChange()
     }
 
     fun handleSelectionMouseDragged(event: MouseEvent) {
@@ -174,6 +354,7 @@ internal class TerminalSelectionController(
         updateSelectionAutoscroll(scrollImmediately = true)
         host.repaint()
         event.consume()
+        publishChange()
     }
 
     fun handleSelectionMouseReleased(event: MouseEvent) {
@@ -236,6 +417,12 @@ internal class TerminalSelectionController(
         val endAbsRow = maxOf(anchorAbsRow, caretAbsRow)
         var text: String? = null
         reader.readRenderFrameForAbsoluteRange(startAbsRow, endAbsRow) { frame ->
+            if (buffer != null &&
+                (buffer != frame.activeBuffer || historyGeneration != frame.historyContentGeneration || columns != frame.columns)
+            ) {
+                clearSelection(notify = false)
+                return@readRenderFrameForAbsoluteRange
+            }
             val frameTopAbsRow = frame.discardedCount + frame.historySize - frame.scrollbackOffset
             val frameLastAbsRow = frameTopAbsRow + frame.rows - 1L
             if (endAbsRow < frameTopAbsRow || startAbsRow > frameLastAbsRow) return@readRenderFrameForAbsoluteRange
@@ -250,6 +437,7 @@ internal class TerminalSelectionController(
                     joinSoftWrappedRows = !selectionIsBlock,
                 )
         }
+        publishChange()
         return text
     }
 
@@ -281,7 +469,7 @@ internal class TerminalSelectionController(
         if (selectingWithMouse && selectionAutoscrollDelta(lastSelectionDragY) != 0) {
             if (!selectionAutoscrollTimer.isRunning) {
                 if (scrollImmediately) handleSelectionAutoscrollTick()
-                selectionAutoscrollTimer.start()
+                if (selectingWithMouse) selectionAutoscrollTimer.start()
             }
         } else {
             selectionAutoscrollTimer.stop()
@@ -318,12 +506,19 @@ internal class TerminalSelectionController(
         }
 
         val changed = host.scrollViewportByRows(delta)
-        if (changed) {
+        if (changed && selectingWithMouse) {
             updateSelectionCaret(lastSelectionDragX, lastSelectionDragY)
+            publishChange()
         }
     }
 
+    private class ListenerRegistration(
+        val listener: TerminalSelectionListener,
+    )
+
     private companion object {
+        private val LOGGER = System.getLogger(TerminalSelectionListener::class.java.name)
+
         private fun unpackCellColumn(packed: Long): Int = (packed ushr 32).toInt()
 
         private fun unpackCellRow(packed: Long): Int = packed.toInt()

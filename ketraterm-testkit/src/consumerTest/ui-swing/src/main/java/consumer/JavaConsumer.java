@@ -44,6 +44,29 @@ import java.util.concurrent.atomic.AtomicInteger;
 import javax.swing.SwingUtilities;
 
 public final class JavaConsumer {
+    public static void verifySelection(SwingTerminal terminal) {
+        var events = new AtomicInteger();
+        io.github.ketraterm.ui.swing.api.TerminalSelectionListener listener = (previous, current) -> {
+            if (!SwingUtilities.isEventDispatchThread()) throw new AssertionError("Selection callback requires EDT");
+            events.incrementAndGet();
+        };
+        terminal.addSelectionListener(listener);
+        try {
+            var range = terminal.createSelectionRange(0, 0L, 5, 0L);
+            if (range == null || range.isEmpty() || !terminal.setSelection(range))
+                throw new AssertionError("Java range assignment failed");
+            var saved = terminal.currentSelectionRange();
+            if (saved == null || saved.getCaretColumn() != 5 || saved.getAnchorAbsoluteRow() != 0L)
+                throw new AssertionError("Java selection snapshot differs");
+            terminal.clearSelection();
+            if (!terminal.setSelection(saved)) throw new AssertionError("Java selection restoration failed");
+            terminal.clearSelection();
+            if (events.get() != 4) throw new AssertionError("Java selection events differ");
+        } finally {
+            terminal.removeSelectionListener(listener);
+        }
+    }
+
     public static void verifyConditionalAdmission(TerminalSession session, TerminalCommandEditContext expected) {
         if (!expected.getCommandLine().getCommandText().equals("help") || expected.isCancelled()
             || session.submitInput(expected, java.util.List.of()) != TerminalInputAdmission.ACCEPTED)
