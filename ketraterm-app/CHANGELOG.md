@@ -2,6 +2,7 @@
 
 ## [Unreleased]
 
+- Improved responsiveness when displaying large text output, including logs, CJK text, and emoji.
 - Search controls follow the selected theme.
 - Fixed typing or pasting during terminal startup causing premature writes or closing the terminal.
 - Discarded stale suggestions to protect newer input. Closing the terminal or disabling suggestions closes completion popups.

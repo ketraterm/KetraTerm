@@ -22,9 +22,14 @@ internal object GraphemeSegmenter {
     fun continuesCurrentCluster(
         state: ParserState,
         currentClass: Int,
-        codepoint: Int,
+        properties: Int,
     ): Boolean {
         val previousClass = state.prevGraphemeBreakClass
+
+        // Ordinary bases need no Hangul, regional-indicator, or emoji continuation checks.
+        if (previousClass == UnicodeClass.GRAPHEME_OTHER && properties == UnicodeClass.GRAPHEME_OTHER) {
+            return false
+        }
 
         if (previousClass == UnicodeClass.GRAPHEME_CR && currentClass == UnicodeClass.GRAPHEME_LF) {
             return true
@@ -40,13 +45,13 @@ internal object GraphemeSegmenter {
             currentClass == UnicodeClass.GRAPHEME_SPACING_MARK ||
             isHangulContinuation(previousClass, currentClass) ||
             isRegionalIndicatorContinuation(state, currentClass) ||
-            isExtendedPictographicZwjContinuation(state, codepoint, currentClass)
+            isExtendedPictographicZwjContinuation(state, properties, currentClass)
     }
 
     @JvmStatic
     fun updateContext(
         state: ParserState,
-        codepoint: Int,
+        properties: Int,
         currentClass: Int,
     ) {
         state.prevWasZwj = currentClass == UnicodeClass.GRAPHEME_ZWJ
@@ -60,7 +65,7 @@ internal object GraphemeSegmenter {
         if (currentClass == UnicodeClass.GRAPHEME_ZWJ) {
             state.zwjBeforeExtendedPictographic = state.lastNonExtendWasExtendedPictographic
         } else if (currentClass != UnicodeClass.GRAPHEME_EXTEND) {
-            state.lastNonExtendWasExtendedPictographic = UnicodeClass.isExtendedPictographic(codepoint)
+            state.lastNonExtendWasExtendedPictographic = UnicodeClass.isExtendedPictographic(properties)
         }
 
         state.prevGraphemeBreakClass = currentClass
@@ -104,11 +109,11 @@ internal object GraphemeSegmenter {
 
     private fun isExtendedPictographicZwjContinuation(
         state: ParserState,
-        codepoint: Int,
+        properties: Int,
         currentClass: Int,
     ): Boolean =
         currentClass == UnicodeClass.GRAPHEME_OTHER &&
             state.prevWasZwj &&
             state.zwjBeforeExtendedPictographic &&
-            UnicodeClass.isExtendedPictographic(codepoint)
+            UnicodeClass.isExtendedPictographic(properties)
 }

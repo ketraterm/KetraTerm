@@ -31,8 +31,41 @@ The [Utf8Decoder](../src/main/kotlin/io/github/ketraterm/parser/utf8/Utf8Decoder
 
 To support modern TUI layouts (which can include emojis, zero-width joiners, and combining accents), the parser uses the [GraphemeSegmenter](../src/main/kotlin/io/github/ketraterm/parser/unicode/GraphemeSegmenter.kt) to detect grapheme boundaries based on the **Unicode Standard Annex #29 (UAX #29)**.
 
-* **Generated Break Tables**: Binary classifications are mapped against a compressed static classification table `GeneratedGraphemeBreakTable` for $O(1)$ property checks.
+* **Generated Break Tables**: After charset mapping, `UnicodeClass.properties` returns one packed integer: the low four bits hold the grapheme-break class and bit four holds `Extended_Pictographic`. The assembler passes that value through boundary decisions and context updates, so an emoji flag never requires a second lookup. Printable ASCII bypasses the table. Other codepoints use two indexed reads from `GeneratedGraphemeBreakTable`, independent of the number of Unicode ranges.
+
 * **Complex Sequences**: Correctly handles Zero-Width Joiner (ZWJ) emoji sequences, combining mark characters, regional indicator (flag) pairs, and Hangul Jamo sequences.
+
+Consecutive ordinary bases take an early boundary path when the previous class is
+`Other` and the incoming packed properties are `Other` without
+`Extended_Pictographic`. This avoids irrelevant continuation checks while retaining
+the same context updates and read-boundary publication. Combining, control, prepend,
+Hangul, regional-indicator, and pictographic inputs use the existing rule checks.
+
+The generated table shares identical 128-codepoint blocks. Its 8,704 block indices
+and 20,992 property values are Latin-1 string constants, offset by `0x40` in source.
+On the supported JVM with compact strings enabled, these use immutable byte storage;
+there is no runtime decompression, temporary array construction, or per-codepoint
+allocation. Disabling compact strings increases storage without changing behavior.
+The data is shared per class loader and initialized only when classification needs
+the non-ASCII/control table, rather than allocated for every terminal.
+
+On Temurin 25.0.3 with compact strings and compressed references, the table retains
+29,792 bytes versus 12,576 bytes for the previous range arrays (including table
+objects, excluding class metadata). This trades about 16.8 KiB shared heap for
+bounded lookup work. `TerminalParserBenchmark` measures warmed parsing with a
+prebuilt input and no-op sink; `TerminalParserFirstInputBenchmark` measures the
+first input in a fresh JVM, with parser construction outside timing. The normal
+Gradle suite keeps its global warmup defaults and excludes that cold benchmark;
+run it explicitly from the JMH JAR with `-wi 0 -i 1 -f 15 -bm ss -tu us`. Cold-run
+GC-profiler totals also contain harness and class-loading activity and are not
+an allocation count for the property table alone.
+
+Regenerate with `tools/generate-unicode-tables.ps1`, then run `spotlessApply` and
+the parser tests. `UnicodeClassTest` compares every codepoint against unmodified
+Unicode 17 `GraphemeBreakProperty.txt` and `emoji-data.txt` test resources. Update
+those pinned resources deliberately when upgrading Unicode; the generator does
+not rewrite the test oracle. This verifies classification, not additional UAX #29
+segmentation rules beyond those implemented by the segmenter.
 
 ---
 
