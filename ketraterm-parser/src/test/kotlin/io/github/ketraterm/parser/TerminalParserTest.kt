@@ -35,6 +35,29 @@ import org.junit.jupiter.params.provider.CsvSource
 @DisplayName("TerminalParser")
 class TerminalParserTest {
     @Test
+    fun `ordinary bases preserve prepend and combining continuations across reads`() {
+        val f = TerminalParserFixture()
+        f.acceptUtf8("\u0600")
+        f.acceptUtf8("A")
+        f.acceptUtf8("B")
+        f.acceptUtf8("\u0301")
+        f.acceptUtf8("\u4E2D")
+        f.acceptUtf8("\u6587")
+
+        assertEquals(
+            listOf(
+                writeCodepoint(0x0600),
+                updatePreviousCluster(0x0600, 'A'.code),
+                writeCodepoint('B'.code),
+                updatePreviousCluster('B'.code, 0x0301),
+                writeCodepoint(0x4E2D),
+                writeCodepoint(0x6587),
+            ),
+            f.sink.events,
+        )
+    }
+
+    @Test
     fun `CSI accepts exactly 32 fields including a colon in the final slot`() {
         val f = TerminalParserFixture()
 

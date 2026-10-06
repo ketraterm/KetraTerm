@@ -340,7 +340,7 @@ Validate library behavior with focused regressions; track adapter migration sepa
 
 I01–I07 are complete for the library.
 I09 concerns library allocation measurements, not IntelliJ feature parity.
-This experiment does not freeze the public API. ASCII property classification was optimized separately; that does not close I09.
+This experiment does not freeze the public API. ASCII fast paths and packed Unicode property classification were optimized separately; neither changes history allocation nor closes I09.
 
 I01/I02 library validation: root `test`, `checkKotlinAbi`, the published Java/Kotlin
 consumer matrix and independent IntelliJ plugin `test` passed. Formatting and

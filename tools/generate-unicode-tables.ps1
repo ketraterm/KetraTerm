@@ -241,93 +241,99 @@ $emojiVariationSequencesPath =
 $eastAsianWidthPath = Get-UnicodeFile "EastAsianWidth.txt" "$ucdBase/EastAsianWidth.txt"
 $derivedGeneralCategoryPath = Get-UnicodeFile "DerivedGeneralCategory.txt" "$ucdBase/extracted/DerivedGeneralCategory.txt"
 
-$graphemeProperties = @(
-    "CR",
-    "LF",
-    "Control",
-    "Extend",
-    "ZWJ",
-    "Regional_Indicator",
-    "Prepend",
-    "L",
-    "V",
-    "T",
-    "LV",
-    "LVT",
-    "SpacingMark"
-)
-
-$graphemeRanges = @{}
-foreach ($property in $graphemeProperties) {
-    $graphemeRanges[$property] = Read-NamedPropertyRanges $graphemePath $property
+# IDs are the packed representation consumed by UnicodeClass. Other is zero;
+# bit 4 is Extended_Pictographic. Keep this mapping aligned with UnicodeClass.
+$graphemeIds = [ordered]@{
+    CR = 1; LF = 2; Control = 3; Extend = 4; ZWJ = 5
+    Regional_Indicator = 6; SpacingMark = 7; Prepend = 8
+    L = 9; V = 10; T = 11; LV = 12; LVT = 13
 }
-$extendedPictographicRanges = Read-NamedPropertyRanges $emojiPath "Extended_Pictographic"
-
-$parserParts = [System.Collections.Generic.List[string]]::new()
-$parserParts.Add($copyright.TrimEnd()) | Out-Null
-$parserParts.Add("package io.github.ketraterm.parser.unicode") | Out-Null
-$parserParts.Add("") | Out-Null
-$parserParts.Add("/**") | Out-Null
-$parserParts.Add(" * Unicode $UnicodeVersion grapheme break and emoji property table generated from UAX #29 data.") | Out-Null
-$parserParts.Add(" * Regenerate with tools/generate-unicode-tables.ps1 after upgrading Unicode data.") | Out-Null
-$parserParts.Add(" */") | Out-Null
-$parserParts.Add("internal object GeneratedGraphemeBreakTable {") | Out-Null
-foreach ($property in $graphemeProperties) {
-    $name = ($property -replace "_", "_").ToUpperInvariant() + "_RANGES"
-    $parserParts.Add((Format-IntArray $name $graphemeRanges[$property])) | Out-Null
-    $parserParts.Add("") | Out-Null
-}
-$parserParts.Add((Format-IntArray "EXTENDED_PICTOGRAPHIC_RANGES" $extendedPictographicRanges)) | Out-Null
-$parserParts.Add("") | Out-Null
-$parserParts.Add(@"
-    @JvmStatic
-    fun graphemeBreakClass(codepoint: Int): Int =
-        when {
-            contains(CR_RANGES, codepoint) -> UnicodeClass.GRAPHEME_CR
-            contains(LF_RANGES, codepoint) -> UnicodeClass.GRAPHEME_LF
-            contains(CONTROL_RANGES, codepoint) -> UnicodeClass.GRAPHEME_CONTROL
-            contains(PREPEND_RANGES, codepoint) -> UnicodeClass.GRAPHEME_PREPEND
-            contains(ZWJ_RANGES, codepoint) -> UnicodeClass.GRAPHEME_ZWJ
-            contains(REGIONAL_INDICATOR_RANGES, codepoint) -> UnicodeClass.GRAPHEME_REGIONAL_INDICATOR
-            contains(L_RANGES, codepoint) -> UnicodeClass.GRAPHEME_L
-            contains(V_RANGES, codepoint) -> UnicodeClass.GRAPHEME_V
-            contains(T_RANGES, codepoint) -> UnicodeClass.GRAPHEME_T
-            contains(LV_RANGES, codepoint) -> UnicodeClass.GRAPHEME_LV
-            contains(LVT_RANGES, codepoint) -> UnicodeClass.GRAPHEME_LVT
-            contains(EXTEND_RANGES, codepoint) -> UnicodeClass.GRAPHEME_EXTEND
-            contains(SPACINGMARK_RANGES, codepoint) -> UnicodeClass.GRAPHEME_SPACING_MARK
-            else -> UnicodeClass.GRAPHEME_OTHER
+$properties = [byte[]]::new(0x110000)
+foreach ($property in $graphemeIds.Keys) {
+    foreach ($range in (Read-NamedPropertyRanges $graphemePath $property)) {
+        for ($cp = $range.Start; $cp -le $range.End; $cp++) {
+            $properties[$cp] = $graphemeIds[$property]
         }
-
-    @JvmStatic
-    fun isExtendedPictographic(codepoint: Int): Boolean = contains(EXTENDED_PICTOGRAPHIC_RANGES, codepoint)
-
-    private fun contains(
-        ranges: IntArray,
-        codepoint: Int,
-    ): Boolean {
-        var low = 0
-        var high = (ranges.size / 2) - 1
-
-        while (low <= high) {
-            val mid = (low + high) ushr 1
-            val start = ranges[mid * 2]
-            val end = ranges[mid * 2 + 1]
-            if (codepoint < start) {
-                high = mid - 1
-            } else if (codepoint > end) {
-                low = mid + 1
-            } else {
-                return true
-            }
-        }
-
-        return false
     }
 }
-"@.TrimEnd()) | Out-Null
+foreach ($range in (Read-NamedPropertyRanges $emojiPath 'Extended_Pictographic')) {
+    for ($cp = $range.Start; $cp -le $range.End; $cp++) {
+        $properties[$cp] = $properties[$cp] -bor 0x10
+    }
+}
 
-$parserTarget = Join-Path $Root "ketraterm-parser/src/main/kotlin/io/github/ketraterm/parser/unicode/GeneratedGraphemeBreakTable.kt"
+# 128-codepoint blocks minimize the combined one-byte index/data footprint for
+# Unicode 17. Deduplicate at generation time, never during class initialization.
+$blockShift = 7
+$blockSize = 1 -shl $blockShift
+$blockIds = [System.Collections.Generic.Dictionary[string, int]]::new([StringComparer]::Ordinal)
+$index = [System.Collections.Generic.List[int]]::new()
+$data = [System.Collections.Generic.List[int]]::new()
+for ($start = 0; $start -lt $properties.Length; $start += $blockSize) {
+    $key = [Convert]::ToBase64String($properties, $start, $blockSize)
+    if (-not $blockIds.ContainsKey($key)) {
+        $blockIds[$key] = $blockIds.Count
+        for ($offset = 0; $offset -lt $blockSize; $offset++) {
+            $data.Add($properties[$start + $offset])
+        }
+    }
+    $index.Add($blockIds[$key])
+}
+
+function Format-PropertyString {
+    param([string] $Name, [System.Collections.Generic.List[int]] $Values)
+
+    # JVM compact strings retain these Latin-1 values in immutable byte storage.
+    # The offset avoids control characters; escaped literals need no runtime
+    # decoder, temporary arrays, or large JVM array-initialization methods.
+    $lines = [System.Collections.Generic.List[string]]::new()
+    $lines.Add("    private const val ${Name}: String =")
+    for ($start = 0; $start -lt $Values.Count; $start += $blockSize) {
+        $literal = [System.Text.StringBuilder]::new()
+        for ($i = $start; $i -lt [Math]::Min($start + $blockSize, $Values.Count); $i++) {
+            if ($Values[$i] -gt 191) {
+                throw 'Property table exceeds the compact Latin-1 encoding; revisit block size.'
+            }
+            [void] $literal.Append(('\u{0:X4}' -f ($Values[$i] + 0x40)))
+        }
+        $suffix = if ($start + $blockSize -lt $Values.Count) { ' +' } else { '' }
+        $indent = if ($start -eq 0) { '        ' } else { '            ' }
+        $lines.Add($indent + '"' + $literal.ToString() + '"' + $suffix)
+    }
+    return [string]::Join([Environment]::NewLine, $lines)
+}
+
+$parserParts = [System.Collections.Generic.List[string]]::new()
+$parserParts.Add($copyright.TrimEnd())
+$parserParts.Add('// One literal per Unicode block keeps generated source and formatter work bounded.')
+$parserParts.Add('@file:Suppress("ktlint:standard:max-line-length")')
+$parserParts.Add('')
+$parserParts.Add('package io.github.ketraterm.parser.unicode')
+$parserParts.Add(@"
+
+/**
+ * Unicode $UnicodeVersion grapheme break and Extended_Pictographic properties.
+ * Regenerate with tools/generate-unicode-tables.ps1 after upgrading Unicode data.
+ *
+ * Two-stage lookup: $($index.Count) block indices and $($data.Count) packed properties.
+ * Identical 128-codepoint blocks share storage. Latin-1 string constants use JVM
+ * compact byte storage without runtime decoding or array initialization loops.
+ */
+internal object GeneratedGraphemeBreakTable {
+    @JvmStatic
+    fun properties(codepoint: Int): Int {
+        if (codepoint !in 0..0x10FFFF) return UnicodeClass.GRAPHEME_OTHER
+        val block = BLOCK_INDEX[codepoint ushr $blockShift].code - 0x40
+        return BLOCK_DATA[(block shl $blockShift) + (codepoint and $($blockSize - 1))].code - 0x40
+    }
+
+"@.TrimEnd())
+$parserParts.Add('')
+$parserParts.Add((Format-PropertyString 'BLOCK_INDEX' $index))
+$parserParts.Add('')
+$parserParts.Add((Format-PropertyString 'BLOCK_DATA' $data))
+$parserParts.Add('}')
+$parserTarget = Join-Path $Root 'ketraterm-parser/src/main/kotlin/io/github/ketraterm/parser/unicode/GeneratedGraphemeBreakTable.kt'
 Write-Utf8NoBom $parserTarget ([string]::Join([Environment]::NewLine, $parserParts) + [Environment]::NewLine)
 
 $wideRanges = [System.Collections.Generic.List[object]]::new()

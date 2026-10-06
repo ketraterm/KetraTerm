@@ -29,10 +29,30 @@ class GraphemeSegmenterTest {
     }
 
     private fun acceptAndCheckContinues(codepoint: Int): Boolean {
-        val graphemeClass = UnicodeClass.graphemeBreakClass(codepoint)
-        val continues = GraphemeSegmenter.continuesCurrentCluster(state, graphemeClass, codepoint)
-        GraphemeSegmenter.updateContext(state, codepoint, graphemeClass)
+        val properties = UnicodeClass.properties(codepoint)
+        val currentClass = UnicodeClass.graphemeBreakClass(properties)
+        val continues = GraphemeSegmenter.continuesCurrentCluster(state, currentClass, properties)
+        GraphemeSegmenter.updateContext(state, properties, currentClass)
         return continues
+    }
+
+    @Test
+    fun `consecutive ordinary ASCII and Unicode bases form separate clusters`() {
+        acceptAndCheckContinues('a'.code)
+
+        for (codepoint in intArrayOf('b'.code, 0x4E2D, 0x6587, 0x03B1, 'c'.code)) {
+            assertFalse(acceptAndCheckContinues(codepoint), "Boundary before U+${codepoint.toString(16)}")
+        }
+    }
+
+    @Test
+    fun `ordinary base ends an emoji ZWJ sequence and clears its context`() {
+        acceptAndCheckContinues(0x1F468)
+        assertTrue(acceptAndCheckContinues(0x200D))
+
+        assertFalse(acceptAndCheckContinues('a'.code))
+        assertFalse(acceptAndCheckContinues(0x1F469))
+        assertFalse(acceptAndCheckContinues(0x4E2D))
     }
 
     @Test
@@ -44,9 +64,9 @@ class GraphemeSegmenterTest {
 
     @Test
     fun `CR LF and control are classified distinctly`() {
-        assertEquals(UnicodeClass.GRAPHEME_CR, UnicodeClass.graphemeBreakClass(0x000D))
-        assertEquals(UnicodeClass.GRAPHEME_LF, UnicodeClass.graphemeBreakClass(0x000A))
-        assertEquals(UnicodeClass.GRAPHEME_CONTROL, UnicodeClass.graphemeBreakClass(0x0000))
+        assertEquals(UnicodeClass.GRAPHEME_CR, UnicodeClass.graphemeBreakClass(UnicodeClass.properties(0x000D)))
+        assertEquals(UnicodeClass.GRAPHEME_LF, UnicodeClass.graphemeBreakClass(UnicodeClass.properties(0x000A)))
+        assertEquals(UnicodeClass.GRAPHEME_CONTROL, UnicodeClass.graphemeBreakClass(UnicodeClass.properties(0x0000)))
     }
 
     @Test

@@ -23,6 +23,75 @@ import org.junit.jupiter.api.Test
 @DisplayName("UnicodeClass")
 class UnicodeClassTest {
     @Test
+    fun `all codepoints agree with independent Unicode 17 property files`() {
+        val classes =
+            mapOf(
+                "CR" to UnicodeClass.GRAPHEME_CR,
+                "LF" to UnicodeClass.GRAPHEME_LF,
+                "Control" to UnicodeClass.GRAPHEME_CONTROL,
+                "Extend" to UnicodeClass.GRAPHEME_EXTEND,
+                "ZWJ" to UnicodeClass.GRAPHEME_ZWJ,
+                "Regional_Indicator" to UnicodeClass.GRAPHEME_REGIONAL_INDICATOR,
+                "SpacingMark" to UnicodeClass.GRAPHEME_SPACING_MARK,
+                "Prepend" to UnicodeClass.GRAPHEME_PREPEND,
+                "L" to UnicodeClass.GRAPHEME_L,
+                "V" to UnicodeClass.GRAPHEME_V,
+                "T" to UnicodeClass.GRAPHEME_T,
+                "LV" to UnicodeClass.GRAPHEME_LV,
+                "LVT" to UnicodeClass.GRAPHEME_LVT,
+            )
+        val expectedClasses = IntArray(0x110000)
+        val expectedPictographic = BooleanArray(0x110000)
+        readPropertyFile("GraphemeBreakProperty.txt") { start, end, property ->
+            expectedClasses.fill(classes.getValue(property), start, end + 1)
+        }
+        readPropertyFile("emoji-data.txt") { start, end, property ->
+            if (property == "Extended_Pictographic") expectedPictographic.fill(true, start, end + 1)
+        }
+        for (codepoint in expectedClasses.indices) {
+            val properties = UnicodeClass.properties(codepoint)
+            val generated = GeneratedGraphemeBreakTable.properties(codepoint)
+            val actualClass = UnicodeClass.graphemeBreakClass(properties)
+            val actualPictographic = UnicodeClass.isExtendedPictographic(properties)
+            if (properties != generated ||
+                actualClass != expectedClasses[codepoint] ||
+                actualPictographic != expectedPictographic[codepoint]
+            ) {
+                fail<Unit>(
+                    "Unicode 17 mismatch at U+${codepoint.toString(16)}: " +
+                        "expected class=${expectedClasses[codepoint]}, EP=${expectedPictographic[codepoint]}; " +
+                        "actual class=$actualClass, EP=$actualPictographic, generated=$generated",
+                )
+            }
+        }
+    }
+
+    @Test
+    fun `out of range integers have no Unicode properties`() {
+        for (codepoint in intArrayOf(Int.MIN_VALUE, -1, 0x110000, Int.MAX_VALUE)) {
+            assertEquals(UnicodeClass.GRAPHEME_OTHER, UnicodeClass.properties(codepoint))
+        }
+    }
+
+    /** Unmodified UCD files are test oracles, independent of the table generator. */
+    private fun readPropertyFile(
+        name: String,
+        consume: (Int, Int, String) -> Unit,
+    ) {
+        val stream = checkNotNull(javaClass.getResourceAsStream("/unicode/17.0.0/$name"))
+        stream.bufferedReader(Charsets.UTF_8).useLines { lines ->
+            lines.forEach { line ->
+                val body = line.substringBefore('#').trim()
+                if (body.isNotEmpty()) {
+                    val fields = body.split(';')
+                    val bounds = fields[0].trim().split("..")
+                    consume(bounds.first().toInt(16), bounds.last().toInt(16), fields[1].trim())
+                }
+            }
+        }
+    }
+
+    @Test
     fun `ASCII classification agrees with Unicode data including control boundaries`() {
         for (codepoint in 0..0x80) {
             val expected =
@@ -32,10 +101,20 @@ class UnicodeClassTest {
                     in 0..0x1F, 0x7F, 0x80 -> UnicodeClass.GRAPHEME_CONTROL
                     else -> UnicodeClass.GRAPHEME_OTHER
                 }
-            assertEquals(expected, GeneratedGraphemeBreakTable.graphemeBreakClass(codepoint), "Unicode data at $codepoint")
-            assertEquals(expected, UnicodeClass.graphemeBreakClass(codepoint), "Classification at $codepoint")
-            assertFalse(GeneratedGraphemeBreakTable.isExtendedPictographic(codepoint), "Unicode data at $codepoint")
-            assertFalse(UnicodeClass.isExtendedPictographic(codepoint), "Pictographic classification at $codepoint")
+            assertEquals(
+                expected,
+                UnicodeClass.graphemeBreakClass(GeneratedGraphemeBreakTable.properties(codepoint)),
+                "Unicode data at $codepoint",
+            )
+            assertEquals(expected, UnicodeClass.graphemeBreakClass(UnicodeClass.properties(codepoint)), "Classification at $codepoint")
+            assertFalse(
+                UnicodeClass.isExtendedPictographic(GeneratedGraphemeBreakTable.properties(codepoint)),
+                "Unicode data at $codepoint",
+            )
+            assertFalse(
+                UnicodeClass.isExtendedPictographic(UnicodeClass.properties(codepoint)),
+                "Pictographic classification at $codepoint",
+            )
         }
     }
 
@@ -44,47 +123,47 @@ class UnicodeClassTest {
     inner class GraphemeBreakClass {
         @Test
         fun `classifies combining marks and variation selectors as Extend`() {
-            assertEquals(UnicodeClass.GRAPHEME_EXTEND, UnicodeClass.graphemeBreakClass(0x0301))
-            assertEquals(UnicodeClass.GRAPHEME_EXTEND, UnicodeClass.graphemeBreakClass(0x1AB0))
-            assertEquals(UnicodeClass.GRAPHEME_EXTEND, UnicodeClass.graphemeBreakClass(0xFE0F))
-            assertEquals(UnicodeClass.GRAPHEME_EXTEND, UnicodeClass.graphemeBreakClass(0xE0100))
+            assertEquals(UnicodeClass.GRAPHEME_EXTEND, UnicodeClass.graphemeBreakClass(UnicodeClass.properties(0x0301)))
+            assertEquals(UnicodeClass.GRAPHEME_EXTEND, UnicodeClass.graphemeBreakClass(UnicodeClass.properties(0x1AB0)))
+            assertEquals(UnicodeClass.GRAPHEME_EXTEND, UnicodeClass.graphemeBreakClass(UnicodeClass.properties(0xFE0F)))
+            assertEquals(UnicodeClass.GRAPHEME_EXTEND, UnicodeClass.graphemeBreakClass(UnicodeClass.properties(0xE0100)))
         }
 
         @Test
         fun `classifies Thai and Lao combining marks as Extend`() {
-            assertEquals(UnicodeClass.GRAPHEME_EXTEND, UnicodeClass.graphemeBreakClass(0x0E31))
-            assertEquals(UnicodeClass.GRAPHEME_EXTEND, UnicodeClass.graphemeBreakClass(0x0E34))
-            assertEquals(UnicodeClass.GRAPHEME_EXTEND, UnicodeClass.graphemeBreakClass(0x0E4D))
-            assertEquals(UnicodeClass.GRAPHEME_EXTEND, UnicodeClass.graphemeBreakClass(0x0EB1))
-            assertEquals(UnicodeClass.GRAPHEME_EXTEND, UnicodeClass.graphemeBreakClass(0x0EB4))
-            assertEquals(UnicodeClass.GRAPHEME_EXTEND, UnicodeClass.graphemeBreakClass(0x0ECD))
+            assertEquals(UnicodeClass.GRAPHEME_EXTEND, UnicodeClass.graphemeBreakClass(UnicodeClass.properties(0x0E31)))
+            assertEquals(UnicodeClass.GRAPHEME_EXTEND, UnicodeClass.graphemeBreakClass(UnicodeClass.properties(0x0E34)))
+            assertEquals(UnicodeClass.GRAPHEME_EXTEND, UnicodeClass.graphemeBreakClass(UnicodeClass.properties(0x0E4D)))
+            assertEquals(UnicodeClass.GRAPHEME_EXTEND, UnicodeClass.graphemeBreakClass(UnicodeClass.properties(0x0EB1)))
+            assertEquals(UnicodeClass.GRAPHEME_EXTEND, UnicodeClass.graphemeBreakClass(UnicodeClass.properties(0x0EB4)))
+            assertEquals(UnicodeClass.GRAPHEME_EXTEND, UnicodeClass.graphemeBreakClass(UnicodeClass.properties(0x0ECD)))
         }
 
         @Test
         fun `classifies ZWJ regional indicators and spacing marks`() {
-            assertEquals(UnicodeClass.GRAPHEME_ZWJ, UnicodeClass.graphemeBreakClass(0x200D))
-            assertEquals(UnicodeClass.GRAPHEME_REGIONAL_INDICATOR, UnicodeClass.graphemeBreakClass(0x1F1FA))
-            assertEquals(UnicodeClass.GRAPHEME_SPACING_MARK, UnicodeClass.graphemeBreakClass(0x0903))
-            assertEquals(UnicodeClass.GRAPHEME_SPACING_MARK, UnicodeClass.graphemeBreakClass(0x11F03))
+            assertEquals(UnicodeClass.GRAPHEME_ZWJ, UnicodeClass.graphemeBreakClass(UnicodeClass.properties(0x200D)))
+            assertEquals(UnicodeClass.GRAPHEME_REGIONAL_INDICATOR, UnicodeClass.graphemeBreakClass(UnicodeClass.properties(0x1F1FA)))
+            assertEquals(UnicodeClass.GRAPHEME_SPACING_MARK, UnicodeClass.graphemeBreakClass(UnicodeClass.properties(0x0903)))
+            assertEquals(UnicodeClass.GRAPHEME_SPACING_MARK, UnicodeClass.graphemeBreakClass(UnicodeClass.properties(0x11F03)))
         }
 
         @Test
         fun `classifies CR LF control and prepend classes`() {
-            assertEquals(UnicodeClass.GRAPHEME_CR, UnicodeClass.graphemeBreakClass(0x000D))
-            assertEquals(UnicodeClass.GRAPHEME_LF, UnicodeClass.graphemeBreakClass(0x000A))
-            assertEquals(UnicodeClass.GRAPHEME_CONTROL, UnicodeClass.graphemeBreakClass(0x0000))
-            assertEquals(UnicodeClass.GRAPHEME_CONTROL, UnicodeClass.graphemeBreakClass(0x009F))
-            assertEquals(UnicodeClass.GRAPHEME_CONTROL, UnicodeClass.graphemeBreakClass(0x1D173))
-            assertEquals(UnicodeClass.GRAPHEME_PREPEND, UnicodeClass.graphemeBreakClass(0x0600))
+            assertEquals(UnicodeClass.GRAPHEME_CR, UnicodeClass.graphemeBreakClass(UnicodeClass.properties(0x000D)))
+            assertEquals(UnicodeClass.GRAPHEME_LF, UnicodeClass.graphemeBreakClass(UnicodeClass.properties(0x000A)))
+            assertEquals(UnicodeClass.GRAPHEME_CONTROL, UnicodeClass.graphemeBreakClass(UnicodeClass.properties(0x0000)))
+            assertEquals(UnicodeClass.GRAPHEME_CONTROL, UnicodeClass.graphemeBreakClass(UnicodeClass.properties(0x009F)))
+            assertEquals(UnicodeClass.GRAPHEME_CONTROL, UnicodeClass.graphemeBreakClass(UnicodeClass.properties(0x1D173)))
+            assertEquals(UnicodeClass.GRAPHEME_PREPEND, UnicodeClass.graphemeBreakClass(UnicodeClass.properties(0x0600)))
         }
 
         @Test
         fun `classifies Hangul Jamo and syllable classes`() {
-            assertEquals(UnicodeClass.GRAPHEME_L, UnicodeClass.graphemeBreakClass(0x1100))
-            assertEquals(UnicodeClass.GRAPHEME_V, UnicodeClass.graphemeBreakClass(0x1161))
-            assertEquals(UnicodeClass.GRAPHEME_T, UnicodeClass.graphemeBreakClass(0x11A8))
-            assertEquals(UnicodeClass.GRAPHEME_LV, UnicodeClass.graphemeBreakClass(0xAC00))
-            assertEquals(UnicodeClass.GRAPHEME_LVT, UnicodeClass.graphemeBreakClass(0xAC01))
+            assertEquals(UnicodeClass.GRAPHEME_L, UnicodeClass.graphemeBreakClass(UnicodeClass.properties(0x1100)))
+            assertEquals(UnicodeClass.GRAPHEME_V, UnicodeClass.graphemeBreakClass(UnicodeClass.properties(0x1161)))
+            assertEquals(UnicodeClass.GRAPHEME_T, UnicodeClass.graphemeBreakClass(UnicodeClass.properties(0x11A8)))
+            assertEquals(UnicodeClass.GRAPHEME_LV, UnicodeClass.graphemeBreakClass(UnicodeClass.properties(0xAC00)))
+            assertEquals(UnicodeClass.GRAPHEME_LVT, UnicodeClass.graphemeBreakClass(UnicodeClass.properties(0xAC01)))
         }
     }
 
@@ -93,16 +172,16 @@ class UnicodeClassTest {
     inner class ExtendedPictographic {
         @Test
         fun `classifies emoji and symbol bases`() {
-            assertTrue(UnicodeClass.isExtendedPictographic(0x1F468))
-            assertTrue(UnicodeClass.isExtendedPictographic(0x2764))
-            assertTrue(UnicodeClass.isExtendedPictographic(0x00A9))
-            assertTrue(UnicodeClass.isExtendedPictographic(0x1FAE8))
+            assertTrue(UnicodeClass.isExtendedPictographic(UnicodeClass.properties(0x1F468)))
+            assertTrue(UnicodeClass.isExtendedPictographic(UnicodeClass.properties(0x2764)))
+            assertTrue(UnicodeClass.isExtendedPictographic(UnicodeClass.properties(0x00A9)))
+            assertTrue(UnicodeClass.isExtendedPictographic(UnicodeClass.properties(0x1FAE8)))
         }
 
         @Test
         fun `does not classify ordinary letters or regional indicators as extended pictographic`() {
-            assertFalse(UnicodeClass.isExtendedPictographic('A'.code))
-            assertFalse(UnicodeClass.isExtendedPictographic(0x1F1FA))
+            assertFalse(UnicodeClass.isExtendedPictographic(UnicodeClass.properties('A'.code)))
+            assertFalse(UnicodeClass.isExtendedPictographic(UnicodeClass.properties(0x1F1FA)))
         }
     }
 }

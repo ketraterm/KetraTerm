@@ -31,11 +31,13 @@ internal object UnicodeClass {
     const val GRAPHEME_LV: Int = 12
     const val GRAPHEME_LVT: Int = 13
 
+    /** Low four bits hold the grapheme class; bit four marks Extended_Pictographic. */
     @JvmStatic
-    fun graphemeBreakClass(codepoint: Int): Int =
-        if (codepoint in 0x20..0x7E) GRAPHEME_OTHER else GeneratedGraphemeBreakTable.graphemeBreakClass(codepoint)
+    fun properties(codepoint: Int): Int = if (codepoint in 0x20..0x7E) GRAPHEME_OTHER else GeneratedGraphemeBreakTable.properties(codepoint)
 
     @JvmStatic
-    fun isExtendedPictographic(codepoint: Int): Boolean =
-        codepoint !in 0..0x7F && GeneratedGraphemeBreakTable.isExtendedPictographic(codepoint)
+    fun graphemeBreakClass(properties: Int): Int = properties and 0x0F
+
+    @JvmStatic
+    fun isExtendedPictographic(properties: Int): Boolean = properties and 0x10 != 0
 }

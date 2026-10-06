@@ -21,8 +21,8 @@ import io.github.ketraterm.parser.spi.TerminalCommandSink
 /**
  * Allocation-free grapheme assembly boundary.
  *
- * The assembler owns cluster buffering only. Unicode classification and break decisions are
- * delegated to [GraphemeSegmenter], while terminal grid width remains owned by :terminal-core.
+ * The assembler owns cluster buffering only. Unicode properties come from [UnicodeClass] and break decisions
+ * from [GraphemeSegmenter], while terminal grid width remains owned by :terminal-core.
  * Only the bounded prefix is retained and published. Discarded continuations still advance
  * segmentation context so capacity exhaustion never introduces a grapheme boundary.
  */
@@ -33,16 +33,17 @@ internal class GraphemeAssembler(
         state: ParserState,
         codepoint: Int,
     ) {
-        val currentClass = UnicodeClass.graphemeBreakClass(codepoint)
+        val properties = UnicodeClass.properties(codepoint)
+        val currentClass = UnicodeClass.graphemeBreakClass(properties)
 
-        if (state.clusterLength > 0 && !GraphemeSegmenter.continuesCurrentCluster(state, currentClass, codepoint)) {
+        if (state.clusterLength > 0 && !GraphemeSegmenter.continuesCurrentCluster(state, currentClass, properties)) {
             flush(state)
         }
 
         if (state.clusterLength < state.clusterBuffer.size) {
             state.clusterBuffer[state.clusterLength++] = codepoint
         }
-        GraphemeSegmenter.updateContext(state, codepoint, currentClass)
+        GraphemeSegmenter.updateContext(state, properties, currentClass)
     }
 
     fun flush(state: ParserState) {

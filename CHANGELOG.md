@@ -7,6 +7,7 @@ Release notes for library consumers and embedders. Product-specific changes are 
 ### Improvements and fixes
 
 - Reduced ASCII output parsing cost by avoiding unnecessary Unicode property searches while preserving charset mapping and grapheme assembly. Added a fresh-terminal log ingestion benchmark with retained-cell validation and separate parser/core measurements.
+- Replaced repeated Unicode grapheme/emoji range searches with a single packed, deduplicated lookup reused throughout grapheme assembly. Added a fast boundary check for consecutive ordinary bases, exhaustive Unicode 17 property verification, and a separate first-input benchmark; segmentation rules and core width policy are unchanged.
 
 - Swing can bind and resize after session exit. It projects retained rows without reflow, preserves selection across font changes, and keeps transport closed.
 - Added `TerminalSession.tryResizeViewport` for explicit resize admission during closure. Strict resize APIs retain their rejection contract.

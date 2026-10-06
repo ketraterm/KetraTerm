@@ -68,4 +68,6 @@ jmh {
     // Honor each benchmark's mode: fresh-terminal ingestion requires single-shot timing.
     timeUnit.set("ms")
     profilers.set(listOf("gc"))
+    // Run cold first-input measurements explicitly from the JMH JAR without these warmup overrides.
+    excludes.set(listOf(".*TerminalParserFirstInputBenchmark.*"))
 }
