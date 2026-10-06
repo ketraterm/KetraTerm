@@ -30,6 +30,24 @@ import kotlin.test.*
 
 class SwingSettingsTest {
     @Test
+    fun `prompt modes copy independently and remove reserved gutter space`() {
+        val initial = SwingSettings()
+        assertEquals(SwingPromptDecoration.GUTTER, initial.promptDecoration)
+        for (mode in listOf(SwingPromptDecoration.NONE, SwingPromptDecoration.DIVIDER)) {
+            val settings = initial.copy { it.promptDecoration = mode }
+            assertEquals(mode, settings.promptDecoration)
+            assertEquals(settings, settings.copy {})
+            assertEquals(settings.hashCode(), settings.copy {}.hashCode())
+            assertNotEquals(initial, settings)
+            assertEquals(0, SwingTerminalChrome.promptDecorationGutterWidth(settings, TerminalRenderBufferKind.PRIMARY))
+            assertEquals(
+                SwingTerminalChrome.horizontalInset(settings, TerminalRenderBufferKind.PRIMARY),
+                SwingTerminalChrome.horizontalInset(settings, TerminalRenderBufferKind.ALTERNATE),
+            )
+        }
+    }
+
+    @Test
     fun columnSpacingDefaultsToZero() {
         assertEquals(0, SwingSettings().columnSpacing)
     }

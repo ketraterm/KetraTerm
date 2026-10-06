@@ -111,6 +111,7 @@ internal class GridPainter(
         val paddingTop = SwingTerminalChrome.top(settings, cache.activeBuffer)
         val paddingBottom = SwingTerminalChrome.bottom(settings, cache.activeBuffer)
         val gridPaintHeight = height - paddingTop - paddingBottom
+        val contentWidth = width - paddingLeft - SwingTerminalChrome.right(settings, cache.activeBuffer)
         if (gridPaintHeight <= 0) return
 
         val promptGutterWidth = SwingTerminalChrome.promptDecorationGutterWidth(settings, cache.activeBuffer)
@@ -130,69 +131,92 @@ internal class GridPainter(
         try {
             var row = firstRow
             while (row < rows) {
-                val bidi = cellGeometry.row(cache, row)
-                backgroundPainter.paintRow(g, cache, palette, metrics, row, bidi)
-                if (hyperlinkPresentations != null || settings.osc8HyperlinkPresentation != null) {
-                    paintHyperlinkBackgrounds(
-                        g,
-                        cache,
-                        metrics,
-                        row,
-                        hyperlinkIds,
-                        hyperlinkPresentations,
-                        settings.resolvedOsc8HyperlinkPresentation,
-                        followedHyperlinkId,
-                        hyperlinkHover,
-                        textBlinkVisible,
+                val rowOffset = (geometry?.rowTop(row) ?: (row * metrics.cellHeight)) - row * metrics.cellHeight
+                if (rowOffset != 0) g.translate(0, rowOffset)
+                try {
+                    if (geometry?.hasDividerBefore(row) == true) {
+                        shellIntegrationDecorationPainter.paintDivider(
+                            g,
+                            metrics,
+                            row,
+                            contentWidth,
+                            row == hoveredPromptMarkerRow,
+                            palette,
+                        )
+                    }
+                    val bidi = cellGeometry.row(cache, row)
+                    backgroundPainter.paintRow(g, cache, palette, metrics, row, bidi)
+                    if (hyperlinkPresentations != null || settings.osc8HyperlinkPresentation != null) {
+                        paintHyperlinkBackgrounds(
+                            g,
+                            cache,
+                            metrics,
+                            row,
+                            hyperlinkIds,
+                            hyperlinkPresentations,
+                            settings.resolvedOsc8HyperlinkPresentation,
+                            followedHyperlinkId,
+                            hyperlinkHover,
+                            textBlinkVisible,
+                        )
+                    }
+                    shellIntegrationDecorationPainter.paint(
+                        g = g,
+                        settings = settings,
+                        metrics = metrics,
+                        decorations = shellDecorations,
+                        gutterWidth = promptGutterWidth,
+                        row = row,
+                        hovered = row == hoveredPromptMarkerRow,
+                        palette = palette,
                     )
+                    searchPainter.paint(
+                        g = g,
+                        metrics = metrics,
+                        row = row,
+                        highlights = searchHighlights,
+                        matchBackground = settings.searchMatchBackground,
+                        activeMatchBackground = settings.searchActiveMatchBackground,
+                        bidi = bidi,
+                    )
+                    selectionPainter.paint(g, cache, metrics, row, selection, settings.selectionBackground, palette, bidi)
+                    textPainter.paintRow(
+                        g = g,
+                        cache = cache,
+                        palette = palette,
+                        metrics = metrics,
+                        row = row,
+                        fontRenderContext = fontRenderContext,
+                        textBlinkVisible = textBlinkVisible,
+                        hyperlinkIds = hyperlinkIds,
+                        hyperlinkHover = hyperlinkHover,
+                        hyperlinkPresentations = hyperlinkPresentations,
+                        followedHyperlinkId = followedHyperlinkId,
+                    )
+                } finally {
+                    if (rowOffset != 0) g.translate(0, -rowOffset)
                 }
-                shellIntegrationDecorationPainter.paint(
-                    g = g,
-                    settings = settings,
-                    metrics = metrics,
-                    decorations = shellDecorations,
-                    gutterWidth = promptGutterWidth,
-                    row = row,
-                    hovered = row == hoveredPromptMarkerRow,
-                    palette = palette,
-                )
-                searchPainter.paint(
-                    g = g,
-                    metrics = metrics,
-                    row = row,
-                    highlights = searchHighlights,
-                    matchBackground = settings.searchMatchBackground,
-                    activeMatchBackground = settings.searchActiveMatchBackground,
-                    bidi = bidi,
-                )
-                selectionPainter.paint(g, cache, metrics, row, selection, settings.selectionBackground, palette, bidi)
-                textPainter.paintRow(
-                    g = g,
-                    cache = cache,
-                    palette = palette,
-                    metrics = metrics,
-                    row = row,
-                    fontRenderContext = fontRenderContext,
-                    textBlinkVisible = textBlinkVisible,
-                    hyperlinkIds = hyperlinkIds,
-                    hyperlinkHover = hyperlinkHover,
-                    hyperlinkPresentations = hyperlinkPresentations,
-                    followedHyperlinkId = followedHyperlinkId,
-                )
                 row++
             }
 
-            cursorPainter.paint(
-                g,
-                cache,
-                palette,
-                metrics,
-                cursorBlinkVisible,
-                textBlinkVisible,
-                fontRenderContext,
-                terminalFocused = terminalFocused,
-                bidi = cellGeometry.row(cache, cache.cursorRow),
-            )
+            val cursorOffset =
+                (geometry?.rowTop(cache.cursorRow) ?: (cache.cursorRow * metrics.cellHeight)) - cache.cursorRow * metrics.cellHeight
+            if (cursorOffset != 0) g.translate(0, cursorOffset)
+            try {
+                cursorPainter.paint(
+                    g,
+                    cache,
+                    palette,
+                    metrics,
+                    cursorBlinkVisible,
+                    textBlinkVisible,
+                    fontRenderContext,
+                    terminalFocused = terminalFocused,
+                    bidi = cellGeometry.row(cache, cache.cursorRow),
+                )
+            } finally {
+                if (cursorOffset != 0) g.translate(0, -cursorOffset)
+            }
         } finally {
             g.translate(-paddingLeft.toDouble(), -(paddingTop.toDouble() + contentOriginY))
             g.clip = originalClip

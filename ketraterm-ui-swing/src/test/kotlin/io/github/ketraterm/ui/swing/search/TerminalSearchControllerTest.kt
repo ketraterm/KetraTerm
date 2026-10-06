@@ -614,15 +614,19 @@ class TerminalSearchControllerTest {
         var repaintCount: Int = 0
             private set
 
-        override fun visibleGridRows(): Int = renderCache.rows
+        private fun visibleGridRows(): Int = renderCache.rows
 
-        override fun scrollViewportTo(
-            offsetRows: Int,
-            historySize: Int,
-            boundSession: TerminalSession,
+        override fun scrollToAbsoluteRow(
+            row: Long,
+            center: Boolean,
         ): Boolean {
             scrollRequestCount++
-            renderCache.updateFrom(boundSession, scrollbackOffset = offsetRows, viewportRows = visibleGridRows())
+            val offset = renderCache.discardedCount + renderCache.historySize + (if (center) visibleGridRows() / 2 else 0) - row
+            renderCache.updateFrom(
+                session,
+                scrollbackOffset = offset.coerceIn(0, renderCache.historySize.toLong()).toInt(),
+                viewportRows = visibleGridRows(),
+            )
             return true
         }
 

@@ -25,7 +25,7 @@ import java.awt.Graphics2D
 import java.awt.RenderingHints
 
 /**
- * Paints shell-integration prompt dots and failed-command rails in the left gutter.
+ * Paints shell-integration gutter markers and prompt divider rules.
  */
 internal class TerminalShellIntegrationDecorationPainter(
     private val colorCache: AwtColorCache,
@@ -86,6 +86,23 @@ internal class TerminalShellIntegrationDecorationPainter(
         } finally {
             g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_OFF)
         }
+    }
+
+    /** Paints a rule centered in the visual band preceding the translated text row. */
+    fun paintDivider(
+        g: Graphics2D,
+        metrics: SwingMetrics,
+        row: Int,
+        contentWidth: Int,
+        hovered: Boolean,
+        palette: TerminalColorPalette,
+    ) {
+        if (contentWidth <= 0) return
+        val alpha = if (hovered) 0x70 else 0x30
+        g.color = colorCache.color(withAlpha(palette.defaultForeground, alpha))
+        val thickness = minOf(2, metrics.cellHeight)
+        val y = row * metrics.cellHeight - (metrics.cellHeight + thickness + 1) / 2
+        g.fillRect(0, y, contentWidth, thickness)
     }
 
     private fun paintFailedCommandRail(

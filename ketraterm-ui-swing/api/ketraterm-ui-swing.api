@@ -482,6 +482,15 @@ public final class io/github/ketraterm/ui/swing/settings/SwingPadding {
 	public fun toString ()Ljava/lang/String;
 }
 
+public final class io/github/ketraterm/ui/swing/settings/SwingPromptDecoration : java/lang/Enum {
+	public static final field DIVIDER Lio/github/ketraterm/ui/swing/settings/SwingPromptDecoration;
+	public static final field GUTTER Lio/github/ketraterm/ui/swing/settings/SwingPromptDecoration;
+	public static final field NONE Lio/github/ketraterm/ui/swing/settings/SwingPromptDecoration;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public static fun valueOf (Ljava/lang/String;)Lio/github/ketraterm/ui/swing/settings/SwingPromptDecoration;
+	public static fun values ()[Lio/github/ketraterm/ui/swing/settings/SwingPromptDecoration;
+}
+
 public final class io/github/ketraterm/ui/swing/settings/SwingSettings {
 	public static final field Companion Lio/github/ketraterm/ui/swing/settings/SwingSettings$Companion;
 	public fun <init> ()V
@@ -512,6 +521,7 @@ public final class io/github/ketraterm/ui/swing/settings/SwingSettings {
 	public final fun getPadding ()Lio/github/ketraterm/ui/swing/settings/SwingPadding;
 	public final fun getPalette ()Lio/github/ketraterm/render/api/TerminalColorPalette;
 	public final fun getPasteControlPolicy ()Lio/github/ketraterm/input/policy/PasteControlPolicy;
+	public final fun getPromptDecoration ()Lio/github/ketraterm/ui/swing/settings/SwingPromptDecoration;
 	public final fun getRows ()I
 	public final fun getScrollOnOutput ()Z
 	public final fun getSearchActiveMatchBackground ()I
@@ -560,6 +570,7 @@ public final class io/github/ketraterm/ui/swing/settings/SwingSettings$Builder {
 	public final fun getPadding ()Lio/github/ketraterm/ui/swing/settings/SwingPadding;
 	public final fun getPalette ()Lio/github/ketraterm/render/api/TerminalColorPalette;
 	public final fun getPasteControlPolicy ()Lio/github/ketraterm/input/policy/PasteControlPolicy;
+	public final fun getPromptDecoration ()Lio/github/ketraterm/ui/swing/settings/SwingPromptDecoration;
 	public final fun getRows ()I
 	public final fun getScrollOnOutput ()Z
 	public final fun getSearchActiveMatchBackground ()I
@@ -601,6 +612,7 @@ public final class io/github/ketraterm/ui/swing/settings/SwingSettings$Builder {
 	public final fun setPadding (Lio/github/ketraterm/ui/swing/settings/SwingPadding;)V
 	public final fun setPalette (Lio/github/ketraterm/render/api/TerminalColorPalette;)V
 	public final fun setPasteControlPolicy (Lio/github/ketraterm/input/policy/PasteControlPolicy;)V
+	public final fun setPromptDecoration (Lio/github/ketraterm/ui/swing/settings/SwingPromptDecoration;)V
 	public final fun setRows (I)V
 	public final fun setScrollOnOutput (Z)V
 	public final fun setSearchActiveMatchBackground (I)V

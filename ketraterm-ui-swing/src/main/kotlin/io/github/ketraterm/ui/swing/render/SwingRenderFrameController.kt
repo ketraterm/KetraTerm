@@ -54,10 +54,10 @@ internal class SwingRenderFrameController(
         host.refreshRenderCacheFromSession(boundSession)
         if (host.session !== boundSession || !host.renderCache.hasFrame) return
         val viewportChanged = host.clampViewport(host.renderCache.historySize, host.renderCache.discardedCount)
+        val shellIntegrationDecorationsChanged = host.refreshShellIntegrationDecorations(boundSession)
         val followUpRenderRequired =
             viewportChanged ||
                 host.renderCache.scrollbackOffset != host.requestedViewportOffset()
-        val shellIntegrationDecorationsChanged = host.refreshShellIntegrationDecorations(boundSession)
         if (followUpRenderRequired) host.requestRender(boundSession)
         host.refreshSearchForFrame()
         host.publishViewportState(host.renderCache.historySize)

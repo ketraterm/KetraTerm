@@ -32,10 +32,7 @@ import io.github.ketraterm.ui.swing.render.*
 import io.github.ketraterm.ui.swing.search.TerminalSearchController
 import io.github.ketraterm.ui.swing.search.TerminalSearchHost
 import io.github.ketraterm.ui.swing.search.TerminalSearchState
-import io.github.ketraterm.ui.swing.settings.SwingMetrics
-import io.github.ketraterm.ui.swing.settings.SwingSettings
-import io.github.ketraterm.ui.swing.settings.SwingSettingsProvider
-import io.github.ketraterm.ui.swing.settings.SwingTerminalChrome
+import io.github.ketraterm.ui.swing.settings.*
 import io.github.ketraterm.ui.swing.suggestion.*
 import io.github.ketraterm.ui.swing.viewport.SwingViewportController
 import io.github.ketraterm.ui.swing.viewport.TerminalScrollbarOverlay
@@ -279,11 +276,10 @@ public class SwingTerminal
                         columns: Int,
                     ) = this@SwingTerminal.selectionController.selectAbsoluteRows(startAbsoluteRow, endAbsoluteRow, columns)
 
-                    override fun scrollViewportTo(
-                        offsetRows: Int,
-                        historySize: Int,
-                        boundSession: TerminalSession,
-                    ): Boolean = this@SwingTerminal.scrollViewportToOnEdt(offsetRows, historySize)
+                    override fun scrollToAbsoluteRow(
+                        row: Long,
+                        center: Boolean,
+                    ): Boolean = this@SwingTerminal.scrollToAbsoluteRowOnEdt(row, center)
 
                     override fun repaint() = this@SwingTerminal.repaint()
                 },
@@ -324,7 +320,8 @@ public class SwingTerminal
                     override fun cellAt(
                         x: Int,
                         y: Int,
-                    ): Long = this@SwingTerminal.cellAt(x, y, this@SwingTerminal.renderCache)
+                    ): Long =
+                        if (isPromptDividerAt(x, y)) packCell(0, -1) else this@SwingTerminal.cellAt(x, y, this@SwingTerminal.renderCache)
 
                     override fun repaintHyperlinkSpan(
                         startRow: Int,
@@ -376,7 +373,7 @@ public class SwingTerminal
                             SwingTerminalChrome.left(settings, renderCache.activeBuffer) + first * metrics.cellWidth,
                             floor(
                                 SwingTerminalChrome.top(settings, renderCache.activeBuffer) + visualGeometry.contentOriginY +
-                                    row * metrics.cellHeight,
+                                    visualGeometry.rowTop(row),
                             ).toInt(),
                             (last - first) * metrics.cellWidth,
                             metrics.cellHeight,
@@ -390,13 +387,10 @@ public class SwingTerminal
                     override val session: TerminalSession? get() = this@SwingTerminal.session
                     override val renderCache: TerminalRenderCache get() = this@SwingTerminal.renderCache
 
-                    override fun visibleGridRows(): Int = this@SwingTerminal.visibleGridRows()
-
-                    override fun scrollViewportTo(
-                        offsetRows: Int,
-                        historySize: Int,
-                        boundSession: TerminalSession,
-                    ): Boolean = this@SwingTerminal.scrollViewportToOnEdt(offsetRows, historySize)
+                    override fun scrollToAbsoluteRow(
+                        row: Long,
+                        center: Boolean,
+                    ): Boolean = this@SwingTerminal.scrollToAbsoluteRowOnEdt(row, center)
 
                     override fun repaint() = this@SwingTerminal.renderFrameController.repaintFrame()
                 },
@@ -470,6 +464,11 @@ public class SwingTerminal
                         y: Int,
                         cache: TerminalRenderCache,
                     ): Long = this@SwingTerminal.cellAt(x, y, cache)
+
+                    override fun isPromptDividerAt(
+                        x: Int,
+                        y: Int,
+                    ): Boolean = this@SwingTerminal.isPromptDividerAt(x, y)
 
                     override fun terminalPixelYAt(
                         y: Int,
@@ -661,6 +660,11 @@ public class SwingTerminal
             y: Int,
         ): Int {
             val paddingLeft = SwingTerminalChrome.left(settings, renderCache.activeBuffer)
+            if (settings.promptDecoration == SwingPromptDecoration.DIVIDER) {
+                val right = width - SwingTerminalChrome.right(settings, renderCache.activeBuffer)
+                if (x !in paddingLeft until right) return NO_PROMPT_MARKER_ROW
+                return visualGeometry.dividerRowAtComponentY(y, SwingTerminalChrome.top(settings, renderCache.activeBuffer))
+            }
             val gutterWidth = SwingTerminalChrome.promptDecorationGutterWidth(settings, renderCache.activeBuffer)
             if (gutterWidth <= 0 || x !in (paddingLeft - gutterWidth) until paddingLeft) {
                 return NO_PROMPT_MARKER_ROW
@@ -668,6 +672,11 @@ public class SwingTerminal
             val row = cellAt(x, y, renderCache).toInt()
             return if (shellIntegrationDecorations.hasPromptStartAt(row)) row else NO_PROMPT_MARKER_ROW
         }
+
+        private fun isPromptDividerAt(
+            x: Int,
+            y: Int,
+        ): Boolean = settings.promptDecoration == SwingPromptDecoration.DIVIDER && promptMarkerRowAt(x, y) != NO_PROMPT_MARKER_ROW
 
         private fun updateHoveredPromptMarker(row: Int) {
             if (hoveredPromptMarkerRow != row) {
@@ -823,7 +832,7 @@ public class SwingTerminal
         }
 
         /**
-         * Returns the latest terminal-native scrollback viewport snapshot.
+         * Returns the latest presentation scrollback viewport snapshot.
          *
          * This method may be called from any thread. EDT callers refresh the
          * snapshot from live component and render-cache state before reading it;
@@ -865,14 +874,15 @@ public class SwingTerminal
         }
 
         /**
-         * Applies a signed scrollback delta in terminal rows.
+         * Applies a signed scrollback delta in presentation slots.
          *
          * Positive values move farther back into scrollback; negative values move
          * toward the live viewport. Fractional values accumulate until they
          * produce a whole-row destination. Animation may render between rows,
          * but always completes on the destination row.
          *
-         * @param deltaLines signed row delta.
+         * Divider mode counts a prompt band as one slot, alongside text rows.
+         * @param deltaLines signed slot delta.
          */
         public fun scrollViewportBy(deltaLines: Double) {
             require(deltaLines.isFinite()) { "deltaLines must be finite, was $deltaLines" }
@@ -1099,22 +1109,23 @@ public class SwingTerminal
                         .toInt()
                 }
             val bottomLimit = height - paddingBottom
+            val fallbackRowTop =
+                if (visualGeometry.rowCount > 0) {
+                    visualGeometry.rowTop(state.anchorRow).toDouble()
+                } else {
+                    state.anchorRow.toDouble() * metrics.cellHeight
+                }
             val anchorTop =
                 if (hasCellBounds) {
                     suggestionAnchorBounds.y
                 } else {
-                    floor(
-                        paddingTop + contentOriginY + state.anchorRow.toDouble() * metrics.cellHeight,
-                    ).toInt()
-                        .coerceIn(paddingTop, bottomLimit)
+                    floor(paddingTop + contentOriginY + fallbackRowTop).toInt().coerceIn(paddingTop, bottomLimit)
                 }
             val anchorBottom =
                 if (hasCellBounds) {
                     suggestionAnchorBounds.y + suggestionAnchorBounds.height
                 } else {
-                    ceil(paddingTop + contentOriginY + (state.anchorRow.toDouble() + 1.0) * metrics.cellHeight)
-                        .toInt()
-                        .coerceIn(paddingTop, bottomLimit)
+                    ceil(paddingTop + contentOriginY + fallbackRowTop + metrics.cellHeight).toInt().coerceIn(paddingTop, bottomLimit)
                 }
             val spaceAbove = anchorTop - paddingTop
             val spaceBelow = bottomLimit - anchorBottom
@@ -1223,6 +1234,9 @@ public class SwingTerminal
                         combine(session.shellIntegrationState.revision, session.state) { _, state -> state }
                             .takeWhile { it !is TerminalSessionState.Closed }
                             .collect {
+                                // Host metadata can be published inside a borrowed frame callback.
+                                // Defer divider source reads until that callback has released its frame.
+                                if (settings.promptDecoration == SwingPromptDecoration.DIVIDER) yield()
                                 if (this@SwingTerminal.session !== session || session.isClosed || !renderCache.hasFrame) return@collect
                                 if (refreshShellIntegrationDecorations(session)) {
                                     if (hoveredPromptMarkerRow != NO_PROMPT_MARKER_ROW &&
@@ -1230,6 +1244,12 @@ public class SwingTerminal
                                     ) {
                                         updateHoveredPromptMarker(NO_PROMPT_MARKER_ROW)
                                     }
+                                    if (renderCache.scrollbackOffset !=
+                                        viewportController.requestedOffset
+                                    ) {
+                                        requestRenderFromSession(session)
+                                    }
+                                    publishViewportState(renderCache.historySize)
                                     renderFrameController.repaintFrame(forceFullRepaint = true)
                                 }
                             }
@@ -1330,7 +1350,8 @@ public class SwingTerminal
                 nextMetrics != metrics ||
                     next.padding != previous.padding ||
                     next.alternateScreenPadding != previous.alternateScreenPadding ||
-                    next.shellIntegrationDecorationGutterWidth != previous.shellIntegrationDecorationGutterWidth
+                    next.shellIntegrationDecorationGutterWidth != previous.shellIntegrationDecorationGutterWidth ||
+                    next.promptDecoration != previous.promptDecoration
             if (geometryChanged) viewportController.finishScroll()
             settings = next
             metrics = nextMetrics
@@ -1349,6 +1370,7 @@ public class SwingTerminal
             }
             session?.let { applySettingsToSession(it, next, previous) }
             if (geometryChanged) {
+                session?.let { refreshShellIntegrationDecorations(it) }
                 resizeSessionToVisibleGridOnEdt()
                 searchController.updateViewportHighlights()
                 clearPointerHover()
@@ -2275,7 +2297,7 @@ public class SwingTerminal
                 val clampedEndColumn = rowEndColumn.coerceIn(0, renderCache.columns)
                 if (clampedEndColumn > clampedStartColumn) {
                     val bidi = visualGeometry.bidiLayout.row(renderCache, row)
-                    val yTop = paddingTop + contentOriginY + row * metrics.cellHeight
+                    val yTop = paddingTop + contentOriginY + visualGeometry.rowTop(row)
                     val y = floor(yTop).toInt()
                     val repaintHeight = ceil(yTop + metrics.cellHeight).toInt() - y
                     forEachVisualCellSpan(bidi, clampedStartColumn, clampedEndColumn) { visualStart, visualEnd ->
@@ -2303,10 +2325,38 @@ public class SwingTerminal
             return localY.coerceIn(0, maxOf(0, cache.rows * metrics.cellHeight - 1))
         }
 
+        private fun scrollToAbsoluteRowOnEdt(
+            row: Long,
+            center: Boolean,
+        ): Boolean {
+            val dividers = viewportController.promptDividers
+            val centerRows = if (center) visibleGridRows() / 2 else 0
+            if (dividers != null) {
+                val offset =
+                    (dividers.liveOrigin - dividers.rowBoundary(row) + centerRows)
+                        .coerceIn(0, dividers.scrollRange.toLong())
+                return viewportController.scrollTo(offset.toDouble(), dividers.scrollRange)
+            }
+            val offset = renderCache.discardedCount + renderCache.historySize + centerRows - row
+            return scrollViewportToOnEdt(offset.coerceIn(0, renderCache.historySize.toLong()).toInt())
+        }
+
         private fun scrollViewportToOnEdt(
             offsetRows: Int,
             historySize: Int = renderCache.historySize,
         ): Boolean {
+            val dividers = viewportController.promptDividers
+            if (dividers != null) {
+                val target =
+                    if (offsetRows == 0) {
+                        0
+                    } else {
+                        dividers.visualOffsetForRow(
+                            renderCache.discardedCount + historySize - offsetRows.coerceIn(0, historySize),
+                        )
+                    }
+                return viewportController.scrollTo(target.toDouble(), dividers.scrollRange)
+            }
             val targetRow = offsetRows.coerceIn(0, historySize)
             return viewportController.scrollTo(targetRow.toDouble(), historySize)
         }
@@ -2496,6 +2546,15 @@ public class SwingTerminal
             lastResizedRows = rows
             // Animation is finished above, so resize anchoring is always row-exact.
             val oldOffset = viewportController.requestedOffset
+            val anchorRow = visualGeometry.firstFullyVisibleRow()
+            val anchorLineId =
+                if (viewportController.preciseOffset > 0.0 &&
+                    anchorRow in 0 until renderCache.rows
+                ) {
+                    renderCache.lineIds[anchorRow]
+                } else {
+                    0L
+                }
 
             val resizedViewport = boundSession.tryResizeViewport(columns, rows, oldOffset) ?: return true
             selectionController.clearSelection(notify = false)
@@ -2503,6 +2562,7 @@ public class SwingTerminal
                 resizedViewport.scrollbackOffset,
                 resizedViewport.historySize,
                 resizedViewport.discardedCount,
+                anchorLineId = anchorLineId,
             )
             selectionController.publishChange()
             return true
@@ -2536,12 +2596,20 @@ public class SwingTerminal
         private fun refreshRenderCacheFromSession(session: TerminalSession) {
             val closed = session.state.value is TerminalSessionState.Closed
             scrollbarOverlay.retainedOutput = closed
-            if (closed) {
+            if (closed &&
+                settings.promptDecoration == SwingPromptDecoration.DIVIDER &&
+                renderCache.activeBuffer != TerminalRenderBufferKind.ALTERNATE
+            ) {
+                retainedViewport = null
+                updatePromptDividers(session)
+                renderCache.updateFrom(session, viewportController.requestedOffset, requestedRenderRows())
+            } else if (closed) {
+                val hadRetainedViewport = retainedViewport != null
                 val viewport = retainedViewport ?: RetainedFrameViewport(session).also { retainedViewport = it }
                 viewport.visibleRows = visibleGridRows()
                 val previousHistory = renderCache.historySize
                 renderCache.updateFrom(viewport, viewportController.requestedOffset, requestedRenderRows())
-                if (previousHistory != renderCache.historySize) {
+                if (hadRetainedViewport && previousHistory != renderCache.historySize) {
                     val offset =
                         if (viewportController.requestedOffset == 0) {
                             0
@@ -2609,7 +2677,29 @@ public class SwingTerminal
 
         private fun refreshShellIntegrationDecorations(session: TerminalSession): Boolean {
             val decorationsChanged = shellIntegrationDecorations.updateFrom(session.shellIntegrationState, renderCache)
-            return decorationsChanged or updateVisualViewportGeometry()
+            val projectionChanged = updatePromptDividers(session)
+            return decorationsChanged or projectionChanged or updateVisualViewportGeometry()
+        }
+
+        private fun updatePromptDividers(session: TerminalSession): Boolean {
+            val previousRange = viewportController.promptDividers?.scrollRange
+            val previousOrigin = viewportController.promptDividers?.liveOrigin
+            val previousOffset = viewportController.preciseOffset
+            viewportController.updatePromptDividers(
+                reader = session,
+                state = session.shellIntegrationState,
+                enabled =
+                    settings.promptDecoration == SwingPromptDecoration.DIVIDER &&
+                        renderCache.activeBuffer != TerminalRenderBufferKind.ALTERNATE,
+                visibleRows = visibleGridRows(),
+                sourceHistorySize = renderCache.historySize,
+                sourceDiscardedCount = renderCache.discardedCount,
+                scrollOnOutput = settings.scrollOnOutput,
+                retainedOutput = session.state.value is TerminalSessionState.Closed,
+            )
+            return previousRange != viewportController.promptDividers?.scrollRange ||
+                previousOrigin != viewportController.promptDividers?.liveOrigin ||
+                previousOffset != viewportController.preciseOffset
         }
 
         private fun updateVisualViewportGeometry(): Boolean {
@@ -2619,11 +2709,18 @@ public class SwingTerminal
                     metrics = metrics,
                     rows = renderCache.rows,
                     viewportPixelHeight = viewportPixelHeight,
+                    dividers = viewportController.promptDividers,
+                    firstAbsoluteRow = renderCache.discardedCount + renderCache.historySize - renderCache.scrollbackOffset,
                 )
             viewportController.updateCellHeight(metrics.cellHeight)
             val originChanged =
                 visualGeometry.updateContentOrigin(
-                    viewportController.contentOriginY(
+                    viewportController.promptDividers?.let { dividers ->
+                        val firstRow = renderCache.discardedCount + renderCache.historySize - renderCache.scrollbackOffset
+                        val desired =
+                            (dividers.rowBoundary(firstRow) - dividers.liveOrigin + viewportController.preciseOffset) * metrics.cellHeight
+                        desired.coerceIn(minOf(0.0, viewportPixelHeight.toDouble() - visualGeometry.visualHeight), 0.0)
+                    } ?: viewportController.contentOriginY(
                         cacheScrollbackOffset = renderCache.scrollbackOffset,
                         cacheRows = renderCache.rows,
                         cellHeight = metrics.cellHeight,

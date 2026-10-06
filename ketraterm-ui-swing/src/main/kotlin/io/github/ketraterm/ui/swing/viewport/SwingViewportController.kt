@@ -16,8 +16,11 @@
 package io.github.ketraterm.ui.swing.viewport
 
 import io.github.ketraterm.render.api.TerminalRenderBufferKind
+import io.github.ketraterm.render.api.TerminalRenderFrameReader
+import io.github.ketraterm.session.TerminalShellIntegrationView
 import io.github.ketraterm.ui.swing.api.TerminalViewportListener
 import io.github.ketraterm.ui.swing.api.TerminalViewportState
+import io.github.ketraterm.ui.swing.render.PromptDividerLayout
 import io.github.ketraterm.ui.swing.settings.SwingMetrics
 import io.github.ketraterm.ui.swing.settings.SwingSettings
 import io.github.ketraterm.ui.swing.settings.SwingTerminalChrome
@@ -39,6 +42,73 @@ internal class SwingViewportController(
     private val onScroll: (renderMappingChanged: Boolean, scrollComplete: Boolean) -> Unit,
 ) {
     private val scrollModel = SwingScrollModel()
+    private val dividerLayout = PromptDividerLayout()
+    private var dividersEnabled = false
+    private var resizeAnchorRow = Long.MIN_VALUE
+    private var resizeAnchorLineId = 0L
+    val promptDividers: PromptDividerLayout? get() = if (dividersEnabled) dividerLayout else null
+
+    /** Reconciles presentation history without changing the terminal grid or copying cell content. */
+    fun updatePromptDividers(
+        reader: TerminalRenderFrameReader,
+        state: TerminalShellIntegrationView,
+        enabled: Boolean,
+        visibleRows: Int,
+        sourceHistorySize: Int,
+        sourceDiscardedCount: Long,
+        scrollOnOutput: Boolean,
+        retainedOutput: Boolean,
+    ) {
+        val oldLayout = promptDividers
+        val oldOffset = preciseOffset
+        val oldRenderOffset = requestedOffset
+        val oldLiveTop = oldLayout?.liveTop
+        val topSlot = if (oldLayout == null) 0.0 else oldLayout.liveOrigin - oldOffset
+        val anchorRow = oldLayout?.rowAt(topSlot)
+        val inRow = if (anchorRow == null) 0.0 else topSlot - oldLayout.rowBoundary(anchorRow)
+        dividersEnabled = enabled
+        if (enabled) {
+            dividerLayout.updateFrom(reader, state, visibleRows, retainedOutput, resizeAnchorLineId)
+            val outputAdvanced = oldLiveTop != null && dividerLayout.liveTop > oldLiveTop
+            scrollModel.clamp(dividerLayout.scrollRange, dividerLayout.visualDiscardedCount, scrollOnOutput && outputAdvanced)
+            if (oldOffset == 0.0 || scrollOnOutput && outputAdvanced) {
+                scrollModel.reanchor(0.0)
+            } else {
+                val row =
+                    when {
+                        dividerLayout.resolvedAnchorRow != Long.MIN_VALUE -> dividerLayout.resolvedAnchorRow
+                        resizeAnchorRow != Long.MIN_VALUE -> resizeAnchorRow
+                        anchorRow != null -> anchorRow
+                        else -> sourceDiscardedCount + sourceHistorySize - oldRenderOffset
+                    }
+                scrollModel.reanchor(dividerLayout.liveOrigin - dividerLayout.rowBoundary(row) - inRow)
+            }
+        } else if (oldLayout != null) {
+            val nativeHistory = (oldLayout.liveTop - oldLayout.discardedCount).toInt()
+            val presentationHistory =
+                if (retainedOutput) {
+                    (nativeHistory.toLong() + oldLayout.gridRows - visibleRows)
+                        .coerceIn(
+                            0,
+                            Int.MAX_VALUE.toLong(),
+                        ).toInt()
+                } else {
+                    nativeHistory
+                }
+            val offset =
+                if (oldOffset == 0.0 || anchorRow == null) {
+                    0
+                } else {
+                    (oldLayout.discardedCount + presentationHistory - anchorRow).coerceIn(0, presentationHistory.toLong()).toInt()
+                }
+            scrollModel.anchorAfterResize(offset, presentationHistory, oldLayout.discardedCount)
+            dividerLayout.reset()
+        }
+        resizeAnchorRow = Long.MIN_VALUE
+        resizeAnchorLineId = 0
+        if (!scrollModel.isAnimating) scrollTimer.stop()
+    }
+
     private val accumulator = ScrollDeltaAccumulator()
     private val scrollTimer =
         Timer(SCROLL_FRAME_DELAY_MILLIS) { advanceScroll(System.nanoTime()) }.apply {
@@ -62,7 +132,7 @@ internal class SwingViewportController(
     private var publishedCellHeightPixels = 1
 
     val requestedOffset: Int
-        get() = scrollModel.requestedOffset
+        get() = promptDividers?.renderOffset(preciseOffset) ?: scrollModel.requestedOffset
 
     val preciseOffset: Double
         get() = scrollModel.preciseScrollbackOffset
@@ -83,6 +153,10 @@ internal class SwingViewportController(
     fun reset() {
         cancelScroll()
         scrollModel.reset()
+        dividersEnabled = false
+        resizeAnchorRow = Long.MIN_VALUE
+        resizeAnchorLineId = 0
+        dividerLayout.reset()
     }
 
     /** Accumulates precise device input into whole-row animation destinations. */
@@ -233,7 +307,7 @@ internal class SwingViewportController(
         activeBuffer: TerminalRenderBufferKind = TerminalRenderBufferKind.PRIMARY,
     ): Int = maxOf(0, componentHeight - SwingTerminalChrome.verticalInset(settings, activeBuffer))
 
-    fun requestedRows(renderRows: Int): Int = scrollModel.requestedRows(renderRows)
+    fun requestedRows(renderRows: Int): Int = maxOf(scrollModel.requestedRows(renderRows), promptDividers?.gridRows ?: 0)
 
     fun scrollTo(
         offsetLines: Double,
@@ -248,6 +322,7 @@ internal class SwingViewportController(
         discardedCount: Long,
         scrollOnOutput: Boolean,
     ): Boolean {
+        if (dividersEnabled) return false
         val previousHistorySize = scrollModel.historySize
         val wasAnimating = scrollModel.isAnimating
         val changed = scrollModel.clamp(historySize, discardedCount, scrollOnOutput)
@@ -264,9 +339,15 @@ internal class SwingViewportController(
         newOffset: Int,
         newHistorySize: Int,
         newDiscardedCount: Long,
+        anchorLineId: Long = 0,
     ) {
         cancelScroll()
-        scrollModel.anchorAfterResize(newOffset, newHistorySize, newDiscardedCount)
+        if (dividersEnabled) {
+            resizeAnchorRow = newDiscardedCount + newHistorySize - newOffset
+            resizeAnchorLineId = anchorLineId
+        } else {
+            scrollModel.anchorAfterResize(newOffset, newHistorySize, newDiscardedCount)
+        }
     }
 
     /**
@@ -326,15 +407,15 @@ internal class SwingViewportController(
         viewportHeightPixels: Int,
         contentHeightPixels: Int,
     ) {
-        val requestedRows = scrollModel.requestedRows(renderRows)
+        val requestedRows = requestedRows(renderRows)
         val scrollbackOffset = scrollModel.preciseScrollbackOffset
-        val renderOffset = scrollModel.requestedOffset
+        val renderOffset = requestedOffset
         val visualScrollOffsetPixels = scrollModel.visualScrollOffsetPixels
         val visualScrollRangePixels = scrollModel.visualScrollRangePixels
         val cellHeightPixels = scrollModel.cellHeightPixels
 
         synchronized(viewportSnapshotLock) {
-            publishedHistorySize = historySize
+            publishedHistorySize = if (dividersEnabled) scrollModel.historySize else historySize
             publishedScrollbackOffset = scrollbackOffset
             publishedRenderOffset = renderOffset
             publishedVisibleRows = visibleRows

@@ -57,7 +57,7 @@ internal class TerminalCommandInteractionController(
 
         refreshCommandNavigationCache(boundSession)
         val targetAbsoluteRow = absoluteRowForLineId(host.searchCache, targetLineId)
-        return targetAbsoluteRow != NO_COMMAND_ABSOLUTE_ROW && scrollToAbsoluteRow(boundSession, targetAbsoluteRow)
+        return targetAbsoluteRow != NO_COMMAND_ABSOLUTE_ROW && host.scrollToAbsoluteRow(targetAbsoluteRow, center = false)
     }
 
     fun commandRecordAt(
@@ -94,7 +94,7 @@ internal class TerminalCommandInteractionController(
         if (endAbsoluteRow == NO_COMMAND_ABSOLUTE_ROW || endAbsoluteRow < startAbsoluteRow) return false
 
         host.selectAbsoluteRows(startAbsoluteRow, endAbsoluteRow, host.searchCache.columns)
-        scrollToAbsoluteRow(boundSession, startAbsoluteRow)
+        host.scrollToAbsoluteRow(startAbsoluteRow, center = false)
         host.repaint()
         return true
     }
@@ -114,7 +114,7 @@ internal class TerminalCommandInteractionController(
         if (endAbsoluteRow == NO_COMMAND_ABSOLUTE_ROW || endAbsoluteRow < startAbsoluteRow) return false
 
         host.selectAbsoluteRows(startAbsoluteRow, endAbsoluteRow, host.searchCache.columns)
-        scrollToAbsoluteRow(boundSession, startAbsoluteRow)
+        host.scrollToAbsoluteRow(startAbsoluteRow, center = false)
         host.repaint()
         return true
     }
@@ -150,20 +150,6 @@ internal class TerminalCommandInteractionController(
     }
 
     private fun currentCommandNavigationRow(): Int = host.commandNavigationAnchorRow()
-
-    private fun scrollToAbsoluteRow(
-        boundSession: TerminalSession,
-        row: Long,
-    ): Boolean {
-        val viewport =
-            if (boundSession.state.value is TerminalSessionState.Closed) host.renderCache else host.searchCache
-        val desiredOffset = viewport.discardedCount + viewport.historySize - row
-        return host.scrollViewportTo(
-            desiredOffset.coerceIn(0L, viewport.historySize.toLong()).toInt(),
-            viewport.historySize,
-            boundSession,
-        )
-    }
 
     private fun refreshCommandNavigationCache(boundSession: TerminalSession) {
         if (boundSession.state.value is TerminalSessionState.Closed) {

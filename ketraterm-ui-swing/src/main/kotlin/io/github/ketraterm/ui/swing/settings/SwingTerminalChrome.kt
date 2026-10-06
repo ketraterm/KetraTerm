@@ -80,7 +80,7 @@ internal object SwingTerminalChrome {
         settings: SwingSettings,
         activeBuffer: TerminalRenderBufferKind,
     ): Int =
-        if (activeBuffer == TerminalRenderBufferKind.ALTERNATE) {
+        if (activeBuffer == TerminalRenderBufferKind.ALTERNATE || settings.promptDecoration != SwingPromptDecoration.GUTTER) {
             0
         } else {
             settings.shellIntegrationDecorationGutterWidth

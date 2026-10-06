@@ -214,13 +214,7 @@ internal class TerminalSearchController(
         val currentHighlights = highlights ?: return
         val activeRow = currentHighlights.activeStartAbsoluteRow()
         if (activeRow == NO_ACTIVE_ROW) return
-        val centerRow = host.visibleGridRows() / 2
-        val desiredOffset = host.renderCache.discardedCount + host.renderCache.historySize + centerRow - activeRow
-        host.scrollViewportTo(
-            desiredOffset.coerceIn(0L, host.renderCache.historySize.toLong()).toInt(),
-            host.renderCache.historySize,
-            host.session ?: return,
-        )
+        host.scrollToAbsoluteRow(activeRow, center = true)
     }
 
     private companion object {
@@ -233,12 +227,10 @@ internal interface TerminalSearchHost {
     val session: TerminalSession?
     val renderCache: TerminalRenderCache
 
-    fun visibleGridRows(): Int
-
-    fun scrollViewportTo(
-        offsetRows: Int,
-        historySize: Int,
-        boundSession: TerminalSession,
+    /** Reveals a source row using the component's current presentation geometry. */
+    fun scrollToAbsoluteRow(
+        row: Long,
+        center: Boolean,
     ): Boolean
 
     fun repaint()

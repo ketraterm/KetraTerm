@@ -99,7 +99,8 @@ import java.util.*
  * terminal grid in pixels. By default, it preserves primary top/bottom padding
  * and splits the primary horizontal margin plus prompt gutter between both sides.
  * Explicit overrides remain supported. Like other constructor properties,
- * `copy` preserves this value unless a replacement is supplied.
+ * `copy` preserves explicit padding. Default padding is rebalanced when the prompt
+ * presentation mode changes, keeping default grid dimensions equal across buffers.
  * @property pasteControlPolicy paste payload transformation applied before
  * host-bound input emission.
  * @property cursorShape default cursor shape configured for the session.
@@ -135,6 +136,14 @@ public class SwingSettings private constructor(
     public val visualBellColor: Int = builder.visualBellColor
     public val visualBellDurationMillis: Int = builder.visualBellDurationMillis
     public val visualBellEdgeThicknessPixels: Int = builder.visualBellEdgeThicknessPixels
+
+    /**
+     * Presentation of known prompt boundaries on the primary screen. Defaults to gutter markers.
+     * Dividers reserve one cell height per prompt in the view without changing terminal rows.
+     * The alternate screen never displays prompt decorations.
+     */
+    public val promptDecoration: SwingPromptDecoration = builder.promptDecoration
+
     public val shellIntegrationPromptDotsVisible: Boolean = builder.shellIntegrationPromptDotsVisible
     public val shellIntegrationPromptDotColor: Int = builder.shellIntegrationPromptDotColor
     public val shellIntegrationFailedPromptDotColor: Int = builder.shellIntegrationFailedPromptDotColor
@@ -144,8 +153,12 @@ public class SwingSettings private constructor(
     public val shellIntegrationFailedCommandRailColor: Int = builder.shellIntegrationFailedCommandRailColor
     public val shellIntegrationFailedCommandRailWidth: Int = builder.shellIntegrationFailedCommandRailWidth
     public val padding: SwingPadding = builder.padding
+    private val automaticAlternateScreenPadding: Boolean = builder.usesAutomaticAlternatePadding
     public val alternateScreenPadding: SwingPadding =
-        builder.alternateScreenPadding ?: balancedAlternatePadding(builder.padding, builder.shellIntegrationDecorationGutterWidth)
+        builder.resolvedAlternatePadding ?: balancedAlternatePadding(
+            builder.padding,
+            if (builder.promptDecoration == SwingPromptDecoration.GUTTER) builder.shellIntegrationDecorationGutterWidth else 0,
+        )
     public val pasteControlPolicy: PasteControlPolicy = builder.pasteControlPolicy
     public val cursorShape: TerminalRenderCursorShape = builder.cursorShape
     public val lineHeight: Float = builder.lineHeight
@@ -201,8 +214,17 @@ public class SwingSettings private constructor(
 
     /** Mutable construction draft. Not thread-safe; [build] never retains this draft. */
     public class Builder internal constructor(
-        source: SwingSettings? = null,
+        private val source: SwingSettings? = null,
     ) {
+        internal val usesAutomaticAlternatePadding: Boolean
+            get() =
+                alternateScreenPadding == null ||
+                    source?.automaticAlternateScreenPadding == true &&
+                    alternateScreenPadding == source.alternateScreenPadding
+
+        internal val resolvedAlternatePadding: SwingPadding?
+            get() = if (usesAutomaticAlternatePadding && source?.promptDecoration != promptDecoration) null else alternateScreenPadding
+
         /** Draft value for [SwingSettings.font]; validated when [build] is called. */
         public var font: Font = source?.font ?: defaultTerminalFont()
 
@@ -257,7 +279,10 @@ public class SwingSettings private constructor(
         /** Draft value for [SwingSettings.visualBellEdgeThicknessPixels]; validated when [build] is called. */
         public var visualBellEdgeThicknessPixels: Int = source?.visualBellEdgeThicknessPixels ?: DEFAULT_VISUAL_BELL_EDGE_THICKNESS_PIXELS
 
-        /** Draft value for [SwingSettings.shellIntegrationPromptDotsVisible]; validated when [build] is called. */
+        /** Draft value for [SwingSettings.promptDecoration]. */
+        public var promptDecoration: SwingPromptDecoration = source?.promptDecoration ?: SwingPromptDecoration.GUTTER
+
+        /** Draft value for [SwingSettings.shellIntegrationPromptDotsVisible]. */
         public var shellIntegrationPromptDotsVisible: Boolean = source?.shellIntegrationPromptDotsVisible ?: true
 
         /** Draft value for [SwingSettings.shellIntegrationPromptDotColor]; validated when [build] is called. */
@@ -357,6 +382,7 @@ public class SwingSettings private constructor(
             visualBellColor == other.visualBellColor &&
             visualBellDurationMillis == other.visualBellDurationMillis &&
             visualBellEdgeThicknessPixels == other.visualBellEdgeThicknessPixels &&
+            promptDecoration == other.promptDecoration &&
             shellIntegrationPromptDotsVisible == other.shellIntegrationPromptDotsVisible &&
             shellIntegrationPromptDotColor == other.shellIntegrationPromptDotColor &&
             shellIntegrationFailedPromptDotColor == other.shellIntegrationFailedPromptDotColor &&
@@ -367,6 +393,7 @@ public class SwingSettings private constructor(
             shellIntegrationFailedCommandRailWidth == other.shellIntegrationFailedCommandRailWidth &&
             padding == other.padding &&
             alternateScreenPadding == other.alternateScreenPadding &&
+            automaticAlternateScreenPadding == other.automaticAlternateScreenPadding &&
             pasteControlPolicy == other.pasteControlPolicy &&
             cursorShape == other.cursorShape &&
             columnSpacing == other.columnSpacing &&
@@ -401,6 +428,7 @@ public class SwingSettings private constructor(
         result = 31 * result + visualBellColor.hashCode()
         result = 31 * result + visualBellDurationMillis.hashCode()
         result = 31 * result + visualBellEdgeThicknessPixels.hashCode()
+        result = 31 * result + promptDecoration.hashCode()
         result = 31 * result + shellIntegrationPromptDotsVisible.hashCode()
         result = 31 * result + shellIntegrationPromptDotColor.hashCode()
         result = 31 * result + shellIntegrationFailedPromptDotColor.hashCode()
@@ -411,6 +439,7 @@ public class SwingSettings private constructor(
         result = 31 * result + shellIntegrationFailedCommandRailWidth.hashCode()
         result = 31 * result + padding.hashCode()
         result = 31 * result + alternateScreenPadding.hashCode()
+        result = 31 * result + automaticAlternateScreenPadding.hashCode()
         result = 31 * result + pasteControlPolicy.hashCode()
         result = 31 * result + cursorShape.hashCode()
         result = 31 * result + columnSpacing

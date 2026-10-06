@@ -18,26 +18,26 @@ package io.github.ketraterm.ui.swing.api
 /**
  * Host-facing snapshot of the terminal viewport's scrollback position.
  *
- * The reusable Swing component uses terminal-native scrollback coordinates:
- * `0.0` means the live viewport, and larger values move farther back into
- * scrollback history. Hosts that use top-origin scrollbars can invert this
+ * `0.0` means the live viewport, and larger values move farther back into history.
+ * In gutter and undecorated modes each scroll slot is a terminal row. Divider mode
+ * counts both text rows and one-cell-high prompt bands in presentation coordinates. Hosts that use top-origin scrollbars can invert this
  * value in their adapter without changing terminal rendering policy.
  *
  * After session closure, zero identifies the bottom of the retained presentation.
  * The history size includes final grid rows hidden above a shorter component.
  * These presentation coordinates do not change the session's grid or history.
  *
- * @property historySize number of rows available above the live viewport.
+ * @property historySize number of presentation slots available above the live viewport.
  * @property scrollbackOffset precise visual offset from the live viewport.
  * Fractional values exist only during smooth animation between integer row
  * destinations; completed viewports are row-aligned.
  * @property renderOffset whole-row offset requested from the render cache.
- * This is the integer overscan anchor for [scrollbackOffset].
- * @property visibleRows number of terminal rows that fit in the component.
+ * This is a terminal-native source offset; prompt bands do not occupy source rows.
+ * @property visibleRows terminal grid capacity computed from component height and cell metrics, before prompt bands.
  * @property requestedRows number of rows requested from the render cache,
  * including smooth-scroll overscan when required.
  * @property visualScrollOffsetPixels precise pixel offset from the live bottom.
- * @property visualScrollRangePixels maximum row-native pixel offset from the
+ * @property visualScrollRangePixels maximum presentation pixel offset from the
  * live bottom.
  * @property viewportHeightPixels visual viewport height in pixels.
  * @property contentHeightPixels visual content height for the current render
@@ -91,9 +91,9 @@ public data class TerminalViewportState(
  */
 public fun interface TerminalViewportListener {
     /**
-     * Reports the latest terminal-native viewport coordinates.
+     * Reports the latest presentation viewport coordinates.
      *
-     * @param historySize rows available above the live viewport.
+     * @param historySize presentation slots available above the live viewport.
      * @param scrollbackOffset precise visual offset from live output;
      * fractional only while an integer-destination animation is in flight.
      * @param renderOffset whole-row render-cache offset.
