@@ -98,6 +98,7 @@ public class SwingTerminal
             hostServices: SwingHostServices = SwingHostServices(),
         ) : this(settingsProvider, hostServices, Dispatchers.Default)
 
+        private val chrome = SwingTerminalChrome()
         private var session: TerminalSession? = null
         private var retainedViewport: RetainedFrameViewport? = null
         private var disposed: Boolean = false
@@ -142,13 +143,13 @@ public class SwingTerminal
 
         private val visualGeometry = TerminalVisualViewportGeometry()
         private val suggestionAnchorBounds = Rectangle()
-        private val painter = GridPainter(hostServices.fontResolver, visualGeometry.bidiLayout)
+        private val painter = GridPainter(hostServices.fontResolver, visualGeometry.bidiLayout, chrome)
         private val visualBellController =
             TerminalVisualBellController {
                 repaint()
             }
         private val viewportController =
-            SwingViewportController(hostServices.viewportListener) { renderMappingChanged, scrollComplete ->
+            SwingViewportController(hostServices.viewportListener, chrome) { renderMappingChanged, scrollComplete ->
                 handleViewportScrollOnEdt(renderMappingChanged, scrollComplete)
             }
         private val renderCache =
@@ -159,7 +160,7 @@ public class SwingTerminal
             )
         private val searchCache = TerminalRenderCache(settings.columns, settings.rows)
         private val shellIntegrationDecorations = TerminalShellIntegrationViewportDecorations()
-        private val scrollbarOverlay = TerminalScrollbarOverlay()
+        private val scrollbarOverlay = TerminalScrollbarOverlay(chrome)
         private var hoveredPromptMarkerRow: Int = NO_PROMPT_MARKER_ROW
         private var hyperlinkCursor: Cursor = DEFAULT_CURSOR
         private val terminalMouseListener =
@@ -370,9 +371,9 @@ public class SwingTerminal
                         }
                         action.mouseEntered(
                             this@SwingTerminal,
-                            SwingTerminalChrome.left(settings, renderCache.activeBuffer) + first * metrics.cellWidth,
+                            chrome.left(settings, renderCache.activeBuffer) + first * metrics.cellWidth,
                             floor(
-                                SwingTerminalChrome.top(settings, renderCache.activeBuffer) + visualGeometry.contentOriginY +
+                                chrome.top(settings, renderCache.activeBuffer) + visualGeometry.contentOriginY +
                                     visualGeometry.rowTop(row),
                             ).toInt(),
                             (last - first) * metrics.cellWidth,
@@ -537,6 +538,7 @@ public class SwingTerminal
                         selectionController.handleSelectionMouseDragged(event)
                     }
                 },
+                chrome,
             )
         private val renderFrameController =
             SwingRenderFrameController(
@@ -593,6 +595,7 @@ public class SwingTerminal
                         this@SwingTerminal.repaint(x, y, width, height)
                     }
                 },
+                chrome,
             )
         internal val cursorTimer =
             Timer(cursorTimerDelay(settings)) {
@@ -659,13 +662,13 @@ public class SwingTerminal
             x: Int,
             y: Int,
         ): Int {
-            val paddingLeft = SwingTerminalChrome.left(settings, renderCache.activeBuffer)
+            val paddingLeft = chrome.left(settings, renderCache.activeBuffer)
             if (settings.promptDecoration == SwingPromptDecoration.DIVIDER) {
-                val right = width - SwingTerminalChrome.right(settings, renderCache.activeBuffer)
+                val right = width - chrome.right(settings, renderCache.activeBuffer)
                 if (x !in paddingLeft until right) return NO_PROMPT_MARKER_ROW
-                return visualGeometry.dividerRowAtComponentY(y, SwingTerminalChrome.top(settings, renderCache.activeBuffer))
+                return visualGeometry.dividerRowAtComponentY(y, chrome.top(settings, renderCache.activeBuffer))
             }
-            val gutterWidth = SwingTerminalChrome.promptDecorationGutterWidth(settings, renderCache.activeBuffer)
+            val gutterWidth = chrome.promptDecorationGutterWidth(settings, renderCache.activeBuffer)
             if (gutterWidth <= 0 || x !in (paddingLeft - gutterWidth) until paddingLeft) {
                 return NO_PROMPT_MARKER_ROW
             }
@@ -1079,12 +1082,12 @@ public class SwingTerminal
 
             val preferred = popup.preferredSize
             val activeBuffer = renderCache.activeBuffer
-            val paddingLeft = SwingTerminalChrome.left(settings, activeBuffer)
-            val paddingRight = SwingTerminalChrome.right(settings, activeBuffer)
-            val paddingTop = SwingTerminalChrome.top(settings, activeBuffer)
+            val paddingLeft = chrome.left(settings, activeBuffer)
+            val paddingRight = chrome.right(settings, activeBuffer)
+            val paddingTop = chrome.top(settings, activeBuffer)
             val availableWidth = width - paddingLeft - paddingRight
             val popupWidth = minOf(availableWidth, preferred.width).coerceAtLeast(0)
-            val paddingBottom = SwingTerminalChrome.bottom(settings, activeBuffer)
+            val paddingBottom = chrome.bottom(settings, activeBuffer)
             val availableHeight = (height - paddingTop - paddingBottom).coerceAtLeast(0)
             if (popupWidth == 0 || availableHeight == 0 || preferred.height <= 0) {
                 popup.setBounds(0, 0, 0, 0)
@@ -1193,6 +1196,7 @@ public class SwingTerminal
                 bindingJob?.cancel(CancellationException("Terminal session binding replaced"))
                 mouseController.resetInput()
                 this.session = session
+                chrome.promptDecorationsAvailable = session.shellIntegrationState.recordCount() > 0
                 retainedViewport = null
                 resetRenderCaches()
                 updateMinimizedStateFromAncestor()
@@ -1235,8 +1239,13 @@ public class SwingTerminal
                             .takeWhile { it !is TerminalSessionState.Closed }
                             .collect {
                                 // Host metadata can be published inside a borrowed frame callback.
-                                // Defer divider source reads until that callback has released its frame.
-                                if (settings.promptDecoration == SwingPromptDecoration.DIVIDER) yield()
+                                // Defer source reads or gutter-triggered resize until the borrowed frame is released.
+                                if (settings.promptDecoration == SwingPromptDecoration.DIVIDER ||
+                                    !chrome.promptDecorationsAvailable &&
+                                    session.shellIntegrationState.recordCount() > 0
+                                ) {
+                                    yield()
+                                }
                                 if (this@SwingTerminal.session !== session || session.isClosed || !renderCache.hasFrame) return@collect
                                 if (refreshShellIntegrationDecorations(session)) {
                                     if (hoveredPromptMarkerRow != NO_PROMPT_MARKER_ROW &&
@@ -1279,6 +1288,7 @@ public class SwingTerminal
                     { cancelAndHideShellSuggestionsOnEdt("Terminal session unbound") },
                     {
                         session = null
+                        chrome.promptDecorationsAvailable = true
                         retainedViewport = null
                         resetRenderCaches()
                     },
@@ -1551,16 +1561,17 @@ public class SwingTerminal
                 destination.setBounds(0, 0, 0, 0)
                 return false
             }
+            updateChromeLayout()
             val buffer = renderCache.activeBuffer
             return visualGeometry.copyCellBounds(
                 renderCache,
                 metrics,
                 column,
                 row,
-                SwingTerminalChrome.left(settings, buffer),
-                SwingTerminalChrome.top(settings, buffer),
-                width - SwingTerminalChrome.right(settings, buffer),
-                height - SwingTerminalChrome.bottom(settings, buffer),
+                chrome.left(settings, buffer),
+                chrome.top(settings, buffer),
+                width - chrome.right(settings, buffer),
+                height - chrome.bottom(settings, buffer),
                 destination,
             )
         }
@@ -2263,8 +2274,9 @@ public class SwingTerminal
             y: Int,
             cache: TerminalRenderCache,
         ): Long {
-            val paddingLeft = SwingTerminalChrome.left(settings, cache.activeBuffer)
-            val paddingTop = SwingTerminalChrome.top(settings, cache.activeBuffer)
+            updateChromeLayout()
+            val paddingLeft = chrome.left(settings, cache.activeBuffer)
+            val paddingTop = chrome.top(settings, cache.activeBuffer)
             val column = ((x - paddingLeft) / metrics.cellWidth).coerceIn(0, cache.columns - 1)
             val row =
                 if (cache === renderCache && visualGeometry.rowCount == cache.rows) {
@@ -2286,8 +2298,8 @@ public class SwingTerminal
             val lastRow = endRow.coerceAtMost(renderCache.rows - 1)
             if (firstRow > lastRow) return
 
-            val paddingLeft = SwingTerminalChrome.left(settings, renderCache.activeBuffer)
-            val paddingTop = SwingTerminalChrome.top(settings, renderCache.activeBuffer)
+            val paddingLeft = chrome.left(settings, renderCache.activeBuffer)
+            val paddingTop = chrome.top(settings, renderCache.activeBuffer)
             val contentOriginY = if (visualGeometry.rowCount == renderCache.rows) visualGeometry.contentOriginY else 0.0
             var row = firstRow
             while (row <= lastRow) {
@@ -2317,7 +2329,7 @@ public class SwingTerminal
             y: Int,
             cache: TerminalRenderCache,
         ): Int {
-            val paddingTop = SwingTerminalChrome.top(settings, cache.activeBuffer)
+            val paddingTop = chrome.top(settings, cache.activeBuffer)
             if (cache === renderCache && visualGeometry.rowCount == cache.rows) {
                 return visualGeometry.terminalPixelYAtComponentY(y, paddingTop)
             }
@@ -2514,8 +2526,8 @@ public class SwingTerminal
             activeBuffer: TerminalRenderBufferKind = TerminalRenderBufferKind.PRIMARY,
         ): Dimension =
             Dimension(
-                gridPixelExtent(columns, metrics.cellWidth, SwingTerminalChrome.horizontalInset(settings, activeBuffer)),
-                gridPixelExtent(rows, metrics.cellHeight, SwingTerminalChrome.verticalInset(settings, activeBuffer)),
+                gridPixelExtent(columns, metrics.cellWidth, chrome.horizontalInset(settings, activeBuffer)),
+                gridPixelExtent(rows, metrics.cellHeight, chrome.verticalInset(settings, activeBuffer)),
             )
 
         private fun resizeSessionToVisibleGridOnEdt(publishWhenUnchanged: Boolean = true): Boolean {
@@ -2677,8 +2689,42 @@ public class SwingTerminal
 
         private fun refreshShellIntegrationDecorations(session: TerminalSession): Boolean {
             val decorationsChanged = shellIntegrationDecorations.updateFrom(session.shellIntegrationState, renderCache)
+            val gutterActivated =
+                !chrome.promptDecorationsAvailable && session.shellIntegrationState.recordCount() > 0 && canActivatePromptGutter()
+            if (gutterActivated) {
+                viewportController.finishScroll()
+                chrome.promptDecorationsAvailable = true
+                if (settings.promptDecoration == SwingPromptDecoration.GUTTER) {
+                    resizeSessionToVisibleGridOnEdt()
+                    preferredSize = preferredGridSize(settings.columns, settings.rows)
+                    revalidate()
+                    clearPointerHover()
+                    requestRenderFromSession(session)
+                }
+            }
             val projectionChanged = updatePromptDividers(session)
-            return decorationsChanged or projectionChanged or updateVisualViewportGeometry()
+            return gutterActivated or decorationsChanged or projectionChanged or updateVisualViewportGeometry()
+        }
+
+        private fun canActivatePromptGutter(): Boolean {
+            if (settings.promptDecoration != SwingPromptDecoration.GUTTER ||
+                renderCache.activeBuffer == TerminalRenderBufferKind.ALTERNATE
+            ) {
+                return true
+            }
+            val firstAbsoluteRow = renderCache.discardedCount + renderCache.historySize - renderCache.scrollbackOffset
+            var row = 0
+            while (row < renderCache.rows) {
+                // A prompt-start marker can precede its text. Resizing now would discard
+                // the untouched row's identity before the prompt becomes durable output.
+                if (shellIntegrationDecorations.hasPromptStartAt(row) &&
+                    firstAbsoluteRow + row >= renderCache.outputEndAbsoluteRow
+                ) {
+                    return false
+                }
+                row++
+            }
+            return true
         }
 
         private fun updatePromptDividers(session: TerminalSession): Boolean {
@@ -2703,6 +2749,7 @@ public class SwingTerminal
         }
 
         private fun updateVisualViewportGeometry(): Boolean {
+            val chromeChanged = updateChromeLayout()
             val viewportPixelHeight = viewportController.viewportPixelHeight(settings, height, renderCache.activeBuffer)
             val layoutChanged =
                 visualGeometry.updateLayout(
@@ -2729,8 +2776,11 @@ public class SwingTerminal
                     ),
                 )
             refreshHyperlinkHover()
-            return layoutChanged or originChanged
+            return chromeChanged or layoutChanged or originChanged
         }
+
+        private fun updateChromeLayout(): Boolean =
+            chrome.updateLayout(settings, metrics, width, height, renderCache.columns, renderCache.rows)
 
         private fun gridPixelExtent(
             cells: Int,
@@ -2747,8 +2797,8 @@ public class SwingTerminal
             val metricsSource: FontMetrics = getFontMetrics(settings.font)
             val result = SwingMetrics.from(metricsSource, settings.lineHeight, settings.columnSpacing)
             for (buffer in TerminalRenderBufferKind.entries) {
-                gridPixelExtent(settings.columns, result.cellWidth, SwingTerminalChrome.horizontalInset(settings, buffer))
-                gridPixelExtent(settings.rows, result.cellHeight, SwingTerminalChrome.verticalInset(settings, buffer))
+                gridPixelExtent(settings.columns, result.cellWidth, chrome.horizontalInset(settings, buffer))
+                gridPixelExtent(settings.rows, result.cellHeight, chrome.verticalInset(settings, buffer))
             }
             return result
         }

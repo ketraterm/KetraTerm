@@ -29,7 +29,9 @@ import kotlin.math.roundToInt
 /**
  * EDT-owned overlay scrollbar painted inside the terminal's reserved right inset.
  */
-internal class TerminalScrollbarOverlay {
+internal class TerminalScrollbarOverlay(
+    private val chrome: SwingTerminalChrome = SwingTerminalChrome(),
+) {
     var retainedOutput: Boolean = false
     private val thumb = Rectangle()
     private var foregroundRgb = -1
@@ -168,10 +170,10 @@ internal class TerminalScrollbarOverlay {
         x: Int,
         y: Int,
     ): Boolean {
-        val rightInset = SwingTerminalChrome.right(settings, activeBuffer)
+        val rightInset = chrome.right(settings, activeBuffer)
         if (rightInset <= 0 || componentWidth <= 0) return false
-        val top = SwingTerminalChrome.top(settings, activeBuffer)
-        val bottom = componentHeight - SwingTerminalChrome.bottom(settings, activeBuffer)
+        val top = chrome.top(settings, activeBuffer)
+        val bottom = componentHeight - chrome.bottom(settings, activeBuffer)
         return x in (componentWidth - rightInset) until componentWidth && y in top until bottom
     }
 
@@ -216,9 +218,9 @@ internal class TerminalScrollbarOverlay {
         ) {
             return false
         }
-        val rightInset = SwingTerminalChrome.right(settings, activeBuffer)
-        val trackTop = SwingTerminalChrome.top(settings, activeBuffer)
-        val trackHeight = componentHeight - trackTop - SwingTerminalChrome.bottom(settings, activeBuffer)
+        val rightInset = chrome.right(settings, activeBuffer)
+        val trackTop = chrome.top(settings, activeBuffer)
+        val trackHeight = componentHeight - trackTop - chrome.bottom(settings, activeBuffer)
         if (rightInset <= 0 || trackHeight <= 0) return false
         val thumbWidth = minOf(rightInset, MAX_THUMB_WIDTH, maxOf(MIN_THUMB_WIDTH, rightInset - THUMB_HORIZONTAL_PADDING * 2))
         val thumbHeight = thumbHeight(trackHeight, visualScrollRangePixels, viewportHeightPixels)
@@ -245,12 +247,12 @@ internal class TerminalScrollbarOverlay {
         if (activeBuffer == TerminalRenderBufferKind.ALTERNATE &&
             !retainedOutput ||
             state.historySize <= 0 ||
-            SwingTerminalChrome.right(settings, activeBuffer) <= 0
+            chrome.right(settings, activeBuffer) <= 0
         ) {
             return 0
         }
-        val trackTop = SwingTerminalChrome.top(settings, activeBuffer)
-        val trackHeight = componentHeight - trackTop - SwingTerminalChrome.bottom(settings, activeBuffer)
+        val trackTop = chrome.top(settings, activeBuffer)
+        val trackHeight = componentHeight - trackTop - chrome.bottom(settings, activeBuffer)
         val thumbHeight = thumbHeight(trackHeight, state.visualScrollRangePixels, state.viewportHeightPixels)
         if (thumbHeight == 0) return 0
         val travel = trackHeight - thumbHeight

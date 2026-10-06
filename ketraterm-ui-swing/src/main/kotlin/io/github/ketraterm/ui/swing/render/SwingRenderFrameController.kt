@@ -25,6 +25,7 @@ import java.awt.Insets
  */
 internal class SwingRenderFrameController(
     private val host: SwingRenderFrameHost,
+    private val chrome: SwingTerminalChrome = SwingTerminalChrome(),
 ) {
     private val repaintPlanner = SwingRepaintPlanner()
     private val repaintPaddingScratch = Insets(0, 0, 0, 0)
@@ -121,14 +122,14 @@ internal class SwingRenderFrameController(
     private fun repaintPadding(): Insets {
         val settings = host.settings
         val activeBuffer = host.renderCache.activeBuffer
-        repaintPaddingScratch.top = SwingTerminalChrome.top(settings, activeBuffer)
+        repaintPaddingScratch.top = chrome.top(settings, activeBuffer)
         repaintPaddingScratch.left =
-            SwingTerminalChrome.left(
+            chrome.left(
                 settings,
                 activeBuffer,
             )
-        repaintPaddingScratch.bottom = SwingTerminalChrome.bottom(settings, activeBuffer)
-        repaintPaddingScratch.right = SwingTerminalChrome.right(settings, activeBuffer)
+        repaintPaddingScratch.bottom = chrome.bottom(settings, activeBuffer)
+        repaintPaddingScratch.right = chrome.right(settings, activeBuffer)
         return repaintPaddingScratch
     }
 }

@@ -94,13 +94,14 @@ class SwingTerminalCommandNavigationTest {
                 fixture.moveToPromptGutter()
 
                 assertEquals(Cursor.HAND_CURSOR, fixture.component.cursor.type)
-                assertEquals(generation, fixture.session.renderGeneration.value)
+                val activatedGeneration = fixture.session.renderGeneration.value
+                assertTrue(activatedGeneration > generation)
 
                 state.clear()
                 fixture.flush()
 
                 assertEquals(Cursor.DEFAULT_CURSOR, fixture.component.cursor.type)
-                assertEquals(generation, fixture.session.renderGeneration.value)
+                assertEquals(activatedGeneration, fixture.session.renderGeneration.value)
             }
         }
     }
@@ -110,8 +111,9 @@ class SwingTerminalCommandNavigationTest {
         SwingUtilities.invokeAndWait {
             HostModelFixture().use { fixture ->
                 val state = fixture.shellState
-                val generation = fixture.session.renderGeneration.value
                 state.recordPromptStart(lineIdForAbsoluteRow(5))
+                fixture.flush()
+                val generation = fixture.session.renderGeneration.value
                 state.recordPromptEnd(lineIdForAbsoluteRow(5))
                 state.recordCommandStart(lineIdForAbsoluteRow(6), true, "host command")
                 state.recordCommandFinished(lineIdForAbsoluteRow(7), 2)

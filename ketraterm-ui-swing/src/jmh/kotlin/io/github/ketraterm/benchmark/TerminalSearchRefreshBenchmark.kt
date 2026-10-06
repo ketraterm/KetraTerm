@@ -142,14 +142,12 @@ open class TerminalSearchRefreshBenchmark {
     ) : TerminalSearchHost {
         override val renderCache = TerminalRenderCache(columns, 1)
 
-        override fun visibleGridRows(): Int = 1
-
-        override fun scrollViewportTo(
-            offsetRows: Int,
-            historySize: Int,
-            boundSession: TerminalSession,
+        override fun scrollToAbsoluteRow(
+            row: Long,
+            center: Boolean,
         ): Boolean {
-            renderCache.updateFrom(boundSession, scrollbackOffset = offsetRows, viewportRows = 1)
+            val offset = (renderCache.discardedCount + renderCache.historySize - row).coerceIn(0, renderCache.historySize.toLong()).toInt()
+            renderCache.updateFrom(session, scrollbackOffset = offset, viewportRows = 1)
             return true
         }
 

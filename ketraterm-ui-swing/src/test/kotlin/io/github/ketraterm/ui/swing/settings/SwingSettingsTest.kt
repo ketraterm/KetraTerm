@@ -29,6 +29,8 @@ import javax.swing.SwingUtilities
 import kotlin.test.*
 
 class SwingSettingsTest {
+    private val chrome = SwingTerminalChrome()
+
     @Test
     fun `prompt modes copy independently and remove reserved gutter space`() {
         val initial = SwingSettings()
@@ -39,12 +41,61 @@ class SwingSettingsTest {
             assertEquals(settings, settings.copy {})
             assertEquals(settings.hashCode(), settings.copy {}.hashCode())
             assertNotEquals(initial, settings)
-            assertEquals(0, SwingTerminalChrome.promptDecorationGutterWidth(settings, TerminalRenderBufferKind.PRIMARY))
+            assertEquals(0, chrome.promptDecorationGutterWidth(settings, TerminalRenderBufferKind.PRIMARY))
             assertEquals(
-                SwingTerminalChrome.horizontalInset(settings, TerminalRenderBufferKind.PRIMARY),
-                SwingTerminalChrome.horizontalInset(settings, TerminalRenderBufferKind.ALTERNATE),
+                chrome.horizontalInset(settings, TerminalRenderBufferKind.PRIMARY),
+                chrome.horizontalInset(settings, TerminalRenderBufferKind.ALTERNATE),
             )
         }
+    }
+
+    @Test
+    fun `unavailable gutter removes automatic alternate margin and preserves explicit padding`() {
+        val unavailableChrome = SwingTerminalChrome().apply { promptDecorationsAvailable = false }
+        val automatic = SwingSettings.create { it.padding = SwingPadding(2, 4, 3, 6) }
+        assertEquals(4, unavailableChrome.left(automatic, TerminalRenderBufferKind.PRIMARY))
+        assertEquals(0, unavailableChrome.promptDecorationGutterWidth(automatic, TerminalRenderBufferKind.PRIMARY))
+        assertEquals(10, unavailableChrome.horizontalInset(automatic, TerminalRenderBufferKind.ALTERNATE))
+        val explicit = automatic.copy { it.alternateScreenPadding = SwingPadding(1, 8, 2, 12) }
+        assertEquals(8, unavailableChrome.left(explicit, TerminalRenderBufferKind.ALTERNATE))
+        assertEquals(12, unavailableChrome.right(explicit, TerminalRenderBufferKind.ALTERNATE))
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = [false, true])
+    fun `alternate grid centering uses actual cells without changing resize insets`(metadataAvailable: Boolean) {
+        val chrome = SwingTerminalChrome().apply { promptDecorationsAvailable = metadataAvailable }
+        val settings = SwingSettings.create { it.padding = SwingPadding(2, 4, 3, 6) }
+        val metrics = SwingMetrics(8, 16, 12, 13, 8, 0, 1)
+        val horizontalInset = chrome.horizontalInset(settings, TerminalRenderBufferKind.ALTERNATE)
+        assertTrue(chrome.updateLayout(settings, metrics, 107, 73, 10, 3))
+        assertEquals(13, chrome.left(settings, TerminalRenderBufferKind.ALTERNATE))
+        assertEquals(14, chrome.right(settings, TerminalRenderBufferKind.ALTERNATE))
+        assertEquals(12, chrome.top(settings, TerminalRenderBufferKind.ALTERNATE))
+        assertEquals(13, chrome.bottom(settings, TerminalRenderBufferKind.ALTERNATE))
+        assertEquals(horizontalInset, chrome.horizontalInset(settings, TerminalRenderBufferKind.ALTERNATE))
+        assertEquals(5, chrome.verticalInset(settings, TerminalRenderBufferKind.ALTERNATE))
+        assertFalse(chrome.updateLayout(settings, metrics, 107, 73, 10, 3))
+        assertEquals(4 + if (metadataAvailable) 16 else 0, chrome.left(settings, TerminalRenderBufferKind.PRIMARY))
+        assertEquals(2, chrome.top(settings, TerminalRenderBufferKind.PRIMARY))
+    }
+
+    @Test
+    fun `explicit alternate padding and oversized grids retain bounded clipping margins`() {
+        val chrome = SwingTerminalChrome().apply { promptDecorationsAvailable = false }
+        val metrics = SwingMetrics(8, 16, 12, 13, 8, 0, 1)
+        val automatic = SwingSettings.create { it.padding = SwingPadding(2, 4, 3, 6) }
+        chrome.updateLayout(automatic, metrics, 1, 1, Int.MAX_VALUE, Int.MAX_VALUE)
+        assertEquals(5, chrome.left(automatic, TerminalRenderBufferKind.ALTERNATE))
+        assertEquals(5, chrome.right(automatic, TerminalRenderBufferKind.ALTERNATE))
+        assertEquals(2, chrome.top(automatic, TerminalRenderBufferKind.ALTERNATE))
+        assertEquals(3, chrome.bottom(automatic, TerminalRenderBufferKind.ALTERNATE))
+        val explicit = automatic.copy { it.alternateScreenPadding = SwingPadding(1, 8, 2, 12) }
+        chrome.updateLayout(explicit, metrics, 300, 200, 10, 3)
+        assertEquals(8, chrome.left(explicit, TerminalRenderBufferKind.ALTERNATE))
+        assertEquals(12, chrome.right(explicit, TerminalRenderBufferKind.ALTERNATE))
+        assertEquals(1, chrome.top(explicit, TerminalRenderBufferKind.ALTERNATE))
+        assertEquals(2, chrome.bottom(explicit, TerminalRenderBufferKind.ALTERNATE))
     }
 
     @Test
@@ -219,10 +270,10 @@ class SwingSettingsTest {
 
         assertFalse(cache.update(settings.font, settings.fallbackFonts, settings.useSystemFallbackFonts))
         assertSame(missingGlyphFont, cache.fontForCodePoint(0x10FFFF, Font.PLAIN))
-        assertEquals(26, SwingTerminalChrome.horizontalInset(settings, TerminalRenderBufferKind.PRIMARY))
-        assertEquals(4, SwingTerminalChrome.verticalInset(settings, TerminalRenderBufferKind.PRIMARY))
-        assertEquals(26, SwingTerminalChrome.horizontalInset(settings, TerminalRenderBufferKind.ALTERNATE))
-        assertEquals(4, SwingTerminalChrome.verticalInset(settings, TerminalRenderBufferKind.ALTERNATE))
+        assertEquals(26, chrome.horizontalInset(settings, TerminalRenderBufferKind.PRIMARY))
+        assertEquals(4, chrome.verticalInset(settings, TerminalRenderBufferKind.PRIMARY))
+        assertEquals(26, chrome.horizontalInset(settings, TerminalRenderBufferKind.ALTERNATE))
+        assertEquals(4, chrome.verticalInset(settings, TerminalRenderBufferKind.ALTERNATE))
     }
 
     @Test
@@ -458,15 +509,15 @@ class SwingSettingsTest {
     fun alternateScreenChromeUsesExplicitAlternatePadding() {
         val settings = SwingSettings()
 
-        assertEquals(20, SwingTerminalChrome.left(settings, TerminalRenderBufferKind.PRIMARY))
-        assertEquals(6, SwingTerminalChrome.right(settings, TerminalRenderBufferKind.PRIMARY))
-        assertEquals(13, SwingTerminalChrome.left(settings, TerminalRenderBufferKind.ALTERNATE))
-        assertEquals(13, SwingTerminalChrome.right(settings, TerminalRenderBufferKind.ALTERNATE))
-        assertEquals(26, SwingTerminalChrome.horizontalInset(settings, TerminalRenderBufferKind.PRIMARY))
-        assertEquals(26, SwingTerminalChrome.horizontalInset(settings, TerminalRenderBufferKind.ALTERNATE))
-        assertEquals(4, SwingTerminalChrome.verticalInset(settings, TerminalRenderBufferKind.ALTERNATE))
-        assertEquals(16, SwingTerminalChrome.promptDecorationGutterWidth(settings, TerminalRenderBufferKind.PRIMARY))
-        assertEquals(0, SwingTerminalChrome.promptDecorationGutterWidth(settings, TerminalRenderBufferKind.ALTERNATE))
+        assertEquals(20, chrome.left(settings, TerminalRenderBufferKind.PRIMARY))
+        assertEquals(6, chrome.right(settings, TerminalRenderBufferKind.PRIMARY))
+        assertEquals(13, chrome.left(settings, TerminalRenderBufferKind.ALTERNATE))
+        assertEquals(13, chrome.right(settings, TerminalRenderBufferKind.ALTERNATE))
+        assertEquals(26, chrome.horizontalInset(settings, TerminalRenderBufferKind.PRIMARY))
+        assertEquals(26, chrome.horizontalInset(settings, TerminalRenderBufferKind.ALTERNATE))
+        assertEquals(4, chrome.verticalInset(settings, TerminalRenderBufferKind.ALTERNATE))
+        assertEquals(16, chrome.promptDecorationGutterWidth(settings, TerminalRenderBufferKind.PRIMARY))
+        assertEquals(0, chrome.promptDecorationGutterWidth(settings, TerminalRenderBufferKind.ALTERNATE))
         assertEquals(true, settings.shellSuggestionsEnabled)
     }
 
@@ -478,13 +529,13 @@ class SwingSettingsTest {
                 draft.alternateScreenPadding = SwingPadding(0, 3, 4, 5)
             }
 
-        assertEquals(56, SwingTerminalChrome.left(settings, TerminalRenderBufferKind.PRIMARY))
-        assertEquals(14, SwingTerminalChrome.right(settings, TerminalRenderBufferKind.PRIMARY))
-        assertEquals(3, SwingTerminalChrome.left(settings, TerminalRenderBufferKind.ALTERNATE))
-        assertEquals(5, SwingTerminalChrome.right(settings, TerminalRenderBufferKind.ALTERNATE))
-        assertEquals(70, SwingTerminalChrome.horizontalInset(settings, TerminalRenderBufferKind.PRIMARY))
-        assertEquals(8, SwingTerminalChrome.horizontalInset(settings, TerminalRenderBufferKind.ALTERNATE))
-        assertEquals(4, SwingTerminalChrome.verticalInset(settings, TerminalRenderBufferKind.ALTERNATE))
+        assertEquals(56, chrome.left(settings, TerminalRenderBufferKind.PRIMARY))
+        assertEquals(14, chrome.right(settings, TerminalRenderBufferKind.PRIMARY))
+        assertEquals(3, chrome.left(settings, TerminalRenderBufferKind.ALTERNATE))
+        assertEquals(5, chrome.right(settings, TerminalRenderBufferKind.ALTERNATE))
+        assertEquals(70, chrome.horizontalInset(settings, TerminalRenderBufferKind.PRIMARY))
+        assertEquals(8, chrome.horizontalInset(settings, TerminalRenderBufferKind.ALTERNATE))
+        assertEquals(4, chrome.verticalInset(settings, TerminalRenderBufferKind.ALTERNATE))
     }
 
     @Test

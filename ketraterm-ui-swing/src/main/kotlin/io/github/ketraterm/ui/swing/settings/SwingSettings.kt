@@ -95,10 +95,10 @@ import java.util.*
  * scrolling can enter through the top edge, leaves a small left margin before
  * the prompt gutter, reserves a stable right gutter for the overlay scrollbar,
  * and keeps a small bottom visual spacer.
- * @property alternateScreenPadding alternate-screen visual inset around the
- * terminal grid in pixels. By default, it preserves primary top/bottom padding
- * and splits the primary horizontal margin plus prompt gutter between both sides.
- * Explicit overrides remain supported. Like other constructor properties,
+ * @property alternateScreenPadding configured alternate-screen inset in pixels.
+ * Defaults preserve primary total margins for grid sizing. Rendering centers the
+ * installed grid in the remaining space, including spare pixels after cell rounding.
+ * Explicit overrides are used as exact insets. Like other constructor properties,
  * `copy` preserves explicit padding. Default padding is rebalanced when the prompt
  * presentation mode changes, keeping default grid dimensions equal across buffers.
  * @property pasteControlPolicy paste payload transformation applied before
@@ -153,12 +153,18 @@ public class SwingSettings private constructor(
     public val shellIntegrationFailedCommandRailColor: Int = builder.shellIntegrationFailedCommandRailColor
     public val shellIntegrationFailedCommandRailWidth: Int = builder.shellIntegrationFailedCommandRailWidth
     public val padding: SwingPadding = builder.padding
-    private val automaticAlternateScreenPadding: Boolean = builder.usesAutomaticAlternatePadding
+    internal val automaticAlternateScreenPadding: Boolean = builder.usesAutomaticAlternatePadding
     public val alternateScreenPadding: SwingPadding =
         builder.resolvedAlternatePadding ?: balancedAlternatePadding(
             builder.padding,
             if (builder.promptDecoration == SwingPromptDecoration.GUTTER) builder.shellIntegrationDecorationGutterWidth else 0,
         )
+    private val alternateScreenPaddingWithoutPromptGutter: SwingPadding =
+        if (automaticAlternateScreenPadding) balancedAlternatePadding(padding, 0) else alternateScreenPadding
+
+    internal fun alternateScreenPaddingForPromptGutter(available: Boolean): SwingPadding =
+        if (available) alternateScreenPadding else alternateScreenPaddingWithoutPromptGutter
+
     public val pasteControlPolicy: PasteControlPolicy = builder.pasteControlPolicy
     public val cursorShape: TerminalRenderCursorShape = builder.cursorShape
     public val lineHeight: Float = builder.lineHeight

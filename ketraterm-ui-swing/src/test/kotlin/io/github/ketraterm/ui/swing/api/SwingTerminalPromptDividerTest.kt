@@ -29,6 +29,8 @@ import io.github.ketraterm.ui.swing.settings.TerminalClipboardHandler
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.StandardTestDispatcher
 import org.junit.jupiter.api.Test
+import org.junit.jupiter.params.ParameterizedTest
+import org.junit.jupiter.params.provider.ValueSource
 import java.awt.Rectangle
 import java.awt.event.MouseEvent
 import java.awt.image.BufferedImage
@@ -198,6 +200,184 @@ class SwingTerminalPromptDividerTest {
             }
         }
 
+    @Test
+    fun `gutter mode reserves no space without shell command metadata on either screen`() =
+        edt {
+            Fixture(SwingPromptDecoration.GUTTER).use { f ->
+                val bounds = Rectangle()
+                assertTrue(f.component.copyCellBounds(0, 0, bounds))
+                assertEquals(0, bounds.x)
+                val columns = f.component.visibleGridSize().width
+                assertTrue(columns > 8)
+                val resizes = f.connector.resizes.toList()
+                f.feed("C:>")
+                f.state.recordCurrentWorkingDirectory("file:///C:/")
+                f.flush()
+                assertTrue(f.component.copyCellBounds(0, 0, bounds))
+                assertEquals(0, bounds.x)
+                val cellWidth = bounds.width
+                f.feed("\u001B[?1049hALT")
+                assertTrue(f.component.copyCellBounds(0, 0, bounds))
+                assertEquals((f.component.width - columns * cellWidth) / 2, bounds.x)
+                assertEquals(columns, f.component.visibleGridSize().width)
+                f.feed("\u001B[?1049l")
+                assertEquals(resizes, f.connector.resizes)
+            }
+        }
+
+    @Test
+    fun `late prompt metadata activates gutter once and clearing retains its width`() =
+        edt {
+            Fixture(SwingPromptDecoration.GUTTER).use { f ->
+                f.prompt(">one")
+                val bounds = Rectangle()
+                assertTrue(f.component.copyCellBounds(0, 0, bounds))
+                assertEquals(f.settings.shellIntegrationDecorationGutterWidth, bounds.x)
+                assertEquals(8, f.component.visibleGridSize().width)
+                assertEquals(f.state.latestCommandRecordId(), f.component.commandRecordAt(1, f.cellHeight / 2))
+                val image = BufferedImage(f.component.width, f.component.height, BufferedImage.TYPE_INT_ARGB)
+                val graphics = image.createGraphics()
+                try {
+                    f.component.paint(graphics)
+                } finally {
+                    graphics.dispose()
+                }
+                assertNotEquals(BLACK, image.getRGB(bounds.x / 2, f.cellHeight / 2))
+                val resizes = f.connector.resizes.toList()
+                f.state.clear()
+                f.flush()
+                assertTrue(f.component.copyCellBounds(0, 0, bounds))
+                assertEquals(f.settings.shellIntegrationDecorationGutterWidth, bounds.x)
+                assertEquals(resizes, f.connector.resizes)
+                f.settings = f.settings.copy { it.promptDecoration = SwingPromptDecoration.NONE }
+                f.component.reloadSettings()
+                f.flush()
+                assertTrue(f.component.copyCellBounds(0, 0, bounds))
+                assertEquals(0, bounds.x)
+                f.settings = f.settings.copy { it.promptDecoration = SwingPromptDecoration.GUTTER }
+                f.component.reloadSettings()
+                f.flush()
+                assertTrue(f.component.copyCellBounds(0, 0, bounds))
+                assertEquals(f.settings.shellIntegrationDecorationGutterWidth, bounds.x)
+            }
+        }
+
+    @ParameterizedTest
+    @ValueSource(booleans = [false, true])
+    fun `first prompt gutter survives metadata arriving before prompt text`(startupBanner: Boolean) =
+        edt {
+            Fixture(SwingPromptDecoration.GUTTER).use { f ->
+                if (startupBanner) f.feed("shell\r\n")
+                val row = if (startupBanner) 1 else 0
+                val resizes = f.connector.resizes.toList()
+                var promptLineId = 0L
+                f.session.readRenderFrame { frame ->
+                    promptLineId = frame.lineId(frame.cursor.row)
+                    f.state.recordPromptStart(promptLineId)
+                }
+                f.flush()
+                assertEquals(resizes, f.connector.resizes)
+                f.session.readRenderFrame { assertEquals(promptLineId, it.lineId(row)) }
+                f.feed(">first")
+                f.session.readRenderFrame { assertEquals(promptLineId, it.lineId(row)) }
+                val bounds = Rectangle()
+                assertTrue(f.component.copyCellBounds(0, row, bounds))
+                assertEquals(f.settings.shellIntegrationDecorationGutterWidth, bounds.x)
+                assertEquals(f.state.latestCommandRecordId(), f.component.commandRecordAt(1, bounds.y + f.cellHeight / 2))
+                val image = BufferedImage(f.component.width, f.component.height, BufferedImage.TYPE_INT_ARGB)
+                val graphics = image.createGraphics()
+                try {
+                    f.component.paint(graphics)
+                } finally {
+                    graphics.dispose()
+                }
+                assertNotEquals(BLACK, image.getRGB(bounds.x / 2, bounds.y + f.cellHeight / 2))
+            }
+        }
+
+    @Test
+    fun `rebinding resets gutter availability for a session without integration`() =
+        edt {
+            Fixture(SwingPromptDecoration.GUTTER).use { f ->
+                f.prompt(">one")
+                val worker = StandardTestDispatcher()
+                val replacement =
+                    TerminalSession.create(
+                        TerminalBuffers.create(8, 3),
+                        Connector(),
+                        workerDispatcher = worker,
+                        ioDispatcher = worker,
+                    )
+                try {
+                    replacement.start(8, 3)
+                    f.component.bind(replacement)
+                    worker.scheduler.runCurrent()
+                    f.flush()
+                    val bounds = Rectangle()
+                    assertTrue(f.component.copyCellBounds(0, 0, bounds))
+                    assertEquals(0, bounds.x)
+                    assertTrue(f.component.visibleGridSize().width > 8)
+                } finally {
+                    replacement.close()
+                    worker.scheduler.runCurrent()
+                    f.flush()
+                }
+            }
+        }
+
+    @ParameterizedTest
+    @ValueSource(booleans = [false, true])
+    fun `alternate screen centers the existing grid with shared paint and mouse offsets`(metadataAvailable: Boolean) =
+        edt {
+            Fixture(SwingPromptDecoration.GUTTER).use { f ->
+                if (metadataAvailable) f.prompt(">one")
+                f.component.setSize(f.component.width + 3, f.component.height + 7)
+                f.component.componentListeners.forEach {
+                    it.componentResized(java.awt.event.ComponentEvent(f.component, java.awt.event.ComponentEvent.COMPONENT_RESIZED))
+                }
+                f.flush()
+                var columns = 0
+                var rows = 0
+                f.session.readRenderFrame {
+                    columns = it.columns
+                    rows = it.rows
+                }
+                val resizes = f.connector.resizes.toList()
+                f.feed("\u001B[?1049h\u001B[41m \u001B[0m\u001B[?1000h\u001B[?1006h")
+                val first = Rectangle()
+                val last = Rectangle()
+                assertTrue(f.component.copyCellBounds(0, 0, first))
+                assertTrue(f.component.copyCellBounds(columns - 1, rows - 1, last))
+                assertEquals((f.component.width - columns * first.width) / 2, first.x)
+                assertEquals((f.component.height - rows * first.height) / 2, first.y)
+                assertTrue(kotlin.math.abs(first.x - (f.component.width - last.x - last.width)) <= 1)
+                assertTrue(kotlin.math.abs(first.y - (f.component.height - last.y - last.height)) <= 1)
+                f.session.readRenderFrame {
+                    assertEquals(columns, it.columns)
+                    assertEquals(rows, it.rows)
+                }
+                val image = BufferedImage(f.component.width, f.component.height, BufferedImage.TYPE_INT_ARGB)
+                val graphics = image.createGraphics()
+                try {
+                    f.component.paint(graphics)
+                } finally {
+                    graphics.dispose()
+                }
+                assertNotEquals(BLACK, image.getRGB(first.x + 1, first.y + 1))
+                assertEquals(BLACK, image.getRGB(0, 0))
+                f.connector.writes.clear()
+                f.mouse(MouseEvent.MOUSE_PRESSED, first.x + 1, first.y + 1)
+                f.mouse(MouseEvent.MOUSE_RELEASED, first.x + 1, first.y + 1)
+                f.flush()
+                assertEquals("\u001B[<0;1;1M\u001B[<0;1;1m", f.connector.writes.joinToString(""))
+                f.feed("\u001B[?1049l")
+                assertEquals(resizes, f.connector.resizes)
+                assertTrue(f.component.copyCellBounds(0, 0, first))
+                assertEquals(if (metadataAvailable) f.settings.shellIntegrationDecorationGutterWidth else 0, first.x)
+                assertEquals(0, first.y)
+            }
+        }
+
     private fun edt(block: () -> Unit) {
         SwingUtilities.invokeAndWait(block)
     }
@@ -249,7 +429,9 @@ class SwingTerminalPromptDividerTest {
             }
         }
 
-    private class Fixture : AutoCloseable {
+    private class Fixture(
+        mode: SwingPromptDecoration = SwingPromptDecoration.DIVIDER,
+    ) : AutoCloseable {
         private val worker = StandardTestDispatcher()
         private val dispatches = LinkedBlockingQueue<Runnable>()
         val state = TerminalShellIntegrationState()
@@ -265,7 +447,7 @@ class SwingTerminalPromptDividerTest {
         var settings =
             SwingSettings.create {
                 it.padding = SwingPadding(0, 0, 0, 0)
-                it.promptDecoration = SwingPromptDecoration.DIVIDER
+                it.promptDecoration = mode
                 it.cursorBlinkMillis = 0
                 it.useSystemFallbackFonts = false
                 it.palette = TerminalColorPalette(defaultForeground = WHITE, defaultBackground = BLACK)

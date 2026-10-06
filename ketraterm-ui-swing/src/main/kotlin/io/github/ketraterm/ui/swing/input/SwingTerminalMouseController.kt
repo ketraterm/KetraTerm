@@ -30,6 +30,7 @@ import kotlin.math.min
  */
 internal class SwingTerminalMouseController(
     private val host: SwingTerminalMouseHost,
+    private val chrome: SwingTerminalChrome = SwingTerminalChrome(),
 ) {
     private val alternateWheelAccumulator = ScrollDeltaAccumulator()
     private var wheelRoute = WheelRoute.NONE
@@ -282,7 +283,7 @@ internal class SwingTerminalMouseController(
         if (event.isMetaDown) mods = mods or TerminalModifiers.SUPER
 
         val paddingLeft =
-            SwingTerminalChrome.left(
+            chrome.left(
                 host.settings,
                 host.renderCache.activeBuffer,
             )

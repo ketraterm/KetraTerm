@@ -39,6 +39,7 @@ import javax.swing.Timer
  */
 internal class SwingViewportController(
     private val listener: TerminalViewportListener,
+    private val chrome: SwingTerminalChrome = SwingTerminalChrome(),
     private val onScroll: (renderMappingChanged: Boolean, scrollComplete: Boolean) -> Unit,
 ) {
     private val scrollModel = SwingScrollModel()
@@ -287,7 +288,7 @@ internal class SwingViewportController(
     ): Int =
         maxOf(
             1,
-            (componentHeight - SwingTerminalChrome.verticalInset(settings, activeBuffer)) / metrics.cellHeight,
+            (componentHeight - chrome.verticalInset(settings, activeBuffer)) / metrics.cellHeight,
         )
 
     fun visibleRenderRows(
@@ -296,7 +297,7 @@ internal class SwingViewportController(
         componentHeight: Int,
         activeBuffer: TerminalRenderBufferKind = TerminalRenderBufferKind.PRIMARY,
     ): Int {
-        val availableHeight = componentHeight - SwingTerminalChrome.verticalInset(settings, activeBuffer)
+        val availableHeight = componentHeight - chrome.verticalInset(settings, activeBuffer)
         if (availableHeight <= 0) return 1
         return ceilDiv(availableHeight, metrics.cellHeight)
     }
@@ -305,7 +306,7 @@ internal class SwingViewportController(
         settings: SwingSettings,
         componentHeight: Int,
         activeBuffer: TerminalRenderBufferKind = TerminalRenderBufferKind.PRIMARY,
-    ): Int = maxOf(0, componentHeight - SwingTerminalChrome.verticalInset(settings, activeBuffer))
+    ): Int = maxOf(0, componentHeight - chrome.verticalInset(settings, activeBuffer))
 
     fun requestedRows(renderRows: Int): Int = maxOf(scrollModel.requestedRows(renderRows), promptDividers?.gridRows ?: 0)
 
@@ -449,25 +450,25 @@ internal class SwingViewportController(
         listener.viewportStateChanged(viewportStateSnapshot())
     }
 
+    private fun visibleGridColumns(
+        settings: SwingSettings,
+        metrics: SwingMetrics,
+        componentWidth: Int,
+        activeBuffer: TerminalRenderBufferKind,
+    ): Int =
+        maxOf(
+            1,
+            (
+                componentWidth -
+                    chrome.horizontalInset(
+                        settings,
+                        activeBuffer,
+                    )
+            ) / metrics.cellWidth,
+        )
+
     private companion object {
         private const val SCROLL_FRAME_DELAY_MILLIS = 8
-
-        private fun visibleGridColumns(
-            settings: SwingSettings,
-            metrics: SwingMetrics,
-            componentWidth: Int,
-            activeBuffer: TerminalRenderBufferKind,
-        ): Int =
-            maxOf(
-                1,
-                (
-                    componentWidth -
-                        SwingTerminalChrome.horizontalInset(
-                            settings,
-                            activeBuffer,
-                        )
-                ) / metrics.cellWidth,
-            )
 
         private fun packVisibleGridSize(
             columns: Int,

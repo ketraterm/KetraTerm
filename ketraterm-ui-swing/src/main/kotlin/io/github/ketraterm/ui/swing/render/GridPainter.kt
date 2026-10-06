@@ -46,6 +46,7 @@ import kotlin.math.floor
 internal class GridPainter(
     fontResolver: TerminalFontResolver? = null,
     private val cellGeometry: TerminalBidiLayout = TerminalBidiLayout(),
+    private val chrome: SwingTerminalChrome = SwingTerminalChrome(),
 ) {
     private val colorCache = AwtColorCache()
     private val backgroundPainter = TerminalBackgroundPainter(colorCache)
@@ -93,6 +94,7 @@ internal class GridPainter(
         followedHyperlinkId: Int = 0,
     ) {
         val palette = cache.palette
+        chrome.updateLayout(settings, metrics, width, height, cache.columns, cache.rows)
         textPainter.updateSettings(settings)
         g.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, settings.textAntialiasing)
         g.setRenderingHint(RenderingHints.KEY_TEXT_LCD_CONTRAST, TEXT_LCD_CONTRAST)
@@ -107,14 +109,14 @@ internal class GridPainter(
         val clip = g.getClipBounds(clipScratch)
         backgroundPainter.clear(g, palette, width, height)
 
-        val paddingLeft = SwingTerminalChrome.left(settings, cache.activeBuffer)
-        val paddingTop = SwingTerminalChrome.top(settings, cache.activeBuffer)
-        val paddingBottom = SwingTerminalChrome.bottom(settings, cache.activeBuffer)
+        val paddingLeft = chrome.left(settings, cache.activeBuffer)
+        val paddingTop = chrome.top(settings, cache.activeBuffer)
+        val paddingBottom = chrome.bottom(settings, cache.activeBuffer)
         val gridPaintHeight = height - paddingTop - paddingBottom
-        val contentWidth = width - paddingLeft - SwingTerminalChrome.right(settings, cache.activeBuffer)
+        val contentWidth = width - paddingLeft - chrome.right(settings, cache.activeBuffer)
         if (gridPaintHeight <= 0) return
 
-        val promptGutterWidth = SwingTerminalChrome.promptDecorationGutterWidth(settings, cache.activeBuffer)
+        val promptGutterWidth = chrome.promptDecorationGutterWidth(settings, cache.activeBuffer)
         val geometry = visualGeometry?.takeIf { it.rowCount == cache.rows }
         val shellDecorations =
             if (cache.activeBuffer == TerminalRenderBufferKind.ALTERNATE || promptGutterWidth <= 0) {

@@ -733,8 +733,9 @@ class SwingTerminalScrollbackTest {
 
         try {
             SwingUtilities.invokeAndWait {
-                component.size = component.preferredGridSize(10, 3)
                 component.bind(session)
+                component.size = component.preferredGridSize(10, 3)
+                component.dispatchEvent(ComponentEvent(component, ComponentEvent.COMPONENT_RESIZED))
                 dispatcher.scheduler.runCurrent()
             }
             drainEdt()

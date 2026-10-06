@@ -329,6 +329,7 @@ open class TerminalFontConfigurationBenchmark {
 
     private lateinit var settings: SwingSettings
     private val fonts = FontCache()
+    private val chrome = SwingTerminalChrome()
 
     @Setup(Level.Trial)
     open fun setup() {
@@ -347,10 +348,10 @@ open class TerminalFontConfigurationBenchmark {
     open fun unchangedFontAndChrome(): Int {
         var checksum = if (fonts.update(settings.font, settings.fallbackFonts, settings.useSystemFallbackFonts)) -1 else 0
         checksum += fonts.fontForCodePoint(0x10FFFF, Font.PLAIN).style
-        checksum += SwingTerminalChrome.horizontalInset(settings, TerminalRenderBufferKind.PRIMARY)
-        checksum += SwingTerminalChrome.verticalInset(settings, TerminalRenderBufferKind.PRIMARY)
-        checksum += SwingTerminalChrome.horizontalInset(settings, TerminalRenderBufferKind.ALTERNATE)
-        checksum += SwingTerminalChrome.verticalInset(settings, TerminalRenderBufferKind.ALTERNATE)
+        checksum += chrome.horizontalInset(settings, TerminalRenderBufferKind.PRIMARY)
+        checksum += chrome.verticalInset(settings, TerminalRenderBufferKind.PRIMARY)
+        checksum += chrome.horizontalInset(settings, TerminalRenderBufferKind.ALTERNATE)
+        checksum += chrome.verticalInset(settings, TerminalRenderBufferKind.ALTERNATE)
         return checksum
     }
 }
