@@ -2,6 +2,7 @@
 
 ## [Unreleased]
 
+- Improved responsiveness when displaying large text output, including logs.
 - Search controls follow the IDE theme.
 - Fixed typing or pasting during terminal startup causing premature writes or closing the terminal.
 - Discarded stale suggestions to protect newer input. Closing the terminal or disabling suggestions closes completion popups.

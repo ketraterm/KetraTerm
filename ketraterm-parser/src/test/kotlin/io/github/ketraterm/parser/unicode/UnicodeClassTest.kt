@@ -22,6 +22,23 @@ import org.junit.jupiter.api.Test
 
 @DisplayName("UnicodeClass")
 class UnicodeClassTest {
+    @Test
+    fun `ASCII classification agrees with Unicode data including control boundaries`() {
+        for (codepoint in 0..0x80) {
+            val expected =
+                when (codepoint) {
+                    0x0A -> UnicodeClass.GRAPHEME_LF
+                    0x0D -> UnicodeClass.GRAPHEME_CR
+                    in 0..0x1F, 0x7F, 0x80 -> UnicodeClass.GRAPHEME_CONTROL
+                    else -> UnicodeClass.GRAPHEME_OTHER
+                }
+            assertEquals(expected, GeneratedGraphemeBreakTable.graphemeBreakClass(codepoint), "Unicode data at $codepoint")
+            assertEquals(expected, UnicodeClass.graphemeBreakClass(codepoint), "Classification at $codepoint")
+            assertFalse(GeneratedGraphemeBreakTable.isExtendedPictographic(codepoint), "Unicode data at $codepoint")
+            assertFalse(UnicodeClass.isExtendedPictographic(codepoint), "Pictographic classification at $codepoint")
+        }
+    }
+
     @Nested
     @DisplayName("grapheme break class")
     inner class GraphemeBreakClass {

@@ -32,8 +32,10 @@ internal object UnicodeClass {
     const val GRAPHEME_LVT: Int = 13
 
     @JvmStatic
-    fun graphemeBreakClass(codepoint: Int): Int = GeneratedGraphemeBreakTable.graphemeBreakClass(codepoint)
+    fun graphemeBreakClass(codepoint: Int): Int =
+        if (codepoint in 0x20..0x7E) GRAPHEME_OTHER else GeneratedGraphemeBreakTable.graphemeBreakClass(codepoint)
 
     @JvmStatic
-    fun isExtendedPictographic(codepoint: Int): Boolean = GeneratedGraphemeBreakTable.isExtendedPictographic(codepoint)
+    fun isExtendedPictographic(codepoint: Int): Boolean =
+        codepoint !in 0..0x7F && GeneratedGraphemeBreakTable.isExtendedPictographic(codepoint)
 }

@@ -6,6 +6,8 @@ Release notes for library consumers and embedders. Product-specific changes are 
 
 ### Improvements and fixes
 
+- Reduced ASCII output parsing cost by avoiding unnecessary Unicode property searches while preserving charset mapping and grapheme assembly. Added a fresh-terminal log ingestion benchmark with retained-cell validation and separate parser/core measurements.
+
 - Swing can bind and resize after session exit. It projects retained rows without reflow, preserves selection across font changes, and keeps transport closed.
 - Added `TerminalSession.tryResizeViewport` for explicit resize admission during closure. Strict resize APIs retain their rejection contract.
 

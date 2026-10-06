@@ -61,10 +61,11 @@ tasks.named<JmhBytecodeGeneratorTask>("jmhRunBytecodeGenerator") {
 }
 
 jmh {
+    jmhVersion.set("1.37")
     warmupIterations.set(3)
     iterations.set(5)
     fork.set(1)
-    benchmarkMode.set(listOf("thrpt"))
+    // Honor each benchmark's mode: fresh-terminal ingestion requires single-shot timing.
     timeUnit.set("ms")
     profilers.set(listOf("gc"))
 }
