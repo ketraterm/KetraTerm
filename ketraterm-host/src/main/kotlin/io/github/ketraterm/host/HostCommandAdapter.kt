@@ -20,7 +20,7 @@ import io.github.ketraterm.core.api.TerminalInputState
 import io.github.ketraterm.core.api.TerminalModeBits
 import io.github.ketraterm.core.model.CellColor
 import io.github.ketraterm.core.model.UnderlineStyle
-import io.github.ketraterm.parser.spi.TerminalCommandSink
+import io.github.ketraterm.parser.spi.TerminalAsciiCommandSink
 import io.github.ketraterm.protocol.*
 import io.github.ketraterm.protocol.keyboard.KittyKeyboardFlagApplicationMode
 import io.github.ketraterm.protocol.keyboard.KittyKeyboardProgressiveFlag
@@ -64,7 +64,7 @@ public class HostCommandAdapter(
     private val kittyKeyboardSupportedFlags: Int = KittyKeyboardProgressiveFlag.DEFAULT_HOST_SUPPORTED_MASK,
     private val modeReportCapabilities: Int = 0,
     @Volatile private var defaultBackarrowSendsBackspace: Boolean = false,
-) : TerminalCommandSink {
+) : TerminalAsciiCommandSink {
     init {
         require(
             modeReportCapabilities and
@@ -137,6 +137,14 @@ public class HostCommandAdapter(
 
     override fun writeCodepoint(codepoint: Int) {
         terminal.writeCodepoint(codepoint)
+    }
+
+    override fun writeAscii(
+        bytes: ByteArray,
+        offset: Int,
+        length: Int,
+    ) {
+        terminal.writeAscii(bytes, offset, length)
     }
 
     override fun writeCluster(

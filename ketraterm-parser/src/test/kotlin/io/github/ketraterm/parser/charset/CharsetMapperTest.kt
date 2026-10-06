@@ -26,6 +26,22 @@ import org.junit.jupiter.api.Test
 
 @DisplayName("CharsetMapper")
 class CharsetMapperTest {
+    @Test
+    fun `ASCII run eligibility observes the active slot and never consumes a single shift`() {
+        val state = ParserState()
+        assertTrue(CharsetMapper.isAsciiActive(state))
+        CharsetMapper.designateDecSpecialGraphics(state, 1)
+        assertTrue(CharsetMapper.isAsciiActive(state))
+        CharsetMapper.lockingShiftG1(state)
+        assertFalse(CharsetMapper.isAsciiActive(state))
+        CharsetMapper.lockingShiftG0(state)
+        CharsetMapper.singleShiftG2(state)
+        assertFalse(CharsetMapper.isAsciiActive(state))
+        assertEquals(2, state.singleShiftSlot)
+        assertEquals('A'.code, CharsetMapper.map(state, 'A'.code))
+        assertTrue(CharsetMapper.isAsciiActive(state))
+    }
+
     // ----- Helpers ----------------------------------------------------------
 
     private fun map(

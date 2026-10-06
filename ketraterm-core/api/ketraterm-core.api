@@ -17,6 +17,7 @@ public final class io/github/ketraterm/core/api/TerminalBuffer$DefaultImpls {
 	public static fun eraseBuffer (Lio/github/ketraterm/core/api/TerminalBuffer;)V
 	public static fun getInputModeBits (Lio/github/ketraterm/core/api/TerminalBuffer;)J
 	public static synthetic fun resize$default (Lio/github/ketraterm/core/api/TerminalBuffer;IIIILjava/lang/Object;)Lkotlin/Pair;
+	public static fun writeAscii (Lio/github/ketraterm/core/api/TerminalBuffer;[BII)V
 }
 
 public abstract interface class io/github/ketraterm/core/api/TerminalCursor {
@@ -290,6 +291,7 @@ public final class io/github/ketraterm/core/api/TerminalRenderBuffer$DefaultImpl
 	public static fun readRenderFrame (Lio/github/ketraterm/core/api/TerminalRenderBuffer;IILio/github/ketraterm/render/api/TerminalRenderFrameConsumer;)V
 	public static fun readRenderFrame (Lio/github/ketraterm/core/api/TerminalRenderBuffer;ILio/github/ketraterm/render/api/TerminalRenderFrameConsumer;)V
 	public static fun readRenderFrameForAbsoluteRange (Lio/github/ketraterm/core/api/TerminalRenderBuffer;JJLio/github/ketraterm/render/api/TerminalRenderFrameConsumer;)V
+	public static fun writeAscii (Lio/github/ketraterm/core/api/TerminalRenderBuffer;[BII)V
 }
 
 public abstract interface class io/github/ketraterm/core/api/TerminalResponseChannel : io/github/ketraterm/core/api/TerminalHostResponseReader {
@@ -388,6 +390,7 @@ public abstract interface class io/github/ketraterm/core/api/TerminalWriter {
 	public static synthetic fun updatePenColors$default (Lio/github/ketraterm/core/api/TerminalWriter;Lio/github/ketraterm/core/model/CellColor;Lio/github/ketraterm/core/model/CellColor;Lio/github/ketraterm/core/model/CellColor;Ljava/lang/Boolean;Ljava/lang/Boolean;Ljava/lang/Boolean;Lio/github/ketraterm/core/model/UnderlineStyle;Ljava/lang/Boolean;Ljava/lang/Boolean;Ljava/lang/Boolean;Ljava/lang/Boolean;Ljava/lang/Boolean;ILjava/lang/Object;)V
 	public abstract fun updatePreviousCluster ([II)V
 	public static synthetic fun updatePreviousCluster$default (Lio/github/ketraterm/core/api/TerminalWriter;[IIILjava/lang/Object;)V
+	public fun writeAscii ([BII)V
 	public abstract fun writeCluster ([II)V
 	public static synthetic fun writeCluster$default (Lio/github/ketraterm/core/api/TerminalWriter;[IIILjava/lang/Object;)V
 	public abstract fun writeCodepoint (I)V
@@ -400,6 +403,7 @@ public final class io/github/ketraterm/core/api/TerminalWriter$DefaultImpls {
 	public static synthetic fun setPenColors$default (Lio/github/ketraterm/core/api/TerminalWriter;Lio/github/ketraterm/core/model/CellColor;Lio/github/ketraterm/core/model/CellColor;Lio/github/ketraterm/core/model/CellColor;ZZZLio/github/ketraterm/core/model/UnderlineStyle;ZZZZZILjava/lang/Object;)V
 	public static synthetic fun updatePenColors$default (Lio/github/ketraterm/core/api/TerminalWriter;Lio/github/ketraterm/core/model/CellColor;Lio/github/ketraterm/core/model/CellColor;Lio/github/ketraterm/core/model/CellColor;Ljava/lang/Boolean;Ljava/lang/Boolean;Ljava/lang/Boolean;Lio/github/ketraterm/core/model/UnderlineStyle;Ljava/lang/Boolean;Ljava/lang/Boolean;Ljava/lang/Boolean;Ljava/lang/Boolean;Ljava/lang/Boolean;ILjava/lang/Object;)V
 	public static synthetic fun updatePreviousCluster$default (Lio/github/ketraterm/core/api/TerminalWriter;[IIILjava/lang/Object;)V
+	public static fun writeAscii (Lio/github/ketraterm/core/api/TerminalWriter;[BII)V
 	public static synthetic fun writeCluster$default (Lio/github/ketraterm/core/api/TerminalWriter;[IIILjava/lang/Object;)V
 }
 

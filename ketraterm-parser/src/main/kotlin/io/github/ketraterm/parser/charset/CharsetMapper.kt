@@ -32,6 +32,9 @@ import io.github.ketraterm.parser.runtime.ParserState
  */
 internal object CharsetMapper {
     @JvmStatic
+    fun isAsciiActive(state: ParserState): Boolean = state.singleShiftSlot < 0 && state.charsets[state.glSlot] == ParserState.CHARSET_ASCII
+
+    @JvmStatic
     fun map(
         state: ParserState,
         codepoint: Int,

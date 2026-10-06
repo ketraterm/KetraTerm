@@ -24,6 +24,8 @@ import io.github.ketraterm.parser.fixture.ParserEvents.writeCluster
 import io.github.ketraterm.parser.fixture.ParserEvents.writeCodepoint
 import io.github.ketraterm.parser.fixture.TerminalParserFixture
 import io.github.ketraterm.parser.runtime.ParserState
+import io.github.ketraterm.parser.spi.TerminalAsciiCommandSink
+import io.github.ketraterm.parser.spi.TerminalCommandSink
 import io.github.ketraterm.parser.utf8.Utf8Decoder
 import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.DisplayName
@@ -34,6 +36,172 @@ import org.junit.jupiter.params.provider.CsvSource
 
 @DisplayName("TerminalParser")
 class TerminalParserTest {
+    @Test
+    fun `ASCII runs consume borrowed slices and retain only the trailing grapheme`() {
+        val recorded = RecordingTerminalCommandSink()
+        val input = byteArrayOf(0, *(0x20..0x7e).map(Int::toByte).toByteArray(), 0)
+        var runCalls = 0
+        val sink =
+            object : TerminalAsciiCommandSink by recorded {
+                override fun writeAscii(
+                    bytes: ByteArray,
+                    offset: Int,
+                    length: Int,
+                ) {
+                    assertSame(input, bytes)
+                    assertTrue(offset >= 1 && offset + length <= input.size - 1)
+                    assertTrue(length > 1)
+                    runCalls++
+                    recorded.writeAscii(bytes, offset, length)
+                }
+            }
+        val parser = TerminalParsers.create(sink)
+        parser.accept(input, 1, input.size - 2)
+        input.fill(0)
+        parser.accept("\u0301".encodeToByteArray())
+        parser.endOfInput()
+
+        assertTrue(runCalls > 0)
+        assertEquals(
+            (0x20..0x7e).map(::writeCodepoint) + updatePreviousCluster('~'.code, 0x0301),
+            recorded.events,
+        )
+    }
+
+    @Test
+    fun `ASCII runs preserve prepend and trailing graphemes at every byte split`() {
+        assertFinalEventsAtEverySplit(
+            "\u0600ABC#\uFE0F\u20E3DEF\u0301GHI\u200DJ\r\nKLM".encodeToByteArray(),
+            listOf(
+                writeCluster(0x0600, 'A'.code),
+                writeCodepoint('B'.code),
+                writeCodepoint('C'.code),
+                writeCluster('#'.code, 0xFE0F, 0x20E3),
+                writeCodepoint('D'.code),
+                writeCodepoint('E'.code),
+                writeCluster('F'.code, 0x0301),
+                writeCodepoint('G'.code),
+                writeCodepoint('H'.code),
+                writeCluster('I'.code, 0x200D),
+                writeCodepoint('J'.code),
+                "carriageReturn",
+                "lineFeed",
+                writeCodepoint('K'.code),
+                writeCodepoint('L'.code),
+                writeCodepoint('M'.code),
+            ),
+        )
+    }
+
+    @Test
+    fun `ASCII runs respect charset shifts and structural boundaries at every byte split`() {
+        assertFinalEventsAtEverySplit(
+            "ABC\u001B)0\u000Eqqq\u000FDEF\u001B*0\u001BNqGHI\u001B[31mJKL\u0007MNO\u007FPQR".encodeToByteArray(),
+            listOf(
+                writeCodepoint('A'.code),
+                writeCodepoint('B'.code),
+                writeCodepoint('C'.code),
+                writeCodepoint(0x2500),
+                writeCodepoint(0x2500),
+                writeCodepoint(0x2500),
+                writeCodepoint('D'.code),
+                writeCodepoint('E'.code),
+                writeCodepoint('F'.code),
+                writeCodepoint(0x2500),
+                writeCodepoint('G'.code),
+                writeCodepoint('H'.code),
+                writeCodepoint('I'.code),
+                "setForegroundIndexed:1",
+                writeCodepoint('J'.code),
+                writeCodepoint('K'.code),
+                writeCodepoint('L'.code),
+                "bell",
+                writeCodepoint('M'.code),
+                writeCodepoint('N'.code),
+                writeCodepoint('O'.code),
+                writeCodepoint('P'.code),
+                writeCodepoint('Q'.code),
+                writeCodepoint('R'.code),
+            ),
+        )
+    }
+
+    @Test
+    fun `ASCII runs preserve malformed UTF8 recovery before ASCII and escape sequences`() {
+        assertFinalEventsAtEverySplit(
+            "ABC".encodeToByteArray() + byteArrayOf(0xC3.toByte()) +
+                "DEF".encodeToByteArray() + byteArrayOf(0xE2.toByte(), 0x82.toByte()) +
+                "\u001B[31mGHI".encodeToByteArray(),
+            listOf(
+                writeCodepoint('A'.code),
+                writeCodepoint('B'.code),
+                writeCodepoint('C'.code),
+                writeCodepoint(0xFFFD),
+                writeCodepoint('D'.code),
+                writeCodepoint('E'.code),
+                writeCodepoint('F'.code),
+                writeCodepoint(0xFFFD),
+                "setForegroundIndexed:1",
+                writeCodepoint('G'.code),
+                writeCodepoint('H'.code),
+                writeCodepoint('I'.code),
+            ),
+        )
+    }
+
+    @Test
+    fun `ASCII base after a full prepend prefix preserves bounded cluster context`() {
+        for (split in 0..3) {
+            val f = TerminalParserFixture(state = ParserState(maxCluster = 1))
+            f.acceptUtf8("\u0600")
+            val bytes = "ABC".encodeToByteArray()
+            f.parser.accept(bytes, 0, split)
+            f.parser.accept(bytes, split, bytes.size - split)
+            f.acceptUtf8("\u0301")
+            f.endOfInput()
+            assertEquals(
+                listOf(writeCodepoint(0x0600), writeCodepoint('B'.code), writeCodepoint('C'.code)),
+                f.sink.events,
+                "split=$split",
+            )
+        }
+    }
+
+    private fun assertFinalEventsAtEverySplit(
+        bytes: ByteArray,
+        expected: List<String>,
+    ) {
+        for (split in 0..bytes.size) {
+            val f = TerminalParserFixture()
+            f.parser.accept(bytes, 0, split)
+            f.parser.accept(bytes, split, bytes.size - split)
+            f.endOfInput()
+            assertEquals(expected, finalizedEvents(f.sink.events), "split=$split")
+        }
+        val scalar = TerminalParserFixture()
+        for (byte in bytes) scalar.acceptByte(byte.toInt() and 0xff)
+        scalar.endOfInput()
+        assertEquals(expected, finalizedEvents(scalar.sink.events), "scalar ingress")
+        val legacy = RecordingTerminalCommandSink()
+        val parser = TerminalParsers.create(object : TerminalCommandSink by legacy {})
+        parser.accept(bytes)
+        parser.endOfInput()
+        assertEquals(expected, finalizedEvents(legacy.events), "legacy command sink")
+    }
+
+    private fun finalizedEvents(events: List<String>): List<String> {
+        val finalized = mutableListOf<String>()
+        for (event in events) {
+            if (event.startsWith("updatePreviousCluster:")) {
+                check(finalized.last().startsWith("writeCodepoint:") || finalized.last().startsWith("writeCluster:"))
+                finalized[finalized.lastIndex] = event.replaceFirst("updatePreviousCluster:", "writeCluster:")
+            } else {
+                finalized += event
+            }
+        }
+        return finalized
+    }
+
     @Test
     fun `ordinary bases preserve prepend and combining continuations across reads`() {
         val f = TerminalParserFixture()

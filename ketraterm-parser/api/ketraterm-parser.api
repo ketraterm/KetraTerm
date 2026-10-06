@@ -27,6 +27,14 @@ public final class io/github/ketraterm/parser/api/TerminalParsers {
 	public static synthetic fun create$default (Lio/github/ketraterm/parser/spi/TerminalCommandSink;Lkotlin/jvm/functions/Function0;ILjava/lang/Object;)Lio/github/ketraterm/parser/api/TerminalOutputParser;
 }
 
+public abstract interface class io/github/ketraterm/parser/spi/TerminalAsciiCommandSink : io/github/ketraterm/parser/spi/TerminalCommandSink {
+	public abstract fun writeAscii ([BII)V
+}
+
+public final class io/github/ketraterm/parser/spi/TerminalAsciiCommandSink$DefaultImpls {
+	public static fun requestClipboard (Lio/github/ketraterm/parser/spi/TerminalAsciiCommandSink;Ljava/lang/String;Ljava/lang/String;)V
+}
+
 public abstract interface class io/github/ketraterm/parser/spi/TerminalCommandSink {
 	public abstract fun applyKittyKeyboardFlags (II)V
 	public abstract fun backspace ()V

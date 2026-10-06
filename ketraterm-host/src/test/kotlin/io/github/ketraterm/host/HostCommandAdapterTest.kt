@@ -41,6 +41,73 @@ import org.junit.jupiter.params.provider.ValueSource
 @DisplayName("HostCommandAdapter")
 class HostCommandAdapterTest {
     @Test
+    fun `ASCII spans preserve hard and deferred wraps across every byte split`() {
+        val bytes = "ABCDEFGH\r\nIJKLMNOPQ".encodeToByteArray()
+        for (split in -1..bytes.size) {
+            val f = Fixture(terminal = TerminalBuffers.create(8, 3))
+            if (split < 0) {
+                for (byte in bytes) f.parser.acceptByte(byte.toInt() and 0xff)
+            } else {
+                f.parser.accept(bytes, 0, split)
+                f.parser.accept(bytes, split, bytes.size - split)
+            }
+            f.end()
+            val context = "split=$split"
+            assertEquals("ABCDEFGH\nIJKLMNOP\nQ", f.terminal.getAllAsString(), context)
+            assertEquals(1, f.terminal.cursorCol, context)
+            assertEquals(2, f.terminal.cursorRow, context)
+            assertEquals(0, f.terminal.historySize, context)
+            (f.terminal as TerminalRenderFrameReader).readRenderFrame { frame ->
+                assertFalse(frame.lineWrapped(0), context)
+                assertTrue(frame.lineWrapped(1), context)
+                assertFalse(frame.lineWrapped(2), context)
+            }
+        }
+    }
+
+    @Test
+    fun `ASCII spans preserve charset locking and single shifts across every byte split`() {
+        val bytes = "prefix\u001B)0\u000Eqqq\u000Fascii\u001B*0\u001BNqtail\u001B+0\u001BOxlast".encodeToByteArray()
+        val expected = "prefix───ascii─tail│last"
+        for (split in -1..bytes.size) {
+            val f = Fixture(terminal = TerminalBuffers.create(40, 2))
+            if (split < 0) {
+                for (byte in bytes) f.parser.acceptByte(byte.toInt() and 0xff)
+            } else {
+                f.parser.accept(bytes, 0, split)
+                f.parser.accept(bytes, split, bytes.size - split)
+            }
+            f.end()
+            assertEquals(expected, f.terminal.getLineAsString(0), "split=$split")
+            assertEquals(expected.length, f.terminal.cursorCol, "split=$split")
+        }
+    }
+
+    @Test
+    fun `ASCII spans recover malformed UTF8 before structural controls across every byte split`() {
+        val bytes =
+            "before".encodeToByteArray() + byteArrayOf(0xc3.toByte()) +
+                "\u001B[31mafter\u0007tail\u001B[0mEND".encodeToByteArray()
+        for (split in -1..bytes.size) {
+            val f = Fixture(terminal = TerminalBuffers.create(40, 2))
+            if (split < 0) {
+                for (byte in bytes) f.parser.acceptByte(byte.toInt() and 0xff)
+            } else {
+                f.parser.accept(bytes, 0, split)
+                f.parser.accept(bytes, split, bytes.size - split)
+            }
+            f.end()
+            val context = "split=$split"
+            assertEquals("before\uFFFDaftertailEND", f.terminal.getLineAsString(0), context)
+            assertEquals(CellColor.indexed(1), f.terminal.getAttrAt(7, 0)?.foreground, context)
+            assertEquals(CellColor.indexed(1), f.terminal.getAttrAt(15, 0)?.foreground, context)
+            assertEquals(f.terminal.getAttrAt(0, 0), f.terminal.getAttrAt(6, 0), context)
+            assertEquals(f.terminal.getAttrAt(0, 0), f.terminal.getAttrAt(16, 0), context)
+            assertEquals(19, f.terminal.cursorCol, context)
+        }
+    }
+
+    @Test
     fun `line feeds use primitive mode reads across byte splits`() {
         for (newline in listOf(false, true)) {
             val bytes = (if (newline) "\u001B[20hAB\nC" else "AB\nC").encodeToByteArray()

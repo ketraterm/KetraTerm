@@ -48,13 +48,21 @@ internal class PrintableProcessor(
         acceptCodepoint(state, byteValue)
     }
 
+    /** Accepts a non-empty printable ASCII slice with identity charset mapping already checked. */
+    fun acceptAsciiRun(
+        state: ParserState,
+        bytes: ByteArray,
+        offset: Int,
+        length: Int,
+    ) {
+        graphemeAssembler.acceptAsciiRun(state, bytes, offset, length)
+    }
+
     /**
      * Accepts one Unicode codepoint from the ANSI FSM GROUND state.
      *
-     * This is the only way to emit a codepoint from the parser.
-     * The top-level parser must call this from the ActionEngine callback after UTF-8 decoding,
-     * GL charset mapping, and any other policy decisions are applied.
-     * The processor will handle grapheme assembly and forwarding to the sink.
+     * The top-level parser calls this after UTF-8 decoding. The processor applies
+     * GL charset mapping and handles grapheme assembly and forwarding to the sink.
      */
     fun acceptDecodedCodepoint(
         state: ParserState,

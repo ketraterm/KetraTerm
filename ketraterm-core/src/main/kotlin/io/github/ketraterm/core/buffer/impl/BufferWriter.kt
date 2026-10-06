@@ -23,6 +23,7 @@ import io.github.ketraterm.core.model.CellColor
 import io.github.ketraterm.core.model.UnderlineStyle
 import io.github.ketraterm.core.state.TerminalState
 import io.github.ketraterm.core.util.UnicodeWidth
+import io.github.ketraterm.core.util.validateAsciiRange
 
 internal class BufferWriter(
     private val state: TerminalState,
@@ -32,6 +33,14 @@ internal class BufferWriter(
     override fun writeCodepoint(codepoint: Int) {
         val charWidth = UnicodeWidth.calculate(codepoint, state.modes.treatAmbiguousAsWide)
         mutationEngine.printCodepoint(codepoint, charWidth)
+    }
+
+    override fun writeAscii(
+        bytes: ByteArray,
+        offset: Int,
+        length: Int,
+    ) {
+        mutationEngine.printAscii(bytes, offset, validateAsciiRange(bytes, offset, length))
     }
 
     override fun writeText(text: String) {

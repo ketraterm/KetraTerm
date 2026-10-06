@@ -42,6 +42,8 @@ open class TerminalCoreWriteBenchmark {
 
     private lateinit var buffer: TerminalBuffer
 
+    private val asciiLine = ByteArray(width) { ('A'.code + it % 26).toByte() }
+
     /** Pre-allocated cluster: U+0065 LATIN SMALL LETTER E + U+0301 COMBINING ACUTE ACCENT. */
     private val eAcuteCluster = intArrayOf('e'.code, 0x0301)
 
@@ -62,6 +64,13 @@ open class TerminalCoreWriteBenchmark {
         for (i in 0 until width) {
             buffer.writeCodepoint('A'.code + (i % 26))
         }
+        bh.consume(buffer)
+    }
+
+    /** Writes the same 160 printable cells through the borrowed ASCII span API. */
+    @Benchmark
+    open fun writeAsciiRun(bh: Blackhole) {
+        buffer.writeAscii(asciiLine, 0, asciiLine.size)
         bh.consume(buffer)
     }
 

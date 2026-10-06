@@ -15,11 +15,11 @@
  */
 package io.github.ketraterm.parser.ansi
 
-import io.github.ketraterm.parser.spi.TerminalCommandSink
+import io.github.ketraterm.parser.spi.TerminalAsciiCommandSink
 import io.github.ketraterm.protocol.NotificationLevel
 import io.github.ketraterm.protocol.ShellIntegrationEvent
 
-internal class RecordingTerminalCommandSink : TerminalCommandSink {
+internal class RecordingTerminalCommandSink : TerminalAsciiCommandSink {
     override var isAlternateScreenActive: Boolean = false
 
     override fun requestModeStatus(
@@ -43,6 +43,14 @@ internal class RecordingTerminalCommandSink : TerminalCommandSink {
 
     override fun writeCodepoint(codepoint: Int) {
         events += "writeCodepoint:$codepoint"
+    }
+
+    override fun writeAscii(
+        bytes: ByteArray,
+        offset: Int,
+        length: Int,
+    ) {
+        for (index in offset until offset + length) writeCodepoint(bytes[index].toInt())
     }
 
     override fun writeCluster(

@@ -6,6 +6,7 @@ Release notes for library consumers and embedders. Product-specific changes are 
 
 ### Improvements and fixes
 
+- Batched printable ASCII runs through the parser, host adapter, and core to reduce per-character work during large log ingestion. Core writes eligible spans directly into empty cells while preserving wrapping, scrolling, attributes, charset mapping, and grapheme continuations across input chunks; complex grid operations retain their existing behavior.
 - Reduced ASCII output parsing cost by avoiding unnecessary Unicode property searches while preserving charset mapping and grapheme assembly. Added a fresh-terminal log ingestion benchmark with retained-cell validation and separate parser/core measurements.
 - Replaced repeated Unicode grapheme/emoji range searches with a single packed, deduplicated lookup reused throughout grapheme assembly. Added a fast boundary check for consecutive ordinary bases, exhaustive Unicode 17 property verification, and a separate first-input benchmark; segmentation rules and core width policy are unchanged.
 
@@ -34,6 +35,7 @@ Release notes for library consumers and embedders. Product-specific changes are 
 
 ### API changes
 
+- Added optional `TerminalAsciiCommandSink` for synchronous consumption of borrowed printable ASCII byte slices. Existing `TerminalCommandSink` implementations continue receiving scalar commands. Added `TerminalWriter.writeAscii` with range/content validation before mutation and a scalar default for existing writer implementations; `HostCommandAdapter` uses the optimized core path.
 - Added Swing settings for mouse reporting, copy on selection, middle-button paste, and extra column spacing. Defaults preserve existing behavior. Hosts retain clipboard and preference ownership.
 
 - Added `TerminalSession.clearBuffer` and the core `TerminalWriter.eraseBuffer` operation for local screen and history clearing. Both preserve the cursor, modes, and inactive buffer. The session returns false after closure. Selection, search, and OSC anchors invalidate after clearing.

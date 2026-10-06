@@ -1,4 +1,4 @@
-public final class io/github/ketraterm/host/HostCommandAdapter : io/github/ketraterm/parser/spi/TerminalCommandSink {
+public final class io/github/ketraterm/host/HostCommandAdapter : io/github/ketraterm/parser/spi/TerminalAsciiCommandSink {
 	public fun <init> (Lio/github/ketraterm/core/api/TerminalBuffer;Lio/github/ketraterm/host/HostEventSink;Lio/github/ketraterm/host/HostPolicy;IIZ)V
 	public synthetic fun <init> (Lio/github/ketraterm/core/api/TerminalBuffer;Lio/github/ketraterm/host/HostEventSink;Lio/github/ketraterm/host/HostPolicy;IIZILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public fun applyKittyKeyboardFlags (II)V
@@ -125,6 +125,7 @@ public final class io/github/ketraterm/host/HostCommandAdapter : io/github/ketra
 	public fun startHyperlink (Ljava/lang/String;Ljava/lang/String;)V
 	public fun tab ()V
 	public fun updatePreviousCluster ([II)V
+	public fun writeAscii ([BII)V
 	public fun writeCluster ([II)V
 	public fun writeCodepoint (I)V
 }

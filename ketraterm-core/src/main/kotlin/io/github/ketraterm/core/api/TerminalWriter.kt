@@ -17,6 +17,7 @@ package io.github.ketraterm.core.api
 
 import io.github.ketraterm.core.model.CellColor
 import io.github.ketraterm.core.model.UnderlineStyle
+import io.github.ketraterm.core.util.validateAsciiRange
 
 /**
  * Write-side contract for the terminal buffer.
@@ -46,6 +47,31 @@ public interface TerminalWriter {
      * Invalid input is rejected before any state mutation.
      */
     public fun writeCodepoint(codepoint: Int)
+
+    /**
+     * Writes [length] printable ASCII bytes starting at [offset], using the active pen.
+     *
+     * Each byte is an independent printable character, with the same wrapping, scrolling,
+     * overwrite and continuation behavior as successive [writeCodepoint] calls. This operation
+     * does not interpret controls, translate character sets, or segment graphemes. The caller
+     * may reuse [bytes] immediately after this synchronous call; the array is not retained.
+     * An empty range leaves all state unchanged.
+     *
+     * @throws IllegalArgumentException if the range is outside [bytes] or any byte in the
+     * range is outside `0x20..0x7E`. The complete range is checked before any mutation.
+     */
+    public fun writeAscii(
+        bytes: ByteArray,
+        offset: Int,
+        length: Int,
+    ) {
+        val end = validateAsciiRange(bytes, offset, length)
+        var index = offset
+        while (index < end) {
+            writeCodepoint(bytes[index].toInt())
+            index++
+        }
+    }
 
     /**
      * Writes [text] literally to the buffer using the active pen attributes.

@@ -29,6 +29,78 @@ import org.junit.jupiter.params.provider.ValueSource
 
 class HostGraphemeTest {
     @Test
+    fun `ASCII runs retain the same wrapped history as bytewise input`() {
+        val bytes = (0..7).joinToString("") { "row${it.toString().padStart(2, '0')}:abcdefghij\r\n" }.encodeToByteArray()
+        val expected = TerminalBuffers.create(8, 3, maxHistory = 5)
+        TerminalParsers.create(HostCommandAdapter(expected)).apply {
+            for (byte in bytes) acceptByte(byte.toInt() and 0xff)
+            endOfInput()
+        }
+        assertEquals("cdefghij\nrow05:ab\ncdefghij\nrow06:ab\ncdefghij\nrow07:ab\ncdefghij\n", expected.getAllAsString())
+        assertEquals(5, expected.historySize)
+        assertEquals(0, expected.cursorCol)
+        assertEquals(2, expected.cursorRow)
+        for (chunkSize in listOf(2, 3, 7, 8, 17, bytes.size)) {
+            val actual = TerminalBuffers.create(8, 3, maxHistory = 5)
+            val parser = TerminalParsers.create(HostCommandAdapter(actual))
+            var offset = 0
+            while (offset < bytes.size) {
+                val length = minOf(chunkSize, bytes.size - offset)
+                parser.accept(bytes, offset, length)
+                offset += length
+            }
+            parser.endOfInput()
+            assertSameGrid(expected, actual, "chunkSize=$chunkSize")
+        }
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = ["e\u0301\u0300", "A\uFE0F", "#\uFE0F\u20E3"])
+    fun `ASCII run suffix remains available for grapheme continuation across every byte split`(cluster: String) {
+        val bytes = ("prefix" + cluster + "tail").encodeToByteArray()
+        val clusterWidth = if (cluster.startsWith('#')) 2 else 1
+        for (split in -1..bytes.size) {
+            val terminal = TerminalBuffers.create(24, 2)
+            val parser = TerminalParsers.create(HostCommandAdapter(terminal))
+            if (split < 0) {
+                for (byte in bytes) parser.acceptByte(byte.toInt() and 0xff)
+            } else {
+                parser.accept(bytes, 0, split)
+                parser.accept(bytes, split, bytes.size - split)
+            }
+            parser.endOfInput()
+            val context = "cluster=$cluster split=$split"
+            assertEquals("prefix${cluster}tail", terminal.getLineAsString(0), context)
+            assertCluster(terminal, 6, 0, cluster.codePoints().toArray(), context)
+            assertEquals('t'.code, terminal.getCodepointAt(6 + clusterWidth, 0), context)
+            assertEquals(10 + clusterWidth, terminal.cursorCol, context)
+            assertEquals(0, terminal.cursorRow, context)
+        }
+    }
+
+    @Test
+    fun `ASCII run beginning completes a preceding prepend cluster across every byte split`() {
+        val bytes = "\u0600ABCDEFGH".encodeToByteArray()
+        for (split in -1..bytes.size) {
+            val terminal = TerminalBuffers.create(16, 2)
+            val parser = TerminalParsers.create(HostCommandAdapter(terminal))
+            if (split < 0) {
+                for (byte in bytes) parser.acceptByte(byte.toInt() and 0xff)
+            } else {
+                parser.accept(bytes, 0, split)
+                parser.accept(bytes, split, bytes.size - split)
+            }
+            parser.endOfInput()
+            val context = "split=$split"
+            assertCluster(terminal, 0, 0, intArrayOf(0x0600, 'A'.code), context)
+            assertEquals("\u0600ABCDEFGH", terminal.getLineAsString(0), context)
+            assertEquals('B'.code, terminal.getCodepointAt(1, 0), context)
+            assertEquals(8, terminal.cursorCol, context)
+            assertEquals(0, terminal.cursorRow, context)
+        }
+    }
+
+    @Test
     fun `narrowing restores text overwritten by the provisional wide prefix`() {
         knownR06Failure(listOf("expected: <a\uD83D\uDE00\uFE0Ecdef> but was: <a\uD83D\uDE00\uFE0E def>")) {
             for (insert in listOf(false, true)) {

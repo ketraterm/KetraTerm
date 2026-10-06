@@ -16,6 +16,7 @@
 package io.github.ketraterm.parser.unicode
 
 import io.github.ketraterm.parser.runtime.ParserState
+import io.github.ketraterm.parser.spi.TerminalAsciiCommandSink
 import io.github.ketraterm.parser.spi.TerminalCommandSink
 
 /**
@@ -44,6 +45,25 @@ internal class GraphemeAssembler(
             state.clusterBuffer[state.clusterLength++] = codepoint
         }
         GraphemeSegmenter.updateContext(state, properties, currentClass)
+    }
+
+    /** Accepts a non-empty, charset-mapped slice containing only `0x20..0x7e`. */
+    fun acceptAsciiRun(
+        state: ParserState,
+        bytes: ByteArray,
+        offset: Int,
+        length: Int,
+    ) {
+        check(sink is TerminalAsciiCommandSink)
+        // The first base can extend a preceding PREPEND, including an already published one.
+        accept(state, bytes[offset].toInt())
+        if (length == 1) return
+
+        // Two adjacent ASCII bases always break. Keep the final base available for a later
+        // combining mark, variation selector, or ZWJ, even when it arrives in another read.
+        flush(state)
+        if (length > 2) sink.writeAscii(bytes, offset + 1, length - 2)
+        accept(state, bytes[offset + length - 1].toInt())
     }
 
     fun flush(state: ParserState) {

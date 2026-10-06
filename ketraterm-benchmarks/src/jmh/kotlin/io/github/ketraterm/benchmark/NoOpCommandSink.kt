@@ -15,7 +15,7 @@
  */
 package io.github.ketraterm.benchmark
 
-import io.github.ketraterm.parser.spi.TerminalCommandSink
+import io.github.ketraterm.parser.spi.TerminalAsciiCommandSink
 import io.github.ketraterm.protocol.NotificationLevel
 import io.github.ketraterm.protocol.ShellIntegrationEvent
 
@@ -23,7 +23,7 @@ import io.github.ketraterm.protocol.ShellIntegrationEvent
  * No-op sink for parser-only benchmarks. Discards all commands to measure
  * pure parser throughput.
  */
-internal class NoOpCommandSink : TerminalCommandSink {
+internal class NoOpCommandSink : TerminalAsciiCommandSink {
     override val isAlternateScreenActive: Boolean get() = false
 
     override fun requestModeStatus(
@@ -32,6 +32,12 @@ internal class NoOpCommandSink : TerminalCommandSink {
     ) = Unit
 
     override fun writeCodepoint(codepoint: Int) {}
+
+    override fun writeAscii(
+        bytes: ByteArray,
+        offset: Int,
+        length: Int,
+    ) {}
 
     override fun writeCluster(
         codepoints: IntArray,

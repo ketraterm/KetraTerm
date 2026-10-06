@@ -18,7 +18,9 @@ package io.github.ketraterm.parser.impl
 import io.github.ketraterm.parser.ansi.*
 import io.github.ketraterm.parser.api.TerminalCustomOscHandler
 import io.github.ketraterm.parser.api.TerminalOutputParser
+import io.github.ketraterm.parser.charset.CharsetMapper
 import io.github.ketraterm.parser.runtime.ParserState
+import io.github.ketraterm.parser.spi.TerminalAsciiCommandSink
 import io.github.ketraterm.parser.spi.TerminalCommandSink
 import io.github.ketraterm.parser.text.PrintableProcessor
 import io.github.ketraterm.parser.text.PrintableProcessorActionSink
@@ -52,6 +54,7 @@ internal class TerminalParser(
 ) : TerminalOutputParser {
     private var inCustomOscCallback = false
     private val utf8Decoder = Utf8Decoder()
+    private val supportsAsciiRuns = sink is TerminalAsciiCommandSink
     private val printableProcessor = PrintableProcessor(sink)
 
     private val actionEngine =
@@ -99,6 +102,17 @@ internal class TerminalParser(
         val end = offset + length
         var index = offset
         while (index < end) {
+            if (supportsAsciiRuns &&
+                state.fsmState == AnsiState.GROUND &&
+                !utf8Decoder.hasPendingSequence() &&
+                CharsetMapper.isAsciiActive(state) &&
+                bytes[index].toInt() in 0x20..0x7e
+            ) {
+                val start = index++
+                while (index < end && bytes[index].toInt() in 0x20..0x7e) index++
+                printableProcessor.acceptAsciiRun(state, bytes, start, index - start)
+                continue
+            }
             acceptByteInternal(bytes[index].toInt() and 0xff)
             index++
         }

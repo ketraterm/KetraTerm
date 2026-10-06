@@ -96,6 +96,11 @@ not mean the final logical line is immutable.
 ### Printable ingress
 
 - `writeCodepoint(codepoint)` writes one Unicode scalar value.
+- `writeAscii(bytes, offset, length)` writes a borrowed range of independent printable
+  ASCII characters (`0x20..0x7E`) with the same cell and cursor semantics as successive
+  scalar writes. It validates the complete range before any mutation, consumes it
+  synchronously without retaining the array, and leaves state unchanged for an empty
+  range. Controls, charset translation, and grapheme segmentation remain parser-owned.
 - `writeText(text)` writes the string as a sequence of scalar codepoints.
 - `writeCluster(codepoints, length)` writes one pre-segmented visual cluster.
   The core computes its grid width from the active width policy.

@@ -583,6 +583,48 @@ internal class MutationEngine(
         }
     }
 
+    /** Writes a validated printable ASCII range, committing empty row spans together. */
+    fun printAscii(
+        bytes: ByteArray,
+        offset: Int,
+        end: Int,
+    ) {
+        var index = offset
+        if (state.modes.isInsertMode || !state.modes.isAutoWrap || leftMargin != 0 || rightMargin != width - 1) {
+            while (index < end) {
+                printCodepoint(bytes[index].toInt(), 1)
+                index++
+            }
+            return
+        }
+
+        val attr = state.pen.currentAttr
+        val extendedAttr = state.pen.currentExtendedAttr
+        val columns = width
+        while (index < end) {
+            val col = state.cursor.col
+            val row = state.cursor.row
+            if (!state.cursor.pendingWrap && row in 0 until height && col in 0 until columns) {
+                val line = getLine(row)
+                val count = line.writeAsciiIntoEmptyCells(col, bytes, index, minOf(end - index, columns - col), attr, extendedAttr)
+                if (count > 0) {
+                    line.hasOutput = true
+                    state.markLineChanged(line)
+                    state.rememberPrintableCell(row, col + count - 1)
+                    val nextCol = col + count
+                    state.cursor.col = minOf(nextCol, columns - 1)
+                    state.cursor.pendingWrap = nextCol == columns
+                    markCursorIfMoved(col, row)
+                    index += count
+                    continue
+                }
+            }
+            // Existing scalar physics owns pending wraps, scrolling, and occupied spans.
+            printCodepoint(bytes[index].toInt(), 1)
+            index++
+        }
+    }
+
     /**
      * Writes one pre-segmented grapheme cluster.
      *

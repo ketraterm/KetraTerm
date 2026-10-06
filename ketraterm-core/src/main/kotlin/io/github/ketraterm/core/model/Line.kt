@@ -240,6 +240,30 @@ internal class Line(
     }
 
     /**
+     * Writes validated printable ASCII into consecutive empty cells, stopping at an occupant.
+     * The caller bounds [length] to the remaining row width and owns generation/cursor updates.
+     * Returns the number written, without inspecting or freeing cluster handles.
+     */
+    fun writeAsciiIntoEmptyCells(
+        col: Int,
+        bytes: ByteArray,
+        offset: Int,
+        length: Int,
+        attr: Long,
+        extendedAttr: Long,
+    ): Int {
+        var written = 0
+        while (written < length && codepoints[col + written] == TerminalConstants.EMPTY) {
+            codepoints[col + written] = bytes[offset + written].toInt()
+            attrs[col + written] = attr
+            extendedAttrs[col + written] = extendedAttr
+            written++
+        }
+        if (written > 0 && col + written == width) endsWithWrapPadding = false
+        return written
+    }
+
+    /**
      * Writes a grapheme cluster into [col] by allocating a slot in [store] and
      * storing the resulting handle. Any previous value (including another cluster
      * handle) at [col] is freed first.
