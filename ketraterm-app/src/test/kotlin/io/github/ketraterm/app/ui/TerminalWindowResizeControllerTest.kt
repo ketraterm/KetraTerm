@@ -16,22 +16,67 @@
 package io.github.ketraterm.app.ui
 
 import io.github.ketraterm.core.TerminalBuffers
+import io.github.ketraterm.render.api.TerminalRenderBufferKind
 import io.github.ketraterm.session.TerminalSession
 import io.github.ketraterm.transport.TerminalConnector
 import io.github.ketraterm.transport.TerminalConnectorListener
 import io.github.ketraterm.ui.swing.api.SwingTerminal
+import io.github.ketraterm.ui.swing.settings.SwingPromptDecoration
 import io.github.ketraterm.ui.swing.settings.SwingSettings
+import org.junit.jupiter.api.Assumptions.assumeFalse
 import org.junit.jupiter.api.Test
 import java.awt.Font
+import java.awt.GraphicsEnvironment
 import java.awt.Rectangle
 import java.util.concurrent.FutureTask
 import java.util.concurrent.TimeUnit
+import javax.swing.JFrame
 import javax.swing.SwingUtilities
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 class TerminalWindowResizeControllerTest {
+    @Test
+    fun `real window geometry preserves grid sizing across prompt style changes`() {
+        assumeFalse(GraphicsEnvironment.isHeadless())
+        onEdt {
+            var style = SwingPromptDecoration.GUTTER
+            val terminal =
+                SwingTerminal(settingsProvider = {
+                    SwingSettings.create { it.promptDecoration = style }
+                })
+            val frame = JFrame()
+            try {
+                frame.contentPane.add(terminal)
+                frame.pack()
+                frame.isVisible = true
+                val host = SwingWindowResizeHost(frame)
+                for (nextStyle in listOf(
+                    SwingPromptDecoration.GUTTER,
+                    SwingPromptDecoration.DIVIDER,
+                    SwingPromptDecoration.NONE,
+                    SwingPromptDecoration.GUTTER,
+                )) {
+                    style = nextStyle
+                    terminal.reloadSettings()
+                    val geometry = requireNotNull(host.readGeometry(terminal))
+                    assertTrue(geometry.cellWidth > 0)
+                    assertTrue(geometry.cellHeight > 0)
+                    for (buffer in TerminalRenderBufferKind.entries) {
+                        val expected = terminal.preferredGridSize(4, 3, buffer)
+                        val target = requireNotNull(geometry.targetBounds(4, 3, buffer == TerminalRenderBufferKind.ALTERNATE))
+                        assertEquals(expected.width + frame.width - terminal.width, target.width)
+                        assertEquals(expected.height + frame.height - terminal.height, target.height)
+                    }
+                }
+            } finally {
+                terminal.dispose()
+                frame.dispose()
+            }
+        }
+    }
+
     @Test
     fun `requests resize only the eligible visible session and stop after disposal`() {
         withWindow { window, terminal, session, controller, updates ->

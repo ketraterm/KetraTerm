@@ -1374,7 +1374,7 @@ class SwingTerminalThreadingTest {
     fun `bind resizes session to current visible grid when component has bounds`() {
         val connector = RecordingConnector()
         val session = testSession(connector)
-        val component = SwingTerminal()
+        val component = SwingTerminal(settingsProvider = { SwingSettings.create { it.shellIntegrationDecorationGutterWidth = 0 } })
 
         val expected =
             edtCall {

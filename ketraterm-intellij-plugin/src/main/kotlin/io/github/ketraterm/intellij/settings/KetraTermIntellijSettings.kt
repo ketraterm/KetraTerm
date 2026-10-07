@@ -23,6 +23,7 @@ import io.github.ketraterm.host.*
 import io.github.ketraterm.input.policy.PasteControlPolicy
 import io.github.ketraterm.render.api.TerminalRenderCursorShape
 import io.github.ketraterm.ui.swing.host.SwingTerminalSettingsBounds
+import io.github.ketraterm.ui.swing.settings.SwingPromptDecoration
 import io.github.ketraterm.ui.swing.settings.SwingSettings
 import io.github.ketraterm.ui.swing.settings.TerminalTheme
 import kotlinx.collections.immutable.persistentListOf
@@ -188,6 +189,7 @@ class KetraTermIntellijSettings :
      * @property cursorBlinkMillis cursor blink period; zero disables blinking.
      * @property useSystemFallbackFonts whether renderer may scan installed fonts.
      * @property cursorShape default cursor shape id.
+     * @property promptDecoration primary-screen prompt style id: gutter, divider, or none.
      * @property visualBell whether BEL events show a visual terminal indicator.
      * @property pasteOnMiddleClick whether the middle click pastes clipboard text.
      * @property overrideIdeShortcuts whether focused terminal panes may claim
@@ -230,6 +232,8 @@ class KetraTermIntellijSettings :
         @JvmField val useSystemFallbackFonts: Boolean = DEFAULT_USE_SYSTEM_FALLBACK_FONTS,
         @OptionTag
         @JvmField val cursorShape: String = DEFAULT_CURSOR_SHAPE,
+        @OptionTag
+        @JvmField val promptDecoration: String = DEFAULT_PROMPT_DECORATION,
         @OptionTag
         @JvmField val visualBell: Boolean = DEFAULT_VISUAL_BELL,
         @OptionTag
@@ -283,6 +287,7 @@ class KetraTermIntellijSettings :
         internal const val DEFAULT_COLUMNS: Int = 100
         internal const val DEFAULT_CURSOR_BLINK_MILLIS: Int = 600
         internal const val DEFAULT_CURSOR_SHAPE: String = "block"
+        internal const val DEFAULT_PROMPT_DECORATION: String = "gutter"
         internal const val DEFAULT_LINE_HEIGHT: Float = 1.0f
         internal const val DEFAULT_PASTE_ON_MIDDLE_CLICK: Boolean = true
         internal const val DEFAULT_ROWS: Int = 30
@@ -364,6 +369,12 @@ internal object KetraTermIntellijSettingsNormalizer {
                     SwingTerminalSettingsBounds.CURSOR_BLINK_MAX,
                 ),
             cursorShape = normalizeCursorShape(state.cursorShape),
+            promptDecoration =
+                SwingPromptDecoration.entries
+                    .firstOrNull {
+                        it.name.equals(state.promptDecoration.trim(), ignoreCase = true)
+                    }?.name
+                    ?.lowercase(Locale.ROOT) ?: KetraTermIntellijSettings.DEFAULT_PROMPT_DECORATION,
             scrollbackLines =
                 state.scrollbackLines.coerceIn(
                     SwingTerminalSettingsBounds.SCROLLBACK_MIN,
@@ -492,6 +503,7 @@ internal object KetraTermIntellijSettingsMapper {
             draft.visualBellEnabled = state.visualBell
             draft.pasteControlPolicy = parsePasteSanitization(state.pasteSanitization)
             draft.cursorShape = parseCursorShape(state.cursorShape)
+            draft.promptDecoration = SwingPromptDecoration.valueOf(state.promptDecoration.uppercase(Locale.ROOT))
             draft.lineHeight = state.lineHeight
             draft.smartSuggestionsEnabled = state.smartSuggestionsEnabled
             draft.shellSuggestionsEnabled = state.shellSuggestionsEnabled

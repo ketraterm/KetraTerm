@@ -545,9 +545,10 @@ class SwingTerminalSelectionTest {
                 component.bind(session)
                 session.requestRender(0)
                 val metrics = SwingMetrics.from(component.getFontMetrics(settings.font))
-                val left = 13
+                val left = (component.width - frame.columns * metrics.cellWidth) / 2
+                val top = (component.height - frame.rows * metrics.cellHeight) / 2
                 val x = left + metrics.cellWidth + 1
-                component.mouseListeners.forEach { it.mousePressed(mousePressed(component, x, 1, 1)) }
+                component.mouseListeners.forEach { it.mousePressed(mousePressed(component, x, top + 1, 1)) }
                 val event = requireNotNull(input.lastMouseEvent.get())
                 assertEquals(1, event.column)
                 assertEquals(metrics.cellWidth + 1, event.pixelX)

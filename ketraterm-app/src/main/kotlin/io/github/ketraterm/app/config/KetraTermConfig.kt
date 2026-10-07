@@ -20,6 +20,7 @@ import io.github.ketraterm.host.TerminalClipboardPolicy
 import io.github.ketraterm.host.TerminalTitlePermission
 import io.github.ketraterm.input.policy.PasteControlPolicy
 import io.github.ketraterm.ui.swing.host.SwingTerminalSettingsBounds
+import io.github.ketraterm.ui.swing.settings.SwingPromptDecoration
 import java.util.*
 
 private fun defaultShellPath(): String {
@@ -60,6 +61,7 @@ private fun defaultFontFamily(): String {
  * @property cursorBlinkMillis cursor blink period in milliseconds. Zero disables blinking.
  * @property useSystemFallbackFonts whether Swing rendering may scan installed
  * system fonts after configured fallback fonts fail.
+ * @property promptDecoration prompt presentation style on the primary screen.
  * @property cursorShape default cursor shape id: `block`, `underline`, or `beam`.
  * @property shellPath command or executable path used when opening a local shell.
  * @property startDirectory initial working directory for newly opened shells.
@@ -97,6 +99,7 @@ internal data class KetraTermConfig(
     val cursorBlinkMillis: Int = DEFAULT_CURSOR_BLINK_MILLIS,
     val useSystemFallbackFonts: Boolean = DEFAULT_USE_SYSTEM_FALLBACK_FONTS,
     val cursorShape: String = DEFAULT_CURSOR_SHAPE,
+    val promptDecoration: SwingPromptDecoration = DEFAULT_PROMPT_DECORATION,
     val shellPath: String = DEFAULT_SHELL_PATH,
     val startDirectory: String = DEFAULT_START_DIRECTORY,
     val audibleBell: Boolean = DEFAULT_AUDIBLE_BELL,
@@ -171,6 +174,7 @@ internal data class KetraTermConfig(
         const val DEFAULT_CURSOR_BLINK_MILLIS: Int = 600
         const val DEFAULT_USE_SYSTEM_FALLBACK_FONTS: Boolean = true
         const val DEFAULT_CURSOR_SHAPE: String = "block"
+        val DEFAULT_PROMPT_DECORATION: SwingPromptDecoration = SwingPromptDecoration.GUTTER
         const val DEFAULT_AUDIBLE_BELL: Boolean = true
         const val DEFAULT_VISUAL_BELL: Boolean = true
         const val DEFAULT_PASTE_ON_MIDDLE_CLICK: Boolean = true

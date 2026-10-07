@@ -18,30 +18,99 @@ package io.github.ketraterm.ui.swing.settings
 import io.github.ketraterm.render.api.TerminalRenderBufferKind
 
 /**
- * Computes visual terminal chrome insets without changing terminal semantics.
+ * EDT-owned chrome geometry shared by sizing, painting and interaction.
  *
  * Primary screen chrome composes host/user margin plus terminal-owned gutters:
  * `left margin | prompt gutter | grid | scrollbar gutter`. Alternate screen
- * chrome defaults to the same total inset, shared equally between both edges.
- * Sizing, painting and interaction share these insets.
+ * sizing uses configured insets; default presentation centers the actual grid,
+ * including spare pixels after cell rounding. Presentation offsets never feed
+ * back into grid capacity. Explicit alternate padding remains authoritative.
  */
-internal object SwingTerminalChrome {
+internal class SwingTerminalChrome {
+    /** Binding-local availability, initialized from the launch expectation or latched by shell metadata. */
+    var promptDecorationsAvailable: Boolean = true
+
+    private var layoutSettings: SwingSettings? = null
+    private var layoutPromptDecorationsAvailable = true
+    private var alternateLeft = 0
+    private var alternateRight = 0
+    private var alternateTop = 0
+    private var alternateBottom = 0
+
+    /** Resolves default alternate-screen margins around the installed grid without resizing it. */
+    fun updateLayout(
+        settings: SwingSettings,
+        metrics: SwingMetrics,
+        componentWidth: Int,
+        componentHeight: Int,
+        columns: Int,
+        rows: Int,
+    ): Boolean {
+        if (!settings.automaticAlternateScreenPadding) {
+            val changed = layoutSettings != null
+            layoutSettings = null
+            return changed
+        }
+        val horizontal =
+            maxOf(
+                horizontalInset(settings, TerminalRenderBufferKind.ALTERNATE).toLong(),
+                componentWidth.toLong() - columns.toLong() * metrics.cellWidth,
+            )
+        val vertical =
+            maxOf(
+                verticalInset(settings, TerminalRenderBufferKind.ALTERNATE).toLong(),
+                componentHeight.toLong() - rows.toLong() * metrics.cellHeight,
+            )
+        val left = (horizontal / 2).toInt()
+        val right = (horizontal - left).toInt()
+        val top = (vertical / 2).toInt()
+        val bottom = (vertical - top).toInt()
+        val changed =
+            layoutSettings !== settings ||
+                alternateLeft != left ||
+                alternateRight != right ||
+                alternateTop != top ||
+                alternateBottom != bottom
+        layoutSettings = settings
+        layoutPromptDecorationsAvailable = promptDecorationsAvailable
+        alternateLeft = left
+        alternateRight = right
+        alternateTop = top
+        alternateBottom = bottom
+        return changed
+    }
+
+    private fun hasLayout(settings: SwingSettings): Boolean =
+        layoutSettings === settings && layoutPromptDecorationsAvailable == promptDecorationsAvailable
+
     fun horizontalInset(
         settings: SwingSettings,
         activeBuffer: TerminalRenderBufferKind,
-    ): Int = left(settings, activeBuffer) + right(settings, activeBuffer)
+    ): Int =
+        if (activeBuffer == TerminalRenderBufferKind.ALTERNATE) {
+            val padding = settings.alternateScreenPaddingForPromptGutter(promptDecorationsAvailable)
+            padding.left + padding.right
+        } else {
+            settings.padding.left + promptDecorationGutterWidth(settings, activeBuffer) + settings.padding.right
+        }
 
     fun verticalInset(
         settings: SwingSettings,
         activeBuffer: TerminalRenderBufferKind,
-    ): Int = top(settings, activeBuffer) + bottom(settings, activeBuffer)
+    ): Int =
+        if (activeBuffer == TerminalRenderBufferKind.ALTERNATE) {
+            val padding = settings.alternateScreenPaddingForPromptGutter(promptDecorationsAvailable)
+            padding.top + padding.bottom
+        } else {
+            settings.padding.top + settings.padding.bottom
+        }
 
     fun left(
         settings: SwingSettings,
         activeBuffer: TerminalRenderBufferKind,
     ): Int =
         if (activeBuffer == TerminalRenderBufferKind.ALTERNATE) {
-            settings.alternateScreenPadding.left
+            if (hasLayout(settings)) alternateLeft else settings.alternateScreenPaddingForPromptGutter(promptDecorationsAvailable).left
         } else {
             settings.padding.left + promptDecorationGutterWidth(settings, activeBuffer)
         }
@@ -51,7 +120,7 @@ internal object SwingTerminalChrome {
         activeBuffer: TerminalRenderBufferKind,
     ): Int =
         if (activeBuffer == TerminalRenderBufferKind.ALTERNATE) {
-            settings.alternateScreenPadding.right
+            if (hasLayout(settings)) alternateRight else settings.alternateScreenPaddingForPromptGutter(promptDecorationsAvailable).right
         } else {
             settings.padding.right
         }
@@ -61,7 +130,7 @@ internal object SwingTerminalChrome {
         activeBuffer: TerminalRenderBufferKind,
     ): Int =
         if (activeBuffer == TerminalRenderBufferKind.ALTERNATE) {
-            settings.alternateScreenPadding.top
+            if (hasLayout(settings)) alternateTop else settings.alternateScreenPaddingForPromptGutter(promptDecorationsAvailable).top
         } else {
             settings.padding.top
         }
@@ -71,7 +140,7 @@ internal object SwingTerminalChrome {
         activeBuffer: TerminalRenderBufferKind,
     ): Int =
         if (activeBuffer == TerminalRenderBufferKind.ALTERNATE) {
-            settings.alternateScreenPadding.bottom
+            if (hasLayout(settings)) alternateBottom else settings.alternateScreenPaddingForPromptGutter(promptDecorationsAvailable).bottom
         } else {
             settings.padding.bottom
         }
@@ -80,7 +149,10 @@ internal object SwingTerminalChrome {
         settings: SwingSettings,
         activeBuffer: TerminalRenderBufferKind,
     ): Int =
-        if (activeBuffer == TerminalRenderBufferKind.ALTERNATE) {
+        if (activeBuffer == TerminalRenderBufferKind.ALTERNATE ||
+            settings.promptDecoration != SwingPromptDecoration.GUTTER ||
+            !promptDecorationsAvailable
+        ) {
             0
         } else {
             settings.shellIntegrationDecorationGutterWidth

@@ -22,6 +22,7 @@ import io.github.ketraterm.host.TerminalTitlePermission
 import io.github.ketraterm.session.TerminalStartupCommand
 import io.github.ketraterm.ui.swing.host.SwingDialogRequest
 import io.github.ketraterm.ui.swing.host.SwingMessageDialogs
+import io.github.ketraterm.ui.swing.settings.SwingPromptDecoration
 import io.github.ketraterm.ui.swing.settings.SwingSettings
 import io.github.ketraterm.ui.swing.settings.TerminalTheme
 import io.github.ketraterm.workspace.TerminalProfile
@@ -175,6 +176,32 @@ internal class SettingsDialog(
         createSpinner(settings.config.rows, KetraTermConfig.ROWS_MIN, KetraTermConfig.ROWS_MAX, 1, 80)
     private val scrollbackSpinner =
         createSpinner(settings.config.scrollbackLines, KetraTermConfig.SCROLLBACK_MIN, KetraTermConfig.SCROLLBACK_MAX, 100, 80)
+    private val promptDecorationCombo =
+        createComboBox(
+            arrayOf(SwingPromptDecoration.GUTTER, SwingPromptDecoration.DIVIDER, SwingPromptDecoration.NONE),
+            settings.config.promptDecoration,
+            150,
+        ).apply {
+            toolTipText = "Choose how shell prompts are separated. Applies to the main screen."
+            renderer =
+                object : DefaultListCellRenderer() {
+                    override fun getListCellRendererComponent(
+                        list: JList<*>?,
+                        value: Any?,
+                        index: Int,
+                        isSelected: Boolean,
+                        cellHasFocus: Boolean,
+                    ): Component =
+                        super.getListCellRendererComponent(list, value, index, isSelected, cellHasFocus).also {
+                            text =
+                                (value as? SwingPromptDecoration)
+                                    ?.name
+                                    ?.lowercase(Locale.ROOT)
+                                    ?.replaceFirstChar(Char::titlecase)
+                                    .orEmpty()
+                        }
+                }
+        }
     private val themeCombo = createComboBox(TerminalTheme.entries.toTypedArray(), settings.theme, 220)
 
     // Form Controls - Behavior
@@ -292,6 +319,7 @@ internal class SettingsDialog(
         registerChangeListener(showForegroundProcessNameCheckbox, updateApplyState)
         registerChangeListener(cursorBlinkSpinner, updateApplyState)
         registerChangeListener(cursorShapeCombo, updateApplyState)
+        registerChangeListener(promptDecorationCombo, updateApplyState)
     }
 
     private fun applySizing(
@@ -481,6 +509,7 @@ internal class SettingsDialog(
             }
         addFormRow(windowSection, 0, "Columns:", layoutGridWrapper)
         addFormRow(windowSection, 1, "Scrollback lines (new sessions):", scrollbackSpinner)
+        addFormRow(windowSection, 2, "Prompt style:", promptDecorationCombo)
         panel.add(windowSection)
 
         return panel
@@ -769,6 +798,7 @@ internal class SettingsDialog(
         showForegroundProcessNameCheckbox.isSelected = KetraTermConfig.DEFAULT_SHOW_FOREGROUND_PROCESS_NAME
         cursorBlinkSpinner.value = KetraTermConfig.DEFAULT_CURSOR_BLINK_MILLIS
         cursorShapeCombo.selectedItem = KetraTermConfig.DEFAULT_CURSOR_SHAPE
+        promptDecorationCombo.selectedItem = KetraTermConfig.DEFAULT_PROMPT_DECORATION
 
         clipboardWriteCombo.selectedItem = KetraTermConfig.DEFAULT_CLIPBOARD_WRITE
         clipboardReadCombo.selectedItem = KetraTermConfig.DEFAULT_CLIPBOARD_READ
@@ -869,6 +899,7 @@ internal class SettingsDialog(
             cursorBlinkMillis = cursorBlinkSpinner.value as? Int ?: KetraTermConfig.DEFAULT_CURSOR_BLINK_MILLIS,
             useSystemFallbackFonts = useSystemFallbackCheckbox.isSelected,
             cursorShape = cursorShapeCombo.selectedItem as? String ?: "",
+            promptDecoration = promptDecorationCombo.selectedItem as? SwingPromptDecoration ?: KetraTermConfig.DEFAULT_PROMPT_DECORATION,
             shellPath = nextShellPath.ifBlank { KetraTermConfig.DEFAULT_SHELL_PATH },
             startDirectory = startDirectoryField.text,
             startupCommand = startupCommandField.text,

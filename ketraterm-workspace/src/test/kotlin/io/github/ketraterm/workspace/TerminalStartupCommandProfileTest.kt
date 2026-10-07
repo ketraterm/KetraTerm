@@ -27,7 +27,7 @@ class TerminalStartupCommandProfileTest {
     ) {
         for (executable in listOf("bash", "zsh", "fish", "pwsh")) {
             val profile = TerminalProfile(executable, executable, listOf(executable), startupCommand = TerminalStartupCommand("echo ready"))
-            val launch = TerminalShellIntegrationBootstrap.apply(profile, true, directory)
+            val launch = TerminalShellIntegrationBootstrap.apply(profile, true, directory).profile
             assertSame(profile.startupCommand, launch.startupCommand)
             assertFalse(launch.command.any { it.contains("echo ready") })
             if (executable == "bash") assertTrue("--rcfile" in launch.command)
@@ -55,10 +55,10 @@ class TerminalStartupCommandProfileTest {
             val profile = TerminalProfile("custom", "Custom", command, startupCommand = TerminalStartupCommand("echo ready"))
             val error =
                 assertFailsWith<IllegalArgumentException>(command.toString()) {
-                    TerminalShellIntegrationBootstrap.apply(profile, true, directory)
+                    TerminalShellIntegrationBootstrap.apply(profile, true, directory).profile
                 }
             assertTrue(error.message.orEmpty().contains("Startup commands require"))
-            TerminalShellIntegrationBootstrap.apply(profile.copy(startupCommand = null), true, directory)
+            TerminalShellIntegrationBootstrap.apply(profile.copy(startupCommand = null), true, directory).profile
         }
     }
 
@@ -67,6 +67,6 @@ class TerminalStartupCommandProfileTest {
         @TempDir directory: Path,
     ) {
         val profile = TerminalProfile("bash", "Bash", listOf("bash"), startupCommand = TerminalStartupCommand("echo ready"))
-        assertFailsWith<IllegalArgumentException> { TerminalShellIntegrationBootstrap.apply(profile, false, directory) }
+        assertFailsWith<IllegalArgumentException> { TerminalShellIntegrationBootstrap.apply(profile, false, directory).profile }
     }
 }

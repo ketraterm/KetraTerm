@@ -69,7 +69,7 @@ class SwingTerminalCellBoundsTest {
                 session.requestRender(0)
                 dispatcher.scheduler.runCurrent()
                 terminal.bind(session)
-                val left = if (alternate) 4 else 16
+                val left = if (alternate) 4 else 7
                 val top = if (alternate) 3 else 5
                 val right = if (alternate) 10 else 13
                 val bottom = if (alternate) 8 else 11
@@ -81,7 +81,13 @@ class SwingTerminalCellBoundsTest {
                 val cellHeight = bounds.height
                 assertTrue(terminal.copyCellBounds(2, 1, bounds))
                 assertEquals(Rectangle(left + 2 * cellWidth, top + cellHeight, cellWidth, cellHeight), bounds)
-                for ((column, row) in listOf(-1 to 0, 0 to -1, 10 to 0, 0 to 3, Int.MAX_VALUE to Int.MAX_VALUE)) {
+                for ((column, row) in listOf(
+                    -1 to 0,
+                    0 to -1,
+                    terminal.visibleGridSize().width to 0,
+                    0 to 3,
+                    Int.MAX_VALUE to Int.MAX_VALUE,
+                )) {
                     assertFalse(terminal.copyCellBounds(column, row, bounds))
                     assertEquals(Rectangle(), bounds)
                 }

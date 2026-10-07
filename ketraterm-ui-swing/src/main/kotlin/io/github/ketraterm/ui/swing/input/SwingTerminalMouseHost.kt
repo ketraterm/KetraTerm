@@ -44,6 +44,12 @@ internal interface SwingTerminalMouseHost {
         cache: TerminalRenderCache,
     ): Long
 
+    /** Whether the pointer is over presentation space that has no terminal mouse coordinates. */
+    fun isPromptDividerAt(
+        x: Int,
+        y: Int,
+    ): Boolean = false
+
     fun terminalPixelYAt(
         y: Int,
         cache: TerminalRenderCache,

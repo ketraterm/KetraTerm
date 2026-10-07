@@ -20,6 +20,7 @@ import io.github.ketraterm.app.config.KetraTermConfigManager
 import io.github.ketraterm.app.config.KetraTermSettings
 import io.github.ketraterm.host.TerminalClipboardPermission
 import io.github.ketraterm.input.policy.PasteControlPolicy
+import io.github.ketraterm.ui.swing.settings.SwingPromptDecoration
 import io.github.ketraterm.ui.swing.settings.SwingSettings
 import io.github.ketraterm.ui.swing.settings.TerminalTheme
 import io.github.ketraterm.workspace.TerminalProfileRegistry
@@ -41,6 +42,30 @@ import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 class SettingsDialogTest {
+    @Test
+    fun `prompt style selector resets and persists its choice`() {
+        withDialog { settings, dialog, closed ->
+            onEdt {
+                val combo =
+                    components(dialog).filterIsInstance<JComboBox<*>>().single {
+                        it.selectedItem is SwingPromptDecoration
+                    }
+                assertEquals(
+                    listOf(SwingPromptDecoration.GUTTER, SwingPromptDecoration.DIVIDER, SwingPromptDecoration.NONE),
+                    (0 until combo.itemCount).map { combo.getItemAt(it) },
+                )
+                combo.selectedItem = SwingPromptDecoration.NONE
+                button(dialog, "Reset to Defaults").doClick()
+                assertEquals(SwingPromptDecoration.GUTTER, combo.selectedItem)
+                combo.selectedItem = SwingPromptDecoration.DIVIDER
+                button(dialog, "OK").doClick()
+            }
+            assertTrue(closed.await(5, TimeUnit.SECONDS))
+            assertEquals(SwingPromptDecoration.DIVIDER, settings.config.promptDecoration)
+            assertEquals(SwingPromptDecoration.DIVIDER, settings.current().promptDecoration)
+        }
+    }
+
     @Test
     fun `clipboard settings offer three permissions and preserve independent choices`() {
         withDialog { settings, dialog, closed ->

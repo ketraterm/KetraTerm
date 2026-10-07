@@ -85,6 +85,7 @@ class SwingTerminalClosedSessionTest {
                     it.bind(session)
                 }
             }
+        val boundColumns = edt { component.visibleGridSize().width }
         "final".toByteArray().let { session.onBytes(it, 0, it.size) }
         val close = FutureTask { session.close() }
         thread(name = "closed-session-test") { close.run() }
@@ -99,10 +100,10 @@ class SwingTerminalClosedSessionTest {
                 }
             }
             session.readRenderFrame {
-                assertEquals(10, it.columns)
+                assertEquals(boundColumns, it.columns)
                 assertEquals(3, it.rows)
             }
-            assertEquals(listOf(10 to 3, 10 to 3), connector.resizes)
+            assertEquals(listOf(10 to 3, boundColumns to 3), connector.resizes)
         } finally {
             release.countDown()
             close.get(10, TimeUnit.SECONDS)

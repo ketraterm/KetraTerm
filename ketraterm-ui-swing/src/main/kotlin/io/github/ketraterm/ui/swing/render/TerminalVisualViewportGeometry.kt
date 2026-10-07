@@ -22,16 +22,16 @@ import kotlin.math.ceil
 import kotlin.math.floor
 
 /**
- * EDT-owned viewport geometry with fixed row pitch and shared bidi cell mapping.
- *
- * Terminal rows always have the same pitch as the PTY-visible grid:
- * `rowTop(row) = row * cellHeight`. Shell-integration prompt metadata is a
- * renderer decoration only and must not change row height, viewport capacity,
- * hit testing, cursor geometry, mouse coordinates, or scrollback math.
+ * EDT-owned row geometry shared by paint, pointer input, cursor and repaint planning.
+ * Terminal cell height stays fixed. Optional prompt bands add presentation-only offsets.
  */
 internal class TerminalVisualViewportGeometry {
     /** Cell permutation shared by rendering, pointer input and repaint planning. */
     val bidiLayout = TerminalBidiLayout()
+
+    private var rowOffsets = IntArray(0)
+    private var dividerBands = BooleanArray(0)
+    private var hasDividers = false
 
     var rowCount: Int = 0
         private set
@@ -45,14 +45,16 @@ internal class TerminalVisualViewportGeometry {
         private set
 
     /**
-     * Rebuilds fixed row positions for the current render cache.
+     * Rebuilds row positions for the current render cache.
      *
-     * @return true when fixed geometry metrics changed.
+     * @return true when row geometry changed.
      */
     fun updateLayout(
         metrics: SwingMetrics,
         rows: Int,
         viewportPixelHeight: Int,
+        dividers: PromptDividerLayout? = null,
+        firstAbsoluteRow: Long = 0,
     ): Boolean {
         require(rows >= 0) { "rows must be >= 0, was $rows" }
         require(viewportPixelHeight >= 0) { "viewportPixelHeight must be >= 0, was $viewportPixelHeight" }
@@ -62,16 +64,39 @@ internal class TerminalVisualViewportGeometry {
         val previousVisualHeight = visualHeight
         val previousViewportPixelHeight = this.viewportPixelHeight
 
+        if (dividers != null && rowOffsets.size < rows) {
+            rowOffsets = IntArray(rows)
+            dividerBands = BooleanArray(rows)
+        }
+        val previouslyHadDividers = hasDividers
+        var offsetsChanged = false
+        var offset = 0L
+        if (dividers != null) {
+            for (row in 0 until rows) {
+                val band = dividers.hasDividerAt(firstAbsoluteRow + row)
+                if (band) offset += metrics.cellHeight
+                require(
+                    offset + (row.toLong() + 1) * metrics.cellHeight <= Int.MAX_VALUE,
+                ) { "visual row geometry exceeds integer pixel range" }
+                if (rowOffsets[row] != offset.toInt() || dividerBands[row] != band) offsetsChanged = true
+                rowOffsets[row] = offset.toInt()
+                dividerBands[row] = band
+            }
+        }
+        require(rows.toLong() * metrics.cellHeight + offset <= Int.MAX_VALUE) { "visual row geometry exceeds integer pixel range" }
+        hasDividers = offset != 0L
+        offsetsChanged = offsetsChanged || previouslyHadDividers != hasDividers
         rowCount = rows
         cellHeight = metrics.cellHeight
         this.viewportPixelHeight = viewportPixelHeight
-        visualHeight = rows * metrics.cellHeight
+        visualHeight = (rows.toLong() * metrics.cellHeight + offset).toInt()
 
         val changed =
             previousRowCount != rows ||
                 previousCellHeight != metrics.cellHeight ||
                 previousVisualHeight != visualHeight ||
-                previousViewportPixelHeight != viewportPixelHeight
+                previousViewportPixelHeight != viewportPixelHeight ||
+                offsetsChanged
         return changed
     }
 
@@ -92,6 +117,7 @@ internal class TerminalVisualViewportGeometry {
      */
     fun reset() {
         bidiLayout.reset()
+        hasDividers = false
         rowCount = 0
         cellHeight = 0
         visualHeight = 0
@@ -125,29 +151,30 @@ internal class TerminalVisualViewportGeometry {
         val xStart = maxOf(left.toLong(), x)
         val xEnd = minOf(right.toLong(), x + metrics.cellWidth)
         val origin = if (rowCount == cache.rows) contentOriginY else 0.0
-        val yStart = maxOf(top, floor(top.toDouble() + origin + row.toDouble() * metrics.cellHeight).toInt())
-        val yEnd = minOf(bottom, ceil(top.toDouble() + origin + (row.toDouble() + 1.0) * metrics.cellHeight).toInt())
+        val cellTop = if (rowCount == cache.rows) rowTop(row) else row * metrics.cellHeight
+        val yStart = maxOf(top, floor(top.toDouble() + origin + cellTop).toInt())
+        val yEnd = minOf(bottom, ceil(top.toDouble() + origin + cellTop + metrics.cellHeight).toInt())
         if (xEnd <= xStart || yEnd <= yStart) return false
         destination.setBounds(xStart.toInt(), yStart, (xEnd - xStart).toInt(), yEnd - yStart)
         return true
     }
 
     /**
-     * Returns the fixed visual top of terminal [row], excluding [contentOriginY].
+     * Returns the visual top of terminal [row], excluding [contentOriginY].
      */
-    fun rowTop(row: Int): Int = row * cellHeight
+    fun rowTop(row: Int): Int = row * cellHeight + if (hasDividers && row in 0 until rowCount) rowOffsets[row] else 0
 
     /**
-     * Returns the fixed visual bottom of terminal [row], excluding [contentOriginY].
+     * Returns the visual bottom of terminal [row], excluding [contentOriginY].
      */
     fun rowBottom(row: Int): Int = rowTop(row) + cellHeight
 
     /**
-     * Returns the fixed visual height occupied by the first [rows] terminal rows.
+     * Returns the visual height occupied by the first [rows] terminal rows.
      */
     fun visualHeightForRows(rows: Int): Int {
         val safeRows = rows.coerceIn(0, rowCount)
-        return safeRows * cellHeight
+        return if (safeRows == 0) 0 else rowBottom(safeRows - 1)
     }
 
     /**
@@ -155,8 +182,28 @@ internal class TerminalVisualViewportGeometry {
      */
     fun rowAt(visualY: Int): Int {
         if (rowCount <= 0) return 0
-        return (visualY / cellHeight).coerceIn(0, rowCount - 1)
+        if (!hasDividers) return (visualY / cellHeight).coerceIn(0, rowCount - 1)
+        var low = 0
+        var high = rowCount - 1
+        while (low < high) {
+            val middle = (low + high) ushr 1
+            if (rowBottom(middle) <= visualY) low = middle + 1 else high = middle
+        }
+        return low
     }
+
+    /** Returns the prompt row owning a divider band, or -1 outside a band. */
+    fun dividerRowAtComponentY(
+        y: Int,
+        paddingTop: Int,
+    ): Int {
+        if (!hasDividers || rowCount == 0) return -1
+        val localY = floor(y.toDouble() - paddingTop - contentOriginY).toInt()
+        val row = rowAt(localY)
+        return if (dividerBands[row] && localY >= rowTop(row) - cellHeight && localY < rowTop(row)) row else -1
+    }
+
+    fun hasDividerBefore(row: Int): Boolean = hasDividers && row in 0 until rowCount && dividerBands[row]
 
     /**
      * Maps a component-local y coordinate to a terminal row.
@@ -211,8 +258,7 @@ internal class TerminalVisualViewportGeometry {
         paddingTop: Int,
         paddingBottom: Int,
     ): Int {
-        val availableHeight = componentHeight - paddingTop - paddingBottom
-        val visibleRows = minOf(rowCount, maxOf(1, ceil((availableHeight.toDouble() - contentOriginY) / cellHeight).toInt()) + 1)
+        val visibleRows = visibleRowsExclusive(componentHeight, paddingTop, paddingBottom)
         if (clip == null || clip.height <= 0) return visibleRows
 
         val clipBottom = clip.y + clip.height
@@ -230,7 +276,10 @@ internal class TerminalVisualViewportGeometry {
         paddingBottom: Int,
     ): Int {
         val availableHeight = componentHeight - paddingTop - paddingBottom
-        return minOf(rowCount, maxOf(1, ceil((availableHeight.toDouble() - contentOriginY) / cellHeight).toInt()) + 1)
+        if (rowCount == 0) return 0
+        if (!hasDividers) return minOf(rowCount, maxOf(1, ceil((availableHeight.toDouble() - contentOriginY) / cellHeight).toInt()) + 1)
+        val bottom = ceil(availableHeight - contentOriginY).toInt()
+        return (rowAt(bottom) + 1).coerceAtMost(rowCount)
     }
 
     /**
@@ -238,6 +287,8 @@ internal class TerminalVisualViewportGeometry {
      */
     fun firstFullyVisibleRow(): Int {
         if (rowCount <= 0) return 0
-        return ceil(-contentOriginY / cellHeight).toInt().coerceIn(0, rowCount - 1)
+        val top = ceil(-contentOriginY).toInt()
+        val row = rowAt(top)
+        return (if (rowTop(row) < top) row + 1 else row).coerceAtMost(rowCount - 1)
     }
 }

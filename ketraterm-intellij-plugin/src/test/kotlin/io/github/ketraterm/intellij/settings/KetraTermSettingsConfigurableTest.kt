@@ -24,6 +24,7 @@ import com.intellij.util.ui.UIUtil
 import io.github.ketraterm.host.TerminalClipboardPermission
 import io.github.ketraterm.intellij.KetraTermBundle
 import io.github.ketraterm.intellij.services.KetraTermCompletionService
+import io.github.ketraterm.ui.swing.settings.SwingPromptDecoration
 import io.github.ketraterm.workspace.TerminalProfile
 import java.awt.Color
 import java.awt.Component
@@ -33,6 +34,38 @@ import javax.swing.JComboBox
 import javax.swing.JLabel
 
 class KetraTermSettingsConfigurableTest : BasePlatformTestCase() {
+    fun testPromptStylesApplyAndResetWithoutChangingOtherSettings() {
+        val settings = KetraTermIntellijSettings.getInstance()
+        val original = settings.state
+        val configurable = KetraTermSettingsConfigurable(emptyList())
+        try {
+            settings.loadState(original.copy(promptDecoration = "gutter"))
+            val baseline = settings.state
+            val combo =
+                descendants(configurable.createComponent()).filterIsInstance<JComboBox<*>>().single {
+                    it.selectedItem?.toString() == KetraTermBundle.message("settings.ketraterm.promptDecoration.gutter")
+                }
+            assertEquals(3, combo.itemCount)
+            for (style in listOf(SwingPromptDecoration.DIVIDER, SwingPromptDecoration.NONE, SwingPromptDecoration.GUTTER)) {
+                val id = style.name.lowercase(java.util.Locale.ROOT)
+                val label = KetraTermBundle.message("settings.ketraterm.promptDecoration.$id")
+                combo.selectedIndex = (0 until combo.itemCount).single { combo.getItemAt(it).toString() == label }
+                assertTrue(configurable.isModified())
+                configurable.apply()
+                assertEquals(baseline.copy(promptDecoration = id), settings.state)
+                assertEquals(style, settings.current().promptDecoration)
+                assertFalse(configurable.isModified())
+                combo.selectedIndex = (combo.selectedIndex + 1) % combo.itemCount
+                configurable.reset()
+                assertEquals(label, combo.selectedItem.toString())
+                assertFalse(configurable.isModified())
+            }
+        } finally {
+            configurable.disposeUIResources()
+            settings.replaceState(original)
+        }
+    }
+
     fun testFreshAndLegacyClipboardReadChoicesSurviveUnrelatedApplyAndFormReset() {
         val settings = KetraTermIntellijSettings.getInstance()
         val original = settings.state

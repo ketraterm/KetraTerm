@@ -23,9 +23,8 @@ import kotlin.math.roundToInt
  *
  * The model owns the precise position, animation timeline and history bounds as
  * one state transition. The controller supplies input and clock ticks. The
- * line-addressed render reader receives a whole-row anchor plus one overscan
- * row; fractional motion is a renderer translation only. Renderer decorations
- * do not contribute scrollable height.
+ * controller projects presentation slots into terminal row addresses. Fractional
+ * motion is a renderer translation only; a divider band occupies one slot.
  */
 internal class SwingScrollModel {
     private val animation = SmoothRowScrollAnimation()
@@ -33,12 +32,12 @@ internal class SwingScrollModel {
     private var discardedCount: Long = 0L
     private var preciseOffset: Double = 0.0
 
-    /** Number of retained rows available above the live viewport. */
+    /** Number of presentation slots available above the live viewport. */
     var historySize: Int = 0
         private set
 
     /**
-     * Precise visual scrollback offset in terminal rows.
+     * Precise visual scrollback offset in presentation slots.
      *
      * `0.0` is the live viewport. Larger values move farther back into
      * scrollback history. Fractional values exist only during animation.
@@ -47,7 +46,7 @@ internal class SwingScrollModel {
         get() = preciseOffset
 
     /**
-     * Scrollback offset that should be requested from the render reader.
+     * Whole-slot anchor; the controller converts it to a terminal render address.
      */
     val requestedOffset: Int
         get() = ceil(preciseOffset).toInt()
@@ -201,6 +200,16 @@ internal class SwingScrollModel {
         val destination = animation.targetRow
         animation.cancel()
         return applyOffset(destination.toDouble())
+    }
+
+    /** Preserves a presentation anchor while sparse divider positions change. */
+    fun reanchor(offset: Double) {
+        require(offset.isFinite())
+        val next = offset.coerceIn(0.0, historySize.toDouble())
+        if (next == preciseOffset) return
+        val delta = kotlin.math.round(next - preciseOffset).toLong()
+        preciseOffset = next
+        animation.rebase(next, delta, historySize)
     }
 
     /** Stops the timeline while preserving the current precise position. */

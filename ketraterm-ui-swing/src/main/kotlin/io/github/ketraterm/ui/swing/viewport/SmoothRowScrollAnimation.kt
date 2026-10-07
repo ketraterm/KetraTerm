@@ -72,7 +72,7 @@ internal class SmoothRowScrollAnimation {
     }
 
     /**
-     * Translates an active timeline after output advances the live bottom.
+     * Translates an active timeline after source or presentation geometry changes.
      *
      * [currentOffset] is the already translated, bounded visual position. If the
      * destination was discarded, adjust the remaining curve to its surviving
@@ -84,18 +84,17 @@ internal class SmoothRowScrollAnimation {
         historySize: Int,
     ) {
         require(currentOffset.isFinite()) { "currentOffset must be finite, was $currentOffset" }
-        require(deltaRows >= 0L) { "deltaRows must be >= 0, was $deltaRows" }
         require(historySize >= 0) { "historySize must be >= 0, was $historySize" }
         if (!isActive) return
 
         val shiftedTarget = targetRow.toLong() + minOf(deltaRows, historySize.toLong())
-        targetRow = shiftedTarget.coerceAtMost(historySize.toLong()).toInt()
+        targetRow = shiftedTarget.coerceIn(0, historySize.toLong()).toInt()
         if (currentOffset == targetRow.toDouble()) {
             cancel()
             return
         }
 
-        if (shiftedTarget <= historySize) {
+        if (shiftedTarget in 0..historySize.toLong()) {
             startOffset += deltaRows
         } else {
             val remaining = 1.0 - sampledElapsedNanos.toDouble() / DURATION_NANOS

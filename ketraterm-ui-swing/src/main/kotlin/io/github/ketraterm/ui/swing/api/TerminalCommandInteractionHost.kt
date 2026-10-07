@@ -46,10 +46,10 @@ internal interface TerminalCommandInteractionHost {
         columns: Int,
     )
 
-    fun scrollViewportTo(
-        offsetRows: Int,
-        historySize: Int,
-        boundSession: TerminalSession,
+    /** Reveals a source row using the component's current presentation geometry. */
+    fun scrollToAbsoluteRow(
+        row: Long,
+        center: Boolean,
     ): Boolean
 
     fun repaint()

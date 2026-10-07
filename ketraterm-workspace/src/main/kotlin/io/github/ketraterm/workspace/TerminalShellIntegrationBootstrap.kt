@@ -31,8 +31,8 @@ import java.util.*
  */
 internal object TerminalShellIntegrationBootstrap {
     /**
-     * Returns [profile] with shell integration startup hooks applied when
-     * supported by the shell family and [enabled] is true.
+     * Prepares [profile] and reports whether prompt hooks were configured.
+     * Environment-only changes do not imply prompt support.
      *
      * @param scriptDirectory persistent directory used for generated shell
      *   startup wrappers required by shells without an init-command argument.
@@ -41,7 +41,7 @@ internal object TerminalShellIntegrationBootstrap {
         profile: TerminalProfile,
         enabled: Boolean,
         scriptDirectory: Path = defaultScriptDirectory(),
-    ): TerminalProfile {
+    ): ShellIntegrationLaunch {
         require(profile.startupCommand == null || enabled) {
             "Startup commands require shell integration. Enable it or clear the startup command."
         }
@@ -49,7 +49,7 @@ internal object TerminalShellIntegrationBootstrap {
             "Startup commands require a directly configured interactive PowerShell, Bash, zsh, or fish shell. " +
                 "WSL launchers are not supported for startup commands."
         }
-        if (!enabled) return TerminalShellEnvironmentBootstrap.applyInitial(profile)
+        if (!enabled) return ShellIntegrationLaunch(TerminalShellEnvironmentBootstrap.applyInitial(profile), false)
 
         val integrated =
             when (profile.kind) {
@@ -69,10 +69,11 @@ internal object TerminalShellIntegrationBootstrap {
             "Startup commands require an interactive PowerShell, Bash, zsh, or fish shell with startup hooks enabled. " +
                 "Remove explicit command/script arguments or clear the startup command."
         }
-        if (integrated === profile) return TerminalShellEnvironmentBootstrap.applyInitial(profile)
-
-        return TerminalShellEnvironmentBootstrap.withMarkers(
-            TerminalShellEnvironmentBootstrap.applyInitial(integrated),
+        val promptMarkersExpected = integrated !== profile
+        val launchProfile = TerminalShellEnvironmentBootstrap.applyInitial(integrated)
+        return ShellIntegrationLaunch(
+            profile = if (promptMarkersExpected) TerminalShellEnvironmentBootstrap.withMarkers(launchProfile) else launchProfile,
+            promptMarkersExpected = promptMarkersExpected,
         )
     }
 
@@ -667,3 +668,9 @@ internal object TerminalShellIntegrationBootstrap {
     private const val OSC7_AUTHORITY_ENVIRONMENT_VARIABLE = "KetraTerm_OSC7_AUTHORITY"
     private const val LOCAL_OSC7_AUTHORITY = "localhost"
 }
+
+/** Launch arguments and the prompt expectation decided while applying shell hooks. */
+internal data class ShellIntegrationLaunch(
+    val profile: TerminalProfile,
+    val promptMarkersExpected: Boolean,
+)

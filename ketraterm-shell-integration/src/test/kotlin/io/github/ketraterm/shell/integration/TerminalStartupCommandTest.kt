@@ -89,10 +89,13 @@ class TerminalStartupCommandTest {
         }
     }
 
-    @Test
-    fun `ordinary output and orphan prompt end never trigger execution`() {
+    @ParameterizedTest
+    @ValueSource(booleans = [false, true])
+    fun `ordinary output and orphan prompt end never trigger execution`(promptMarkersExpected: Boolean) {
         val connector = MockConnector()
-        session(connector).use { session ->
+        session(connector, promptMarkersExpected = promptMarkersExpected).use { session ->
+            assertEquals(promptMarkersExpected, session.promptMarkersExpected)
+            assertEquals("", connector.writtenBytes.decodeToString())
             connector.feedFromHost("Welcome\r\n$ \u001B]133;B\u0007".toByteArray())
             assertEquals("", connector.writtenBytes.decodeToString())
             assertEquals(TerminalStartupCommandStatus.WAITING, session.startupCommandStatus?.value)
@@ -221,13 +224,14 @@ class TerminalStartupCommandTest {
         connector: TerminalConnector,
         command: String = "echo ready",
         ioDispatcher: CoroutineDispatcher = UnconfinedTestDispatcher(),
+        promptMarkersExpected: Boolean = false,
     ): TerminalSession =
         TerminalSession
             .create(
                 terminal = TerminalBuffers.create(width = 40, height = 4),
                 connector = connector,
                 startupCommand = TerminalStartupCommand(command),
-                shellIntegration = OscShellIntegration,
+                shellIntegration = OscShellIntegration.configured(promptMarkersExpected),
                 workerDispatcher = StandardTestDispatcher(),
                 ioDispatcher = ioDispatcher,
             ).also { it.start(40, 4) }

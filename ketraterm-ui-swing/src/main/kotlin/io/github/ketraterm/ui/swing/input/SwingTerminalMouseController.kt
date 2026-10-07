@@ -30,6 +30,7 @@ import kotlin.math.min
  */
 internal class SwingTerminalMouseController(
     private val host: SwingTerminalMouseHost,
+    private val chrome: SwingTerminalChrome = SwingTerminalChrome(),
 ) {
     private val alternateWheelAccumulator = ScrollDeltaAccumulator()
     private var wheelRoute = WheelRoute.NONE
@@ -39,6 +40,12 @@ internal class SwingTerminalMouseController(
     private var gestureTracked = false
     private var gestureSession: TerminalInputEncoder? = null
     private var middlePaste = false
+    private var decorationGesture = false
+    private var hasTrackedPosition = false
+    private var trackedColumn = 0
+    private var trackedRow = 0
+    private var trackedPixelX = 0
+    private var trackedPixelY = 0
 
     val hasPressedButtons: Boolean get() = pressedButtons != 0
 
@@ -48,6 +55,8 @@ internal class SwingTerminalMouseController(
         gestureTracked = false
         gestureSession = null
         middlePaste = false
+        decorationGesture = false
+        hasTrackedPosition = false
         shiftDown = false
     }
 
@@ -57,6 +66,8 @@ internal class SwingTerminalMouseController(
         if (pressedButtons == 0) {
             gestureTracked = isMouseTrackingIntercepted()
             gestureSession = host.session
+            decorationGesture = false
+            hasTrackedPosition = false
         }
         pressedButtons = pressedButtons or bit
     }
@@ -86,7 +97,11 @@ internal class SwingTerminalMouseController(
                 beginGesture(event)
                 if (handleContextMenu(event)) return
                 if (!host.renderCache.hasFrame) return
-                if (host.handlePromptMarkerMousePressed(event)) return
+                if (host.handlePromptMarkerMousePressed(event) || host.isPromptDividerAt(event.x, event.y)) {
+                    decorationGesture = true
+                    event.consume()
+                    return
+                }
                 if (handleMouseTracking(event, TerminalMouseEventType.PRESS)) return
                 if (SwingUtilities.isMiddleMouseButton(event) && host.settings.middleClickPaste) {
                     middlePaste = true
@@ -103,6 +118,10 @@ internal class SwingTerminalMouseController(
                 try {
                     if (handleContextMenu(event)) return
                     if (!host.renderCache.hasFrame) return
+                    if (decorationGesture) {
+                        event.consume()
+                        return
+                    }
                     if (handleMouseTracking(event, TerminalMouseEventType.RELEASE)) return
                     if (SwingUtilities.isMiddleMouseButton(event) && middlePaste) {
                         event.consume()
@@ -127,6 +146,10 @@ internal class SwingTerminalMouseController(
                 updatePointerModifiers(event.modifiersEx)
                 host.handleHyperlinkMouseDragged()
                 if (!host.renderCache.hasFrame) return
+                if (decorationGesture) {
+                    event.consume()
+                    return
+                }
                 if (handleMouseTracking(event, TerminalMouseEventType.MOTION)) return
                 host.handleSelectionMouseDragged(event)
             }
@@ -232,9 +255,14 @@ internal class SwingTerminalMouseController(
             return true
         }
 
-        val cell = host.cellAt(event.x, event.y, host.renderCache)
-        val column = unpackCellColumn(cell)
-        val row = unpackCellRow(cell)
+        val overDivider = host.isPromptDividerAt(event.x, event.y)
+        if (overDivider && (type != TerminalMouseEventType.RELEASE || !hasTrackedPosition)) {
+            event.consume()
+            return true
+        }
+        val cell = if (overDivider) 0L else host.cellAt(event.x, event.y, host.renderCache)
+        val column = if (overDivider) trackedColumn else unpackCellColumn(cell)
+        val row = if (overDivider) trackedRow else unpackCellRow(cell)
 
         val button =
             if (event is MouseWheelEvent) {
@@ -255,15 +283,15 @@ internal class SwingTerminalMouseController(
         if (event.isMetaDown) mods = mods or TerminalModifiers.SUPER
 
         val paddingLeft =
-            SwingTerminalChrome.left(
+            chrome.left(
                 host.settings,
                 host.renderCache.activeBuffer,
             )
         val gridWidth = host.renderCache.columns * host.metrics.cellWidth
         val gridHeight = host.renderCache.rows * host.metrics.cellHeight
         val visualPixelX = (event.x - paddingLeft).coerceIn(0, gridWidth - 1)
-        val pixelX = column * host.metrics.cellWidth + visualPixelX % host.metrics.cellWidth
-        val pixelY = host.terminalPixelYAt(event.y, host.renderCache).coerceIn(0, gridHeight - 1)
+        val pixelX = if (overDivider) trackedPixelX else column * host.metrics.cellWidth + visualPixelX % host.metrics.cellWidth
+        val pixelY = if (overDivider) trackedPixelY else host.terminalPixelYAt(event.y, host.renderCache).coerceIn(0, gridHeight - 1)
 
         val mouseEvent =
             TerminalMouseEvent(
@@ -275,6 +303,13 @@ internal class SwingTerminalMouseController(
                 pixelX = pixelX,
                 pixelY = pixelY,
             )
+        if (type != TerminalMouseEventType.WHEEL) {
+            hasTrackedPosition = true
+            trackedColumn = column
+            trackedRow = row
+            trackedPixelX = pixelX
+            trackedPixelY = pixelY
+        }
         val reportCount =
             if (event is MouseWheelEvent) {
                 min(kotlin.math.abs(wheelRotation.toLong()), MAX_WHEEL_STEPS_PER_EVENT.toLong()).toInt()

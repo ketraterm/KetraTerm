@@ -75,7 +75,7 @@ class GridPainterTest {
     }
 
     @Test
-    fun `alternate grid paints at balanced default padding`() {
+    fun `alternate grid paints centered within default margins`() {
         val image = BufferedImage(100, 40, BufferedImage.TYPE_INT_ARGB)
         val g = image.createGraphics()
         val settings =
@@ -100,9 +100,13 @@ class GridPainterTest {
         } finally {
             g.dispose()
         }
-        val left = 13
+        val left = (image.width - cache.columns * metrics.cellWidth) / 2
+        val top = (image.height - cache.rows * metrics.cellHeight) / 2
         for (x in 0 until image.width) {
-            assertEquals(if (x in left until left + 2 * metrics.cellWidth) RED else BLACK, image.getRGB(x, 1), "pixel $x")
+            assertEquals(if (x in left until left + 2 * metrics.cellWidth) RED else BLACK, image.getRGB(x, top + 1), "pixel $x")
+        }
+        for (y in 0 until image.height) {
+            assertEquals(if (y in top until top + metrics.cellHeight) RED else BLACK, image.getRGB(left + 1, y), "pixel $y")
         }
     }
 

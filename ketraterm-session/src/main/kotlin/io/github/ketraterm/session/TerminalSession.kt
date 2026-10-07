@@ -187,6 +187,14 @@ public class TerminalSession private constructor(
 
     /** Bounded projection supplied by the selected shell producer, or an empty model when absent. */
     public val shellIntegrationState: TerminalShellIntegrationView get() = runtime.shellState
+
+    /**
+     * Immutable startup expectation supplied by the selected shell producer.
+     * True permits reserving prompt presentation space before metadata arrives;
+     * false means no expectation was supplied, including sessions without a producer.
+     * This does not report current prompt readiness or identify a running shell.
+     */
+    public val promptMarkersExpected: Boolean = runtime.shellIntegration?.promptMarkersExpected == true
     private val renderReader: TerminalRenderFrameReader get() = runtime.reader
     private val pendingRenderRequest = AtomicLong(packRenderRequest(scrollbackOffset = 0, viewportRows = 0))
     private val pendingRenderGeneration = AtomicLong(0)
