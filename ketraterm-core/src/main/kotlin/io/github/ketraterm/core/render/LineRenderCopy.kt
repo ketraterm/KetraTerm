@@ -38,26 +38,35 @@ internal fun Line.copyToRenderAbi(
     clusterScratch: RenderClusterScratch,
     reverseVideo: Boolean,
 ) {
+    // Reuse translations within this copy only; reverseVideo is constant for the whole row.
+    var previousPrimaryAttr = 0L
+    var previousExtendedAttr = 0L
+    var renderAttr = 0L
+    var renderExtraAttr = 0L
+    var hyperlinkId = 0
     var col = 0
     while (col < width) {
         val raw = rawCodepoint(col)
         val primaryAttr = getPackedAttr(col)
         val extendedAttr = getPackedExtendedAttr(col)
 
+        if (col == 0 || primaryAttr != previousPrimaryAttr || extendedAttr != previousExtendedAttr) {
+            renderAttr = attrTranslator.toRenderAttrWord(primaryAttr, extendedAttr, reverseVideo)
+            if (extraAttrWords != null) renderExtraAttr = attrTranslator.toRenderExtraAttrWord(extendedAttr)
+            if (hyperlinkIds != null) hyperlinkId = AttributeCodec.hyperlinkId(extendedAttr)
+            previousPrimaryAttr = primaryAttr
+            previousExtendedAttr = extendedAttr
+        }
+
         codeWords[codeOffset + col] = 0
-        attrWords[attrOffset + col] =
-            attrTranslator.toRenderAttrWord(
-                primaryAttr = primaryAttr,
-                extendedAttr = extendedAttr,
-                reverseVideo = reverseVideo,
-            )
+        attrWords[attrOffset + col] = renderAttr
         flags[flagOffset + col] = cellFlags(col, raw)
 
         if (extraAttrWords != null) {
-            extraAttrWords[extraAttrOffset + col] = attrTranslator.toRenderExtraAttrWord(extendedAttr)
+            extraAttrWords[extraAttrOffset + col] = renderExtraAttr
         }
         if (hyperlinkIds != null) {
-            hyperlinkIds[hyperlinkOffset + col] = AttributeCodec.hyperlinkId(extendedAttr)
+            hyperlinkIds[hyperlinkOffset + col] = hyperlinkId
         }
 
         when {
