@@ -40,6 +40,54 @@ import java.io.IOException
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class TerminalHostShellIntegrationTest {
+    @ParameterizedTest
+    @ValueSource(booleans = [false, true])
+    fun `host prompt expectation is available before metadata and independent of readiness`(expected: Boolean) =
+        runTest {
+            val model = TerminalShellIntegrationState()
+            val ready = MutableStateFlow(false)
+            val dispatcher = StandardTestDispatcher(testScheduler)
+            val factories =
+                listOf(
+                    TerminalShellIntegrationFactory.host(model, promptReady = ready),
+                    TerminalShellIntegrationFactory.host(
+                        model,
+                        TerminalShellCommandLineState(),
+                        promptReady = ready,
+                    ),
+                )
+            for (factory in factories) {
+                TerminalSession
+                    .create(
+                        TerminalBuffers.create(8, 3),
+                        MockConnector(),
+                        workerDispatcher = dispatcher,
+                        ioDispatcher = dispatcher,
+                        shellIntegration =
+                            TerminalShellIntegrationFactory { context ->
+                                object : TerminalShellIntegration by factory.create(context) {
+                                    override val promptMarkersExpected = expected
+                                }
+                            },
+                    ).use { session ->
+                        assertEquals(expected, session.promptMarkersExpected)
+                        assertEquals(0, session.shellIntegrationState.recordCount())
+                        ready.value = true
+                        model.recordPromptStart(1)
+                        model.clear()
+                        ready.value = false
+                        assertEquals(expected, session.promptMarkersExpected)
+                    }
+            }
+            TerminalSession
+                .create(
+                    TerminalBuffers.create(8, 3),
+                    MockConnector(),
+                    workerDispatcher = dispatcher,
+                    ioDispatcher = dispatcher,
+                ).use { assertFalse(it.promptMarkersExpected) }
+        }
+
     @Test
     fun `consumer view observes the producer without taking its lifetime`() =
         runTest {

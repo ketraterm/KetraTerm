@@ -59,7 +59,13 @@ class TerminalShellIntegrationBootstrapIntegrationTest {
                 environment = mapOf("HOME" to home.toString(), "JAVA_HOME" to "explicit-jdk", "TERM" to "xterm-256color"),
                 shellEnvironment = TerminalShellEnvironment(mapOf("JAVA_HOME" to jdk.toString()), bin.toString()),
             )
-        val launch = TerminalShellIntegrationBootstrap.apply(profile, enabled = true, scriptDirectory = tempDir.resolve("bootstrap"))
+        val launch =
+            TerminalShellIntegrationBootstrap
+                .apply(
+                    profile,
+                    enabled = true,
+                    scriptDirectory = tempDir.resolve("bootstrap"),
+                ).profile
         val result =
             runProcess(
                 launch.command,
@@ -107,7 +113,13 @@ class TerminalShellIntegrationBootstrapIntegrationTest {
                 environment = mapOf("HOME" to home.toString(), "TERM" to "xterm-256color"),
                 shellEnvironment = TerminalShellEnvironment(mapOf("JAVA_HOME" to "project-jdk"), "/project/bin"),
             )
-        val launch = TerminalShellIntegrationBootstrap.apply(profile, enabled = true, scriptDirectory = tempDir.resolve("bootstrap"))
+        val launch =
+            TerminalShellIntegrationBootstrap
+                .apply(
+                    profile,
+                    enabled = true,
+                    scriptDirectory = tempDir.resolve("bootstrap"),
+                ).profile
         val result =
             runProcess(
                 launch.command,
@@ -141,7 +153,13 @@ class TerminalShellIntegrationBootstrapIntegrationTest {
                 command = listOf(powerShell!!),
                 shellEnvironment = TerminalShellEnvironment(mapOf("JAVA_HOME" to javaHome), bin),
             )
-        val launch = TerminalShellIntegrationBootstrap.apply(profile, enabled = true, scriptDirectory = tempDir.resolve("bootstrap"))
+        val launch =
+            TerminalShellIntegrationBootstrap
+                .apply(
+                    profile,
+                    enabled = true,
+                    scriptDirectory = tempDir.resolve("bootstrap"),
+                ).profile
         val bootstrap = String(Base64.getDecoder().decode(launch.command.last()), Charsets.UTF_16LE)
         val startupFile = tempDir.resolve("profile.ps1")
         Files.writeString(startupFile, "${'$'}env:JAVA_HOME = 'profile-jdk'\n${'$'}env:PATH = 'profile-bin'\n")
@@ -192,7 +210,13 @@ class TerminalShellIntegrationBootstrapIntegrationTest {
                 environment = mapOf("ZDOTDIR" to original.toString(), "TERM" to "xterm-256color"),
                 shellEnvironment = TerminalShellEnvironment(mapOf("JAVA_HOME" to "project-jdk"), "/project/bin"),
             )
-        val launch = TerminalShellIntegrationBootstrap.apply(profile, enabled = true, scriptDirectory = tempDir.resolve("bootstrap"))
+        val launch =
+            TerminalShellIntegrationBootstrap
+                .apply(
+                    profile,
+                    enabled = true,
+                    scriptDirectory = tempDir.resolve("bootstrap"),
+                ).profile
         val assertions =
             """
             printf 'LOGIN_RESULT=%s:%s:%s\n' "${'$'}JAVA_HOME" "${'$'}LOGIN_FILE" "${'$'}PATH"
@@ -232,7 +256,13 @@ class TerminalShellIntegrationBootstrapIntegrationTest {
                 environment = mapOf("XDG_CONFIG_HOME" to config.parent.toString(), "TERM" to "xterm-256color"),
                 shellEnvironment = TerminalShellEnvironment(mapOf("JAVA_HOME" to "project-jdk"), "/project/bin"),
             )
-        val launch = TerminalShellIntegrationBootstrap.apply(profile, enabled = true, scriptDirectory = tempDir.resolve("bootstrap"))
+        val launch =
+            TerminalShellIntegrationBootstrap
+                .apply(
+                    profile,
+                    enabled = true,
+                    scriptDirectory = tempDir.resolve("bootstrap"),
+                ).profile
         val assertions =
             """
             printf 'RESULT=%s:%s:%s\n' "${'$'}JAVA_HOME" "${'$'}USER_CONFIG_RAN" "${'$'}PATH[1]"
@@ -262,7 +292,7 @@ class TerminalShellIntegrationBootstrapIntegrationTest {
                 displayName = "PowerShell",
                 command = listOf(powerShell!!),
             )
-        val integrated = TerminalShellIntegrationBootstrap.apply(profile, enabled = true)
+        val integrated = TerminalShellIntegrationBootstrap.apply(profile, enabled = true).profile
         val bootstrap = String(Base64.getDecoder().decode(integrated.command.last()), Charsets.UTF_16LE)
         val invocation = Base64.getEncoder().encodeToString("$bootstrap\nprompt | Out-Host".toByteArray(Charsets.UTF_16LE))
         val workingDirectory = Files.createDirectory(tempDir.resolve("space % directory"))
@@ -304,7 +334,11 @@ class TerminalShellIntegrationBootstrapIntegrationTest {
                 displayName = "Bash",
                 command = listOf(bash!!),
             )
-        val bootstrap = TerminalShellIntegrationBootstrap.apply(profile, enabled = true).environment.getValue("PROMPT_COMMAND")
+        val bootstrap =
+            TerminalShellIntegrationBootstrap
+                .apply(profile, enabled = true)
+                .profile.environment
+                .getValue("PROMPT_COMMAND")
         val workingDirectory = Files.createDirectory(tempDir.resolve("space % directory"))
         val result =
             runProcess(
@@ -335,7 +369,7 @@ class TerminalShellIntegrationBootstrapIntegrationTest {
                 command = listOf(bash!!),
                 environment = mapOf("TERM" to "xterm-256color"),
             )
-        val integrated = TerminalShellIntegrationBootstrap.apply(profile, enabled = true)
+        val integrated = TerminalShellIntegrationBootstrap.apply(profile, enabled = true).profile
         val bootstrap = integrated.environment.getValue("PROMPT_COMMAND")
         val result =
             runProcess(
@@ -369,7 +403,7 @@ class TerminalShellIntegrationBootstrapIntegrationTest {
                 command = listOf(zsh!!),
                 environment = mapOf("KetraTerm_ORIGINAL_ZDOTDIR" to originalZdotdir.toString()),
             )
-        val integrated = TerminalShellIntegrationBootstrap.apply(profile, enabled = true, scriptDirectory = tempDir)
+        val integrated = TerminalShellIntegrationBootstrap.apply(profile, enabled = true, scriptDirectory = tempDir).profile
         val zshrc = Path.of(integrated.environment.getValue("ZDOTDIR")).resolve(".zshrc")
         val result =
             runProcess(
@@ -400,7 +434,7 @@ class TerminalShellIntegrationBootstrapIntegrationTest {
                 displayName = "Fish",
                 command = listOf(fish!!),
             )
-        val integrated = TerminalShellIntegrationBootstrap.apply(profile, enabled = true)
+        val integrated = TerminalShellIntegrationBootstrap.apply(profile, enabled = true).profile
         val result =
             runProcess(
                 integrated.command +

@@ -27,7 +27,7 @@ import io.github.ketraterm.render.api.TerminalRenderBufferKind
  * back into grid capacity. Explicit alternate padding remains authoritative.
  */
 internal class SwingTerminalChrome {
-    /** Binding-local capability, latched once shell command metadata has been observed. */
+    /** Binding-local availability, initialized from the launch expectation or latched by shell metadata. */
     var promptDecorationsAvailable: Boolean = true
 
     private var layoutSettings: SwingSettings? = null

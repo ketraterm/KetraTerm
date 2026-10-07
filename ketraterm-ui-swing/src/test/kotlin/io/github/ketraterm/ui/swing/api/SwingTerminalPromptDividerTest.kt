@@ -20,6 +20,7 @@ import io.github.ketraterm.render.api.TerminalColorPalette
 import io.github.ketraterm.session.TerminalSession
 import io.github.ketraterm.session.TerminalShellIntegrationFactory
 import io.github.ketraterm.session.TerminalShellIntegrationState
+import io.github.ketraterm.shell.integration.OscShellIntegration
 import io.github.ketraterm.transport.TerminalConnector
 import io.github.ketraterm.transport.TerminalConnectorListener
 import io.github.ketraterm.ui.swing.settings.SwingPadding
@@ -30,6 +31,7 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.StandardTestDispatcher
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.params.ParameterizedTest
+import org.junit.jupiter.params.provider.EnumSource
 import org.junit.jupiter.params.provider.ValueSource
 import java.awt.Rectangle
 import java.awt.event.MouseEvent
@@ -43,6 +45,48 @@ import kotlin.test.assertTrue
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class SwingTerminalPromptDividerTest {
+    @ParameterizedTest
+    @EnumSource(SwingPromptDecoration::class)
+    fun `configured prompt layout precedes OSC metadata without a first prompt resize`(mode: SwingPromptDecoration) =
+        edt {
+            Fixture(mode, OscShellIntegration.configured(promptMarkersExpected = true)).use { f ->
+                assertTrue(f.session.promptMarkersExpected)
+                assertEquals(0, f.session.shellIntegrationState.recordCount())
+                val bounds = Rectangle()
+                assertTrue(f.component.copyCellBounds(0, 0, bounds))
+                val expectedLeft = if (mode == SwingPromptDecoration.GUTTER) f.settings.shellIntegrationDecorationGutterWidth else 0
+                assertEquals(expectedLeft, bounds.x)
+                assertEquals(8, f.component.visibleGridSize().width)
+                val resizes = f.connector.resizes.toList()
+                var promptLineId = 0L
+                f.session.readRenderFrame { promptLineId = it.lineId(0) }
+                f.feed("\u001B]133;A\u0007")
+                assertEquals(resizes, f.connector.resizes)
+                f.feed(">first\u001B]133;B\u0007")
+                f.session.readRenderFrame { assertEquals(promptLineId, it.lineId(0)) }
+                assertTrue(f.component.copyCellBounds(0, 0, bounds))
+                assertEquals(expectedLeft, bounds.x)
+                if (mode == SwingPromptDecoration.GUTTER) {
+                    val image = BufferedImage(f.component.width, f.component.height, BufferedImage.TYPE_INT_ARGB)
+                    val graphics = image.createGraphics()
+                    try {
+                        f.component.paint(graphics)
+                    } finally {
+                        graphics.dispose()
+                    }
+                    assertNotEquals(BLACK, image.getRGB(bounds.x / 2, bounds.y + f.cellHeight / 2))
+                }
+                f.feed("\u001B[?1049hALT")
+                assertTrue(f.component.copyCellBounds(0, 0, bounds))
+                assertEquals((f.component.width - 8 * bounds.width) / 2, bounds.x)
+                assertEquals(0, bounds.y)
+                f.feed("\u001B[?1049l")
+                assertEquals(resizes, f.connector.resizes)
+                assertTrue(f.component.copyCellBounds(0, 0, bounds))
+                assertEquals(expectedLeft, bounds.x)
+            }
+        }
+
     @Test
     fun `divider painting and cursor bounds share reserved band geometry`() =
         edt {
@@ -431,6 +475,7 @@ class SwingTerminalPromptDividerTest {
 
     private class Fixture(
         mode: SwingPromptDecoration = SwingPromptDecoration.DIVIDER,
+        shellIntegration: TerminalShellIntegrationFactory? = null,
     ) : AutoCloseable {
         private val worker = StandardTestDispatcher()
         private val dispatches = LinkedBlockingQueue<Runnable>()
@@ -442,7 +487,7 @@ class SwingTerminalPromptDividerTest {
                 connector,
                 workerDispatcher = worker,
                 ioDispatcher = worker,
-                shellIntegration = TerminalShellIntegrationFactory.host(state),
+                shellIntegration = shellIntegration ?: TerminalShellIntegrationFactory.host(state),
             )
         var settings =
             SwingSettings.create {

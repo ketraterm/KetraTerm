@@ -39,11 +39,24 @@ private const val SHELL_COMMAND_LINE_CONTEXT_ACTIVE_INDEX = 2
  * collected and reuse primitive scratch storage between render publications.
  */
 public object OscShellIntegration : TerminalShellIntegrationFactory {
-    override fun create(context: TerminalShellIntegrationContext): TerminalShellIntegration = OscShellIntegrationSession(context)
+    override fun create(context: TerminalShellIntegrationContext): TerminalShellIntegration = OscShellIntegrationSession(context, false)
+
+    /**
+     * Selects OSC integration with the host's immutable startup expectation.
+     * Set [promptMarkersExpected] only when compatible prompt hooks were configured.
+     * False still accepts OSC metadata, including manually installed or nested-shell hooks.
+     * The expectation neither enables startup input nor changes protocol handling.
+     */
+    @JvmStatic
+    public fun configured(promptMarkersExpected: Boolean): TerminalShellIntegrationFactory =
+        if (promptMarkersExpected) configuredPromptFactory else this
+
+    private val configuredPromptFactory = TerminalShellIntegrationFactory { OscShellIntegrationSession(it, true) }
 }
 
 private class OscShellIntegrationSession(
     private val context: TerminalShellIntegrationContext,
+    override val promptMarkersExpected: Boolean,
 ) : TerminalShellIntegration {
     override val state = TerminalShellIntegrationState()
     private val mutablePromptReady = MutableStateFlow(false)

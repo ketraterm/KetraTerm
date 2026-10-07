@@ -25,6 +25,77 @@ import kotlin.test.*
 
 class TerminalShellIntegrationBootstrapTest {
     @Test
+    fun `interactive hook installation reports prompt expectation before output`(
+        @TempDir directory: Path,
+    ) {
+        val commands =
+            listOf(
+                listOf("pwsh.exe", "-NoLogo"),
+                listOf("bash", "-l"),
+                listOf("zsh", "-l"),
+                listOf("fish"),
+                listOf("wsl.exe", "-e", "bash", "-l"),
+            )
+        for (command in commands) {
+            val profile = TerminalProfile("test", "test", command)
+            val launch = TerminalShellIntegrationBootstrap.apply(profile, true, directory)
+            assertTrue(launch.promptMarkersExpected, command.toString())
+        }
+    }
+
+    @Test
+    fun `environment changes and skipped hooks do not imply prompt expectation`(
+        @TempDir directory: Path,
+    ) {
+        val commands =
+            listOf(
+                listOf("cmd.exe"),
+                listOf("pwsh.exe", "-Command", "Write-Host custom"),
+                listOf("bash", "-c", "echo custom"),
+                listOf("zsh", "-f"),
+                listOf("fish", "-c", "echo custom"),
+                listOf("wsl.exe"),
+            )
+        for (command in commands) {
+            val profile =
+                TerminalProfile(
+                    "test",
+                    "test",
+                    command,
+                    shellEnvironment = TerminalShellEnvironment(mapOf("KETRA_TEST" to "value")),
+                )
+            val launch = TerminalShellIntegrationBootstrap.apply(profile, true, directory)
+            assertFalse(launch.promptMarkersExpected, command.toString())
+            assertEquals("value", launch.profile.environment["KETRA_TEST"])
+            assertEquals(command, launch.profile.command)
+        }
+        val disabled =
+            TerminalShellIntegrationBootstrap.apply(
+                TerminalProfile("test", "test", listOf("pwsh.exe")),
+                false,
+                directory,
+            )
+        assertFalse(disabled.promptMarkersExpected)
+    }
+
+    @Test
+    fun `failed hook file preparation leaves prompt expectation unconfirmed`(
+        @TempDir directory: Path,
+    ) {
+        val occupied =
+            java.nio.file.Files
+                .createFile(directory.resolve("occupied"))
+        val launch =
+            TerminalShellIntegrationBootstrap.apply(
+                TerminalProfile("test", "test", listOf("zsh")),
+                true,
+                occupied,
+            )
+        assertFalse(launch.promptMarkersExpected)
+        assertEquals(listOf("zsh"), launch.profile.command)
+    }
+
+    @Test
     fun `PowerShell profile receives interactive OSC 133 encoded bootstrap command`() {
         val profile =
             TerminalProfile(
@@ -33,7 +104,7 @@ class TerminalShellIntegrationBootstrapTest {
                 command = listOf("pwsh.exe", "-NoLogo"),
             )
 
-        val integrated = TerminalShellIntegrationBootstrap.apply(profile, enabled = true)
+        val integrated = TerminalShellIntegrationBootstrap.apply(profile, enabled = true).profile
 
         assertEquals("pwsh.exe", integrated.command[0])
         assertTrue("-NoLogo" in integrated.command)
@@ -79,7 +150,7 @@ class TerminalShellIntegrationBootstrapTest {
                 command = listOf("powershell.exe", "-NoLogo", "/NoExit"),
             )
 
-        val integrated = TerminalShellIntegrationBootstrap.apply(profile, enabled = true)
+        val integrated = TerminalShellIntegrationBootstrap.apply(profile, enabled = true).profile
 
         assertEquals(
             1,
@@ -96,7 +167,7 @@ class TerminalShellIntegrationBootstrapTest {
                 command = listOf("pwsh.exe", "-NoLogo", "-Command", "Write-Host already-custom"),
             )
 
-        val integrated = TerminalShellIntegrationBootstrap.apply(profile, enabled = true)
+        val integrated = TerminalShellIntegrationBootstrap.apply(profile, enabled = true).profile
 
         assertSame(profile, integrated)
     }
@@ -110,7 +181,7 @@ class TerminalShellIntegrationBootstrapTest {
                 command = listOf("pwsh.exe", "/Command:Write-Host already-custom"),
             )
 
-        val integrated = TerminalShellIntegrationBootstrap.apply(profile, enabled = true)
+        val integrated = TerminalShellIntegrationBootstrap.apply(profile, enabled = true).profile
 
         assertSame(profile, integrated)
     }
@@ -125,7 +196,7 @@ class TerminalShellIntegrationBootstrapTest {
                 environment = mapOf("Path" to "host-bin", "KetraTerm_CONFIG_PATH" to "host-settings.xml"),
             )
 
-        val integrated = TerminalShellIntegrationBootstrap.apply(profile, enabled = false)
+        val integrated = TerminalShellIntegrationBootstrap.apply(profile, enabled = false).profile
 
         assertSame(profile, integrated)
     }
@@ -140,7 +211,7 @@ class TerminalShellIntegrationBootstrapTest {
                 environment = mapOf("PROMPT_COMMAND" to "history -a"),
             )
 
-        val integrated = TerminalShellIntegrationBootstrap.apply(profile, enabled = true)
+        val integrated = TerminalShellIntegrationBootstrap.apply(profile, enabled = true).profile
 
         assertEquals(profile.command, integrated.command)
         val promptCommand = integrated.environment.getValue("PROMPT_COMMAND")
@@ -162,7 +233,7 @@ class TerminalShellIntegrationBootstrapTest {
                 command = listOf("C:\\Program Files\\Git\\bin\\bash.exe", "--login", "-i"),
             )
 
-        val integrated = TerminalShellIntegrationBootstrap.apply(profile, enabled = true)
+        val integrated = TerminalShellIntegrationBootstrap.apply(profile, enabled = true).profile
 
         assertEquals(profile.command, integrated.command)
         assertTrue(integrated.environment.getValue("PROMPT_COMMAND").contains("__ketraterm_preexec"))
@@ -177,7 +248,7 @@ class TerminalShellIntegrationBootstrapTest {
                 command = listOf("/bin/bash", "-lc", "echo already-custom"),
             )
 
-        val integrated = TerminalShellIntegrationBootstrap.apply(profile, enabled = true)
+        val integrated = TerminalShellIntegrationBootstrap.apply(profile, enabled = true).profile
 
         assertSame(profile, integrated)
     }
@@ -195,7 +266,7 @@ class TerminalShellIntegrationBootstrapTest {
                 environment = mapOf("ZDOTDIR" to originalZdotdir.toString()),
             )
 
-        val integrated = TerminalShellIntegrationBootstrap.apply(profile, enabled = true, scriptDirectory = tempDir)
+        val integrated = TerminalShellIntegrationBootstrap.apply(profile, enabled = true, scriptDirectory = tempDir).profile
         val zshDirectory = tempDir.resolve("zsh")
 
         assertEquals(profile.command, integrated.command)
@@ -223,7 +294,7 @@ class TerminalShellIntegrationBootstrapTest {
                 command = listOf("/bin/zsh", "-c", "echo already-custom"),
             )
 
-        val integrated = TerminalShellIntegrationBootstrap.apply(profile, enabled = true, scriptDirectory = tempDir)
+        val integrated = TerminalShellIntegrationBootstrap.apply(profile, enabled = true, scriptDirectory = tempDir).profile
 
         assertSame(profile, integrated)
         assertFalse(tempDir.resolve("zsh").exists())
@@ -238,7 +309,7 @@ class TerminalShellIntegrationBootstrapTest {
                 command = listOf("/usr/bin/fish", "-l"),
             )
 
-        val integrated = TerminalShellIntegrationBootstrap.apply(profile, enabled = true)
+        val integrated = TerminalShellIntegrationBootstrap.apply(profile, enabled = true).profile
 
         assertEquals(listOf("/usr/bin/fish", "-l", "--init-command"), integrated.command.dropLast(1))
         assertTrue(integrated.command.last().contains("__ketraterm_fish_preexec"))
@@ -257,7 +328,7 @@ class TerminalShellIntegrationBootstrapTest {
                 command = listOf("/usr/bin/fish", "-c", "echo already-custom"),
             )
 
-        val integrated = TerminalShellIntegrationBootstrap.apply(profile, enabled = true)
+        val integrated = TerminalShellIntegrationBootstrap.apply(profile, enabled = true).profile
 
         assertSame(profile, integrated)
     }
@@ -273,7 +344,7 @@ class TerminalShellIntegrationBootstrapTest {
                 kind = TerminalProfileKind.DEFAULT,
             )
 
-        val integrated = TerminalShellIntegrationBootstrap.apply(profile, enabled = true)
+        val integrated = TerminalShellIntegrationBootstrap.apply(profile, enabled = true).profile
 
         assertSame(profile, integrated)
     }
@@ -289,7 +360,7 @@ class TerminalShellIntegrationBootstrapTest {
                 kind = TerminalProfileKind.WSL,
             )
 
-        val integrated = TerminalShellIntegrationBootstrap.apply(profile, enabled = true)
+        val integrated = TerminalShellIntegrationBootstrap.apply(profile, enabled = true).profile
 
         assertEquals(profile.command, integrated.command)
         assertTrue(integrated.environment.getValue("PROMPT_COMMAND").contains("]133;"))
@@ -309,7 +380,7 @@ class TerminalShellIntegrationBootstrapTest {
                 kind = TerminalProfileKind.WSL,
             )
 
-        val integrated = TerminalShellIntegrationBootstrap.apply(profile, enabled = true, scriptDirectory = tempDir)
+        val integrated = TerminalShellIntegrationBootstrap.apply(profile, enabled = true, scriptDirectory = tempDir).profile
 
         assertEquals(profile.command, integrated.command)
         assertEquals(tempDir.resolve("zsh").toString(), integrated.environment["ZDOTDIR"])
@@ -335,12 +406,12 @@ class TerminalShellIntegrationBootstrapTest {
                 kind = TerminalProfileKind.WSL,
             )
 
-        val integrated = TerminalShellIntegrationBootstrap.apply(fish, enabled = true)
+        val integrated = TerminalShellIntegrationBootstrap.apply(fish, enabled = true).profile
 
         assertEquals(listOf("wsl.exe", "-e", "fish", "-l", "--init-command"), integrated.command.dropLast(1))
         assertTrue(integrated.command.last().contains("]133;"))
         assertNull(integrated.environment["KetraTerm_OSC7_AUTHORITY"])
-        assertSame(defaultShell, TerminalShellIntegrationBootstrap.apply(defaultShell, enabled = true))
+        assertSame(defaultShell, TerminalShellIntegrationBootstrap.apply(defaultShell, enabled = true).profile)
     }
 
     @Test
@@ -354,7 +425,7 @@ class TerminalShellIntegrationBootstrapTest {
                 command = listOf("bash"),
             )
 
-        val integrated = TerminalShellIntegrationBootstrap.apply(profile, enabled = true, scriptDirectory = tempDir)
+        val integrated = TerminalShellIntegrationBootstrap.apply(profile, enabled = true, scriptDirectory = tempDir).profile
 
         val promptCommand = integrated.environment.getValue("PROMPT_COMMAND")
         assertTrue(promptCommand.contains("]133;"))
@@ -392,7 +463,7 @@ class TerminalShellIntegrationBootstrapTest {
                 environment = mapOf("PATH" to hostPath, "KetraTerm_CONFIG_PATH" to hostConfig, "PROMPT_COMMAND" to "history -a"),
             )
 
-        val integrated = TerminalShellIntegrationBootstrap.apply(profile, enabled = true, scriptDirectory = tempDir)
+        val integrated = TerminalShellIntegrationBootstrap.apply(profile, enabled = true, scriptDirectory = tempDir).profile
 
         val promptCommand = integrated.environment.getValue("PROMPT_COMMAND")
         assertTrue(promptCommand.contains("]133;"))
@@ -420,7 +491,7 @@ class TerminalShellIntegrationBootstrapTest {
                 environment = mapOf("Path" to hostPath, "KetraTerm_CONFIG_PATH" to hostConfig),
             )
 
-        val integrated = TerminalShellIntegrationBootstrap.apply(profile, enabled = true, scriptDirectory = tempDir)
+        val integrated = TerminalShellIntegrationBootstrap.apply(profile, enabled = true, scriptDirectory = tempDir).profile
 
         val script = decodePowerShellScript(integrated.command.last())
         assertTrue(script.contains("]133;"))
@@ -460,13 +531,14 @@ class TerminalShellIntegrationBootstrapTest {
 
         for (profile in profiles) {
             val scriptDirectory = tempDir.resolve(profile.id)
-            val inherited = TerminalShellIntegrationBootstrap.apply(profile, enabled = true, scriptDirectory = scriptDirectory)
+            val inherited = TerminalShellIntegrationBootstrap.apply(profile, enabled = true, scriptDirectory = scriptDirectory).profile
             val explicit =
-                TerminalShellIntegrationBootstrap.apply(
-                    profile.copy(environment = hostEnvironment),
-                    enabled = true,
-                    scriptDirectory = scriptDirectory,
-                )
+                TerminalShellIntegrationBootstrap
+                    .apply(
+                        profile.copy(environment = hostEnvironment),
+                        enabled = true,
+                        scriptDirectory = scriptDirectory,
+                    ).profile
 
             assertAll(
                 profile.displayName,
@@ -494,6 +566,11 @@ class TerminalShellIntegrationBootstrapTest {
                 displayName = "PowerShell",
                 command = listOf("pwsh.exe"),
             )
-        return decodePowerShellScript(TerminalShellIntegrationBootstrap.apply(profile, enabled = true).command.last())
+        return decodePowerShellScript(
+            TerminalShellIntegrationBootstrap
+                .apply(profile, enabled = true)
+                .profile.command
+                .last(),
+        )
     }
 }

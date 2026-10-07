@@ -35,6 +35,16 @@ import kotlinx.coroutines.flow.StateFlow
  * synchronous protocol callbacks below; they run under session serialization.
  */
 public interface TerminalShellIntegration {
+    /**
+     * Whether the host configured this producer to supply prompt markers from startup.
+     *
+     * Immutable for the producer's lifetime. Consumers may reserve presentation space
+     * before the first marker. This is a launch expectation, not live prompt readiness
+     * or a guarantee that shell hooks execute. False leaves support unconfirmed;
+     * later metadata remains authoritative.
+     */
+    public val promptMarkersExpected: Boolean get() = false
+
     /** Thread-safe command metadata and primitive viewport projection. */
     public val state: TerminalShellIntegrationView
 

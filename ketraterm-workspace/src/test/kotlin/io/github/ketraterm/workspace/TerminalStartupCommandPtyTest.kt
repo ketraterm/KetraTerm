@@ -104,7 +104,7 @@ class TerminalStartupCommandPtyTest {
                     environment = if (shell == "bash") mapOf("HOME" to directory.toString()) else emptyMap(),
                     startupCommand = TerminalStartupCommand(startup),
                 )
-            val launch = TerminalShellIntegrationBootstrap.apply(profile, true, directory.resolve("bootstrap"))
+            val launch = TerminalShellIntegrationBootstrap.apply(profile, true, directory.resolve("bootstrap")).profile
             val prompts = Channel<Unit>(Channel.UNLIMITED)
             val listener =
                 object : PtyEventListener by PtyEventListener.NONE {

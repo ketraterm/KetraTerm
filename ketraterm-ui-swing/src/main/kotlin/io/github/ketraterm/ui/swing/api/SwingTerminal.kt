@@ -1196,7 +1196,7 @@ public class SwingTerminal
                 bindingJob?.cancel(CancellationException("Terminal session binding replaced"))
                 mouseController.resetInput()
                 this.session = session
-                chrome.promptDecorationsAvailable = session.shellIntegrationState.recordCount() > 0
+                chrome.promptDecorationsAvailable = session.promptMarkersExpected || session.shellIntegrationState.recordCount() > 0
                 retainedViewport = null
                 resetRenderCaches()
                 updateMinimizedStateFromAncestor()

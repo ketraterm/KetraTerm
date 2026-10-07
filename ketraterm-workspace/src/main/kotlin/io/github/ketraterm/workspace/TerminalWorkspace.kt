@@ -46,7 +46,7 @@ import java.util.concurrent.atomic.AtomicInteger
  * Optional process-title and startup-notification observers report failures
  * through the JVM logger and stop independently of essential session observation.
  */
-public class TerminalWorkspace internal constructor(
+class TerminalWorkspace internal constructor(
     private val listener: TerminalWorkspaceListener,
     private val sessionFactory: TerminalWorkspaceSessionFactory,
     workerDispatcher: CoroutineDispatcher = Dispatchers.Default,
@@ -56,7 +56,7 @@ public class TerminalWorkspace internal constructor(
      *
      * @param listener host-neutral workspace event listener.
      */
-    public constructor(listener: TerminalWorkspaceListener = TerminalWorkspaceListener.NONE) : this(
+    constructor(listener: TerminalWorkspaceListener = TerminalWorkspaceListener.NONE) : this(
         listener = listener,
         sessionFactory = LocalPtyWorkspaceSessionFactory,
     )
@@ -84,14 +84,14 @@ public class TerminalWorkspace internal constructor(
      *
      * @return a list containing all currently open [TerminalWorkspaceTab]s.
      */
-    public fun tabSnapshot(): List<TerminalWorkspaceTab> = synchronized(stateLock) { tabs.toList() }
+    fun tabSnapshot(): List<TerminalWorkspaceTab> = synchronized(stateLock) { tabs.toList() }
 
     /**
      * Returns the currently selected tab, or `null` when no tabs are open.
      *
      * @return the selected [TerminalWorkspaceTab], or null if none.
      */
-    public fun selectedTab(): TerminalWorkspaceTab? = synchronized(stateLock) { selectedTabId?.let(::tabByIdLocked) }
+    fun selectedTab(): TerminalWorkspaceTab? = synchronized(stateLock) { selectedTabId?.let(::tabByIdLocked) }
 
     /**
      * Opens a new local PTY-backed tab. Publishes it through
@@ -103,7 +103,7 @@ public class TerminalWorkspace internal constructor(
      * @param options initial session dimensions and terminal policy.
      * @return opened workspace tab.
      */
-    public fun openTab(
+    fun openTab(
         profile: TerminalProfile,
         options: TerminalWorkspaceOpenOptions,
     ): TerminalWorkspaceTab {
@@ -212,7 +212,7 @@ public class TerminalWorkspace internal constructor(
      *
      * @param id tab id.
      */
-    public fun selectTab(id: String) {
+    fun selectTab(id: String) {
         synchronized(stateLock) {
             require(tabByIdLocked(id) != null) { "unknown terminal tab id: $id" }
             selectedTabId = id
@@ -229,7 +229,7 @@ public class TerminalWorkspace internal constructor(
      *
      * @param id tab id.
      */
-    public fun closeTab(id: String) {
+    fun closeTab(id: String) {
         val result =
             synchronized(stateLock) {
                 val index = tabs.indexOfFirst { it.id == id }
@@ -261,7 +261,7 @@ public class TerminalWorkspace internal constructor(
      * @param palette terminal color palette.
      * @param treatAmbiguousAsWide width policy for future writes.
      */
-    public fun applySettings(
+    fun applySettings(
         palette: TerminalColorPalette,
         treatAmbiguousAsWide: Boolean,
     ) {
@@ -478,11 +478,12 @@ private object LocalPtyWorkspaceSessionFactory : TerminalWorkspaceSessionFactory
         options: TerminalWorkspaceOpenOptions,
         eventListener: PtyEventListener,
     ): TerminalSession {
-        val launchProfile =
+        val launch =
             TerminalShellIntegrationBootstrap.apply(
                 profile = profile,
                 enabled = options.shellIntegrationEnabled,
             )
+        val launchProfile = launch.profile
         return TerminalSessions.createLocalPty(
             PtyOptions.create { draft ->
                 draft.command = launchProfile.command
@@ -500,7 +501,7 @@ private object LocalPtyWorkspaceSessionFactory : TerminalWorkspaceSessionFactory
                 draft.hostPolicy = options.hostPolicy
                 draft.startupCommand = launchProfile.startupCommand
                 draft.modeReportCapabilities = options.modeReportCapabilities
-                draft.shellIntegration = OscShellIntegration
+                draft.shellIntegration = OscShellIntegration.configured(launch.promptMarkersExpected)
             },
         )
     }
@@ -525,65 +526,65 @@ private object LocalPtyWorkspaceSessionFactory : TerminalWorkspaceSessionFactory
  * @property showForegroundProcessName whether detected processes provide automatic title fallbacks.
  * @property modeReportCapabilities implemented host actions; only bits defined by [TerminalHostModeCapability] are accepted.
  */
-public class TerminalWorkspaceOpenOptions private constructor(
+class TerminalWorkspaceOpenOptions private constructor(
     builder: Builder,
 ) {
     /** Creates a validated snapshot with default values. */
-    public constructor() : this(Builder())
+    constructor() : this(Builder())
 
-    public val columns: Int = builder.columns
-    public val rows: Int = builder.rows
-    public val treatAmbiguousAsWide: Boolean = builder.treatAmbiguousAsWide
-    public val maxHistory: Int = builder.maxHistory
-    public val pasteControlPolicy: PasteControlPolicy = builder.pasteControlPolicy
-    public val shellIntegrationEnabled: Boolean = builder.shellIntegrationEnabled
-    public val hostPolicy: HostPolicy = builder.hostPolicy
-    public val showForegroundProcessName: Boolean = builder.showForegroundProcessName
-    public val modeReportCapabilities: Int = builder.modeReportCapabilities
+    val columns: Int = builder.columns
+    val rows: Int = builder.rows
+    val treatAmbiguousAsWide: Boolean = builder.treatAmbiguousAsWide
+    val maxHistory: Int = builder.maxHistory
+    val pasteControlPolicy: PasteControlPolicy = builder.pasteControlPolicy
+    val shellIntegrationEnabled: Boolean = builder.shellIntegrationEnabled
+    val hostPolicy: HostPolicy = builder.hostPolicy
+    val showForegroundProcessName: Boolean = builder.showForegroundProcessName
+    val modeReportCapabilities: Int = builder.modeReportCapabilities
 
     /** Returns a detached mutable draft. Builders are caller-confined and never retained by snapshots. */
-    public fun toBuilder(): Builder = Builder(this)
+    fun toBuilder(): Builder = Builder(this)
 
     /**
      * Configures a fresh draft synchronously and returns a validated immutable snapshot.
      * Exceptions propagate without changing this snapshot. Supplied services remain host-owned.
      */
-    public fun copy(configure: java.util.function.Consumer<Builder>): TerminalWorkspaceOpenOptions =
+    fun copy(configure: java.util.function.Consumer<Builder>): TerminalWorkspaceOpenOptions =
         toBuilder().also { configure.accept(it) }.build()
 
     /** Mutable construction draft. Not thread-safe; [build] never retains this draft. */
-    public class Builder internal constructor(
+    class Builder internal constructor(
         source: TerminalWorkspaceOpenOptions? = null,
     ) {
         /** Draft value for [TerminalWorkspaceOpenOptions.columns]; validated when [build] is called. */
-        public var columns: Int = source?.columns ?: 80
+        var columns: Int = source?.columns ?: 80
 
         /** Draft value for [TerminalWorkspaceOpenOptions.rows]; validated when [build] is called. */
-        public var rows: Int = source?.rows ?: 24
+        var rows: Int = source?.rows ?: 24
 
         /** Draft value for [TerminalWorkspaceOpenOptions.treatAmbiguousAsWide]; validated when [build] is called. */
-        public var treatAmbiguousAsWide: Boolean = source?.treatAmbiguousAsWide ?: false
+        var treatAmbiguousAsWide: Boolean = source?.treatAmbiguousAsWide ?: false
 
         /** Draft value for [TerminalWorkspaceOpenOptions.maxHistory]; validated when [build] is called. */
-        public var maxHistory: Int = source?.maxHistory ?: 1000
+        var maxHistory: Int = source?.maxHistory ?: 1000
 
         /** Draft value for [TerminalWorkspaceOpenOptions.pasteControlPolicy]; validated when [build] is called. */
-        public var pasteControlPolicy: PasteControlPolicy = source?.pasteControlPolicy ?: PasteControlPolicy.PRESERVE
+        var pasteControlPolicy: PasteControlPolicy = source?.pasteControlPolicy ?: PasteControlPolicy.PRESERVE
 
         /** Draft value for [TerminalWorkspaceOpenOptions.shellIntegrationEnabled]; validated when [build] is called. */
-        public var shellIntegrationEnabled: Boolean = source?.shellIntegrationEnabled ?: true
+        var shellIntegrationEnabled: Boolean = source?.shellIntegrationEnabled ?: true
 
         /** Draft value for [TerminalWorkspaceOpenOptions.hostPolicy]; validated when [build] is called. */
-        public var hostPolicy: HostPolicy = source?.hostPolicy ?: HostPolicy()
+        var hostPolicy: HostPolicy = source?.hostPolicy ?: HostPolicy()
 
         /** Draft value for [TerminalWorkspaceOpenOptions.showForegroundProcessName]; validated when [build] is called. */
-        public var showForegroundProcessName: Boolean = source?.showForegroundProcessName ?: true
+        var showForegroundProcessName: Boolean = source?.showForegroundProcessName ?: true
 
         /** Draft value for [TerminalWorkspaceOpenOptions.modeReportCapabilities]; validated when [build] is called. */
-        public var modeReportCapabilities: Int = source?.modeReportCapabilities ?: 0
+        var modeReportCapabilities: Int = source?.modeReportCapabilities ?: 0
 
         /** Validates and freezes current values; later draft changes cannot affect the result. */
-        public fun build(): TerminalWorkspaceOpenOptions = TerminalWorkspaceOpenOptions(this)
+        fun build(): TerminalWorkspaceOpenOptions = TerminalWorkspaceOpenOptions(this)
     }
 
     override fun equals(other: Any?): Boolean =
@@ -622,14 +623,14 @@ public class TerminalWorkspaceOpenOptions private constructor(
         }
     }
 
-    public companion object {
+    companion object {
         /** Creates a fresh caller-confined draft initialized to defaults. */
         @JvmStatic
-        public fun builder(): Builder = Builder()
+        fun builder(): Builder = Builder()
 
         /** Configures a draft synchronously and returns one validated immutable snapshot. */
         @JvmStatic
-        public fun create(configure: java.util.function.Consumer<Builder>): TerminalWorkspaceOpenOptions =
+        fun create(configure: java.util.function.Consumer<Builder>): TerminalWorkspaceOpenOptions =
             builder().also { configure.accept(it) }.build()
     }
 }
@@ -644,11 +645,11 @@ public class TerminalWorkspaceOpenOptions private constructor(
  *   `null` before one is reported.
  * @property session running terminal session.
  */
-public class TerminalWorkspaceTab internal constructor(
-    public val id: String,
-    public val profile: TerminalProfile,
+class TerminalWorkspaceTab internal constructor(
+    val id: String,
+    val profile: TerminalProfile,
     title: String,
-    public val session: TerminalSession,
+    val session: TerminalSession,
     private val onColorChanged: (TerminalWorkspaceTab, String?) -> Unit,
     private val onTitleChanged: (TerminalWorkspaceTab, String) -> Unit,
     private val onCurrentWorkingDirectoryChanged: (TerminalWorkspaceTab, String) -> Unit,
@@ -668,14 +669,14 @@ public class TerminalWorkspaceTab internal constructor(
     /**
      * Current host-visible title for this tab.
      */
-    public val title: String
+    val title: String
         get() = synchronized(titleLock) { titleLocked() }
 
     private fun titleLocked(): String =
         customTitle ?: if (applicationTitleActive) dynamicTitle else foregroundProcessTitle ?: directoryTitle ?: dynamicTitle
 
     /** Enables process-title tracking; disabling immediately restores the existing title fallback. */
-    public var showForegroundProcessName: Boolean
+    var showForegroundProcessName: Boolean
         get() = processTitleEnabled.value
         set(enabled) {
             val changedTitle =
@@ -710,13 +711,13 @@ public class TerminalWorkspaceTab internal constructor(
      * a directory is observed. Model publications update it synchronously until
      * the session closes; the tab then retains its last observed value.
      */
-    public val currentWorkingDirectoryUri: String?
+    val currentWorkingDirectoryUri: String?
         get() = currentWorkingDirectory
 
     /**
      * Optional user title, taking precedence over application, process, and directory titles.
      */
-    public var customTitle: String? = null
+    var customTitle: String? = null
         get() = synchronized(titleLock) { field }
         set(value) {
             val changedTitle =
@@ -750,7 +751,7 @@ public class TerminalWorkspaceTab internal constructor(
     /**
      * Optional custom color representation for this tab (e.g. hex string "#3b82f6").
      */
-    public var color: String? = null
+    var color: String? = null
         set(value) {
             if (field != value) {
                 field = value
@@ -813,7 +814,7 @@ public class TerminalWorkspaceTab internal constructor(
 /**
  * Host-neutral workspace events.
  */
-public interface TerminalWorkspaceListener {
+interface TerminalWorkspaceListener {
     /**
      * Effective palette change for an attached tab. The immutable value may be
      * retained. Metadata callbacks run synchronously under the session mutation
@@ -821,13 +822,13 @@ public interface TerminalWorkspaceListener {
      * terminal mutation. There is no initial replay; read the session's palette
      * for current state. Events before tab attachment or after removal are ignored.
      */
-    public fun paletteChanged(
+    fun paletteChanged(
         tab: TerminalWorkspaceTab,
         palette: TerminalColorPalette,
     ): Unit = Unit
 
     /** New accepted OSC 8 registry entry for an attached tab; no browser action is implied. */
-    public fun hyperlinkRegistered(
+    fun hyperlinkRegistered(
         tab: TerminalWorkspaceTab,
         hyperlinkId: Int,
         uri: String,
@@ -835,16 +836,16 @@ public interface TerminalWorkspaceListener {
     ): Unit = Unit
 
     /** An evicted OSC 8 identity is no longer resolvable in this tab's session. */
-    public fun hyperlinkRemoved(
+    fun hyperlinkRemoved(
         tab: TerminalWorkspaceTab,
         hyperlinkId: Int,
     ): Unit = Unit
 
     /** Hard reset cleared this tab's nonempty OSC 8 registry. */
-    public fun hyperlinksCleared(tab: TerminalWorkspaceTab): Unit = Unit
+    fun hyperlinksCleared(tab: TerminalWorkspaceTab): Unit = Unit
 
     /** The user typed before shell readiness, so the configured startup command was not submitted. */
-    public fun startupCommandCancelled(tab: TerminalWorkspaceTab): Unit = Unit
+    fun startupCommandCancelled(tab: TerminalWorkspaceTab): Unit = Unit
 
     /**
      * Called after a tab is registered and selected, before its session starts.
@@ -853,7 +854,7 @@ public interface TerminalWorkspaceListener {
      *
      * @param tab opened tab.
      */
-    public fun tabOpened(tab: TerminalWorkspaceTab): Unit = Unit
+    fun tabOpened(tab: TerminalWorkspaceTab): Unit = Unit
 
     /**
      * Called when a tab color changes.
@@ -861,7 +862,7 @@ public interface TerminalWorkspaceListener {
      * @param tab tab whose color changed.
      * @param color new color representation (e.g. hex string) or null if reset.
      */
-    public fun colorChanged(
+    fun colorChanged(
         tab: TerminalWorkspaceTab,
         color: String?,
     ): Unit = Unit
@@ -871,21 +872,21 @@ public interface TerminalWorkspaceListener {
      *
      * @param tabId selected tab id.
      */
-    public fun tabSelected(tabId: String): Unit = Unit
+    fun tabSelected(tabId: String): Unit = Unit
 
     /**
      * Called after a tab is closed.
      *
      * @param tabId closed tab id.
      */
-    public fun tabClosed(tabId: String): Unit = Unit
+    fun tabClosed(tabId: String): Unit = Unit
 
     /**
      * Called when a tab emits a terminal bell event.
      *
      * @param tab tab that emitted the bell.
      */
-    public fun bell(tab: TerminalWorkspaceTab): Unit = Unit
+    fun bell(tab: TerminalWorkspaceTab): Unit = Unit
 
     /**
      * Called when a tab requests a window/grid resize.
@@ -894,7 +895,7 @@ public interface TerminalWorkspaceListener {
      * @param rows target row count.
      * @param columns target column count.
      */
-    public fun resizeWindow(
+    fun resizeWindow(
         tab: TerminalWorkspaceTab,
         rows: Int,
         columns: Int,
@@ -905,7 +906,7 @@ public interface TerminalWorkspaceListener {
      * optional window resize without changing the session grid.
      * See [io.github.ketraterm.host.HostEventSink.columnModeChanged].
      */
-    public fun columnModeChanged(
+    fun columnModeChanged(
         tab: TerminalWorkspaceTab,
         rows: Int,
         columns: Int,
@@ -918,7 +919,7 @@ public interface TerminalWorkspaceListener {
      * @param x target x position on screen.
      * @param y target y position on screen.
      */
-    public fun moveWindow(
+    fun moveWindow(
         tab: TerminalWorkspaceTab,
         x: Int,
         y: Int,
@@ -929,28 +930,28 @@ public interface TerminalWorkspaceListener {
      *
      * @param tab tab that received the request.
      */
-    public fun minimizeWindow(tab: TerminalWorkspaceTab): Unit = Unit
+    fun minimizeWindow(tab: TerminalWorkspaceTab): Unit = Unit
 
     /**
      * Called when the shell requests deminimizing (restoring) the terminal window.
      *
      * @param tab tab that received the request.
      */
-    public fun deminimizeWindow(tab: TerminalWorkspaceTab): Unit = Unit
+    fun deminimizeWindow(tab: TerminalWorkspaceTab): Unit = Unit
 
     /**
      * Called when the shell requests raising the terminal window.
      *
      * @param tab tab that received the request.
      */
-    public fun raiseWindow(tab: TerminalWorkspaceTab): Unit = Unit
+    fun raiseWindow(tab: TerminalWorkspaceTab): Unit = Unit
 
     /**
      * Called when the shell requests lowering the terminal window.
      *
      * @param tab tab that received the request.
      */
-    public fun lowerWindow(tab: TerminalWorkspaceTab): Unit = Unit
+    fun lowerWindow(tab: TerminalWorkspaceTab): Unit = Unit
 
     /**
      * Called when the shell requests maximizing or restoring the terminal window.
@@ -958,7 +959,7 @@ public interface TerminalWorkspaceListener {
      * @param tab tab that received the request.
      * @param maximize true to maximize, false to restore.
      */
-    public fun setMaximized(
+    fun setMaximized(
         tab: TerminalWorkspaceTab,
         maximize: Boolean,
     ): Unit = Unit
@@ -969,7 +970,7 @@ public interface TerminalWorkspaceListener {
      * @param tab tab that received the marker.
      * @param event typed marker event.
      */
-    public fun shellIntegrationMarker(
+    fun shellIntegrationMarker(
         tab: TerminalWorkspaceTab,
         event: ShellIntegrationEvent,
     ): Unit = Unit
@@ -981,7 +982,7 @@ public interface TerminalWorkspaceListener {
      * The callback runs on the producer thread and must not block. Registration
      * ends when the tab or session closes; an already dispatched callback may finish.
      */
-    public fun commandFinished(
+    fun commandFinished(
         tab: TerminalWorkspaceTab,
         metadata: TerminalShellIntegrationCommandMetadata,
     ): Unit = Unit
@@ -995,7 +996,7 @@ public interface TerminalWorkspaceListener {
      * @param tab tab whose title changed.
      * @param title new title.
      */
-    public fun titleChanged(
+    fun titleChanged(
         tab: TerminalWorkspaceTab,
         title: String,
     ): Unit = Unit
@@ -1010,7 +1011,7 @@ public interface TerminalWorkspaceListener {
      * @param tab tab whose working directory changed.
      * @param uri absolute `file://` URI reported by the shell.
      */
-    public fun currentWorkingDirectoryChanged(
+    fun currentWorkingDirectoryChanged(
         tab: TerminalWorkspaceTab,
         uri: String,
     ): Unit = Unit
@@ -1021,7 +1022,7 @@ public interface TerminalWorkspaceListener {
      * @param tab tab associated with the failure.
      * @param exception failure raised by the listener bridge.
      */
-    public fun listenerFailed(
+    fun listenerFailed(
         tab: TerminalWorkspaceTab,
         exception: Exception,
     ): Unit = Unit
@@ -1039,7 +1040,7 @@ public interface TerminalWorkspaceListener {
      * unknown.
      * @param failure transport failure, or null for a normal process exit.
      */
-    public fun sessionClosed(
+    fun sessionClosed(
         tab: TerminalWorkspaceTab,
         exitCode: Int?,
         failure: Throwable?,
@@ -1053,7 +1054,7 @@ public interface TerminalWorkspaceListener {
      * @param body notification message body.
      * @param level notification severity level.
      */
-    public fun showNotification(
+    fun showNotification(
         tab: TerminalWorkspaceTab,
         title: String,
         body: String,
@@ -1070,7 +1071,7 @@ public interface TerminalWorkspaceListener {
      * @param tab tab that received the request.
      * @param event decoded clipboard write request.
      */
-    public fun terminalClipboardWrite(
+    fun terminalClipboardWrite(
         tab: TerminalWorkspaceTab,
         event: TerminalClipboardWriteEvent,
     ): Unit = Unit
@@ -1085,7 +1086,7 @@ public interface TerminalWorkspaceListener {
      * @param tab tab that received the request.
      * @param event decoded clipboard prompt request.
      */
-    public fun terminalClipboardPrompt(
+    fun terminalClipboardPrompt(
         tab: TerminalWorkspaceTab,
         event: TerminalClipboardPromptEvent,
     ): Unit = Unit
@@ -1101,15 +1102,15 @@ public interface TerminalWorkspaceListener {
      * are audited without details; they are not delivered to [listenerFailed].
      * The default reports unavailable data without accessing a clipboard.
      */
-    public suspend fun readClipboard(
+    suspend fun readClipboard(
         tab: TerminalWorkspaceTab,
         request: TerminalClipboardReadRequest,
     ): TerminalClipboardReadResult = TerminalClipboardReadResult.Unavailable
 
-    public companion object {
+    companion object {
         /**
          * Listener implementation that ignores every event.
          */
-        public val NONE: TerminalWorkspaceListener = object : TerminalWorkspaceListener {}
+        val NONE: TerminalWorkspaceListener = object : TerminalWorkspaceListener {}
     }
 }

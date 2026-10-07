@@ -119,12 +119,12 @@ class TerminalShellEnvironmentBootstrapTest {
                 profile(command = listOf("pwsh", "-Command", "Write-Host explicit"), kind = TerminalProfileKind.POWERSHELL),
             )
         for (profile in profiles) {
-            val launch = TerminalShellIntegrationBootstrap.apply(profile, enabled = true)
+            val launch = TerminalShellIntegrationBootstrap.apply(profile, enabled = true).profile
             assertEquals(profile.command, launch.command)
             assertEquals("/project/jdk", launch.environment["JAVA_HOME"])
             assertFalse(launch.environment.keys.any { it.startsWith("_KetraTerm_FORCE_") })
         }
-        val launch = TerminalShellIntegrationBootstrap.apply(profile(), enabled = false)
+        val launch = TerminalShellIntegrationBootstrap.apply(profile(), enabled = false).profile
         assertEquals(profile().command, launch.command)
         assertEquals("/project/jdk", launch.environment["JAVA_HOME"])
         assertFalse(launch.environment.keys.any { it.startsWith("_KetraTerm_FORCE_") })
@@ -135,7 +135,7 @@ class TerminalShellEnvironmentBootstrapTest {
         @TempDir directory: Path,
     ) {
         val profile = profile(command = listOf("bash", "--noprofile", "-il"))
-        val launch = TerminalShellIntegrationBootstrap.apply(profile, enabled = true, scriptDirectory = directory)
+        val launch = TerminalShellIntegrationBootstrap.apply(profile, enabled = true, scriptDirectory = directory).profile
 
         assertEquals(listOf("bash", "--rcfile", directory.resolve("bash/rcfile.bash").toString(), "--noprofile", "-i"), launch.command)
         assertEquals("1", launch.environment["_KetraTerm_BASH_LOGIN_SHELL"])
@@ -158,7 +158,7 @@ class TerminalShellEnvironmentBootstrapTest {
                 profile(command = listOf("zsh", "--"), kind = TerminalProfileKind.ZSH),
             )
         for (profile in profiles) {
-            val launch = TerminalShellIntegrationBootstrap.apply(profile, enabled = true, scriptDirectory = directory)
+            val launch = TerminalShellIntegrationBootstrap.apply(profile, enabled = true, scriptDirectory = directory).profile
             assertEquals(profile.command[0], launch.command.first())
             assertEquals("--", launch.command.last())
             assertEquals(1, launch.command.count { it == "--" })
@@ -170,11 +170,12 @@ class TerminalShellEnvironmentBootstrapTest {
     fun `zsh enforces environment after final startup file for login and nonlogin shells`(
         @TempDir directory: Path,
     ) {
-        TerminalShellIntegrationBootstrap.apply(
-            profile(command = listOf("zsh", "-l"), kind = TerminalProfileKind.ZSH),
-            enabled = true,
-            scriptDirectory = directory,
-        )
+        TerminalShellIntegrationBootstrap
+            .apply(
+                profile(command = listOf("zsh", "-l"), kind = TerminalProfileKind.ZSH),
+                enabled = true,
+                scriptDirectory = directory,
+            )
         val rc = directory.resolve("zsh/.zshrc").readText()
         val login = directory.resolve("zsh/.zlogin").readText()
         assertTrue(rc.contains("if [[ ! -o login ]]"))
@@ -187,20 +188,22 @@ class TerminalShellEnvironmentBootstrapTest {
         @TempDir directory: Path,
     ) {
         val powerShell =
-            TerminalShellIntegrationBootstrap.apply(
-                profile(command = listOf("pwsh"), kind = TerminalProfileKind.POWERSHELL),
-                enabled = true,
-                scriptDirectory = directory,
-            )
+            TerminalShellIntegrationBootstrap
+                .apply(
+                    profile(command = listOf("pwsh"), kind = TerminalProfileKind.POWERSHELL),
+                    enabled = true,
+                    scriptDirectory = directory,
+                ).profile
         val script = String(Base64.getDecoder().decode(powerShell.command.last()), Charsets.UTF_16LE)
         assertTrue(script.indexOf("_KetraTerm_FORCE_SET_") < script.indexOf("function global:prompt"))
         assertFalse(script.contains("/project/jdk"))
         val fish =
-            TerminalShellIntegrationBootstrap.apply(
-                profile(command = listOf("fish"), kind = TerminalProfileKind.FISH),
-                enabled = true,
-                scriptDirectory = directory,
-            )
+            TerminalShellIntegrationBootstrap
+                .apply(
+                    profile(command = listOf("fish"), kind = TerminalProfileKind.FISH),
+                    enabled = true,
+                    scriptDirectory = directory,
+                ).profile
         assertTrue(fish.command.last().indexOf("_KetraTerm_FORCE_SET_") < fish.command.last().indexOf("function __ketraterm_fish_prompt"))
         assertFalse(fish.command.last().contains("/project/jdk"))
     }
