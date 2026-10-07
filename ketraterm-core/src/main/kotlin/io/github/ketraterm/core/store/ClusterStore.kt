@@ -188,16 +188,22 @@ internal class ClusterStore {
      * @param array     The raw codepoint array of a [io.github.ketraterm.core.model.Line].
      * @param fromIndex Start of the range to sweep (inclusive).
      * @param toIndex   End of the range to sweep (exclusive).
+     * @return Number of handles freed, for the owning row's cluster accounting.
      */
     fun freeRange(
         array: IntArray,
         fromIndex: Int,
         toIndex: Int,
-    ) {
+    ): Int {
+        var freed = 0
         for (i in fromIndex until toIndex) {
             val v = array[i]
-            if (v <= TerminalConstants.CLUSTER_HANDLE_MAX) free(v)
+            if (v <= TerminalConstants.CLUSTER_HANDLE_MAX) {
+                free(v)
+                freed++
+            }
         }
+        return freed
     }
 
     // Public API — zero-allocation accessors (safe on the hot render path)

@@ -333,7 +333,7 @@ class ClusterStoreTest {
             val h2 = store.alloc(intArrayOf(300))
 
             val line = intArrayOf('A'.code, h0, TerminalConstants.WIDE_CHAR_SPACER, h1, TerminalConstants.EMPTY, h2)
-            store.freeRange(line, fromIndex = 1, toIndex = 5) // frees h0 and h1, skips non-handles
+            assertEquals(2, store.freeRange(line, fromIndex = 1, toIndex = 5)) // frees h0 and h1, skips non-handles
 
             val r1 = store.alloc(intArrayOf(901))
             val r2 = store.alloc(intArrayOf(902))
@@ -357,7 +357,7 @@ class ClusterStoreTest {
             val h2 = store.alloc(intArrayOf(3))
             val arr = intArrayOf(h0, h1, h2)
 
-            store.freeRange(arr, fromIndex = 0, toIndex = 2) // frees h0, h1 only
+            assertEquals(2, store.freeRange(arr, fromIndex = 0, toIndex = 2)) // frees h0, h1 only
 
             val r1 = store.alloc(intArrayOf(10))
             val r2 = store.alloc(intArrayOf(11))
@@ -403,7 +403,7 @@ class ClusterStoreTest {
             val h = store.alloc(intArrayOf(42))
             val arr = intArrayOf(h)
 
-            store.freeRange(arr, fromIndex = 0, toIndex = 0) // empty range
+            assertEquals(0, store.freeRange(arr, fromIndex = 0, toIndex = 0)) // empty range
 
             // Handle must still be alive
             assertCluster(store, h, intArrayOf(42))
@@ -421,7 +421,7 @@ class ClusterStoreTest {
                     0x1F600,
                 )
 
-            store.freeRange(arr, fromIndex = 0, toIndex = arr.size)
+            assertEquals(0, store.freeRange(arr, fromIndex = 0, toIndex = arr.size))
 
             // h was never in arr, must still be live
             assertCluster(store, h, intArrayOf(1))

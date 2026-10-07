@@ -28,6 +28,128 @@ import org.junit.jupiter.params.provider.ValueSource
 @DisplayName("Line Test Suite")
 class LineTest {
     @ParameterizedTest
+    @ValueSource(strings = ["scalar", "clear", "prefix", "suffix", "range", "insert", "delete", "fill"])
+    fun `cluster accounting follows erasure and shifting without leaking or freeing survivors`(operation: String) {
+        val store = store()
+        val line = Line(8, store)
+        val payloads = mapOf(0 to intArrayOf('a'.code, 0x0301), 3 to intArrayOf('b'.code, 0x0301), 7 to intArrayOf('c'.code, 0x0301))
+        assertEquals(0, clusterCount(line))
+        payloads.forEach { (col, cps) -> line.setCluster(col, cps, cps.size, 0L) }
+        val handles = payloads.keys.map { line.rawCodepoint(it) }.toSet()
+        assertEquals(3, clusterCount(line))
+
+        val survivors =
+            when (operation) {
+                "scalar" -> {
+                    line.setCell(3, 'x'.code, 0L)
+                    mapOf(0 to 0, 7 to 7)
+                }
+                "clear" -> {
+                    line.clear(0L)
+                    emptyMap()
+                }
+                "prefix" -> {
+                    line.clearToColumn(3, 0L)
+                    mapOf(7 to 7)
+                }
+                "suffix" -> {
+                    line.clearFromColumn(3, 0L)
+                    mapOf(0 to 0)
+                }
+                "range" -> {
+                    line.clearRange(2, 5, 0L)
+                    mapOf(0 to 0, 7 to 7)
+                }
+                "insert" -> {
+                    line.insertCellsInRange(1, 5, 7, 0L)
+                    mapOf(0 to 0)
+                }
+                "delete" -> {
+                    line.deleteCellsInRange(1, 4, 7, 0L)
+                    mapOf(0 to 0, 3 to 7)
+                }
+                "fill" -> {
+                    line.fill('x'.code, 0L)
+                    emptyMap()
+                }
+                else -> error(operation)
+            }
+        assertEquals(survivors.size, clusterCount(line))
+        repeat(line.width) { col ->
+            assertEquals(col in survivors, line.isCluster(col), "operation=$operation column=$col")
+            val originalCol = survivors[col]
+            if (originalCol != null) {
+                val copied = IntArray(2)
+                assertEquals(2, line.readCluster(col, copied))
+                assertArrayEquals(payloads.getValue(originalCol), copied)
+            }
+        }
+        line.clear(0L)
+        assertEquals(0, clusterCount(line))
+        assertEquals("", line.toTextTrimmed())
+        val reused = IntArray(3) { store.alloc(intArrayOf('z'.code, 0x0301)) }
+        assertEquals(handles, reused.toSet(), "Every discarded handle must be freed exactly once")
+        line.clear(0L)
+        assertEquals(0, clusterCount(line))
+        reused.forEach { assertEquals('z'.code, store.baseCodepoint(it)) }
+    }
+
+    @Test
+    fun `cluster replacement and edits outside clusters preserve exact accounting`() {
+        val line = line(8)
+        line.setCluster(3, intArrayOf('a'.code, 0x0301), 2, 0L)
+        line.setCluster(3, intArrayOf('b'.code, 0x0301), 2, 0L)
+        assertEquals(1, clusterCount(line))
+        line.setCellAttributes(3, 5L, 7L)
+        line.clearRange(0, 2, 0L)
+        line.insertCellsInRange(2, 1, 6, 0L)
+        assertEquals(1, clusterCount(line))
+        assertTrue(line.isCluster(4))
+        line.deleteCellsInRange(2, 1, 6, 0L)
+        assertEquals(1, clusterCount(line))
+        assertEquals('b'.code, line.getCodepoint(3))
+        assertEquals(3, line.writeAsciiIntoSimpleCells(0, "abcdef".toByteArray(), 0, 6, 0L, 0L))
+        assertEquals(1, clusterCount(line))
+        line.clearRange(3, 4, 0L)
+        assertEquals(0, clusterCount(line))
+        line.setCell(6, '界'.code, 0L)
+        line.setCell(7, TerminalConstants.WIDE_CHAR_SPACER, 0L)
+        line.clear(0L)
+        assertEquals(0, clusterCount(line))
+    }
+
+    @Test
+    fun `raw handle transfers update row accounting without freeing payloads`() {
+        val store = store()
+        val source = Line(4, store)
+        val target = Line(4, store)
+        source.setCluster(0, intArrayOf('a'.code, 0x0301), 2, 0L)
+        val handle = source.rawCodepoint(0)
+        target.setRawCell(3, handle, 0L)
+        source.setRawCell(0, TerminalConstants.EMPTY, 0L)
+        assertEquals(0, clusterCount(source))
+        assertEquals(1, clusterCount(target))
+        target.setRawCell(3, handle, 7L)
+        assertEquals(1, clusterCount(target))
+        source.clear(0L)
+        assertEquals('a'.code, target.getCodepoint(3))
+
+        val replacement = store.alloc(intArrayOf('b'.code, 0x0301))
+        target.setRawCell(3, replacement, 0L)
+        store.free(handle) // Raw replacement leaves release of the old handle to the caller.
+        assertEquals(1, clusterCount(target))
+        target.clear(0L)
+        assertEquals(0, clusterCount(target))
+        assertEquals(setOf(handle, replacement), IntArray(2) { store.alloc(intArrayOf(1, 2)) }.toSet())
+    }
+
+    private fun clusterCount(line: Line): Int {
+        val field = Line::class.java.getDeclaredField("clusterCount")
+        field.isAccessible = true
+        return field.getInt(line)
+    }
+
+    @ParameterizedTest
     @ValueSource(
         strings = ["scalar", "raw", "attributes", "cluster", "ascii", "clear", "prefix", "suffix", "range", "insert", "delete", "fill"],
     )
