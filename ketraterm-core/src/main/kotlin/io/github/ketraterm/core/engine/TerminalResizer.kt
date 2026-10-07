@@ -80,7 +80,7 @@ internal object TerminalResizer {
 
         val newStore = ClusterStore()
         val newRing =
-            HistoryRing(buffer.maxHistory + newHeight) {
+            HistoryRing(buffer.maxHistory + newHeight, newHeight) {
                 Line(newWidth, newStore)
             }
 

@@ -20,7 +20,6 @@ import io.github.ketraterm.core.codec.AttributeCodec
 import io.github.ketraterm.core.model.Line
 import io.github.ketraterm.core.model.TerminalConstants
 import io.github.ketraterm.core.state.TerminalState
-import io.github.ketraterm.core.store.ClusterStore
 import io.github.ketraterm.protocol.DecRectangleAttribute
 
 /**
@@ -1607,48 +1606,13 @@ internal class MutationEngine(
         block(topRow, leftCol, bottomRow, rightCol)
     }
 
-    /**
-     * Clears scrollback history while preserving the current visible viewport (ED 3).
-     *
-     * Visible rows are deep-copied into a fresh ring/store pair so dropped
-     * history lines release any cluster payloads they owned.
-     */
+    /** Clears scrollback (ED 3), retaining visible rows and allocated storage for reuse. */
     fun eraseScreenAndHistory() =
         structuralMutation {
-            val buffer = state.activeBuffer
-            val sourceStore = buffer.store
-            val newStore = ClusterStore()
-            val newRing = HistoryRing(buffer.maxHistory + height) { Line(width, newStore) }
-            val visibleTop = (buffer.ring.size - height).coerceAtLeast(0)
-            var clusterBuf = IntArray(16)
-
-            for (row in 0 until height) {
-                val srcLine = buffer.ring[visibleTop + row]
-                val destLine = newRing.push()
-                destLine.assignLineId(if (srcLine.lineId > 0L) srcLine.lineId else state.allocateLineId())
-                for (col in 0 until width) {
-                    val raw = srcLine.rawCodepoint(col)
-                    val attr = srcLine.getPackedAttr(col)
-                    val extendedAttr = srcLine.getPackedExtendedAttr(col)
-                    if (raw <= TerminalConstants.CLUSTER_HANDLE_MAX) {
-                        val cpLen = sourceStore.length(raw)
-                        if (clusterBuf.size < cpLen) {
-                            clusterBuf = IntArray(cpLen)
-                        }
-                        sourceStore.readInto(raw, clusterBuf, 0)
-                        destLine.setCluster(col, clusterBuf, cpLen, attr, extendedAttr)
-                    } else {
-                        destLine.setRawCell(col, raw, attr, extendedAttr)
-                    }
-                }
-                destLine.wrapped = srcLine.wrapped
-                destLine.endsWithWrapPadding = srcLine.endsWithWrapPadding
-                destLine.hasOutput = srcLine.hasOutput
-                state.markLineChanged(destLine)
+            state.activeBuffer.clearHistory(height)
+            for (row in 0 until state.ring.size) {
+                state.markLineChanged(state.ring[row])
             }
-
-            buffer.store = newStore
-            buffer.ring = newRing
             state.markStructureChanged()
         }
 

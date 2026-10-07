@@ -47,7 +47,7 @@ internal class ScreenBuffer(
     var store = ClusterStore()
         internal set
 
-    var ring = HistoryRing(maxHistory + initialHeight) { Line(initialWidth, store) }
+    var ring = store.let { arena -> HistoryRing(maxHistory + initialHeight, initialHeight) { Line(initialWidth, arena) } }
         internal set(value) {
             if (field !== value) historyContentGeneration++
             field = value
@@ -176,6 +176,19 @@ internal class ScreenBuffer(
     }
 
     /**
+     * Clears history while preserving the visible rows and reusing all allocated
+     * row and cluster storage. Freed cluster slots remain available for future output.
+     */
+    fun clearHistory(viewportHeight: Int) {
+        val visibleRows = minOf(viewportHeight, ring.size)
+        for (i in 0 until ring.size - visibleRows) {
+            ring[i].clear(0L, 0L)
+        }
+        ring.retainLast(visibleRows)
+        historyContentGeneration++
+    }
+
+    /**
      * Replaces the entire memory arena with a fresh store and ring sized to
      * [newWidth] x [newHeight], then fills the new ring with blank lines.
      *
@@ -189,8 +202,9 @@ internal class ScreenBuffer(
         penAttr: Long,
         penExtendedAttr: Long = 0L,
     ) {
-        store = ClusterStore()
-        ring = HistoryRing(maxHistory + newHeight) { Line(newWidth, store) }
+        val newStore = ClusterStore()
+        store = newStore
+        ring = HistoryRing(maxHistory + newHeight, newHeight) { Line(newWidth, newStore) }
         repeat(newHeight) { clearLineAsNew(ring.push(), penAttr, penExtendedAttr) }
         scrollTop = 0
         scrollBottom = newHeight - 1

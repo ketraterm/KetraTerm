@@ -33,11 +33,68 @@ class HistoryRingTest {
     @Nested
     @DisplayName("Initialization")
     inner class InitializationTests {
+        @ParameterizedTest
+        @ValueSource(ints = [1, 127, 128, 129, 256, 259])
+        fun `constructs rows in bounded batches and recycles only at capacity`(capacity: Int) {
+            val store = ClusterStore()
+            val created = mutableListOf<Line>()
+            val ring = HistoryRing(capacity) { Line(10, store).also { created.add(it) } }
+            assertEquals(minOf(128, capacity), created.size)
+
+            repeat(capacity) { index ->
+                val line = ring.push()
+                line.setCell(0, index + 1, 0)
+                assertSame(created[index], line)
+                assertEquals(minOf(capacity, (index / 128 + 1) * 128), created.size)
+                assertEquals(0L, ring.discardedCount)
+            }
+            repeat(capacity) { index -> assertEquals(index + 1, ring[index].getCodepoint(0)) }
+
+            repeat(capacity * 2) { index ->
+                assertSame(created[index % capacity], ring.push())
+                assertEquals(capacity, created.size)
+                assertEquals(index + 1L, ring.discardedCount)
+            }
+        }
+
         @Test
-        @DisplayName("Pre-allocates Line objects immediately")
-        fun testPreAllocation() {
-            assertDoesNotThrow {
-                HistoryRing(10, createLineFactory())
+        fun `reserves visible rows plus 128 spare rows`() {
+            var created = 0
+            val store = ClusterStore()
+            val ring =
+                HistoryRing(capacity = 1000, initialRows = 200) {
+                    created++
+                    Line(4, store)
+                }
+            assertEquals(328, created)
+            assertEquals(0, ring.size)
+            repeat(328) { ring.push() }
+            assertEquals(328, created)
+            ring.push()
+            assertEquals(456, created)
+        }
+
+        @Test
+        fun `visible rows can exhaust capacity without reserving history`() {
+            var created = 0
+            val store = ClusterStore()
+            val ring =
+                HistoryRing(capacity = 200, initialRows = 200) {
+                    created++
+                    Line(4, store)
+                }
+            repeat(400) { ring.push() }
+            assertEquals(200, created)
+            assertEquals(200, ring.size)
+            assertEquals(200L, ring.discardedCount)
+        }
+
+        @Test
+        fun `rejects invalid initial row counts before invoking factory`() {
+            for (initialRows in intArrayOf(-1, 11)) {
+                assertThrows<IllegalArgumentException> {
+                    HistoryRing(10, initialRows) { error("Factory must not be called") }
+                }
             }
         }
 
@@ -45,7 +102,7 @@ class HistoryRingTest {
         @DisplayName("Starts empty with correct capacity")
         fun testInitialState() {
             val capacity = 5
-            val ring = HistoryRing(capacity, createLineFactory())
+            val ring = HistoryRing(capacity, lineFactory = createLineFactory())
 
             assertEquals(0, ring.size, "Should start empty")
             assertEquals(capacity, ring.capacity, "Capacity should match constructor")
@@ -59,7 +116,7 @@ class HistoryRingTest {
         @DisplayName("Push increases size up to capacity")
         fun testPushIncreasesSize() {
             val capacity = 3
-            val ring = HistoryRing(capacity, createLineFactory())
+            val ring = HistoryRing(capacity, lineFactory = createLineFactory())
 
             ring.push()
             assertEquals(1, ring.size)
@@ -78,7 +135,7 @@ class HistoryRingTest {
         @Test
         @DisplayName("Get returns lines in logical order (Oldest -> Newest)")
         fun testLogicalOrder() {
-            val ring = HistoryRing(5, createLineFactory())
+            val ring = HistoryRing(5, lineFactory = createLineFactory())
 
             // Push 3 lines and mark them
             val l1 = ring.push()
@@ -102,7 +159,7 @@ class HistoryRingTest {
         @DisplayName("Pushing when full overwrites oldest (FIFO)")
         fun testOverwriteOldest() {
             val capacity = 3
-            val ring = HistoryRing(capacity, createLineFactory())
+            val ring = HistoryRing(capacity, lineFactory = createLineFactory())
 
             // Fill buffer: [A, B, C]
             val a = ring.push()
@@ -128,7 +185,7 @@ class HistoryRingTest {
         @Test
         @DisplayName("Recycles existing object instances when full")
         fun testObjectRecycling() {
-            val ring = HistoryRing(1, createLineFactory())
+            val ring = HistoryRing(1, lineFactory = createLineFactory())
 
             val line1 = ring.push()
             val line2 = ring.push()
@@ -140,7 +197,7 @@ class HistoryRingTest {
         @Test
         @DisplayName("Complex wrapping scenario")
         fun testComplexWrap() {
-            val ring = HistoryRing(3, createLineFactory())
+            val ring = HistoryRing(3, lineFactory = createLineFactory())
 
             // Push 0, 1, 2. Ring: [0, 1, 2]. Head: 0.
             repeat(3) { i -> ring.push().setCell(0, i, 0) }
@@ -161,7 +218,7 @@ class HistoryRingTest {
         @Test
         @DisplayName("Accessing empty ring throws exception")
         fun testEmptyAccess() {
-            val ring = HistoryRing(5, createLineFactory())
+            val ring = HistoryRing(5, lineFactory = createLineFactory())
             assertThrows<IndexOutOfBoundsException> {
                 ring[0]
             }
@@ -170,7 +227,7 @@ class HistoryRingTest {
         @ParameterizedTest
         @ValueSource(ints = [-1, 3, 100])
         fun testOutOfBoundsAccess(index: Int) {
-            val ring = HistoryRing(3, createLineFactory())
+            val ring = HistoryRing(3, lineFactory = createLineFactory())
             ring.push()
             ring.push()
             ring.push()
@@ -186,7 +243,7 @@ class HistoryRingTest {
         @Test
         @DisplayName("Off-by-one check: ring[size] should throw")
         fun testStrictUpperBound() {
-            val ring = HistoryRing(5, createLineFactory())
+            val ring = HistoryRing(5, lineFactory = createLineFactory())
             ring.push() // Size 1. Index 0 is valid.
 
             assertThrows<IndexOutOfBoundsException>("Accessing index=size must throw") {
@@ -198,10 +255,73 @@ class HistoryRingTest {
     @Nested
     @DisplayName("Clear Operation")
     inner class ClearTests {
+        @ParameterizedTest
+        @ValueSource(ints = [1, 5, 129, 259, 1000])
+        fun `retaining newest rows preserves identity and reuses all allocated rows`(capacity: Int) {
+            for (pushes in intArrayOf(minOf(capacity, 3), minOf(capacity, 130), capacity, capacity + 2)) {
+                val size = minOf(capacity, pushes)
+                for (keep in intArrayOf(0, 1, minOf(size, 2), size)) {
+                    val store = ClusterStore()
+                    val created = mutableListOf<Line>()
+                    val ring = HistoryRing(capacity) { Line(4, store).also { created.add(it) } }
+                    repeat(pushes) { ring.push().setCell(0, it + 1, 0) }
+                    val retained = List(keep) { ring[size - keep + it] }
+                    val allocated = created.size
+
+                    repeat(2) {
+                        ring.retainLast(keep)
+                        assertEquals(keep, ring.size)
+                        assertEquals(0L, ring.discardedCount)
+                        retained.forEachIndexed { index, line ->
+                            assertSame(line, ring[index])
+                            assertEquals(pushes - keep + index + 1, ring[index].getCodepoint(0))
+                        }
+                    }
+
+                    repeat(allocated - keep) { ring.push() }
+                    assertEquals(allocated, created.size, "Refilling allocated storage must not call the factory")
+                    assertEquals(created.toSet(), (0 until ring.size).map { ring[it] }.toSet())
+                    repeat(capacity - allocated) { ring.push() }
+                    assertEquals(capacity, created.size)
+                    assertEquals(created.toSet(), (0 until ring.size).map { ring[it] }.toSet())
+                    val oldest = ring[0]
+                    assertSame(oldest, ring.push())
+                    assertEquals(1L, ring.discardedCount)
+                }
+            }
+        }
+
+        @Test
+        fun `retaining an invalid count leaves contents intact`() {
+            val ring = HistoryRing(3, lineFactory = createLineFactory())
+            val line = ring.push()
+            for (count in intArrayOf(-1, 2)) {
+                assertThrows<IllegalArgumentException> { ring.retainLast(count) }
+                assertEquals(1, ring.size)
+                assertSame(line, ring[0])
+            }
+        }
+
+        @Test
+        fun `clear reuses allocated batches after partial growth and wrapping`() {
+            for (pushes in intArrayOf(129, 600)) {
+                val store = ClusterStore()
+                val created = mutableListOf<Line>()
+                val ring = HistoryRing(259) { Line(4, store).also { created.add(it) } }
+                repeat(pushes) { ring.push() }
+                val allocated = created.size
+                ring.clear()
+                assertEquals(0, ring.size)
+                assertEquals(0L, ring.discardedCount)
+                repeat(allocated) { index -> assertSame(created[index], ring.push()) }
+                assertEquals(allocated, created.size)
+            }
+        }
+
         @Test
         @DisplayName("Clear resets size but keeps capacity")
         fun testClear() {
-            val ring = HistoryRing(5, createLineFactory())
+            val ring = HistoryRing(5, lineFactory = createLineFactory())
             repeat(5) { ring.push() }
 
             assertEquals(5, ring.size)
@@ -217,7 +337,7 @@ class HistoryRingTest {
         @Test
         @DisplayName("Can push after clear")
         fun testPushAfterClear() {
-            val ring = HistoryRing(2, createLineFactory())
+            val ring = HistoryRing(2, lineFactory = createLineFactory())
             ring.push()
             ring.clear()
 
@@ -235,7 +355,7 @@ class HistoryRingTest {
         @Test
         @DisplayName("rotateUp with single-line region")
         fun testRotateUpSingleLine() {
-            val ring = HistoryRing(3, createLineFactory())
+            val ring = HistoryRing(3, lineFactory = createLineFactory())
             val l0 = ring.push()
             l0.setCell(0, 'A'.code, 0)
             val l1 = ring.push()
@@ -254,7 +374,7 @@ class HistoryRingTest {
         @Test
         @DisplayName("rotateUp with two-line region")
         fun testRotateUpTwoLines() {
-            val ring = HistoryRing(4, createLineFactory())
+            val ring = HistoryRing(4, lineFactory = createLineFactory())
             val l0 = ring.push()
             l0.setCell(0, 'A'.code, 0)
             val l1 = ring.push()
@@ -276,7 +396,7 @@ class HistoryRingTest {
         @Test
         @DisplayName("rotateUp full range moves oldest to newest")
         fun testRotateUpFullRange() {
-            val ring = HistoryRing(3, createLineFactory())
+            val ring = HistoryRing(3, lineFactory = createLineFactory())
             val l0 = ring.push()
             l0.setCell(0, 'A'.code, 0)
             val l1 = ring.push()
@@ -294,7 +414,7 @@ class HistoryRingTest {
         @Test
         @DisplayName("rotateUp after ring wrap maintains order")
         fun testRotateUpAfterWrap() {
-            val ring = HistoryRing(3, createLineFactory())
+            val ring = HistoryRing(3, lineFactory = createLineFactory())
             repeat(3) { i -> ring.push().setCell(0, i, 0) }
             // Push one more to wrap: [1, 2, 3] logically
             ring.push().setCell(0, 3, 0)
@@ -313,7 +433,7 @@ class HistoryRingTest {
         @Test
         @DisplayName("rotateUp three times cycles full range")
         fun testRotateUpMultiple() {
-            val ring = HistoryRing(3, createLineFactory())
+            val ring = HistoryRing(3, lineFactory = createLineFactory())
             val l0 = ring.push()
             l0.setCell(0, 'A'.code, 0)
             val l1 = ring.push()
@@ -338,7 +458,7 @@ class HistoryRingTest {
         @Test
         @DisplayName("rotateDown with single-line region")
         fun testRotateDownSingleLine() {
-            val ring = HistoryRing(3, createLineFactory())
+            val ring = HistoryRing(3, lineFactory = createLineFactory())
             val l0 = ring.push()
             l0.setCell(0, 'A'.code, 0)
             val l1 = ring.push()
@@ -357,7 +477,7 @@ class HistoryRingTest {
         @Test
         @DisplayName("rotateDown with two-line region")
         fun testRotateDownTwoLines() {
-            val ring = HistoryRing(4, createLineFactory())
+            val ring = HistoryRing(4, lineFactory = createLineFactory())
             val l0 = ring.push()
             l0.setCell(0, 'A'.code, 0)
             val l1 = ring.push()
@@ -379,7 +499,7 @@ class HistoryRingTest {
         @Test
         @DisplayName("rotateDown full range moves newest to oldest")
         fun testRotateDownFullRange() {
-            val ring = HistoryRing(3, createLineFactory())
+            val ring = HistoryRing(3, lineFactory = createLineFactory())
             val l0 = ring.push()
             l0.setCell(0, 'A'.code, 0)
             val l1 = ring.push()
@@ -397,7 +517,7 @@ class HistoryRingTest {
         @Test
         @DisplayName("rotateDown after ring wrap maintains order")
         fun testRotateDownAfterWrap() {
-            val ring = HistoryRing(3, createLineFactory())
+            val ring = HistoryRing(3, lineFactory = createLineFactory())
             repeat(3) { i -> ring.push().setCell(0, i, 0) }
             ring.push().setCell(0, 3, 0)
 
@@ -415,7 +535,7 @@ class HistoryRingTest {
         @Test
         @DisplayName("rotateDown multiple times cycles through")
         fun testRotateDownMultiple() {
-            val ring = HistoryRing(3, createLineFactory())
+            val ring = HistoryRing(3, lineFactory = createLineFactory())
             val l0 = ring.push()
             l0.setCell(0, 'A'.code, 0)
             val l1 = ring.push()
@@ -438,7 +558,7 @@ class HistoryRingTest {
         @Test
         @DisplayName("rotateUp then rotateDown returns to original")
         fun testRotateUpThenDown() {
-            val ring = HistoryRing(4, createLineFactory())
+            val ring = HistoryRing(4, lineFactory = createLineFactory())
             val l0 = ring.push()
             val l1 = ring.push()
             val l2 = ring.push()
@@ -456,7 +576,7 @@ class HistoryRingTest {
         @Test
         @DisplayName("rotateDown then rotateUp returns to original")
         fun testRotateDownThenUp() {
-            val ring = HistoryRing(4, createLineFactory())
+            val ring = HistoryRing(4, lineFactory = createLineFactory())
             val l0 = ring.push()
             val l1 = ring.push()
             val l2 = ring.push()
@@ -478,7 +598,7 @@ class HistoryRingTest {
         @Test
         @DisplayName("Multiple operations interleaved")
         fun testMultipleOperationsInterleaved() {
-            val ring = HistoryRing(5, createLineFactory())
+            val ring = HistoryRing(5, lineFactory = createLineFactory())
 
             // Build [0, 1, 2, 3, 4]
             repeat(5) { i -> ring.push().setCell(0, i, 0) }
@@ -505,7 +625,7 @@ class HistoryRingTest {
         @Test
         @DisplayName("Push after rotate maintains consistency")
         fun testPushAfterRotate() {
-            val ring = HistoryRing(3, createLineFactory())
+            val ring = HistoryRing(3, lineFactory = createLineFactory())
             val l0 = ring.push()
             l0.setCell(0, 'A'.code, 0)
             val l1 = ring.push()
@@ -529,7 +649,7 @@ class HistoryRingTest {
         @Test
         @DisplayName("Clear after rotate resets state correctly")
         fun testClearAfterRotate() {
-            val ring = HistoryRing(3, createLineFactory())
+            val ring = HistoryRing(3, lineFactory = createLineFactory())
             repeat(3) { i -> ring.push().setCell(0, i, 0) }
 
             ring.rotateUp(0, 2)
@@ -542,7 +662,7 @@ class HistoryRingTest {
         @Test
         @DisplayName("Capacity 1 edge case with rotations")
         fun testCapacityOneRotation() {
-            val ring = HistoryRing(1, createLineFactory())
+            val ring = HistoryRing(1, lineFactory = createLineFactory())
             val l0 = ring.push()
 
             // Rotating a single-element ring should be safe

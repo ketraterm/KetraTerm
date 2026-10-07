@@ -18,17 +18,35 @@ package io.github.ketraterm.core.buffer
 import io.github.ketraterm.core.model.Line
 
 /**
- * A fixed-capacity ring buffer of [Line]s.
+ * A bounded ring whose row storage grows synchronously in batches of 128.
+ * The reference table has full [capacity], but only [initialRows] plus the first
+ * batch of spare rows are constructed upfront. Existing rows are reused on clear
+ * and on capacity wrapping. All access, including [lineFactory], is caller-serialized.
+ * The factory must keep the same width and cluster store throughout the ring's lifetime.
  */
 internal class HistoryRing(
     val capacity: Int,
+    initialRows: Int = 0,
     private val lineFactory: () -> Line,
 ) {
     init {
         require(capacity > 0) { "capacity must be > 0, was $capacity" }
+        require(initialRows in 0..capacity) { "initialRows must be in 0..capacity, was $initialRows" }
     }
 
-    private val data: Array<Line> = Array(capacity) { lineFactory() }
+    private val data: Array<Line?> = arrayOfNulls(capacity)
+    private var allocatedRows: Int = 0
+
+    init {
+        allocateRows(initialRows + minOf(ROW_BATCH_SIZE, capacity - initialRows))
+    }
+
+    private fun allocateRows(target: Int) {
+        while (allocatedRows < target) {
+            data[allocatedRows] = lineFactory()
+            allocatedRows++
+        }
+    }
 
     private var head: Int = 0 // physical index of the oldest element
     var size: Int = 0 // number of logical lines currently in the ring
@@ -45,7 +63,7 @@ internal class HistoryRing(
      */
     operator fun get(i: Int): Line {
         if (i !in 0 until size) throw IndexOutOfBoundsException("index $i out of bounds (size=$size)")
-        return data[(head + i) % capacity]
+        return checkNotNull(data[(head + i) % capacity])
     }
 
     /**
@@ -54,11 +72,15 @@ internal class HistoryRing(
      */
     fun push(): Line =
         if (size < capacity) {
+            if (size == allocatedRows) {
+                allocateRows(allocatedRows + minOf(ROW_BATCH_SIZE, capacity - allocatedRows))
+            }
             val slot = (head + size) % capacity
+            val line = checkNotNull(data[slot])
             size++
-            data[slot]
+            line
         } else {
-            val recycled = data[head]
+            val recycled = checkNotNull(data[head])
             head = (head + 1) % capacity
             discardedCount++
             recycled
@@ -99,6 +121,29 @@ internal class HistoryRing(
     }
 
     /**
+     * Keeps the newest [count] logical rows and resets eviction accounting.
+     * Removed rows remain allocated for reuse, in unspecified order. The caller
+     * must clear their contents first to release any cluster handles.
+     */
+    fun retainLast(count: Int) {
+        require(count in 0..size) { "count must be in 0..size, was $count" }
+        val removed = size - count
+        if (removed > 0) {
+            var target = head
+            var source = ((head.toLong() + removed) % capacity).toInt()
+            repeat(count) {
+                val reusable = data[target]
+                data[target] = data[source]
+                data[source] = reusable
+                if (++target == capacity) target = 0
+                if (++source == capacity) source = 0
+            }
+        }
+        size = count
+        discardedCount = 0L
+    }
+
+    /**
      * Clears the ring buffer by resetting head and size.
      * The Line objects themselves are not modified, but they will be overwritten by future pushes.
      */
@@ -106,5 +151,9 @@ internal class HistoryRing(
         head = 0
         size = 0
         discardedCount = 0L
+    }
+
+    private companion object {
+        const val ROW_BATCH_SIZE = 128
     }
 }
