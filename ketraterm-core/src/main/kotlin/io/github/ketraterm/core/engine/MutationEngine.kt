@@ -109,25 +109,24 @@ internal class MutationEngine(
         if (top == 0) {
             repeat(n) {
                 val line = state.ring.push()
-                if (bottom < state.dimensions.height - 1) {
-                    // Pushing admits the top row to history but initially puts
-                    // the recycled blank at the viewport bottom. Move that
-                    // line to the bottom of the top-anchored scroll region so
-                    // rows below the region retain their viewport positions.
-                    state.ring.rotateDown(
-                        state.resolveRingIndex(bottom),
-                        state.resolveRingIndex(state.dimensions.height - 1),
-                    )
-                }
                 state.clearLineAsNew(line, blankAttr, blankExtendedAttr)
                 state.markLineChanged(line)
+            }
+            if (bottom < height - 1) {
+                // Pushes place the new blanks below the viewport's surviving rows.
+                // Move them into the region together, restoring the rows below it.
+                state.ring.rotateDown(
+                    state.resolveRingIndex(bottom - n + 1),
+                    state.resolveRingIndex(height - 1),
+                    n,
+                )
             }
         } else {
             val absTop = state.resolveRingIndex(top)
             val absBottom = state.resolveRingIndex(bottom)
-            repeat(n) {
-                state.ring.rotateUp(absTop, absBottom)
-                val line = state.ring[absBottom]
+            state.ring.rotateUp(absTop, absBottom, n)
+            for (row in absBottom - n + 1..absBottom) {
+                val line = state.ring[row]
                 state.clearLineAsNew(line, blankAttr, blankExtendedAttr)
                 state.markLineChanged(line)
             }
@@ -154,9 +153,10 @@ internal class MutationEngine(
 
         val absTop = state.resolveRingIndex(top)
         val absBottom = state.resolveRingIndex(bottom)
-        repeat(n) {
-            state.ring.rotateDown(absTop, absBottom)
-            val line = state.ring[absTop]
+        state.ring.rotateDown(absTop, absBottom, n)
+        // Match the identity assignment order of successive downward scrolls.
+        for (row in absTop + n - 1 downTo absTop) {
+            val line = state.ring[row]
             state.clearLineAsNew(line, blankAttr, blankExtendedAttr)
             state.markLineChanged(line)
         }
@@ -739,9 +739,9 @@ internal class MutationEngine(
         structuralMutation {
             mutateLines(count) { absCursorRow, absBottom, times ->
                 if (!state.modes.isLeftRightMarginMode) {
-                    repeat(times) {
-                        state.ring.rotateDown(absCursorRow, absBottom)
-                        val line = state.ring[absCursorRow]
+                    state.ring.rotateDown(absCursorRow, absBottom, times)
+                    for (row in absCursorRow + times - 1 downTo absCursorRow) {
+                        val line = state.ring[row]
                         state.clearLineAsNew(line, blankAttr, blankExtendedAttr)
                         state.markLineChanged(line)
                     }
@@ -761,9 +761,9 @@ internal class MutationEngine(
         structuralMutation {
             mutateLines(count) { absCursorRow, absBottom, times ->
                 if (!state.modes.isLeftRightMarginMode) {
-                    repeat(times) {
-                        state.ring.rotateUp(absCursorRow, absBottom)
-                        val line = state.ring[absBottom]
+                    state.ring.rotateUp(absCursorRow, absBottom, times)
+                    for (row in absBottom - times + 1..absBottom) {
+                        val line = state.ring[row]
                         state.clearLineAsNew(line, blankAttr, blankExtendedAttr)
                         state.markLineChanged(line)
                     }

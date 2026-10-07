@@ -87,15 +87,24 @@ internal class HistoryRing(
         }
 
     /**
-     * Rotates lines in the logical range [fromLogical, toLogical] upward by one slot.
-     * The line at [fromLogical] is moved to [toLogical]; everything else shifts toward [fromLogical] by one.
-     * After this call, the line now at [toLogical] is the one that was at [fromLogical] —
-     * caller is responsible for clearing it to create a blank scroll-in line.
+     * Rotates the inclusive logical range upward by [count] slots in O(range length)
+     * time without allocating. [count] must be in 0..range length.
+     * The first [count] rows move to the end in their original order; callers own clearing.
      */
     internal fun rotateUp(
         fromLogical: Int,
         toLogical: Int,
+        count: Int = 1,
     ) {
+        val length = toLogical - fromLogical + 1
+        require(count in 0..length) { "count must be in 0..$length, was $count" }
+        if (count == 0 || count == length) return
+        if (count > 1) {
+            reverseRange(fromLogical, fromLogical + count - 1)
+            reverseRange(fromLogical + count, toLogical)
+            reverseRange(fromLogical, toLogical)
+            return
+        }
         val evicted = data[(head + fromLogical) % capacity]
         for (i in fromLogical until toLogical) {
             data[(head + i) % capacity] = data[(head + i + 1) % capacity]
@@ -104,20 +113,42 @@ internal class HistoryRing(
     }
 
     /**
-     * Rotates lines in the logical range [fromLogical, toLogical] downward by one slot.
-     * The line at [toLogical] is moved to [fromLogical]; everything else shifts toward [toLogical] by one.
-     * After this call, the line now at [fromLogical] is the one that was at [toLogical] —
-     * caller is responsible for clearing it to create a blank scroll-in line.
+     * Rotates the inclusive logical range downward by [count] slots in O(range length)
+     * time without allocating. [count] must be in 0..range length.
+     * The last [count] rows move to the start in their original order; callers own clearing.
      */
     internal fun rotateDown(
         fromLogical: Int,
         toLogical: Int,
+        count: Int = 1,
     ) {
+        val length = toLogical - fromLogical + 1
+        require(count in 0..length) { "count must be in 0..$length, was $count" }
+        if (count == 0 || count == length) return
+        if (count > 1) {
+            rotateUp(fromLogical, toLogical, length - count)
+            return
+        }
         val evicted = data[(head + toLogical) % capacity]
         for (i in toLogical downTo fromLogical + 1) {
             data[(head + i) % capacity] = data[(head + i - 1) % capacity]
         }
         data[(head + fromLogical) % capacity] = evicted
+    }
+
+    private fun reverseRange(
+        fromLogical: Int,
+        toLogical: Int,
+    ) {
+        var left = ((head.toLong() + fromLogical) % capacity).toInt()
+        var right = ((head.toLong() + toLogical) % capacity).toInt()
+        repeat((toLogical - fromLogical + 1) / 2) {
+            val saved = data[left]
+            data[left] = data[right]
+            data[right] = saved
+            if (++left == capacity) left = 0
+            if (--right < 0) right = capacity - 1
+        }
     }
 
     /**
