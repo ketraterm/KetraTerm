@@ -240,11 +240,12 @@ internal class Line(
     }
 
     /**
-     * Writes validated printable ASCII into consecutive empty cells, stopping at an occupant.
+     * Writes validated printable ASCII over empty or single-width scalar cells.
+     * Stops before a cluster, wide leader, or spacer so the caller can clear its full span.
      * The caller bounds [length] to the remaining row width and owns generation/cursor updates.
-     * Returns the number written, without inspecting or freeing cluster handles.
+     * Returns the number written without freeing cluster handles.
      */
-    fun writeAsciiIntoEmptyCells(
+    fun writeAsciiIntoSimpleCells(
         col: Int,
         bytes: ByteArray,
         offset: Int,
@@ -253,10 +254,16 @@ internal class Line(
         extendedAttr: Long,
     ): Int {
         var written = 0
-        while (written < length && codepoints[col + written] == TerminalConstants.EMPTY) {
-            codepoints[col + written] = bytes[offset + written].toInt()
-            attrs[col + written] = attr
-            extendedAttrs[col + written] = extendedAttr
+        while (written < length) {
+            val target = col + written
+            if (codepoints[target] < TerminalConstants.EMPTY ||
+                (target + 1 < width && codepoints[target + 1] == TerminalConstants.WIDE_CHAR_SPACER)
+            ) {
+                break
+            }
+            codepoints[target] = bytes[offset + written].toInt()
+            attrs[target] = attr
+            extendedAttrs[target] = extendedAttr
             written++
         }
         if (written > 0 && col + written == width) endsWithWrapPadding = false

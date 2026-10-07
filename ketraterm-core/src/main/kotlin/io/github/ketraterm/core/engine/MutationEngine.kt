@@ -582,7 +582,7 @@ internal class MutationEngine(
         }
     }
 
-    /** Writes a validated printable ASCII range, committing empty row spans together. */
+    /** Writes a validated printable ASCII range, committing simple row spans together. */
     fun printAscii(
         bytes: ByteArray,
         offset: Int,
@@ -605,7 +605,7 @@ internal class MutationEngine(
             val row = state.cursor.row
             if (!state.cursor.pendingWrap && row in 0 until height && col in 0 until columns) {
                 val line = getLine(row)
-                val count = line.writeAsciiIntoEmptyCells(col, bytes, index, minOf(end - index, columns - col), attr, extendedAttr)
+                val count = line.writeAsciiIntoSimpleCells(col, bytes, index, minOf(end - index, columns - col), attr, extendedAttr)
                 if (count > 0) {
                     line.hasOutput = true
                     state.markLineChanged(line)
@@ -618,7 +618,7 @@ internal class MutationEngine(
                     continue
                 }
             }
-            // Existing scalar physics owns pending wraps, scrolling, and occupied spans.
+            // Existing scalar physics owns pending wraps, scrolling, and wide or clustered spans.
             printCodepoint(bytes[index].toInt(), 1)
             index++
         }

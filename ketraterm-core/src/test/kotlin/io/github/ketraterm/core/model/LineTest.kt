@@ -28,6 +28,58 @@ import org.junit.jupiter.params.provider.ValueSource
 @DisplayName("Line Test Suite")
 class LineTest {
     @Test
+    fun `ASCII span overwrites narrow scalars and blanks with both attribute words`() {
+        val line = line(5)
+        line.setCell(0, 'a'.code, 1L, 2L)
+        line.setCell(2, 'é'.code, 1L, 2L)
+        line.setCell(4, 'z'.code, 1L, 2L)
+        val bytes = byteArrayOf(0) + "ABCDE".toByteArray() + byteArrayOf(-1)
+
+        assertEquals(5, line.writeAsciiIntoSimpleCells(0, bytes, 1, 5, 3L, 4L))
+
+        assertEquals("ABCDE", line.toText())
+        repeat(5) { col ->
+            assertEquals(3L, line.getPackedAttr(col))
+            assertEquals(4L, line.getPackedExtendedAttr(col))
+        }
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = ["wide", "cluster", "wide cluster"])
+    fun `ASCII span stops before a complex occupant even when its spacer is outside the write range`(occupant: String) {
+        val line = line(5)
+        val cluster = intArrayOf(0x1F469, 0x200D, 0x1F4BB)
+        line.setCell(0, 'a'.code, 1L, 2L)
+        if (occupant == "wide") {
+            line.setCell(2, '界'.code, 1L, 2L)
+        } else {
+            line.setCluster(2, cluster, cluster.size, 1L, 2L)
+        }
+        if (occupant != "cluster") line.setRawCell(3, TerminalConstants.WIDE_CHAR_SPACER, 1L, 2L)
+        val raw = line.rawCodepoint(2)
+        val bytes = "XYZ".toByteArray()
+
+        assertEquals(2, line.writeAsciiIntoSimpleCells(0, bytes, 0, 3, 3L, 4L))
+        assertEquals('X'.code, line.rawCodepoint(0))
+        assertEquals('Y'.code, line.rawCodepoint(1))
+        assertEquals(raw, line.rawCodepoint(2))
+        assertEquals(1L, line.getPackedAttr(2))
+        assertEquals(2L, line.getPackedExtendedAttr(2))
+        assertEquals(0, line.writeAsciiIntoSimpleCells(2, bytes, 0, 1, 3L, 4L))
+        if (occupant != "cluster") {
+            assertEquals(0, line.writeAsciiIntoSimpleCells(3, bytes, 0, 1, 3L, 4L))
+            assertEquals(TerminalConstants.WIDE_CHAR_SPACER, line.rawCodepoint(3))
+        }
+        if (occupant != "wide") {
+            val copy = IntArray(cluster.size)
+            assertEquals(cluster.size, line.readCluster(2, copy))
+            assertArrayEquals(cluster, copy)
+        }
+        line.clear(0L)
+        assertEquals("", line.toTextTrimmed())
+    }
+
+    @Test
     fun `edits before trailing wrap padding preserve its provenance`() {
         val line = line(4)
         line.wrapped = true
