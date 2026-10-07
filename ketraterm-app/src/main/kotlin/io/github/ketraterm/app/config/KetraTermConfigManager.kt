@@ -18,6 +18,7 @@ package io.github.ketraterm.app.config
 import io.github.ketraterm.host.TerminalClipboardPermission
 import io.github.ketraterm.host.TerminalTitlePermission
 import io.github.ketraterm.input.policy.PasteControlPolicy
+import io.github.ketraterm.ui.swing.settings.SwingPromptDecoration
 import java.io.IOException
 import java.nio.file.Files
 import java.nio.file.Path
@@ -182,6 +183,10 @@ internal class KetraTermConfigManager(
                 cursorBlinkMillis = cursorBlinkMillis,
                 useSystemFallbackFonts = useSystemFallbackFonts,
                 cursorShape = cleanCursorShape,
+                promptDecoration =
+                    SwingPromptDecoration.entries.firstOrNull {
+                        it.name.equals(behavior["prompt_decoration"]?.trim(), ignoreCase = true)
+                    } ?: default.promptDecoration,
                 shellPath = cleanShellPath,
                 startDirectory = startDirectory,
                 startupCommand = shell["startup_command"].orEmpty(),
@@ -299,6 +304,9 @@ internal class KetraTermConfigManager(
         cursor_blink_millis = ${config.cursorBlinkMillis}
         # Style of the text cursor (block, underline, beam)
         cursor_shape = ${TomlParser.quoteString(config.cursorShape)}
+
+        # Prompt presentation: "gutter", "divider", or "none".
+        prompt_decoration = ${TomlParser.quoteString(config.promptDecoration.name.lowercase(Locale.ROOT))}
         # Play a system beep when the terminal receives a BEL character
         audible_bell = ${config.audibleBell}
         # Show a visual edge pulse when the terminal receives a BEL character

@@ -18,8 +18,10 @@ package io.github.ketraterm.app.config
 import io.github.ketraterm.host.TerminalClipboardPermission
 import io.github.ketraterm.host.TerminalTitlePermission
 import io.github.ketraterm.input.policy.PasteControlPolicy
+import io.github.ketraterm.ui.swing.settings.SwingPromptDecoration
 import org.junit.jupiter.api.DynamicTest
 import org.junit.jupiter.api.TestFactory
+import org.junit.jupiter.api.io.TempDir
 import java.io.IOException
 import java.nio.file.Files
 import java.nio.file.Path
@@ -27,6 +29,34 @@ import java.util.*
 import kotlin.test.*
 
 class KetraTermConfigTest {
+    @Test
+    fun `prompt styles round trip and reach renderer settings`(
+        @TempDir directory: Path,
+    ) {
+        val manager = KetraTermConfigManager(directory.resolve("config.toml"))
+        val settings = KetraTermSettings(manager)
+        for (style in SwingPromptDecoration.entries) {
+            val config = settings.config.copy(promptDecoration = style)
+            settings.update(config)
+            assertEquals(config, manager.load())
+            assertEquals(style, settings.current().promptDecoration)
+        }
+    }
+
+    @Test
+    fun `legacy and invalid prompt styles use gutter while ids ignore case`(
+        @TempDir directory: Path,
+    ) {
+        val file = directory.resolve("config.toml")
+        val manager = KetraTermConfigManager(file)
+        for (value in listOf(null, "", "unknown", "gutter")) {
+            Files.writeString(file, if (value == null) "" else "[behavior]\nprompt_decoration = \"$value\"")
+            assertEquals(SwingPromptDecoration.GUTTER, manager.load().promptDecoration)
+        }
+        Files.writeString(file, "[behavior]\nprompt_decoration = \" DiViDeR \"")
+        assertEquals(SwingPromptDecoration.DIVIDER, manager.load().promptDecoration)
+    }
+
     @TestFactory
     fun `string configuration values survive save and reload`(): List<DynamicTest> {
         val fields = listOf("theme", "fontFamily", "cursorShape", "shellPath", "startDirectory")

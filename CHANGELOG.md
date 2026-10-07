@@ -6,6 +6,10 @@ Release notes for library consumers and embedders. Product-specific changes are 
 
 ### Improvements and fixes
 
+- Added gutter, divider, and undecorated prompt presentation through `SwingPromptDecoration`. Divider bands share painting and interaction geometry without changing terminal rows or copied text; alternate screens suppress prompt decorations.
+- Exposed the selected shell producer's immutable `promptMarkersExpected` startup expectation. Configured launches reserve gutters at binding; unconfirmed sessions retain metadata-based activation without losing the first prompt anchor.
+- Centered the installed alternate-screen grid on both axes, including leftover pixels, while retaining configured insets for grid sizing and exact explicit padding overrides.
+
 - Batched printable ASCII runs through the parser, host adapter, and core to reduce per-character work during large log ingestion. Core writes eligible spans directly into empty cells while preserving wrapping, scrolling, attributes, charset mapping, and grapheme continuations across input chunks; complex grid operations retain their existing behavior.
 - Reduced ASCII output parsing cost by avoiding unnecessary Unicode property searches while preserving charset mapping and grapheme assembly. Added a fresh-terminal log ingestion benchmark with retained-cell validation and separate parser/core measurements.
 - Replaced repeated Unicode grapheme/emoji range searches with a single packed, deduplicated lookup reused throughout grapheme assembly. Added a fast boundary check for consecutive ordinary bases, exhaustive Unicode 17 property verification, and a separate first-input benchmark; segmentation rules and core width policy are unchanged.
@@ -17,7 +21,7 @@ Release notes for library consumers and embedders. Product-specific changes are 
 
 - Preserve application cursor shapes in unfocused Swing terminals: blocks become thin hollow outlines, while bars and underlines remain steady. Device-aligned beams and underlines keep thickness consistent across panes at fractional display scales. Focus restores application blinking; cursor visibility, wide-cell ownership, bidi placement, and blinking-text behavior are preserved.
 - Reworked hyperlink retention and discovery to preserve prepared links through scrolling and focus changes, keep ordered filters from consuming unused rows, and validate hover and activation against the displayed occurrence. Hosts can configure OSC 8 styles and direct or modifier activation through immutable Swing settings; link cursors reflect activation eligibility.
-- Stopped frame-triggered terminal resizing on buffer switches. Default alternate-screen padding now shares the primary horizontal inset equally and preserves vertical insets, so physical resizing retains the same grid dimensions in either buffer. Explicit alternate-padding overrides remain supported.
+- Stopped frame-triggered terminal resizing on buffer switches. Default alternate-screen sizing retains the primary total insets while presentation centers the installed grid, so physical resizing retains the same grid dimensions in either buffer. Explicit alternate-padding overrides remain supported.
 - Shell metadata now updates without transport output, including command completion events.
 - Discarded stale suggestions when the command context changes. Closing the session or disabling suggestions cancels pending requests and closes popups.
 - Restored focus notifications for terminal applications that request them.

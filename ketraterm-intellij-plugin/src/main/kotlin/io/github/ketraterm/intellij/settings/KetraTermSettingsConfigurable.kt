@@ -97,6 +97,7 @@ class KetraTermSettingsConfigurable internal constructor(
     private val addProjectJdkToPathCheckBox = JBCheckBox(KetraTermBundle.message("settings.ketraterm.addProjectJdkToPath"))
     private val defaultTabNameField = JBTextField()
     private val cursorShapeCombo = ComboBox(cursorShapeOptions())
+    private val promptDecorationCombo = ComboBox(promptDecorationOptions())
     private val ambiguousWidthCheckBox = JBCheckBox(KetraTermBundle.message("settings.ketraterm.ambiguousWidth"))
     private val systemFallbackFontsCheckBox = JBCheckBox(KetraTermBundle.message("settings.ketraterm.systemFallbackFonts"))
     private val visualBellCheckBox = JBCheckBox(KetraTermBundle.message("settings.ketraterm.visualBell"))
@@ -203,6 +204,11 @@ class KetraTermSettingsConfigurable internal constructor(
                     row(KetraTermBundle.message("settings.ketraterm.scrollback")) {
                         cell(scrollbackSpinner)
                     }
+                    row(KetraTermBundle.message("settings.ketraterm.promptDecoration")) {
+                        cell(promptDecorationCombo)
+                            .align(AlignX.LEFT)
+                            .comment(KetraTermBundle.message("settings.ketraterm.promptDecoration.comment"))
+                    }
                     row(KetraTermBundle.message("settings.ketraterm.cursorShape")) {
                         cell(cursorShapeCombo).align(AlignX.LEFT)
                     }
@@ -306,6 +312,7 @@ class KetraTermSettingsConfigurable internal constructor(
         addProjectJdkToPathCheckBox.isSelected = state.addProjectJdkToPath
         defaultTabNameField.text = state.defaultTabName
         cursorShapeCombo.selectedItem = cursorShapeOptions().first { it.id == state.cursorShape }
+        promptDecorationCombo.selectedItem = promptDecorationOptions().first { it.id == state.promptDecoration }
         ambiguousWidthCheckBox.isSelected = state.treatAmbiguousAsWide
         systemFallbackFontsCheckBox.isSelected = state.useSystemFallbackFonts
         visualBellCheckBox.isSelected = state.visualBell
@@ -337,6 +344,9 @@ class KetraTermSettingsConfigurable internal constructor(
             cursorBlinkMillis = spinnerValue(cursorBlinkSpinner),
             useSystemFallbackFonts = systemFallbackFontsCheckBox.isSelected,
             cursorShape = selectedCursorShapeId(),
+            promptDecoration =
+                (promptDecorationCombo.selectedItem as? PromptDecorationOption)?.id
+                    ?: KetraTermIntellijSettings.DEFAULT_PROMPT_DECORATION,
             visualBell = visualBellCheckBox.isSelected,
             pasteOnMiddleClick = pasteOnMiddleClickCheckBox.isSelected,
             overrideIdeShortcuts = overrideIdeShortcutsCheckBox.isSelected,
@@ -479,6 +489,20 @@ private fun themeOptions(): Array<ThemeOption> =
                         .joinToString(" ") { part -> part.replaceFirstChar(Char::titlecase) },
                 )
             }.toTypedArray(),
+    )
+
+private data class PromptDecorationOption(
+    val id: String,
+    private val label: String,
+) {
+    override fun toString(): String = label
+}
+
+private fun promptDecorationOptions(): Array<PromptDecorationOption> =
+    arrayOf(
+        PromptDecorationOption("gutter", KetraTermBundle.message("settings.ketraterm.promptDecoration.gutter")),
+        PromptDecorationOption("divider", KetraTermBundle.message("settings.ketraterm.promptDecoration.divider")),
+        PromptDecorationOption("none", KetraTermBundle.message("settings.ketraterm.promptDecoration.none")),
     )
 
 private fun cursorShapeOptions(): Array<CursorShapeOption> =

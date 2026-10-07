@@ -26,6 +26,7 @@ import io.github.ketraterm.input.policy.PasteControlPolicy
 import io.github.ketraterm.render.api.TerminalRenderCursorShape
 import io.github.ketraterm.ui.swing.host.SwingTerminalSettingsBounds
 import io.github.ketraterm.ui.swing.settings.SwingPadding
+import io.github.ketraterm.ui.swing.settings.SwingPromptDecoration
 import io.github.ketraterm.ui.swing.settings.TerminalTheme
 import org.jdom.Element
 import org.junit.Assert.*
@@ -36,6 +37,24 @@ import java.util.concurrent.CancellationException
  * Tests IntelliJ settings persistence mapping without opening an IDE window.
  */
 class KetraTermIntellijSettingsTest {
+    @Test
+    fun `prompt styles normalize persist and reach rendering settings`() {
+        val service = KetraTermIntellijSettings()
+        assertEquals("gutter", Element("State").deserialize(KetraTermIntellijSettings.State::class.java).promptDecoration)
+        for (style in SwingPromptDecoration.entries) {
+            service.loadState(service.state.copy(themeId = "nord", promptDecoration = " ${style.name} "))
+            assertEquals(style.name.lowercase(java.util.Locale.ROOT), service.state.promptDecoration)
+            val restored = KetraTermIntellijSettings()
+            restored.loadState(requireNotNull(serialize(service.state)).deserialize(KetraTermIntellijSettings.State::class.java))
+            assertEquals(service.state, restored.state)
+            assertEquals(style, KetraTermIntellijSettingsMapper.toSwingSettings(restored.state).promptDecoration)
+        }
+        for (invalid in listOf("", "unknown")) {
+            service.loadState(service.state.copy(promptDecoration = invalid))
+            assertEquals("gutter", service.state.promptDecoration)
+        }
+    }
+
     @Test
     fun `fresh clipboard Ask survives XML round trip while library reads stay denied`() {
         val settings = KetraTermIntellijSettings()
