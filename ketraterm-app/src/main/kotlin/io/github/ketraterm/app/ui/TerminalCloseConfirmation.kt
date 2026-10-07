@@ -15,6 +15,7 @@
  */
 package io.github.ketraterm.app.ui
 
+import io.github.ketraterm.app.appMessages
 import io.github.ketraterm.ui.swing.host.SwingDialogRequest
 import io.github.ketraterm.ui.swing.host.SwingMessageDialogs
 import java.awt.Component
@@ -70,19 +71,19 @@ internal class SwingTerminalCloseConfirmation(
 internal object TerminalClosePromptText {
     fun title(request: TerminalCloseRequest): String =
         if (request.liveProcessCount == 1) {
-            "Kill Terminal Process?"
+            appMessages.text("close.singleTitle")
         } else {
-            "Kill Terminal Processes?"
+            appMessages.text("close.multipleTitle")
         }
 
     fun message(request: TerminalCloseRequest): String =
         if (request.liveProcessCount == 1) {
-            "Closing \"${request.displayName}\" will kill its running process."
+            appMessages.text("close.singleMessage", request.displayName)
         } else {
-            "Closing \"${request.displayName}\" will kill ${request.liveProcessCount} running processes."
+            appMessages.text("close.multipleMessage", request.displayName, request.liveProcessCount)
         }
 
-    fun options(): Array<String> = arrayOf("Kill Process", cancelOption())
+    fun options(): Array<String> = arrayOf(appMessages.text("close.kill"), cancelOption())
 
-    fun cancelOption(): String = "Cancel"
+    fun cancelOption(): String = appMessages.text("button.cancel")
 }

@@ -15,6 +15,7 @@
  */
 package io.github.ketraterm.ui.swing.suggestion
 
+import io.github.ketraterm.ui.swing.api.SwingTerminalMessages
 import java.util.*
 import javax.swing.JComponent
 
@@ -233,5 +234,15 @@ public fun interface SwingShellSuggestionViewFactory {
         @JvmField
         public val DEFAULT: SwingShellSuggestionViewFactory =
             SwingShellSuggestionViewFactory { listener -> SwingCompletionPopupView(listener) }
+
+        /**
+         * Creates the standard Swing popup factory with host-localized text.
+         *
+         * @param messages plain-text messages and accessible labels for the host locale.
+         * @return factory creating an independent popup for each terminal.
+         */
+        @JvmStatic
+        public fun createDefault(messages: SwingTerminalMessages): SwingShellSuggestionViewFactory =
+            SwingShellSuggestionViewFactory { listener -> SwingCompletionPopupView(listener, messages) }
     }
 }

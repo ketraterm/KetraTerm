@@ -6,6 +6,7 @@ Release notes for library consumers and embedders. Product-specific changes are 
 
 ### Improvements and fixes
 
+- Moved reusable search, context-menu, clipboard-consent, and completion-popup labels, tooltips, status, and accessibility text into UTF-8 `.properties` catalogs. Search chrome accommodates longer translated labels and status messages; message lookup and formatting occur outside painting. Clipboard consent retains payload privacy and the safe Deny default.
 - Added gutter, divider, and undecorated prompt presentation through `SwingPromptDecoration`. Divider bands share painting and interaction geometry without changing terminal rows or copied text; alternate screens suppress prompt decorations.
 - Exposed the selected shell producer's immutable `promptMarkersExpected` startup expectation. Configured launches reserve gutters at binding; unconfirmed sessions retain metadata-based activation without losing the first prompt anchor.
 - Centered the installed alternate-screen grid on both axes, including leftover pixels, while retaining configured insets for grid sizing and exact explicit padding overrides.
@@ -39,6 +40,8 @@ Release notes for library consumers and embedders. Product-specific changes are 
 
 ### API changes
 
+- Added `SwingHostMessages`, `SwingTerminalMessages`, and `TerminalCompletionMessages` with locale-aware resource-bundle factories, English fallback for missing custom keys, and integration with host message providers. Added message-aware search, clipboard, context-menu, completion-view, source, and engine overloads while preserving existing constructors and factories. See [localization configuration](docs/library-configuration.md#optional-host-chrome-and-labels).
+- Added `TerminalCommandSpecs.defaults` overloads for locales, resource bundles, and localization callbacks. Command descriptions and argument display labels can be translated when constructing the catalog while insertion tokens, source IDs, replacement ranges, and ranking remain unchanged.
 - Added optional `TerminalAsciiCommandSink` for synchronous consumption of borrowed printable ASCII byte slices. Existing `TerminalCommandSink` implementations continue receiving scalar commands. Added `TerminalWriter.writeAscii` with range/content validation before mutation and a scalar default for existing writer implementations; `HostCommandAdapter` uses the optimized core path.
 - Added Swing settings for mouse reporting, copy on selection, middle-button paste, and extra column spacing. Defaults preserve existing behavior. Hosts retain clipboard and preference ownership.
 

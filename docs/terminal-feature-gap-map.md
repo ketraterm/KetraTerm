@@ -242,6 +242,8 @@ semantics, not claiming arbitrary chunk-independent placement.
 
 ### Embedding Contracts
 
+- `DONE(ui/host/profile/completion)`: reusable UI and completion localization has message-bundle hooks, locale selection and partial-bundle English fallback; products use resource catalogs and the IDE uses `DynamicBundle`. English catalogs are supplied. Additional translations and native standalone companion-script help remain distribution-owned. See the [supported localization contract](terminal-feature-map.md#7-embedding--swing-ui).
+
 The [IntelliJ embedding audit](reviews/intellij-embedding-audit-2026-09-27.md) distinguishes supported host customization from these composition decisions. The optional OSC producer is separated from the neutral session contract; its dependency is selected by the host.
 
 **Scope decision (E04):** Reusing KetraTerm's Swing renderer without `TerminalSession` is not required and is outside the planned scope. Keep the renderer-to-session dependency; no independent painter API or renderer extraction is planned. Hosts using their own renderer can consume the existing core/render contracts with or without the session. Host-owned shell integration and suggestions remain separate integration concerns.

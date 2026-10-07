@@ -39,16 +39,24 @@ public object SwingTerminalContextMenuItems {
         menu: JPopupMenu,
         request: SwingTerminalContextMenuRequest,
         openSearch: () -> Unit,
+    ): Boolean = addTerminalActions(menu, request, openSearch, SwingHostMessages.forLocale())
+
+    /** Appends terminal actions using [messages] for every label; decisions and actions stay unchanged. */
+    public fun addTerminalActions(
+        menu: JPopupMenu,
+        request: SwingTerminalContextMenuRequest,
+        openSearch: () -> Unit,
+        messages: SwingHostMessages,
     ): Boolean {
         request.hyperlink?.let { link ->
             menu.add(
-                JMenuItem("Open Link").apply {
+                JMenuItem(messages.message("menu.openLink")).apply {
                     addActionListener { link.open() }
                 },
             )
             if (link.uri != null) {
                 menu.add(
-                    JMenuItem("Copy Link").apply {
+                    JMenuItem(messages.message("menu.copyLink")).apply {
                         addActionListener { link.copyUri() }
                     },
                 )
@@ -57,28 +65,28 @@ public object SwingTerminalContextMenuItems {
         }
 
         menu.add(
-            JMenuItem("Copy").apply {
+            JMenuItem(messages.message("menu.copy")).apply {
                 isEnabled = request.hasSelection()
                 addActionListener { request.copySelection() }
             },
         )
         menu.add(
-            JMenuItem("Paste").apply {
+            JMenuItem(messages.message("menu.paste")).apply {
                 addActionListener { request.pasteClipboard() }
             },
         )
         menu.add(
-            JMenuItem("Select All").apply {
+            JMenuItem(messages.message("menu.selectAll")).apply {
                 addActionListener { request.selectAll() }
             },
         )
         menu.add(
-            JMenuItem("Search").apply {
+            JMenuItem(messages.message("menu.search")).apply {
                 addActionListener { openSearch() }
             },
         )
         menu.add(
-            JMenuItem("Clear Screen").apply {
+            JMenuItem(messages.message("menu.clearScreen")).apply {
                 addActionListener { request.clearScreen() }
             },
         )

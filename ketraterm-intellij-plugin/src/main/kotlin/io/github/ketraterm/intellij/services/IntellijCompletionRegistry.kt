@@ -20,6 +20,7 @@ import io.github.ketraterm.completion.host.TerminalLocalFileSystemProvider
 import io.github.ketraterm.completion.model.TerminalCommandSpec
 import io.github.ketraterm.completion.model.TerminalCommandSpecs
 import io.github.ketraterm.completion.persistence.TerminalCompletionLearningCoordinator
+import io.github.ketraterm.intellij.KetraTermBundle
 import io.github.ketraterm.session.TerminalShellIntegrationCommandLifecycle
 import io.github.ketraterm.session.TerminalShellIntegrationCommandMetadata
 import io.github.ketraterm.ui.swing.host.SwingCompletionFeedbackRecorder
@@ -39,7 +40,7 @@ import java.nio.file.Path
  * @param onPersistenceLoadFailure host diagnostic invoked when existing learning cannot be loaded safely.
  */
 internal class IntellijCompletionRegistry(
-    specs: List<TerminalCommandSpec> = TerminalCommandSpecs.defaults(),
+    specs: List<TerminalCommandSpec> = TerminalCommandSpecs.defaults(KetraTermBundle.locale),
     private val learningStore: TerminalCompletionLearningStore = TerminalCompletionLearningStore(),
     persistencePath: Path,
     persistenceEnabled: Boolean,
@@ -49,6 +50,7 @@ internal class IntellijCompletionRegistry(
     private val lock = Any()
     private var closed = false
     private val commandSpecs = specs
+    private val completionMessages = TerminalCompletionMessages.forLocale(KetraTermBundle.locale)
     private val learning =
         TerminalCompletionLearningCoordinator(
             learningStore = learningStore,
@@ -89,7 +91,7 @@ internal class IntellijCompletionRegistry(
                 buildList(context.additionalSources.size + 1) {
                     add(
                         TerminalCompletionSourceEntry(
-                            TerminalCompletionSources.path(fileSystemProvider),
+                            TerminalCompletionSources.path(completionMessages, fileSystemProvider),
                             TerminalCompletionSourcePrior.DIRECTORY_PATH,
                         ),
                     )
@@ -97,6 +99,7 @@ internal class IntellijCompletionRegistry(
                 }
             val engine =
                 TerminalCompletionEngines.fromSources(
+                    messages = completionMessages,
                     sources = sources,
                     commandSpecs = commandSpecs,
                     learningStore = learningStore,
@@ -107,13 +110,17 @@ internal class IntellijCompletionRegistry(
                         engine,
                         context::swingContext,
                         mapOf(
-                            "intellij-project-file" to "Project",
-                            "intellij-gradle-task" to "Gradle",
-                            "intellij-git-branch" to "Git",
-                            "intellij-git-remote-branch" to "Git",
-                            "intellij-git-tag" to "Git",
-                            "intellij-git-commit" to "Git",
-                            "intellij-git-status-path" to "Git",
+                            "spec" to KetraTermBundle.message("completion.source.builtin"),
+                            "learned" to KetraTermBundle.message("completion.source.learned"),
+                            "observed" to KetraTermBundle.message("completion.source.learned"),
+                            "path" to KetraTermBundle.message("completion.source.path"),
+                            "intellij-project-file" to KetraTermBundle.message("completion.source.project"),
+                            "intellij-gradle-task" to KetraTermBundle.message("completion.source.gradle"),
+                            "intellij-git-branch" to KetraTermBundle.message("completion.source.git"),
+                            "intellij-git-remote-branch" to KetraTermBundle.message("completion.source.git"),
+                            "intellij-git-tag" to KetraTermBundle.message("completion.source.git"),
+                            "intellij-git-commit" to KetraTermBundle.message("completion.source.git"),
+                            "intellij-git-status-path" to KetraTermBundle.message("completion.source.git"),
                         ),
                     ),
                 feedbackHandler = feedbackRecorder.createHandler(),

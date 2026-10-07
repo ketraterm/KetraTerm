@@ -32,6 +32,7 @@ internal class GradleTaskCompletionSource(
     private val sourceId: String,
     private val tasksProvider:
         suspend (TerminalCompletionRequest, TerminalCompletionContext) -> List<TerminalGradleTask>,
+    private val messages: TerminalCompletionMessages = TerminalCompletionMessages.forLocale(),
 ) : TerminalCompletionSource {
     init {
         require(sourceId.isNotBlank()) { "sourceId must not be blank" }
@@ -86,7 +87,7 @@ internal class GradleTaskCompletionSource(
                     replacementStartOffset = context.replacementStartOffset,
                     replacementEndOffset = context.replacementEndOffset,
                     displayText = if (replacement == task.path) task.path else replacement,
-                    detail = task.description.ifBlank { "Gradle task ${task.path}" },
+                    detail = task.description.ifBlank { messages.message("completion.gradleTask", task.path) },
                     source = sourceId,
                     kind = TerminalCompletionCandidateKind.SUBCOMMAND,
                     score = candidateScore,

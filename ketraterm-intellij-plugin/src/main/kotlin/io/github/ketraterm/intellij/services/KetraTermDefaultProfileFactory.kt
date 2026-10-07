@@ -17,6 +17,7 @@ package io.github.ketraterm.intellij.services
 
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.project.guessProjectDir
+import io.github.ketraterm.intellij.KetraTermBundle
 import io.github.ketraterm.intellij.settings.KetraTermIntellijSettings
 import io.github.ketraterm.intellij.settings.KetraTermIntellijSettingsNormalizer
 import io.github.ketraterm.workspace.TerminalProfile
@@ -58,7 +59,7 @@ internal object KetraTermDefaultProfileFactory {
         workingDirectory: Path? = null,
     ): TerminalProfile {
         val launchDirectory = workingDirectory ?: workingDirectory(basePath, settings.startDirectory)
-        return TerminalProfileRegistry()
+        return intellijTerminalProfileRegistry()
             .configuredProfile(settings.shellPath, launchDirectory)
             .copy(
                 displayName = settings.defaultTabName,
@@ -121,3 +122,10 @@ internal object KetraTermDefaultProfileFactory {
 
     private fun userHome(): Path = Path.of(System.getProperty("user.home"))
 }
+
+/** Applies IDE localization consistently to discovered and fallback shell profiles. */
+internal fun intellijTerminalProfileRegistry(): TerminalProfileRegistry =
+    TerminalProfileRegistry(
+        commandPromptDisplayName = KetraTermBundle.message("terminal.profile.commandPrompt"),
+        defaultShellDisplayName = KetraTermBundle.message("terminal.profile.defaultShell"),
+    )

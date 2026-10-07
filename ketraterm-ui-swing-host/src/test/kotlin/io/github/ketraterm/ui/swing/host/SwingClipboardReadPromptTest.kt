@@ -21,6 +21,45 @@ import kotlin.test.*
 
 class SwingClipboardReadPromptTest {
     @Test
+    fun localizedLabelsPreserveSafeDefaultAndPersistentBlockDecision() =
+        runBlocking {
+            withContext(Dispatchers.Swing) {
+                val words =
+                    SwingHostMessages { key, _ ->
+                        when (key) {
+                            "clipboard.title" -> "Zustimmung"
+                            "clipboard.allowOnce" -> "Einmal erlauben"
+                            "clipboard.deny" -> "Ablehnen"
+                            "clipboard.block" -> "Für dieses Terminal sperren"
+                            else -> error("Unexpected message: $key")
+                        }
+                    }
+                var request: SwingDialogRequest? = null
+                var decide: ((Int?) -> Unit)? = null
+                var closed = false
+                val prompt =
+                    SwingClipboardReadPrompt(words) { dialog, decision ->
+                        request = dialog
+                        decide = decision
+                        AutoCloseable { closed = true }
+                    }
+                try {
+                    val pending = async(start = CoroutineStart.UNDISPATCHED) { prompt.request("Nachricht") }
+                    assertEquals("Zustimmung", request?.title)
+                    assertEquals(listOf("Einmal erlauben", "Ablehnen", "Für dieses Terminal sperren"), request?.options)
+                    assertEquals(SwingClipboardReadPrompt.Decision.DENY.ordinal, request?.defaultOption)
+                    requireNotNull(decide)(SwingClipboardReadPrompt.Decision.BLOCK.ordinal)
+                    assertFalse(pending.await())
+                    assertTrue(closed)
+                    assertTrue(prompt.isBlocked)
+                    assertFalse(prompt.request("Erneut"))
+                } finally {
+                    prompt.close()
+                }
+            }
+        }
+
+    @Test
     fun cancellationCloseAndStaleDecisionsCannotGrantAReplacementRequest() =
         runBlocking {
             withContext(Dispatchers.Swing) {

@@ -15,6 +15,7 @@
  */
 package io.github.ketraterm.intellij.services
 
+import io.github.ketraterm.intellij.KetraTermBundle
 import io.github.ketraterm.workspace.TerminalProfile
 import io.github.ketraterm.workspace.TerminalWorkspace
 import io.github.ketraterm.workspace.TerminalWorkspaceOpenOptions
@@ -68,7 +69,7 @@ internal class IntelliJPtyRuntime {
                 Class.forName("com.pty4j.PtyProcessBuilder", false, classLoader)
             } catch (cause: ClassNotFoundException) {
                 throw IllegalStateException(
-                    "IntelliJ bundled Pty4J runtime is not available to the plugin classloader.",
+                    KetraTermBundle.message("terminal.startup.runtimeUnavailable"),
                     cause,
                 )
             }

@@ -23,6 +23,48 @@ import kotlin.test.assertTrue
 
 class TerminalProfileRegistryTest {
     @Test
+    fun localizedCommandPromptNamePreservesLaunchMetadataAndConfiguredProfileKind() {
+        val registry =
+            TerminalProfileRegistry(
+                osName = "Windows 11",
+                environment = mapOf("COMSPEC" to "cmd.exe"),
+                executableExists = { false },
+                commandPromptDisplayName = "Invite de commandes",
+            )
+
+        val profile = registry.availableProfiles().single { it.id == "cmd" }
+        assertEquals("Invite de commandes", profile.displayName)
+        assertEquals(listOf("cmd.exe"), profile.command)
+        assertEquals(TerminalProfileKind.COMMAND_PROMPT, profile.kind)
+        val configured = registry.configuredProfile("cmd.exe")
+        assertEquals("Invite de commandes", configured.displayName)
+        assertEquals(TerminalProfileKind.COMMAND_PROMPT, configured.kind)
+    }
+
+    @Test
+    fun localizedFallbackNamePreservesDefaultLaunchCommand() {
+        val registry =
+            TerminalProfileRegistry(
+                osName = "Linux",
+                environment = emptyMap(),
+                executableExists = { false },
+                defaultShellDisplayName = "Shell par défaut",
+            )
+        val profile = registry.availableProfiles().single()
+        val english =
+            TerminalProfileRegistry(
+                osName = "Linux",
+                environment = emptyMap(),
+                executableExists = { false },
+            ).availableProfiles().single()
+
+        assertEquals("default-shell", profile.id)
+        assertEquals("Shell par défaut", profile.displayName)
+        assertEquals(english.command, profile.command)
+        assertEquals(english.kind, profile.kind)
+    }
+
+    @Test
     fun windowsProfilesPreferWindowsPowerShellThenPowerShellThenCommandPrompt() {
         val registry =
             TerminalProfileRegistry(

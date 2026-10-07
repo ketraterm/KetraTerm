@@ -16,6 +16,7 @@
 package io.github.ketraterm.app.ui
 
 import com.formdev.flatlaf.extras.FlatSVGIcon
+import io.github.ketraterm.app.appMessages
 import io.github.ketraterm.app.appVersion
 import java.awt.*
 import javax.swing.*
@@ -27,11 +28,13 @@ import javax.swing.border.EmptyBorder
  */
 internal class AboutDialog(
     parent: JFrame,
-) : JDialog(parent, "About KetraTerm Terminal", true) {
+) : JDialog(parent, appMessages.text("about.title"), true) {
     init {
         contentPane = buildAboutPanel()
         defaultCloseOperation = DISPOSE_ON_CLOSE
-        setSize(460, 280)
+        pack()
+        size = Dimension(maxOf(460, width), maxOf(280, height))
+        minimumSize = size
         setLocationRelativeTo(parent)
         isResizable = false
     }
@@ -57,7 +60,7 @@ internal class AboutDialog(
 
             // Action: OK Button
             val okButton =
-                JButton("OK").apply {
+                JButton(appMessages.text("button.ok")).apply {
                     addActionListener {
                         dispose()
                     }
@@ -95,13 +98,13 @@ internal class AboutDialog(
             }
 
         val titleLabel =
-            JLabel("KetraTerm Terminal").apply {
+            JLabel(appMessages.text("about.product")).apply {
                 font = Font("Dialog", Font.BOLD, 20)
                 foreground = Chrome.textPrimary
             }
 
         val subtitleLabel =
-            JLabel("A high-performance, modern terminal emulator.").apply {
+            JLabel(appMessages.text("about.description")).apply {
                 font = Font("Dialog", Font.PLAIN, 11)
                 foreground = Chrome.textSecondary
             }
@@ -127,19 +130,19 @@ internal class AboutDialog(
 
         val version = appVersion
         val versionLabel =
-            JLabel("Version: $version").apply {
+            JLabel(appMessages.text("about.version", version)).apply {
                 font = Font("Dialog", Font.PLAIN, 11)
                 foreground = Chrome.textSecondary
             }
 
         val developerLabel =
-            JLabel("Developer: Gagik Sargsyan").apply {
+            JLabel(appMessages.text("about.developer")).apply {
                 font = Font("Dialog", Font.PLAIN, 11)
                 foreground = Chrome.textSecondary
             }
 
         val licenseLabel =
-            JLabel("Licensed under the Apache License, Version 2.0").apply {
+            JLabel(appMessages.text("about.license")).apply {
                 font = Font("Dialog", Font.PLAIN, 10)
                 foreground = Chrome.controlTextDisabled
             }

@@ -21,12 +21,25 @@ import io.github.ketraterm.ui.swing.host.SwingShellSuggestionTarget;
 import io.github.ketraterm.ui.swing.host.SwingTerminalSearchColors;
 import io.github.ketraterm.ui.swing.host.SwingCompletionSuggestionProvider;
 import io.github.ketraterm.ui.swing.host.SwingCompletionContext;
+import io.github.ketraterm.ui.swing.host.SwingHostMessages;
 import io.github.ketraterm.completion.api.TerminalCompletionEngine;
 import java.awt.Color;
 import java.util.List;
 import java.util.Map;
+import java.util.Locale;
+import java.util.ListResourceBundle;
 
 public final class JavaConsumer {
+    public static SwingHostMessages hostMessages() {
+        return SwingHostMessages.forLocale(Locale.FRENCH, new ListResourceBundle() {
+            @Override protected Object[][] getContents() {
+                return new Object[][] {
+                    {"search.placeholder", "Rechercher"},
+                    {"search.matchCounter", "{1,number,0} résultats ; actif {0,number,0}"}
+                };
+            }
+        });
+    }
     public static SwingCompletionSuggestionProvider labeledProvider(TerminalCompletionEngine engine) {
         return new SwingCompletionSuggestionProvider(engine, () -> SwingCompletionContext.EMPTY, Map.of("host", "Product source"));
     }
@@ -47,6 +60,10 @@ public final class JavaConsumer {
         @Override public void hideSuggestions() { requested = null; hides++; }
     }
     public static void verify() {
+        var messages = hostMessages();
+        if (!messages.message("search.placeholder").equals("Rechercher")
+            || !messages.message("search.matchCounter", 2, 4).equals("4 résultats ; actif 2")
+            || !messages.message("menu.copy").equals("Copy")) throw new AssertionError("Message bundle contract");
         var request = new SwingDialogRequest("Title", "<hello>", SwingDialogRequest.Severity.WARNING, List.of("Allow", "Deny"), 1);
         if (request.getDefaultOption() != 1 || !request.htmlMessage().contains("&lt;hello&gt;")) throw new AssertionError("Dialog contract");
         try { request.getOptions().set(0, "Changed"); throw new AssertionError("Mutable options"); }

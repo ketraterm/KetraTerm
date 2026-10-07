@@ -22,6 +22,7 @@ import com.intellij.openapi.project.DumbAwareAction
 import com.intellij.openapi.project.ProjectManager
 import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.openapi.wm.ToolWindowManager
+import io.github.ketraterm.intellij.KetraTermBundle
 import io.github.ketraterm.intellij.services.KetraTermProjectTerminalService
 import io.github.ketraterm.ui.swing.host.SwingTerminalHostAction
 import java.awt.KeyboardFocusManager
@@ -187,6 +188,14 @@ internal class KetraTermOpenTerminalHereAction : DumbAwareAction() {
     }
 
     override fun update(event: AnActionEvent) {
+        event.presentation.text =
+            KetraTermBundle.message(
+                if (event.isTerminalContextMenu()) {
+                    "action.KetraTerm.Terminal.OpenTerminalHere.context.text"
+                } else {
+                    "action.KetraTerm.Terminal.OpenTerminalHere.text"
+                },
+            )
         val file = event.getData(CommonDataKeys.VIRTUAL_FILE)
         if (usesTerminalPane(event, file)) {
             val enabled =

@@ -31,7 +31,11 @@ import io.github.ketraterm.completion.matching.CompletionMatcher
  */
 internal class PathCompletionSource(
     private val fileSystemProvider: TerminalFileSystemProvider,
+    messages: TerminalCompletionMessages = TerminalCompletionMessages.forLocale(),
 ) : TerminalCompletionSource {
+    private val directoryDetail = messages.message("completion.directory")
+    private val fileDetail = messages.message("completion.file")
+
     override suspend fun complete(
         request: TerminalCompletionRequest,
         context: TerminalCompletionContext,
@@ -92,7 +96,7 @@ internal class PathCompletionSource(
                     replacementStartOffset = context.replacementStartOffset,
                     replacementEndOffset = context.replacementEndOffset,
                     displayText = name + rawSuffix,
-                    detail = if (isDirectory) "directory" else "file",
+                    detail = if (isDirectory) directoryDetail else fileDetail,
                     source = SOURCE_PATH,
                     kind = TerminalCompletionCandidateKind.PATH,
                     score = candidateScore,

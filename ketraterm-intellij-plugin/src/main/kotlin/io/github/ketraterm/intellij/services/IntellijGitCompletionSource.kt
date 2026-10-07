@@ -20,6 +20,7 @@ import com.intellij.openapi.project.Project
 import io.github.ketraterm.completion.api.*
 import io.github.ketraterm.completion.model.TerminalCompletionDomainValue
 import io.github.ketraterm.completion.model.TerminalCompletionValueDomain
+import io.github.ketraterm.intellij.KetraTermBundle
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
 import kotlin.coroutines.CoroutineContext
@@ -91,6 +92,9 @@ internal class IntellijGitCompletionLoader(
     suspend fun load(workingDirectoryUri: String?): IntellijGitCompletionSnapshot {
         val cancellationContext = currentCoroutineContext()
         cancellationContext.ensureActive()
+        val localBranchDetail = KetraTermBundle.message("completion.detail.localBranch")
+        val remoteBranchDetail = KetraTermBundle.message("completion.detail.remoteBranch")
+        val tagDetail = KetraTermBundle.message("completion.detail.tag")
         return readPort.read(workingDirectoryUri) { model ->
             IntellijGitCompletionSnapshot(
                 localBranches =
@@ -100,7 +104,7 @@ internal class IntellijGitCompletionLoader(
                         } else {
                             TerminalCompletionDomainValue(
                                 value = branchName,
-                                detail = "local branch",
+                                detail = localBranchDetail,
                                 scoreAdjustment = LOCAL_SCORE_ADJUSTMENT,
                             )
                         }
@@ -109,13 +113,13 @@ internal class IntellijGitCompletionLoader(
                     collectValues(model.remoteBranchNames, cancellationContext) { branchName ->
                         TerminalCompletionDomainValue(
                             value = branchName,
-                            detail = "remote branch",
+                            detail = remoteBranchDetail,
                             scoreAdjustment = REMOTE_SCORE_ADJUSTMENT,
                         )
                     },
                 tags =
                     collectValues(model.tagNames, cancellationContext) { tagName ->
-                        TerminalCompletionDomainValue(tagName, detail = "tag")
+                        TerminalCompletionDomainValue(tagName, detail = tagDetail)
                     },
             )
         } ?: IntellijGitCompletionSnapshot.EMPTY

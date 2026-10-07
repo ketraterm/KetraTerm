@@ -15,10 +15,7 @@
  */
 package io.github.ketraterm.completion.source
 
-import io.github.ketraterm.completion.api.TerminalCompletionCandidate
-import io.github.ketraterm.completion.api.TerminalCompletionCandidateKind
-import io.github.ketraterm.completion.api.TerminalCompletionContext
-import io.github.ketraterm.completion.api.TerminalCompletionRequest
+import io.github.ketraterm.completion.api.*
 import io.github.ketraterm.completion.commandline.TERMINAL_COMMAND_OPTION_TERMINATOR
 import io.github.ketraterm.completion.commandline.firstCommandTokenIndex
 import io.github.ketraterm.completion.commandline.isTerminalOptionToken
@@ -37,6 +34,7 @@ internal class LearnedObservedTokenIndex private constructor(
         request: TerminalCompletionRequest,
         context: TerminalCompletionContext,
         destination: MutableList<TerminalCompletionCandidate>,
+        detail: String = TerminalCompletionMessages.forLocale().message("completion.observedToken"),
     ) {
         val observedContext = context.observedContext() ?: return
         val bucket = buckets[ObservedBucketKey(CompletionLearningContextKey.from(request), observedContext)] ?: return
@@ -46,7 +44,7 @@ internal class LearnedObservedTokenIndex private constructor(
             val entry = bucket[index]
             if (!entry.normalizedToken.startsWith(prefix)) break
             if (entry.normalizedToken != prefix) {
-                entry.toCandidate(request, context)?.let(destination::add)
+                entry.toCandidate(request, context, detail)?.let(destination::add)
             }
             index++
         }
@@ -82,6 +80,7 @@ internal class LearnedObservedTokenIndex private constructor(
     private fun Entry.toCandidate(
         request: TerminalCompletionRequest,
         context: TerminalCompletionContext,
+        detail: String,
     ): TerminalCompletionCandidate? {
         val replacement =
             ShellReplacementText.encode(
@@ -94,7 +93,7 @@ internal class LearnedObservedTokenIndex private constructor(
             replacementStartOffset = context.replacementStartOffset,
             replacementEndOffset = context.replacementEndOffset,
             displayText = token,
-            detail = DETAIL,
+            detail = detail,
             source = SOURCE_ID,
             kind =
                 if (normalizedToken.isTerminalOptionToken()) {
@@ -209,7 +208,6 @@ internal class LearnedObservedTokenIndex private constructor(
                 .thenBy { it.bucketKey.learningContext.workingDirectoryUri }
 
         private const val SOURCE_ID = "observed"
-        private const val DETAIL = "learned from successful commands"
         private const val BASE_SCORE = 760
         private const val SUCCESS_SCORE = 30
         private const val MAX_SUCCESS_SCORE_UNITS = 20

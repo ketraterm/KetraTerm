@@ -49,10 +49,29 @@ public object TerminalCompletionEngines {
         learningStore: TerminalCompletionLearningStore? = null,
         sourceFailureHandler: TerminalCompletionSourceFailureHandler = TerminalCompletionSourceFailureHandler.SYSTEM_LOGGER,
     ): TerminalCompletionEngine =
+        fromSources(TerminalCompletionMessages.forLocale(), sources, commandSpecs, learningStore, sourceFailureHandler)
+
+    /**
+     * Creates a merged engine with localized learned and observed descriptions.
+     *
+     * [messages] changes generated presentation only. Supply a localized catalog through
+     * [commandSpecs] and the same text to source factories for their fallback descriptions.
+     * All token, range, source identity, and ranking behavior follows [fromSources].
+     */
+    @JvmStatic
+    @JvmOverloads
+    public fun fromSources(
+        messages: TerminalCompletionMessages,
+        sources: List<TerminalCompletionSourceEntry>,
+        commandSpecs: List<TerminalCommandSpec> = TerminalCommandSpecs.defaults(),
+        learningStore: TerminalCompletionLearningStore? = null,
+        sourceFailureHandler: TerminalCompletionSourceFailureHandler = TerminalCompletionSourceFailureHandler.SYSTEM_LOGGER,
+    ): TerminalCompletionEngine =
         MergedCompletionEngine(
             sources = sources,
             commandSpecs = commandSpecs,
             learningStore = learningStore,
             sourceFailureHandler = sourceFailureHandler,
+            messages = messages,
         )
 }

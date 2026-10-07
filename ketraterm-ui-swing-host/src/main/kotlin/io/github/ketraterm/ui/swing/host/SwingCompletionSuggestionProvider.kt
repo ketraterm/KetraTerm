@@ -128,7 +128,7 @@ public class SwingCompletionSuggestionProvider(
                     separatorPending = false
                 }
             }
-            return result.toString().ifEmpty { "other" }
+            return result.toString().ifEmpty { messages.message("source.other") }
         }
 
         private fun String.boundedSourceLabel(): String {
@@ -144,12 +144,13 @@ public class SwingCompletionSuggestionProvider(
 
         private const val MAXIMUM_SOURCE_LABEL_CODE_UNITS = 128
         private const val ELLIPSIS = "…"
+        private val messages = SwingHostMessages.forLocale()
         private val SOURCE_DISPLAY_TEXT =
             mapOf(
-                "spec" to "Built-in",
-                "learned" to "Learned",
-                "observed" to "Learned",
-                "path" to "Path",
+                "spec" to messages.message("source.builtIn"),
+                "learned" to messages.message("source.learned"),
+                "observed" to messages.message("source.learned"),
+                "path" to messages.message("source.path"),
             )
     }
 }

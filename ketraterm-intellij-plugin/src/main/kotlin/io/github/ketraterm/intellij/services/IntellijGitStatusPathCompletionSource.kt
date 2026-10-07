@@ -18,8 +18,10 @@ package io.github.ketraterm.intellij.services
 import com.intellij.openapi.progress.ProgressManager
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.vcs.changes.ChangeListManager
+import io.github.ketraterm.completion.api.TerminalCompletionMessages
 import io.github.ketraterm.completion.api.TerminalCompletionSources
 import io.github.ketraterm.completion.api.TerminalFuzzyPathEntry
+import io.github.ketraterm.intellij.KetraTermBundle
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
 import java.nio.file.Path
@@ -98,6 +100,8 @@ internal class IntellijGitStatusPathLoader(
         val cancellationContext = currentCoroutineContext()
         cancellationContext.ensureActive()
         val normalizedPrefix = prefix.replace('\\', '/')
+        val changedFileDetail = KetraTermBundle.message("completion.detail.changedFile")
+        val untrackedFileDetail = KetraTermBundle.message("completion.detail.untrackedFile")
         return readPort.read(workingDirectoryUri) { model ->
             val retained = ArrayList<ScoredGitStatusPath>(INITIAL_RESULT_CAPACITY)
             val retainedPaths = HashSet<String>(INITIAL_RESULT_CAPACITY)
@@ -125,13 +129,13 @@ internal class IntellijGitStatusPathLoader(
             }
             visitBudget.visit(model.changedPathValues) { pathValue ->
                 pathValue?.let { runCatching { Path.of(it) }.getOrNull() }?.let { path ->
-                    retain(path, isDirectory = false, detail = "changed file")
+                    retain(path, isDirectory = false, detail = changedFileDetail)
                 }
                 true
             }
             visitBudget.visit(model.unversionedPathValues) { pathValue ->
                 pathValue?.let { runCatching { Path.of(it) }.getOrNull() }?.let { path ->
-                    retain(path, isDirectory = false, detail = "untracked file")
+                    retain(path, isDirectory = false, detail = untrackedFileDetail)
                 }
                 true
             }
@@ -156,6 +160,7 @@ internal class IntellijGitStatusPathLoader(
 /** Creates changed-Git-path completion without exposing IntelliJ VCS APIs to the shared engine. */
 internal fun intellijGitStatusPathCompletionSource(loader: suspend (String?, String) -> List<TerminalFuzzyPathEntry>) =
     TerminalCompletionSources.fuzzyPath(
+        messages = TerminalCompletionMessages.forLocale(KetraTermBundle.locale),
         sourceId = "intellij-git-status-path",
         entriesProvider = { request, context -> loader(request.workingDirectoryUri, context.activePrefix) },
         requiresNonEmptyPrefix = false,

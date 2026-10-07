@@ -28,6 +28,7 @@ import com.intellij.openapi.ui.Messages
 import com.intellij.ui.JBColor
 import com.intellij.ui.components.JBScrollBar
 import com.intellij.util.ui.UIUtil
+import io.github.ketraterm.intellij.KetraTermBundle
 import io.github.ketraterm.intellij.services.KetraTermCompletionService
 import io.github.ketraterm.intellij.services.captureCleanupFailure
 import io.github.ketraterm.intellij.settings.KetraTermIntellijSettings
@@ -189,8 +190,8 @@ internal class KetraTermTerminalPane private constructor(
         val title =
             Messages.showInputDialog(
                 project,
-                "Tab name (leave empty for automatic):",
-                "Rename Terminal Tab",
+                KetraTermBundle.message("terminal.tab.rename.question"),
+                KetraTermBundle.message("terminal.tab.rename.title"),
                 null,
                 tab.customTitle ?: tab.title,
                 null,
@@ -226,7 +227,7 @@ internal class KetraTermTerminalPane private constructor(
             val providerGroup = (hyperlink.providerAction as? IntellijTerminalHyperlinkAction)?.popupGroup(request.triggerEvent)
             if (providerGroup != null) group.add(providerGroup)
             group.add(
-                object : DumbAwareAction("Open Link") {
+                object : DumbAwareAction(KetraTermBundle.message("menu.openLink")) {
                     override fun actionPerformed(event: com.intellij.openapi.actionSystem.AnActionEvent) {
                         hyperlink.open()
                     }
@@ -235,7 +236,7 @@ internal class KetraTermTerminalPane private constructor(
                 },
             )
             group.add(
-                object : DumbAwareAction("Copy Link") {
+                object : DumbAwareAction(KetraTermBundle.message("menu.copyLink")) {
                     override fun actionPerformed(event: com.intellij.openapi.actionSystem.AnActionEvent) {
                         hyperlink.copyUri()
                     }
@@ -396,9 +397,9 @@ internal class KetraTermTerminalPane private constructor(
             try {
                 scrollbarAdapter.attach(terminal)
                 terminal.bind(tab.session)
-                searchBar = SwingTerminalSearchBar(terminal).apply { refreshColors(searchColors()) }
+                searchBar = SwingTerminalSearchBar(terminal, IntellijSwingHostMessages).apply { refreshColors(searchColors()) }
                 clipboardReadPrompt =
-                    SwingClipboardReadPrompt { message, decide ->
+                    SwingClipboardReadPrompt(IntellijSwingHostMessages) { message, decide ->
                         IntellijMessageDialogs.showModeless(project, message, decide)
                     }
                 val terminalArea = SwingTerminalOverlayPane(terminal, searchBar.component)

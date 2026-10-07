@@ -27,10 +27,10 @@ import com.intellij.openapi.wm.ex.ToolWindowEx
 import com.intellij.openapi.wm.ex.ToolWindowManagerListener
 import io.github.ketraterm.intellij.KetraTermBundle
 import io.github.ketraterm.intellij.services.KetraTermProjectTerminalService
+import io.github.ketraterm.intellij.services.intellijTerminalProfileRegistry
 import io.github.ketraterm.intellij.settings.KetraTermIntellijProfileIcons
 import io.github.ketraterm.intellij.settings.KetraTermSettingsConfigurable
 import io.github.ketraterm.workspace.TerminalProfile
-import io.github.ketraterm.workspace.TerminalProfileRegistry
 
 /**
  * Creates the IntelliJ tool window that hosts KetraTerm terminal tabs.
@@ -111,7 +111,7 @@ class KetraTermToolWindowFactory :
         ) {
         private val profileIcons = KetraTermIntellijProfileIcons()
         private val profileActions: Array<AnAction> =
-            TerminalProfileRegistry()
+            intellijTerminalProfileRegistry()
                 .availableProfiles()
                 .map { profile ->
                     OpenTerminalProfileAction(

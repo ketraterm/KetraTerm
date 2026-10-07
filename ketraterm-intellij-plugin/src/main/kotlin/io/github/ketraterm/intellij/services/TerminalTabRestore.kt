@@ -19,7 +19,6 @@ import com.intellij.util.concurrency.annotations.RequiresBackgroundThread
 import io.github.ketraterm.completion.host.TerminalLocalFileUriResolver
 import io.github.ketraterm.intellij.settings.KetraTermIntellijSettings
 import io.github.ketraterm.workspace.TerminalProfile
-import io.github.ketraterm.workspace.TerminalProfileRegistry
 import java.nio.file.Files
 import java.nio.file.InvalidPathException
 import java.nio.file.Path
@@ -37,7 +36,7 @@ internal object TerminalTabRestore {
         basePath: String?,
         state: TerminalTabState,
         settings: KetraTermIntellijSettings.State,
-        profiles: List<TerminalProfile> = TerminalProfileRegistry().availableProfiles(),
+        profiles: List<TerminalProfile> = intellijTerminalProfileRegistry().availableProfiles(),
     ): TerminalProfile {
         val selectedProfile = profiles.firstOrNull { it.id == state.profileId }
         val profile =

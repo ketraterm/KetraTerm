@@ -83,10 +83,15 @@ public abstract interface class io/github/ketraterm/completion/api/TerminalCompl
 
 public final class io/github/ketraterm/completion/api/TerminalCompletionEngines {
 	public static final field INSTANCE Lio/github/ketraterm/completion/api/TerminalCompletionEngines;
+	public static final fun fromSources (Lio/github/ketraterm/completion/api/TerminalCompletionMessages;Ljava/util/List;)Lio/github/ketraterm/completion/api/TerminalCompletionEngine;
+	public static final fun fromSources (Lio/github/ketraterm/completion/api/TerminalCompletionMessages;Ljava/util/List;Ljava/util/List;)Lio/github/ketraterm/completion/api/TerminalCompletionEngine;
+	public static final fun fromSources (Lio/github/ketraterm/completion/api/TerminalCompletionMessages;Ljava/util/List;Ljava/util/List;Lio/github/ketraterm/completion/api/TerminalCompletionLearningStore;)Lio/github/ketraterm/completion/api/TerminalCompletionEngine;
+	public static final fun fromSources (Lio/github/ketraterm/completion/api/TerminalCompletionMessages;Ljava/util/List;Ljava/util/List;Lio/github/ketraterm/completion/api/TerminalCompletionLearningStore;Lio/github/ketraterm/completion/api/TerminalCompletionSourceFailureHandler;)Lio/github/ketraterm/completion/api/TerminalCompletionEngine;
 	public static final fun fromSources (Ljava/util/List;)Lio/github/ketraterm/completion/api/TerminalCompletionEngine;
 	public static final fun fromSources (Ljava/util/List;Ljava/util/List;)Lio/github/ketraterm/completion/api/TerminalCompletionEngine;
 	public static final fun fromSources (Ljava/util/List;Ljava/util/List;Lio/github/ketraterm/completion/api/TerminalCompletionLearningStore;)Lio/github/ketraterm/completion/api/TerminalCompletionEngine;
 	public static final fun fromSources (Ljava/util/List;Ljava/util/List;Lio/github/ketraterm/completion/api/TerminalCompletionLearningStore;Lio/github/ketraterm/completion/api/TerminalCompletionSourceFailureHandler;)Lio/github/ketraterm/completion/api/TerminalCompletionEngine;
+	public static synthetic fun fromSources$default (Lio/github/ketraterm/completion/api/TerminalCompletionMessages;Ljava/util/List;Ljava/util/List;Lio/github/ketraterm/completion/api/TerminalCompletionLearningStore;Lio/github/ketraterm/completion/api/TerminalCompletionSourceFailureHandler;ILjava/lang/Object;)Lio/github/ketraterm/completion/api/TerminalCompletionEngine;
 	public static synthetic fun fromSources$default (Ljava/util/List;Ljava/util/List;Lio/github/ketraterm/completion/api/TerminalCompletionLearningStore;Lio/github/ketraterm/completion/api/TerminalCompletionSourceFailureHandler;ILjava/lang/Object;)Lio/github/ketraterm/completion/api/TerminalCompletionEngine;
 }
 
@@ -117,6 +122,21 @@ public final class io/github/ketraterm/completion/api/TerminalCompletionMatchRan
 
 public final class io/github/ketraterm/completion/api/TerminalCompletionMatchRanges$Companion {
 	public final fun fromPackedOffsets (Ljava/lang/String;[I)Lio/github/ketraterm/completion/api/TerminalCompletionMatchRanges;
+}
+
+public abstract interface class io/github/ketraterm/completion/api/TerminalCompletionMessages {
+	public static final field Companion Lio/github/ketraterm/completion/api/TerminalCompletionMessages$Companion;
+	public static fun forLocale ()Lio/github/ketraterm/completion/api/TerminalCompletionMessages;
+	public static fun forLocale (Ljava/util/Locale;)Lio/github/ketraterm/completion/api/TerminalCompletionMessages;
+	public static fun forLocale (Ljava/util/Locale;Ljava/util/ResourceBundle;)Lio/github/ketraterm/completion/api/TerminalCompletionMessages;
+	public abstract fun message (Ljava/lang/String;[Ljava/lang/Object;)Ljava/lang/String;
+}
+
+public final class io/github/ketraterm/completion/api/TerminalCompletionMessages$Companion {
+	public final fun forLocale ()Lio/github/ketraterm/completion/api/TerminalCompletionMessages;
+	public final fun forLocale (Ljava/util/Locale;)Lio/github/ketraterm/completion/api/TerminalCompletionMessages;
+	public final fun forLocale (Ljava/util/Locale;Ljava/util/ResourceBundle;)Lio/github/ketraterm/completion/api/TerminalCompletionMessages;
+	public static synthetic fun forLocale$default (Lio/github/ketraterm/completion/api/TerminalCompletionMessages$Companion;Ljava/util/Locale;Ljava/util/ResourceBundle;ILjava/lang/Object;)Lio/github/ketraterm/completion/api/TerminalCompletionMessages;
 }
 
 public final class io/github/ketraterm/completion/api/TerminalCompletionReplayPolicy {
@@ -186,11 +206,17 @@ public final class io/github/ketraterm/completion/api/TerminalCompletionSourcePr
 
 public final class io/github/ketraterm/completion/api/TerminalCompletionSources {
 	public static final field INSTANCE Lio/github/ketraterm/completion/api/TerminalCompletionSources;
+	public static final fun fuzzyPath (Lio/github/ketraterm/completion/api/TerminalCompletionMessages;Ljava/lang/String;Lio/github/ketraterm/completion/api/TerminalFuzzyPathProvider;)Lio/github/ketraterm/completion/api/TerminalCompletionSource;
+	public static final fun fuzzyPath (Lio/github/ketraterm/completion/api/TerminalCompletionMessages;Ljava/lang/String;Lio/github/ketraterm/completion/api/TerminalFuzzyPathProvider;Z)Lio/github/ketraterm/completion/api/TerminalCompletionSource;
+	public static final fun fuzzyPath (Lio/github/ketraterm/completion/api/TerminalCompletionMessages;Ljava/lang/String;Lio/github/ketraterm/completion/api/TerminalFuzzyPathProvider;ZLjava/util/Set;)Lio/github/ketraterm/completion/api/TerminalCompletionSource;
 	public static final fun fuzzyPath (Ljava/lang/String;Lio/github/ketraterm/completion/api/TerminalFuzzyPathProvider;)Lio/github/ketraterm/completion/api/TerminalCompletionSource;
 	public static final fun fuzzyPath (Ljava/lang/String;Lio/github/ketraterm/completion/api/TerminalFuzzyPathProvider;Z)Lio/github/ketraterm/completion/api/TerminalCompletionSource;
 	public static final fun fuzzyPath (Ljava/lang/String;Lio/github/ketraterm/completion/api/TerminalFuzzyPathProvider;ZLjava/util/Set;)Lio/github/ketraterm/completion/api/TerminalCompletionSource;
+	public static synthetic fun fuzzyPath$default (Lio/github/ketraterm/completion/api/TerminalCompletionMessages;Ljava/lang/String;Lio/github/ketraterm/completion/api/TerminalFuzzyPathProvider;ZLjava/util/Set;ILjava/lang/Object;)Lio/github/ketraterm/completion/api/TerminalCompletionSource;
 	public static synthetic fun fuzzyPath$default (Ljava/lang/String;Lio/github/ketraterm/completion/api/TerminalFuzzyPathProvider;ZLjava/util/Set;ILjava/lang/Object;)Lio/github/ketraterm/completion/api/TerminalCompletionSource;
+	public static final fun gradleTask (Lio/github/ketraterm/completion/api/TerminalCompletionMessages;Ljava/lang/String;Lkotlin/jvm/functions/Function3;)Lio/github/ketraterm/completion/api/TerminalCompletionSource;
 	public static final fun gradleTask (Ljava/lang/String;Lkotlin/jvm/functions/Function3;)Lio/github/ketraterm/completion/api/TerminalCompletionSource;
+	public static final fun path (Lio/github/ketraterm/completion/api/TerminalCompletionMessages;Lio/github/ketraterm/completion/api/TerminalFileSystemProvider;)Lio/github/ketraterm/completion/api/TerminalCompletionSource;
 	public static final fun path (Lio/github/ketraterm/completion/api/TerminalFileSystemProvider;)Lio/github/ketraterm/completion/api/TerminalCompletionSource;
 	public static final fun valueDomain (Lio/github/ketraterm/completion/model/TerminalCompletionValueDomain;Ljava/lang/String;Lkotlin/jvm/functions/Function3;)Lio/github/ketraterm/completion/api/TerminalCompletionSource;
 	public static final fun valueDomain (Lio/github/ketraterm/completion/model/TerminalCompletionValueDomain;Ljava/lang/String;Lkotlin/jvm/functions/Function3;Ljava/util/Set;)Lio/github/ketraterm/completion/api/TerminalCompletionSource;
@@ -403,6 +429,9 @@ public final class io/github/ketraterm/completion/model/TerminalCommandSpec {
 public final class io/github/ketraterm/completion/model/TerminalCommandSpecs {
 	public static final field INSTANCE Lio/github/ketraterm/completion/model/TerminalCommandSpecs;
 	public static final fun defaults ()Ljava/util/List;
+	public static final fun defaults (Ljava/util/Locale;)Ljava/util/List;
+	public static final fun defaults (Ljava/util/ResourceBundle;)Ljava/util/List;
+	public static final fun defaults (Lkotlin/jvm/functions/Function2;)Ljava/util/List;
 }
 
 public final class io/github/ketraterm/completion/model/TerminalCompletionDomainValue {
