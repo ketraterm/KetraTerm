@@ -31,8 +31,8 @@ import io.github.ketraterm.core.store.ClusterStore
  * 3. Select the new live-screen boundary using ConPTY-compatible anchoring.
  * 4. Relocate the cursor and scrollback viewport into the reflowed result.
  *
- * A resize creates a brand-new [ClusterStore] alongside a brand-new [HistoryRing].
- * Cluster payloads that survive reflow are deep-copied into the new store.
+ * Width changes create a new [ClusterStore] and [HistoryRing], deep-copying surviving
+ * clusters. Height-only changes preserve physical rows and their existing arena.
  *
  * Important:
  *
@@ -57,8 +57,8 @@ internal object TerminalResizer {
     }
 
     /**
-     * Resizes a specific [ScreenBuffer], reflowing all its content and safely
-     * copying surviving grapheme clusters to a new memory arena.
+     * Resizes a [ScreenBuffer], reusing rows when the width is unchanged and
+     * reflowing into a new arena when the width changes.
      *
      * The returned value is the updated scrollback offset for a user-controlled
      * viewport. A return value of zero means the viewport remains attached to
@@ -77,6 +77,11 @@ internal object TerminalResizer {
         require(oldHeight > 0) { "oldHeight must be positive" }
         require(newWidth > 0) { "newWidth must be positive" }
         require(newHeight > 0) { "newHeight must be positive" }
+        require(buffer.maxHistory <= Int.MAX_VALUE - newHeight) { "maxHistory + newHeight exceeds Int.MAX_VALUE" }
+        if (newWidth == oldWidth) {
+            if (newHeight == oldHeight) return oldScrollbackOffset.coerceIn(0, maxOf(0, buffer.ring.size - oldHeight))
+            return resizeHeight(buffer, oldHeight, newHeight, oldScrollbackOffset, lineIdProvider)
+        }
 
         val newStore = ClusterStore()
         val newRing =
@@ -536,6 +541,42 @@ internal object TerminalResizer {
                 0
             }
         }
+    }
+
+    private fun resizeHeight(
+        buffer: ScreenBuffer,
+        oldHeight: Int,
+        newHeight: Int,
+        oldScrollbackOffset: Int,
+        lineIdProvider: () -> Long,
+    ): Int {
+        val oldTop = maxOf(0, buffer.ring.size - oldHeight)
+        val cursorRow = oldTop + buffer.cursor.row
+        val viewportTop = oldTop - oldScrollbackOffset.coerceIn(0, oldTop)
+        val retainedEnd = buffer.ring.size - countTrailingBlankRows(buffer, oldTop, oldHeight)
+
+        // Keep the existing anchoring policy when the live top continues a logical line.
+        var targetTop = oldTop
+        while (targetTop > 0 && buffer.ring[targetTop - 1].wrapped) targetTop--
+
+        val capacity = buffer.maxHistory + newHeight
+        val discarded = maxOf(0, retainedEnd - capacity)
+        val minimumSize = (targetTop - discarded).coerceIn(0, buffer.maxHistory) + newHeight
+        buffer.resizeRows(newHeight, discarded, retainedEnd)
+        while (buffer.ring.size < minimumSize) {
+            val line = buffer.ring.push()
+            line.assignLineId(lineIdProvider())
+            line.clear(0L, 0L)
+        }
+
+        val liveTop = buffer.ring.size - newHeight
+        buffer.cursor.row =
+            if (cursorRow < retainedEnd) {
+                (cursorRow - discarded - liveTop).coerceIn(0, newHeight - 1)
+            } else {
+                buffer.cursor.row.coerceIn(0, newHeight - 1)
+            }
+        return if (oldScrollbackOffset > 0) (discarded + liveTop - viewportTop).coerceIn(0, liveTop) else 0
     }
 
     /**

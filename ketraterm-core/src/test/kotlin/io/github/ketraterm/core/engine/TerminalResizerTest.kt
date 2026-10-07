@@ -557,14 +557,14 @@ class TerminalResizerTest {
         }
 
         @Test
-        fun `cluster handle in new ring points into new store not old store`() {
+        fun `width change copies cluster handles into the new store`() {
             val state = buildState(cols = 6, rows = 2)
             val top = (state.ring.size - 2).coerceAtLeast(0)
             state.ring[top + 1].setCluster(0, intArrayOf(0xAAAA, 0xBBBB), 2, 0)
             val oldStore = state.primaryBuffer.store
             state.cursor.row = 1
 
-            resizeState(state, 6, 2)
+            resizeState(state, 7, 2)
 
             assertNotSame(
                 oldStore,
@@ -954,11 +954,11 @@ class TerminalResizerTest {
         }
 
         @Test
-        fun `state clusterStore is replaced with a new instance after resize`() {
+        fun `state clusterStore is replaced with a new instance after width change`() {
             val state = buildState(cols = 10, rows = 5)
             val oldStore = state.primaryBuffer.store
 
-            resizeState(state, 10, 5)
+            resizeState(state, 11, 5)
 
             assertNotSame(
                 oldStore,

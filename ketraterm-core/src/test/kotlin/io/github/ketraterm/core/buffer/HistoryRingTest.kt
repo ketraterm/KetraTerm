@@ -27,6 +27,100 @@ import org.junit.jupiter.params.provider.ValueSource
 
 @DisplayName("HistoryRing Buffer Storage")
 class HistoryRingTest {
+    @ParameterizedTest
+    @ValueSource(ints = [5, 129, 259])
+    fun `capacity changes preserve live rows and reuse spare rows through further growth`(capacity: Int) {
+        for (pushes in intArrayOf(capacity / 2, capacity + 3)) {
+            val store = ClusterStore()
+            val created = mutableListOf<Line>()
+            val ring = HistoryRing(capacity) { Line(2, store).also { created.add(it) } }
+            repeat(pushes) { ring.push() }
+            val before = List(ring.size) { ring[it] }
+            val allocated = created.size
+            val end = ring.size - 1
+            ring.resizeCapacity(capacity + 7, 1, end)
+            assertEquals(end - 1, ring.size)
+            assertEquals(1L, ring.discardedCount)
+            assertEquals(allocated, created.size)
+            for (index in 1 until end) assertSame(before[index], ring[index - 1])
+            while (ring.size < allocated) ring.push()
+            assertEquals(allocated, created.size)
+            assertEquals(created.toSet(), (0 until ring.size).map { ring[it] }.toSet())
+            while (ring.size < ring.capacity) ring.push()
+            assertEquals(capacity + 7, created.size)
+
+            val survivors = List(3) { ring[ring.size - 3 + it] }
+            ring.resizeCapacity(3, ring.size - 3, ring.size)
+            survivors.forEachIndexed { index, line -> assertSame(line, ring[index]) }
+            assertSame(survivors[0], ring.push())
+            val wrapped = List(3) { ring[it] }
+            ring.resizeCapacity(9, 0, 3)
+            wrapped.forEachIndexed { index, line -> assertSame(line, ring[index]) }
+            repeat(6) { assertSame(store, ring.push().store) }
+            assertEquals(9, (0 until ring.size).map { ring[it] }.toSet().size)
+            assertEquals(capacity + 13, created.size)
+        }
+    }
+
+    @ParameterizedTest
+    @ValueSource(ints = [1, 7, 129, 259])
+    fun `counted rotations preserve reference order and storage across ring boundaries`(capacity: Int) {
+        val store = ClusterStore()
+        var allocations = 0
+        val ring =
+            HistoryRing(capacity) {
+                allocations++
+                Line(2, store)
+            }
+        for (pushes in intArrayOf(maxOf(1, capacity / 2), capacity, capacity + 1, capacity * 2 - 1)) {
+            ring.clear()
+            repeat(pushes) { ring.push() }
+            val before = List(ring.size) { ring[it] }
+            val allocated = allocations
+            val discarded = ring.discardedCount
+            for (from in intArrayOf(0, ring.size / 2)) {
+                for (to in intArrayOf(from, ring.size - 1)) {
+                    val length = to - from + 1
+                    for (count in intArrayOf(0, 1, minOf(2, length), length / 2, length - 1, length)) {
+                        for (up in listOf(true, false)) {
+                            if (up) ring.rotateUp(from, to, count) else ring.rotateDown(from, to, count)
+                            for (index in before.indices) {
+                                val source =
+                                    if (index in from..to) {
+                                        from + (index - from + if (up) count else length - count) % length
+                                    } else {
+                                        index
+                                    }
+                                assertSame(
+                                    before[source],
+                                    ring[index],
+                                    "capacity=$capacity pushes=$pushes range=$from..$to count=$count up=$up index=$index",
+                                )
+                            }
+                            assertEquals(before.size, ring.size)
+                            assertEquals(discarded, ring.discardedCount)
+                            assertEquals(allocated, allocations)
+                            if (up) ring.rotateDown(from, to, count) else ring.rotateUp(from, to, count)
+                            before.forEachIndexed { index, line -> assertSame(line, ring[index]) }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    @Test
+    fun `invalid rotation counts fail before moving rows`() {
+        val ring = HistoryRing(5, lineFactory = createLineFactory())
+        repeat(5) { ring.push() }
+        val before = List(5) { ring[it] }
+        for (count in intArrayOf(-1, 4, Int.MAX_VALUE)) {
+            assertThrows<IllegalArgumentException> { ring.rotateUp(1, 3, count) }
+            assertThrows<IllegalArgumentException> { ring.rotateDown(1, 3, count) }
+            before.forEachIndexed { index, line -> assertSame(line, ring[index]) }
+        }
+    }
+
     // Helper factory to create distinct lines for identity testing
     private fun createLineFactory(width: Int = 10): () -> Line = { Line(width, ClusterStore()) }
 

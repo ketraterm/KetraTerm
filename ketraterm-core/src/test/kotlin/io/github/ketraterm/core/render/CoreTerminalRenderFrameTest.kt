@@ -18,8 +18,10 @@ package io.github.ketraterm.core.render
 import io.github.ketraterm.core.TerminalBuffers
 import io.github.ketraterm.core.buffer.DefaultTerminalBuffer
 import io.github.ketraterm.core.buffer.impl.TerminalModeControllerImpl
+import io.github.ketraterm.core.codec.AttributeCodec
 import io.github.ketraterm.core.engine.CursorEngine
 import io.github.ketraterm.core.model.CellColor
+import io.github.ketraterm.core.model.TerminalConstants
 import io.github.ketraterm.core.model.UnderlineStyle
 import io.github.ketraterm.core.state.TerminalState
 import io.github.ketraterm.render.api.*
@@ -29,6 +31,82 @@ import org.junit.jupiter.params.ParameterizedTest
 import org.junit.jupiter.params.provider.ValueSource
 
 class CoreTerminalRenderFrameTest {
+    @ParameterizedTest
+    @ValueSource(ints = [0, 1, 2, 3])
+    fun `adjacent attribute runs preserve all outputs and refresh for each copy`(optionalOutputs: Int) {
+        val state = TerminalState(initialWidth = 12, initialHeight = 1, maxHistory = 0)
+        val line = state.ring[0]
+        val primary = AttributeCodec.packColors(foreground = CellColor.rgb(0x123456), bold = true, inverse = true)
+        val extended = AttributeCodec.packExtended(underlineStyle = UnderlineStyle.CURLY, conceal = true, hyperlinkId = 7)
+        val changedLink = AttributeCodec.packExtended(underlineStyle = UnderlineStyle.CURLY, conceal = true, hyperlinkId = 8)
+        val changedExtra =
+            AttributeCodec.packExtended(
+                underlineColor = 42,
+                underlineStyle = UnderlineStyle.CURLY,
+                conceal = true,
+                hyperlinkId = 8,
+            )
+        val primaries = longArrayOf(0, 0, primary, primary, primary, primary, primary, primary, primary, primary, 0, 0)
+        val extendeds = longArrayOf(0, 0, 0, 0, extended, extended, changedLink, changedLink, changedExtra, changedExtra, 0, 0)
+        repeat(12) { col -> line.setCell(col, 'a'.code + col, primaries[col], extendeds[col]) }
+        line.setCell(1, TerminalConstants.EMPTY, primaries[1], extendeds[1])
+        line.setCell(4, '界'.code, primaries[4], extendeds[4])
+        line.setCell(5, TerminalConstants.WIDE_CHAR_SPACER, primaries[5], extendeds[5])
+        line.setCluster(6, intArrayOf('e'.code, 0x0301), 2, primaries[6], extendeds[6])
+        val expectedCodes = IntArray(12) { 'a'.code + it }
+        expectedCodes[1] = 0
+        expectedCodes[4] = '界'.code
+        expectedCodes[5] = 0
+        expectedCodes[6] = 0
+        val expectedFlags = IntArray(12) { TerminalRenderCellFlags.CODEPOINT }
+        expectedFlags[1] = TerminalRenderCellFlags.EMPTY
+        expectedFlags[4] = TerminalRenderCellFlags.CODEPOINT or TerminalRenderCellFlags.WIDE_LEADING
+        expectedFlags[5] = TerminalRenderCellFlags.WIDE_TRAILING
+        expectedFlags[6] = TerminalRenderCellFlags.CLUSTER
+        val translator = RenderAttrTranslator()
+        val frame = CoreTerminalRenderFrame(state)
+        val modes = TerminalModeControllerImpl(state, CursorEngine(state))
+
+        for (reverseVideo in listOf(false, true, false)) {
+            modes.setReverseVideo(reverseVideo)
+            val codes = IntArray(14) { -99 }
+            val attrs = LongArray(16) { -99L }
+            val flags = IntArray(18) { -99 }
+            val extras = if (optionalOutputs and 1 != 0) LongArray(20) { -99L } else null
+            val links = if (optionalOutputs and 2 != 0) IntArray(22) { -99 } else null
+            val clusters = mutableMapOf<Int, String>()
+            frame.use(scrollbackOffset = 0) {
+                frame.copyLine(
+                    row = 0,
+                    codeWords = codes,
+                    codeOffset = 1,
+                    attrWords = attrs,
+                    attrOffset = 2,
+                    flags = flags,
+                    flagOffset = 3,
+                    extraAttrWords = extras,
+                    extraAttrOffset = 4,
+                    hyperlinkIds = links,
+                    hyperlinkOffset = 5,
+                    clusterSink = { col, text -> clusters[col] = text },
+                )
+            }
+            assertEquals(mapOf(6 to "e\u0301"), clusters)
+            assertArrayEquals(intArrayOf(-99) + expectedCodes + intArrayOf(-99), codes)
+            assertArrayEquals(IntArray(3) { -99 } + expectedFlags + IntArray(3) { -99 }, flags)
+            val expectedAttrs = LongArray(12) { translator.toRenderAttrWord(primaries[it], extendeds[it], reverseVideo) }
+            assertArrayEquals(LongArray(2) { -99L } + expectedAttrs + LongArray(2) { -99L }, attrs)
+            if (extras != null) {
+                val expectedExtras = LongArray(12) { translator.toRenderExtraAttrWord(extendeds[it]) }
+                assertArrayEquals(LongArray(4) { -99L } + expectedExtras + LongArray(4) { -99L }, extras)
+            }
+            if (links != null) {
+                val expectedLinks = intArrayOf(0, 0, 0, 0, 7, 7, 8, 8, 8, 8, 0, 0)
+                assertArrayEquals(IntArray(5) { -99 } + expectedLinks + IntArray(5) { -99 }, links)
+            }
+        }
+    }
+
     @Test
     fun `all nested read variants reject before entering and release after callback failure`() {
         val buffer = TerminalBuffers.create(width = 4, height = 2)

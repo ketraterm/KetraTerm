@@ -29,6 +29,49 @@ import org.junit.jupiter.params.provider.ValueSource
 
 class BufferWriterAsciiTest {
     @ParameterizedTest
+    @ValueSource(ints = [0, 1, 2, 3, 4, 5, 6, 7])
+    fun `ASCII redraws match scalar writes at every mixed occupant boundary`(startColumn: Int) {
+        for (length in intArrayOf(1, 2, 5, 10)) {
+            for (chunkSize in intArrayOf(1, 3, 10)) {
+                val actual = TerminalBuffers.create(8, 3, maxHistory = 2)
+                val expected = TerminalBuffers.create(8, 3, maxHistory = 2)
+                for (terminal in listOf(actual, expected)) {
+                    terminal.setSelectiveEraseProtection(true)
+                    terminal.setHyperlinkId(12)
+                    repeat(3) { row ->
+                        terminal.positionCursor(0, row)
+                        terminal.writeText("AB界")
+                        terminal.writeCluster(intArrayOf('e'.code, 0x0301))
+                        terminal.writeCluster(intArrayOf(0x1F469, 0x200D, 0x1F4BB))
+                        terminal.writeText("Z")
+                    }
+                    terminal.setSelectiveEraseProtection(false)
+                    terminal.setHyperlinkId(34)
+                    terminal.setPenColors(CellColor.rgb(0x123456), CellColor.indexed(5), underlineStyle = UnderlineStyle.CURLY)
+                    terminal.positionCursor(startColumn, 2)
+                }
+                val bytes = "0123456789".toByteArray()
+                var offset = 0
+                while (offset < length) {
+                    val count = minOf(chunkSize, length - offset)
+                    actual.writeAscii(bytes, offset, count)
+                    repeat(count) { expected.writeCodepoint(bytes[offset + it].toInt()) }
+                    assertEquivalent(expected, actual)
+                    offset += count
+                }
+                for (terminal in listOf(actual, expected)) {
+                    terminal.updatePreviousCluster(intArrayOf(bytes[length - 1].toInt(), 0x0301))
+                }
+                assertEquivalent(expected, actual)
+                for (terminal in listOf(actual, expected)) terminal.selectiveEraseEntireScreen()
+                assertEquivalent(expected, actual)
+                for (terminal in listOf(actual, expected)) terminal.resize(5, 3)
+                assertEquivalent(expected, actual)
+            }
+        }
+    }
+
+    @ParameterizedTest
     @CsvSource("1,0", "1,2", "4,0", "4,10", "80,2", "80,10")
     fun `ASCII spans match scalar writes through wrapping history eviction and reflow`(
         width: Int,
@@ -199,9 +242,14 @@ class BufferWriterAsciiTest {
         assertEquals('E'.code, terminal.getCodepointAt(0, 1))
     }
 
-    @Test
-    fun `span changes content cursor and affected line generations`() {
+    @ParameterizedTest
+    @ValueSource(booleans = [false, true])
+    fun `span changes content cursor and affected line generations`(overwrite: Boolean) {
         val terminal = TerminalBuffers.create(8, 2)
+        if (overwrite) {
+            terminal.writeText("previous")
+            terminal.carriageReturn()
+        }
         var frameGeneration = 0L
         var contentGeneration = 0L
         var cursorGeneration = 0L

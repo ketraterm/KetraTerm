@@ -22,9 +22,92 @@ import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
+import org.junit.jupiter.params.ParameterizedTest
+import org.junit.jupiter.params.provider.ValueSource
 
 @DisplayName("GridWriter Test Suite")
 class MutationEngineTest {
+    @ParameterizedTest
+    @ValueSource(strings = ["up", "down", "insert", "delete"])
+    fun `counted row operations preserve scalar identities content and cluster ownership`(operation: String) {
+        for (history in intArrayOf(0, 2, 259)) {
+            for (warmup in intArrayOf(0, 270)) {
+                for ((top, bottom) in listOf(0 to 4, 0 to 2, 1 to 3)) {
+                    for (count in intArrayOf(1, 2, 3, 5, Int.MAX_VALUE)) {
+                        val actual = createState(width = 6, height = 5, history = history)
+                        val expected = createState(width = 6, height = 5, history = history)
+                        val actualMutation = MutationEngine(actual)
+                        val expectedMutation = MutationEngine(expected)
+                        for ((state, mutation) in listOf(actual to actualMutation, expected to expectedMutation)) {
+                            repeat(warmup) { mutation.scrollUp() }
+                            for (row in 0 until state.ring.size) {
+                                val line = state.ring[row]
+                                line.setCell(0, 'A'.code + row % 26, 17L, 23L)
+                                line.setCell(1, '界'.code, 17L, 23L)
+                                line.setRawCell(2, TerminalConstants.WIDE_CHAR_SPACER, 17L, 23L)
+                                line.setCluster(3, intArrayOf('e'.code, 0x0301), 2, 17L, 23L)
+                                line.wrapped = true
+                                line.endsWithWrapPadding = true
+                                line.hasOutput = true
+                            }
+                            state.activeBuffer.setScrollRegion(top + 1, bottom + 1, false, 5)
+                            state.pen.setAttributes(3, 5, bold = true)
+                            state.cursor.row = top + 1
+                            state.cursor.col = 5
+                            state.cursor.pendingWrap = true
+                        }
+
+                        fun apply(
+                            mutation: MutationEngine,
+                            amount: Int,
+                        ) {
+                            when (operation) {
+                                "up" -> mutation.scrollUp(amount)
+                                "down" -> mutation.scrollDown(amount)
+                                "insert" -> mutation.insertLines(amount)
+                                "delete" -> mutation.deleteLines(amount)
+                            }
+                        }
+                        val limit =
+                            if (operation == "insert" ||
+                                operation == "delete"
+                            ) {
+                                bottom - expected.cursor.row + 1
+                            } else {
+                                bottom - top + 1
+                            }
+                        apply(actualMutation, count)
+                        repeat(minOf(count, limit)) { apply(expectedMutation, 1) }
+                        val context = "$operation history=$history warmup=$warmup region=$top..$bottom count=$count"
+                        assertEquals(expected.ring.size, actual.ring.size, context)
+                        assertEquals(expected.ring.discardedCount, actual.ring.discardedCount, context)
+                        assertEquals(expected.cursor.col, actual.cursor.col, context)
+                        assertEquals(expected.cursor.row, actual.cursor.row, context)
+                        assertFalse(actual.cursor.pendingWrap, context)
+                        for (row in 0 until expected.ring.size) {
+                            val expectedLine = expected.ring[row]
+                            val actualLine = actual.ring[row]
+                            assertEquals(expectedLine.lineId, actualLine.lineId, "$context row=$row")
+                            assertEquals(expectedLine.toText(), actualLine.toText(), "$context row=$row")
+                            assertEquals(expectedLine.wrapped, actualLine.wrapped, context)
+                            assertEquals(expectedLine.endsWithWrapPadding, actualLine.endsWithWrapPadding, context)
+                            assertEquals(expectedLine.hasOutput, actualLine.hasOutput, context)
+                            repeat(6) { col ->
+                                assertEquals(expectedLine.rawCodepoint(col), actualLine.rawCodepoint(col), context)
+                                assertEquals(expectedLine.getPackedAttr(col), actualLine.getPackedAttr(col), context)
+                                assertEquals(expectedLine.getPackedExtendedAttr(col), actualLine.getPackedExtendedAttr(col), context)
+                            }
+                        }
+                        // Clearing survivors must not double-free clusters from recycled rows.
+                        actualMutation.clearAllHistory()
+                        repeat(5) { row -> assertEquals("", lineAt(actual, row).toTextTrimmed()) }
+                        assertEquals(0, actual.historySize)
+                    }
+                }
+            }
+        }
+    }
+
     private fun createState(
         width: Int = 5,
         height: Int = 2,

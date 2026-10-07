@@ -83,14 +83,14 @@ internal class DefaultTerminalBuffer private constructor(
     }
 
     /**
-     * Reflows the primary screen, recreates the alternate screen, updates global
+     * Resizes the primary screen, recreates the alternate screen, updates global
      * dimensions and tab stops, then restores invariants that must hold even for
      * the currently inactive buffer.
      *
      * @return A [Pair] of (newScrollbackOffset, newHistorySize), allowing the caller to
      *   re-anchor a scrollback viewport that was active at [oldScrollbackOffset] before
      *   the reflow. Both values describe the active buffer; the alternate viewport
-     *   stays at offset 0 while primary content is reflowed in the background.
+     *   stays at offset 0 while primary content is resized in the background.
      */
     override fun resize(
         newWidth: Int,

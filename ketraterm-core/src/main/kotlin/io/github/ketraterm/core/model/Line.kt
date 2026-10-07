@@ -26,7 +26,7 @@ import io.github.ketraterm.core.store.ClusterStore
  * Each column is represented by parallel primitive values:
  * - `codepoints[col]` — the raw storage value (see [TerminalConstants] for the full encoding)
  * - `attrs[col]`      — the primary packed cell attribute
- * - `extendedAttrs[col]` — the extended packed cell attribute
+ * - `extendedAttrs[col]` — the extended packed cell attribute, implicitly zero without storage
  *
  * `wrapped=true` means this line continues into the following physical line
  * because of a soft wrap at the terminal width.
@@ -60,8 +60,11 @@ internal class Line(
     /** Primary packed cell attributes, parallel to [codepoints]. */
     private val attrs = LongArray(width)
 
-    /** Extended packed cell attributes, parallel to [codepoints]. */
-    private val extendedAttrs = LongArray(width)
+    /** Allocated on the first nonzero extended write and retained through clears for reuse. */
+    private var extendedAttrs: LongArray? = null
+
+    /** Number of cluster-bearing cells; zero lets range erases skip the handle scan. */
+    private var clusterCount: Int = 0
 
     /**
      * True when this line's content continues on the next physical line.
@@ -140,7 +143,9 @@ internal class Line(
      * raw values (including live cluster handles) into a newly allocated line that
      * shares the same [store].
      *
-     * **Caller is responsible** for ensuring the handle is valid in [store].
+     * **Caller is responsible** for ensuring the handle is valid in [store] and
+     * releasing or transferring any replaced handle. Row-local cluster accounting
+     * is updated without changing store ownership.
      *
      * @param col Column index.
      */
@@ -151,9 +156,11 @@ internal class Line(
         extendedAttr: Long = 0L,
     ) {
         if (col == width - 1) endsWithWrapPadding = false
+        if (codepoints[col] <= TerminalConstants.CLUSTER_HANDLE_MAX) clusterCount--
+        if (raw <= TerminalConstants.CLUSTER_HANDLE_MAX) clusterCount++
         codepoints[col] = raw
         attrs[col] = attr
-        extendedAttrs[col] = extendedAttr
+        extendedAttrsForWrite(extendedAttr)?.set(col, extendedAttr)
     }
 
     /**
@@ -167,7 +174,7 @@ internal class Line(
         extendedAttr: Long,
     ) {
         attrs[col] = attr
-        extendedAttrs[col] = extendedAttr
+        extendedAttrsForWrite(extendedAttr)?.set(col, extendedAttr)
     }
 
     // TerminalLine — public read-only surface
@@ -192,7 +199,7 @@ internal class Line(
      */
     fun getPackedAttr(col: Int): Long = attrs[col]
 
-    fun getPackedExtendedAttr(col: Int): Long = extendedAttrs[col]
+    fun getPackedExtendedAttr(col: Int): Long = extendedAttrs?.get(col) ?: 0L
 
     /**
      * Returns `true` if [col] holds a multi-codepoint grapheme cluster.
@@ -236,15 +243,16 @@ internal class Line(
         freeHandleAt(col)
         codepoints[col] = codepoint
         attrs[col] = attr
-        extendedAttrs[col] = extendedAttr
+        extendedAttrsForWrite(extendedAttr)?.set(col, extendedAttr)
     }
 
     /**
-     * Writes validated printable ASCII into consecutive empty cells, stopping at an occupant.
+     * Writes validated printable ASCII over empty or single-width scalar cells.
+     * Stops before a cluster, wide leader, or spacer so the caller can clear its full span.
      * The caller bounds [length] to the remaining row width and owns generation/cursor updates.
-     * Returns the number written, without inspecting or freeing cluster handles.
+     * Returns the number written without freeing cluster handles.
      */
-    fun writeAsciiIntoEmptyCells(
+    fun writeAsciiIntoSimpleCells(
         col: Int,
         bytes: ByteArray,
         offset: Int,
@@ -253,12 +261,18 @@ internal class Line(
         extendedAttr: Long,
     ): Int {
         var written = 0
-        while (written < length && codepoints[col + written] == TerminalConstants.EMPTY) {
-            codepoints[col + written] = bytes[offset + written].toInt()
-            attrs[col + written] = attr
-            extendedAttrs[col + written] = extendedAttr
+        while (written < length) {
+            val target = col + written
+            if (codepoints[target] < TerminalConstants.EMPTY ||
+                (target + 1 < width && codepoints[target + 1] == TerminalConstants.WIDE_CHAR_SPACER)
+            ) {
+                break
+            }
+            codepoints[target] = bytes[offset + written].toInt()
+            attrs[target] = attr
             written++
         }
+        if (written > 0) extendedAttrsForWrite(extendedAttr)?.fill(extendedAttr, col, col + written)
         if (written > 0 && col + written == width) endsWithWrapPadding = false
         return written
     }
@@ -283,8 +297,9 @@ internal class Line(
         if (col == width - 1) endsWithWrapPadding = false
         freeHandleAt(col)
         codepoints[col] = store.alloc(cps, 0, cpLen)
+        clusterCount++
         attrs[col] = attr
-        extendedAttrs[col] = extendedAttr
+        extendedAttrsForWrite(extendedAttr)?.set(col, extendedAttr)
     }
 
     /**
@@ -295,10 +310,10 @@ internal class Line(
         defaultAttr: Long,
         defaultExtendedAttr: Long = 0L,
     ) {
-        store.freeRange(codepoints, 0, width)
+        freeHandlesInRange(0, width)
         codepoints.fill(TerminalConstants.EMPTY)
         attrs.fill(defaultAttr)
-        extendedAttrs.fill(defaultExtendedAttr)
+        extendedAttrsForWrite(defaultExtendedAttr)?.fill(defaultExtendedAttr)
         wrapped = false
     }
 
@@ -314,10 +329,10 @@ internal class Line(
         val from = startCol.coerceAtLeast(0)
         if (from >= width) return
         endsWithWrapPadding = false
-        store.freeRange(codepoints, from, width)
+        freeHandlesInRange(from, width)
         codepoints.fill(TerminalConstants.EMPTY, from, width)
         attrs.fill(attr, from, width)
-        extendedAttrs.fill(extendedAttr, from, width)
+        extendedAttrsForWrite(extendedAttr)?.fill(extendedAttr, from, width)
     }
 
     /**
@@ -332,10 +347,10 @@ internal class Line(
         val to = (endCol + 1).coerceAtMost(width)
         if (to <= 0) return
         if (to == width) endsWithWrapPadding = false
-        store.freeRange(codepoints, 0, to)
+        freeHandlesInRange(0, to)
         codepoints.fill(TerminalConstants.EMPTY, 0, to)
         attrs.fill(attr, 0, to)
-        extendedAttrs.fill(extendedAttr, 0, to)
+        extendedAttrsForWrite(extendedAttr)?.fill(extendedAttr, 0, to)
     }
 
     /**
@@ -352,10 +367,10 @@ internal class Line(
         val to = endExclusive.coerceIn(0, width)
         if (from >= to) return
         if (to == width) endsWithWrapPadding = false
-        store.freeRange(codepoints, from, to)
+        freeHandlesInRange(from, to)
         codepoints.fill(TerminalConstants.EMPTY, from, to)
         attrs.fill(attr, from, to)
-        extendedAttrs.fill(extendedAttr, from, to)
+        extendedAttrsForWrite(extendedAttr)?.fill(extendedAttr, from, to)
     }
 
     /**
@@ -392,16 +407,16 @@ internal class Line(
         val clearStart = rightInclusive - safeCount + 1
 
         // Free handles that will fall off the active range.
-        store.freeRange(codepoints, clearStart, rightInclusive + 1)
+        freeHandlesInRange(clearStart, rightInclusive + 1)
 
         if (shiftCount > 0) {
             System.arraycopy(codepoints, col, codepoints, col + safeCount, shiftCount)
             System.arraycopy(attrs, col, attrs, col + safeCount, shiftCount)
-            System.arraycopy(extendedAttrs, col, extendedAttrs, col + safeCount, shiftCount)
+            extendedAttrs?.let { System.arraycopy(it, col, it, col + safeCount, shiftCount) }
         }
         codepoints.fill(TerminalConstants.EMPTY, col, col + safeCount)
         attrs.fill(defaultAttr, col, col + safeCount)
-        extendedAttrs.fill(defaultExtendedAttr, col, col + safeCount)
+        extendedAttrsForWrite(defaultExtendedAttr)?.fill(defaultExtendedAttr, col, col + safeCount)
     }
 
     /**
@@ -443,22 +458,22 @@ internal class Line(
         val shiftCount = rightInclusive - col + 1 - safeCount
 
         // Free cluster handles for the cells being deleted before the shift overwrites them.
-        store.freeRange(codepoints, col, col + safeCount)
+        freeHandlesInRange(col, col + safeCount)
 
         // Shift surviving cells left to close the gap.
         if (shiftCount > 0) {
             System.arraycopy(codepoints, col + safeCount, codepoints, col, shiftCount)
             System.arraycopy(attrs, col + safeCount, attrs, col, shiftCount)
-            System.arraycopy(extendedAttrs, col + safeCount, extendedAttrs, col, shiftCount)
+            extendedAttrs?.let { System.arraycopy(it, col + safeCount, it, col, shiftCount) }
         }
 
         // Fill the vacated trailing cells with blanks.
-        // Do NOT call store.freeRange() here: the cluster handles that previously
+        // Do NOT free handles here: the cluster handles that previously
         // occupied these slots were shifted left above and are still live.
         val clearStart = rightInclusive - safeCount + 1
         codepoints.fill(TerminalConstants.EMPTY, clearStart, rightInclusive + 1)
         attrs.fill(defaultAttr, clearStart, rightInclusive + 1)
-        extendedAttrs.fill(defaultExtendedAttr, clearStart, rightInclusive + 1)
+        extendedAttrsForWrite(defaultExtendedAttr)?.fill(defaultExtendedAttr, clearStart, rightInclusive + 1)
     }
 
     /**
@@ -471,10 +486,10 @@ internal class Line(
         extendedAttr: Long = 0L,
     ) {
         endsWithWrapPadding = false
-        store.freeRange(codepoints, 0, width)
+        freeHandlesInRange(0, width)
         codepoints.fill(codepoint)
         attrs.fill(attr)
-        extendedAttrs.fill(extendedAttr)
+        extendedAttrsForWrite(extendedAttr)?.fill(extendedAttr)
     }
 
     // -------------------------------------------------------------------------
@@ -510,6 +525,12 @@ internal class Line(
     // Private helpers
     // -------------------------------------------------------------------------
 
+    private fun extendedAttrsForWrite(value: Long): LongArray? {
+        val existing = extendedAttrs
+        if (existing != null || value == 0L) return existing
+        return LongArray(width).also { extendedAttrs = it }
+    }
+
     /**
      * Appends the glyph(s) at [col] to [this] [StringBuilder].
      * Cluster cells emit all codepoints in sequence; spacer cells are skipped.
@@ -530,7 +551,18 @@ internal class Line(
     /** Frees the cluster handle at [col] if present; no-op otherwise. */
     private fun freeHandleAt(col: Int) {
         val raw = codepoints[col]
-        if (raw <= TerminalConstants.CLUSTER_HANDLE_MAX) store.free(raw)
+        if (raw <= TerminalConstants.CLUSTER_HANDLE_MAX) {
+            store.free(raw)
+            clusterCount--
+        }
+    }
+
+    private fun freeHandlesInRange(
+        fromIndex: Int,
+        toIndex: Int,
+    ) {
+        if (clusterCount == 0) return
+        clusterCount -= store.freeRange(codepoints, fromIndex, toIndex)
     }
 
     @Suppress("NOTHING_TO_INLINE")
