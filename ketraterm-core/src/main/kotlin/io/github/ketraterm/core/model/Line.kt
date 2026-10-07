@@ -26,7 +26,7 @@ import io.github.ketraterm.core.store.ClusterStore
  * Each column is represented by parallel primitive values:
  * - `codepoints[col]` — the raw storage value (see [TerminalConstants] for the full encoding)
  * - `attrs[col]`      — the primary packed cell attribute
- * - `extendedAttrs[col]` — the extended packed cell attribute
+ * - `extendedAttrs[col]` — the extended packed cell attribute, implicitly zero without storage
  *
  * `wrapped=true` means this line continues into the following physical line
  * because of a soft wrap at the terminal width.
@@ -60,8 +60,8 @@ internal class Line(
     /** Primary packed cell attributes, parallel to [codepoints]. */
     private val attrs = LongArray(width)
 
-    /** Extended packed cell attributes, parallel to [codepoints]. */
-    private val extendedAttrs = LongArray(width)
+    /** Allocated on the first nonzero extended write and retained through clears for reuse. */
+    private var extendedAttrs: LongArray? = null
 
     /**
      * True when this line's content continues on the next physical line.
@@ -153,7 +153,7 @@ internal class Line(
         if (col == width - 1) endsWithWrapPadding = false
         codepoints[col] = raw
         attrs[col] = attr
-        extendedAttrs[col] = extendedAttr
+        extendedAttrsForWrite(extendedAttr)?.set(col, extendedAttr)
     }
 
     /**
@@ -167,7 +167,7 @@ internal class Line(
         extendedAttr: Long,
     ) {
         attrs[col] = attr
-        extendedAttrs[col] = extendedAttr
+        extendedAttrsForWrite(extendedAttr)?.set(col, extendedAttr)
     }
 
     // TerminalLine — public read-only surface
@@ -192,7 +192,7 @@ internal class Line(
      */
     fun getPackedAttr(col: Int): Long = attrs[col]
 
-    fun getPackedExtendedAttr(col: Int): Long = extendedAttrs[col]
+    fun getPackedExtendedAttr(col: Int): Long = extendedAttrs?.get(col) ?: 0L
 
     /**
      * Returns `true` if [col] holds a multi-codepoint grapheme cluster.
@@ -236,7 +236,7 @@ internal class Line(
         freeHandleAt(col)
         codepoints[col] = codepoint
         attrs[col] = attr
-        extendedAttrs[col] = extendedAttr
+        extendedAttrsForWrite(extendedAttr)?.set(col, extendedAttr)
     }
 
     /**
@@ -263,9 +263,9 @@ internal class Line(
             }
             codepoints[target] = bytes[offset + written].toInt()
             attrs[target] = attr
-            extendedAttrs[target] = extendedAttr
             written++
         }
+        if (written > 0) extendedAttrsForWrite(extendedAttr)?.fill(extendedAttr, col, col + written)
         if (written > 0 && col + written == width) endsWithWrapPadding = false
         return written
     }
@@ -291,7 +291,7 @@ internal class Line(
         freeHandleAt(col)
         codepoints[col] = store.alloc(cps, 0, cpLen)
         attrs[col] = attr
-        extendedAttrs[col] = extendedAttr
+        extendedAttrsForWrite(extendedAttr)?.set(col, extendedAttr)
     }
 
     /**
@@ -305,7 +305,7 @@ internal class Line(
         store.freeRange(codepoints, 0, width)
         codepoints.fill(TerminalConstants.EMPTY)
         attrs.fill(defaultAttr)
-        extendedAttrs.fill(defaultExtendedAttr)
+        extendedAttrsForWrite(defaultExtendedAttr)?.fill(defaultExtendedAttr)
         wrapped = false
     }
 
@@ -324,7 +324,7 @@ internal class Line(
         store.freeRange(codepoints, from, width)
         codepoints.fill(TerminalConstants.EMPTY, from, width)
         attrs.fill(attr, from, width)
-        extendedAttrs.fill(extendedAttr, from, width)
+        extendedAttrsForWrite(extendedAttr)?.fill(extendedAttr, from, width)
     }
 
     /**
@@ -342,7 +342,7 @@ internal class Line(
         store.freeRange(codepoints, 0, to)
         codepoints.fill(TerminalConstants.EMPTY, 0, to)
         attrs.fill(attr, 0, to)
-        extendedAttrs.fill(extendedAttr, 0, to)
+        extendedAttrsForWrite(extendedAttr)?.fill(extendedAttr, 0, to)
     }
 
     /**
@@ -362,7 +362,7 @@ internal class Line(
         store.freeRange(codepoints, from, to)
         codepoints.fill(TerminalConstants.EMPTY, from, to)
         attrs.fill(attr, from, to)
-        extendedAttrs.fill(extendedAttr, from, to)
+        extendedAttrsForWrite(extendedAttr)?.fill(extendedAttr, from, to)
     }
 
     /**
@@ -404,11 +404,11 @@ internal class Line(
         if (shiftCount > 0) {
             System.arraycopy(codepoints, col, codepoints, col + safeCount, shiftCount)
             System.arraycopy(attrs, col, attrs, col + safeCount, shiftCount)
-            System.arraycopy(extendedAttrs, col, extendedAttrs, col + safeCount, shiftCount)
+            extendedAttrs?.let { System.arraycopy(it, col, it, col + safeCount, shiftCount) }
         }
         codepoints.fill(TerminalConstants.EMPTY, col, col + safeCount)
         attrs.fill(defaultAttr, col, col + safeCount)
-        extendedAttrs.fill(defaultExtendedAttr, col, col + safeCount)
+        extendedAttrsForWrite(defaultExtendedAttr)?.fill(defaultExtendedAttr, col, col + safeCount)
     }
 
     /**
@@ -456,7 +456,7 @@ internal class Line(
         if (shiftCount > 0) {
             System.arraycopy(codepoints, col + safeCount, codepoints, col, shiftCount)
             System.arraycopy(attrs, col + safeCount, attrs, col, shiftCount)
-            System.arraycopy(extendedAttrs, col + safeCount, extendedAttrs, col, shiftCount)
+            extendedAttrs?.let { System.arraycopy(it, col + safeCount, it, col, shiftCount) }
         }
 
         // Fill the vacated trailing cells with blanks.
@@ -465,7 +465,7 @@ internal class Line(
         val clearStart = rightInclusive - safeCount + 1
         codepoints.fill(TerminalConstants.EMPTY, clearStart, rightInclusive + 1)
         attrs.fill(defaultAttr, clearStart, rightInclusive + 1)
-        extendedAttrs.fill(defaultExtendedAttr, clearStart, rightInclusive + 1)
+        extendedAttrsForWrite(defaultExtendedAttr)?.fill(defaultExtendedAttr, clearStart, rightInclusive + 1)
     }
 
     /**
@@ -481,7 +481,7 @@ internal class Line(
         store.freeRange(codepoints, 0, width)
         codepoints.fill(codepoint)
         attrs.fill(attr)
-        extendedAttrs.fill(extendedAttr)
+        extendedAttrsForWrite(extendedAttr)?.fill(extendedAttr)
     }
 
     // -------------------------------------------------------------------------
@@ -516,6 +516,12 @@ internal class Line(
     // -------------------------------------------------------------------------
     // Private helpers
     // -------------------------------------------------------------------------
+
+    private fun extendedAttrsForWrite(value: Long): LongArray? {
+        val existing = extendedAttrs
+        if (existing != null || value == 0L) return existing
+        return LongArray(width).also { extendedAttrs = it }
+    }
 
     /**
      * Appends the glyph(s) at [col] to [this] [StringBuilder].

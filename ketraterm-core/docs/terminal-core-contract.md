@@ -358,13 +358,16 @@ Not guaranteed:
 
 `resize(newWidth, newHeight)` guarantees:
 
-- primary logical-line reconstruction and rewrap
+- primary logical-line reconstruction and rewrap when width changes
 - cursor relocation into the reflowed primary content
 - newest-row retention within the configured history capacity, with cursor and
   viewport positions adjusted for rows evicted during reflow
 - scrolled viewport anchors preserved while retained, or clamped to the oldest
   surviving row when evicted
-- deep-copy of surviving clusters into a fresh primary store
+- height-only changes preserve retained primary physical rows, identities, attributes,
+  wrap flags, and cluster handles without reflow; trailing untouched rows are reused
+  as layout capacity, with cursor and viewport positions adjusted to the new boundary
+- width changes deep-copy surviving clusters into a fresh primary store
 - alternate-screen wipe and recreation at the new dimensions
 - scroll margins reset/clamped to the new viewport
 - left/right margins reset to full width

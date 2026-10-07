@@ -27,6 +27,124 @@ import org.junit.jupiter.params.provider.ValueSource
 
 @DisplayName("Line Test Suite")
 class LineTest {
+    @ParameterizedTest
+    @ValueSource(
+        strings = ["scalar", "raw", "attributes", "cluster", "ascii", "clear", "prefix", "suffix", "range", "insert", "delete", "fill"],
+    )
+    fun `extended storage is allocated only for nonzero writes and reused after clearing`(operation: String) {
+        val line = line(6)
+        var allocated: LongArray? = null
+        for (value in longArrayOf(0L, 0x12345678ABCDEF01L, 0L)) {
+            val background = if (allocated != null) 99L else 0L
+            line.fill('a'.code, 0L, background)
+            val affected =
+                when (operation) {
+                    "scalar" -> {
+                        line.setCell(2, 'b'.code, 0L, value)
+                        2..2
+                    }
+                    "raw" -> {
+                        line.setRawCell(2, 'b'.code, 0L, value)
+                        2..2
+                    }
+                    "attributes" -> {
+                        line.setCellAttributes(2, 0L, value)
+                        2..2
+                    }
+                    "cluster" -> {
+                        line.setCluster(2, intArrayOf('e'.code, 0x0301), 2, 0L, value)
+                        2..2
+                    }
+                    "ascii" -> {
+                        assertEquals(3, line.writeAsciiIntoSimpleCells(1, "ABC".toByteArray(), 0, 3, 0L, value))
+                        1..3
+                    }
+                    "clear" -> {
+                        line.clear(0L, value)
+                        0..5
+                    }
+                    "prefix" -> {
+                        line.clearToColumn(2, 0L, value)
+                        0..2
+                    }
+                    "suffix" -> {
+                        line.clearFromColumn(2, 0L, value)
+                        2..5
+                    }
+                    "range" -> {
+                        line.clearRange(1, 4, 0L, value)
+                        1..3
+                    }
+                    "insert" -> {
+                        line.insertCellsInRange(1, 2, 4, 0L, value)
+                        1..2
+                    }
+                    "delete" -> {
+                        line.deleteCellsInRange(1, 2, 4, 0L, value)
+                        3..4
+                    }
+                    "fill" -> {
+                        line.fill('b'.code, 0L, value)
+                        0..5
+                    }
+                    else -> error(operation)
+                }
+            repeat(6) { col ->
+                val expected = if (col in affected) value else background
+                assertEquals(
+                    expected,
+                    line.getPackedExtendedAttr(col),
+                    "operation=$operation column=$col value=$value",
+                )
+            }
+            if (value != 0L) {
+                allocated = extendedStorage(line)
+                assertNotNull(allocated)
+            }
+            assertSame(allocated, extendedStorage(line))
+        }
+    }
+
+    @Test
+    fun `extended words move with cells and plain overwrites remove old styling`() {
+        val line = line(6)
+        val original = longArrayOf(0L, 10L, 20L, 0L, 40L, 50L)
+        original.forEachIndexed { col, value -> line.setCell(col, 'a'.code + col, 0L, value) }
+        val storage = extendedStorage(line)
+
+        line.insertCellsInRange(2, 2, 4, 0L, 7L)
+        assertArrayEquals(longArrayOf(0L, 10L, 7L, 7L, 20L, 50L), LongArray(6) { line.getPackedExtendedAttr(it) })
+        line.deleteCellsInRange(1, 2, 4, 0L)
+        assertArrayEquals(longArrayOf(0L, 7L, 20L, 0L, 0L, 50L), LongArray(6) { line.getPackedExtendedAttr(it) })
+        assertEquals(3, line.writeAsciiIntoSimpleCells(1, "ABC".toByteArray(), 0, 3, 0L, 0L))
+        assertArrayEquals(longArrayOf(0L, 0L, 0L, 0L, 0L, 50L), LongArray(6) { line.getPackedExtendedAttr(it) })
+        line.setCellAttributes(5, 0L, 0L)
+        assertArrayEquals(LongArray(6), LongArray(6) { line.getPackedExtendedAttr(it) })
+        assertSame(storage, extendedStorage(line))
+    }
+
+    @Test
+    fun `empty edits and blocked ASCII spans do not allocate extended storage`() {
+        val line = line(4)
+        line.setCluster(0, intArrayOf('e'.code, 0x0301), 2, 0L)
+        assertEquals(0, line.writeAsciiIntoSimpleCells(0, byteArrayOf(65), 0, 1, 0L, 7L))
+        assertEquals(0, line.writeAsciiIntoSimpleCells(1, byteArrayOf(), 0, 0, 0L, 7L))
+        line.clearRange(2, 2, 0L, 7L)
+        line.clearFromColumn(4, 0L, 7L)
+        line.clearToColumn(-1, 0L, 7L)
+        line.insertCells(1, 0, 0L, 7L)
+        line.deleteCells(1, 0, 0L, 7L)
+        assertNull(extendedStorage(line))
+        assertEquals("e\u0301", line.toTextTrimmed())
+        repeat(4) { assertEquals(0L, line.getPackedExtendedAttr(it)) }
+    }
+
+    private fun extendedStorage(line: Line): LongArray? {
+        val field = Line::class.java.getDeclaredField("extendedAttrs")
+        field.isAccessible = true
+        return field.get(line) as LongArray?
+    }
+
     @Test
     fun `ASCII span overwrites narrow scalars and blanks with both attribute words`() {
         val line = line(5)

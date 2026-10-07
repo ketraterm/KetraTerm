@@ -29,12 +29,12 @@ import io.github.ketraterm.core.store.ClusterStore
  *
  * Memory ownership:
  * [store] and [ring] are always co-owned. Every [Line] in the ring holds a
- * reference to [store]. The pair must always be replaced together; never
- * replace one without the other. [replaceStorage] is the single safe entry
- * point for doing this.
+ * reference to [store]. A new store requires rows bound to that store.
+ * Height-only resize reuses the arena through [resizeRows]; [replaceStorage]
+ * replaces both storage components when row width changes or content is reset.
  *
  * Resize lifecycle:
- * - the primary buffer must be reflowed by `TerminalResizer` so scrollback survives
+ * - `TerminalResizer` retains primary rows for height changes and reflows width changes
  * - the alternate buffer is always wiped via [replaceStorage]
  * - alternate content is transient and recreated on each alt-screen entry
  */
@@ -185,6 +185,18 @@ internal class ScreenBuffer(
             ring[i].clear(0L, 0L)
         }
         ring.retainLast(visibleRows)
+        historyContentGeneration++
+    }
+
+    /** Retains a physical row range for a height resize, releasing only discarded content. */
+    fun resizeRows(
+        newHeight: Int,
+        fromLogical: Int,
+        untilLogical: Int,
+    ) {
+        for (index in 0 until fromLogical) ring[index].clear(0L, 0L)
+        for (index in untilLogical until ring.size) ring[index].clear(0L, 0L)
+        ring.resizeCapacity(maxHistory + newHeight, fromLogical, untilLogical)
         historyContentGeneration++
     }
 

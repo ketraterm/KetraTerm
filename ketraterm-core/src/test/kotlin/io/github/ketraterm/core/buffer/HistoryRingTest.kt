@@ -28,6 +28,41 @@ import org.junit.jupiter.params.provider.ValueSource
 @DisplayName("HistoryRing Buffer Storage")
 class HistoryRingTest {
     @ParameterizedTest
+    @ValueSource(ints = [5, 129, 259])
+    fun `capacity changes preserve live rows and reuse spare rows through further growth`(capacity: Int) {
+        for (pushes in intArrayOf(capacity / 2, capacity + 3)) {
+            val store = ClusterStore()
+            val created = mutableListOf<Line>()
+            val ring = HistoryRing(capacity) { Line(2, store).also { created.add(it) } }
+            repeat(pushes) { ring.push() }
+            val before = List(ring.size) { ring[it] }
+            val allocated = created.size
+            val end = ring.size - 1
+            ring.resizeCapacity(capacity + 7, 1, end)
+            assertEquals(end - 1, ring.size)
+            assertEquals(1L, ring.discardedCount)
+            assertEquals(allocated, created.size)
+            for (index in 1 until end) assertSame(before[index], ring[index - 1])
+            while (ring.size < allocated) ring.push()
+            assertEquals(allocated, created.size)
+            assertEquals(created.toSet(), (0 until ring.size).map { ring[it] }.toSet())
+            while (ring.size < ring.capacity) ring.push()
+            assertEquals(capacity + 7, created.size)
+
+            val survivors = List(3) { ring[ring.size - 3 + it] }
+            ring.resizeCapacity(3, ring.size - 3, ring.size)
+            survivors.forEachIndexed { index, line -> assertSame(line, ring[index]) }
+            assertSame(survivors[0], ring.push())
+            val wrapped = List(3) { ring[it] }
+            ring.resizeCapacity(9, 0, 3)
+            wrapped.forEachIndexed { index, line -> assertSame(line, ring[index]) }
+            repeat(6) { assertSame(store, ring.push().store) }
+            assertEquals(9, (0 until ring.size).map { ring[it] }.toSet().size)
+            assertEquals(capacity + 13, created.size)
+        }
+    }
+
+    @ParameterizedTest
     @ValueSource(ints = [1, 7, 129, 259])
     fun `counted rotations preserve reference order and storage across ring boundaries`(capacity: Int) {
         val store = ClusterStore()

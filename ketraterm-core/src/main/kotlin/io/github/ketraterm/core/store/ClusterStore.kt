@@ -37,8 +37,8 @@ import java.util.*
  * ## Lifecycle
  *
  * A [ClusterStore] is owned by a single [io.github.ketraterm.core.buffer.HistoryRing].
- * When the terminal resizes, the resizer creates a fresh [ClusterStore] for the
- * new ring. Clusters that survive reflow are deep-copied into the new store.
+ * Width changes create a fresh [ClusterStore] for the new ring and deep-copy
+ * surviving clusters. Height-only changes keep this store and its live handles.
  *
  * ## Freelist
  *

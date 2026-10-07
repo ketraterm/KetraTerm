@@ -47,7 +47,9 @@ public interface TerminalBuffer :
      * Resizes the terminal to [newWidth] x [newHeight].
      *
      * Existing content is reflowed to the new width. The cursor is relocated to
-     * the corresponding position in the reflowed content. Scrollback history is
+     * the corresponding position in the reflowed content. Height-only changes retain
+     * physical primary rows without reflow, adjusting blank rows and the viewport boundary.
+     * Scrollback history is
      * preserved within the configured capacity. Both the primary and alternate
      * grids are resized, and both screen buffers reset their scroll regions to
      * the full viewport. Tab stops are resized non-destructively: surviving

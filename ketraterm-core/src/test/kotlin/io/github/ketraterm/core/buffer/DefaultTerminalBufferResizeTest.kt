@@ -24,6 +24,137 @@ import org.junit.jupiter.params.provider.CsvSource
 import org.junit.jupiter.params.provider.ValueSource
 
 class DefaultTerminalBufferResizeTest {
+    @Test
+    fun `height changes preserve edited wrap padding and attributes on blank cells`() {
+        val buffer = DefaultTerminalBuffer(4, 2, 4)
+        buffer.writeText("abc中x")
+        buffer.positionCursor(2, 0)
+        buffer.eraseCharacters(1)
+        val state = stateOf(buffer)
+        val first = state.ring[0]
+        val second = state.ring[1]
+        first.setCellAttributes(3, 17L, 23L)
+        assertTrue(first.endsWithWrapPadding)
+
+        buffer.resize(4, 4)
+
+        assertSame(first, state.ring[0])
+        assertSame(second, state.ring[1])
+        assertTrue(first.wrapped)
+        assertTrue(first.endsWithWrapPadding)
+        assertEquals(17L, first.getPackedAttr(3))
+        assertEquals(23L, first.getPackedExtendedAttr(3))
+        assertEquals('中'.code, second.rawCodepoint(0))
+        assertEquals(TerminalConstants.WIDE_CHAR_SPACER, second.rawCodepoint(1))
+        buffer.resize(8, 4)
+        assertEquals("ab 中x", buffer.getAllAsString().trimEnd())
+    }
+
+    @ParameterizedTest
+    @ValueSource(ints = [0, 2, 259])
+    fun `height cycles reuse retained rows and cluster handles through history eviction`(maxHistory: Int) {
+        val buffer = DefaultTerminalBuffer(8, 4, maxHistory)
+        repeat(270) { row ->
+            if (row > 0) {
+                buffer.carriageReturn()
+                buffer.newLine()
+            }
+            buffer.writeText("$row")
+            buffer.writeCluster(intArrayOf('e'.code, 0x0301))
+        }
+        val state = stateOf(buffer)
+        val ring = state.ring
+        val store = state.primaryBuffer.store
+        for (height in intArrayOf(7, 3, 8, 1, 6, 4)) {
+            val liveRows = (0 until ring.size).map { ring[it] }.filter { it.hasOutput }
+            val ids = liveRows.map { it.lineId }
+            val raw = liveRows.map { line -> IntArray(8) { line.rawCodepoint(it) } }
+            val texts = liveRows.map { it.toText() }
+            val oldGeneration = state.primaryBuffer.historyContentGeneration
+            buffer.resize(8, height)
+            assertSame(ring, state.ring)
+            assertSame(store, state.primaryBuffer.store)
+            assertEquals(maxHistory + height, ring.capacity)
+            assertTrue(buffer.historySize <= maxHistory)
+            assertNotEquals(oldGeneration, state.primaryBuffer.historyContentGeneration)
+            val retained = (0 until ring.size).map { ring[it] }.filter { it.hasOutput }
+            assertEquals(liveRows.takeLast(retained.size), retained)
+            for (line in retained) {
+                val index = liveRows.indexOf(line)
+                assertEquals(ids[index], line.lineId)
+                assertArrayEquals(raw[index], IntArray(8) { line.rawCodepoint(it) })
+                assertEquals(texts[index], line.toText())
+            }
+        }
+        // Both subsequent width reflow and ED3 must still own valid cluster handles.
+        val content = buffer.getAllAsString().trimEnd()
+        buffer.resize(10, 4)
+        assertEquals(content, buffer.getAllAsString().trimEnd())
+        assertNotSame(store, state.primaryBuffer.store)
+        buffer.eraseScreenAndHistory()
+        buffer.clearAll()
+        assertEquals(0, buffer.historySize)
+        assertEquals("\n\n\n", buffer.getScreenAsString())
+    }
+
+    @Test
+    fun `height shrink consumes untouched blanks before moving content into history`() {
+        val buffer = DefaultTerminalBuffer(6, 4, 2)
+        writeRows(buffer, "A", "B")
+        val state = stateOf(buffer)
+        val first = state.ring[0]
+        val second = state.ring[1]
+        buffer.positionCursor(4, 3)
+        buffer.saveCursor()
+        buffer.resize(6, 2)
+        assertEquals("A\nB", buffer.getScreenAsString())
+        assertEquals(0, buffer.historySize)
+        assertSame(first, state.ring[0])
+        assertSame(second, state.ring[1])
+        assertEquals(4, buffer.cursorCol)
+        assertEquals(1, buffer.cursorRow)
+        buffer.restoreCursor()
+        assertEquals(1, buffer.cursorRow)
+        buffer.resize(6, 4)
+        assertEquals("A\nB\n\n", buffer.getScreenAsString())
+        assertEquals(0, buffer.historySize)
+    }
+
+    @Test
+    fun `height shrink retains authored blanks and clamps an evicted viewport anchor`() {
+        val buffer = DefaultTerminalBuffer(6, 4, 2)
+        writeRows(buffer, "A", "B", "C", "D", "E", "F")
+        buffer.newLine()
+        buffer.newLine()
+        val state = stateOf(buffer)
+        val survivors = (1 until state.ring.size - 1).map { state.ring[it] }
+        val result = buffer.resize(6, 2, oldScrollbackOffset = 2)
+        assertEquals(2 to 2, result)
+        assertEquals("D\nE\nF\n", buffer.getAllAsString())
+        assertEquals("F\n", buffer.getScreenAsString())
+        assertEquals(1L, state.ring.discardedCount)
+        survivors.forEachIndexed { index, line -> assertSame(line, state.ring[index]) }
+    }
+
+    @Test
+    fun `height growth anchors a wrapped logical line without repacking its rows`() {
+        val buffer = DefaultTerminalBuffer(4, 2, 4)
+        buffer.writeText("abcdefghij")
+        val state = stateOf(buffer)
+        val rows = List(state.ring.size) { state.ring[it] }
+        val ids = rows.map { it.lineId }
+        val result = buffer.resize(4, 4, oldScrollbackOffset = 1)
+        assertEquals(0 to 0, result)
+        assertEquals("abcd\nefgh\nij\n", buffer.getScreenAsString())
+        assertEquals(2, buffer.cursorRow)
+        rows.forEachIndexed { index, line ->
+            assertSame(line, state.ring[index])
+            assertEquals(ids[index], line.lineId)
+        }
+        assertTrue(rows[0].wrapped)
+        assertTrue(rows[1].wrapped)
+    }
+
     @ParameterizedTest
     @ValueSource(booleans = [false, true])
     fun `overflowing retained line capacity is rejected without changing either screen`(alternate: Boolean) {
