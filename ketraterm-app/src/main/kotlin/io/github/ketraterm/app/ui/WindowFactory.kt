@@ -16,6 +16,7 @@
 package io.github.ketraterm.app.ui
 
 import com.formdev.flatlaf.extras.FlatSVGIcon
+import io.github.ketraterm.app.appMessages
 import io.github.ketraterm.app.config.KetraTermSettings
 import io.github.ketraterm.workspace.TerminalProfile
 import io.github.ketraterm.workspace.TerminalProfileRegistry
@@ -174,7 +175,7 @@ internal class WindowFactory(
         popup.addSeparator()
 
         val settingsItem =
-            JMenuItem("Settings").apply {
+            JMenuItem(appMessages.text("menu.settings")).apply {
                 icon =
                     FlatSVGIcon("io/github/ketraterm/app/icons/settings.svg", 16, 16).apply {
                         colorFilter =
@@ -195,7 +196,7 @@ internal class WindowFactory(
         popup.add(settingsItem)
 
         val aboutItem =
-            JMenuItem("About").apply {
+            JMenuItem(appMessages.text("menu.about")).apply {
                 icon =
                     FlatSVGIcon("io/github/ketraterm/app/icons/about.svg", 16, 16).apply {
                         colorFilter =

@@ -15,6 +15,7 @@
  */
 package io.github.ketraterm.app.ui
 
+import io.github.ketraterm.app.appMessages
 import io.github.ketraterm.workspace.TerminalProfileKind
 import java.awt.*
 import java.awt.event.*
@@ -1029,17 +1030,17 @@ internal class TabBar(
         val tabId = entries[index].id
         val menu = javax.swing.JPopupMenu()
 
-        val colorMenu = javax.swing.JMenu("Tab Color")
+        val colorMenu = javax.swing.JMenu(appMessages.text("tab.color"))
 
         val colors =
             listOf(
-                "Blue" to "#3b82f6",
-                "Red" to "#ef4444",
-                "Green" to "#10b981",
-                "Orange" to "#f97316",
-                "Purple" to "#a855f7",
-                "Yellow" to "#eab308",
-                "Gray" to "#6b7280",
+                appMessages.text("color.blue") to "#3b82f6",
+                appMessages.text("color.red") to "#ef4444",
+                appMessages.text("color.green") to "#10b981",
+                appMessages.text("color.orange") to "#f97316",
+                appMessages.text("color.purple") to "#a855f7",
+                appMessages.text("color.yellow") to "#eab308",
+                appMessages.text("color.gray") to "#6b7280",
             )
 
         colors.forEach { (name, hex) ->
@@ -1052,7 +1053,7 @@ internal class TabBar(
         }
 
         colorMenu.addSeparator()
-        val resetItem = javax.swing.JMenuItem("Reset Color")
+        val resetItem = javax.swing.JMenuItem(appMessages.text("tab.resetColor"))
         resetItem.addActionListener {
             onTabColorChanged(tabId, null)
         }
@@ -1061,13 +1062,13 @@ internal class TabBar(
         menu.add(colorMenu)
         menu.addSeparator()
 
-        val renameItem = javax.swing.JMenuItem("Rename Tab...")
+        val renameItem = javax.swing.JMenuItem(appMessages.text("tab.rename"))
         renameItem.addActionListener {
             triggerRenameDialog(index)
         }
         menu.add(renameItem)
 
-        val closeItem = javax.swing.JMenuItem("Close Tab")
+        val closeItem = javax.swing.JMenuItem(appMessages.text("tab.close"))
         closeItem.addActionListener {
             onTabClose(tabId)
         }

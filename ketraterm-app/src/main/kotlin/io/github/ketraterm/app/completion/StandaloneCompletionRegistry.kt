@@ -26,6 +26,7 @@ import io.github.ketraterm.ui.swing.host.SwingCompletionResources
 import io.github.ketraterm.ui.swing.host.SwingCompletionSuggestionProvider
 import kotlinx.coroutines.*
 import java.nio.file.Path
+import java.util.*
 
 /**
  * Standalone completion wiring for one application window.
@@ -42,7 +43,7 @@ import java.nio.file.Path
 internal class StandaloneCompletionRegistry private constructor(
     persistencePath: Path,
     persistenceEnabled: Boolean,
-    specs: List<TerminalCommandSpec> = TerminalCommandSpecs.defaults(),
+    specs: List<TerminalCommandSpec> = TerminalCommandSpecs.defaults(Locale.getDefault(Locale.Category.DISPLAY)),
     private val learningStore: TerminalCompletionLearningStore = TerminalCompletionLearningStore(),
     onPersistenceLoadFailure: (Throwable) -> Unit = {},
     internal val completionScope: CoroutineScope,
@@ -50,6 +51,7 @@ internal class StandaloneCompletionRegistry private constructor(
 ) {
     private val lifecycleLock = Any()
     private var closed = false
+    private val completionMessages = TerminalCompletionMessages.forLocale(Locale.getDefault(Locale.Category.DISPLAY))
     private val learning =
         TerminalCompletionLearningCoordinator(
             learningStore = learningStore,
@@ -61,10 +63,11 @@ internal class StandaloneCompletionRegistry private constructor(
         )
     private val engine =
         TerminalCompletionEngines.fromSources(
+            messages = completionMessages,
             sources =
                 listOf(
                     TerminalCompletionSourceEntry(
-                        TerminalCompletionSources.path(TerminalLocalFileSystemProvider()),
+                        TerminalCompletionSources.path(completionMessages, TerminalLocalFileSystemProvider()),
                         TerminalCompletionSourcePrior.DIRECTORY_PATH,
                     ),
                 ),
@@ -193,7 +196,7 @@ internal class StandaloneCompletionRegistry private constructor(
         fun create(
             persistencePath: Path,
             persistenceEnabled: Boolean,
-            specs: List<TerminalCommandSpec> = TerminalCommandSpecs.defaults(),
+            specs: List<TerminalCommandSpec> = TerminalCommandSpecs.defaults(Locale.getDefault(Locale.Category.DISPLAY)),
             learningStore: TerminalCompletionLearningStore = TerminalCompletionLearningStore(),
             onPersistenceLoadFailure: (Throwable) -> Unit = {},
             workerDispatcher: CoroutineDispatcher = Dispatchers.Default,

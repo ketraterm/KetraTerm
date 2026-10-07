@@ -15,12 +15,33 @@
  */
 package io.github.ketraterm.ui.swing.host
 
+import java.util.*
 import kotlin.test.Test
 import kotlin.test.assertContains
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 
 class SwingClipboardPromptsTest {
+    @Test
+    fun localizedConsentKeepsPayloadPrivateAndUsesUnicodeCountsAndSafeChoices() {
+        val words =
+            SwingHostMessages.forLocale(
+                Locale.FRENCH,
+                ResourceBundle.getBundle("io.github.ketraterm.ui.swing.host.LocalizedTerminalMessages", Locale.FRENCH),
+            )
+        assertEquals("Lire presse-papiers depuis ce terminal ?", SwingClipboardPrompts.readQuestion(" ", messages = words))
+        assertEquals("Effacer sélection depuis Shell ?", SwingClipboardPrompts.writeQuestion(" Shell ", "", "sélection", words))
+        val request = SwingClipboardPrompts.writeConfirmation(" Shell ", "\ud83d\ude42", messages = words)
+        assertEquals("Accès au presse-papiers", request.title)
+        assertEquals("Depuis Shell, écrire un caractère dans presse-papiers ?", request.message)
+        assertEquals(listOf("Autoriser une fois", "Refuser"), request.options)
+        assertEquals(1, request.defaultOption)
+        assertFalse(request.message.contains("\ud83d\ude42"))
+        val unsafeName = "<img src='https://invalid.example'>"
+        val message = SwingClipboardPrompts.readQuestion(unsafeName, messages = words)
+        assertFalse(SwingDialogRequest(request.title, message, SwingDialogRequest.Severity.WARNING).htmlMessage().contains("<img"))
+    }
+
     @Test
     fun productsShareNamesUnicodeCountsAndEmptyWriteMeaning() {
         for (clipboard in listOf("clipboard", "IDE clipboard")) {

@@ -15,6 +15,7 @@
  */
 package io.github.ketraterm.app.config
 
+import io.github.ketraterm.app.appMessages
 import io.github.ketraterm.host.TerminalClipboardPermission
 import io.github.ketraterm.host.TerminalTitlePermission
 import io.github.ketraterm.input.policy.PasteControlPolicy
@@ -212,15 +213,15 @@ internal class KetraTermConfigManager(
                     behavior["show_foreground_process_name"]?.toBooleanStrictOrNull() ?: default.showForegroundProcessName,
             )
         } catch (failure: IOException) {
-            System.err.println("Using default configuration; could not read $configPath: ${failure.message}")
+            System.err.println(appMessages.text("config.read.error", configPath, failure.message))
             default
         } catch (_: IllegalArgumentException) {
             try {
                 val backupPath = configPath.resolveSibling("${configPath.fileName}.broken")
                 Files.move(configPath, backupPath, StandardCopyOption.REPLACE_EXISTING)
-                System.err.println("Configuration file was malformed and has been backed up to $backupPath")
+                System.err.println(appMessages.text("config.backup.success", backupPath))
             } catch (ioe: IOException) {
-                System.err.println("Failed to back up malformed configuration file: ${ioe.message}")
+                System.err.println(appMessages.text("config.backup.error", ioe.message))
                 return default
             }
             saveDefaults(default)
@@ -256,7 +257,7 @@ internal class KetraTermConfigManager(
         try {
             save(config)
         } catch (failure: IOException) {
-            System.err.println("Using default configuration; could not save $configPath: ${failure.message}")
+            System.err.println(appMessages.text("config.save.error", configPath, failure.message))
         }
     }
 

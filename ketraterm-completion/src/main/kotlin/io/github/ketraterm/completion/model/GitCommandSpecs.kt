@@ -22,48 +22,57 @@ internal object GitCommandSpecs {
     fun git(): TerminalCommandSpec =
         TerminalCommandSpec(
             name = "git",
-            description = "distributed version control",
+            description = commandSpecText("spec.git.description"),
             subcommands =
                 listOf(
                     TerminalCommandSpec(
                         name = "status",
-                        description = "show working tree status",
+                        description = commandSpecText("spec.git.status.description"),
                         options =
                             listOf(
-                                TerminalOptionSpec(listOf("--short", "-s"), "show status concisely"),
-                                TerminalOptionSpec(listOf("--branch", "-b"), "show branch information"),
-                                TerminalOptionSpec(listOf("--ignored"), "show ignored files as well"),
+                                TerminalOptionSpec(listOf("--short", "-s"), commandSpecText("spec.git.status.option.--short.description")),
+                                TerminalOptionSpec(
+                                    listOf("--branch", "-b"),
+                                    commandSpecText("spec.git.status.option.--branch.description"),
+                                ),
+                                TerminalOptionSpec(listOf("--ignored"), commandSpecText("spec.git.status.option.--ignored.description")),
                             ),
                     ),
                     TerminalCommandSpec(
                         name = "add",
-                        description = "add file contents to the index",
+                        description = commandSpecText("spec.git.add.description"),
                         positionalArgumentPathKind = TerminalPathArgumentKind.FILE_OR_DIRECTORY,
                         options =
                             listOf(
-                                TerminalOptionSpec(listOf("-A", "--all"), "add changes from all tracked and untracked files"),
+                                TerminalOptionSpec(listOf("-A", "--all"), commandSpecText("spec.git.add.option.-A.description")),
                                 TerminalOptionSpec(
                                     listOf("-p", "--patch"),
-                                    "interactively choose hunks of patch between the index and the work tree",
+                                    commandSpecText("spec.git.add.option.-p.description"),
                                 ),
                                 TerminalOptionSpec(
                                     listOf("-u", "--update"),
-                                    "update the index just where it already has an entry matching <pathspec>",
+                                    commandSpecText("spec.git.add.option.-u.description"),
                                 ),
-                                TerminalOptionSpec(listOf("-f", "--force"), "allow adding otherwise ignored files"),
+                                TerminalOptionSpec(listOf("-f", "--force"), commandSpecText("spec.git.add.option.-f.description")),
                             ),
                     ),
                     TerminalCommandSpec(
                         name = "restore",
-                        description = "restore working tree files",
+                        description = commandSpecText("spec.git.restore.description"),
                         positionalArgumentPathKind = TerminalPathArgumentKind.FILE_OR_DIRECTORY,
                         options =
                             listOf(
-                                TerminalOptionSpec(listOf("--staged", "-S"), "restore the index"),
-                                TerminalOptionSpec(listOf("--worktree", "-W"), "restore the working tree"),
+                                TerminalOptionSpec(
+                                    listOf("--staged", "-S"),
+                                    commandSpecText("spec.git.restore.option.--staged.description"),
+                                ),
+                                TerminalOptionSpec(
+                                    listOf("--worktree", "-W"),
+                                    commandSpecText("spec.git.restore.option.--worktree.description"),
+                                ),
                                 TerminalOptionSpec(
                                     listOf("--source", "-s"),
-                                    "which tree to restore from",
+                                    commandSpecText("spec.git.restore.option.--source.description"),
                                     requiresValue = true,
                                     valueDomain = TerminalCompletionValueDomain.GIT_BRANCH,
                                 ),
@@ -71,306 +80,343 @@ internal object GitCommandSpecs {
                     ),
                     TerminalCommandSpec(
                         name = "rm",
-                        description = "remove files from the working tree and index",
+                        description = commandSpecText("spec.git.rm.description"),
                         positionalArgumentPathKind = TerminalPathArgumentKind.FILE_OR_DIRECTORY,
                         options =
                             listOf(
-                                TerminalOptionSpec(listOf("--cached"), "only remove from the index"),
-                                TerminalOptionSpec(listOf("-r"), "allow recursive removal when a leading directory name is given"),
-                                TerminalOptionSpec(listOf("-f", "--force"), "override the up-to-date check"),
+                                TerminalOptionSpec(listOf("--cached"), commandSpecText("spec.git.rm.option.--cached.description")),
+                                TerminalOptionSpec(listOf("-r"), commandSpecText("spec.git.rm.option.-r.description")),
+                                TerminalOptionSpec(listOf("-f", "--force"), commandSpecText("spec.git.rm.option.-f.description")),
                             ),
                     ),
                     TerminalCommandSpec(
                         name = "commit",
-                        description = "record changes to the repository",
+                        description = commandSpecText("spec.git.commit.description"),
                         options =
                             listOf(
-                                TerminalOptionSpec(listOf("-m", "--message"), "commit message", requiresValue = true),
-                                TerminalOptionSpec(listOf("-a", "--all"), "stage all modified and deleted files"),
-                                TerminalOptionSpec(listOf("--amend"), "amend previous commit"),
-                                TerminalOptionSpec(listOf("--no-verify", "-n"), "bypass pre-commit and commit-msg hooks"),
-                                TerminalOptionSpec(listOf("--allow-empty"), "allow recording a commit with no changes"),
+                                TerminalOptionSpec(
+                                    listOf("-m", "--message"),
+                                    commandSpecText("spec.git.commit.option.-m.description"),
+                                    requiresValue = true,
+                                ),
+                                TerminalOptionSpec(listOf("-a", "--all"), commandSpecText("spec.git.commit.option.-a.description")),
+                                TerminalOptionSpec(listOf("--amend"), commandSpecText("spec.git.commit.option.--amend.description")),
+                                TerminalOptionSpec(
+                                    listOf("--no-verify", "-n"),
+                                    commandSpecText("spec.git.commit.option.--no-verify.description"),
+                                ),
+                                TerminalOptionSpec(
+                                    listOf("--allow-empty"),
+                                    commandSpecText("spec.git.commit.option.--allow-empty.description"),
+                                ),
                                 TerminalOptionSpec(
                                     listOf("-s", "--signoff"),
-                                    "add Signed-off-by line by the committer at the end of the commit log message",
+                                    commandSpecText("spec.git.commit.option.-s.description"),
                                 ),
                                 TerminalOptionSpec(
                                     listOf("--fixup"),
-                                    "construct a fixup commit for use with rebase --autosquash",
+                                    commandSpecText("spec.git.commit.option.--fixup.description"),
                                     requiresValue = true,
                                 ),
                             ),
                     ),
                     TerminalCommandSpec(
                         name = "checkout",
-                        description = "switch branches or restore files",
+                        description = commandSpecText("spec.git.checkout.description"),
                         aliases = listOf("co"),
                         positionalArgumentValueDomain = TerminalCompletionValueDomain.GIT_BRANCH,
                         options =
                             listOf(
-                                TerminalOptionSpec(listOf("-b"), "create and check out a new branch", requiresValue = true),
-                                TerminalOptionSpec(listOf("-B"), "create/reset and check out a branch", requiresValue = true),
-                                TerminalOptionSpec(listOf("--detach"), "detach HEAD at named commit"),
-                                TerminalOptionSpec(listOf("--theirs"), "check out their version for unmerged files"),
-                                TerminalOptionSpec(listOf("--ours"), "check out our version for unmerged files"),
+                                TerminalOptionSpec(
+                                    listOf("-b"),
+                                    commandSpecText("spec.git.checkout.option.-b.description"),
+                                    requiresValue = true,
+                                ),
+                                TerminalOptionSpec(
+                                    listOf("-B"),
+                                    commandSpecText("spec.git.checkout.option.-B.description"),
+                                    requiresValue = true,
+                                ),
+                                TerminalOptionSpec(listOf("--detach"), commandSpecText("spec.git.checkout.option.--detach.description")),
+                                TerminalOptionSpec(listOf("--theirs"), commandSpecText("spec.git.checkout.option.--theirs.description")),
+                                TerminalOptionSpec(listOf("--ours"), commandSpecText("spec.git.checkout.option.--ours.description")),
                             ),
                     ),
                     TerminalCommandSpec(
                         name = "switch",
-                        description = "switch branches",
+                        description = commandSpecText("spec.git.switch.description"),
                         positionalArgumentValueDomain = TerminalCompletionValueDomain.GIT_BRANCH,
                         options =
                             listOf(
-                                TerminalOptionSpec(listOf("-c", "--create"), "create and switch to a new branch", requiresValue = true),
                                 TerminalOptionSpec(
-                                    listOf("-C", "--force-create"),
-                                    "create/reset and switch to a branch",
+                                    listOf("-c", "--create"),
+                                    commandSpecText("spec.git.switch.option.-c.description"),
                                     requiresValue = true,
                                 ),
-                                TerminalOptionSpec(listOf("-d", "--detach"), "switch to a commit in detached HEAD state"),
+                                TerminalOptionSpec(
+                                    listOf("-C", "--force-create"),
+                                    commandSpecText("spec.git.switch.option.-C.description"),
+                                    requiresValue = true,
+                                ),
+                                TerminalOptionSpec(listOf("-d", "--detach"), commandSpecText("spec.git.switch.option.-d.description")),
                             ),
                     ),
                     TerminalCommandSpec(
                         name = "branch",
-                        description = "list, create, or delete branches",
+                        description = commandSpecText("spec.git.branch.description"),
                         positionalArgumentValueDomain = TerminalCompletionValueDomain.GIT_BRANCH,
                         options =
                             listOf(
-                                TerminalOptionSpec(listOf("-a", "--all"), "list both remote-tracking and local branches"),
-                                TerminalOptionSpec(listOf("-r", "--remotes"), "list remote-tracking branches"),
+                                TerminalOptionSpec(listOf("-a", "--all"), commandSpecText("spec.git.branch.option.-a.description")),
+                                TerminalOptionSpec(listOf("-r", "--remotes"), commandSpecText("spec.git.branch.option.-r.description")),
                                 TerminalOptionSpec(
                                     listOf("-d", "--delete"),
-                                    "delete fully merged branch",
+                                    commandSpecText("spec.git.branch.option.-d.description"),
                                     requiresValue = true,
                                     valueDomain = TerminalCompletionValueDomain.GIT_BRANCH,
                                 ),
                                 TerminalOptionSpec(
                                     listOf("-D"),
-                                    "force delete branch",
+                                    commandSpecText("spec.git.branch.option.-D.description"),
                                     requiresValue = true,
                                     valueDomain = TerminalCompletionValueDomain.GIT_BRANCH,
                                 ),
-                                TerminalOptionSpec(listOf("-m", "--move"), "move/rename a branch"),
-                                TerminalOptionSpec(listOf("--merged"), "print only branches that are merged into HEAD"),
-                                TerminalOptionSpec(listOf("--no-merged"), "print only branches that are not merged into HEAD"),
+                                TerminalOptionSpec(listOf("-m", "--move"), commandSpecText("spec.git.branch.option.-m.description")),
+                                TerminalOptionSpec(listOf("--merged"), commandSpecText("spec.git.branch.option.--merged.description")),
+                                TerminalOptionSpec(
+                                    listOf("--no-merged"),
+                                    commandSpecText("spec.git.branch.option.--no-merged.description"),
+                                ),
                             ),
                     ),
                     TerminalCommandSpec(
                         name = "pull",
-                        description = "fetch from and integrate with another repository",
+                        description = commandSpecText("spec.git.pull.description"),
                         positionalArgumentValueDomain = TerminalCompletionValueDomain.GIT_BRANCH,
                         options =
                             listOf(
-                                TerminalOptionSpec(listOf("-r", "--rebase"), "rebase current branch on top of upstream branch"),
-                                TerminalOptionSpec(listOf("--autostash"), "automatically stash and unstash local changes"),
+                                TerminalOptionSpec(listOf("-r", "--rebase"), commandSpecText("spec.git.pull.option.-r.description")),
+                                TerminalOptionSpec(listOf("--autostash"), commandSpecText("spec.git.pull.option.--autostash.description")),
                                 TerminalOptionSpec(
                                     listOf("--no-ff"),
-                                    "create a merge commit even when the merge could be resolved as a fast-forward",
+                                    commandSpecText("spec.git.pull.option.--no-ff.description"),
                                 ),
                                 TerminalOptionSpec(
                                     listOf("--ff-only"),
-                                    "refuse to merge unless the current HEAD is already up to date or the merge can be resolved as a fast-forward",
+                                    commandSpecText("spec.git.pull.option.--ff-only.description"),
                                 ),
                             ),
                     ),
                     TerminalCommandSpec(
                         name = "push",
-                        description = "update remote refs",
+                        description = commandSpecText("spec.git.push.description"),
                         positionalArgumentValueDomain = TerminalCompletionValueDomain.GIT_BRANCH,
                         options =
                             listOf(
-                                TerminalOptionSpec(listOf("-u", "--set-upstream"), "set upstream for git pull/status"),
-                                TerminalOptionSpec(listOf("-f", "--force"), "force update"),
+                                TerminalOptionSpec(listOf("-u", "--set-upstream"), commandSpecText("spec.git.push.option.-u.description")),
+                                TerminalOptionSpec(listOf("-f", "--force"), commandSpecText("spec.git.push.option.-f.description")),
                                 TerminalOptionSpec(
                                     listOf("--force-with-lease"),
-                                    "force update only if remote branch matches expected state",
+                                    commandSpecText("spec.git.push.option.--force-with-lease.description"),
                                 ),
-                                TerminalOptionSpec(listOf("--all"), "push all branches"),
-                                TerminalOptionSpec(listOf("--tags"), "push all tags"),
-                                TerminalOptionSpec(listOf("-d", "--delete"), "delete all listed refs from the remote repository"),
+                                TerminalOptionSpec(listOf("--all"), commandSpecText("spec.git.push.option.--all.description")),
+                                TerminalOptionSpec(listOf("--tags"), commandSpecText("spec.git.push.option.--tags.description")),
+                                TerminalOptionSpec(listOf("-d", "--delete"), commandSpecText("spec.git.push.option.-d.description")),
                             ),
                     ),
                     TerminalCommandSpec(
                         name = "fetch",
-                        description = "download objects and refs",
+                        description = commandSpecText("spec.git.fetch.description"),
                         positionalArgumentValueDomain = TerminalCompletionValueDomain.GIT_BRANCH,
                         options =
                             listOf(
-                                TerminalOptionSpec(listOf("--all"), "fetch all remotes"),
+                                TerminalOptionSpec(listOf("--all"), commandSpecText("spec.git.fetch.option.--all.description")),
                                 TerminalOptionSpec(
                                     listOf("-p", "--prune"),
-                                    "remove local tracking branches that no longer exist on remote",
+                                    commandSpecText("spec.git.fetch.option.-p.description"),
                                 ),
-                                TerminalOptionSpec(listOf("--tags"), "fetch all tags from the remote"),
+                                TerminalOptionSpec(listOf("--tags"), commandSpecText("spec.git.fetch.option.--tags.description")),
                             ),
                     ),
                     TerminalCommandSpec(
                         name = "merge",
-                        description = "join development histories",
+                        description = commandSpecText("spec.git.merge.description"),
                         positionalArgumentValueDomain = TerminalCompletionValueDomain.GIT_BRANCH,
                         options =
                             listOf(
                                 TerminalOptionSpec(
                                     listOf("--no-ff"),
-                                    "create a merge commit even when the merge could be resolved as a fast-forward",
+                                    commandSpecText("spec.git.merge.option.--no-ff.description"),
                                 ),
-                                TerminalOptionSpec(listOf("--ff-only"), "refuse to merge unless fast-forward"),
-                                TerminalOptionSpec(listOf("--squash"), "squash commits into a single commit"),
-                                TerminalOptionSpec(listOf("--abort"), "abort current conflict resolution"),
-                                TerminalOptionSpec(listOf("--continue"), "continue current merge"),
+                                TerminalOptionSpec(listOf("--ff-only"), commandSpecText("spec.git.merge.option.--ff-only.description")),
+                                TerminalOptionSpec(listOf("--squash"), commandSpecText("spec.git.merge.option.--squash.description")),
+                                TerminalOptionSpec(listOf("--abort"), commandSpecText("spec.git.merge.option.--abort.description")),
+                                TerminalOptionSpec(listOf("--continue"), commandSpecText("spec.git.merge.option.--continue.description")),
                             ),
                     ),
                     TerminalCommandSpec(
                         name = "rebase",
-                        description = "reapply commits on top of another base",
+                        description = commandSpecText("spec.git.rebase.description"),
                         positionalArgumentValueDomain = TerminalCompletionValueDomain.GIT_BRANCH,
                         options =
                             listOf(
                                 TerminalOptionSpec(
                                     listOf("-i", "--interactive"),
-                                    "make a list of the commits which are about to be rebased",
+                                    commandSpecText("spec.git.rebase.option.-i.description"),
                                 ),
                                 TerminalOptionSpec(
                                     listOf("--onto"),
-                                    "starting point at which to create the new commits",
+                                    commandSpecText("spec.git.rebase.option.--onto.description"),
                                     requiresValue = true,
                                     valueDomain = TerminalCompletionValueDomain.GIT_BRANCH,
                                 ),
                                 TerminalOptionSpec(
                                     listOf("--continue"),
-                                    "restart the rebasing process after editing a commit or resolving a merge conflict",
+                                    commandSpecText("spec.git.rebase.option.--continue.description"),
                                 ),
-                                TerminalOptionSpec(listOf("--abort"), "abort the rebase operation and reset HEAD to the original branch"),
-                                TerminalOptionSpec(listOf("--skip"), "restart the rebasing process by skipping the current patch"),
+                                TerminalOptionSpec(listOf("--abort"), commandSpecText("spec.git.rebase.option.--abort.description")),
+                                TerminalOptionSpec(listOf("--skip"), commandSpecText("spec.git.rebase.option.--skip.description")),
                                 TerminalOptionSpec(
                                     listOf("--autostash"),
-                                    "automatically create a temporary stash entry before the operation begins",
+                                    commandSpecText("spec.git.rebase.option.--autostash.description"),
                                 ),
                             ),
                     ),
                     TerminalCommandSpec(
                         name = "reset",
-                        description = "reset current HEAD to the specified state",
+                        description = commandSpecText("spec.git.reset.description"),
                         positionalArgumentValueDomain = TerminalCompletionValueDomain.GIT_BRANCH,
                         options =
                             listOf(
-                                TerminalOptionSpec(listOf("--soft"), "do not touch the index file or the working tree at all"),
-                                TerminalOptionSpec(listOf("--mixed"), "resets the index but not the working tree"),
-                                TerminalOptionSpec(listOf("--hard"), "resets the index and working tree"),
+                                TerminalOptionSpec(listOf("--soft"), commandSpecText("spec.git.reset.option.--soft.description")),
+                                TerminalOptionSpec(listOf("--mixed"), commandSpecText("spec.git.reset.option.--mixed.description")),
+                                TerminalOptionSpec(listOf("--hard"), commandSpecText("spec.git.reset.option.--hard.description")),
                                 TerminalOptionSpec(
                                     listOf("--merge"),
-                                    "resets index and updates files in working tree that differ between commit and HEAD",
+                                    commandSpecText("spec.git.reset.option.--merge.description"),
                                 ),
                                 TerminalOptionSpec(
                                     listOf("--keep"),
-                                    "resets index, updates working tree if no uncommitted changes in tracked files",
+                                    commandSpecText("spec.git.reset.option.--keep.description"),
                                 ),
                             ),
                     ),
                     TerminalCommandSpec(
                         name = "log",
-                        description = "show commit logs",
+                        description = commandSpecText("spec.git.log.description"),
                         options =
                             listOf(
-                                TerminalOptionSpec(listOf("--oneline"), "shorthand for --pretty=oneline --abbrev-commit"),
-                                TerminalOptionSpec(listOf("--graph"), "draw a text-based graphical representation of the commit history"),
-                                TerminalOptionSpec(listOf("--stat"), "generate a diffstat"),
+                                TerminalOptionSpec(listOf("--oneline"), commandSpecText("spec.git.log.option.--oneline.description")),
+                                TerminalOptionSpec(listOf("--graph"), commandSpecText("spec.git.log.option.--graph.description")),
+                                TerminalOptionSpec(listOf("--stat"), commandSpecText("spec.git.log.option.--stat.description")),
                                 TerminalOptionSpec(
                                     listOf("-n", "--max-count"),
-                                    "limit the number of commits to output",
+                                    commandSpecText("spec.git.log.option.-n.description"),
                                     requiresValue = true,
                                 ),
                             ),
                     ),
                     TerminalCommandSpec(
                         name = "show",
-                        description = "show one or more objects",
+                        description = commandSpecText("spec.git.show.description"),
                         positionalArgumentValueDomain = TerminalCompletionValueDomain.GIT_COMMIT,
                     ),
                     TerminalCommandSpec(
                         name = "diff",
-                        description = "show changes between commits, trees, or files",
+                        description = commandSpecText("spec.git.diff.description"),
                         positionalArgumentPathKind = TerminalPathArgumentKind.FILE_OR_DIRECTORY,
                         options =
                             listOf(
-                                TerminalOptionSpec(listOf("--staged", "--cached"), "view changes staged for the next commit"),
-                                TerminalOptionSpec(listOf("--name-only"), "show only names of changed files"),
-                                TerminalOptionSpec(listOf("--name-status"), "show only names and status of changed files"),
-                                TerminalOptionSpec(listOf("--stat"), "generate a diffstat"),
+                                TerminalOptionSpec(
+                                    listOf("--staged", "--cached"),
+                                    commandSpecText("spec.git.diff.option.--staged.description"),
+                                ),
+                                TerminalOptionSpec(listOf("--name-only"), commandSpecText("spec.git.diff.option.--name-only.description")),
+                                TerminalOptionSpec(
+                                    listOf("--name-status"),
+                                    commandSpecText("spec.git.diff.option.--name-status.description"),
+                                ),
+                                TerminalOptionSpec(listOf("--stat"), commandSpecText("spec.git.diff.option.--stat.description")),
                             ),
                     ),
                     TerminalCommandSpec(
                         name = "stash",
-                        description = "stash local modifications",
+                        description = commandSpecText("spec.git.stash.description"),
                         subcommands =
                             listOf(
-                                TerminalCommandSpec("push", "save local modifications to a new stash entry"),
-                                TerminalCommandSpec("pop", "remove a single stashed state from the stash list and apply it"),
-                                TerminalCommandSpec("apply", "like pop, but do not remove the state from the stash list"),
-                                TerminalCommandSpec("list", "list the stash entries that you currently have"),
-                                TerminalCommandSpec("show", "show the changes recorded in the stash entry as a diff"),
-                                TerminalCommandSpec("drop", "remove a single stash entry from the list of stash entries"),
-                                TerminalCommandSpec("clear", "remove all the stash entries"),
+                                TerminalCommandSpec("push", commandSpecText("spec.git.stash.push.description")),
+                                TerminalCommandSpec("pop", commandSpecText("spec.git.stash.pop.description")),
+                                TerminalCommandSpec("apply", commandSpecText("spec.git.stash.apply.description")),
+                                TerminalCommandSpec("list", commandSpecText("spec.git.stash.list.description")),
+                                TerminalCommandSpec("show", commandSpecText("spec.git.stash.show.description")),
+                                TerminalCommandSpec("drop", commandSpecText("spec.git.stash.drop.description")),
+                                TerminalCommandSpec("clear", commandSpecText("spec.git.stash.clear.description")),
                                 TerminalCommandSpec(
                                     "branch",
-                                    "create and check out a new branch starting from the commit at which the stash entry was originally created",
+                                    commandSpecText("spec.git.stash.branch.description"),
                                 ),
                             ),
                     ),
                     TerminalCommandSpec(
                         name = "remote",
-                        description = "manage set of tracked repositories",
+                        description = commandSpecText("spec.git.remote.description"),
                         subcommands =
                             listOf(
-                                TerminalCommandSpec("add", "adds a remote named <name> for the repository at <url>"),
-                                TerminalCommandSpec("rename", "renames the remote named <old> to <new>"),
-                                TerminalCommandSpec("remove", "deletes the remote named <name>"),
-                                TerminalCommandSpec("get-url", "retrieves the URLs for a remote"),
-                                TerminalCommandSpec("set-url", "changes URLs for the remote"),
-                                TerminalCommandSpec("show", "gives some information about the remote <name>"),
-                                TerminalCommandSpec("prune", "deletes stale references associated with <name>"),
+                                TerminalCommandSpec("add", commandSpecText("spec.git.remote.add.description")),
+                                TerminalCommandSpec("rename", commandSpecText("spec.git.remote.rename.description")),
+                                TerminalCommandSpec("remove", commandSpecText("spec.git.remote.remove.description")),
+                                TerminalCommandSpec("get-url", commandSpecText("spec.git.remote.get-url.description")),
+                                TerminalCommandSpec("set-url", commandSpecText("spec.git.remote.set-url.description")),
+                                TerminalCommandSpec("show", commandSpecText("spec.git.remote.show.description")),
+                                TerminalCommandSpec("prune", commandSpecText("spec.git.remote.prune.description")),
                             ),
                     ),
                     TerminalCommandSpec(
                         name = "tag",
-                        description = "create, list, delete or verify a tag object",
+                        description = commandSpecText("spec.git.tag.description"),
                         options =
                             listOf(
-                                TerminalOptionSpec(listOf("-a", "--annotate"), "make an unsigned, annotated tag object"),
-                                TerminalOptionSpec(listOf("-d", "--delete"), "delete tags with given names"),
-                                TerminalOptionSpec(listOf("-l", "--list"), "list tags"),
+                                TerminalOptionSpec(listOf("-a", "--annotate"), commandSpecText("spec.git.tag.option.-a.description")),
+                                TerminalOptionSpec(listOf("-d", "--delete"), commandSpecText("spec.git.tag.option.-d.description")),
+                                TerminalOptionSpec(listOf("-l", "--list"), commandSpecText("spec.git.tag.option.-l.description")),
                             ),
                     ),
                     TerminalCommandSpec(
                         name = "cherry-pick",
-                        description = "apply the changes introduced by some existing commits",
+                        description = commandSpecText("spec.git.cherry-pick.description"),
                         positionalArgumentValueDomain = TerminalCompletionValueDomain.GIT_COMMIT,
                         options =
                             listOf(
-                                TerminalOptionSpec(listOf("--continue"), "continue operation in progress"),
-                                TerminalOptionSpec(listOf("--abort"), "cancel operation and return to pre-sequence state"),
-                                TerminalOptionSpec(listOf("--skip"), "skip current commit and continue with the rest of the sequence"),
+                                TerminalOptionSpec(
+                                    listOf("--continue"),
+                                    commandSpecText("spec.git.cherry-pick.option.--continue.description"),
+                                ),
+                                TerminalOptionSpec(listOf("--abort"), commandSpecText("spec.git.cherry-pick.option.--abort.description")),
+                                TerminalOptionSpec(listOf("--skip"), commandSpecText("spec.git.cherry-pick.option.--skip.description")),
                             ),
                     ),
                     TerminalCommandSpec(
                         name = "revert",
-                        description = "revert some existing commits",
+                        description = commandSpecText("spec.git.revert.description"),
                         positionalArgumentValueDomain = TerminalCompletionValueDomain.GIT_COMMIT,
                         options =
                             listOf(
-                                TerminalOptionSpec(listOf("--continue"), "continue operation in progress"),
-                                TerminalOptionSpec(listOf("--abort"), "cancel operation and return to pre-sequence state"),
-                                TerminalOptionSpec(listOf("--no-commit", "-n"), "do not automatically commit reverted changes"),
+                                TerminalOptionSpec(listOf("--continue"), commandSpecText("spec.git.revert.option.--continue.description")),
+                                TerminalOptionSpec(listOf("--abort"), commandSpecText("spec.git.revert.option.--abort.description")),
+                                TerminalOptionSpec(
+                                    listOf("--no-commit", "-n"),
+                                    commandSpecText("spec.git.revert.option.--no-commit.description"),
+                                ),
                             ),
                     ),
                 ),
             options =
                 listOf(
-                    TerminalOptionSpec(listOf("--help", "-h"), "show help"),
-                    TerminalOptionSpec(listOf("--version"), "show version"),
+                    TerminalOptionSpec(listOf("--help", "-h"), commandSpecText("spec.git.option.--help.description")),
+                    TerminalOptionSpec(listOf("--version"), commandSpecText("spec.git.option.--version.description")),
                     TerminalOptionSpec(
                         names = listOf("-C"),
-                        description = "run as if git was started in path",
+                        description = commandSpecText("spec.git.option.-C.description"),
                         requiresValue = true,
                         valuePathKind = TerminalPathArgumentKind.DIRECTORY,
                     ),

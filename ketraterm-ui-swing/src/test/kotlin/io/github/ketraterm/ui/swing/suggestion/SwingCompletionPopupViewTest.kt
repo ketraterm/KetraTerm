@@ -15,6 +15,7 @@
  */
 package io.github.ketraterm.ui.swing.suggestion
 
+import io.github.ketraterm.ui.swing.api.SwingTerminalMessages
 import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.Test
 import java.awt.Color
@@ -22,12 +23,103 @@ import java.awt.Font
 import java.awt.event.MouseEvent
 import java.awt.event.MouseWheelEvent
 import java.awt.image.BufferedImage
+import java.io.StringReader
+import java.util.*
 import javax.accessibility.AccessibleRole
 import javax.accessibility.AccessibleSelection
 import javax.swing.JPanel
 import javax.swing.SwingUtilities
 
 class SwingCompletionPopupViewTest {
+    @Test
+    fun `static bundle text preserves braces and apostrophes verbatim`() {
+        val messages =
+            SwingTerminalMessages.forLocale(
+                Locale.FRANCE,
+                PropertyResourceBundle(StringReader("completion.accessibleName=Commandes { d'utilisateur")),
+            )
+        assertEquals("Commandes { d'utilisateur", messages.message("completion.accessibleName"))
+        assertEquals("No suggestions", messages.message("completion.empty"))
+    }
+
+    @Test
+    fun `host text controls range accessibility and escaped tooltip outside repeated rendering`() =
+        onEdt {
+            var rowMessages = 0
+            val localized =
+                SwingTerminalMessages.forLocale(
+                    Locale.FRANCE,
+                    PropertyResourceBundle(
+                        StringReader(
+                            """
+                            completion.accessibleName=Suggestions de commande
+                            completion.range={2,number,integer} au total : {0,number,integer} à {1,number,integer}
+                            completion.description.many={0,number,integer} possibilités ; affichage {1,number,integer} à {2,number,integer}
+                            completion.empty=0 possibilités ; affichage 0 à 0
+                            completion.role.command=Commande
+                            completion.row.description={2} de {1} : {0}
+                            completion.row.tooltip=Depuis {2} : <{0}> — {1}
+                            """.trimIndent(),
+                        ),
+                    ),
+                )
+            val messages =
+                SwingTerminalMessages { key, arguments ->
+                    assertTrue(SwingUtilities.isEventDispatchThread())
+                    if (key == "completion.row.description") rowMessages++
+                    localized.message(key, *arguments)
+                }
+            val view = createView(RecordingListener(), messages)
+            try {
+                val candidate = suggestion("git", detail = "Branche", sourceDisplayText = "Projet")
+                view.update(snapshot(listOf(candidate), 0, 12, 4))
+                assertEquals("Suggestions de commande", view.list.accessibleContext.accessibleName)
+                assertEquals("12 possibilités ; affichage 5 à 5", view.list.accessibleContext.accessibleDescription)
+                val position = view.components.filterIsInstance<javax.swing.JLabel>().single()
+                assertEquals("12 au total : 5 à 5", position.text)
+
+                repeat(5) {
+                    val renderer =
+                        view.list.cellRenderer.getListCellRendererComponent(view.list, candidate, 0, false, false) as javax.swing.JLabel
+                    assertEquals("Commande de Projet : Branche", renderer.accessibleContext.accessibleDescription)
+                    assertTrue(renderer.toolTipText.contains("Depuis&nbsp;Projet&nbsp;:&nbsp;&lt;git&gt;"))
+                    assertFalse(renderer.toolTipText.contains("<git>"))
+                }
+                assertEquals(1, rowMessages)
+
+                view.update(snapshot(listOf(candidate), -1, 12, 4))
+                assertEquals(1, rowMessages)
+                view.update(SwingShellSuggestionViewSnapshot.EMPTY)
+                assertEquals("0 possibilités ; affichage 0 à 0", view.list.accessibleContext.accessibleDescription)
+            } finally {
+                view.close()
+            }
+        }
+
+    @Test
+    fun `localized standard factory creates independently owned views`() =
+        onEdt {
+            val messages =
+                SwingTerminalMessages.forLocale(
+                    Locale.FRANCE,
+                    PropertyResourceBundle(StringReader("completion.accessibleName=Commandes")),
+                )
+            val factory = SwingShellSuggestionViewFactory.createDefault(messages)
+            val first = factory.create(RecordingListener()) as SwingCompletionPopupView
+            val second = factory.create(RecordingListener()) as SwingCompletionPopupView
+            try {
+                assertNotSame(first, second)
+                assertEquals("Commandes", first.list.accessibleContext.accessibleName)
+                assertEquals("Commandes", second.list.accessibleContext.accessibleName)
+                first.close()
+                second.update(snapshot(listOf(suggestion("git")), 0, 1, 0))
+                assertEquals("1 suggestion, 1–1 of 1", second.list.accessibleContext.accessibleDescription)
+            } finally {
+                first.close()
+                second.close()
+            }
+        }
+
     @Test
     fun `view exposes list semantics and selected item to accessibility`() =
         onEdt {
@@ -261,7 +353,10 @@ class SwingCompletionPopupViewTest {
             }
         }
 
-    private fun createView(listener: RecordingListener): SwingCompletionPopupView {
+    private fun createView(
+        listener: RecordingListener,
+        messages: SwingTerminalMessages = SwingTerminalMessages.forLocale(Locale.ROOT),
+    ): SwingCompletionPopupView {
         val parent =
             JPanel(null).apply {
                 setSize(800, 600)
@@ -269,7 +364,7 @@ class SwingCompletionPopupViewTest {
                 background = Color(0x10, 0x14, 0x18)
                 foreground = Color(0xE5, 0xE7, 0xEB)
             }
-        return SwingCompletionPopupView(listener).also {
+        return SwingCompletionPopupView(listener, messages).also {
             it.font = Font(Font.MONOSPACED, Font.PLAIN, 13)
             parent.add(it)
         }

@@ -33,7 +33,7 @@ fun main(args: Array<String>) {
 internal val appVersion: String by lazy {
     KetraTermApp::class.java.getResourceAsStream("/io/github/ketraterm/app/version.properties")?.use { stream ->
         Properties().apply { load(stream) }.getProperty("version")
-    } ?: "unknown"
+    } ?: appMessages.text("version.unknown")
 }
 
 private object KetraTermApp {
@@ -46,7 +46,10 @@ private object KetraTermApp {
         io.github.ketraterm.app.ui.Chrome
             .applyPalette(settings.current().palette)
         val profileRegistry =
-            TerminalProfileRegistry()
+            TerminalProfileRegistry(
+                commandPromptDisplayName = appMessages.text("profile.commandPrompt"),
+                defaultShellDisplayName = appMessages.text("profile.defaultShell"),
+            )
         val windowFactory =
             io.github.ketraterm.app.ui
                 .WindowFactory(settings, profileRegistry)

@@ -28,7 +28,15 @@ public object TerminalCompletionSources {
      * @return path completion source.
      */
     @JvmStatic
-    public fun path(fileSystemProvider: TerminalFileSystemProvider): TerminalCompletionSource = PathCompletionSource(fileSystemProvider)
+    public fun path(fileSystemProvider: TerminalFileSystemProvider): TerminalCompletionSource =
+        path(TerminalCompletionMessages.forLocale(), fileSystemProvider)
+
+    /** Creates direct path completion with host-localized generated descriptions. */
+    @JvmStatic
+    public fun path(
+        messages: TerminalCompletionMessages,
+        fileSystemProvider: TerminalFileSystemProvider,
+    ): TerminalCompletionSource = PathCompletionSource(fileSystemProvider, messages)
 
     /**
      * Creates a source backed by a query-aware host fuzzy-path provider.
@@ -55,6 +63,18 @@ public object TerminalCompletionSources {
         entriesProvider: TerminalFuzzyPathProvider,
         requiresNonEmptyPrefix: Boolean = true,
         allowedCommandNames: Set<String> = emptySet(),
+    ): TerminalCompletionSource =
+        fuzzyPath(TerminalCompletionMessages.forLocale(), sourceId, entriesProvider, requiresNonEmptyPrefix, allowedCommandNames)
+
+    /** Creates fuzzy path completion with localized fallback descriptions; provider details remain authoritative. */
+    @JvmStatic
+    @JvmOverloads
+    public fun fuzzyPath(
+        messages: TerminalCompletionMessages,
+        sourceId: String,
+        entriesProvider: TerminalFuzzyPathProvider,
+        requiresNonEmptyPrefix: Boolean = true,
+        allowedCommandNames: Set<String> = emptySet(),
     ): TerminalCompletionSource {
         require(sourceId.isNotBlank()) { "sourceId must not be blank" }
         require(allowedCommandNames.none(String::isBlank)) { "allowedCommandNames must not contain blank values" }
@@ -63,6 +83,7 @@ public object TerminalCompletionSources {
             entriesProvider = entriesProvider::entries,
             requiresNonEmptyPrefix = requiresNonEmptyPrefix,
             allowedCommandNames = allowedCommandNames.toSet(),
+            messages = messages,
         )
     }
 
@@ -85,10 +106,19 @@ public object TerminalCompletionSources {
     public fun gradleTask(
         sourceId: String,
         tasksProvider: suspend (TerminalCompletionRequest, TerminalCompletionContext) -> List<TerminalGradleTask>,
+    ): TerminalCompletionSource = gradleTask(TerminalCompletionMessages.forLocale(), sourceId, tasksProvider)
+
+    /** Creates Gradle task completion with localized fallback descriptions; imported task documentation is preserved. */
+    @JvmStatic
+    public fun gradleTask(
+        messages: TerminalCompletionMessages,
+        sourceId: String,
+        tasksProvider: suspend (TerminalCompletionRequest, TerminalCompletionContext) -> List<TerminalGradleTask>,
     ): TerminalCompletionSource =
         GradleTaskCompletionSource(
             sourceId = sourceId,
             tasksProvider = tasksProvider,
+            messages = messages,
         )
 
     /**

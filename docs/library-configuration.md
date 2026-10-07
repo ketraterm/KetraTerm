@@ -59,6 +59,33 @@ recalculation. Rendering reads resolved values without consulting a builder.
 
 ## Optional host chrome and labels
 
+User-facing text lives in UTF-8 `.properties` catalogs. `SwingHostMessages`,
+`SwingTerminalMessages`, and `TerminalCompletionMessages` are small bundle facades
+for optional host chrome, the completion popup, and generated completion details.
+Their `message(key, arguments...)` boundary can also delegate to an embedding
+application's message framework. The IntelliJ host delegates to `DynamicBundle`,
+using the IDE's UI locale. The standalone application has its own product catalog.
+
+```kotlin
+val messages = SwingHostMessages.forLocale(Locale.FRENCH)
+val searchBar = SwingTerminalSearchBar(terminal, messages)
+```
+
+Supply a custom `ResourceBundle` as the second `forLocale` argument to replace
+some or all messages. Missing custom keys use the English catalog. Resource keys
+are documented by each owning module's base `.properties` file; locale variants
+follow the standard `Bundle_fr.properties` naming convention. Static labels are
+resolved during component construction, and complete formatted messages are
+resolved when UI state changes. Painting does not perform bundle lookup or message
+formatting. Providers capture one locale and can be supplied independently to
+different hosts. Recreate the chrome to change its captured language.
+
+Message patterns use JDK `MessageFormat`: arguments are plain text, can be
+reordered, and may use number or choice formats. Literal apostrophes in formatted
+patterns must be doubled. Static messages without arguments are returned verbatim.
+Clipboard consent receives names and Unicode code-point counts, never clipboard
+contents; translated labels preserve decision indices and the safe Deny default.
+
 `SwingTerminalSearchColors` uses the same synchronous `create`/`copy` and builder
 pattern for prepared search colors. Build on the host theme's owning thread;
 dynamic `Color` subclasses are sampled into detached ARGB values. Pass the result
@@ -73,8 +100,15 @@ an exact source-ID-to-label map. It copies and bounds labels at construction;
 blank values fail with `IllegalArgumentException`. Unknown IDs use neutral
 humanization, without removing product prefixes. Display labels never change
 source IDs, ranking or feedback. IntelliJ supplies its product labels at registry
-composition; standalone needs no overrides. Published Kotlin and Java consumers
+composition; standalone uses the bundled source labels. Published Kotlin and Java consumers
 exercise both APIs alongside the existing host-owned suggestion target.
+
+`TerminalCommandSpecs.defaults(locale)` builds a localized immutable command
+catalog once, before engine construction. `defaults(bundle)` supports partial
+custom resources, and `defaults { key, english -> ... }` integrates another message
+framework. Keys use canonical command paths, option tokens, and original argument
+names. Localization changes descriptions and argument display labels while
+preserving insertion tokens, aliases, ranking, replacement ranges and source IDs.
 
 ## Prototype and migration evidence
 

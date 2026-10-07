@@ -18,7 +18,7 @@ package io.github.ketraterm.intellij
 import com.intellij.DynamicBundle
 import org.jetbrains.annotations.Nls
 import org.jetbrains.annotations.PropertyKey
-import java.util.function.Supplier
+import java.util.*
 
 private const val BUNDLE = "messages.MyMessageBundle"
 
@@ -27,6 +27,9 @@ private const val BUNDLE = "messages.MyMessageBundle"
  */
 internal object KetraTermBundle {
     private val instance = DynamicBundle(KetraTermBundle::class.java, BUNDLE)
+
+    /** Current IDE UI language, which can differ from the JVM default locale. */
+    val locale: Locale get() = DynamicBundle.getLocale()
 
     /**
      * Resolves a localized message by key.
@@ -42,17 +45,4 @@ internal object KetraTermBundle {
             String,
         vararg params: Any?,
     ): @Nls String = instance.getMessage(key, *params)
-
-    /**
-     * Resolves a localized message lazily.
-     *
-     * @param key resource-bundle key.
-     * @param params optional formatting parameters.
-     * @return supplier that resolves localized message text.
-     */
-    @JvmStatic
-    fun lazyMessage(
-        @PropertyKey(resourceBundle = BUNDLE) key: String,
-        vararg params: Any?,
-    ): Supplier<@Nls String> = instance.getLazyMessage(key, *params)
 }

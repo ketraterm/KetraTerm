@@ -61,9 +61,7 @@
 
     <actions>
         <action id="KetraTerm.Terminal.CopySelection"
-                class="io.github.ketraterm.intellij.ui.KetraTermCopySelectionAction"
-                text="Copy"
-                description="Copy the current KetraTerm terminal selection to the clipboard">
+                class="io.github.ketraterm.intellij.ui.KetraTermCopySelectionAction">
             <keyboard-shortcut keymap="$default" first-keystroke="control C"/>
             <keyboard-shortcut keymap="Mac OS X" first-keystroke="control C" remove="true"/>
             <keyboard-shortcut keymap="Mac OS X 10.5+" first-keystroke="control C" remove="true"/>
@@ -72,9 +70,7 @@
         </action>
 
         <action id="KetraTerm.Terminal.PasteClipboard"
-                class="io.github.ketraterm.intellij.ui.KetraTermPasteClipboardAction"
-                text="Paste"
-                description="Paste clipboard text into the focused KetraTerm terminal">
+                class="io.github.ketraterm.intellij.ui.KetraTermPasteClipboardAction">
             <keyboard-shortcut keymap="$default" first-keystroke="control V"/>
             <keyboard-shortcut keymap="Mac OS X" first-keystroke="control V" remove="true"/>
             <keyboard-shortcut keymap="Mac OS X 10.5+" first-keystroke="control V" remove="true"/>
@@ -83,9 +79,7 @@
         </action>
 
         <action id="KetraTerm.Terminal.OpenSearch"
-                class="io.github.ketraterm.intellij.ui.KetraTermOpenSearchAction"
-                text="Find"
-                description="Open search for the focused KetraTerm terminal">
+                class="io.github.ketraterm.intellij.ui.KetraTermOpenSearchAction">
             <keyboard-shortcut keymap="$default" first-keystroke="control F"/>
             <keyboard-shortcut keymap="Mac OS X" first-keystroke="control F" remove="true"/>
             <keyboard-shortcut keymap="Mac OS X 10.5+" first-keystroke="control F" remove="true"/>
@@ -94,61 +88,37 @@
         </action>
 
         <action id="KetraTerm.Terminal.RequestSuggestions"
-                class="io.github.ketraterm.intellij.ui.KetraTermRequestSuggestionsAction"
-                text="Request Terminal Suggestions"
-                description="Show suggestions for the active KetraTerm command line">
+                class="io.github.ketraterm.intellij.ui.KetraTermRequestSuggestionsAction">
             <keyboard-shortcut keymap="$default" first-keystroke="control SPACE"/>
         </action>
 
         <action id="KetraTerm.Terminal.SelectAll"
-                class="io.github.ketraterm.intellij.ui.KetraTermSelectAllAction"
-                text="Select All"
-                description="Select all retained text in the focused KetraTerm terminal"
-        />
+                class="io.github.ketraterm.intellij.ui.KetraTermSelectAllAction"/>
 
         <action id="KetraTerm.Terminal.ClearScreen"
-                class="io.github.ketraterm.intellij.ui.KetraTermClearScreenAction"
-                text="Clear"
-                description="Request the focused terminal process to clear the screen"
-        />
+                class="io.github.ketraterm.intellij.ui.KetraTermClearScreenAction"/>
 
         <action id="KetraTerm.Terminal.NewTab"
-                class="io.github.ketraterm.intellij.ui.KetraTermNewTabAction"
-                text="New Tab"
-                description="Open a new KetraTerm terminal tab"
-        />
+                class="io.github.ketraterm.intellij.ui.KetraTermNewTabAction"/>
 
         <action id="KetraTerm.Terminal.CloseTab"
-                class="io.github.ketraterm.intellij.ui.KetraTermCloseTabAction"
-                text="Close Tab"
-                description="Close the focused KetraTerm terminal tab"
-        />
+                class="io.github.ketraterm.intellij.ui.KetraTermCloseTabAction"/>
 
         <action id="KetraTerm.Terminal.RenameTab"
-                class="io.github.ketraterm.intellij.ui.KetraTermRenameTabAction"
-                text="Rename Tab..."
-                description="Set a custom KetraTerm tab title or restore its automatic title"
-        />
+                class="io.github.ketraterm.intellij.ui.KetraTermRenameTabAction"/>
 
         <action id="KetraTerm.Terminal.OpenTerminalHere"
-                class="io.github.ketraterm.intellij.ui.KetraTermOpenTerminalHereAction"
-                text="Open in KetraTerm"
-                description="Open a KetraTerm terminal tab in this directory">
-            <override-text place="KetraTerm.TerminalContextMenu" text="Open Terminal Here"/>
+                class="io.github.ketraterm.intellij.ui.KetraTermOpenTerminalHereAction">
             <add-to-group group-id="RevealGroup"/>
         </action>
 
         <action id="KetraTerm.Terminal.ScrollPageUp"
-                class="io.github.ketraterm.intellij.ui.KetraTermScrollPageUpAction"
-                text="Scroll Terminal Page Up"
-                description="Scroll the focused KetraTerm terminal one page up">
+                class="io.github.ketraterm.intellij.ui.KetraTermScrollPageUpAction">
             <keyboard-shortcut keymap="$default" first-keystroke="shift PAGE_UP"/>
         </action>
 
         <action id="KetraTerm.Terminal.ScrollPageDown"
-                class="io.github.ketraterm.intellij.ui.KetraTermScrollPageDownAction"
-                text="Scroll Terminal Page Down"
-                description="Scroll the focused KetraTerm terminal one page down">
+                class="io.github.ketraterm.intellij.ui.KetraTermScrollPageDownAction">
             <keyboard-shortcut keymap="$default" first-keystroke="shift PAGE_DOWN"/>
         </action>
     </actions>

@@ -23,9 +23,11 @@ import com.intellij.openapi.externalSystem.model.task.TaskData
 import com.intellij.openapi.externalSystem.service.project.ProjectDataManager
 import com.intellij.openapi.progress.ProgressManager
 import com.intellij.openapi.project.Project
+import io.github.ketraterm.completion.api.TerminalCompletionMessages
 import io.github.ketraterm.completion.api.TerminalCompletionSources
 import io.github.ketraterm.completion.api.TerminalGradleTask
 import io.github.ketraterm.completion.host.TerminalLocalFileUriResolver
+import io.github.ketraterm.intellij.KetraTermBundle
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
 import org.jetbrains.plugins.gradle.util.GradleConstants
@@ -225,6 +227,7 @@ internal object IntellijGradleTaskPath {
 /** Creates imported-Gradle-task completion without exposing IntelliJ model APIs to the shared engine. */
 internal fun intellijGradleTaskCompletionSource(loader: suspend (String?) -> List<TerminalGradleTask>) =
     TerminalCompletionSources.gradleTask(
+        messages = TerminalCompletionMessages.forLocale(KetraTermBundle.locale),
         sourceId = "intellij-gradle-task",
         tasksProvider = { request, _ -> loader(request.workingDirectoryUri) },
     )

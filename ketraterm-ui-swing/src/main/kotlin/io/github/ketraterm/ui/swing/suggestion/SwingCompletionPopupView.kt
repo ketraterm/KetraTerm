@@ -15,6 +15,7 @@
  */
 package io.github.ketraterm.ui.swing.suggestion
 
+import io.github.ketraterm.ui.swing.api.SwingTerminalMessages
 import java.awt.BorderLayout
 import java.awt.Component
 import java.awt.Dimension
@@ -25,6 +26,7 @@ import javax.swing.*
 /** Standard Swing list presentation; the controller retains selection and acceptance ownership. */
 internal class SwingCompletionPopupView(
     private val listener: SwingShellSuggestionViewListener,
+    private val messages: SwingTerminalMessages = SwingTerminalMessages.forLocale(),
 ) : JPanel(BorderLayout()),
     SwingShellSuggestionView {
     override val component: JComponent get() = this
@@ -32,6 +34,7 @@ internal class SwingCompletionPopupView(
     private var updating = false
     private var closed = false
     internal val list = JList<SwingShellSuggestion>()
+    private val renderer = CompletionRenderer(messages)
     private val scrollPane = JScrollPane(list)
     private val position = JLabel()
     private val selectionListener =
@@ -64,9 +67,9 @@ internal class SwingCompletionPopupView(
         isFocusable = false
         list.isFocusable = false
         list.selectionMode = ListSelectionModel.SINGLE_SELECTION
-        list.cellRenderer = CompletionRenderer()
+        list.cellRenderer = renderer
         list.visibleRowCount = SwingShellSuggestionViewSnapshot.MAX_VISIBLE_SUGGESTIONS
-        list.accessibleContext.accessibleName = "Command completions"
+        list.accessibleContext.accessibleName = messages.message("completion.accessibleName")
         list.addListSelectionListener(selectionListener)
         list.addMouseListener(pointerHandler)
         list.addMouseMotionListener(pointerHandler)
@@ -92,15 +95,22 @@ internal class SwingCompletionPopupView(
         updating = true
         try {
             if (this.snapshot.visibleSuggestions != snapshot.visibleSuggestions) {
+                renderer.update(snapshot.visibleSuggestions)
                 list.setListData(snapshot.visibleSuggestions.toTypedArray())
             }
             this.snapshot = snapshot
             list.selectedIndex = snapshot.selectedIndex
             list.visibleRowCount = snapshot.visibleSuggestions.size
             position.isVisible = snapshot.hasSuggestionsBefore || snapshot.hasSuggestionsAfter
-            position.text =
-                "${snapshot.viewportStartIndex + 1}–${snapshot.viewportStartIndex + snapshot.visibleSuggestions.size} of ${snapshot.totalSuggestionCount}"
-            list.accessibleContext.accessibleDescription = "${snapshot.totalSuggestionCount} suggestions, ${position.text}"
+            val first = if (snapshot.visibleSuggestions.isEmpty()) 0 else snapshot.viewportStartIndex + 1
+            val last = snapshot.viewportStartIndex + snapshot.visibleSuggestions.size
+            position.text = messages.message("completion.range", first, last, snapshot.totalSuggestionCount)
+            list.accessibleContext.accessibleDescription =
+                when (snapshot.totalSuggestionCount) {
+                    0 -> messages.message("completion.empty")
+                    1 -> messages.message("completion.description.one", snapshot.totalSuggestionCount, first, last)
+                    else -> messages.message("completion.description.many", snapshot.totalSuggestionCount, first, last)
+                }
             revealSelection()
         } finally {
             updating = false
@@ -142,12 +152,36 @@ internal class SwingCompletionPopupView(
         list.removeMouseWheelListener(pointerHandler)
         scrollPane.removeMouseWheelListener(pointerHandler)
         ToolTipManager.sharedInstance().unregisterComponent(list)
+        renderer.update(emptyList())
         list.setListData(emptyArray<SwingShellSuggestion>())
         snapshot = SwingShellSuggestionViewSnapshot.EMPTY
     }
 }
 
-private class CompletionRenderer : DefaultListCellRenderer() {
+private class CompletionRenderer(
+    private val messages: SwingTerminalMessages,
+) : DefaultListCellRenderer() {
+    private var suggestions = emptyList<SwingShellSuggestion>()
+    private var rows = emptyArray<CompletionRow>()
+    private val rowBorder = BorderFactory.createEmptyBorder(4, 6, 4, 6)
+    private val fallbackAccessibleName = messages.message("completion.suggestionAccessibleName")
+    private val roles =
+        Array(SwingShellSuggestionAccentRole.entries.size) {
+            when (SwingShellSuggestionAccentRole.entries[it]) {
+                SwingShellSuggestionAccentRole.COMMAND -> messages.message("completion.role.command")
+                SwingShellSuggestionAccentRole.PATH -> messages.message("completion.role.path")
+                SwingShellSuggestionAccentRole.OPTION -> messages.message("completion.role.option")
+                SwingShellSuggestionAccentRole.HISTORY -> messages.message("completion.role.history")
+                SwingShellSuggestionAccentRole.OTHER -> messages.message("completion.role.other")
+            }
+        }
+
+    fun update(suggestions: List<SwingShellSuggestion>) {
+        val preparedRows = Array(suggestions.size) { presentation(suggestions[it]) }
+        this.suggestions = suggestions
+        rows = preparedRows
+    }
+
     override fun getListCellRendererComponent(
         list: JList<*>?,
         value: Any?,
@@ -157,10 +191,28 @@ private class CompletionRenderer : DefaultListCellRenderer() {
     ): Component {
         super.getListCellRendererComponent(list, "", index, isSelected, cellHasFocus)
         val suggestion = value as? SwingShellSuggestion ?: return this
+        val row = if (suggestions.getOrNull(index) === suggestion) rows[index] else presentation(suggestion)
+        text = row.html
+        icon =
+            UIManager.getIcon(
+                when (suggestion.accentRole) {
+                    SwingShellSuggestionAccentRole.PATH -> "FileView.directoryIcon"
+                    SwingShellSuggestionAccentRole.COMMAND -> "FileView.computerIcon"
+                    else -> "Tree.leafIcon"
+                },
+            )
+        border = rowBorder
+        toolTipText = row.tooltip
+        getAccessibleContext().accessibleName = row.accessibleName
+        getAccessibleContext().accessibleDescription = row.accessibleDescription
+        return this
+    }
+
+    private fun presentation(suggestion: SwingShellSuggestion): CompletionRow {
         val primary = displayText(suggestion.displayText, 4096)
         val detail = displayText(suggestion.detail, 1024)
         val source = displayText(suggestion.sourceDisplayText, 128)
-        text =
+        val html =
             buildString {
                 append("<html>")
                 var offset = 0
@@ -176,24 +228,34 @@ private class CompletionRenderer : DefaultListCellRenderer() {
                 if (detail.isNotEmpty()) append(" &nbsp; ").append(escapeHtml(detail))
                 append(" &nbsp; <small>").append(escapeHtml(source)).append("</small></html>")
             }
-        icon =
-            UIManager.getIcon(
-                when (suggestion.accentRole) {
-                    SwingShellSuggestionAccentRole.PATH -> "FileView.directoryIcon"
-                    SwingShellSuggestionAccentRole.COMMAND -> "FileView.computerIcon"
-                    else -> "Tree.leafIcon"
-                },
-            )
-        border = BorderFactory.createEmptyBorder(4, 6, 4, 6)
-        toolTipText = "<html>" +
-            listOf(displayText(primary, 1024), detail, source)
-                .filter { it.isNotEmpty() }
-                .joinToString(" — ", transform = ::escapeHtml) + "</html>"
-        getAccessibleContext().accessibleName = primary.ifEmpty { "Completion suggestion" }
-        getAccessibleContext().accessibleDescription = listOf(detail, source, suggestion.accentRole.name).joinToString(", ")
-        return this
+        val tooltip =
+            if (detail.isEmpty()) {
+                messages.message("completion.row.tooltipWithoutDetail", displayText(primary, 1024), source)
+            } else {
+                messages.message("completion.row.tooltip", displayText(primary, 1024), detail, source)
+            }
+        val role = roles[suggestion.accentRole.ordinal]
+        val accessibleDescription =
+            if (detail.isEmpty()) {
+                messages.message("completion.row.descriptionWithoutDetail", source, role)
+            } else {
+                messages.message("completion.row.description", detail, source, role)
+            }
+        return CompletionRow(
+            html = html,
+            tooltip = "<html>" + escapeHtml(tooltip) + "</html>",
+            accessibleName = primary.ifEmpty { fallbackAccessibleName },
+            accessibleDescription = accessibleDescription,
+        )
     }
 }
+
+private class CompletionRow(
+    val html: String,
+    val tooltip: String,
+    val accessibleName: String,
+    val accessibleDescription: String,
+)
 
 /** Bound hostile provider text without splitting an extended grapheme or exposing display controls. */
 private fun displayText(

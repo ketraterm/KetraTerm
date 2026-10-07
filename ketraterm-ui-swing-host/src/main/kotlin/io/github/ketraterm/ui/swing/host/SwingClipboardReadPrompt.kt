@@ -29,17 +29,33 @@ import kotlin.coroutines.resume
  * Cancellation, expiry and pane disposal close the dialog. Blocking persists
  * for this pane's lifetime, including later requests admitted with Allow.
  * @param showDialog opens product UI, delivers a decision on the EDT, and returns its disposal handle.
+ * @param messages host message bundle; choices keep their stable decision indices.
  */
 public class SwingClipboardReadPrompt(
+    private val messages: SwingHostMessages,
     private val showDialog: (request: SwingDialogRequest, decide: (Int?) -> Unit) -> AutoCloseable,
 ) : AutoCloseable {
+    /** Creates a prompt using the JVM display locale and bundled messages. */
+    public constructor(
+        showDialog: (request: SwingDialogRequest, decide: (Int?) -> Unit) -> AutoCloseable,
+    ) : this(SwingHostMessages.forLocale(), showDialog)
+
     /** Choices shared by both products' standard clipboard dialogs. */
-    public enum class Decision(
-        public val label: String,
-    ) {
-        ALLOW_ONCE("Allow once"),
-        DENY("Deny"),
-        BLOCK("Block for this terminal"),
+    public enum class Decision {
+        ALLOW_ONCE,
+        DENY,
+        BLOCK,
+        ;
+
+        /** Label in the JVM display locale; localized presenters resolve their own bundle. */
+        public val label: String get() = SwingHostMessages.forLocale().message(messageKey)
+
+        internal val messageKey: String get() =
+            when (this) {
+                ALLOW_ONCE -> "clipboard.allowOnce"
+                DENY -> "clipboard.deny"
+                BLOCK -> "clipboard.block"
+            }
     }
 
     private var pending: CancellableContinuation<Boolean>? = null
@@ -64,10 +80,10 @@ public class SwingClipboardReadPrompt(
                 dialog =
                     showDialog(
                         SwingDialogRequest(
-                            SwingClipboardPrompts.TITLE,
+                            messages.message("clipboard.title"),
                             message,
                             SwingDialogRequest.Severity.WARNING,
-                            Decision.entries.map { it.label },
+                            Decision.entries.map { messages.message(it.messageKey) },
                             defaultOption = Decision.DENY.ordinal,
                         ),
                     ) { option ->

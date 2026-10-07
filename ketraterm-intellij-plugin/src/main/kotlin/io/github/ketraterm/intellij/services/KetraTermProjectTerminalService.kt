@@ -35,12 +35,10 @@ import com.intellij.util.ui.update.UiNotifyConnector
 import io.github.ketraterm.host.TerminalClipboardPromptEvent
 import io.github.ketraterm.host.TerminalClipboardReadRequest
 import io.github.ketraterm.host.TerminalClipboardWriteEvent
+import io.github.ketraterm.intellij.KetraTermBundle
 import io.github.ketraterm.intellij.settings.KetraTermIntellijSettings
 import io.github.ketraterm.intellij.settings.KetraTermProjectSettings
-import io.github.ketraterm.intellij.ui.IntellijMessageDialogs
-import io.github.ketraterm.intellij.ui.KetraTermTerminalPane
-import io.github.ketraterm.intellij.ui.KetraTermTerminalPaneHostActions
-import io.github.ketraterm.intellij.ui.KetraTermTerminalStartupView
+import io.github.ketraterm.intellij.ui.*
 import io.github.ketraterm.protocol.NotificationLevel
 import io.github.ketraterm.session.TerminalClipboardReadResult
 import io.github.ketraterm.session.TerminalSessionState
@@ -487,7 +485,8 @@ class KetraTermProjectTerminalService internal constructor(
         error: Throwable,
     ) {
         val profileName = pendingTab.sourceProfile?.displayName ?: KetraTermIntellijSettings.getInstance().state.defaultTabName
-        pendingTab.content.displayName = pendingTab.restoredState?.customTitle ?: "Failed: $profileName"
+        pendingTab.content.displayName =
+            pendingTab.restoredState?.customTitle ?: KetraTermBundle.message("terminal.tab.failed", profileName)
         replaceContent(
             pendingTab.container,
             KetraTermTerminalStartupView.failure(profileName, error),
@@ -587,10 +586,10 @@ class KetraTermProjectTerminalService internal constructor(
             IntellijMessageDialogs.show(
                 project,
                 SwingDialogRequest(
-                    "Terminate Terminal Process?",
-                    "Closing \"${tab.title}\" will terminate its running process.",
+                    KetraTermBundle.message("terminal.tab.close.title"),
+                    KetraTermBundle.message("terminal.tab.close.question", tab.title),
                     SwingDialogRequest.Severity.WARNING,
-                    listOf("Terminate", "Cancel"),
+                    listOf(KetraTermBundle.message("terminal.tab.close.terminate"), KetraTermBundle.message("terminal.tab.close.cancel")),
                 ),
             )
         return answer == 0
@@ -630,7 +629,7 @@ class KetraTermProjectTerminalService internal constructor(
             request: TerminalClipboardReadRequest,
         ): TerminalClipboardReadResult {
             val binding = clipboardSessions[tab.id] ?: return TerminalClipboardReadResult.Unavailable
-            return binding.read(request, SwingClipboardPrompts.readQuestion(tab.profile.displayName, "IDE clipboard"))
+            return binding.read(request, SwingClipboardPrompts.readQuestion(tab.profile.displayName, messages = IntellijSwingHostMessages))
         }
 
         override fun commandFinished(
@@ -668,8 +667,8 @@ class KetraTermProjectTerminalService internal constructor(
             invokeLaterIfAlive {
                 KetraTermIntellijNotifier.showNotification(
                     project,
-                    "Startup command skipped",
-                    "You entered input before the shell was ready. The startup command was not run.",
+                    KetraTermBundle.message("terminal.startup.commandSkipped.title"),
+                    KetraTermBundle.message("terminal.startup.commandSkipped.body"),
                     NotificationLevel.INFO,
                 )
             }
@@ -704,7 +703,7 @@ class KetraTermProjectTerminalService internal constructor(
                 val allowed =
                     IntellijMessageDialogs.show(
                         project,
-                        SwingClipboardPrompts.writeConfirmation(tab.profile.displayName, event.text, "IDE clipboard"),
+                        SwingClipboardPrompts.writeConfirmation(tab.profile.displayName, event.text, messages = IntellijSwingHostMessages),
                     ) == 0
                 if (allowed && binding.isAlive) {
                     binding.clipboard.copyText(event.text)

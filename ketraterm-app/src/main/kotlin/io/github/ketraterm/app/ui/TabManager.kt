@@ -16,6 +16,7 @@
 package io.github.ketraterm.app.ui
 
 import io.github.ketraterm.app.KetraTermCli
+import io.github.ketraterm.app.appMessages
 import io.github.ketraterm.app.completion.StandaloneCompletionRegistry
 import io.github.ketraterm.app.completion.completionShellCapabilities
 import io.github.ketraterm.app.config.KetraTermSettings
@@ -627,12 +628,12 @@ internal class TabManager(
         val hyperlink = request.hyperlink
         if (hyperlink != null) {
             menu.add(
-                JMenuItem("Open Link").apply {
+                JMenuItem(appMessages.text("menu.openLink")).apply {
                     addActionListener { hyperlink.open() }
                 },
             )
             menu.add(
-                JMenuItem("Copy Link").apply {
+                JMenuItem(appMessages.text("menu.copyLink")).apply {
                     isEnabled = hyperlink.uri != null
                     addActionListener { hyperlink.copyUri() }
                 },
@@ -641,24 +642,24 @@ internal class TabManager(
         }
 
         val copyItem =
-            JMenuItem("Copy").apply {
+            JMenuItem(appMessages.text("menu.copy")).apply {
                 isEnabled = request.hasSelection()
                 addActionListener { request.copySelection() }
             }
         val pasteItem =
-            JMenuItem("Paste").apply {
+            JMenuItem(appMessages.text("menu.paste")).apply {
                 addActionListener { request.pasteClipboard() }
             }
         val selectAllItem =
-            JMenuItem("Select All").apply {
+            JMenuItem(appMessages.text("menu.selectAll")).apply {
                 addActionListener { request.selectAll() }
             }
         val searchItem =
-            JMenuItem("Search").apply {
+            JMenuItem(appMessages.text("menu.search")).apply {
                 addActionListener { pane.openSearch() }
             }
         val clearItem =
-            JMenuItem("Clear").apply {
+            JMenuItem(appMessages.text("menu.clear")).apply {
                 addActionListener { request.clearScreen() }
             }
 
@@ -672,19 +673,19 @@ internal class TabManager(
         if (commandRecordId != 0) {
             menu.addSeparator()
             menu.add(
-                JMenuItem("Copy Command").apply {
+                JMenuItem(appMessages.text("menu.copyCommand")).apply {
                     isEnabled = pane.tab.session.shellIntegrationState
                         .commandText(commandRecordId) != null
                     addActionListener { pane.terminal.copyCommandTextToClipboard(commandRecordId) }
                 },
             )
             menu.add(
-                JMenuItem("Copy Command Output").apply {
+                JMenuItem(appMessages.text("menu.copyCommandOutput")).apply {
                     addActionListener { pane.terminal.copyCommandOutputToClipboard(commandRecordId) }
                 },
             )
             menu.add(
-                JMenuItem("Export Command Output…").apply {
+                JMenuItem(appMessages.text("menu.exportCommandOutput")).apply {
                     addActionListener { exportCommandOutput(pane, commandRecordId) }
                 },
             )
@@ -693,9 +694,9 @@ internal class TabManager(
 
         val workingDirectory = LocalWorkingDirectoryResolver.resolve(pane.tab.currentWorkingDirectoryUri)
         val openHereItem =
-            JMenuItem("Open Terminal Here").apply {
+            JMenuItem(appMessages.text("menu.openTerminalHere")).apply {
                 isEnabled = workingDirectory != null
-                toolTipText = if (workingDirectory == null) "No local shell working directory is available" else null
+                toolTipText = if (workingDirectory == null) appMessages.text("menu.noDirectory") else null
                 addActionListener {
                     val directory = workingDirectory ?: return@addActionListener
                     openTab(pane.tab.profile.copy(workingDirectory = directory))
@@ -705,13 +706,13 @@ internal class TabManager(
         menu.addSeparator()
 
         val splitVert =
-            JMenuItem("Split Vertically").apply {
+            JMenuItem(appMessages.text("menu.splitVertical")).apply {
                 addActionListener {
                     splitPane(pane, isVertical = true)
                 }
             }
         val splitHor =
-            JMenuItem("Split Horizontally").apply {
+            JMenuItem(appMessages.text("menu.splitHorizontal")).apply {
                 addActionListener {
                     splitPane(pane, isVertical = false)
                 }
@@ -721,7 +722,7 @@ internal class TabManager(
         menu.add(splitHor)
 
         val closeItem =
-            JMenuItem("Close Pane").apply {
+            JMenuItem(appMessages.text("menu.closePane")).apply {
                 addActionListener {
                     closePane(pane)
                 }
@@ -737,15 +738,16 @@ internal class TabManager(
         commandRecordId: Int,
     ) {
         val output = pane.terminal.commandOutputText(commandRecordId) ?: return
-        val chooser = JFileChooser().apply { selectedFile = java.io.File("command-output.txt") }
+        val chooser = JFileChooser().apply { selectedFile = java.io.File(appMessages.text("export.defaultFileName")) }
         if (chooser.showSaveDialog(frame) != JFileChooser.APPROVE_OPTION) return
         commandOutputExporter.export(chooser.selectedFile.toPath(), output) { exception ->
             SwingMessageDialogs.show(
                 frame,
                 SwingDialogRequest(
-                    "Unable to export command output",
+                    appMessages.text("export.errorTitle"),
                     exception.message ?: exception.javaClass.name,
                     SwingDialogRequest.Severity.ERROR,
+                    options = listOf(appMessages.text("button.ok")),
                 ),
             )
         }
@@ -875,9 +877,10 @@ internal class TabManager(
         SwingMessageDialogs.show(
             frame,
             SwingDialogRequest(
-                "Unable to start ${profile.displayName}",
+                appMessages.text("startup.errorTitle", profile.displayName),
                 exception.message ?: exception.javaClass.name,
                 SwingDialogRequest.Severity.ERROR,
+                options = listOf(appMessages.text("button.ok")),
             ),
         )
     }
@@ -969,9 +972,10 @@ internal class TabManager(
                 SwingMessageDialogs.show(
                     frame,
                     SwingDialogRequest(
-                        "Startup Command Skipped",
-                        "The startup command was skipped because you entered input before the shell was ready.",
+                        appMessages.text("startup.skippedTitle"),
+                        appMessages.text("startup.skipped"),
                         SwingDialogRequest.Severity.INFORMATION,
+                        options = listOf(appMessages.text("button.ok")),
                     ),
                 )
             }

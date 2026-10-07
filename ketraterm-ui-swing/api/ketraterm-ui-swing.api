@@ -368,6 +368,21 @@ public abstract interface class io/github/ketraterm/ui/swing/api/SwingTerminalHo
 public final class io/github/ketraterm/ui/swing/api/SwingTerminalHostKeyHandler$Companion {
 }
 
+public abstract interface class io/github/ketraterm/ui/swing/api/SwingTerminalMessages {
+	public static final field Companion Lio/github/ketraterm/ui/swing/api/SwingTerminalMessages$Companion;
+	public static fun forLocale ()Lio/github/ketraterm/ui/swing/api/SwingTerminalMessages;
+	public static fun forLocale (Ljava/util/Locale;)Lio/github/ketraterm/ui/swing/api/SwingTerminalMessages;
+	public static fun forLocale (Ljava/util/Locale;Ljava/util/ResourceBundle;)Lio/github/ketraterm/ui/swing/api/SwingTerminalMessages;
+	public abstract fun message (Ljava/lang/String;[Ljava/lang/Object;)Ljava/lang/String;
+}
+
+public final class io/github/ketraterm/ui/swing/api/SwingTerminalMessages$Companion {
+	public final fun forLocale ()Lio/github/ketraterm/ui/swing/api/SwingTerminalMessages;
+	public final fun forLocale (Ljava/util/Locale;)Lio/github/ketraterm/ui/swing/api/SwingTerminalMessages;
+	public final fun forLocale (Ljava/util/Locale;Ljava/util/ResourceBundle;)Lio/github/ketraterm/ui/swing/api/SwingTerminalMessages;
+	public static synthetic fun forLocale$default (Lio/github/ketraterm/ui/swing/api/SwingTerminalMessages$Companion;Ljava/util/Locale;Ljava/util/ResourceBundle;ILjava/lang/Object;)Lio/github/ketraterm/ui/swing/api/SwingTerminalMessages;
+}
+
 public abstract interface class io/github/ketraterm/ui/swing/api/TerminalFontResolver {
 	public abstract fun resolveFallbackFont (IIF)Ljava/awt/Font;
 	public abstract fun resolveFallbackFont (Ljava/lang/String;IF)Ljava/awt/Font;
@@ -969,9 +984,11 @@ public abstract interface class io/github/ketraterm/ui/swing/suggestion/SwingShe
 	public static final field Companion Lio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionViewFactory$Companion;
 	public static final field DEFAULT Lio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionViewFactory;
 	public abstract fun create (Lio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionViewListener;)Lio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionView;
+	public static fun createDefault (Lio/github/ketraterm/ui/swing/api/SwingTerminalMessages;)Lio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionViewFactory;
 }
 
 public final class io/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionViewFactory$Companion {
+	public final fun createDefault (Lio/github/ketraterm/ui/swing/api/SwingTerminalMessages;)Lio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionViewFactory;
 }
 
 public abstract interface class io/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionViewListener {

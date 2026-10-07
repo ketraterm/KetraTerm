@@ -7,6 +7,15 @@ behavior, persistence, shell processes, PTY/session lifecycle, or IntelliJ APIs.
 
 ## Public Surface
 
+`TerminalCompletionMessages` is the host-owned message lookup boundary for generated
+candidate descriptions. Its default facade reads UTF-8 resource bundles for a
+captured display locale and uses English for missing custom keys. Source and engine
+construction resolve static descriptions once; ranking and matching perform no
+message lookup. `TerminalCommandSpecs.defaults(locale)` and its bundle/callback
+overloads prepare localized descriptions and argument labels once while preserving
+canonical tokens and semantic metadata. Hosts keep provider-supplied documentation
+and choose their localization framework. See the [message configuration contract](../../docs/library-configuration.md#optional-host-chrome-and-labels).
+
 External modules should import only:
 
 - `io.github.ketraterm.completion.api`

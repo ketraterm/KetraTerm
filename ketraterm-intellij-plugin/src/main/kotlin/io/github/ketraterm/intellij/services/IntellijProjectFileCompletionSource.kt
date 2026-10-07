@@ -28,9 +28,11 @@ import com.intellij.psi.PsiFileSystemItem
 import com.intellij.psi.search.GlobalSearchScope
 import com.intellij.util.Processor
 import com.intellij.util.indexing.FindSymbolParameters
+import io.github.ketraterm.completion.api.TerminalCompletionMessages
 import io.github.ketraterm.completion.api.TerminalCompletionSources
 import io.github.ketraterm.completion.api.TerminalFuzzyPathEntry
 import io.github.ketraterm.completion.host.TerminalLocalFileUriResolver
+import io.github.ketraterm.intellij.KetraTermBundle
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
 import java.nio.file.Path
@@ -146,6 +148,7 @@ private class IntellijProjectFileSearchViewModel(
 /** Creates query-aware IntelliJ project paths without exposing VFS APIs to the shared engine. */
 internal fun intellijProjectFileCompletionSource(loader: suspend (String?, String) -> List<TerminalFuzzyPathEntry>) =
     TerminalCompletionSources.fuzzyPath(
+        messages = TerminalCompletionMessages.forLocale(KetraTermBundle.locale),
         sourceId = "intellij-project-file",
         entriesProvider = { request, context ->
             loader(request.workingDirectoryUri, context.activePrefix)

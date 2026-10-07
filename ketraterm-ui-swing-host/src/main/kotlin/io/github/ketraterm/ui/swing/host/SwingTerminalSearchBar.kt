@@ -33,19 +33,27 @@ import kotlin.coroutines.CoroutineContext
  * shortcut opens it.
  *
  * @param terminal terminal whose headless search API backs this bar.
+ * @param messages host message bundle, read on the EDT outside painting. Static labels are captured at construction.
  */
 public class SwingTerminalSearchBar
     public constructor(
         private val terminal: SwingTerminal,
+        private val messages: SwingHostMessages,
     ) {
+        /** Creates a search bar using the JVM display locale and bundled messages. */
+        public constructor(terminal: SwingTerminal) : this(terminal, SwingHostMessages.forLocale())
+
         private var colors = SwingTerminalSearchColors()
+        private val placeholder = messages.message("search.placeholder")
+        private val searchingText = messages.message("search.searching")
+        private val failedText = messages.message("search.failed")
 
         private var suppressDocumentEvents = false
         private val queryField = SearchTextField(24)
-        private val counterLabel = JLabel("0/0")
+        private val counterLabel = JLabel(messages.message("search.matchCounter", 0, 0))
         private val previousButton = IconButton(ButtonIcon.PREVIOUS)
         private val nextButton = IconButton(ButtonIcon.NEXT)
-        private val caseSensitiveToggle = FlatToggleButton("Aa")
+        private val caseSensitiveToggle = FlatToggleButton(messages.message("search.matchCaseLabel"))
         private val searchInputPanel = SearchInputPanel(queryField, caseSensitiveToggle)
         private val closeButton = IconButton(ButtonIcon.CLOSE)
         private val searchPanel = SearchPanel()
@@ -84,16 +92,24 @@ public class SwingTerminalSearchBar
                     searchObservation = null
                 }
             }
-            queryField.toolTipText = "Search terminal output"
-            counterLabel.toolTipText = "Active match and total matches"
-            previousButton.toolTipText = "Previous match"
-            nextButton.toolTipText = "Next match"
-            closeButton.toolTipText = "Close search"
-            caseSensitiveToggle.toolTipText = "Match case"
+            queryField.toolTipText = messages.message("search.queryToolTip")
+            counterLabel.toolTipText = messages.message("search.counterToolTip")
+            previousButton.toolTipText = messages.message("search.previousToolTip")
+            nextButton.toolTipText = messages.message("search.nextToolTip")
+            closeButton.toolTipText = messages.message("search.closeToolTip")
+            caseSensitiveToggle.toolTipText = messages.message("search.matchCaseToolTip")
+            for (control in arrayOf<JComponent>(queryField, counterLabel, previousButton, nextButton, closeButton, caseSensitiveToggle)) {
+                control.accessibleContext.accessibleName = control.toolTipText
+            }
             counterLabel.horizontalAlignment = SwingConstants.CENTER
             counterLabel.preferredSize =
                 Dimension(
-                    maxOf(COUNTER_LABEL_WIDTH, counterLabel.getFontMetrics(counterLabel.font).stringWidth("Searching…") + 8),
+                    maxOf(
+                        COUNTER_LABEL_WIDTH,
+                        counterLabel.getFontMetrics(counterLabel.font).stringWidth(searchingText) + 8,
+                        counterLabel.getFontMetrics(counterLabel.font).stringWidth(failedText) + 8,
+                        counterLabel.getFontMetrics(counterLabel.font).stringWidth(counterLabel.text) + 8,
+                    ),
                     COMMAND_BUTTON_HEIGHT,
                 )
             counterLabel.minimumSize = counterLabel.preferredSize
@@ -229,7 +245,7 @@ public class SwingTerminalSearchBar
             queryField.isOpaque = false
             queryField.foreground = colors.foreground
             queryField.caretColor = colors.foreground
-            queryField.border = BorderFactory.createEmptyBorder(4, 34, 4, 48)
+            queryField.border = BorderFactory.createEmptyBorder(4, 34, 4, caseSensitiveToggle.preferredSize.width + 10)
             counterLabel.foreground = colors.counterForeground
             previousButton.foreground = colors.foreground
             nextButton.foreground = colors.foreground
@@ -258,11 +274,31 @@ public class SwingTerminalSearchBar
             val state = terminal.currentSearchState()
             counterLabel.text =
                 when {
-                    state.failure != null -> "Failed"
-                    state.isSearching -> "Searching…"
-                    state.resultCount == 0 -> "0/0"
-                    else -> "${state.activeResultIndex + 1}/${state.resultCount}"
+                    state.failure != null -> failedText
+                    state.isSearching -> searchingText
+                    else ->
+                        messages.message(
+                            "search.matchCounter",
+                            if (state.resultCount ==
+                                0
+                            ) {
+                                0
+                            } else {
+                                state.activeResultIndex + 1
+                            },
+                            state.resultCount,
+                        )
                 }
+            counterLabel.accessibleContext.accessibleDescription = counterLabel.text
+            val width =
+                maxOf(
+                    counterLabel.minimumSize.width,
+                    counterLabel.getFontMetrics(counterLabel.font).stringWidth(counterLabel.text) + 8,
+                )
+            if (width != counterLabel.preferredSize.width) {
+                counterLabel.preferredSize = Dimension(width, COMMAND_BUTTON_HEIGHT)
+                revalidateHost()
+            }
         }
 
         private fun revalidateHost() {
@@ -375,7 +411,8 @@ public class SwingTerminalSearchBar
                 addMouseListener(RepaintOnHoverListener)
             }
 
-            override fun getPreferredSize(): Dimension = Dimension(TOGGLE_BUTTON_WIDTH, COMMAND_BUTTON_HEIGHT)
+            override fun getPreferredSize(): Dimension =
+                Dimension(maxOf(TOGGLE_BUTTON_WIDTH, getFontMetrics(font).stringWidth(text) + 12), COMMAND_BUTTON_HEIGHT)
 
             override fun getMinimumSize(): Dimension = preferredSize
 
@@ -467,7 +504,7 @@ public class SwingTerminalSearchBar
                         g.font = font
                         val metrics = g.fontMetrics
                         val y = ((height - metrics.height) / 2) + metrics.ascent
-                        g.drawString("Search", 34, y)
+                        g.drawString(placeholder, 34, y)
                     }
                 } finally {
                     g.dispose()

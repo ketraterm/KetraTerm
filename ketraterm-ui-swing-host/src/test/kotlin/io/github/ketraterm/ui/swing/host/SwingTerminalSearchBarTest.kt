@@ -26,10 +26,8 @@ import java.awt.Color
 import java.awt.Component
 import java.awt.Container
 import java.awt.image.BufferedImage
-import javax.swing.JComponent
-import javax.swing.JLabel
-import javax.swing.JTextField
-import javax.swing.SwingUtilities
+import java.util.*
+import javax.swing.*
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -37,6 +35,57 @@ import kotlin.test.assertTrue
 import kotlin.time.Duration.Companion.milliseconds
 
 class SwingTerminalSearchBarTest {
+    @Test
+    fun localizedChromeUsesHostLabelsAndFitsLongStatusAndToggleText() {
+        val words =
+            SwingHostMessages.forLocale(
+                Locale.FRENCH,
+                ResourceBundle.getBundle("io.github.ketraterm.ui.swing.host.LocalizedTerminalMessages", Locale.FRENCH),
+            )
+        SwingUtilities.invokeAndWait {
+            val terminal = SwingTerminal()
+            val bar = SwingTerminalSearchBar(terminal, words)
+
+            fun descendants(component: Component): List<Component> =
+                listOf(component) + if (component is Container) component.components.flatMap(::descendants) else emptyList()
+            try {
+                val controls = descendants(bar.component).filterIsInstance<JComponent>()
+                val field = controls.filterIsInstance<JTextField>().single()
+                val counter = controls.filterIsInstance<JLabel>().single()
+                val toggle = controls.filterIsInstance<JToggleButton>().single()
+                assertEquals("Rechercher dans le terminal", field.toolTipText)
+                assertEquals("Rechercher dans le terminal", field.accessibleContext.accessibleName)
+                assertEquals("Majuscules", toggle.text)
+                assertTrue(toggle.preferredSize.width > toggle.getFontMetrics(toggle.font).stringWidth(toggle.text))
+                assertTrue(
+                    counter.preferredSize.width > counter.getFontMetrics(counter.font).stringWidth(words.message("search.searching")),
+                )
+                assertEquals(
+                    setOf(
+                        "Rechercher dans le terminal",
+                        "Résultat actif et nombre total",
+                        "Résultat précédent",
+                        "Résultat suivant",
+                        "Fermer la recherche",
+                        "Respecter la casse",
+                    ),
+                    controls.mapNotNull { it.toolTipText }.toSet(),
+                )
+                bar.open()
+                assertEquals("0 résultats ; actif 0", counter.text)
+                field.text = "requête conservée"
+                bar.refreshColors()
+                assertEquals("requête conservée", field.text)
+                bar.close()
+                bar.open()
+                assertEquals("0 résultats ; actif 0", counter.text)
+            } finally {
+                bar.close()
+                terminal.dispose()
+            }
+        }
+    }
+
     @Test
     fun offEdtColorRefreshIsOrderedAndSurvivesReopening() {
         lateinit var terminal: SwingTerminal

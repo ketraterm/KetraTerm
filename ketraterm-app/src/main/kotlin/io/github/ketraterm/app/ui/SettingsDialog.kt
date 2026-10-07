@@ -15,6 +15,7 @@
  */
 package io.github.ketraterm.app.ui
 
+import io.github.ketraterm.app.appMessages
 import io.github.ketraterm.app.config.KetraTermConfig
 import io.github.ketraterm.app.config.KetraTermSettings
 import io.github.ketraterm.host.TerminalClipboardPermission
@@ -44,7 +45,7 @@ internal class SettingsDialog(
     parent: JFrame,
     private val settings: KetraTermSettings,
     profileRegistry: TerminalProfileRegistry,
-) : JDialog(parent, "Terminal Settings", true) {
+) : JDialog(parent, appMessages.text("settings.title"), true) {
     private val cardLayout = CardLayout()
 
     // Opaque panel is critical for CardLayout to clear previous artifacts correctly
@@ -63,7 +64,7 @@ internal class SettingsDialog(
         }
 
     private val categories = mutableListOf<CategoryLabel>()
-    private val applyButton = JButton("Apply")
+    private val applyButton = JButton(appMessages.text("button.apply"))
     private val model = SettingsModel(settings, profileRegistry)
     private var saving = false
 
@@ -110,8 +111,8 @@ internal class SettingsDialog(
     private val shellPathCombo =
         JComboBox<Any>().apply {
             availableProfiles.forEach { addItem(it) }
-            addItem("Custom...")
-            selectedItem = matchedProfile ?: "Custom..."
+            addItem(appMessages.text("settings.custom"))
+            selectedItem = matchedProfile ?: appMessages.text("settings.custom")
             renderer =
                 object : DefaultListCellRenderer() {
                     private val profileIcons = ProfileIcons()
@@ -130,7 +131,7 @@ internal class SettingsDialog(
                             label.icon = profileIcons.icon(value.kind)
                         } else if (value is String) {
                             label.text = value
-                            if (value == "Custom...") {
+                            if (value == appMessages.text("settings.custom")) {
                                 label.icon = profileIcons.icon(TerminalProfileKind.DEFAULT)
                             } else {
                                 label.icon = null
@@ -145,10 +146,10 @@ internal class SettingsDialog(
     private val startDirectoryField = createTextField(settings.config.startDirectory, 140) // Will be wrapped with button
     private val startupCommandField =
         createTextField(settings.config.startupCommand, 140).apply {
-            toolTipText = "Run once when a new shell is ready. Requires PowerShell, Bash, zsh, or fish. Leave blank to disable."
+            toolTipText = appMessages.text("settings.startup.tooltip")
         }
-    private val audibleBellCheckbox = JCheckBox("Audible bell", settings.config.audibleBell)
-    private val visualBellCheckbox = JCheckBox("Visual bell", settings.config.visualBell)
+    private val audibleBellCheckbox = JCheckBox(appMessages.text("settings.audibleBell"), settings.config.audibleBell)
+    private val visualBellCheckbox = JCheckBox(appMessages.text("settings.visualBell"), settings.config.visualBell)
 
     // Form Controls - Appearance
     private val fontFamilyCombo =
@@ -182,7 +183,7 @@ internal class SettingsDialog(
             settings.config.promptDecoration,
             150,
         ).apply {
-            toolTipText = "Choose how shell prompts are separated. Applies to the main screen."
+            toolTipText = appMessages.text("settings.prompt.tooltip")
             renderer =
                 object : DefaultListCellRenderer() {
                     override fun getListCellRendererComponent(
@@ -194,31 +195,33 @@ internal class SettingsDialog(
                     ): Component =
                         super.getListCellRendererComponent(list, value, index, isSelected, cellHasFocus).also {
                             text =
-                                (value as? SwingPromptDecoration)
-                                    ?.name
-                                    ?.lowercase(Locale.ROOT)
-                                    ?.replaceFirstChar(Char::titlecase)
-                                    .orEmpty()
+                                when (value) {
+                                    SwingPromptDecoration.GUTTER -> appMessages.text("settings.prompt.gutter")
+                                    SwingPromptDecoration.DIVIDER -> appMessages.text("settings.prompt.divider")
+                                    SwingPromptDecoration.NONE -> appMessages.text("settings.prompt.none")
+                                    else -> ""
+                                }
                         }
                 }
         }
     private val themeCombo = createComboBox(TerminalTheme.entries.toTypedArray(), settings.theme, 220)
 
     // Form Controls - Behavior
-    private val treatAmbiguousCheckbox = JCheckBox("Treat East Asian ambiguous characters as wide", settings.config.treatAmbiguousAsWide)
-    private val useSystemFallbackCheckbox = JCheckBox("Use system font fallback for missing glyphs", settings.config.useSystemFallbackFonts)
-    private val pasteOnMiddleClickCheckbox = JCheckBox("Paste on middle mouse button click", settings.config.pasteOnMiddleClick)
+    private val treatAmbiguousCheckbox = JCheckBox(appMessages.text("settings.ambiguousWidth"), settings.config.treatAmbiguousAsWide)
+    private val useSystemFallbackCheckbox = JCheckBox(appMessages.text("settings.fontFallback"), settings.config.useSystemFallbackFonts)
+    private val pasteOnMiddleClickCheckbox = JCheckBox(appMessages.text("settings.middleClickPaste"), settings.config.pasteOnMiddleClick)
     private val pasteSanitizationCombo =
         createComboBox(
             PASTE_SANITIZATION_OPTIONS.toTypedArray(),
             PASTE_SANITIZATION_OPTIONS.first { it.policy == settings.config.pasteControlPolicy },
             220,
         ).apply {
-            toolTipText = "Both choices protect bracketed paste. Removing controls keeps tabs and line breaks."
+            toolTipText = appMessages.text("settings.paste.tooltip")
         }
-    private val shellRequestResizeWindowCheckbox = JCheckBox("Allow window resize from shell", settings.config.shellRequestResizeWindow)
+    private val shellRequestResizeWindowCheckbox =
+        JCheckBox(appMessages.text("settings.allowResize"), settings.config.shellRequestResizeWindow)
     private val shellRequestWindowManipulationCheckbox =
-        JCheckBox("Allow window manipulation from shell", settings.config.shellRequestWindowManipulation)
+        JCheckBox(appMessages.text("settings.allowWindowManipulation"), settings.config.shellRequestWindowManipulation)
 
     // TODO(host/profile): SUGGESTION_SETTINGS: Uncomment all matching blocks in this file together
     // when restoring the controls; see docs/terminal-feature-gap-map.md. Keep the master default off.
@@ -230,20 +233,40 @@ internal class SettingsDialog(
     //     JCheckBox("Accept selected suggestion with Enter", settings.config.acceptSelectedSuggestionWithEnter)
     // private val persistentSuggestionLearningCheckbox =
     //     JCheckBox("Persist suggestion learning", settings.config.persistentSuggestionLearningEnabled)
-    private val scrollOnOutputCheckbox = JCheckBox("Scroll on output", settings.config.scrollOnOutput)
+    private val scrollOnOutputCheckbox = JCheckBox(appMessages.text("settings.scrollOnOutput"), settings.config.scrollOnOutput)
     private val showForegroundProcessNameCheckbox =
-        JCheckBox("Show running process in tab titles", settings.config.showForegroundProcessName)
+        JCheckBox(appMessages.text("settings.processTitle"), settings.config.showForegroundProcessName)
     private val cursorBlinkSpinner =
         createSpinner(settings.config.cursorBlinkMillis, KetraTermConfig.CURSOR_BLINK_MIN, KetraTermConfig.CURSOR_BLINK_MAX, 50, 70)
     private val cursorShapeCombo =
-        createComboBox(arrayOf("block", "underline", "beam"), settings.config.cursorShape.lowercase(Locale.ROOT), 150)
+        createComboBox(arrayOf("block", "underline", "beam"), settings.config.cursorShape.lowercase(Locale.ROOT), 150).apply {
+            renderer =
+                object : DefaultListCellRenderer() {
+                    override fun getListCellRendererComponent(
+                        list: JList<*>?,
+                        value: Any?,
+                        index: Int,
+                        isSelected: Boolean,
+                        cellHasFocus: Boolean,
+                    ): Component =
+                        super.getListCellRendererComponent(list, value, index, isSelected, cellHasFocus).also {
+                            text =
+                                when (value) {
+                                    "block" -> appMessages.text("settings.cursor.block")
+                                    "underline" -> appMessages.text("settings.cursor.underline")
+                                    "beam" -> appMessages.text("settings.cursor.beam")
+                                    else -> ""
+                                }
+                        }
+                }
+        }
 
     // Form Controls - Security
     private val clipboardWriteCombo = createClipboardPermissionCombo(settings.config.clipboardWrite)
     private val clipboardReadCombo = createClipboardPermissionCombo(settings.config.clipboardRead)
     private val clipboardMaxDecodedBytesSpinner = createSpinner(settings.config.clipboardMaxDecodedBytes, 0, Int.MAX_VALUE, 1024, 150)
     private val titlePermissionCheckbox =
-        JCheckBox("Allow applications to rename window/tab", settings.config.titlePermission == TerminalTitlePermission.ALLOW)
+        JCheckBox(appMessages.text("settings.allowTitle"), settings.config.titlePermission == TerminalTitlePermission.ALLOW)
 
     init {
         size = Dimension(820, 600)
@@ -274,12 +297,12 @@ internal class SettingsDialog(
         add(buildFooterPanel(), BorderLayout.SOUTH)
 
         // Add Pages
-        addPage("General", buildGeneralPanel())
-        addPage("Appearance", buildAppearancePanel())
-        addPage("Behavior", buildBehaviorPanel())
-        addPage("Security", buildSecurityPanel())
+        addPage("settings.general", buildGeneralPanel())
+        addPage("settings.appearance", buildAppearancePanel())
+        addPage("settings.behavior", buildBehaviorPanel())
+        addPage("settings.security", buildSecurityPanel())
 
-        selectCategory(categories.first().categoryName)
+        selectCategory(categories.first().categoryId)
 
         updateApplyButtonState()
 
@@ -320,6 +343,12 @@ internal class SettingsDialog(
         registerChangeListener(cursorBlinkSpinner, updateApplyState)
         registerChangeListener(cursorShapeCombo, updateApplyState)
         registerChangeListener(promptDecorationCombo, updateApplyState)
+        sidebarPanel.preferredSize =
+            Dimension(maxOf(180, sidebarPanel.minimumSize.width), sidebarPanel.preferredSize.height)
+        pack()
+        size = Dimension(maxOf(820, width), 600)
+        minimumSize = size
+        setLocationRelativeTo(parent)
     }
 
     private fun applySizing(
@@ -329,11 +358,19 @@ internal class SettingsDialog(
         component.preferredSize = Dimension(width, 26)
     }
 
+    private fun applyMinimumSizing(
+        component: JComponent,
+        width: Int,
+    ) {
+        val naturalSize = component.preferredSize
+        component.preferredSize = Dimension(maxOf(width, naturalSize.width), maxOf(26, naturalSize.height))
+    }
+
     private fun addPage(
-        title: String,
+        categoryId: String,
         panel: JPanel,
     ) {
-        val categoryLabel = CategoryLabel(title)
+        val categoryLabel = CategoryLabel(categoryId)
         categories.add(categoryLabel)
         sidebarPanel.add(categoryLabel)
 
@@ -346,20 +383,20 @@ internal class SettingsDialog(
                 add(panel, BorderLayout.NORTH)
             }
 
-        cardPanel.add(contentContainer, title)
+        cardPanel.add(contentContainer, categoryId)
 
         categoryLabel.addMouseListener(
             object : MouseAdapter() {
                 override fun mouseClicked(e: MouseEvent?) {
-                    selectCategory(title)
+                    selectCategory(categoryId)
                 }
             },
         )
     }
 
-    private fun selectCategory(title: String) {
-        categories.forEach { it.updateState(it.categoryName == title) }
-        cardLayout.show(cardPanel, title)
+    private fun selectCategory(categoryId: String) {
+        categories.forEach { it.updateState(it.categoryId == categoryId) }
+        cardLayout.show(cardPanel, categoryId)
     }
 
     private fun buildGeneralPanel(): JPanel {
@@ -369,17 +406,17 @@ internal class SettingsDialog(
                 isOpaque = false
             }
 
-        panel.add(SectionHeader("Shell & Session"))
+        panel.add(SectionHeader(appMessages.text("settings.shellSession")))
         val projectSection = createSectionPanel()
-        addFormRow(projectSection, 0, "Default shell:", shellPathCombo)
+        addFormRow(projectSection, 0, appMessages.text("settings.defaultShell"), shellPathCombo)
 
         val customShellWrapper =
             JPanel(BorderLayout(8, 0)).apply {
                 isOpaque = false
                 add(customShellField, BorderLayout.CENTER)
                 val browseBtn =
-                    JButton("Browse...").apply {
-                        preferredSize = Dimension(72, 26)
+                    JButton(appMessages.text("button.browse")).apply {
+                        applyMinimumSizing(this, 72)
                         addActionListener {
                             val chooser =
                                 JFileChooser(customShellField.text).apply {
@@ -392,13 +429,13 @@ internal class SettingsDialog(
                     }
                 add(browseBtn, BorderLayout.EAST)
             }
-        val customShellLabel = addFormRow(projectSection, 1, "Custom path:", customShellWrapper)
+        val customShellLabel = addFormRow(projectSection, 1, appMessages.text("settings.customPath"), customShellWrapper)
         customShellLabel.isVisible = isCustomShell
         customShellWrapper.isVisible = isCustomShell
 
         shellPathCombo.addItemListener { e ->
             if (e.stateChange == java.awt.event.ItemEvent.SELECTED) {
-                val isCustom = e.item == "Custom..."
+                val isCustom = e.item == appMessages.text("settings.custom")
                 customShellLabel.isVisible = isCustom
                 customShellWrapper.isVisible = isCustom
                 projectSection.revalidate()
@@ -411,8 +448,8 @@ internal class SettingsDialog(
                 isOpaque = false
                 add(startDirectoryField, BorderLayout.CENTER)
                 val browseBtn =
-                    JButton("Browse...").apply {
-                        preferredSize = Dimension(72, 26)
+                    JButton(appMessages.text("button.browse")).apply {
+                        applyMinimumSizing(this, 72)
                         addActionListener {
                             val chooser =
                                 JFileChooser(startDirectoryField.text).apply {
@@ -425,23 +462,23 @@ internal class SettingsDialog(
                     }
                 add(browseBtn, BorderLayout.EAST)
             }
-        addFormRow(projectSection, 2, "Start directory:", startDirWrapper)
-        addFormRow(projectSection, 3, "Startup command:", startupCommandField)
+        addFormRow(projectSection, 2, appMessages.text("settings.startDirectory"), startDirWrapper)
+        addFormRow(projectSection, 3, appMessages.text("settings.startupCommand"), startupCommandField)
         panel.add(projectSection)
 
-        panel.add(SectionHeader("Terminal Bells"))
+        panel.add(SectionHeader(appMessages.text("settings.bells")))
         val appSection = createSectionPanel()
         addCheckboxRow(
             appSection,
             0,
             audibleBellCheckbox,
-            "Play an alert sound when the terminal triggers the bell sequence (ASCII BEL).",
+            appMessages.text("settings.audibleBell.description"),
         )
         addCheckboxRow(
             appSection,
             2,
             visualBellCheckbox,
-            "Flash the screen or window when the terminal triggers the bell sequence.",
+            appMessages.text("settings.visualBell.description"),
         )
         panel.add(appSection)
 
@@ -455,9 +492,9 @@ internal class SettingsDialog(
                 isOpaque = false
             }
 
-        panel.add(SectionHeader("Typography & Theme"))
+        panel.add(SectionHeader(appMessages.text("settings.typography")))
         val typoSection = createSectionPanel()
-        addFormRow(typoSection, 0, "Font family:", fontFamilyCombo)
+        addFormRow(typoSection, 0, appMessages.text("settings.fontFamily"), fontFamilyCombo)
 
         val fontGridWrapper =
             JPanel(FlowLayout(FlowLayout.LEFT, 0, 0)).apply {
@@ -465,7 +502,7 @@ internal class SettingsDialog(
                 add(fontSizeSpinner)
                 add(Box.createHorizontalStrut(24))
                 add(
-                    JLabel("Line height:").apply {
+                    JLabel(appMessages.text("settings.lineHeight")).apply {
                         foreground = Chrome.textPrimary
                         font = font.deriveFont(Font.PLAIN, 13f)
                         border = EmptyBorder(0, 0, 0, 12)
@@ -473,24 +510,24 @@ internal class SettingsDialog(
                 )
                 add(lineHeightSpinner)
             }
-        addFormRow(typoSection, 1, "Font size:", fontGridWrapper)
+        addFormRow(typoSection, 1, appMessages.text("settings.fontSize"), fontGridWrapper)
 
-        addFormRow(typoSection, 2, "Color theme:", themeCombo)
+        addFormRow(typoSection, 2, appMessages.text("settings.colorTheme"), themeCombo)
         addCheckboxRow(
             typoSection,
             3,
             useSystemFallbackCheckbox,
-            "Query the system catalog to resolve characters and symbols missing in the primary typeface.",
+            appMessages.text("settings.fontFallback.description"),
         )
         panel.add(typoSection)
 
-        panel.add(SectionHeader("Cursor Settings"))
+        panel.add(SectionHeader(appMessages.text("settings.cursor")))
         val cursorSection = createSectionPanel()
-        addFormRow(cursorSection, 0, "Cursor shape:", cursorShapeCombo)
-        addFormRow(cursorSection, 1, "Blink period (ms):", cursorBlinkSpinner)
+        addFormRow(cursorSection, 0, appMessages.text("settings.cursorShape"), cursorShapeCombo)
+        addFormRow(cursorSection, 1, appMessages.text("settings.cursorBlink"), cursorBlinkSpinner)
         panel.add(cursorSection)
 
-        panel.add(SectionHeader("Layout & Scrollback"))
+        panel.add(SectionHeader(appMessages.text("settings.layout")))
         val windowSection = createSectionPanel()
 
         val layoutGridWrapper =
@@ -499,7 +536,7 @@ internal class SettingsDialog(
                 add(columnsSpinner)
                 add(Box.createHorizontalStrut(24))
                 add(
-                    JLabel("Rows:").apply {
+                    JLabel(appMessages.text("settings.rows")).apply {
                         foreground = Chrome.textPrimary
                         font = font.deriveFont(Font.PLAIN, 13f)
                         border = EmptyBorder(0, 0, 0, 12)
@@ -507,9 +544,9 @@ internal class SettingsDialog(
                 )
                 add(rowsSpinner)
             }
-        addFormRow(windowSection, 0, "Columns:", layoutGridWrapper)
-        addFormRow(windowSection, 1, "Scrollback lines (new sessions):", scrollbackSpinner)
-        addFormRow(windowSection, 2, "Prompt style:", promptDecorationCombo)
+        addFormRow(windowSection, 0, appMessages.text("settings.columns"), layoutGridWrapper)
+        addFormRow(windowSection, 1, appMessages.text("settings.scrollback"), scrollbackSpinner)
+        addFormRow(windowSection, 2, appMessages.text("settings.promptStyle"), promptDecorationCombo)
         panel.add(windowSection)
 
         return panel
@@ -522,13 +559,13 @@ internal class SettingsDialog(
                 isOpaque = false
             }
 
-        panel.add(SectionHeader("Input & Keyboard"))
+        panel.add(SectionHeader(appMessages.text("settings.input")))
         val keyboardSection = createSectionPanel()
         addCheckboxRow(
             keyboardSection,
             0,
             treatAmbiguousCheckbox,
-            "Render East Asian ambiguous characters (e.g. smart quotes, emojis) with double cell width.",
+            appMessages.text("settings.ambiguousWidth.description"),
         )
         panel.add(keyboardSection)
 
@@ -552,33 +589,33 @@ internal class SettingsDialog(
         // panel.add(suggestionsSection)
         // TODO(host/profile): Reconnect the host learning-reset callback before restoring its confirmation button.
 
-        panel.add(SectionHeader("Mouse"))
+        panel.add(SectionHeader(appMessages.text("settings.mouse")))
         val mouseSection = createSectionPanel()
         addCheckboxRow(
             mouseSection,
             0,
             pasteOnMiddleClickCheckbox,
-            "Insert the system clipboard content when clicking the middle mouse button.",
+            appMessages.text("settings.middleClickPaste.description"),
         )
         panel.add(mouseSection)
 
-        panel.add(SectionHeader("Scrolling"))
+        panel.add(SectionHeader(appMessages.text("settings.scrolling")))
         val scrollingSection = createSectionPanel()
         addCheckboxRow(
             scrollingSection,
             0,
             scrollOnOutputCheckbox,
-            "Automatically scroll to the bottom when new process output is received.",
+            appMessages.text("settings.scrollOnOutput.description"),
         )
         panel.add(scrollingSection)
 
-        panel.add(SectionHeader("Tab titles"))
+        panel.add(SectionHeader(appMessages.text("settings.tabTitles")))
         val titleSection = createSectionPanel()
         addCheckboxRow(
             titleSection,
             0,
             showForegroundProcessNameCheckbox,
-            "Use the detected process name when an app does not report a title. Custom names take priority.",
+            appMessages.text("settings.processTitle.description"),
         )
         panel.add(titleSection)
 
@@ -602,7 +639,7 @@ internal class SettingsDialog(
             JLabel(labelText).apply {
                 foreground = Chrome.textPrimary
                 font = font.deriveFont(Font.PLAIN, 13f)
-                preferredSize = Dimension(190, 26)
+                applyMinimumSizing(this, 190)
             }
 
         val gbc =
@@ -674,41 +711,41 @@ internal class SettingsDialog(
                 isOpaque = false
             }
 
-        panel.add(SectionHeader("Clipboard Safety (OSC 52)"))
+        panel.add(SectionHeader(appMessages.text("settings.clipboard")))
         val clipboardSection = createSectionPanel()
-        addFormRow(clipboardSection, 0, "Write permission:", clipboardWriteCombo)
-        addFormRow(clipboardSection, 1, "Read / Query permission:", clipboardReadCombo)
-        addFormRow(clipboardSection, 2, "Max decoded size (bytes):", clipboardMaxDecodedBytesSpinner)
+        addFormRow(clipboardSection, 0, appMessages.text("settings.clipboardWrite"), clipboardWriteCombo)
+        addFormRow(clipboardSection, 1, appMessages.text("settings.clipboardRead"), clipboardReadCombo)
+        addFormRow(clipboardSection, 2, appMessages.text("settings.clipboardLimit"), clipboardMaxDecodedBytesSpinner)
         panel.add(clipboardSection)
 
-        panel.add(SectionHeader("Paste Safety"))
+        panel.add(SectionHeader(appMessages.text("settings.paste")))
         val pasteSection = createSectionPanel()
-        addFormRow(pasteSection, 0, "Paste handling:", pasteSanitizationCombo)
+        addFormRow(pasteSection, 0, appMessages.text("settings.pasteHandling"), pasteSanitizationCombo)
         panel.add(pasteSection)
 
-        panel.add(SectionHeader("Window Security"))
+        panel.add(SectionHeader(appMessages.text("settings.windowSecurity")))
         val windowSection = createSectionPanel()
         addCheckboxRow(
             windowSection,
             0,
             shellRequestResizeWindowCheckbox,
-            "Allow applications to resize a normal window with one visible pane, including switching between 80 and 132 columns.",
+            appMessages.text("settings.allowResize.description"),
         )
         addCheckboxRow(
             windowSection,
             2,
             shellRequestWindowManipulationCheckbox,
-            "Allow the shell to move, minimize, maximize, raise, or lower the terminal window.",
+            appMessages.text("settings.allowWindowManipulation.description"),
         )
         panel.add(windowSection)
 
-        panel.add(SectionHeader("Title Safety (OSC 0/1/2)"))
+        panel.add(SectionHeader(appMessages.text("settings.titleSecurity")))
         val titleSection = createSectionPanel()
         addCheckboxRow(
             titleSection,
             0,
             titlePermissionCheckbox,
-            "Applies to all applications in the session, including applications running through SSH.",
+            appMessages.text("settings.allowTitle.description"),
         )
         panel.add(titleSection)
 
@@ -731,18 +768,18 @@ internal class SettingsDialog(
                 }
 
             val resetButton =
-                JButton("Reset to Defaults").apply {
+                JButton(appMessages.text("button.resetDefaults")).apply {
                     addActionListener { resetToDefaults() }
                 }
             leftPanel.add(resetButton)
 
             val okButton =
-                JButton("OK").apply {
+                JButton(appMessages.text("button.ok")).apply {
                     addActionListener { applyChanges(closeAfterSave = true) }
                 }
 
             val cancelButton =
-                JButton("Cancel").apply {
+                JButton(appMessages.text("button.cancel")).apply {
                     addActionListener { dispose() }
                 }
 
@@ -761,7 +798,7 @@ internal class SettingsDialog(
 
     private fun selectShell(shellPath: String) {
         val profile = findProfile(shellPath)
-        shellPathCombo.selectedItem = profile ?: "Custom..."
+        shellPathCombo.selectedItem = profile ?: appMessages.text("settings.custom")
         customShellField.text = if (profile == null) shellPath else ""
     }
 
@@ -811,10 +848,19 @@ internal class SettingsDialog(
         val uiState = getUiState()
         try {
             TerminalStartupCommand.fromText(uiState.startupCommand)
-        } catch (exception: IllegalArgumentException) {
+        } catch (_: IllegalArgumentException) {
             SwingMessageDialogs.show(
                 this,
-                SwingDialogRequest("Invalid Startup Command", exception.message.orEmpty(), SwingDialogRequest.Severity.ERROR),
+                SwingDialogRequest(
+                    appMessages.text("settings.startup.invalidTitle"),
+                    if (uiState.startupCommand.length > TerminalStartupCommand.MAX_LENGTH) {
+                        appMessages.text("settings.startup.invalidLength", TerminalStartupCommand.MAX_LENGTH)
+                    } else {
+                        appMessages.text("settings.startup.invalid")
+                    },
+                    SwingDialogRequest.Severity.ERROR,
+                    options = listOf(appMessages.text("button.ok")),
+                ),
             )
             return
         }
@@ -841,9 +887,10 @@ internal class SettingsDialog(
                     SwingMessageDialogs.show(
                         this@SettingsDialog,
                         SwingDialogRequest(
-                            "Unable to Save Settings",
-                            "Your changes could not be saved.\n${cause.message ?: cause.javaClass.simpleName}",
+                            appMessages.text("settings.save.errorTitle"),
+                            appMessages.text("settings.save.error", cause.message ?: cause.javaClass.simpleName),
                             SwingDialogRequest.Severity.ERROR,
+                            options = listOf(appMessages.text("button.ok")),
                         ),
                     )
                 }
@@ -956,13 +1003,13 @@ internal class SettingsDialog(
     }
 
     private inner class CategoryLabel(
-        val categoryName: String,
+        val categoryId: String,
     ) : JPanel() {
         private var selected = false
         private var hovered = false
 
         private val nameLabel =
-            JLabel(categoryName).apply {
+            JLabel(appMessages.text(categoryId)).apply {
                 font = font.deriveFont(Font.PLAIN, 13f)
                 foreground = Chrome.textPrimary
                 border = EmptyBorder(0, 12, 0, 0)
@@ -1033,9 +1080,9 @@ private fun createClipboardPermissionCombo(current: TerminalClipboardPermission)
                     super.getListCellRendererComponent(list, value, index, isSelected, cellHasFocus).also {
                         text =
                             when (value) {
-                                TerminalClipboardPermission.DENY -> "Deny"
-                                TerminalClipboardPermission.PROMPT -> "Ask"
-                                TerminalClipboardPermission.ALLOW -> "Allow"
+                                TerminalClipboardPermission.DENY -> appMessages.text("permission.deny")
+                                TerminalClipboardPermission.PROMPT -> appMessages.text("permission.ask")
+                                TerminalClipboardPermission.ALLOW -> appMessages.text("permission.allow")
                                 else -> ""
                             }
                     }
@@ -1044,9 +1091,9 @@ private fun createClipboardPermissionCombo(current: TerminalClipboardPermission)
 
 private val PASTE_SANITIZATION_OPTIONS =
     listOf(
-        PasteSanitizationOption("Preserve text", io.github.ketraterm.input.policy.PasteControlPolicy.PRESERVE),
+        PasteSanitizationOption(appMessages.text("settings.paste.preserve"), io.github.ketraterm.input.policy.PasteControlPolicy.PRESERVE),
         PasteSanitizationOption(
-            "Remove control characters",
+            appMessages.text("settings.paste.stripControls"),
             io.github.ketraterm.input.policy.PasteControlPolicy.STRIP_C0_EXCEPT_TAB_CR_LF,
         ),
     )

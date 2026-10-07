@@ -31,6 +31,9 @@ internal fun appendLearnedHistoryCandidates(
     index: LearnedHistoryCandidateIndex,
     nowEpochMillis: Long,
     destination: MutableList<TerminalCompletionCandidate>,
+    commandDetail: String,
+    directoryDetail: String,
+    pathDetail: String,
 ) {
     val requestContext = CompletionLearningContextKey.from(request)
     for (indexed in index.matching(lineContext, requestContext)) {
@@ -42,7 +45,9 @@ internal fun appendLearnedHistoryCandidates(
             learnedCommand = indexed.replay.commandLine,
             source = SOURCE_LEARNED,
             score = entry.localScore(nowEpochMillis),
-            detailPrefix = "learned",
+            commandDetail = commandDetail,
+            directoryDetail = directoryDetail,
+            pathDetail = pathDetail,
             learnedLine = indexed.lineContext,
         )?.let(destination::add)
     }

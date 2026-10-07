@@ -2,14 +2,21 @@ public final class io/github/ketraterm/ui/swing/host/SwingClipboardPrompts {
 	public static final field INSTANCE Lio/github/ketraterm/ui/swing/host/SwingClipboardPrompts;
 	public static final field TITLE Ljava/lang/String;
 	public final fun readQuestion (Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;
+	public final fun readQuestion (Ljava/lang/String;Ljava/lang/String;Lio/github/ketraterm/ui/swing/host/SwingHostMessages;)Ljava/lang/String;
 	public static synthetic fun readQuestion$default (Lio/github/ketraterm/ui/swing/host/SwingClipboardPrompts;Ljava/lang/String;Ljava/lang/String;ILjava/lang/Object;)Ljava/lang/String;
+	public static synthetic fun readQuestion$default (Lio/github/ketraterm/ui/swing/host/SwingClipboardPrompts;Ljava/lang/String;Ljava/lang/String;Lio/github/ketraterm/ui/swing/host/SwingHostMessages;ILjava/lang/Object;)Ljava/lang/String;
 	public final fun writeConfirmation (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)Lio/github/ketraterm/ui/swing/host/SwingDialogRequest;
+	public final fun writeConfirmation (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Lio/github/ketraterm/ui/swing/host/SwingHostMessages;)Lio/github/ketraterm/ui/swing/host/SwingDialogRequest;
 	public static synthetic fun writeConfirmation$default (Lio/github/ketraterm/ui/swing/host/SwingClipboardPrompts;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;ILjava/lang/Object;)Lio/github/ketraterm/ui/swing/host/SwingDialogRequest;
+	public static synthetic fun writeConfirmation$default (Lio/github/ketraterm/ui/swing/host/SwingClipboardPrompts;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Lio/github/ketraterm/ui/swing/host/SwingHostMessages;ILjava/lang/Object;)Lio/github/ketraterm/ui/swing/host/SwingDialogRequest;
 	public final fun writeQuestion (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;
+	public final fun writeQuestion (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Lio/github/ketraterm/ui/swing/host/SwingHostMessages;)Ljava/lang/String;
 	public static synthetic fun writeQuestion$default (Lio/github/ketraterm/ui/swing/host/SwingClipboardPrompts;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;ILjava/lang/Object;)Ljava/lang/String;
+	public static synthetic fun writeQuestion$default (Lio/github/ketraterm/ui/swing/host/SwingClipboardPrompts;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Lio/github/ketraterm/ui/swing/host/SwingHostMessages;ILjava/lang/Object;)Ljava/lang/String;
 }
 
 public final class io/github/ketraterm/ui/swing/host/SwingClipboardReadPrompt : java/lang/AutoCloseable {
+	public fun <init> (Lio/github/ketraterm/ui/swing/host/SwingHostMessages;Lkotlin/jvm/functions/Function2;)V
 	public fun <init> (Lkotlin/jvm/functions/Function2;)V
 	public fun close ()V
 	public final fun dismiss ()Z
@@ -116,6 +123,21 @@ public final class io/github/ketraterm/ui/swing/host/SwingDialogRequest$Severity
 	public static fun values ()[Lio/github/ketraterm/ui/swing/host/SwingDialogRequest$Severity;
 }
 
+public abstract interface class io/github/ketraterm/ui/swing/host/SwingHostMessages {
+	public static final field Companion Lio/github/ketraterm/ui/swing/host/SwingHostMessages$Companion;
+	public static fun forLocale ()Lio/github/ketraterm/ui/swing/host/SwingHostMessages;
+	public static fun forLocale (Ljava/util/Locale;)Lio/github/ketraterm/ui/swing/host/SwingHostMessages;
+	public static fun forLocale (Ljava/util/Locale;Ljava/util/ResourceBundle;)Lio/github/ketraterm/ui/swing/host/SwingHostMessages;
+	public abstract fun message (Ljava/lang/String;[Ljava/lang/Object;)Ljava/lang/String;
+}
+
+public final class io/github/ketraterm/ui/swing/host/SwingHostMessages$Companion {
+	public final fun forLocale ()Lio/github/ketraterm/ui/swing/host/SwingHostMessages;
+	public final fun forLocale (Ljava/util/Locale;)Lio/github/ketraterm/ui/swing/host/SwingHostMessages;
+	public final fun forLocale (Ljava/util/Locale;Ljava/util/ResourceBundle;)Lio/github/ketraterm/ui/swing/host/SwingHostMessages;
+	public static synthetic fun forLocale$default (Lio/github/ketraterm/ui/swing/host/SwingHostMessages$Companion;Ljava/util/Locale;Ljava/util/ResourceBundle;ILjava/lang/Object;)Lio/github/ketraterm/ui/swing/host/SwingHostMessages;
+}
+
 public final class io/github/ketraterm/ui/swing/host/SwingLiveCompletionBinding : java/lang/AutoCloseable {
 	public fun <init> (Lio/github/ketraterm/session/TerminalSession;Lkotlinx/coroutines/CoroutineScope;Lkotlin/jvm/functions/Function0;Lkotlin/jvm/functions/Function0;Lio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionFeedbackHandler;)V
 	public synthetic fun <init> (Lio/github/ketraterm/session/TerminalSession;Lkotlinx/coroutines/CoroutineScope;Lkotlin/jvm/functions/Function0;Lkotlin/jvm/functions/Function0;Lio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionFeedbackHandler;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
@@ -142,6 +164,7 @@ public abstract interface class io/github/ketraterm/ui/swing/host/SwingShellSugg
 public final class io/github/ketraterm/ui/swing/host/SwingTerminalContextMenuItems {
 	public static final field INSTANCE Lio/github/ketraterm/ui/swing/host/SwingTerminalContextMenuItems;
 	public final fun addTerminalActions (Ljavax/swing/JPopupMenu;Lio/github/ketraterm/ui/swing/api/SwingTerminalContextMenuRequest;Lkotlin/jvm/functions/Function0;)Z
+	public final fun addTerminalActions (Ljavax/swing/JPopupMenu;Lio/github/ketraterm/ui/swing/api/SwingTerminalContextMenuRequest;Lkotlin/jvm/functions/Function0;Lio/github/ketraterm/ui/swing/host/SwingHostMessages;)Z
 }
 
 public final class io/github/ketraterm/ui/swing/host/SwingTerminalHostAction : java/lang/Enum {
@@ -197,6 +220,7 @@ public final class io/github/ketraterm/ui/swing/host/SwingTerminalOverlayPane : 
 
 public final class io/github/ketraterm/ui/swing/host/SwingTerminalSearchBar {
 	public fun <init> (Lio/github/ketraterm/ui/swing/api/SwingTerminal;)V
+	public fun <init> (Lio/github/ketraterm/ui/swing/api/SwingTerminal;Lio/github/ketraterm/ui/swing/host/SwingHostMessages;)V
 	public final fun close ()V
 	public final fun getComponent ()Ljavax/swing/JComponent;
 	public final fun isOpen ()Z

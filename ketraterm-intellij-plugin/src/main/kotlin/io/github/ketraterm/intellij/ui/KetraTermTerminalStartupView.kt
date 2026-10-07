@@ -19,6 +19,7 @@ import com.intellij.ui.JBColor
 import com.intellij.ui.components.JBLabel
 import com.intellij.ui.components.JBPanel
 import com.intellij.util.ui.JBUI
+import io.github.ketraterm.intellij.KetraTermBundle
 import java.awt.BorderLayout
 import javax.swing.JComponent
 
@@ -34,8 +35,8 @@ internal object KetraTermTerminalStartupView {
      */
     fun starting(profileName: String): JComponent =
         panel(
-            title = "Starting $profileName...",
-            detail = "Preparing local terminal session.",
+            title = KetraTermBundle.message("terminal.startup.starting", profileName),
+            detail = KetraTermBundle.message("terminal.startup.preparing"),
         )
 
     /**
@@ -50,7 +51,7 @@ internal object KetraTermTerminalStartupView {
         error: Throwable,
     ): JComponent =
         panel(
-            title = "Unable to start $profileName",
+            title = KetraTermBundle.message("terminal.startup.failed", profileName),
             detail = error.message ?: error.javaClass.name,
         )
 

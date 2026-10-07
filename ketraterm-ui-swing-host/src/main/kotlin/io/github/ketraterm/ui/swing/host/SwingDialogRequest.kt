@@ -29,7 +29,7 @@ public class SwingDialogRequest(
     public val title: String,
     public val message: String,
     public val severity: Severity,
-    options: List<String> = listOf("OK"),
+    options: List<String> = listOf(SwingHostMessages.forLocale().message("dialog.ok")),
     public val defaultOption: Int = options.lastIndex,
 ) {
     /** Standard platform message icon. */

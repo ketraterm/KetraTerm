@@ -33,7 +33,11 @@ internal class FuzzyPathCompletionSource(
         suspend (TerminalCompletionRequest, TerminalCompletionContext) -> List<TerminalFuzzyPathEntry>,
     private val requiresNonEmptyPrefix: Boolean,
     private val allowedCommandNames: Set<String>,
+    messages: TerminalCompletionMessages = TerminalCompletionMessages.forLocale(),
 ) : TerminalCompletionSource {
+    private val directoryDetail = messages.message("completion.projectDirectory")
+    private val fileDetail = messages.message("completion.projectFile")
+
     override suspend fun complete(
         request: TerminalCompletionRequest,
         context: TerminalCompletionContext,
@@ -75,7 +79,7 @@ internal class FuzzyPathCompletionSource(
                     replacementStartOffset = context.replacementStartOffset,
                     replacementEndOffset = context.replacementEndOffset,
                     displayText = path + if (isDirectory) "/" else "",
-                    detail = detail ?: if (isDirectory) "project directory" else "project file",
+                    detail = detail ?: if (isDirectory) directoryDetail else fileDetail,
                     source = sourceId,
                     kind = TerminalCompletionCandidateKind.PATH,
                     score = candidateScore,

@@ -25,11 +25,11 @@ import com.intellij.ui.components.JBTextField
 import com.intellij.ui.dsl.builder.AlignX
 import com.intellij.ui.dsl.builder.panel
 import io.github.ketraterm.intellij.KetraTermBundle
+import io.github.ketraterm.intellij.services.intellijTerminalProfileRegistry
 import io.github.ketraterm.ui.swing.host.SwingTerminalSettingsBounds
 import io.github.ketraterm.ui.swing.settings.SwingSettings
 import io.github.ketraterm.ui.swing.settings.TerminalTheme
 import io.github.ketraterm.workspace.TerminalProfile
-import io.github.ketraterm.workspace.TerminalProfileRegistry
 import java.awt.Component
 import java.util.*
 import javax.swing.*
@@ -45,7 +45,7 @@ private const val KETRATERM_SETTINGS_CONFIGURABLE_ID = "io.github.ketraterm.term
 class KetraTermSettingsConfigurable internal constructor(
     shellProfiles: List<TerminalProfile>,
 ) : SearchableConfigurable {
-    constructor() : this(TerminalProfileRegistry().availableProfiles())
+    constructor() : this(intellijTerminalProfileRegistry().availableProfiles())
 
     private val settings: KetraTermIntellijSettings
         get() = KetraTermIntellijSettings.getInstance()

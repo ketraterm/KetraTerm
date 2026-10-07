@@ -44,7 +44,12 @@ internal class MergedCompletionEngine(
     private val clockEpochMillis: () -> Long = System::currentTimeMillis,
     private val sourceFailureHandler: TerminalCompletionSourceFailureHandler =
         TerminalCompletionSourceFailureHandler.SYSTEM_LOGGER,
+    messages: TerminalCompletionMessages = TerminalCompletionMessages.forLocale(),
 ) : TerminalCompletionEngine {
+    private val learnedCommandDetail = messages.message("completion.learnedCommand")
+    private val learnedDirectoryDetail = messages.message("completion.learnedDirectory")
+    private val learnedPathDetail = messages.message("completion.learnedPath")
+    private val observedDetail = messages.message("completion.observedToken")
     private val specSource = commandSpecs.takeIf { it.isNotEmpty() }?.let(::SpecCompletionSource)
     private val sources = sources.toList()
     private val hostSourceIndexOffset = if (specSource == null) 0 else 1
@@ -100,11 +105,15 @@ internal class MergedCompletionEngine(
                                     index = indexes.history,
                                     nowEpochMillis = nowEpochMillis,
                                     destination = this,
+                                    commandDetail = learnedCommandDetail,
+                                    directoryDetail = learnedDirectoryDetail,
+                                    pathDetail = learnedPathDetail,
                                 )
                                 indexes.observed.appendCandidates(
                                     request = request,
                                     context = completionContext,
                                     destination = this,
+                                    detail = observedDetail,
                                 )
                                 sortWith(TERMINAL_COMPLETION_CANDIDATE_ORDER)
                             }.let { candidates ->

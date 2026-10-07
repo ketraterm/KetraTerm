@@ -28,7 +28,9 @@ internal fun projectLearnedCommandCandidate(
     learnedCommand: String,
     source: String,
     score: Int,
-    detailPrefix: String,
+    commandDetail: String,
+    directoryDetail: String,
+    pathDetail: String,
     learnedLine: TerminalCommandLineContext,
 ): TerminalCompletionCandidate? {
     val activeIndex = requestLine.activeTokenIndex
@@ -60,7 +62,12 @@ internal fun projectLearnedCommandCandidate(
         replacementStartOffset = completionContext.replacementStartOffset,
         replacementEndOffset = replacementEnd,
         displayText = replacementText,
-        detail = learnedCandidateDetail(detailPrefix, kind, completionContext.expectedPathKind),
+        detail =
+            when {
+                kind != TerminalCompletionCandidateKind.PATH -> commandDetail
+                completionContext.expectedPathKind == TerminalPathArgumentKind.DIRECTORY -> directoryDetail
+                else -> pathDetail
+            },
         source = source,
         kind = kind,
         score = score,
@@ -109,15 +116,4 @@ private fun semanticKind(context: TerminalCompletionContext): TerminalCompletion
                 TerminalCompletionCandidateKind.PATH
             }
         TerminalCompletionActivePosition.OPERATOR -> null
-    }
-
-private fun learnedCandidateDetail(
-    prefix: String,
-    kind: TerminalCompletionCandidateKind,
-    pathKind: TerminalPathArgumentKind,
-): String =
-    when {
-        kind != TerminalCompletionCandidateKind.PATH -> "$prefix command"
-        pathKind == TerminalPathArgumentKind.DIRECTORY -> "$prefix directory"
-        else -> "$prefix path"
     }

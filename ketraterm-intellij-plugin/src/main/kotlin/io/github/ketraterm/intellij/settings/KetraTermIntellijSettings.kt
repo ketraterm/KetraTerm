@@ -21,6 +21,7 @@ import com.intellij.util.xmlb.annotations.OptionTag
 import com.intellij.util.xmlb.annotations.Property
 import io.github.ketraterm.host.*
 import io.github.ketraterm.input.policy.PasteControlPolicy
+import io.github.ketraterm.intellij.KetraTermBundle
 import io.github.ketraterm.render.api.TerminalRenderCursorShape
 import io.github.ketraterm.ui.swing.host.SwingTerminalSettingsBounds
 import io.github.ketraterm.ui.swing.settings.SwingPromptDecoration
@@ -253,7 +254,7 @@ class KetraTermIntellijSettings :
         @OptionTag
         @JvmField val addProjectJdkToPath: Boolean = true,
         @OptionTag
-        @JvmField val defaultTabName: String = "Local",
+        @JvmField val defaultTabName: String = KetraTermBundle.message("terminal.tab.defaultName"),
         @OptionTag
         @JvmField val smartSuggestionsEnabled: Boolean = DEFAULT_SMART_SUGGESTIONS_ENABLED,
         @OptionTag
@@ -384,7 +385,7 @@ internal object KetraTermIntellijSettingsNormalizer {
             shellPath = state.shellPath.trim().ifBlank { KetraTermIntellijSettings.DEFAULT_SHELL_PATH },
             startDirectory = state.startDirectory.trim(),
             environmentVariables = normalizeEnvironmentText(state.environmentVariables),
-            defaultTabName = state.defaultTabName.trim().ifBlank { "Local" },
+            defaultTabName = state.defaultTabName.trim().ifBlank { KetraTermBundle.message("terminal.tab.defaultName") },
             pasteSanitization = normalizePasteSanitization(state.pasteSanitization),
             clipboardWrite =
                 normalizeClipboardPermission(

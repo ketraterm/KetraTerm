@@ -32,19 +32,38 @@ import java.util.*
  * @property environment process environment used for path and shell discovery.
  * @property pathSeparator platform path separator.
  * @property executableExists predicate used to verify discovered executables.
+ * @property commandPromptDisplayName localized display name for the Windows command prompt.
+ * @property defaultShellDisplayName localized display name for the portable fallback shell.
  */
-public class TerminalProfileRegistry(
+class TerminalProfileRegistry(
     private val osName: String = System.getProperty("os.name"),
     private val environment: Map<String, String> = System.getenv(),
     private val pathSeparator: String = File.pathSeparator,
     private val executableExists: (Path) -> Boolean = Files::isRegularFile,
+    private val commandPromptDisplayName: String = defaultProfileDisplayName("profile.commandPrompt"),
+    private val defaultShellDisplayName: String = defaultProfileDisplayName("profile.defaultShell"),
 ) {
+    /** Discovers profiles with the display locale while preserving the original constructor contract. */
+    constructor(
+        osName: String = System.getProperty("os.name"),
+        environment: Map<String, String> = System.getenv(),
+        pathSeparator: String = File.pathSeparator,
+        executableExists: (Path) -> Boolean = Files::isRegularFile,
+    ) : this(
+        osName = osName,
+        environment = environment,
+        pathSeparator = pathSeparator,
+        executableExists = executableExists,
+        commandPromptDisplayName = defaultProfileDisplayName("profile.commandPrompt"),
+        defaultShellDisplayName = defaultProfileDisplayName("profile.defaultShell"),
+    )
+
     /**
      * Returns built-in profiles in menu/default preference order.
      *
      * @return a list of discovered built-in [TerminalProfile]s.
      */
-    public fun availableProfiles(): List<TerminalProfile> =
+    fun availableProfiles(): List<TerminalProfile> =
         if (isWindows()) {
             windowsProfiles()
         } else {
@@ -73,7 +92,7 @@ public class TerminalProfileRegistry(
      *   platform default.
      * @return launch profile ready for use by the PTY session.
      */
-    public fun configuredProfile(
+    fun configuredProfile(
         shellPath: String,
         workingDirectory: Path? = null,
     ): TerminalProfile {
@@ -109,7 +128,7 @@ public class TerminalProfileRegistry(
      * @param shellPath shell path to validate.
      * @return true if the shell path exists and is executable, false otherwise.
      */
-    public fun isValidShellPath(shellPath: String): Boolean {
+    fun isValidShellPath(shellPath: String): Boolean {
         if (shellPath.isBlank()) return false
         val path =
             try {
@@ -133,7 +152,7 @@ public class TerminalProfileRegistry(
      * @param args command-line arguments passed by the product shell.
      * @return initial terminal launch profile.
      */
-    public fun initialProfile(args: List<String>): TerminalProfile =
+    fun initialProfile(args: List<String>): TerminalProfile =
         if (args.isNotEmpty()) {
             TerminalProfile(
                 id = "command-line",
@@ -196,7 +215,7 @@ public class TerminalProfileRegistry(
         profiles +=
             TerminalProfile(
                 id = "cmd",
-                displayName = "Command Prompt",
+                displayName = commandPromptDisplayName,
                 command = listOf(commandPromptExecutable()),
             )
         return profiles
@@ -259,7 +278,7 @@ public class TerminalProfileRegistry(
             profiles +=
                 TerminalProfile(
                     id = "default-shell",
-                    displayName = "Default Shell",
+                    displayName = defaultShellDisplayName,
                     command = PtyOptions.defaultCommand(),
                 )
         }
@@ -379,3 +398,11 @@ public class TerminalProfileRegistry(
         private const val CONFIGURED_SHELL_ID = "configured-shell"
     }
 }
+
+private fun defaultProfileDisplayName(key: String): String =
+    ResourceBundle
+        .getBundle(
+            "io.github.ketraterm.workspace.WorkspaceMessages",
+            Locale.getDefault(Locale.Category.DISPLAY),
+            ResourceBundle.Control.getNoFallbackControl(ResourceBundle.Control.FORMAT_PROPERTIES),
+        ).getString(key)

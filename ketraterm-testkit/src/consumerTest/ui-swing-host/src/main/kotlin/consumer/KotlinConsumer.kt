@@ -78,7 +78,7 @@ fun main() =
             TerminalSession.create(buffer, buffer, connector).use { session ->
                 SwingUtilities.invokeAndWait {
                     val terminal = SwingTerminal()
-                    val searchBar = SwingTerminalSearchBar(terminal)
+                    val searchBar = SwingTerminalSearchBar(terminal, JavaConsumer.hostMessages())
                     val target = JavaConsumer.NativeTarget()
                     val binding = SwingLiveCompletionBinding(session, scope, { false })
                     try {

@@ -22,38 +22,38 @@ internal object ToolchainCommandSpecs {
     fun aws(): TerminalCommandSpec =
         TerminalCommandSpec(
             name = "aws",
-            description = "AWS Unified Command Line Interface",
+            description = commandSpecText("spec.aws.description"),
             subcommands =
                 listOf(
-                    TerminalCommandSpec("s3", "manage S3 storage resources"),
-                    TerminalCommandSpec("ec2", "manage elastic compute cloud resources"),
-                    TerminalCommandSpec("rds", "manage relational database service instances"),
-                    TerminalCommandSpec("dynamodb", "manage DynamoDB tables and items"),
-                    TerminalCommandSpec("lambda", "manage AWS Lambda functions"),
-                    TerminalCommandSpec("iam", "manage Identity and Access Management"),
-                    TerminalCommandSpec("sts", "manage Security Token Service credentials"),
-                    TerminalCommandSpec("configure", "configure AWS CLI settings"),
-                    TerminalCommandSpec("cloudformation", "manage CloudFormation stacks"),
+                    TerminalCommandSpec("s3", commandSpecText("spec.aws.s3.description")),
+                    TerminalCommandSpec("ec2", commandSpecText("spec.aws.ec2.description")),
+                    TerminalCommandSpec("rds", commandSpecText("spec.aws.rds.description")),
+                    TerminalCommandSpec("dynamodb", commandSpecText("spec.aws.dynamodb.description")),
+                    TerminalCommandSpec("lambda", commandSpecText("spec.aws.lambda.description")),
+                    TerminalCommandSpec("iam", commandSpecText("spec.aws.iam.description")),
+                    TerminalCommandSpec("sts", commandSpecText("spec.aws.sts.description")),
+                    TerminalCommandSpec("configure", commandSpecText("spec.aws.configure.description")),
+                    TerminalCommandSpec("cloudformation", commandSpecText("spec.aws.cloudformation.description")),
                 ),
             options =
                 listOf(
-                    TerminalOptionSpec(listOf("--help"), "show help"),
-                    TerminalOptionSpec(listOf("--version"), "show version"),
+                    TerminalOptionSpec(listOf("--help"), commandSpecText("spec.aws.option.--help.description")),
+                    TerminalOptionSpec(listOf("--version"), commandSpecText("spec.aws.option.--version.description")),
                     TerminalOptionSpec(
                         names = listOf("--profile"),
-                        description = "select AWS CLI profile to use",
+                        description = commandSpecText("spec.aws.option.--profile.description"),
                         requiresValue = true,
                         valueDomain = TerminalCompletionValueDomain.AWS_PROFILE,
                     ),
                     TerminalOptionSpec(
                         names = listOf("--region"),
-                        description = "AWS region to target",
+                        description = commandSpecText("spec.aws.option.--region.description"),
                         requiresValue = true,
                         valueDomain = TerminalCompletionValueDomain.AWS_REGION,
                     ),
                     TerminalOptionSpec(
                         names = listOf("--output"),
-                        description = "output format json, text, table",
+                        description = commandSpecText("spec.aws.option.--output.description"),
                         requiresValue = true,
                         valueCandidates = listOf("json", "text", "table", "yaml", "yaml-stream"),
                     ),
@@ -63,136 +63,146 @@ internal object ToolchainCommandSpecs {
     fun kotlin(): TerminalCommandSpec =
         TerminalCommandSpec(
             name = "kotlin",
-            description = "Kotlin command-line runner and REPL",
+            description = commandSpecText("spec.kotlin.description"),
             subcommands =
                 listOf(
-                    TerminalCommandSpec("run", "runs a Kotlin application or script"),
-                    TerminalCommandSpec("build", "builds a Kotlin project"),
-                    TerminalCommandSpec("test", "runs Kotlin tests"),
+                    TerminalCommandSpec("run", commandSpecText("spec.kotlin.run.description")),
+                    TerminalCommandSpec("build", commandSpecText("spec.kotlin.build.description")),
+                    TerminalCommandSpec("test", commandSpecText("spec.kotlin.test.description")),
                 ),
             options =
                 listOf(
-                    TerminalOptionSpec(listOf("-version", "--version", "-v"), "display compiler version"),
-                    TerminalOptionSpec(listOf("-help", "-h"), "how help"),
-                    TerminalOptionSpec(listOf("-e"), "evaluate inline Kotlin expression", requiresValue = true),
+                    TerminalOptionSpec(listOf("-version", "--version", "-v"), commandSpecText("spec.kotlin.option.-version.description")),
+                    TerminalOptionSpec(listOf("-help", "-h"), commandSpecText("spec.kotlin.option.-help.description")),
+                    TerminalOptionSpec(listOf("-e"), commandSpecText("spec.kotlin.option.-e.description"), requiresValue = true),
                     TerminalOptionSpec(
                         listOf("-classpath", "-cp"),
-                        "paths where to find user class files and annotation processors",
+                        commandSpecText("spec.kotlin.option.-classpath.description"),
                         requiresValue = true,
                     ),
-                    TerminalOptionSpec(listOf("-include-runtime"), "include Kotlin runtime in to resulting JAR"),
-                    TerminalOptionSpec(listOf("-nowarn"), "generate no warnings"),
-                    TerminalOptionSpec(listOf("-verbose"), "enable verbose logging output"),
+                    TerminalOptionSpec(listOf("-include-runtime"), commandSpecText("spec.kotlin.option.-include-runtime.description")),
+                    TerminalOptionSpec(listOf("-nowarn"), commandSpecText("spec.kotlin.option.-nowarn.description")),
+                    TerminalOptionSpec(listOf("-verbose"), commandSpecText("spec.kotlin.option.-verbose.description")),
                 ),
         )
 
     fun kotlinc(): TerminalCommandSpec =
         TerminalCommandSpec(
             name = "kotlinc",
-            description = "Kotlin command-line compiler",
+            description = commandSpecText("spec.kotlinc.description"),
             aliases = listOf("kotlinc-jvm", "kotlinc-js", "kotlinc-native"),
             options =
                 listOf(
-                    TerminalOptionSpec(listOf("-version", "--version", "-v"), "display compiler version"),
-                    TerminalOptionSpec(listOf("-help", "-h"), "show help"),
+                    TerminalOptionSpec(listOf("-version", "--version", "-v"), commandSpecText("spec.kotlinc.option.-version.description")),
+                    TerminalOptionSpec(listOf("-help", "-h"), commandSpecText("spec.kotlinc.option.-help.description")),
                     TerminalOptionSpec(
                         names = listOf("-d"),
-                        description = "destination for generated class files",
+                        description = commandSpecText("spec.kotlinc.option.-d.description"),
                         requiresValue = true,
                         valuePathKind = TerminalPathArgumentKind.FILE_OR_DIRECTORY,
                     ),
                     TerminalOptionSpec(
                         listOf("-classpath", "-cp"),
-                        "paths where to find user class files and annotation processors",
+                        commandSpecText("spec.kotlinc.option.-classpath.description"),
                         requiresValue = true,
                     ),
-                    TerminalOptionSpec(listOf("-include-runtime"), "include Kotlin runtime in to resulting JAR"),
+                    TerminalOptionSpec(listOf("-include-runtime"), commandSpecText("spec.kotlinc.option.-include-runtime.description")),
                     TerminalOptionSpec(
                         names = listOf("-jvm-target"),
-                        description = "target version of the generated JVM bytecode",
+                        description = commandSpecText("spec.kotlinc.option.-jvm-target.description"),
                         requiresValue = true,
                         valueCandidates = listOf("1.8", "11", "17", "21", "22", "23", "24", "25"),
                     ),
                     TerminalOptionSpec(
                         listOf("-language-version"),
-                        "provide source compatibility with specified version of Kotlin",
+                        commandSpecText("spec.kotlinc.option.-language-version.description"),
                         requiresValue = true,
                     ),
                     TerminalOptionSpec(
                         listOf("-api-version"),
-                        "allow using declarations only from the specified version of Kotlin",
+                        commandSpecText("spec.kotlinc.option.-api-version.description"),
                         requiresValue = true,
                     ),
                     TerminalOptionSpec(
                         listOf("-opt-in"),
-                        "enable API usages that require opt-in with a requirement annotation",
+                        commandSpecText("spec.kotlinc.option.-opt-in.description"),
                         requiresValue = true,
                     ),
-                    TerminalOptionSpec(listOf("-Xcontext-receivers"), "enable experimental context receivers"),
-                    TerminalOptionSpec(listOf("-Xcontext-parameters"), "enable experimental context parameters"),
-                    TerminalOptionSpec(listOf("-Xmulti-platform"), "enable multiplatform support"),
-                    TerminalOptionSpec(listOf("-Werror"), "turn all warnings into errors"),
-                    TerminalOptionSpec(listOf("-nowarn"), "generate no warnings"),
-                    TerminalOptionSpec(listOf("-verbose"), "enable verbose logging output"),
+                    TerminalOptionSpec(
+                        listOf("-Xcontext-receivers"),
+                        commandSpecText("spec.kotlinc.option.-Xcontext-receivers.description"),
+                    ),
+                    TerminalOptionSpec(
+                        listOf("-Xcontext-parameters"),
+                        commandSpecText("spec.kotlinc.option.-Xcontext-parameters.description"),
+                    ),
+                    TerminalOptionSpec(listOf("-Xmulti-platform"), commandSpecText("spec.kotlinc.option.-Xmulti-platform.description")),
+                    TerminalOptionSpec(listOf("-Werror"), commandSpecText("spec.kotlinc.option.-Werror.description")),
+                    TerminalOptionSpec(listOf("-nowarn"), commandSpecText("spec.kotlinc.option.-nowarn.description")),
+                    TerminalOptionSpec(listOf("-verbose"), commandSpecText("spec.kotlinc.option.-verbose.description")),
                 ),
         )
 
     fun adb(): TerminalCommandSpec =
         TerminalCommandSpec(
             name = "adb",
-            description = "Android Debug Bridge CLI",
+            description = commandSpecText("spec.adb.description"),
             subcommands =
                 listOf(
-                    TerminalCommandSpec("devices", "list connected devices"),
-                    TerminalCommandSpec("logcat", "view device log stream"),
+                    TerminalCommandSpec("devices", commandSpecText("spec.adb.devices.description")),
+                    TerminalCommandSpec("logcat", commandSpecText("spec.adb.logcat.description")),
                     TerminalCommandSpec(
                         "install",
-                        "install an Android package (APK) to device",
+                        commandSpecText("spec.adb.install.description"),
                         positionalArgumentPathKind = TerminalPathArgumentKind.FILE,
                     ),
-                    TerminalCommandSpec("uninstall", "remove an application package from device"),
-                    TerminalCommandSpec("shell", "run remote shell command on device"),
+                    TerminalCommandSpec("uninstall", commandSpecText("spec.adb.uninstall.description")),
+                    TerminalCommandSpec("shell", commandSpecText("spec.adb.shell.description")),
                     TerminalCommandSpec(
                         "push",
-                        "copy local files to device",
+                        commandSpecText("spec.adb.push.description"),
                         positionalArgumentPathKind = TerminalPathArgumentKind.FILE_OR_DIRECTORY,
                     ),
                     TerminalCommandSpec(
                         "pull",
-                        "copy files from device to local",
+                        commandSpecText("spec.adb.pull.description"),
                         positionalArgumentPathKind = TerminalPathArgumentKind.FILE_OR_DIRECTORY,
                     ),
-                    TerminalCommandSpec("reboot", "reboot the device"),
-                    TerminalCommandSpec("reverse", "reverse socket connections"),
-                    TerminalCommandSpec("forward", "forward socket connections"),
-                    TerminalCommandSpec("start-server", "ensure that there is a server running"),
-                    TerminalCommandSpec("kill-server", "kill the server if it is running"),
-                    TerminalCommandSpec("connect", "connect to a device via TCP/IP"),
-                    TerminalCommandSpec("disconnect", "disconnect from a given TCP/IP device"),
-                    TerminalCommandSpec("tcpip", "restart host in TCP mode"),
+                    TerminalCommandSpec("reboot", commandSpecText("spec.adb.reboot.description")),
+                    TerminalCommandSpec("reverse", commandSpecText("spec.adb.reverse.description")),
+                    TerminalCommandSpec("forward", commandSpecText("spec.adb.forward.description")),
+                    TerminalCommandSpec("start-server", commandSpecText("spec.adb.start-server.description")),
+                    TerminalCommandSpec("kill-server", commandSpecText("spec.adb.kill-server.description")),
+                    TerminalCommandSpec("connect", commandSpecText("spec.adb.connect.description")),
+                    TerminalCommandSpec("disconnect", commandSpecText("spec.adb.disconnect.description")),
+                    TerminalCommandSpec("tcpip", commandSpecText("spec.adb.tcpip.description")),
                 ),
             options =
                 listOf(
-                    TerminalOptionSpec(listOf("-s"), "use device with given serial number", requiresValue = true),
-                    TerminalOptionSpec(listOf("-d"), "direct an adb command to the only connected USB device"),
-                    TerminalOptionSpec(listOf("-e"), "direct an adb command to the only running emulator"),
-                    TerminalOptionSpec(listOf("--help", "-h"), "show help"),
-                    TerminalOptionSpec(listOf("--version"), "show version"),
+                    TerminalOptionSpec(listOf("-s"), commandSpecText("spec.adb.option.-s.description"), requiresValue = true),
+                    TerminalOptionSpec(listOf("-d"), commandSpecText("spec.adb.option.-d.description")),
+                    TerminalOptionSpec(listOf("-e"), commandSpecText("spec.adb.option.-e.description")),
+                    TerminalOptionSpec(listOf("--help", "-h"), commandSpecText("spec.adb.option.--help.description")),
+                    TerminalOptionSpec(listOf("--version"), commandSpecText("spec.adb.option.--version.description")),
                 ),
         )
 
     fun ketra(): TerminalCommandSpec =
         TerminalCommandSpec(
             name = "ketra",
-            description = "KetraTerm launcher CLI",
+            description = commandSpecText("spec.ketra.description"),
             options =
                 listOf(
-                    TerminalOptionSpec(listOf("--help", "-h"), "show help"),
-                    TerminalOptionSpec(listOf("--version", "-v"), "show version"),
-                    TerminalOptionSpec(listOf("--profile", "-p"), "launch with specific shell profile", requiresValue = true),
+                    TerminalOptionSpec(listOf("--help", "-h"), commandSpecText("spec.ketra.option.--help.description")),
+                    TerminalOptionSpec(listOf("--version", "-v"), commandSpecText("spec.ketra.option.--version.description")),
+                    TerminalOptionSpec(
+                        listOf("--profile", "-p"),
+                        commandSpecText("spec.ketra.option.--profile.description"),
+                        requiresValue = true,
+                    ),
                     TerminalOptionSpec(
                         names = listOf("--directory", "-d"),
-                        description = "start in specific directory",
+                        description = commandSpecText("spec.ketra.option.--directory.description"),
                         requiresValue = true,
                         valuePathKind = TerminalPathArgumentKind.DIRECTORY,
                     ),
