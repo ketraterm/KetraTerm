@@ -855,4 +855,325 @@ class ClusterStoreTest {
             assertCluster(store, handle, intArrayOf(5, 6))
         }
     }
+
+    @Nested
+    @DisplayName("deterministic retention accounting")
+    inner class RetentionTests {
+        @Test
+        fun `large cluster burst remains reusable after row erasure`() {
+            val store = ClusterStore()
+            val lines = Array(64) { Line(128, store) }
+            val expected = mutableMapOf<Int, IntArray>()
+            printRetentionHeader("burst and row erasure")
+            retentionSnapshot(store, expected, "initial")
+
+            for ((row, line) in lines.withIndex()) {
+                repeat(line.width) { col ->
+                    val payload = retentionPayload(3, row * line.width + col)
+                    line.setCluster(col, payload, payload.size, 0L)
+                    assertNull(expected.put(line.rawCodepoint(col), payload), "Live handles must be unique")
+                }
+            }
+            val peak = retentionSnapshot(store, expected, "populated")
+            assertEquals(8192, peak.liveSlots, peak.toString())
+            assertEquals(98_304L, peak.livePayloadBytes, peak.toString())
+            assertEquals(0L, peak.livePaddingBytes, peak.toString())
+
+            lines.forEach { it.clear(0L) }
+            expected.clear()
+            val erased = retentionSnapshot(store, expected, "erased")
+            assertEquals(0L, erased.livePayloadBytes, erased.toString())
+            assertEquals(peak.assignedBytes, erased.reusableBytes, erased.toString())
+            assertEquals(mapOf(3 to 98_304L), erased.reusableBytesByCapacity, erased.toString())
+            assertStorageUnchanged(peak, erased)
+            lines.forEach { assertEquals("", it.toTextTrimmed()) }
+
+            for ((row, line) in lines.withIndex()) {
+                repeat(line.width) { col ->
+                    val payload = retentionPayload(3, row * line.width + col + 1)
+                    line.setCluster(col, payload, payload.size, 0L)
+                    assertNull(expected.put(line.rawCodepoint(col), payload), "Live handles must be unique")
+                }
+            }
+            val refilled = retentionSnapshot(store, expected, "refilled")
+            assertEquals(peak.livePayloadBytes, refilled.livePayloadBytes, refilled.toString())
+            assertEquals(peak.liveSlots, refilled.liveSlots, refilled.toString())
+            assertEquals(0L, refilled.reusableBytes, refilled.toString())
+            assertStorageUnchanged(peak, refilled)
+        }
+
+        @Test
+        fun `changing size distributions retain class reserves then plateau`() {
+            val store = ClusterStore()
+            val sizes = intArrayOf(2, 3, 4, 5, 9, 17)
+            val capacities = intArrayOf(2, 3, 4, 8, 16, 32)
+            val expected = mutableMapOf<Int, IntArray>()
+            val freeByCapacity = sortedMapOf<Int, Long>()
+            printRetentionHeader("changing size distributions")
+            retentionSnapshot(store, expected, "initial")
+            var assignedBytes = 0L
+
+            for (index in sizes.indices) {
+                val length = sizes[index]
+                val capacity = capacities[index]
+                repeat(1024) { slot ->
+                    val payload = retentionPayload(length, slot)
+                    assertNull(expected.put(store.alloc(payload), payload), "Live handles must be unique")
+                }
+                assignedBytes += 1024L * capacity * 4
+                val populated = retentionSnapshot(store, expected, "warm length=$length populated")
+                assertEquals(1024, populated.liveSlots, populated.toString())
+                assertEquals(1024L * length * 4, populated.livePayloadBytes, populated.toString())
+                assertEquals(1024L * (capacity - length) * 4, populated.livePaddingBytes, populated.toString())
+                assertEquals(assignedBytes, populated.assignedBytes, populated.toString())
+                assertEquals(freeByCapacity, populated.reusableBytesByCapacity, populated.toString())
+
+                expected.keys.forEach(store::free)
+                expected.clear()
+                freeByCapacity[capacity] = 1024L * capacity * 4
+                val erased = retentionSnapshot(store, expected, "warm length=$length erased")
+                assertEquals(freeByCapacity, erased.reusableBytesByCapacity, erased.toString())
+                assertEquals(assignedBytes, erased.reusableBytes, erased.toString())
+                assertStorageUnchanged(populated, erased)
+            }
+            val warmed = retentionSnapshot(store, expected, "warmed", record = false)
+
+            repeat(20) { cycle ->
+                val order = if (cycle % 2 == 0) sizes.indices else sizes.indices.reversed()
+                for (index in order) {
+                    val length = sizes[index]
+                    val capacity = capacities[index]
+                    repeat(1024) { slot ->
+                        val payload = retentionPayload(length, slot + cycle + 1)
+                        assertNull(expected.put(store.alloc(payload), payload), "Live handles must be unique")
+                    }
+                    val populated = retentionSnapshot(store, expected, "cycle=$cycle length=$length populated", record = false)
+                    assertEquals(1024, populated.liveSlots, populated.toString())
+                    assertEquals(1024L * length * 4, populated.livePayloadBytes, populated.toString())
+                    assertEquals(1024L * (capacity - length) * 4, populated.livePaddingBytes, populated.toString())
+                    assertEquals(freeByCapacity - capacity, populated.reusableBytesByCapacity, populated.toString())
+                    assertStorageUnchanged(warmed, populated)
+                    expected.keys.forEach(store::free)
+                    expected.clear()
+                    val erased = retentionSnapshot(store, expected, "cycle=$cycle length=$length erased", record = false)
+                    assertEquals(freeByCapacity, erased.reusableBytesByCapacity, erased.toString())
+                    assertStorageUnchanged(warmed, erased)
+                }
+            }
+            assertStorageUnchanged(warmed, retentionSnapshot(store, expected, "after 20 cycles"))
+        }
+
+        @Test
+        fun `few long lived survivors preserve payloads while surrounding storage is reused`() {
+            val store = ClusterStore()
+            val sizes = intArrayOf(2, 3, 4, 5, 9, 17)
+            val capacities = intArrayOf(2, 3, 4, 8, 16, 32)
+            val survivorPositions = intArrayOf(0, 85, 170, 255, 340, 511)
+            val expected = mutableMapOf<Int, IntArray>()
+            val survivors = mutableMapOf<Int, IntArray>()
+            printRetentionHeader("long lived survivors")
+            retentionSnapshot(store, expected, "initial")
+            for (index in sizes.indices) {
+                repeat(512) { slot ->
+                    val payload = retentionPayload(sizes[index], index * 512 + slot)
+                    val handle = store.alloc(payload)
+                    assertNull(expected.put(handle, payload), "Live handles must be unique")
+                    if (slot == survivorPositions[index]) survivors[handle] = payload
+                }
+            }
+            val peak = retentionSnapshot(store, expected, "populated")
+            assertEquals(3072, peak.liveSlots, peak.toString())
+            assertEquals(512L * 40 * 4, peak.livePayloadBytes, peak.toString())
+            assertEquals(512L * 65 * 4, peak.assignedBytes, peak.toString())
+            (expected.keys - survivors.keys).forEach(store::free)
+            expected.keys.retainAll(survivors.keys)
+            val retained = retentionSnapshot(store, expected, "six survivors")
+            val freeByCapacity = capacities.associateWith { 511L * it * 4 }
+            assertEquals(6, retained.liveSlots, retained.toString())
+            assertEquals(160L, retained.livePayloadBytes, retained.toString())
+            assertEquals(100L, retained.livePaddingBytes, retained.toString())
+            assertEquals(freeByCapacity, retained.reusableBytesByCapacity, retained.toString())
+            assertStorageUnchanged(peak, retained)
+
+            repeat(20) { cycle ->
+                for (index in sizes.indices) {
+                    val handles =
+                        IntArray(511) { slot ->
+                            val payload = retentionPayload(sizes[index], slot + cycle + 1)
+                            val handle = store.alloc(payload)
+                            assertNull(expected.put(handle, payload), "Survivor and transient handles must stay distinct")
+                            handle
+                        }
+                    val populated = retentionSnapshot(store, expected, "cycle=$cycle length=${sizes[index]} populated", record = false)
+                    assertEquals(517, populated.liveSlots, populated.toString())
+                    assertEquals(160L + 511L * sizes[index] * 4, populated.livePayloadBytes, populated.toString())
+                    assertEquals(freeByCapacity - capacities[index], populated.reusableBytesByCapacity, populated.toString())
+                    assertStorageUnchanged(peak, populated)
+                    handles.forEach { handle ->
+                        store.free(handle)
+                        expected.remove(handle)
+                    }
+                    val freed = retentionSnapshot(store, expected, "cycle=$cycle length=${sizes[index]} freed", record = false)
+                    assertEquals(6, freed.liveSlots, freed.toString())
+                    assertEquals(160L, freed.livePayloadBytes, freed.toString())
+                    assertEquals(freeByCapacity, freed.reusableBytesByCapacity, freed.toString())
+                    assertStorageUnchanged(peak, freed)
+                }
+            }
+            assertStorageUnchanged(peak, retentionSnapshot(store, expected, "survivors after 20 cycles"))
+            survivors.keys.forEach(store::free)
+            expected.clear()
+            val erased = retentionSnapshot(store, expected, "all freed")
+            assertEquals(0L, erased.livePayloadBytes, erased.toString())
+            assertEquals(peak.assignedBytes, erased.reusableBytes, erased.toString())
+            assertStorageUnchanged(peak, erased)
+        }
+    }
+
+    private fun retentionPayload(
+        length: Int,
+        seed: Int,
+    ): IntArray = IntArray(length) { if (it == 0) 'a'.code + seed % 26 else 0x0300 + (seed + it) % 64 }
+
+    private data class RetentionSnapshot(
+        val phase: String,
+        val livePayloadBytes: Long,
+        val reusableBytes: Long,
+        val livePaddingBytes: Long,
+        val assignedBytes: Long,
+        val unassignedBytes: Long,
+        val backingBytes: Long,
+        val metadataBytes: Long,
+        val liveSlots: Int,
+        val freeSlots: Int,
+        val issuedSlots: Int,
+        val metadataSlots: Int,
+        val reusableBytesByCapacity: Map<Int, Long>,
+    ) {
+        fun tableRow(): String =
+            listOf(
+                phase,
+                livePayloadBytes,
+                reusableBytes,
+                livePaddingBytes,
+                assignedBytes,
+                unassignedBytes,
+                backingBytes,
+                metadataBytes,
+                liveSlots,
+                freeSlots,
+                issuedSlots,
+                metadataSlots,
+                metadataSlots - issuedSlots,
+                reusableBytesByCapacity,
+            ).joinToString(" | ")
+    }
+
+    private fun printRetentionHeader(workload: String) {
+        println("Retention: $workload. Bytes count primitive-array elements only; exclude headers, references, fixtures, and RSS.")
+        println("Free capacity is class-dependent; its aggregate is not interchangeable allocation space.")
+        println(
+            "phase | live B | reusable B | padding B | assigned B | unassigned B | backing B | metadata B | live slots | free slots | issued slots | metadata slots | unused slots | reusable B by slot capacity",
+        )
+    }
+
+    private fun retentionSnapshot(
+        store: ClusterStore,
+        expectedLive: Map<Int, IntArray>,
+        phase: String,
+        record: Boolean = true,
+    ): RetentionSnapshot {
+        fun field(name: String): Any {
+            val field = ClusterStore::class.java.getDeclaredField(name)
+            field.isAccessible = true
+            return field.get(store)
+        }
+        val starts = field("slotStarts") as IntArray
+        val lengths = field("slotLengths") as IntArray
+        val capacities = field("slotCapacities") as IntArray
+        val nextFree = field("nextFree") as IntArray
+        val freeHeads = field("freeHeads") as IntArray
+        val data = field("clusterData") as IntArray
+        val issued = field("slotCount") as Int
+        val assigned = field("dataSize") as Int
+        val liveHandles = mutableSetOf<Int>()
+        val reusableByCapacity = sortedMapOf<Int, Long>()
+        var liveBytes = 0L
+        var paddingBytes = 0L
+        var freeBytes = 0L
+        for (slot in 0 until issued) {
+            if (nextFree[slot] == -2) { // LIVE_SLOT in the store's private bookkeeping.
+                liveHandles.add(-(slot + 2))
+                liveBytes += lengths[slot].toLong() * 4
+                paddingBytes += (capacities[slot].toLong() - lengths[slot]) * 4
+            } else {
+                val bytes = capacities[slot].toLong() * 4
+                freeBytes += bytes
+                reusableByCapacity[capacities[slot]] = reusableByCapacity.getOrDefault(capacities[slot], 0L) + bytes
+            }
+        }
+        val snapshot =
+            RetentionSnapshot(
+                phase,
+                liveBytes,
+                freeBytes,
+                paddingBytes,
+                assigned.toLong() * 4,
+                (data.size.toLong() - assigned) * 4,
+                data.size.toLong() * 4,
+                listOf(starts, lengths, capacities, nextFree, freeHeads).sumOf { it.size.toLong() * 4 },
+                liveHandles.size,
+                issued - liveHandles.size,
+                issued,
+                starts.size,
+                reusableByCapacity,
+            )
+        val message = snapshot.toString()
+        assertEquals(snapshot.assignedBytes, liveBytes + paddingBytes + freeBytes, message)
+        assertEquals(snapshot.backingBytes, snapshot.assignedBytes + snapshot.unassignedBytes, message)
+        assertTrue(assigned in 0..data.size && issued in 0..starts.size, message)
+        listOf(lengths, capacities, nextFree).forEach { assertEquals(starts.size, it.size, message) }
+        assertEquals(expectedLive.keys, liveHandles, message)
+
+        val visited = BooleanArray(issued)
+        for (bucket in freeHeads.indices) {
+            var slot = freeHeads[bucket]
+            val bucketCapacity = if (bucket < 4) bucket + 1L else (1L shl (bucket - 1)).coerceAtMost(Int.MAX_VALUE.toLong())
+            while (slot != -1) {
+                assertTrue(slot in 0 until issued, "$message; invalid free slot=$slot bucket=$bucket")
+                assertFalse(visited[slot], "$message; repeated free slot=$slot bucket=$bucket")
+                visited[slot] = true
+                assertNotEquals(-2, nextFree[slot], message)
+                assertEquals(bucketCapacity, capacities[slot].toLong(), message)
+                slot = nextFree[slot]
+            }
+        }
+        for (slot in 0 until issued) {
+            assertEquals(nextFree[slot] != -2, visited[slot], message)
+            assertTrue(capacities[slot] > 0 && starts[slot] >= 0 && starts[slot].toLong() + capacities[slot] <= assigned, message)
+            if (!visited[slot]) assertTrue(lengths[slot] in 1..capacities[slot], message)
+        }
+        for ((handle, payload) in expectedLive) {
+            assertEquals(payload.size, store.length(handle), message)
+            val copied = IntArray(payload.size)
+            assertEquals(payload.size, store.readInto(handle, copied), message)
+            assertArrayEquals(payload, copied, "$message; handle=$handle")
+        }
+        if (record) println(snapshot.tableRow())
+        return snapshot
+    }
+
+    private fun assertStorageUnchanged(
+        before: RetentionSnapshot,
+        after: RetentionSnapshot,
+    ) {
+        val message = "Before: $before\nAfter: $after"
+        assertAll(
+            { assertEquals(before.assignedBytes, after.assignedBytes, message) },
+            { assertEquals(before.backingBytes, after.backingBytes, message) },
+            { assertEquals(before.metadataBytes, after.metadataBytes, message) },
+            { assertEquals(before.issuedSlots, after.issuedSlots, message) },
+            { assertEquals(before.metadataSlots, after.metadataSlots, message) },
+        )
+    }
 }
