@@ -2,10 +2,10 @@
 
 ## [Unreleased]
 
+- Fixed window geometry refresh throwing after prompt-style changes or window moves and resizes.
 - Added a Prompt style setting with Gutter, Divider, and None choices, applied to open terminals and saved across restarts.
 - Reserved prompt gutters before the first prompt for shells with configured integration, while shells without prompt support use the full available width.
 - Centered full-screen terminal apps consistently across shell profiles, including spare pixels around the existing grid.
-
 - Improved responsiveness when displaying large text output, including logs, CJK text, and emoji.
 - Search controls follow the selected theme.
 - Fixed typing or pasting during terminal startup causing premature writes or closing the terminal.

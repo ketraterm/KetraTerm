@@ -44,18 +44,20 @@ internal class SwingWindowResizeHost(
         if (terminal.width <= 0 || terminal.height <= 0) return null
         val bounds = configuration.bounds
         val insets = frame.toolkit.getScreenInsets(configuration)
-        val primary = terminal.preferredGridSize(0, 0)
-        val alternate = terminal.preferredGridSize(0, 0, TerminalRenderBufferKind.ALTERNATE)
-        val cell = terminal.preferredGridSize(1, 1)
+        val primary = terminal.preferredGridSize(1, 1)
+        val alternate = terminal.preferredGridSize(1, 1, TerminalRenderBufferKind.ALTERNATE)
+        val twoCells = terminal.preferredGridSize(2, 2)
+        val cellWidth = twoCells.width - primary.width
+        val cellHeight = twoCells.height - primary.height
         return WindowResizeGeometry(
-            cellWidth = cell.width - primary.width,
-            cellHeight = cell.height - primary.height,
+            cellWidth = cellWidth,
+            cellHeight = cellHeight,
             windowExtraWidth = frame.width - terminal.width,
             windowExtraHeight = frame.height - terminal.height,
-            primaryInsetWidth = primary.width,
-            primaryInsetHeight = primary.height,
-            alternateInsetWidth = alternate.width,
-            alternateInsetHeight = alternate.height,
+            primaryInsetWidth = primary.width - cellWidth,
+            primaryInsetHeight = primary.height - cellHeight,
+            alternateInsetWidth = alternate.width - cellWidth,
+            alternateInsetHeight = alternate.height - cellHeight,
             minimumWidth = frame.minimumSize.width,
             minimumHeight = frame.minimumSize.height,
             availableWidth = bounds.width - insets.left - insets.right,
