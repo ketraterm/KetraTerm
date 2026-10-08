@@ -97,6 +97,10 @@ public data class TerminalArgumentSpec
 /**
  * Declarative option or flag specification.
  *
+ * An active option owns its value's path kind, dynamic domain, and hidden-entry
+ * policy, including `NONE` and default values. Positional metadata is not used
+ * as a fallback for option values.
+ *
  * @property names accepted option tokens, such as `--help` and `-h`.
  * @property description short human-readable description.
  * @property requiresValue whether this option consumes the following token as a
