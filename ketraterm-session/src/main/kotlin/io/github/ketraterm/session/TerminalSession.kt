@@ -560,7 +560,7 @@ public class TerminalSession private constructor(
                     terminal.resize(columns, rows)
                 }
                 if (isSessionClosed()) return
-                connector.resize(columns, rows)
+                resizeConnector(columns, rows)
                 if (!isSessionClosed()) {
                     connector.start(this)
                     if (!isSessionClosed()) {
@@ -655,13 +655,20 @@ public class TerminalSession private constructor(
                 renderReader.readRenderFrame { frame ->
                     resizedViewport = TerminalViewportResizeResult(scrollbackOffset, historySize, frame.discardedCount)
                 }
-                synchronized(connectorResizeLock) {
-                    if (!isSessionClosed()) connector.resize(columns, rows)
-                }
+                resizeConnector(columns, rows)
                 checkNotNull(resizedViewport) { "Render reader did not expose the resized terminal frame" }
             }
         invalidateRender()
         return result
+    }
+
+    private fun resizeConnector(
+        columns: Int,
+        rows: Int,
+    ) {
+        synchronized(connectorResizeLock) {
+            if (!isSessionClosed()) connector.resize(columns, rows)
+        }
     }
 
     /**
@@ -1493,7 +1500,6 @@ public class TerminalSession private constructor(
             val recordingHostEvents =
                 SessionHostEventSink(
                     delegate = hostEvents,
-                    connector = connector,
                     shellIntegration = runtime.shellIntegration,
                 )
             val sink =
@@ -1539,6 +1545,7 @@ public class TerminalSession private constructor(
                     timeSource = clipboardReadTimeSource,
                 )
             session.clipboardReads = clipboardReads
+            recordingHostEvents.resizeConnector = session::resizeConnector
             recordingHostEvents.clipboardReadRequest = { request ->
                 session.drainResponses()
                 clipboardReads.request(request)
@@ -1564,9 +1571,9 @@ private class SessionRuntime(
 
 private class SessionHostEventSink(
     private val delegate: HostEventSink,
-    private val connector: TerminalConnector,
     private val shellIntegration: TerminalShellIntegration?,
 ) : HostEventSink {
+    var resizeConnector: ((Int, Int) -> Unit)? = null
     var clipboardReadRequest: ((TerminalClipboardReadRequest) -> Unit)? = null
 
     override fun terminalClipboardReadRequested(request: TerminalClipboardReadRequest) {
@@ -1613,7 +1620,7 @@ private class SessionHostEventSink(
         rows: Int,
         columns: Int,
     ) {
-        connector.resize(columns, rows)
+        checkNotNull(resizeConnector).invoke(columns, rows)
     }
 
     override fun columnModeChanged(
