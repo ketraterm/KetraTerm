@@ -29,10 +29,39 @@ import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionRequest
 import io.github.ketraterm.workspace.TerminalProfile
 import io.github.ketraterm.workspace.TerminalWorkspaceTab
 import kotlinx.coroutines.CancellationException
+import java.awt.event.AdjustmentListener
 import java.util.*
 import java.util.concurrent.CopyOnWriteArrayList
+import javax.swing.JScrollBar
 
 class KetraTermTerminalPaneLifecycleTest : BasePlatformTestCase() {
+    fun testCloseRemovesOnlyThePaneScrollbarListener() {
+        val settings = KetraTermIntellijSettings()
+        settings.loadState(settings.state.copy(smartSuggestionsEnabled = false, cursorBlinkMillis = 0))
+        ApplicationManager.getApplication().replaceService(KetraTermIntellijSettings::class.java, settings, testRootDisposable)
+        TerminalSession.create(TerminalBuffers.create(30, 4, 0), MockConnector()).use { session ->
+            val pane = KetraTermTerminalPane.create(project, createTab(session), TerminalClipboardHandler.SYSTEM)
+            val scrollbar =
+                pane.component.components
+                    .filterIsInstance<JScrollBar>()
+                    .single()
+            val hostListener = AdjustmentListener {}
+            scrollbar.addAdjustmentListener(hostListener)
+            val attachedListeners = scrollbar.adjustmentListeners.toList()
+            try {
+                pane.close()
+                val remainingListeners = scrollbar.adjustmentListeners.toList()
+                assertEquals(attachedListeners.size - 1, remainingListeners.size)
+                assertTrue("Closing a pane must preserve host-owned listeners", hostListener in remainingListeners)
+                assertFalse("Pane closure does not own the workspace session", session.isClosed)
+                pane.close()
+                assertEquals("Repeated close must not remove other listeners", remainingListeners, scrollbar.adjustmentListeners.toList())
+            } finally {
+                pane.close()
+            }
+        }
+    }
+
     fun testCreationRollsBackAfterCompletionResourceFailure() = verifyRollback(IllegalStateException("resource lookup failed"))
 
     fun testCreationRollsBackAfterCompletionResourceCancellation() = verifyRollback(CancellationException("resource lookup cancelled"))
@@ -52,6 +81,8 @@ class KetraTermTerminalPaneLifecycleTest : BasePlatformTestCase() {
         application.replaceService(KetraTermCompletionService::class.java, service, testRootDisposable)
         val listeners = CopyOnWriteArrayList<() -> Unit>()
         var acquiredPane: KetraTermTerminalPane? = null
+        val hostScrollbarListener = AdjustmentListener {}
+        var attachedScrollbarListeners = emptyList<AdjustmentListener>()
         // Observe the actual private registration to inspect resources acquired before create returns.
         // No production factory hook is needed for this failing service boundary.
         val resources =
@@ -63,6 +94,13 @@ class KetraTermTerminalPaneLifecycleTest : BasePlatformTestCase() {
                             .single { it.type == KetraTermTerminalPane::class.java }
                             .apply { isAccessible = true }
                             .get(listener) as KetraTermTerminalPane
+                    val scrollbar =
+                        requireNotNull(acquiredPane)
+                            .component.components
+                            .filterIsInstance<JScrollBar>()
+                            .single()
+                    scrollbar.addAdjustmentListener(hostScrollbarListener)
+                    attachedScrollbarListeners = scrollbar.adjustmentListeners.toList()
                     throw failure
                 }
 
@@ -79,17 +117,7 @@ class KetraTermTerminalPaneLifecycleTest : BasePlatformTestCase() {
         }
         val connector = MockConnector()
         TerminalSession.create(TerminalBuffers.create(30, 4, 0), connector).use { session ->
-            val tab =
-                TerminalWorkspaceTab::class.java.constructors.single { it.parameterCount == 8 }.newInstance(
-                    "test",
-                    TerminalProfile("test", "Test", listOf("unused")),
-                    "Test",
-                    session,
-                    { _: TerminalWorkspaceTab, _: String? -> },
-                    { _: TerminalWorkspaceTab, _: String -> },
-                    { _: TerminalWorkspaceTab, _: String -> },
-                    false,
-                ) as TerminalWorkspaceTab
+            val tab = createTab(session)
             try {
                 assertSame(
                     failure,
@@ -102,6 +130,13 @@ class KetraTermTerminalPaneLifecycleTest : BasePlatformTestCase() {
                 assertTrue("Failed creation must remove its service listener", listeners.isEmpty())
                 assertTrue(resources.isEmpty())
                 assertFalse("Pane rollback does not own the workspace session", session.isClosed)
+                val scrollbar =
+                    pane.component.components
+                        .filterIsInstance<JScrollBar>()
+                        .single()
+                val remainingScrollbarListeners = scrollbar.adjustmentListeners.toList()
+                assertEquals(attachedScrollbarListeners.size - 1, remainingScrollbarListeners.size)
+                assertTrue("Rollback must preserve host-owned scrollbar listeners", hostScrollbarListener in remainingScrollbarListeners)
                 assertTrue(
                     "Shortcut hooks must be removed",
                     pane.terminal.mouseListeners.none {
@@ -114,6 +149,7 @@ class KetraTermTerminalPaneLifecycleTest : BasePlatformTestCase() {
                 )
                 assertFalse("Rolled-back terminal must reject presentation", pane.terminal.currentShellSuggestionState().visible)
                 pane.close()
+                assertEquals(remainingScrollbarListeners, scrollbar.adjustmentListeners.toList())
             } finally {
                 try {
                     acquiredPane?.close()
@@ -125,4 +161,16 @@ class KetraTermTerminalPaneLifecycleTest : BasePlatformTestCase() {
             }
         }
     }
+
+    private fun createTab(session: TerminalSession): TerminalWorkspaceTab =
+        TerminalWorkspaceTab::class.java.constructors.single { it.parameterCount == 8 }.newInstance(
+            "test",
+            TerminalProfile("test", "Test", listOf("unused")),
+            "Test",
+            session,
+            { _: TerminalWorkspaceTab, _: String? -> },
+            { _: TerminalWorkspaceTab, _: String -> },
+            { _: TerminalWorkspaceTab, _: String -> },
+            false,
+        ) as TerminalWorkspaceTab
 }

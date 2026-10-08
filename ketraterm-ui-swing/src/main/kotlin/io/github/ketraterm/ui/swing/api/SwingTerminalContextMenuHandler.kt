@@ -82,7 +82,7 @@ public class SwingTerminalContextMenuRequest internal constructor(
     /**
      * Pastes host clipboard text into the terminal session.
      *
-     * @return `true` when text was pasted.
+     * @return `true` when the bound session admitted the paste request.
      */
     public fun pasteClipboard(): Boolean = terminal.pasteClipboardText()
 

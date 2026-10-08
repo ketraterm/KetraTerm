@@ -18,101 +18,269 @@ package io.github.ketraterm.ui.swing.api
 import java.awt.Adjustable
 import java.awt.BorderLayout
 import java.awt.Dimension
+import java.awt.event.AdjustmentEvent
+import java.awt.event.AdjustmentListener
 import javax.swing.JPanel
 import javax.swing.JScrollBar
+import javax.swing.SwingUtilities
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertTrue
 
 class SwingScrollbarAdapterTest {
     @Test
-    fun `continuous thumb drag applies integer top row without lag`() {
-        val scrollbar = JScrollBar(Adjustable.VERTICAL)
-        var requestedOffset = -1
-        var requestedAdjusting = false
-        val adapter = SwingScrollbarAdapter(scrollbar)
-        adapter.attach(
-            SwingScrollbarScroller { offset, valueIsAdjusting ->
+    fun `continuous thumb drag applies integer top row without lag`() =
+        onEdt {
+            val scrollbar = JScrollBar(Adjustable.VERTICAL)
+            var requestedOffset = -1
+            var requestedAdjusting = false
+            val adapter = SwingScrollbarAdapter(scrollbar)
+            adapter.attach { offset, valueIsAdjusting ->
                 requestedOffset = offset
                 requestedAdjusting = valueIsAdjusting
-            },
-        )
-        val state = viewportState(renderOffset = 0)
-        adapter.viewportStateChanged(state)
-
-        scrollbar.model.valueIsAdjusting = true
-        scrollbar.value = 47
-
-        assertEquals(6, requestedOffset)
-        assertTrue(requestedAdjusting)
-        adapter.viewportChanged(10, requestedOffset.toDouble(), 6, 3, 4)
-        assertEquals(47, scrollbar.value)
-        assertTrue(scrollbar.valueIsAdjusting)
-
-        scrollbar.model.valueIsAdjusting = false
-
-        assertEquals(6, requestedOffset)
-        assertEquals(false, requestedAdjusting)
-        assertEquals(47, scrollbar.value)
-
-        adapter.viewportChanged(10, 6.0, 6, 3, 3)
-        assertEquals(40, scrollbar.value)
-    }
-
-    @Test
-    fun `terminal publication uses pixel scale with row-sized increments`() {
-        val scrollbar = JScrollBar(Adjustable.VERTICAL)
-        val adapter = SwingScrollbarAdapter(scrollbar)
-
-        adapter.viewportStateChanged(viewportState(renderOffset = 3))
-
-        assertTrue(scrollbar.isVisible)
-        assertTrue(scrollbar.isEnabled)
-        assertEquals(70, scrollbar.value)
-        assertEquals(10, scrollbar.unitIncrement)
-        assertEquals(30, scrollbar.blockIncrement)
-        assertEquals(130, scrollbar.maximum)
-    }
-
-    @Test
-    fun `scrollback appearing keeps terminal layout width stable`() {
-        val terminal = JPanel()
-        terminal.preferredSize = Dimension(100, 30)
-        val scrollbar = JScrollBar(Adjustable.VERTICAL)
-        scrollbar.preferredSize = Dimension(10, 30)
-        val container =
-            JPanel(BorderLayout()).apply {
-                add(terminal, BorderLayout.CENTER)
-                add(scrollbar, BorderLayout.EAST)
-                setBounds(0, 0, 110, 30)
             }
-        val adapter = SwingScrollbarAdapter(scrollbar)
+            val state = viewportState(renderOffset = 0)
+            adapter.viewportStateChanged(state)
 
-        adapter.viewportStateChanged(viewportState(historySize = 0, renderOffset = 0))
-        container.doLayout()
-        val widthWithoutHistory = terminal.width
+            scrollbar.model.valueIsAdjusting = true
+            scrollbar.value = 47
 
-        adapter.viewportStateChanged(viewportState(historySize = 10, renderOffset = 0))
-        container.doLayout()
+            assertEquals(6, requestedOffset)
+            assertTrue(requestedAdjusting)
+            adapter.viewportChanged(10, requestedOffset.toDouble(), 6, 3, 4)
+            assertEquals(47, scrollbar.value)
+            assertTrue(scrollbar.valueIsAdjusting)
 
-        assertTrue(scrollbar.isVisible)
-        assertEquals(widthWithoutHistory, terminal.width)
-        assertEquals(100, terminal.width)
-    }
+            scrollbar.model.valueIsAdjusting = false
+
+            assertEquals(6, requestedOffset)
+            assertEquals(false, requestedAdjusting)
+            assertEquals(47, scrollbar.value)
+
+            adapter.viewportChanged(10, 6.0, 6, 3, 3)
+            assertEquals(40, scrollbar.value)
+        }
 
     @Test
-    fun `primitive animation update preserves pixel metrics and moves thumb`() {
-        val scrollbar = JScrollBar(Adjustable.VERTICAL)
-        val adapter = SwingScrollbarAdapter(scrollbar)
+    fun `terminal publication uses pixel scale with row-sized increments`() =
+        onEdt {
+            val scrollbar = JScrollBar(Adjustable.VERTICAL)
+            val adapter = SwingScrollbarAdapter(scrollbar)
 
-        adapter.viewportStateChanged(viewportState(renderOffset = 3))
-        adapter.viewportChanged(10, 2.5, 3, 3, 4)
+            adapter.viewportStateChanged(viewportState(renderOffset = 3))
 
-        assertEquals(75, scrollbar.value)
-        assertEquals(10, scrollbar.unitIncrement)
-        assertEquals(30, scrollbar.blockIncrement)
-        assertEquals(130, scrollbar.maximum)
-    }
+            assertTrue(scrollbar.isVisible)
+            assertTrue(scrollbar.isEnabled)
+            assertEquals(70, scrollbar.value)
+            assertEquals(10, scrollbar.unitIncrement)
+            assertEquals(30, scrollbar.blockIncrement)
+            assertEquals(130, scrollbar.maximum)
+        }
+
+    @Test
+    fun `scrollback appearing keeps terminal layout width stable`() =
+        onEdt {
+            val terminal = JPanel()
+            terminal.preferredSize = Dimension(100, 30)
+            val scrollbar = JScrollBar(Adjustable.VERTICAL)
+            scrollbar.preferredSize = Dimension(10, 30)
+            val container =
+                JPanel(BorderLayout()).apply {
+                    add(terminal, BorderLayout.CENTER)
+                    add(scrollbar, BorderLayout.EAST)
+                    setBounds(0, 0, 110, 30)
+                }
+            val adapter = SwingScrollbarAdapter(scrollbar)
+
+            adapter.viewportStateChanged(viewportState(historySize = 0, renderOffset = 0))
+            container.doLayout()
+            val widthWithoutHistory = terminal.width
+
+            adapter.viewportStateChanged(viewportState(historySize = 10, renderOffset = 0))
+            container.doLayout()
+
+            assertTrue(scrollbar.isVisible)
+            assertEquals(widthWithoutHistory, terminal.width)
+            assertEquals(100, terminal.width)
+        }
+
+    @Test
+    fun `primitive animation update preserves pixel metrics and moves thumb`() =
+        onEdt {
+            val scrollbar = JScrollBar(Adjustable.VERTICAL)
+            val adapter = SwingScrollbarAdapter(scrollbar)
+
+            adapter.viewportStateChanged(viewportState(renderOffset = 3))
+            adapter.viewportChanged(10, 2.5, 3, 3, 4)
+
+            assertEquals(75, scrollbar.value)
+            assertEquals(10, scrollbar.unitIncrement)
+            assertEquals(30, scrollbar.blockIncrement)
+            assertEquals(130, scrollbar.maximum)
+        }
+
+    @Test
+    fun `close removes only the adapter listener and preserves host adjustments`() =
+        onEdt {
+            val scrollbar = JScrollBar(Adjustable.VERTICAL)
+            val hostValues = mutableListOf<Int>()
+            val hostListener = AdjustmentListener { hostValues += it.value }
+            scrollbar.addAdjustmentListener(hostListener)
+            val hostListeners = scrollbar.adjustmentListeners.toList()
+            val adapter = SwingScrollbarAdapter(scrollbar)
+
+            assertEquals(hostListeners.size + 1, scrollbar.adjustmentListeners.size)
+
+            adapter.close()
+            adapter.close()
+            scrollbar.value = 40
+
+            assertEquals(hostListeners, scrollbar.adjustmentListeners.toList())
+            assertEquals(listOf(40), hostValues)
+        }
+
+    @Test
+    fun `reusing a scrollbar after close reaches only its new destination`() =
+        onEdt {
+            val scrollbar = JScrollBar(Adjustable.VERTICAL)
+            val initialListeners = scrollbar.adjustmentListeners.toList()
+            val oldOffsets = mutableListOf<Int>()
+            val oldAdapter = SwingScrollbarAdapter(scrollbar)
+            oldAdapter.attach { offset, _ -> oldOffsets += offset }
+            oldAdapter.viewportStateChanged(viewportState(renderOffset = 0))
+            oldAdapter.close()
+
+            val newOffsets = mutableListOf<Int>()
+            val newAdapter = SwingScrollbarAdapter(scrollbar)
+            newAdapter.attach { offset, _ -> newOffsets += offset }
+            newAdapter.viewportStateChanged(viewportState(renderOffset = 0))
+            oldAdapter.close()
+            scrollbar.value = 60
+
+            assertTrue(oldOffsets.isEmpty())
+            assertEquals(listOf(4), newOffsets)
+            assertEquals(initialListeners.size + 1, scrollbar.adjustmentListeners.size)
+
+            newAdapter.close()
+
+            assertEquals(initialListeners, scrollbar.adjustmentListeners.toList())
+        }
+
+    @Test
+    fun `close makes a previously captured adjustment callback inert`() =
+        onEdt {
+            val scrollbar = JScrollBar(Adjustable.VERTICAL)
+            val initialListeners = scrollbar.adjustmentListeners.toList()
+            val offsets = mutableListOf<Int>()
+            val adapter = SwingScrollbarAdapter(scrollbar)
+            adapter.attach { offset, _ -> offsets += offset }
+            adapter.viewportStateChanged(viewportState(renderOffset = 0))
+            val capturedListener = scrollbar.adjustmentListeners.single { it !in initialListeners }
+
+            adapter.close()
+            capturedListener.adjustmentValueChanged(
+                AdjustmentEvent(scrollbar, AdjustmentEvent.ADJUSTMENT_VALUE_CHANGED, AdjustmentEvent.TRACK, 30, true),
+            )
+
+            assertTrue(offsets.isEmpty())
+            assertEquals(initialListeners, scrollbar.adjustmentListeners.toList())
+        }
+
+    @Test
+    fun `late viewport publications after close preserve the host scrollbar state`() =
+        onEdt {
+            val scrollbar = JScrollBar(Adjustable.VERTICAL)
+            val adapter = SwingScrollbarAdapter(scrollbar)
+            adapter.viewportStateChanged(viewportState(renderOffset = 0))
+            adapter.close()
+            scrollbar.model.setRangeProperties(12, 7, 2, 80, true)
+            scrollbar.unitIncrement = 2
+            scrollbar.blockIncrement = 11
+            scrollbar.isVisible = false
+            scrollbar.isEnabled = true
+
+            fun assertHostState() {
+                assertEquals(12, scrollbar.value)
+                assertEquals(7, scrollbar.visibleAmount)
+                assertEquals(2, scrollbar.minimum)
+                assertEquals(80, scrollbar.maximum)
+                assertTrue(scrollbar.valueIsAdjusting)
+                assertEquals(2, scrollbar.unitIncrement)
+                assertEquals(11, scrollbar.blockIncrement)
+                assertEquals(false, scrollbar.isVisible)
+                assertTrue(scrollbar.isEnabled)
+            }
+
+            adapter.viewportStateChanged(viewportState(historySize = 25, renderOffset = 5))
+            assertHostState()
+
+            adapter.viewportChanged(30, 6.0, 6, 4, 4)
+            assertHostState()
+        }
+
+    @Test
+    fun `closed adapter rejects a new destination without reinstalling its listener`() =
+        onEdt {
+            val scrollbar = JScrollBar(Adjustable.VERTICAL)
+            val initialListeners = scrollbar.adjustmentListeners.toList()
+            val adapter = SwingScrollbarAdapter(scrollbar)
+            adapter.close()
+            val offsets = mutableListOf<Int>()
+
+            assertFailsWith<IllegalStateException> {
+                adapter.attach { offset, _ -> offsets += offset }
+            }
+            scrollbar.value = 40
+
+            assertTrue(offsets.isEmpty())
+            assertEquals(initialListeners, scrollbar.adjustmentListeners.toList())
+        }
+
+    @Test
+    fun `reattaching a live adapter replaces its scrolling destination`() =
+        onEdt {
+            val scrollbar = JScrollBar(Adjustable.VERTICAL)
+            val oldOffsets = mutableListOf<Int>()
+            val newOffsets = mutableListOf<Int>()
+            val adapter = SwingScrollbarAdapter(scrollbar)
+            adapter.attach { offset, _ -> oldOffsets += offset }
+            adapter.viewportStateChanged(viewportState(renderOffset = 0))
+            adapter.attach { offset, _ -> newOffsets += offset }
+
+            scrollbar.value = 60
+
+            assertTrue(oldOffsets.isEmpty())
+            assertEquals(listOf(4), newOffsets)
+            adapter.close()
+        }
+
+    @Test
+    fun `close during adjustment dispatch prevents a captured listener from scrolling`() =
+        onEdt {
+            val scrollbar = JScrollBar(Adjustable.VERTICAL)
+            val initialListeners = scrollbar.adjustmentListeners.toList()
+            val offsets = mutableListOf<Int>()
+            val adapter = SwingScrollbarAdapter(scrollbar)
+            adapter.attach { offset, _ -> offsets += offset }
+            adapter.viewportStateChanged(viewportState(renderOffset = 0))
+            var closeCalls = 0
+            val closingListener =
+                AdjustmentListener {
+                    closeCalls++
+                    adapter.close()
+                }
+            scrollbar.addAdjustmentListener(closingListener)
+
+            scrollbar.value = 60
+
+            assertEquals(1, closeCalls)
+            assertTrue(offsets.isEmpty())
+            assertTrue(closingListener in scrollbar.adjustmentListeners)
+            assertEquals(initialListeners, scrollbar.adjustmentListeners.filterNot { it === closingListener })
+        }
+
+    private fun onEdt(block: () -> Unit) = SwingUtilities.invokeAndWait(block)
 
     private fun viewportState(
         historySize: Int = 10,

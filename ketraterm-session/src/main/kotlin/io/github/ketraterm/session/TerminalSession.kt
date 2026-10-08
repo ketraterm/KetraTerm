@@ -560,7 +560,7 @@ public class TerminalSession private constructor(
                     terminal.resize(columns, rows)
                 }
                 if (isSessionClosed()) return
-                connector.resize(columns, rows)
+                resizeConnector(columns, rows)
                 if (!isSessionClosed()) {
                     connector.start(this)
                     if (!isSessionClosed()) {
@@ -627,6 +627,7 @@ public class TerminalSession private constructor(
      * Returns null when closure wins admission. Terminal state and the connector then remain unchanged.
      * Presentation owners can continue to read retained frames.
      * Invalid dimensions fail validation first. Other failures propagate to the caller.
+     * An admitted resize requests render publication even if a collaborator fails afterward.
      *
      * Calls serialize with terminal mutation. An admitted core resize can finish during closure.
      * Connector resize and disposal share a separate lock. Closure prevents new connector resize calls.
@@ -646,8 +647,8 @@ public class TerminalSession private constructor(
         require(rows > 0) { "rows must be positive, got $rows" }
         if (isSessionClosed()) return null
 
-        val result =
-            synchronized(mutationLock) {
+        try {
+            return synchronized(mutationLock) {
                 if (isSessionClosed()) return null
                 outputRevision++
                 val (scrollbackOffset, historySize) = terminal.resize(columns, rows, oldScrollbackOffset)
@@ -655,13 +656,21 @@ public class TerminalSession private constructor(
                 renderReader.readRenderFrame { frame ->
                     resizedViewport = TerminalViewportResizeResult(scrollbackOffset, historySize, frame.discardedCount)
                 }
-                synchronized(connectorResizeLock) {
-                    if (!isSessionClosed()) connector.resize(columns, rows)
-                }
+                resizeConnector(columns, rows)
                 checkNotNull(resizedViewport) { "Render reader did not expose the resized terminal frame" }
             }
-        invalidateRender()
-        return result
+        } finally {
+            invalidateRender()
+        }
+    }
+
+    private fun resizeConnector(
+        columns: Int,
+        rows: Int,
+    ) {
+        synchronized(connectorResizeLock) {
+            if (!isSessionClosed()) connector.resize(columns, rows)
+        }
     }
 
     /**
@@ -1493,7 +1502,6 @@ public class TerminalSession private constructor(
             val recordingHostEvents =
                 SessionHostEventSink(
                     delegate = hostEvents,
-                    connector = connector,
                     shellIntegration = runtime.shellIntegration,
                 )
             val sink =
@@ -1539,6 +1547,7 @@ public class TerminalSession private constructor(
                     timeSource = clipboardReadTimeSource,
                 )
             session.clipboardReads = clipboardReads
+            recordingHostEvents.resizeConnector = session::resizeConnector
             recordingHostEvents.clipboardReadRequest = { request ->
                 session.drainResponses()
                 clipboardReads.request(request)
@@ -1564,9 +1573,9 @@ private class SessionRuntime(
 
 private class SessionHostEventSink(
     private val delegate: HostEventSink,
-    private val connector: TerminalConnector,
     private val shellIntegration: TerminalShellIntegration?,
 ) : HostEventSink {
+    var resizeConnector: ((Int, Int) -> Unit)? = null
     var clipboardReadRequest: ((TerminalClipboardReadRequest) -> Unit)? = null
 
     override fun terminalClipboardReadRequested(request: TerminalClipboardReadRequest) {
@@ -1613,7 +1622,7 @@ private class SessionHostEventSink(
         rows: Int,
         columns: Int,
     ) {
-        connector.resize(columns, rows)
+        checkNotNull(resizeConnector).invoke(columns, rows)
     }
 
     override fun columnModeChanged(
