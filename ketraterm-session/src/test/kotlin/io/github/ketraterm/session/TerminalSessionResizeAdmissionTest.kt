@@ -20,23 +20,186 @@ import io.github.ketraterm.core.api.TerminalBuffer
 import io.github.ketraterm.host.HostCommandAdapter
 import io.github.ketraterm.host.HostEventSink
 import io.github.ketraterm.parser.api.TerminalParsers
+import io.github.ketraterm.render.api.TerminalRenderFrameConsumer
+import io.github.ketraterm.render.api.TerminalRenderFrameReader
 import io.github.ketraterm.render.cache.TerminalRenderPublisher
 import io.github.ketraterm.testkit.MockConnector
 import io.github.ketraterm.transport.TerminalConnector
 import io.github.ketraterm.transport.TerminalConnectorListener
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.StandardTestDispatcher
+import kotlinx.coroutines.test.advanceTimeBy
+import kotlinx.coroutines.test.runCurrent
+import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.params.ParameterizedTest
+import org.junit.jupiter.params.provider.CsvSource
 import org.junit.jupiter.params.provider.ValueSource
-import java.util.Collections
+import java.util.*
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.FutureTask
 import java.util.concurrent.TimeUnit
 import kotlin.concurrent.thread
+import kotlin.time.Duration.Companion.milliseconds
 
 class TerminalSessionResizeAdmissionTest {
     private val dispatcher = StandardTestDispatcher()
+
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @ParameterizedTest
+    @CsvSource(
+        "resize, false",
+        "resizeViewport, false",
+        "tryResizeViewport, false",
+        "resize, true",
+        "resizeViewport, true",
+        "tryResizeViewport, true",
+    )
+    fun `connector resize failure preserves the exception and publishes resized geometry`(
+        operation: String,
+        cancelled: Boolean,
+    ) = runTest {
+        val dispatcher = StandardTestDispatcher(testScheduler)
+        val terminal = TerminalBuffers.create(10, 3)
+        val recorded = MockConnector()
+        val failure =
+            if (cancelled) {
+                CancellationException(
+                    "connector resize cancelled",
+                )
+            } else {
+                IllegalStateException("connector resize failed")
+            }
+        val connector =
+            object : TerminalConnector by recorded {
+                override fun resize(
+                    columns: Int,
+                    rows: Int,
+                ) {
+                    recorded.resize(columns, rows)
+                    if (columns == 8) throw failure
+                }
+            }
+        TerminalSession
+            .create(
+                terminal,
+                connector,
+                workerDispatcher = dispatcher,
+                ioDispatcher = dispatcher,
+            ).use { session ->
+                session.start(10, 3)
+                session.requestRender(0)
+                runCurrent()
+                advanceTimeBy(TerminalSession.RENDER_PUBLICATION_INTERVAL_MS.milliseconds)
+                runCurrent()
+                val before = session.renderGeneration.value
+                assertEquals(10 to 3, session.readPublishedFrame { it.columns to it.rows })
+
+                val thrown =
+                    assertThrows(IllegalStateException::class.java) {
+                        when (operation) {
+                            "resize" -> session.resize(8, 2)
+                            "resizeViewport" -> session.resizeViewport(8, 2)
+                            "tryResizeViewport" -> session.tryResizeViewport(8, 2)
+                            else -> error("unknown resize operation: $operation")
+                        }
+                    }
+
+                assertSame(failure, thrown)
+                assertEquals(8, terminal.width)
+                assertEquals(2, terminal.height)
+                assertEquals(listOf(10 to 3, 8 to 2), recorded.resizeCalls)
+                runCurrent()
+                assertTrue(session.renderGeneration.value > before)
+                assertEquals(8 to 2, session.readPublishedFrame { it.columns to it.rows })
+                assertSame(TerminalSessionState.Running, session.state.value)
+            }
+    }
+
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
+    fun `resize metadata failure preserves the exception and publishes the admitted core mutation`() =
+        runTest {
+            val dispatcher = StandardTestDispatcher(testScheduler)
+            val terminal = TerminalBuffers.create(10, 3)
+            val connector = MockConnector()
+            val failure = IllegalStateException("resize metadata read failed")
+            var failNextMetadataRead = false
+            val renderReader =
+                object : TerminalRenderFrameReader by terminal {
+                    override fun readRenderFrame(consumer: TerminalRenderFrameConsumer) {
+                        if (failNextMetadataRead) {
+                            failNextMetadataRead = false
+                            throw failure
+                        }
+                        terminal.readRenderFrame(consumer)
+                    }
+                }
+            TerminalSession(
+                terminal,
+                TerminalRenderPublisher(10, 3),
+                renderReader,
+                terminal,
+                connector,
+                TerminalParsers.create(HostCommandAdapter(terminal)),
+                workerDispatcher = dispatcher,
+                ioDispatcher = dispatcher,
+            ).use { session ->
+                session.start(10, 3)
+                session.requestRender(0)
+                runCurrent()
+                advanceTimeBy(TerminalSession.RENDER_PUBLICATION_INTERVAL_MS.milliseconds)
+                runCurrent()
+                val before = session.renderGeneration.value
+                assertEquals(10 to 3, session.readPublishedFrame { it.columns to it.rows })
+
+                failNextMetadataRead = true
+                assertSame(failure, assertThrows(IllegalStateException::class.java) { session.tryResizeViewport(8, 2) })
+
+                assertEquals(8, terminal.width)
+                assertEquals(2, terminal.height)
+                assertEquals(listOf(10 to 3), connector.resizeCalls)
+                runCurrent()
+                assertTrue(session.renderGeneration.value > before)
+                assertEquals(8 to 2, session.readPublishedFrame { it.columns to it.rows })
+            }
+        }
+
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
+    fun `invalid resize dimensions do not mutate or request publication`() =
+        runTest {
+            val dispatcher = StandardTestDispatcher(testScheduler)
+            val terminal = TerminalBuffers.create(10, 3)
+            val connector = MockConnector()
+            TerminalSession
+                .create(
+                    terminal,
+                    connector,
+                    workerDispatcher = dispatcher,
+                    ioDispatcher = dispatcher,
+                ).use { session ->
+                    session.start(10, 3)
+                    session.requestRender(0)
+                    runCurrent()
+                    advanceTimeBy(TerminalSession.RENDER_PUBLICATION_INTERVAL_MS.milliseconds)
+                    runCurrent()
+                    val before = session.renderGeneration.value
+
+                    for ((columns, rows) in listOf(0 to 1, 1 to 0, Int.MIN_VALUE to 1, 1 to Int.MIN_VALUE)) {
+                        assertThrows(IllegalArgumentException::class.java) { session.tryResizeViewport(columns, rows) }
+                    }
+                    runCurrent()
+
+                    assertEquals(10, terminal.width)
+                    assertEquals(3, terminal.height)
+                    assertEquals(listOf(10 to 3), connector.resizeCalls)
+                    assertEquals(before, session.renderGeneration.value)
+                    assertEquals(10 to 3, session.readPublishedFrame { it.columns to it.rows })
+                }
+        }
 
     @ParameterizedTest
     @ValueSource(booleans = [false, true])

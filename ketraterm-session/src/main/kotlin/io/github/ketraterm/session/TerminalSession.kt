@@ -627,6 +627,7 @@ public class TerminalSession private constructor(
      * Returns null when closure wins admission. Terminal state and the connector then remain unchanged.
      * Presentation owners can continue to read retained frames.
      * Invalid dimensions fail validation first. Other failures propagate to the caller.
+     * An admitted resize requests render publication even if a collaborator fails afterward.
      *
      * Calls serialize with terminal mutation. An admitted core resize can finish during closure.
      * Connector resize and disposal share a separate lock. Closure prevents new connector resize calls.
@@ -646,8 +647,8 @@ public class TerminalSession private constructor(
         require(rows > 0) { "rows must be positive, got $rows" }
         if (isSessionClosed()) return null
 
-        val result =
-            synchronized(mutationLock) {
+        try {
+            return synchronized(mutationLock) {
                 if (isSessionClosed()) return null
                 outputRevision++
                 val (scrollbackOffset, historySize) = terminal.resize(columns, rows, oldScrollbackOffset)
@@ -658,8 +659,9 @@ public class TerminalSession private constructor(
                 resizeConnector(columns, rows)
                 checkNotNull(resizedViewport) { "Render reader did not expose the resized terminal frame" }
             }
-        invalidateRender()
-        return result
+        } finally {
+            invalidateRender()
+        }
     }
 
     private fun resizeConnector(
