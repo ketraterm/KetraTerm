@@ -48,1231 +48,1237 @@ import kotlin.collections.ArrayDeque
  * Policy replacement and [currentPolicy] are safe across threads; metadata registries and
  * the remaining command surface are not independently thread-safe.
  *
+ * Java callers may omit trailing optional constructor parameters, using the same defaults
+ * as Kotlin callers. Hosts with richer keyboard metadata or bell actions should supply
+ * their implemented capability masks explicitly.
+ *
  * @param terminal public core buffer API mutated by parser semantic commands.
  * @param hostEvents optional sink for accepted host metadata and requests.
  * @param hostPolicy safety limits for host-owned metadata.
- * @param modeReportCapabilities implemented host actions from TerminalHostModeCapability.
- * @param defaultBackarrowSendsBackspace current legacy Backspace default before DECBKM overrides it.
  * @param kittyKeyboardSupportedFlags progressive Kitty keyboard flags the
  * active input host can provide truthfully. The value must be a subset of the
  * input encoder's implemented protocol mask.
+ * @param modeReportCapabilities implemented host actions from TerminalHostModeCapability.
+ * @param defaultBackarrowSendsBackspace current legacy Backspace default before DECBKM overrides it.
  */
-public class HostCommandAdapter(
-    private val terminal: TerminalBuffer,
-    private val hostEvents: HostEventSink = HostEventSink.NONE,
-    @Volatile private var hostPolicy: HostPolicy = HostPolicy(),
-    private val kittyKeyboardSupportedFlags: Int = KittyKeyboardProgressiveFlag.DEFAULT_HOST_SUPPORTED_MASK,
-    private val modeReportCapabilities: Int = 0,
-    @Volatile private var defaultBackarrowSendsBackspace: Boolean = false,
-) : TerminalAsciiCommandSink {
-    init {
-        require(
-            modeReportCapabilities and
-                TerminalHostModeCapability.ALL
-                    .inv() == 0,
-        ) {
-            "invalid host mode-report capabilities: $modeReportCapabilities"
+public class HostCommandAdapter
+    @JvmOverloads
+    constructor(
+        private val terminal: TerminalBuffer,
+        private val hostEvents: HostEventSink = HostEventSink.NONE,
+        @Volatile private var hostPolicy: HostPolicy = HostPolicy(),
+        private val kittyKeyboardSupportedFlags: Int = KittyKeyboardProgressiveFlag.DEFAULT_HOST_SUPPORTED_MASK,
+        private val modeReportCapabilities: Int = 0,
+        @Volatile private var defaultBackarrowSendsBackspace: Boolean = false,
+    ) : TerminalAsciiCommandSink {
+        init {
+            require(
+                modeReportCapabilities and
+                    TerminalHostModeCapability.ALL
+                        .inv() == 0,
+            ) {
+                "invalid host mode-report capabilities: $modeReportCapabilities"
+            }
+            require(
+                kittyKeyboardSupportedFlags >= 0 &&
+                    kittyKeyboardSupportedFlags and KittyKeyboardProgressiveFlag.ENCODER_SUPPORTED_MASK == kittyKeyboardSupportedFlags,
+            ) {
+                "invalid Kitty keyboard host capability mask: $kittyKeyboardSupportedFlags"
+            }
         }
-        require(
-            kittyKeyboardSupportedFlags >= 0 &&
-                kittyKeyboardSupportedFlags and KittyKeyboardProgressiveFlag.ENCODER_SUPPORTED_MASK == kittyKeyboardSupportedFlags,
-        ) {
-            "invalid Kitty keyboard host capability mask: $kittyKeyboardSupportedFlags"
+
+        /**
+         * Updates the active host security policy dynamically.
+         *
+         * This only publishes the policy. A lowered hyperlink retention limit is
+         * reconciled by the serialized command owner on the next accepted open,
+         * including reuse of an existing explicit key.
+         *
+         * @param policy new security policy.
+         */
+        public fun setHostPolicy(policy: HostPolicy) {
+            this.hostPolicy = policy
         }
-    }
 
-    /**
-     * Updates the active host security policy dynamically.
-     *
-     * This only publishes the policy. A lowered hyperlink retention limit is
-     * reconciled by the serialized command owner on the next accepted open,
-     * including reuse of an existing explicit key.
-     *
-     * @param policy new security policy.
-     */
-    public fun setHostPolicy(policy: HostPolicy) {
-        this.hostPolicy = policy
-    }
+        /** Immutable active policy snapshot for asynchronous host-operation revalidation. */
+        public val currentPolicy: HostPolicy
+            get() = hostPolicy
 
-    /** Immutable active policy snapshot for asynchronous host-operation revalidation. */
-    public val currentPolicy: HostPolicy
-        get() = hostPolicy
+        @Volatile
+        private var currentWorkingDirectory: String? = null
 
-    @Volatile
-    private var currentWorkingDirectory: String? = null
+        /**
+         * The current authoritative core window title. Read under the same serialization as core mutation.
+         */
+        public val windowTitle: String
+            get() = terminal.windowTitle
 
-    /**
-     * The current authoritative core window title. Read under the same serialization as core mutation.
-     */
-    public val windowTitle: String
-        get() = terminal.windowTitle
+        /**
+         * The current authoritative core icon title. Read under the same serialization as core mutation.
+         */
+        public val iconTitle: String
+            get() = terminal.iconTitle
 
-    /**
-     * The current authoritative core icon title. Read under the same serialization as core mutation.
-     */
-    public val iconTitle: String
-        get() = terminal.iconTitle
+        /**
+         * The URI of the currently active hyperlink (OSC 8), or `null` if none.
+         */
+        public var activeHyperlinkUri: String? = null
+            private set
 
-    /**
-     * The URI of the currently active hyperlink (OSC 8), or `null` if none.
-     */
-    public var activeHyperlinkUri: String? = null
-        private set
+        /**
+         * The client-provided ID of the currently active hyperlink (OSC 8), or `null` if none.
+         */
+        public var activeHyperlinkId: String? = null
+            private set
 
-    /**
-     * The client-provided ID of the currently active hyperlink (OSC 8), or `null` if none.
-     */
-    public var activeHyperlinkId: String? = null
-        private set
+        private val windowTitleStack = ArrayDeque<String>()
+        private val iconTitleStack = ArrayDeque<String>()
 
-    private val windowTitleStack = ArrayDeque<String>()
-    private val iconTitleStack = ArrayDeque<String>()
+        private var activeHyperlinkNumericId: Int = 0
 
-    private var activeHyperlinkNumericId: Int = 0
+        // Zero marks exhaustion. IDs can outlive registry entries in cells and UI snapshots.
+        private var nextHyperlinkNumericId: Int = 1
+        private val hyperlinkIds = LinkedHashMap<HyperlinkKey, Int>(256, 0.75f, true)
+        private val hyperlinkKeysByNumericId = HashMap<Int, HyperlinkKey>(256)
 
-    // Zero marks exhaustion. IDs can outlive registry entries in cells and UI snapshots.
-    private var nextHyperlinkNumericId: Int = 1
-    private val hyperlinkIds = LinkedHashMap<HyperlinkKey, Int>(256, 0.75f, true)
-    private val hyperlinkKeysByNumericId = HashMap<Int, HyperlinkKey>(256)
+        override fun writeCodepoint(codepoint: Int) {
+            terminal.writeCodepoint(codepoint)
+        }
 
-    override fun writeCodepoint(codepoint: Int) {
-        terminal.writeCodepoint(codepoint)
-    }
+        override fun writeAscii(
+            bytes: ByteArray,
+            offset: Int,
+            length: Int,
+        ) {
+            terminal.writeAscii(bytes, offset, length)
+        }
 
-    override fun writeAscii(
-        bytes: ByteArray,
-        offset: Int,
-        length: Int,
-    ) {
-        terminal.writeAscii(bytes, offset, length)
-    }
+        override fun writeCluster(
+            codepoints: IntArray,
+            length: Int,
+        ) {
+            terminal.writeCluster(codepoints, length)
+        }
 
-    override fun writeCluster(
-        codepoints: IntArray,
-        length: Int,
-    ) {
-        terminal.writeCluster(codepoints, length)
-    }
+        override fun updatePreviousCluster(
+            codepoints: IntArray,
+            length: Int,
+        ) {
+            terminal.updatePreviousCluster(codepoints, length)
+        }
 
-    override fun updatePreviousCluster(
-        codepoints: IntArray,
-        length: Int,
-    ) {
-        terminal.updatePreviousCluster(codepoints, length)
-    }
+        override fun bell() {
+            // TODO(core-gap): Add a core/UI bell hook. Do not fake this by mutating grid state.
+            hostEvents.bell()
+        }
 
-    override fun bell() {
-        // TODO(core-gap): Add a core/UI bell hook. Do not fake this by mutating grid state.
-        hostEvents.bell()
-    }
+        override fun backspace() {
+            terminal.cursorLeft()
+        }
 
-    override fun backspace() {
-        terminal.cursorLeft()
-    }
+        override fun tab() {
+            terminal.horizontalTab()
+        }
 
-    override fun tab() {
-        terminal.horizontalTab()
-    }
+        override fun lineFeed() {
+            terminal.newLine()
+            if (TerminalInputState.isNewLineMode(terminal.getInputModeBits())) {
+                terminal.carriageReturn()
+            }
+        }
 
-    override fun lineFeed() {
-        terminal.newLine()
-        if (TerminalInputState.isNewLineMode(terminal.getInputModeBits())) {
+        override fun carriageReturn() {
             terminal.carriageReturn()
         }
-    }
 
-    override fun carriageReturn() {
-        terminal.carriageReturn()
-    }
-
-    override fun reverseIndex() {
-        terminal.reverseLineFeed()
-    }
-
-    override fun nextLine() {
-        terminal.newLine()
-        terminal.carriageReturn()
-    }
-
-    override fun softReset() {
-        terminal.softReset()
-        activeHyperlinkUri = null
-        activeHyperlinkId = null
-        activeHyperlinkNumericId = 0
-    }
-
-    override fun resetTerminal() {
-        val previousPalette = terminal.palette
-        val hadHyperlinks = hyperlinkIds.isNotEmpty()
-        terminal.reset()
-        activeHyperlinkUri = null
-        activeHyperlinkId = null
-        activeHyperlinkNumericId = 0
-        hyperlinkIds.clear()
-        hyperlinkKeysByNumericId.clear()
-        if (hadHyperlinks) hostEvents.hyperlinksCleared()
-        publishPaletteChange(previousPalette)
-    }
-
-    override fun decaln() {
-        terminal.decaln()
-    }
-
-    override val isAlternateScreenActive: Boolean get() = terminal.isAlternateScreenActive
-
-    override fun saveCursor() {
-        terminal.saveCursor()
-    }
-
-    override fun saveCursorOrResetMargins(): Boolean {
-        if (TerminalModeBits.hasFlag(terminal.getModeBitsSnapshot(), TerminalModeBits.LEFT_RIGHT_MARGIN_MODE)) {
-            terminal.setLeftRightMargins(left = 1, right = terminal.width)
-            return false
-        }
-        terminal.saveCursor()
-        return true
-    }
-
-    override fun restoreCursor() {
-        terminal.restoreCursor()
-    }
-
-    override fun setCursorStyle(style: Int) {
-        when (style) {
-            0 -> terminal.resetCursorStyle()
-            1 -> {
-                terminal.setCursorBlinking(true)
-                terminal.setCursorShape(TerminalRenderCursorShape.BLOCK)
-            }
-            2 -> {
-                terminal.setCursorBlinking(false)
-                terminal.setCursorShape(TerminalRenderCursorShape.BLOCK)
-            }
-            3 -> {
-                terminal.setCursorBlinking(true)
-                terminal.setCursorShape(TerminalRenderCursorShape.UNDERLINE)
-            }
-            4 -> {
-                terminal.setCursorBlinking(false)
-                terminal.setCursorShape(TerminalRenderCursorShape.UNDERLINE)
-            }
-            5 -> {
-                terminal.setCursorBlinking(true)
-                terminal.setCursorShape(TerminalRenderCursorShape.BAR)
-            }
-            6 -> {
-                terminal.setCursorBlinking(false)
-                terminal.setCursorShape(TerminalRenderCursorShape.BAR)
-            }
-        }
-    }
-
-    override fun cursorUp(n: Int) {
-        terminal.cursorUp(n)
-    }
-
-    override fun cursorDown(n: Int) {
-        terminal.cursorDown(n)
-    }
-
-    override fun cursorForward(n: Int) {
-        terminal.cursorRight(n)
-    }
-
-    override fun cursorBackward(n: Int) {
-        terminal.cursorLeft(n)
-    }
-
-    override fun cursorNextLine(n: Int) {
-        terminal.cursorDown(n)
-        terminal.carriageReturn()
-    }
-
-    override fun cursorPreviousLine(n: Int) {
-        terminal.cursorUp(n)
-        terminal.carriageReturn()
-    }
-
-    override fun cursorForwardTabs(n: Int) {
-        terminal.cursorForwardTab(n)
-    }
-
-    override fun cursorBackwardTabs(n: Int) {
-        terminal.cursorBackwardTab(n)
-    }
-
-    override fun setCursorColumn(col: Int) {
-        terminal.positionCursor(col = col, row = terminal.cursorRow)
-    }
-
-    override fun setCursorRow(row: Int) {
-        terminal.positionCursor(col = terminal.cursorCol, row = row)
-    }
-
-    override fun setCursorAbsolute(
-        row: Int,
-        col: Int,
-    ) {
-        terminal.positionCursor(col = col, row = row)
-    }
-
-    override fun setScrollRegion(
-        top: Int,
-        bottom: Int,
-    ) {
-        // Parser SPI passes zero-based inclusive margins; core TerminalWriter keeps DECSTBM's
-        // one-based inclusive API. This conversion is intentional.
-        terminal.setScrollRegion(
-            top = top + 1,
-            bottom = if (bottom < 0) terminal.height else bottom + 1,
-        )
-    }
-
-    override fun setLeftRightMargins(
-        left: Int,
-        right: Int,
-    ) {
-        // Parser SPI passes zero-based inclusive margins; core TerminalWriter keeps DECSLRM's
-        // one-based inclusive API. This conversion is intentional.
-        terminal.setLeftRightMargins(
-            left = left + 1,
-            right = if (right < 0) terminal.width else right + 1,
-        )
-    }
-
-    override fun eraseInDisplay(
-        mode: Int,
-        selective: Boolean,
-    ) {
-        when {
-            selective && mode == 0 -> terminal.selectiveEraseScreenToEnd()
-            selective && mode == 1 -> terminal.selectiveEraseScreenToCursor()
-            selective && mode == 2 -> terminal.selectiveEraseEntireScreen()
-            !selective && mode == 0 -> terminal.eraseScreenToEnd()
-            !selective && mode == 1 -> terminal.eraseScreenToCursor()
-            !selective && mode == 2 -> terminal.eraseEntireScreen()
-            !selective && mode == 3 -> terminal.eraseScreenAndHistory()
-        }
-    }
-
-    override fun eraseInLine(
-        mode: Int,
-        selective: Boolean,
-    ) {
-        when {
-            selective && mode == 0 -> terminal.selectiveEraseLineToEnd()
-            selective && mode == 1 -> terminal.selectiveEraseLineToCursor()
-            selective && mode == 2 -> terminal.selectiveEraseCurrentLine()
-            !selective && mode == 0 -> terminal.eraseLineToEnd()
-            !selective && mode == 1 -> terminal.eraseLineToCursor()
-            !selective && mode == 2 -> terminal.eraseCurrentLine()
-        }
-    }
-
-    override fun eraseRectangle(
-        top: Int,
-        left: Int,
-        bottom: Int,
-        right: Int,
-        selective: Boolean,
-    ) {
-        terminal.eraseRectangle(top, left, bottom, right, selective)
-    }
-
-    override fun fillRectangle(
-        codepoint: Int,
-        top: Int,
-        left: Int,
-        bottom: Int,
-        right: Int,
-    ) {
-        terminal.fillRectangle(codepoint, top, left, bottom, right)
-    }
-
-    override fun copyRectangle(
-        sourceTop: Int,
-        sourceLeft: Int,
-        sourceBottom: Int,
-        sourceRight: Int,
-        sourcePage: Int,
-        destinationTop: Int,
-        destinationLeft: Int,
-        destinationPage: Int,
-    ) {
-        terminal.copyRectangle(
-            sourceTop,
-            sourceLeft,
-            sourceBottom,
-            sourceRight,
-            sourcePage,
-            destinationTop,
-            destinationLeft,
-            destinationPage,
-        )
-    }
-
-    override fun requestRectangleChecksum(
-        requestId: Int,
-        page: Int,
-        top: Int,
-        left: Int,
-        bottom: Int,
-        right: Int,
-    ) {
-        if (!hostPolicy.terminalResponsePolicy.isAllowed) return
-        terminal.requestRectangleChecksum(requestId, page, top, left, bottom, right)
-    }
-
-    override fun setAttributeChangeExtent(extent: Int) {
-        terminal.setAttributeChangeExtent(extent)
-    }
-
-    override fun changeRectangleAttributes(
-        top: Int,
-        left: Int,
-        bottom: Int,
-        right: Int,
-        setMask: Int,
-        clearMask: Int,
-    ) {
-        terminal.changeRectangleAttributes(top, left, bottom, right, setMask, clearMask)
-    }
-
-    override fun reverseRectangleAttributes(
-        top: Int,
-        left: Int,
-        bottom: Int,
-        right: Int,
-        reverseMask: Int,
-    ) {
-        terminal.reverseRectangleAttributes(top, left, bottom, right, reverseMask)
-    }
-
-    override fun insertColumns(count: Int) {
-        terminal.insertColumns(count)
-    }
-
-    override fun deleteColumns(count: Int) {
-        terminal.deleteColumns(count)
-    }
-
-    override fun insertLines(n: Int) {
-        terminal.insertLines(n)
-    }
-
-    override fun deleteLines(n: Int) {
-        terminal.deleteLines(n)
-    }
-
-    override fun insertCharacters(n: Int) {
-        terminal.insertBlankCharacters(n)
-    }
-
-    override fun deleteCharacters(n: Int) {
-        terminal.deleteCharacters(n)
-    }
-
-    override fun eraseCharacters(n: Int) {
-        terminal.eraseCharacters(n)
-    }
-
-    override fun scrollUp(n: Int) {
-        terminal.scrollUp(n)
-    }
-
-    override fun scrollDown(n: Int) {
-        terminal.scrollDown(n)
-    }
-
-    override fun setTabStop() {
-        terminal.setTabStop()
-    }
-
-    override fun clearTabStop() {
-        terminal.clearTabStop()
-    }
-
-    override fun clearAllTabStops() {
-        terminal.clearAllTabStops()
-    }
-
-    override fun setAnsiMode(
-        mode: Int,
-        enable: Boolean,
-    ) {
-        when (mode) {
-            AnsiMode.INSERT -> terminal.setInsertMode(enable)
-            AnsiMode.NEW_LINE -> terminal.setNewLineMode(enable)
-        }
-    }
-
-    override fun setDecMode(
-        mode: Int,
-        enable: Boolean,
-    ) {
-        when (mode) {
-            DecPrivateMode.APPLICATION_CURSOR_KEYS -> terminal.setApplicationCursorKeys(enable)
-            DecPrivateMode.DECCOLM -> {
-                val columns = if (enable) 132 else 80
-                hostEvents.resizeForColumnMode(terminal.height, columns)
-                terminal.executeDeccolm(columns)
-                hostEvents.columnModeChanged(terminal.height, columns)
-            }
-            DecPrivateMode.REVERSE_VIDEO -> terminal.setReverseVideo(enable)
-            DecPrivateMode.ORIGIN -> terminal.setOriginMode(enable)
-            DecPrivateMode.AUTO_WRAP -> terminal.setAutoWrap(enable)
-            DecPrivateMode.CURSOR_BLINK -> terminal.setCursorBlinking(enable)
-            DecPrivateMode.CURSOR_VISIBLE -> terminal.setCursorVisible(enable)
-            DecPrivateMode.APPLICATION_KEYPAD -> terminal.setApplicationKeypad(enable)
-            DecPrivateMode.BACKARROW_KEY -> terminal.setBackarrowKeyMode(enable)
-            DecPrivateMode.LEFT_RIGHT_MARGIN -> terminal.setLeftRightMarginMode(enable)
-            DecPrivateMode.MOUSE_X10 -> setMouseTrackingMode(enable, MouseTrackingMode.X10)
-            DecPrivateMode.MOUSE_NORMAL -> setMouseTrackingMode(enable, MouseTrackingMode.NORMAL)
-            DecPrivateMode.MOUSE_BUTTON_EVENT -> setMouseTrackingMode(enable, MouseTrackingMode.BUTTON_EVENT)
-            DecPrivateMode.MOUSE_ANY_EVENT -> setMouseTrackingMode(enable, MouseTrackingMode.ANY_EVENT)
-            DecPrivateMode.FOCUS_REPORTING -> terminal.setFocusReportingEnabled(enable)
-            DecPrivateMode.MOUSE_UTF8 ->
-                terminal.setMouseEncodingMode(
-                    if (enable) MouseEncodingMode.UTF8 else MouseEncodingMode.DEFAULT,
-                )
-            DecPrivateMode.MOUSE_SGR ->
-                terminal.setMouseEncodingMode(
-                    if (enable) MouseEncodingMode.SGR else MouseEncodingMode.DEFAULT,
-                )
-            DecPrivateMode.MOUSE_URXVT ->
-                terminal.setMouseEncodingMode(
-                    if (enable) MouseEncodingMode.URXVT else MouseEncodingMode.DEFAULT,
-                )
-            DecPrivateMode.MOUSE_SGR_PIXELS ->
-                terminal.setMouseEncodingMode(
-                    if (enable) MouseEncodingMode.SGR_PIXELS else MouseEncodingMode.DEFAULT,
-                )
-            DecPrivateMode.ALT_SCREEN -> {
-                if (enable) {
-                    terminal.enterAltBufferWithoutCursorSave(clearBeforeEnter = false)
-                } else {
-                    terminal.exitAltBufferWithoutCursorRestore()
-                }
-            }
-            DecPrivateMode.ALT_SCREEN_BUFFER -> {
-                if (enable) {
-                    terminal.enterAltBufferWithoutCursorSave(clearBeforeEnter = true)
-                } else {
-                    terminal.exitAltBufferWithoutCursorRestore()
-                }
-            }
-            DecPrivateMode.SAVE_RESTORE_CURSOR -> {
-                if (enable) terminal.saveCursor() else terminal.restoreCursor()
-            }
-            DecPrivateMode.ALT_SCREEN_SAVE_CURSOR -> {
-                if (enable) terminal.enterAltBuffer() else terminal.exitAltBuffer()
-            }
-            DecPrivateMode.BRACKETED_PASTE -> terminal.setBracketedPasteEnabled(enable)
-            DecPrivateMode.SYNCHRONIZED_OUTPUT -> terminal.setSynchronizedOutput(enable)
-            DecPrivateMode.BELL_IS_URGENT -> terminal.setBellIsUrgent(enable)
-            DecPrivateMode.POP_ON_BELL -> terminal.setPopOnBell(enable)
-        }
-    }
-
-    override fun setKeyModifierOption(
-        resource: Int,
-        value: Int,
-    ) {
-        if (value >= 0 && XtermKeyResource.isValidModifierValue(resource, value)) {
-            terminal.setKeyModifierOption(resource, value)
-        }
-    }
-
-    override fun resetKeyModifierOption(resource: Int): Unit = terminal.resetKeyModifierOption(resource)
-
-    override fun resetKeyModifierOptions(): Unit = terminal.resetKeyModifierOptions()
-
-    override fun disableKeyModifierOption(resource: Int) {
-        if (XtermKeyResource.isSupported(resource)) terminal.setKeyModifierOption(resource, -1)
-    }
-
-    override fun requestKeyModifierOption(resource: Int) {
-        if (hostPolicy.terminalResponsePolicy.isAllowed) terminal.requestKeyModifierOption(resource)
-    }
-
-    override fun requestKeyFormatOption(resource: Int) {
-        if (hostPolicy.terminalResponsePolicy.isAllowed) terminal.requestKeyFormatOption(resource)
-    }
-
-    override fun setKeyFormatOption(
-        resource: Int,
-        value: Int,
-    ) {
-        if (XtermKeyResource.isValidFormatValue(resource, value)) terminal.setKeyFormatOption(resource, value)
-    }
-
-    override fun resetKeyFormatOption(resource: Int): Unit = terminal.resetKeyFormatOption(resource)
-
-    override fun resetKeyFormatOptions(): Unit = terminal.resetKeyFormatOptions()
-
-    override fun applyKittyKeyboardFlags(
-        flags: Int,
-        applicationMode: Int,
-    ) {
-        if (flags < 0) return
-        val current = TerminalInputState.kittyKeyboardFlags(terminal.getInputModeBits())
-        val next =
-            when (applicationMode) {
-                KittyKeyboardFlagApplicationMode.REPLACE -> flags
-                KittyKeyboardFlagApplicationMode.SET -> current or flags
-                KittyKeyboardFlagApplicationMode.CLEAR -> current and flags.inv()
-                else -> return
-            }
-        terminal.setKittyKeyboardFlags(next and kittyKeyboardSupportedFlags)
-    }
-
-    override fun pushKittyKeyboardFlags(flags: Int) {
-        terminal.pushKittyKeyboardFlags(flags and kittyKeyboardSupportedFlags)
-    }
-
-    override fun popKittyKeyboardFlags(count: Int) {
-        terminal.popKittyKeyboardFlags(count)
-    }
-
-    /**
-     * Publishes the host default without requiring parser synchronization.
-     *
-     * The host serializes publication with its input-policy update. Mode queries
-     * read the last published default without waiting for outbound writes.
-     */
-    public fun setDefaultBackarrowSendsBackspace(value: Boolean) {
-        defaultBackarrowSendsBackspace = value
-    }
-
-    override fun requestModeStatus(
-        mode: Int,
-        decPrivate: Boolean,
-    ) {
-        if (!hostPolicy.terminalResponsePolicy.isAllowed) return
-        terminal.requestModeStatus(mode, decPrivate, modeReportCapabilities, defaultBackarrowSendsBackspace)
-    }
-
-    override fun requestDeviceStatusReport(
-        mode: Int,
-        decPrivate: Boolean,
-    ) {
-        if (!hostPolicy.terminalResponsePolicy.isAllowed) return
-        terminal.requestDeviceStatusReport(mode, decPrivate)
-    }
-
-    override fun requestDeviceAttributes(
-        kind: Int,
-        parameter: Int,
-    ) {
-        if (!hostPolicy.terminalResponsePolicy.isAllowed) return
-        terminal.requestDeviceAttributes(kind, parameter)
-    }
-
-    override fun requestKittyKeyboardFlags() {
-        if (!hostPolicy.terminalResponsePolicy.isAllowed) return
-        terminal.requestKittyKeyboardFlags()
-    }
-
-    override fun requestWindowReport(mode: Int) {
-        if (!hostPolicy.terminalResponsePolicy.isAllowed) return
-        terminal.requestWindowReport(mode)
-    }
-
-    override fun resizeWindow(
-        rows: Int,
-        columns: Int,
-    ) {
-        if (!hostPolicy.windowManipulationPolicy.isAllowed) return
-        hostEvents.resizeWindow(rows, columns)
-    }
-
-    override fun moveWindow(
-        x: Int,
-        y: Int,
-    ) {
-        if (!hostPolicy.windowManipulationPolicy.isAllowed) return
-        hostEvents.moveWindow(x, y)
-    }
-
-    override fun minimizeWindow() {
-        if (!hostPolicy.windowManipulationPolicy.isAllowed) return
-        hostEvents.minimizeWindow()
-    }
-
-    override fun deminimizeWindow() {
-        if (!hostPolicy.windowManipulationPolicy.isAllowed) return
-        hostEvents.deminimizeWindow()
-    }
-
-    override fun raiseWindow() {
-        if (!hostPolicy.windowManipulationPolicy.isAllowed) return
-        hostEvents.raiseWindow()
-    }
-
-    override fun lowerWindow() {
-        if (!hostPolicy.windowManipulationPolicy.isAllowed) return
-        hostEvents.lowerWindow()
-    }
-
-    override fun setMaximized(maximize: Boolean) {
-        if (!hostPolicy.windowManipulationPolicy.isAllowed) return
-        hostEvents.setMaximized(maximize)
-    }
-
-    override fun pushTitleStack(scope: Int) {
-        if (!hostPolicy.titlePolicy.isAllowed) return
-        when (scope) {
-            0 -> {
-                pushTitle(windowTitleStack, windowTitle)
-                pushTitle(iconTitleStack, iconTitle)
-            }
-            1 -> pushTitle(iconTitleStack, iconTitle)
-            2 -> pushTitle(windowTitleStack, windowTitle)
-        }
-    }
-
-    override fun popTitleStack(scope: Int) {
-        if (!hostPolicy.titlePolicy.isAllowed) return
-        when (scope) {
-            0 -> {
-                popTitle(windowTitleStack)?.let { updateWindowTitle(it) }
-                popTitle(iconTitleStack)?.let { updateIconTitle(it) }
-            }
-            1 -> popTitle(iconTitleStack)?.let { updateIconTitle(it) }
-            2 -> popTitle(windowTitleStack)?.let { updateWindowTitle(it) }
-        }
-    }
-
-    override fun resetAttributes() {
-        terminal.resetPen()
-    }
-
-    override fun setBold(enabled: Boolean) {
-        terminal.updatePenColors(bold = enabled)
-    }
-
-    override fun setFaint(enabled: Boolean) {
-        terminal.updatePenColors(faint = enabled)
-    }
-
-    override fun setItalic(enabled: Boolean) {
-        terminal.updatePenColors(italic = enabled)
-    }
-
-    override fun setUnderlineStyle(style: Int) {
-        terminal.updatePenColors(underlineStyle = UnderlineStyle.fromSgrCode(style) ?: return)
-    }
-
-    override fun setBlink(enabled: Boolean) {
-        terminal.updatePenColors(blink = enabled)
-    }
-
-    override fun setInverse(enabled: Boolean) {
-        terminal.updatePenColors(inverse = enabled)
-    }
-
-    override fun setConceal(enabled: Boolean) {
-        terminal.updatePenColors(conceal = enabled)
-    }
-
-    override fun setStrikethrough(enabled: Boolean) {
-        terminal.updatePenColors(strikethrough = enabled)
-    }
-
-    override fun setOverline(enabled: Boolean) {
-        terminal.updatePenColors(overline = enabled)
-    }
-
-    override fun setSelectiveEraseProtection(enabled: Boolean) {
-        terminal.setSelectiveEraseProtection(enabled)
-    }
-
-    override fun setForegroundDefault() {
-        terminal.updatePenColors(foreground = CellColor.DEFAULT)
-    }
-
-    override fun setBackgroundDefault() {
-        terminal.updatePenColors(background = CellColor.DEFAULT)
-    }
-
-    override fun setUnderlineColorDefault() {
-        terminal.updatePenColors(underlineColor = CellColor.DEFAULT)
-    }
-
-    override fun setForegroundIndexed(index: Int) {
-        if (index !in 0..255) return
-        terminal.updatePenColors(foreground = CellColor.indexed(index))
-    }
-
-    override fun setBackgroundIndexed(index: Int) {
-        if (index !in 0..255) return
-        terminal.updatePenColors(background = CellColor.indexed(index))
-    }
-
-    override fun setUnderlineColorIndexed(index: Int) {
-        if (index !in 0..255) return
-        terminal.updatePenColors(underlineColor = CellColor.indexed(index))
-    }
-
-    override fun setForegroundRgb(
-        red: Int,
-        green: Int,
-        blue: Int,
-    ) {
-        terminal.updatePenColors(foreground = CellColor.rgb(red, green, blue))
-    }
-
-    override fun setBackgroundRgb(
-        red: Int,
-        green: Int,
-        blue: Int,
-    ) {
-        terminal.updatePenColors(background = CellColor.rgb(red, green, blue))
-    }
-
-    override fun setUnderlineColorRgb(
-        red: Int,
-        green: Int,
-        blue: Int,
-    ) {
-        terminal.updatePenColors(underlineColor = CellColor.rgb(red, green, blue))
-    }
-
-    override fun setWindowTitle(title: String) {
-        acceptedTitle(title)?.let { updateWindowTitle(it) }
-    }
-
-    override fun setIconTitle(title: String) {
-        acceptedTitle(title)?.let { updateIconTitle(it) }
-    }
-
-    override fun setIconAndWindowTitle(title: String) {
-        val accepted = acceptedTitle(title) ?: return
-        updateIconTitle(accepted)
-        updateWindowTitle(accepted)
-    }
-
-    override fun setCurrentWorkingDirectoryUri(uri: String) {
-        if (!hostPolicy.currentWorkingDirectoryPolicy.isAllowed) return
-        if (!isCurrentWorkingDirectoryUriAllowed(uri)) return
-        currentWorkingDirectory = uri
-        hostEvents.currentWorkingDirectoryChanged(uri)
-    }
-
-    override fun startHyperlink(
-        uri: String,
-        id: String?,
-    ) {
-        if (!hostPolicy.hyperlinkPolicy.isAllowed) {
-            clearActiveHyperlink()
-            return
-        }
-        if (!isHyperlinkAllowed(uri, id)) {
-            clearActiveHyperlink()
-            return
+        override fun reverseIndex() {
+            terminal.reverseLineFeed()
         }
 
-        val numericId = hyperlinkIdFor(uri, id)
-        if (numericId == NO_HYPERLINK_ID) {
-            clearActiveHyperlink()
-            return
+        override fun nextLine() {
+            terminal.newLine()
+            terminal.carriageReturn()
         }
 
-        activeHyperlinkUri = uri
-        activeHyperlinkId = id
-        activeHyperlinkNumericId = numericId
-        terminal.setHyperlinkId(activeHyperlinkNumericId)
-    }
-
-    override fun endHyperlink() {
-        clearActiveHyperlink()
-    }
-
-    /**
-     * Current decoded-byte budget for collecting larger OSC 52 writes. Denied writes
-     * return zero, retaining the parser's ordinary envelope bound and small-request auditing.
-     * This does not authorize execution: [requestClipboard] rechecks the current policy.
-     */
-    public fun clipboardWriteLimitBytes(): Int {
-        val policy = hostPolicy.clipboardPolicy
-        return when (clipboardDecisionForWrite(policy)) {
-            TerminalClipboardDecision.ALLOWED_BY_POLICY, TerminalClipboardDecision.PROMPT_REQUIRED -> policy.maxDecodedBytes
-            else -> 0
-        }
-    }
-
-    override fun requestClipboard(
-        selection: String,
-        encodedData: String,
-    ) {
-        val requestPolicy = hostPolicy
-        val policy = requestPolicy.clipboardPolicy
-        val operation =
-            if (encodedData == CLIPBOARD_QUERY_MARKER) {
-                TerminalClipboardOperation.READ_QUERY
-            } else {
-                TerminalClipboardOperation.WRITE
-            }
-        val readSelection =
-            if (operation == TerminalClipboardOperation.READ_QUERY) {
-                TerminalClipboardSelection.parse(selection)
-            } else {
-                null
-            }
-        val decodedBytes = if (operation == TerminalClipboardOperation.WRITE) decodedBase64ByteCount(encodedData) else 0
-        // Bound allocation before decoding, and validate the text before publishing
-        // permission outcomes. Reuse the decoded text for the write or prompt.
-        val decodedText =
-            if (operation == TerminalClipboardOperation.WRITE && decodedBytes in 0..policy.maxDecodedBytes) {
-                decodeClipboardText(encodedData)
-            } else {
-                null
-            }
-        val decision =
-            when {
-                operation == TerminalClipboardOperation.READ_QUERY -> clipboardDecisionForRead(readSelection, requestPolicy)
-                decodedBytes < 0 -> TerminalClipboardDecision.DENIED_MALFORMED_PAYLOAD
-                decodedBytes > policy.maxDecodedBytes -> TerminalClipboardDecision.DENIED_PAYLOAD_TOO_LARGE
-                decodedText == null -> TerminalClipboardDecision.DENIED_MALFORMED_PAYLOAD
-                else -> clipboardDecisionForWrite(policy)
-            }
-        val audit =
-            TerminalClipboardAuditEvent(
-                operation = operation,
-                selection = selection,
-                encodedLength = encodedData.length,
-                decodedBytes = decodedBytes.coerceAtLeast(0),
-                maxDecodedBytes = policy.maxDecodedBytes,
-                decision = decision,
-            )
-        hostEvents.terminalClipboardRequest(audit)
-        if (readSelection != null && requestPolicy.terminalResponsePolicy.isAllowed) {
-            hostEvents.terminalClipboardReadRequested(
-                TerminalClipboardReadRequest(readSelection, policy.readPermission, policy.maxDecodedBytes),
-            )
-            return
-        }
-        if (decodedText == null) return
-        when (audit.decision) {
-            TerminalClipboardDecision.ALLOWED_BY_POLICY ->
-                hostEvents.terminalClipboardWrite(
-                    TerminalClipboardWriteEvent(
-                        selection = selection,
-                        text = decodedText,
-                        audit = audit,
-                    ),
-                )
-            TerminalClipboardDecision.PROMPT_REQUIRED ->
-                hostEvents.terminalClipboardPrompt(
-                    TerminalClipboardPromptEvent(
-                        selection = selection,
-                        text = decodedText,
-                        audit = audit,
-                    ),
-                )
-            else -> Unit
-        }
-    }
-
-    override fun setPaletteColor(
-        index: Int,
-        color: Int,
-    ) {
-        if (!hostPolicy.palettePolicy.isAllowed) return
-        val previous = terminal.palette
-        terminal.setPaletteColor(index, color)
-        publishPaletteChange(previous)
-    }
-
-    override fun queryPaletteColor(index: Int) {
-        if (!hostPolicy.palettePolicy.isAllowed) return
-        terminal.queryPaletteColor(index)
-    }
-
-    override fun setDynamicColor(
-        target: Int,
-        color: Int,
-    ) {
-        if (!hostPolicy.palettePolicy.isAllowed) return
-        val previous = terminal.palette
-        terminal.setDynamicColor(target, color)
-        publishPaletteChange(previous)
-    }
-
-    /**
-     * Applies a host-selected theme and publishes an effective palette change.
-     * Unlike application OSC controls, this operation is not gated by host policy.
-     * The caller must serialize it with parser/core mutations.
-     */
-    public fun setThemePalette(palette: TerminalColorPalette) {
-        val previous = terminal.palette
-        terminal.setThemePalette(palette)
-        publishPaletteChange(previous)
-    }
-
-    private fun publishPaletteChange(previous: TerminalColorPalette) {
-        val current = terminal.palette
-        if (previous != current) hostEvents.paletteChanged(current)
-    }
-
-    override fun queryDynamicColor(target: Int) {
-        if (!hostPolicy.palettePolicy.isAllowed) return
-        terminal.queryDynamicColor(target)
-    }
-
-    override fun queryStatusString(query: String) {
-        if (!hostPolicy.terminalResponsePolicy.isAllowed) return
-        terminal.queryStatusString(query)
-    }
-
-    override fun queryTerminfo(rawPayload: String) {
-        if (!hostPolicy.terminalResponsePolicy.isAllowed) return
-        terminal.queryTerminfo(rawPayload)
-    }
-
-    override fun shellIntegrationMarker(event: ShellIntegrationEvent) {
-        hostEvents.shellIntegrationMarker(event)
-    }
-
-    override fun showNotification(
-        title: String,
-        body: String,
-        level: NotificationLevel,
-    ) {
-        if (!hostPolicy.notificationPolicy.isAllowed) return
-        val clampedTitle = title.truncateAtScalarBoundary(hostPolicy.maxNotificationTitleLength)
-        val clampedBody = body.truncateAtScalarBoundary(hostPolicy.maxNotificationBodyLength)
-        hostEvents.showNotification(clampedTitle, clampedBody, level)
-    }
-
-    /**
-     * Returns the OSC 8 URI associated with [hyperlinkId], or `null`.
-     *
-     * The renderer stores only primitive ids in cells. This adapter owns the
-     * bounded metadata registry that maps those ids back to validated URIs for
-     * explicit host/UI activation. IDs invalidated by reset or evicted by
-     * [hostPolicy] remain unresolved even if cells or UI snapshots retain them.
-     * An issued ID is never assigned to another link during this adapter's
-     * lifetime. Exhausting the positive ID range prevents new entries while
-     * existing explicit OSC 8 keys can still reuse their retained entries.
-     *
-     * @param hyperlinkId render-cell hyperlink id.
-     * @return target URI, or `null`.
-     */
-    public fun hyperlinkUri(hyperlinkId: Int): String? = hyperlinkKeysByNumericId[hyperlinkId]?.uri
-
-    /**
-     * Returns the latest valid OSC 7 current-working-directory URI.
-     *
-     * @return accepted absolute `file://` URI, or `null` before one is received.
-     */
-    public fun currentWorkingDirectoryUri(): String? = currentWorkingDirectory
-
-    private fun setMouseTrackingMode(
-        enabled: Boolean,
-        mode: MouseTrackingMode,
-    ) {
-        terminal.setMouseTrackingMode(if (enabled) mode else MouseTrackingMode.OFF)
-    }
-
-    private fun pushTitle(
-        stack: ArrayDeque<String>,
-        title: String,
-    ) {
-        if (stack.size == MAX_TITLE_STACK_DEPTH) {
-            stack.removeFirst()
-        }
-        stack.addLast(title)
-    }
-
-    private fun popTitle(stack: ArrayDeque<String>): String? = if (stack.isEmpty()) null else stack.removeLast()
-
-    private fun updateIconTitle(title: String) {
-        terminal.setIconTitle(title)
-        hostEvents.iconTitleChanged(title)
-    }
-
-    private fun updateWindowTitle(title: String) {
-        terminal.setWindowTitle(title)
-        hostEvents.windowTitleChanged(title)
-    }
-
-    private fun clearActiveHyperlink() {
-        activeHyperlinkUri = null
-        activeHyperlinkId = null
-        activeHyperlinkNumericId = NO_HYPERLINK_ID
-        terminal.setHyperlinkId(NO_HYPERLINK_ID)
-    }
-
-    private fun clipboardDecisionForWrite(policy: TerminalClipboardPolicy): TerminalClipboardDecision =
-        when (policy.writePermission) {
-            TerminalClipboardPermission.DENY -> TerminalClipboardDecision.DENIED_BY_POLICY
-            TerminalClipboardPermission.PROMPT -> TerminalClipboardDecision.PROMPT_REQUIRED
-            TerminalClipboardPermission.ALLOW -> TerminalClipboardDecision.ALLOWED_BY_POLICY
+        override fun softReset() {
+            terminal.softReset()
+            activeHyperlinkUri = null
+            activeHyperlinkId = null
+            activeHyperlinkNumericId = 0
         }
 
-    private fun clipboardDecisionForRead(
-        selection: TerminalClipboardSelection?,
-        policy: HostPolicy,
-    ): TerminalClipboardDecision {
-        // This is the protocol allowlist, independent of the host's available clipboards.
-        if (selection == null) return TerminalClipboardDecision.DENIED_MALFORMED_PAYLOAD
-        if (!policy.terminalResponsePolicy.isAllowed) return TerminalClipboardDecision.DENIED_BY_POLICY
-        return when (policy.clipboardPolicy.readPermission) {
-            TerminalClipboardPermission.DENY -> TerminalClipboardDecision.DENIED_READ_DISABLED
-            TerminalClipboardPermission.PROMPT -> TerminalClipboardDecision.PROMPT_REQUIRED
-            TerminalClipboardPermission.ALLOW -> TerminalClipboardDecision.ALLOWED_BY_POLICY
+        override fun resetTerminal() {
+            val previousPalette = terminal.palette
+            val hadHyperlinks = hyperlinkIds.isNotEmpty()
+            terminal.reset()
+            activeHyperlinkUri = null
+            activeHyperlinkId = null
+            activeHyperlinkNumericId = 0
+            hyperlinkIds.clear()
+            hyperlinkKeysByNumericId.clear()
+            if (hadHyperlinks) hostEvents.hyperlinksCleared()
+            publishPaletteChange(previousPalette)
         }
-    }
 
-    private fun hyperlinkIdFor(
-        uri: String,
-        id: String?,
-    ): Int {
-        val maxEntries = hostPolicy.maxHyperlinkEntries
-        val numericId = nextHyperlinkNumericId
-        val key =
-            if (id == null) {
-                HyperlinkKey(id = "", uri = uri, anonymousInstance = numericId)
-            } else {
-                HyperlinkKey(id = id, uri = uri, anonymousInstance = EXPLICIT_HYPERLINK_INSTANCE)
-            }
-        if (id != null) {
-            hyperlinkIds[key]?.let {
-                trimHyperlinks(maxEntries)
-                return it
-            }
+        override fun decaln() {
+            terminal.decaln()
         }
-        if (numericId == NO_HYPERLINK_ID) return NO_HYPERLINK_ID
 
-        trimHyperlinks(maxEntries - 1)
+        override val isAlternateScreenActive: Boolean get() = terminal.isAlternateScreenActive
 
-        hyperlinkIds[key] = numericId
-        hyperlinkKeysByNumericId[numericId] = key
-        nextHyperlinkNumericId = if (numericId == Int.MAX_VALUE) NO_HYPERLINK_ID else numericId + 1
-        hostEvents.hyperlinkRegistered(numericId, uri, id)
-        return numericId
-    }
-
-    private fun trimHyperlinks(maxEntries: Int) {
-        if (hyperlinkIds.size <= maxEntries) return
-        val eldest = hyperlinkIds.entries.iterator()
-        while (hyperlinkIds.size > maxEntries) {
-            val numericId = eldest.next().value
-            hyperlinkKeysByNumericId.remove(numericId)
-            eldest.remove()
-            hostEvents.hyperlinkRemoved(numericId)
+        override fun saveCursor() {
+            terminal.saveCursor()
         }
-    }
 
-    private fun isHyperlinkAllowed(
-        uri: String,
-        id: String?,
-    ): Boolean =
-        uri.length <= hostPolicy.maxHyperlinkUriLength &&
-            (id?.length ?: 0) <= hostPolicy.maxHyperlinkIdLength
-
-    private fun acceptedTitle(title: String): String? {
-        val policy = hostPolicy.titlePolicy
-        if (!policy.isAllowed) return null
-        if (title.length <= policy.maxLength) return title
-        return when (policy.overflowPolicy) {
-            TerminalTitleOverflowPolicy.REJECT -> null
-            TerminalTitleOverflowPolicy.CLAMP -> title.truncateAtScalarBoundary(policy.maxLength)
-        }
-    }
-
-    private companion object {
-        const val NO_HYPERLINK_ID: Int = 0
-        const val EXPLICIT_HYPERLINK_INSTANCE: Int = 0
-        const val MAX_TITLE_STACK_DEPTH: Int = 16
-        const val CLIPBOARD_QUERY_MARKER: String = "?"
-    }
-
-    private data class HyperlinkKey(
-        val id: String,
-        val uri: String,
-        val anonymousInstance: Int,
-    )
-
-    private fun isCurrentWorkingDirectoryUriAllowed(value: String): Boolean {
-        if (value.isEmpty() || value.length > hostPolicy.maxCurrentWorkingDirectoryUriLength) return false
-        val uri =
-            try {
-                URI(value)
-            } catch (_: URISyntaxException) {
+        override fun saveCursorOrResetMargins(): Boolean {
+            if (TerminalModeBits.hasFlag(terminal.getModeBitsSnapshot(), TerminalModeBits.LEFT_RIGHT_MARGIN_MODE)) {
+                terminal.setLeftRightMargins(left = 1, right = terminal.width)
                 return false
             }
-        return uri.scheme.equals("file", ignoreCase = true) &&
-            value.regionMatches(uri.scheme.length + 1, "//", 0, 2) &&
-            !uri.rawPath.isNullOrEmpty() &&
-            uri.rawUserInfo == null &&
-            uri.rawQuery == null &&
-            uri.rawFragment == null
-    }
+            terminal.saveCursor()
+            return true
+        }
 
-    private fun decodedBase64ByteCount(value: String): Int {
-        if (value.isEmpty()) return 0
+        override fun restoreCursor() {
+            terminal.restoreCursor()
+        }
 
-        var nonPaddingChars = 0
-        var paddingChars = 0
-        var sawPadding = false
-        var i = 0
-        while (i < value.length) {
-            when (value[i]) {
-                in 'A'..'Z',
-                in 'a'..'z',
-                in '0'..'9',
-                '+',
-                '/',
-                -> {
-                    if (sawPadding) return -1
-                    nonPaddingChars++
+        override fun setCursorStyle(style: Int) {
+            when (style) {
+                0 -> terminal.resetCursorStyle()
+                1 -> {
+                    terminal.setCursorBlinking(true)
+                    terminal.setCursorShape(TerminalRenderCursorShape.BLOCK)
                 }
-                '=' -> {
-                    sawPadding = true
-                    paddingChars++
-                    if (paddingChars > 2) return -1
+                2 -> {
+                    terminal.setCursorBlinking(false)
+                    terminal.setCursorShape(TerminalRenderCursorShape.BLOCK)
                 }
-                else -> return -1
+                3 -> {
+                    terminal.setCursorBlinking(true)
+                    terminal.setCursorShape(TerminalRenderCursorShape.UNDERLINE)
+                }
+                4 -> {
+                    terminal.setCursorBlinking(false)
+                    terminal.setCursorShape(TerminalRenderCursorShape.UNDERLINE)
+                }
+                5 -> {
+                    terminal.setCursorBlinking(true)
+                    terminal.setCursorShape(TerminalRenderCursorShape.BAR)
+                }
+                6 -> {
+                    terminal.setCursorBlinking(false)
+                    terminal.setCursorShape(TerminalRenderCursorShape.BAR)
+                }
             }
-            i++
         }
 
-        if (paddingChars > 0) {
-            val encodedChars = nonPaddingChars + paddingChars
-            if (encodedChars % 4 != 0) return -1
-            return (encodedChars / 4) * 3 - paddingChars
+        override fun cursorUp(n: Int) {
+            terminal.cursorUp(n)
         }
 
-        val remainder = nonPaddingChars % 4
-        if (remainder == 1) return -1
-        return (nonPaddingChars / 4) * 3 +
-            when (remainder) {
-                2 -> 1
-                3 -> 2
+        override fun cursorDown(n: Int) {
+            terminal.cursorDown(n)
+        }
+
+        override fun cursorForward(n: Int) {
+            terminal.cursorRight(n)
+        }
+
+        override fun cursorBackward(n: Int) {
+            terminal.cursorLeft(n)
+        }
+
+        override fun cursorNextLine(n: Int) {
+            terminal.cursorDown(n)
+            terminal.carriageReturn()
+        }
+
+        override fun cursorPreviousLine(n: Int) {
+            terminal.cursorUp(n)
+            terminal.carriageReturn()
+        }
+
+        override fun cursorForwardTabs(n: Int) {
+            terminal.cursorForwardTab(n)
+        }
+
+        override fun cursorBackwardTabs(n: Int) {
+            terminal.cursorBackwardTab(n)
+        }
+
+        override fun setCursorColumn(col: Int) {
+            terminal.positionCursor(col = col, row = terminal.cursorRow)
+        }
+
+        override fun setCursorRow(row: Int) {
+            terminal.positionCursor(col = terminal.cursorCol, row = row)
+        }
+
+        override fun setCursorAbsolute(
+            row: Int,
+            col: Int,
+        ) {
+            terminal.positionCursor(col = col, row = row)
+        }
+
+        override fun setScrollRegion(
+            top: Int,
+            bottom: Int,
+        ) {
+            // Parser SPI passes zero-based inclusive margins; core TerminalWriter keeps DECSTBM's
+            // one-based inclusive API. This conversion is intentional.
+            terminal.setScrollRegion(
+                top = top + 1,
+                bottom = if (bottom < 0) terminal.height else bottom + 1,
+            )
+        }
+
+        override fun setLeftRightMargins(
+            left: Int,
+            right: Int,
+        ) {
+            // Parser SPI passes zero-based inclusive margins; core TerminalWriter keeps DECSLRM's
+            // one-based inclusive API. This conversion is intentional.
+            terminal.setLeftRightMargins(
+                left = left + 1,
+                right = if (right < 0) terminal.width else right + 1,
+            )
+        }
+
+        override fun eraseInDisplay(
+            mode: Int,
+            selective: Boolean,
+        ) {
+            when {
+                selective && mode == 0 -> terminal.selectiveEraseScreenToEnd()
+                selective && mode == 1 -> terminal.selectiveEraseScreenToCursor()
+                selective && mode == 2 -> terminal.selectiveEraseEntireScreen()
+                !selective && mode == 0 -> terminal.eraseScreenToEnd()
+                !selective && mode == 1 -> terminal.eraseScreenToCursor()
+                !selective && mode == 2 -> terminal.eraseEntireScreen()
+                !selective && mode == 3 -> terminal.eraseScreenAndHistory()
+            }
+        }
+
+        override fun eraseInLine(
+            mode: Int,
+            selective: Boolean,
+        ) {
+            when {
+                selective && mode == 0 -> terminal.selectiveEraseLineToEnd()
+                selective && mode == 1 -> terminal.selectiveEraseLineToCursor()
+                selective && mode == 2 -> terminal.selectiveEraseCurrentLine()
+                !selective && mode == 0 -> terminal.eraseLineToEnd()
+                !selective && mode == 1 -> terminal.eraseLineToCursor()
+                !selective && mode == 2 -> terminal.eraseCurrentLine()
+            }
+        }
+
+        override fun eraseRectangle(
+            top: Int,
+            left: Int,
+            bottom: Int,
+            right: Int,
+            selective: Boolean,
+        ) {
+            terminal.eraseRectangle(top, left, bottom, right, selective)
+        }
+
+        override fun fillRectangle(
+            codepoint: Int,
+            top: Int,
+            left: Int,
+            bottom: Int,
+            right: Int,
+        ) {
+            terminal.fillRectangle(codepoint, top, left, bottom, right)
+        }
+
+        override fun copyRectangle(
+            sourceTop: Int,
+            sourceLeft: Int,
+            sourceBottom: Int,
+            sourceRight: Int,
+            sourcePage: Int,
+            destinationTop: Int,
+            destinationLeft: Int,
+            destinationPage: Int,
+        ) {
+            terminal.copyRectangle(
+                sourceTop,
+                sourceLeft,
+                sourceBottom,
+                sourceRight,
+                sourcePage,
+                destinationTop,
+                destinationLeft,
+                destinationPage,
+            )
+        }
+
+        override fun requestRectangleChecksum(
+            requestId: Int,
+            page: Int,
+            top: Int,
+            left: Int,
+            bottom: Int,
+            right: Int,
+        ) {
+            if (!hostPolicy.terminalResponsePolicy.isAllowed) return
+            terminal.requestRectangleChecksum(requestId, page, top, left, bottom, right)
+        }
+
+        override fun setAttributeChangeExtent(extent: Int) {
+            terminal.setAttributeChangeExtent(extent)
+        }
+
+        override fun changeRectangleAttributes(
+            top: Int,
+            left: Int,
+            bottom: Int,
+            right: Int,
+            setMask: Int,
+            clearMask: Int,
+        ) {
+            terminal.changeRectangleAttributes(top, left, bottom, right, setMask, clearMask)
+        }
+
+        override fun reverseRectangleAttributes(
+            top: Int,
+            left: Int,
+            bottom: Int,
+            right: Int,
+            reverseMask: Int,
+        ) {
+            terminal.reverseRectangleAttributes(top, left, bottom, right, reverseMask)
+        }
+
+        override fun insertColumns(count: Int) {
+            terminal.insertColumns(count)
+        }
+
+        override fun deleteColumns(count: Int) {
+            terminal.deleteColumns(count)
+        }
+
+        override fun insertLines(n: Int) {
+            terminal.insertLines(n)
+        }
+
+        override fun deleteLines(n: Int) {
+            terminal.deleteLines(n)
+        }
+
+        override fun insertCharacters(n: Int) {
+            terminal.insertBlankCharacters(n)
+        }
+
+        override fun deleteCharacters(n: Int) {
+            terminal.deleteCharacters(n)
+        }
+
+        override fun eraseCharacters(n: Int) {
+            terminal.eraseCharacters(n)
+        }
+
+        override fun scrollUp(n: Int) {
+            terminal.scrollUp(n)
+        }
+
+        override fun scrollDown(n: Int) {
+            terminal.scrollDown(n)
+        }
+
+        override fun setTabStop() {
+            terminal.setTabStop()
+        }
+
+        override fun clearTabStop() {
+            terminal.clearTabStop()
+        }
+
+        override fun clearAllTabStops() {
+            terminal.clearAllTabStops()
+        }
+
+        override fun setAnsiMode(
+            mode: Int,
+            enable: Boolean,
+        ) {
+            when (mode) {
+                AnsiMode.INSERT -> terminal.setInsertMode(enable)
+                AnsiMode.NEW_LINE -> terminal.setNewLineMode(enable)
+            }
+        }
+
+        override fun setDecMode(
+            mode: Int,
+            enable: Boolean,
+        ) {
+            when (mode) {
+                DecPrivateMode.APPLICATION_CURSOR_KEYS -> terminal.setApplicationCursorKeys(enable)
+                DecPrivateMode.DECCOLM -> {
+                    val columns = if (enable) 132 else 80
+                    hostEvents.resizeForColumnMode(terminal.height, columns)
+                    terminal.executeDeccolm(columns)
+                    hostEvents.columnModeChanged(terminal.height, columns)
+                }
+                DecPrivateMode.REVERSE_VIDEO -> terminal.setReverseVideo(enable)
+                DecPrivateMode.ORIGIN -> terminal.setOriginMode(enable)
+                DecPrivateMode.AUTO_WRAP -> terminal.setAutoWrap(enable)
+                DecPrivateMode.CURSOR_BLINK -> terminal.setCursorBlinking(enable)
+                DecPrivateMode.CURSOR_VISIBLE -> terminal.setCursorVisible(enable)
+                DecPrivateMode.APPLICATION_KEYPAD -> terminal.setApplicationKeypad(enable)
+                DecPrivateMode.BACKARROW_KEY -> terminal.setBackarrowKeyMode(enable)
+                DecPrivateMode.LEFT_RIGHT_MARGIN -> terminal.setLeftRightMarginMode(enable)
+                DecPrivateMode.MOUSE_X10 -> setMouseTrackingMode(enable, MouseTrackingMode.X10)
+                DecPrivateMode.MOUSE_NORMAL -> setMouseTrackingMode(enable, MouseTrackingMode.NORMAL)
+                DecPrivateMode.MOUSE_BUTTON_EVENT -> setMouseTrackingMode(enable, MouseTrackingMode.BUTTON_EVENT)
+                DecPrivateMode.MOUSE_ANY_EVENT -> setMouseTrackingMode(enable, MouseTrackingMode.ANY_EVENT)
+                DecPrivateMode.FOCUS_REPORTING -> terminal.setFocusReportingEnabled(enable)
+                DecPrivateMode.MOUSE_UTF8 ->
+                    terminal.setMouseEncodingMode(
+                        if (enable) MouseEncodingMode.UTF8 else MouseEncodingMode.DEFAULT,
+                    )
+                DecPrivateMode.MOUSE_SGR ->
+                    terminal.setMouseEncodingMode(
+                        if (enable) MouseEncodingMode.SGR else MouseEncodingMode.DEFAULT,
+                    )
+                DecPrivateMode.MOUSE_URXVT ->
+                    terminal.setMouseEncodingMode(
+                        if (enable) MouseEncodingMode.URXVT else MouseEncodingMode.DEFAULT,
+                    )
+                DecPrivateMode.MOUSE_SGR_PIXELS ->
+                    terminal.setMouseEncodingMode(
+                        if (enable) MouseEncodingMode.SGR_PIXELS else MouseEncodingMode.DEFAULT,
+                    )
+                DecPrivateMode.ALT_SCREEN -> {
+                    if (enable) {
+                        terminal.enterAltBufferWithoutCursorSave(clearBeforeEnter = false)
+                    } else {
+                        terminal.exitAltBufferWithoutCursorRestore()
+                    }
+                }
+                DecPrivateMode.ALT_SCREEN_BUFFER -> {
+                    if (enable) {
+                        terminal.enterAltBufferWithoutCursorSave(clearBeforeEnter = true)
+                    } else {
+                        terminal.exitAltBufferWithoutCursorRestore()
+                    }
+                }
+                DecPrivateMode.SAVE_RESTORE_CURSOR -> {
+                    if (enable) terminal.saveCursor() else terminal.restoreCursor()
+                }
+                DecPrivateMode.ALT_SCREEN_SAVE_CURSOR -> {
+                    if (enable) terminal.enterAltBuffer() else terminal.exitAltBuffer()
+                }
+                DecPrivateMode.BRACKETED_PASTE -> terminal.setBracketedPasteEnabled(enable)
+                DecPrivateMode.SYNCHRONIZED_OUTPUT -> terminal.setSynchronizedOutput(enable)
+                DecPrivateMode.BELL_IS_URGENT -> terminal.setBellIsUrgent(enable)
+                DecPrivateMode.POP_ON_BELL -> terminal.setPopOnBell(enable)
+            }
+        }
+
+        override fun setKeyModifierOption(
+            resource: Int,
+            value: Int,
+        ) {
+            if (value >= 0 && XtermKeyResource.isValidModifierValue(resource, value)) {
+                terminal.setKeyModifierOption(resource, value)
+            }
+        }
+
+        override fun resetKeyModifierOption(resource: Int): Unit = terminal.resetKeyModifierOption(resource)
+
+        override fun resetKeyModifierOptions(): Unit = terminal.resetKeyModifierOptions()
+
+        override fun disableKeyModifierOption(resource: Int) {
+            if (XtermKeyResource.isSupported(resource)) terminal.setKeyModifierOption(resource, -1)
+        }
+
+        override fun requestKeyModifierOption(resource: Int) {
+            if (hostPolicy.terminalResponsePolicy.isAllowed) terminal.requestKeyModifierOption(resource)
+        }
+
+        override fun requestKeyFormatOption(resource: Int) {
+            if (hostPolicy.terminalResponsePolicy.isAllowed) terminal.requestKeyFormatOption(resource)
+        }
+
+        override fun setKeyFormatOption(
+            resource: Int,
+            value: Int,
+        ) {
+            if (XtermKeyResource.isValidFormatValue(resource, value)) terminal.setKeyFormatOption(resource, value)
+        }
+
+        override fun resetKeyFormatOption(resource: Int): Unit = terminal.resetKeyFormatOption(resource)
+
+        override fun resetKeyFormatOptions(): Unit = terminal.resetKeyFormatOptions()
+
+        override fun applyKittyKeyboardFlags(
+            flags: Int,
+            applicationMode: Int,
+        ) {
+            if (flags < 0) return
+            val current = TerminalInputState.kittyKeyboardFlags(terminal.getInputModeBits())
+            val next =
+                when (applicationMode) {
+                    KittyKeyboardFlagApplicationMode.REPLACE -> flags
+                    KittyKeyboardFlagApplicationMode.SET -> current or flags
+                    KittyKeyboardFlagApplicationMode.CLEAR -> current and flags.inv()
+                    else -> return
+                }
+            terminal.setKittyKeyboardFlags(next and kittyKeyboardSupportedFlags)
+        }
+
+        override fun pushKittyKeyboardFlags(flags: Int) {
+            terminal.pushKittyKeyboardFlags(flags and kittyKeyboardSupportedFlags)
+        }
+
+        override fun popKittyKeyboardFlags(count: Int) {
+            terminal.popKittyKeyboardFlags(count)
+        }
+
+        /**
+         * Publishes the host default without requiring parser synchronization.
+         *
+         * The host serializes publication with its input-policy update. Mode queries
+         * read the last published default without waiting for outbound writes.
+         */
+        public fun setDefaultBackarrowSendsBackspace(value: Boolean) {
+            defaultBackarrowSendsBackspace = value
+        }
+
+        override fun requestModeStatus(
+            mode: Int,
+            decPrivate: Boolean,
+        ) {
+            if (!hostPolicy.terminalResponsePolicy.isAllowed) return
+            terminal.requestModeStatus(mode, decPrivate, modeReportCapabilities, defaultBackarrowSendsBackspace)
+        }
+
+        override fun requestDeviceStatusReport(
+            mode: Int,
+            decPrivate: Boolean,
+        ) {
+            if (!hostPolicy.terminalResponsePolicy.isAllowed) return
+            terminal.requestDeviceStatusReport(mode, decPrivate)
+        }
+
+        override fun requestDeviceAttributes(
+            kind: Int,
+            parameter: Int,
+        ) {
+            if (!hostPolicy.terminalResponsePolicy.isAllowed) return
+            terminal.requestDeviceAttributes(kind, parameter)
+        }
+
+        override fun requestKittyKeyboardFlags() {
+            if (!hostPolicy.terminalResponsePolicy.isAllowed) return
+            terminal.requestKittyKeyboardFlags()
+        }
+
+        override fun requestWindowReport(mode: Int) {
+            if (!hostPolicy.terminalResponsePolicy.isAllowed) return
+            terminal.requestWindowReport(mode)
+        }
+
+        override fun resizeWindow(
+            rows: Int,
+            columns: Int,
+        ) {
+            if (!hostPolicy.windowManipulationPolicy.isAllowed) return
+            hostEvents.resizeWindow(rows, columns)
+        }
+
+        override fun moveWindow(
+            x: Int,
+            y: Int,
+        ) {
+            if (!hostPolicy.windowManipulationPolicy.isAllowed) return
+            hostEvents.moveWindow(x, y)
+        }
+
+        override fun minimizeWindow() {
+            if (!hostPolicy.windowManipulationPolicy.isAllowed) return
+            hostEvents.minimizeWindow()
+        }
+
+        override fun deminimizeWindow() {
+            if (!hostPolicy.windowManipulationPolicy.isAllowed) return
+            hostEvents.deminimizeWindow()
+        }
+
+        override fun raiseWindow() {
+            if (!hostPolicy.windowManipulationPolicy.isAllowed) return
+            hostEvents.raiseWindow()
+        }
+
+        override fun lowerWindow() {
+            if (!hostPolicy.windowManipulationPolicy.isAllowed) return
+            hostEvents.lowerWindow()
+        }
+
+        override fun setMaximized(maximize: Boolean) {
+            if (!hostPolicy.windowManipulationPolicy.isAllowed) return
+            hostEvents.setMaximized(maximize)
+        }
+
+        override fun pushTitleStack(scope: Int) {
+            if (!hostPolicy.titlePolicy.isAllowed) return
+            when (scope) {
+                0 -> {
+                    pushTitle(windowTitleStack, windowTitle)
+                    pushTitle(iconTitleStack, iconTitle)
+                }
+                1 -> pushTitle(iconTitleStack, iconTitle)
+                2 -> pushTitle(windowTitleStack, windowTitle)
+            }
+        }
+
+        override fun popTitleStack(scope: Int) {
+            if (!hostPolicy.titlePolicy.isAllowed) return
+            when (scope) {
+                0 -> {
+                    popTitle(windowTitleStack)?.let { updateWindowTitle(it) }
+                    popTitle(iconTitleStack)?.let { updateIconTitle(it) }
+                }
+                1 -> popTitle(iconTitleStack)?.let { updateIconTitle(it) }
+                2 -> popTitle(windowTitleStack)?.let { updateWindowTitle(it) }
+            }
+        }
+
+        override fun resetAttributes() {
+            terminal.resetPen()
+        }
+
+        override fun setBold(enabled: Boolean) {
+            terminal.updatePenColors(bold = enabled)
+        }
+
+        override fun setFaint(enabled: Boolean) {
+            terminal.updatePenColors(faint = enabled)
+        }
+
+        override fun setItalic(enabled: Boolean) {
+            terminal.updatePenColors(italic = enabled)
+        }
+
+        override fun setUnderlineStyle(style: Int) {
+            terminal.updatePenColors(underlineStyle = UnderlineStyle.fromSgrCode(style) ?: return)
+        }
+
+        override fun setBlink(enabled: Boolean) {
+            terminal.updatePenColors(blink = enabled)
+        }
+
+        override fun setInverse(enabled: Boolean) {
+            terminal.updatePenColors(inverse = enabled)
+        }
+
+        override fun setConceal(enabled: Boolean) {
+            terminal.updatePenColors(conceal = enabled)
+        }
+
+        override fun setStrikethrough(enabled: Boolean) {
+            terminal.updatePenColors(strikethrough = enabled)
+        }
+
+        override fun setOverline(enabled: Boolean) {
+            terminal.updatePenColors(overline = enabled)
+        }
+
+        override fun setSelectiveEraseProtection(enabled: Boolean) {
+            terminal.setSelectiveEraseProtection(enabled)
+        }
+
+        override fun setForegroundDefault() {
+            terminal.updatePenColors(foreground = CellColor.DEFAULT)
+        }
+
+        override fun setBackgroundDefault() {
+            terminal.updatePenColors(background = CellColor.DEFAULT)
+        }
+
+        override fun setUnderlineColorDefault() {
+            terminal.updatePenColors(underlineColor = CellColor.DEFAULT)
+        }
+
+        override fun setForegroundIndexed(index: Int) {
+            if (index !in 0..255) return
+            terminal.updatePenColors(foreground = CellColor.indexed(index))
+        }
+
+        override fun setBackgroundIndexed(index: Int) {
+            if (index !in 0..255) return
+            terminal.updatePenColors(background = CellColor.indexed(index))
+        }
+
+        override fun setUnderlineColorIndexed(index: Int) {
+            if (index !in 0..255) return
+            terminal.updatePenColors(underlineColor = CellColor.indexed(index))
+        }
+
+        override fun setForegroundRgb(
+            red: Int,
+            green: Int,
+            blue: Int,
+        ) {
+            terminal.updatePenColors(foreground = CellColor.rgb(red, green, blue))
+        }
+
+        override fun setBackgroundRgb(
+            red: Int,
+            green: Int,
+            blue: Int,
+        ) {
+            terminal.updatePenColors(background = CellColor.rgb(red, green, blue))
+        }
+
+        override fun setUnderlineColorRgb(
+            red: Int,
+            green: Int,
+            blue: Int,
+        ) {
+            terminal.updatePenColors(underlineColor = CellColor.rgb(red, green, blue))
+        }
+
+        override fun setWindowTitle(title: String) {
+            acceptedTitle(title)?.let { updateWindowTitle(it) }
+        }
+
+        override fun setIconTitle(title: String) {
+            acceptedTitle(title)?.let { updateIconTitle(it) }
+        }
+
+        override fun setIconAndWindowTitle(title: String) {
+            val accepted = acceptedTitle(title) ?: return
+            updateIconTitle(accepted)
+            updateWindowTitle(accepted)
+        }
+
+        override fun setCurrentWorkingDirectoryUri(uri: String) {
+            if (!hostPolicy.currentWorkingDirectoryPolicy.isAllowed) return
+            if (!isCurrentWorkingDirectoryUriAllowed(uri)) return
+            currentWorkingDirectory = uri
+            hostEvents.currentWorkingDirectoryChanged(uri)
+        }
+
+        override fun startHyperlink(
+            uri: String,
+            id: String?,
+        ) {
+            if (!hostPolicy.hyperlinkPolicy.isAllowed) {
+                clearActiveHyperlink()
+                return
+            }
+            if (!isHyperlinkAllowed(uri, id)) {
+                clearActiveHyperlink()
+                return
+            }
+
+            val numericId = hyperlinkIdFor(uri, id)
+            if (numericId == NO_HYPERLINK_ID) {
+                clearActiveHyperlink()
+                return
+            }
+
+            activeHyperlinkUri = uri
+            activeHyperlinkId = id
+            activeHyperlinkNumericId = numericId
+            terminal.setHyperlinkId(activeHyperlinkNumericId)
+        }
+
+        override fun endHyperlink() {
+            clearActiveHyperlink()
+        }
+
+        /**
+         * Current decoded-byte budget for collecting larger OSC 52 writes. Denied writes
+         * return zero, retaining the parser's ordinary envelope bound and small-request auditing.
+         * This does not authorize execution: [requestClipboard] rechecks the current policy.
+         */
+        public fun clipboardWriteLimitBytes(): Int {
+            val policy = hostPolicy.clipboardPolicy
+            return when (clipboardDecisionForWrite(policy)) {
+                TerminalClipboardDecision.ALLOWED_BY_POLICY, TerminalClipboardDecision.PROMPT_REQUIRED -> policy.maxDecodedBytes
                 else -> 0
             }
-    }
+        }
 
-    private fun decodeClipboardText(value: String): String? {
-        val bytes =
-            try {
-                Base64.getDecoder().decode(value)
-            } catch (_: IllegalArgumentException) {
-                return null
+        override fun requestClipboard(
+            selection: String,
+            encodedData: String,
+        ) {
+            val requestPolicy = hostPolicy
+            val policy = requestPolicy.clipboardPolicy
+            val operation =
+                if (encodedData == CLIPBOARD_QUERY_MARKER) {
+                    TerminalClipboardOperation.READ_QUERY
+                } else {
+                    TerminalClipboardOperation.WRITE
+                }
+            val readSelection =
+                if (operation == TerminalClipboardOperation.READ_QUERY) {
+                    TerminalClipboardSelection.parse(selection)
+                } else {
+                    null
+                }
+            val decodedBytes = if (operation == TerminalClipboardOperation.WRITE) decodedBase64ByteCount(encodedData) else 0
+            // Bound allocation before decoding, and validate the text before publishing
+            // permission outcomes. Reuse the decoded text for the write or prompt.
+            val decodedText =
+                if (operation == TerminalClipboardOperation.WRITE && decodedBytes in 0..policy.maxDecodedBytes) {
+                    decodeClipboardText(encodedData)
+                } else {
+                    null
+                }
+            val decision =
+                when {
+                    operation == TerminalClipboardOperation.READ_QUERY -> clipboardDecisionForRead(readSelection, requestPolicy)
+                    decodedBytes < 0 -> TerminalClipboardDecision.DENIED_MALFORMED_PAYLOAD
+                    decodedBytes > policy.maxDecodedBytes -> TerminalClipboardDecision.DENIED_PAYLOAD_TOO_LARGE
+                    decodedText == null -> TerminalClipboardDecision.DENIED_MALFORMED_PAYLOAD
+                    else -> clipboardDecisionForWrite(policy)
+                }
+            val audit =
+                TerminalClipboardAuditEvent(
+                    operation = operation,
+                    selection = selection,
+                    encodedLength = encodedData.length,
+                    decodedBytes = decodedBytes.coerceAtLeast(0),
+                    maxDecodedBytes = policy.maxDecodedBytes,
+                    decision = decision,
+                )
+            hostEvents.terminalClipboardRequest(audit)
+            if (readSelection != null && requestPolicy.terminalResponsePolicy.isAllowed) {
+                hostEvents.terminalClipboardReadRequested(
+                    TerminalClipboardReadRequest(readSelection, policy.readPermission, policy.maxDecodedBytes),
+                )
+                return
             }
-        val decoder =
-            StandardCharsets.UTF_8
-                .newDecoder()
-                .onMalformedInput(CodingErrorAction.REPORT)
-                .onUnmappableCharacter(CodingErrorAction.REPORT)
-        val chars = CharBuffer.allocate(bytes.size)
-        if (decoder.decode(ByteBuffer.wrap(bytes), chars, true).isError) return null
-        if (decoder.flush(chars).isError) return null
-        return String(chars.array(), 0, chars.position())
+            if (decodedText == null) return
+            when (audit.decision) {
+                TerminalClipboardDecision.ALLOWED_BY_POLICY ->
+                    hostEvents.terminalClipboardWrite(
+                        TerminalClipboardWriteEvent(
+                            selection = selection,
+                            text = decodedText,
+                            audit = audit,
+                        ),
+                    )
+                TerminalClipboardDecision.PROMPT_REQUIRED ->
+                    hostEvents.terminalClipboardPrompt(
+                        TerminalClipboardPromptEvent(
+                            selection = selection,
+                            text = decodedText,
+                            audit = audit,
+                        ),
+                    )
+                else -> Unit
+            }
+        }
+
+        override fun setPaletteColor(
+            index: Int,
+            color: Int,
+        ) {
+            if (!hostPolicy.palettePolicy.isAllowed) return
+            val previous = terminal.palette
+            terminal.setPaletteColor(index, color)
+            publishPaletteChange(previous)
+        }
+
+        override fun queryPaletteColor(index: Int) {
+            if (!hostPolicy.palettePolicy.isAllowed) return
+            terminal.queryPaletteColor(index)
+        }
+
+        override fun setDynamicColor(
+            target: Int,
+            color: Int,
+        ) {
+            if (!hostPolicy.palettePolicy.isAllowed) return
+            val previous = terminal.palette
+            terminal.setDynamicColor(target, color)
+            publishPaletteChange(previous)
+        }
+
+        /**
+         * Applies a host-selected theme and publishes an effective palette change.
+         * Unlike application OSC controls, this operation is not gated by host policy.
+         * The caller must serialize it with parser/core mutations.
+         */
+        public fun setThemePalette(palette: TerminalColorPalette) {
+            val previous = terminal.palette
+            terminal.setThemePalette(palette)
+            publishPaletteChange(previous)
+        }
+
+        private fun publishPaletteChange(previous: TerminalColorPalette) {
+            val current = terminal.palette
+            if (previous != current) hostEvents.paletteChanged(current)
+        }
+
+        override fun queryDynamicColor(target: Int) {
+            if (!hostPolicy.palettePolicy.isAllowed) return
+            terminal.queryDynamicColor(target)
+        }
+
+        override fun queryStatusString(query: String) {
+            if (!hostPolicy.terminalResponsePolicy.isAllowed) return
+            terminal.queryStatusString(query)
+        }
+
+        override fun queryTerminfo(rawPayload: String) {
+            if (!hostPolicy.terminalResponsePolicy.isAllowed) return
+            terminal.queryTerminfo(rawPayload)
+        }
+
+        override fun shellIntegrationMarker(event: ShellIntegrationEvent) {
+            hostEvents.shellIntegrationMarker(event)
+        }
+
+        override fun showNotification(
+            title: String,
+            body: String,
+            level: NotificationLevel,
+        ) {
+            if (!hostPolicy.notificationPolicy.isAllowed) return
+            val clampedTitle = title.truncateAtScalarBoundary(hostPolicy.maxNotificationTitleLength)
+            val clampedBody = body.truncateAtScalarBoundary(hostPolicy.maxNotificationBodyLength)
+            hostEvents.showNotification(clampedTitle, clampedBody, level)
+        }
+
+        /**
+         * Returns the OSC 8 URI associated with [hyperlinkId], or `null`.
+         *
+         * The renderer stores only primitive ids in cells. This adapter owns the
+         * bounded metadata registry that maps those ids back to validated URIs for
+         * explicit host/UI activation. IDs invalidated by reset or evicted by
+         * [hostPolicy] remain unresolved even if cells or UI snapshots retain them.
+         * An issued ID is never assigned to another link during this adapter's
+         * lifetime. Exhausting the positive ID range prevents new entries while
+         * existing explicit OSC 8 keys can still reuse their retained entries.
+         *
+         * @param hyperlinkId render-cell hyperlink id.
+         * @return target URI, or `null`.
+         */
+        public fun hyperlinkUri(hyperlinkId: Int): String? = hyperlinkKeysByNumericId[hyperlinkId]?.uri
+
+        /**
+         * Returns the latest valid OSC 7 current-working-directory URI.
+         *
+         * @return accepted absolute `file://` URI, or `null` before one is received.
+         */
+        public fun currentWorkingDirectoryUri(): String? = currentWorkingDirectory
+
+        private fun setMouseTrackingMode(
+            enabled: Boolean,
+            mode: MouseTrackingMode,
+        ) {
+            terminal.setMouseTrackingMode(if (enabled) mode else MouseTrackingMode.OFF)
+        }
+
+        private fun pushTitle(
+            stack: ArrayDeque<String>,
+            title: String,
+        ) {
+            if (stack.size == MAX_TITLE_STACK_DEPTH) {
+                stack.removeFirst()
+            }
+            stack.addLast(title)
+        }
+
+        private fun popTitle(stack: ArrayDeque<String>): String? = if (stack.isEmpty()) null else stack.removeLast()
+
+        private fun updateIconTitle(title: String) {
+            terminal.setIconTitle(title)
+            hostEvents.iconTitleChanged(title)
+        }
+
+        private fun updateWindowTitle(title: String) {
+            terminal.setWindowTitle(title)
+            hostEvents.windowTitleChanged(title)
+        }
+
+        private fun clearActiveHyperlink() {
+            activeHyperlinkUri = null
+            activeHyperlinkId = null
+            activeHyperlinkNumericId = NO_HYPERLINK_ID
+            terminal.setHyperlinkId(NO_HYPERLINK_ID)
+        }
+
+        private fun clipboardDecisionForWrite(policy: TerminalClipboardPolicy): TerminalClipboardDecision =
+            when (policy.writePermission) {
+                TerminalClipboardPermission.DENY -> TerminalClipboardDecision.DENIED_BY_POLICY
+                TerminalClipboardPermission.PROMPT -> TerminalClipboardDecision.PROMPT_REQUIRED
+                TerminalClipboardPermission.ALLOW -> TerminalClipboardDecision.ALLOWED_BY_POLICY
+            }
+
+        private fun clipboardDecisionForRead(
+            selection: TerminalClipboardSelection?,
+            policy: HostPolicy,
+        ): TerminalClipboardDecision {
+            // This is the protocol allowlist, independent of the host's available clipboards.
+            if (selection == null) return TerminalClipboardDecision.DENIED_MALFORMED_PAYLOAD
+            if (!policy.terminalResponsePolicy.isAllowed) return TerminalClipboardDecision.DENIED_BY_POLICY
+            return when (policy.clipboardPolicy.readPermission) {
+                TerminalClipboardPermission.DENY -> TerminalClipboardDecision.DENIED_READ_DISABLED
+                TerminalClipboardPermission.PROMPT -> TerminalClipboardDecision.PROMPT_REQUIRED
+                TerminalClipboardPermission.ALLOW -> TerminalClipboardDecision.ALLOWED_BY_POLICY
+            }
+        }
+
+        private fun hyperlinkIdFor(
+            uri: String,
+            id: String?,
+        ): Int {
+            val maxEntries = hostPolicy.maxHyperlinkEntries
+            val numericId = nextHyperlinkNumericId
+            val key =
+                if (id == null) {
+                    HyperlinkKey(id = "", uri = uri, anonymousInstance = numericId)
+                } else {
+                    HyperlinkKey(id = id, uri = uri, anonymousInstance = EXPLICIT_HYPERLINK_INSTANCE)
+                }
+            if (id != null) {
+                hyperlinkIds[key]?.let {
+                    trimHyperlinks(maxEntries)
+                    return it
+                }
+            }
+            if (numericId == NO_HYPERLINK_ID) return NO_HYPERLINK_ID
+
+            trimHyperlinks(maxEntries - 1)
+
+            hyperlinkIds[key] = numericId
+            hyperlinkKeysByNumericId[numericId] = key
+            nextHyperlinkNumericId = if (numericId == Int.MAX_VALUE) NO_HYPERLINK_ID else numericId + 1
+            hostEvents.hyperlinkRegistered(numericId, uri, id)
+            return numericId
+        }
+
+        private fun trimHyperlinks(maxEntries: Int) {
+            if (hyperlinkIds.size <= maxEntries) return
+            val eldest = hyperlinkIds.entries.iterator()
+            while (hyperlinkIds.size > maxEntries) {
+                val numericId = eldest.next().value
+                hyperlinkKeysByNumericId.remove(numericId)
+                eldest.remove()
+                hostEvents.hyperlinkRemoved(numericId)
+            }
+        }
+
+        private fun isHyperlinkAllowed(
+            uri: String,
+            id: String?,
+        ): Boolean =
+            uri.length <= hostPolicy.maxHyperlinkUriLength &&
+                (id?.length ?: 0) <= hostPolicy.maxHyperlinkIdLength
+
+        private fun acceptedTitle(title: String): String? {
+            val policy = hostPolicy.titlePolicy
+            if (!policy.isAllowed) return null
+            if (title.length <= policy.maxLength) return title
+            return when (policy.overflowPolicy) {
+                TerminalTitleOverflowPolicy.REJECT -> null
+                TerminalTitleOverflowPolicy.CLAMP -> title.truncateAtScalarBoundary(policy.maxLength)
+            }
+        }
+
+        private companion object {
+            const val NO_HYPERLINK_ID: Int = 0
+            const val EXPLICIT_HYPERLINK_INSTANCE: Int = 0
+            const val MAX_TITLE_STACK_DEPTH: Int = 16
+            const val CLIPBOARD_QUERY_MARKER: String = "?"
+        }
+
+        private data class HyperlinkKey(
+            val id: String,
+            val uri: String,
+            val anonymousInstance: Int,
+        )
+
+        private fun isCurrentWorkingDirectoryUriAllowed(value: String): Boolean {
+            if (value.isEmpty() || value.length > hostPolicy.maxCurrentWorkingDirectoryUriLength) return false
+            val uri =
+                try {
+                    URI(value)
+                } catch (_: URISyntaxException) {
+                    return false
+                }
+            return uri.scheme.equals("file", ignoreCase = true) &&
+                value.regionMatches(uri.scheme.length + 1, "//", 0, 2) &&
+                !uri.rawPath.isNullOrEmpty() &&
+                uri.rawUserInfo == null &&
+                uri.rawQuery == null &&
+                uri.rawFragment == null
+        }
+
+        private fun decodedBase64ByteCount(value: String): Int {
+            if (value.isEmpty()) return 0
+
+            var nonPaddingChars = 0
+            var paddingChars = 0
+            var sawPadding = false
+            var i = 0
+            while (i < value.length) {
+                when (value[i]) {
+                    in 'A'..'Z',
+                    in 'a'..'z',
+                    in '0'..'9',
+                    '+',
+                    '/',
+                    -> {
+                        if (sawPadding) return -1
+                        nonPaddingChars++
+                    }
+                    '=' -> {
+                        sawPadding = true
+                        paddingChars++
+                        if (paddingChars > 2) return -1
+                    }
+                    else -> return -1
+                }
+                i++
+            }
+
+            if (paddingChars > 0) {
+                val encodedChars = nonPaddingChars + paddingChars
+                if (encodedChars % 4 != 0) return -1
+                return (encodedChars / 4) * 3 - paddingChars
+            }
+
+            val remainder = nonPaddingChars % 4
+            if (remainder == 1) return -1
+            return (nonPaddingChars / 4) * 3 +
+                when (remainder) {
+                    2 -> 1
+                    3 -> 2
+                    else -> 0
+                }
+        }
+
+        private fun decodeClipboardText(value: String): String? {
+            val bytes =
+                try {
+                    Base64.getDecoder().decode(value)
+                } catch (_: IllegalArgumentException) {
+                    return null
+                }
+            val decoder =
+                StandardCharsets.UTF_8
+                    .newDecoder()
+                    .onMalformedInput(CodingErrorAction.REPORT)
+                    .onUnmappableCharacter(CodingErrorAction.REPORT)
+            val chars = CharBuffer.allocate(bytes.size)
+            if (decoder.decode(ByteBuffer.wrap(bytes), chars, true).isError) return null
+            if (decoder.flush(chars).isError) return null
+            return String(chars.array(), 0, chars.position())
+        }
     }
-}
 
 /** Keeps the UTF-16 size bound without splitting a valid supplementary scalar. */
 private fun String.truncateAtScalarBoundary(limit: Int): String {

@@ -18,7 +18,6 @@ package consumer;
 import io.github.ketraterm.core.TerminalBuffers;
 import io.github.ketraterm.host.HostCommandAdapter;
 import io.github.ketraterm.host.HostEventSink;
-import io.github.ketraterm.host.HostPolicy;
 import io.github.ketraterm.parser.api.TerminalParsers;
 import io.github.ketraterm.parser.spi.TerminalCommandSink;
 import io.github.ketraterm.protocol.NotificationLevel;
@@ -27,7 +26,7 @@ import java.nio.charset.StandardCharsets;
 public final class JavaConsumer {
     public static void verify() throws Exception {
         var buffer = TerminalBuffers.create(12, 2, 0);
-        var adapter = new HostCommandAdapter(buffer, HostEventSink.NONE, new HostPolicy(), 0, 0, false);
+        var adapter = new HostCommandAdapter(buffer);
         TerminalCommandSink sink = adapter;
         sink.writeCodepoint('J');
         var parser = TerminalParsers.create(adapter);

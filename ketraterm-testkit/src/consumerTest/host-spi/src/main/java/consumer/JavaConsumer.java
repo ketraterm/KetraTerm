@@ -19,6 +19,10 @@ import io.github.ketraterm.core.TerminalBuffers;
 import io.github.ketraterm.core.api.TerminalLine;
 import io.github.ketraterm.host.HostCommandAdapter;
 import io.github.ketraterm.host.HostEventSink;
+import io.github.ketraterm.input.event.TerminalKey;
+import io.github.ketraterm.input.event.TerminalKeyEvent;
+import io.github.ketraterm.input.event.TerminalKeyEventType;
+import io.github.ketraterm.input.event.TerminalModifiers;
 import io.github.ketraterm.parser.api.TerminalParsers;
 import io.github.ketraterm.parser.spi.TerminalCommandSink;
 import java.nio.charset.StandardCharsets;
@@ -166,10 +170,19 @@ public final class JavaConsumer {
         sink.requestClipboard("c", "?");
         var events = new Events();
         var buffer = TerminalBuffers.create(8, 2, 0);
-        var hostParser = TerminalParsers.create(new HostCommandAdapter(buffer, events, new io.github.ketraterm.host.HostPolicy(), 0, 0, false));
+        var hostParser = TerminalParsers.create(new HostCommandAdapter(buffer, events));
         bytes = "\033]2;Java title\007".getBytes(StandardCharsets.UTF_8);
         hostParser.accept(bytes, 0, bytes.length);
         if (!events.title.equals("Java title")) throw new AssertionError(events.title);
+        var key = TerminalKeyEvent.key(TerminalKey.UP);
+        var scalar = TerminalKeyEvent.codepoint('a', TerminalModifiers.CTRL);
+        var text = TerminalKeyEvent.text("committed", TerminalModifiers.NONE, TerminalKeyEventType.REPEAT);
+        if (key.getKey() != TerminalKey.UP || key.getModifiers() != TerminalModifiers.NONE
+                || key.getType() != TerminalKeyEventType.PRESS) throw new AssertionError("Key defaults");
+        if (scalar.getCodepoint() != 'a' || scalar.getUnshiftedCodepoint() != TerminalKeyEvent.NO_CODEPOINT
+                || scalar.getModifiers() != TerminalModifiers.CTRL) throw new AssertionError("Codepoint defaults");
+        if (text.getCodepoint() != TerminalKeyEvent.TEXT_ONLY_CODEPOINT || !text.getAssociatedText().equals("committed")
+                || text.getType() != TerminalKeyEventType.REPEAT) throw new AssertionError("Committed text");
         events.currentWorkingDirectoryChanged("file:///tmp");
         var line = new PlainLine();
         if (line.isCluster(0) || line.readCluster(0, new int[0]) != 0 || line.getCodepoint(0) != 'J') throw new AssertionError("Line defaults");

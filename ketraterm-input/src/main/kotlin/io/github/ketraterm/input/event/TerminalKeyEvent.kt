@@ -125,6 +125,8 @@ public data class TerminalKeyEvent(
          * @param type physical lifecycle phase reported by the host.
          * @return a new [TerminalKeyEvent] instance.
          */
+        @JvmStatic
+        @JvmOverloads
         public fun key(
             key: TerminalKey,
             modifiers: Int = TerminalModifiers.NONE,
@@ -153,6 +155,8 @@ public data class TerminalKeyEvent(
          * @param type physical lifecycle phase reported by the host.
          * @return a new [TerminalKeyEvent] instance.
          */
+        @JvmStatic
+        @JvmOverloads
         public fun codepoint(
             codepoint: Int,
             modifiers: Int = TerminalModifiers.NONE,
@@ -185,6 +189,8 @@ public data class TerminalKeyEvent(
          * @param type physical lifecycle phase reported by the host.
          * @return a normalized text-only key event.
          */
+        @JvmStatic
+        @JvmOverloads
         public fun text(
             associatedText: String,
             modifiers: Int = TerminalModifiers.NONE,

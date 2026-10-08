@@ -76,6 +76,7 @@ class TerminalLibraryConsumerCompilationTest {
     @ParameterizedTest
     @CsvSource(
         "host,io.github.ketraterm.host.HostPolicy",
+        "input,io.github.ketraterm.input.event.TerminalKeyEvent",
         "parser,io.github.ketraterm.parser.api.TerminalOutputParser",
         "completion,io.github.ketraterm.completion.api.TerminalCompletionCandidateKind",
         "completion-host,io.github.ketraterm.completion.host.TerminalBoundedDirectoryScanner",
@@ -235,8 +236,45 @@ class TerminalLibraryConsumerCompilationTest {
             import io.github.ketraterm.host.HostPolicy;
 
             final class Consumer {
-                HostCommandAdapter create(TerminalBuffer buffer, HostEventSink events, HostPolicy policy) {
-                    return new HostCommandAdapter(buffer, events, policy, 0, 0, false);
+                HostCommandAdapter[] create(TerminalBuffer buffer, HostEventSink events, HostPolicy policy) {
+                    return new HostCommandAdapter[] {
+                        new HostCommandAdapter(buffer),
+                        new HostCommandAdapter(buffer, events),
+                        new HostCommandAdapter(buffer, events, policy),
+                        new HostCommandAdapter(buffer, events, policy, 0),
+                        new HostCommandAdapter(buffer, events, policy, 0, 0),
+                        new HostCommandAdapter(buffer, events, policy, 0, 0, false)
+                    };
+                }
+            }
+            """.trimIndent(),
+        )
+    }
+
+    @Test
+    fun `input dependency exports static key event factories and Java overloads`() {
+        assertCompilation(
+            "input",
+            """
+            import io.github.ketraterm.input.event.*;
+
+            final class Consumer {
+                TerminalKeyEvent[] events() {
+                    return new TerminalKeyEvent[] {
+                        TerminalKeyEvent.key(TerminalKey.UP),
+                        TerminalKeyEvent.key(TerminalKey.UP, TerminalModifiers.CTRL),
+                        TerminalKeyEvent.key(TerminalKey.UP, TerminalModifiers.CTRL, TerminalKeyEventType.RELEASE),
+                        TerminalKeyEvent.codepoint('a'),
+                        TerminalKeyEvent.codepoint('a', TerminalModifiers.CTRL),
+                        TerminalKeyEvent.codepoint('a', TerminalModifiers.CTRL, 'a'),
+                        TerminalKeyEvent.codepoint('A', TerminalModifiers.SHIFT, 'a', 'A'),
+                        TerminalKeyEvent.codepoint('A', TerminalModifiers.SHIFT, 'a', 'A', 'a'),
+                        TerminalKeyEvent.codepoint('A', TerminalModifiers.SHIFT, 'a', 'A', 'a', "A"),
+                        TerminalKeyEvent.codepoint('A', TerminalModifiers.SHIFT, 'a', 'A', 'a', "A", TerminalKeyEventType.REPEAT),
+                        TerminalKeyEvent.text("committed"),
+                        TerminalKeyEvent.text("committed", TerminalModifiers.CTRL),
+                        TerminalKeyEvent.text("committed", TerminalModifiers.CTRL, TerminalKeyEventType.REPEAT)
+                    };
                 }
             }
             """.trimIndent(),

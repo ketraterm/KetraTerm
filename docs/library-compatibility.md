@@ -335,7 +335,12 @@ first. Configured shortcuts accept only extended keyboard modifier masks.
 
 Generated Java overloads also require consumer coverage: Kotlin's validator omits
 the scanner's generated no-argument secondary-constructor overload. The isolated
-Java consumer checks every supported scanner constructor. These checks remain
+Java consumer checks every supported scanner constructor. Host adapter constructor
+overloads and static `TerminalKeyEvent.key`, `codepoint`, and `text` factories
+use the same trailing defaults and validation as Kotlin. Java compilation covers
+every overload; runtime checks cover default host capabilities and normalized input.
+Existing full constructors, companion methods, and Kotlin default-call entries remain.
+These checks remain
 representative rather than exhaustive JVM-signature coverage. Follow
 [Kotlin's compatibility guidance](https://kotlinlang.org/docs/api-guidelines-backward-compatibility.html)
 and [ABI validation documentation](https://kotlinlang.org/docs/gradle-binary-compatibility-validation.html)
