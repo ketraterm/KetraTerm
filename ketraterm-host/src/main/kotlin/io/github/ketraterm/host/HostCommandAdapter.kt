@@ -168,7 +168,6 @@ public class HostCommandAdapter
         }
 
         override fun bell() {
-            // TODO(core-gap): Add a core/UI bell hook. Do not fake this by mutating grid state.
             hostEvents.bell()
         }
 
