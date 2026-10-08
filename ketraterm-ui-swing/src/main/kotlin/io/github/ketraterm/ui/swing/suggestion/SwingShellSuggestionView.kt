@@ -38,9 +38,12 @@ public class SwingShellSuggestionViewSnapshot private constructor(
     public val selectedIndex: Int,
     public val viewportStartIndex: Int,
     public val totalSuggestionCount: Int,
+    copySuggestions: Boolean = true,
+    internal val publication: SwingShellSuggestionSnapshot? = null,
 ) {
     /** Defensively copied visible suggestion window; Java mutation attempts throw [UnsupportedOperationException]. */
-    public val visibleSuggestions: List<SwingShellSuggestion> = Collections.unmodifiableList(visibleSuggestions.toList())
+    public val visibleSuggestions: List<SwingShellSuggestion> =
+        Collections.unmodifiableList(if (copySuggestions) visibleSuggestions.toList() else visibleSuggestions)
 
     /** Whether ranked suggestions precede this viewport. */
     public val hasSuggestionsBefore: Boolean
@@ -59,9 +62,6 @@ public class SwingShellSuggestionViewSnapshot private constructor(
         get() = visibleSuggestions.getOrNull(selectedIndex)
 
     init {
-        require(this.visibleSuggestions.size <= MAX_VISIBLE_SUGGESTIONS) {
-            "visibleSuggestions must contain at most $MAX_VISIBLE_SUGGESTIONS items, was ${this.visibleSuggestions.size}"
-        }
         require(selectedIndex == NO_SELECTION || selectedIndex in this.visibleSuggestions.indices) {
             "selectedIndex must be -1 or address visibleSuggestions, was $selectedIndex"
         }
@@ -104,9 +104,6 @@ public class SwingShellSuggestionViewSnapshot private constructor(
             "totalSuggestionCount=$totalSuggestionCount)"
 
     public companion object {
-        /** Maximum number of completion rows rendered at once by any host view. */
-        public const val MAX_VISIBLE_SUGGESTIONS: Int = 8
-
         /** Shared empty hidden-view snapshot. */
         @JvmField
         public val EMPTY: SwingShellSuggestionViewSnapshot =
@@ -140,6 +137,20 @@ public class SwingShellSuggestionViewSnapshot private constructor(
                 totalSuggestionCount = totalSuggestionCount,
             )
 
+        internal fun fromPublication(
+            publication: SwingShellSuggestionSnapshot,
+            start: Int,
+            end: Int,
+        ): SwingShellSuggestionViewSnapshot =
+            SwingShellSuggestionViewSnapshot(
+                publication.suggestions.subList(start, end),
+                publication.selectedIndex.takeIf { it in start until end }?.minus(start) ?: NO_SELECTION,
+                start,
+                publication.suggestions.size,
+                copySuggestions = false,
+                publication = publication,
+            )
+
         private const val NO_SELECTION = -1
     }
 }
@@ -147,13 +158,16 @@ public class SwingShellSuggestionViewSnapshot private constructor(
 /**
  * Host-pluggable visual surface for shell suggestions.
  *
- * The reusable suggestion controller owns navigation, acceptance, dismissal,
- * feedback, and popup state. A view only renders the supplied immutable items
+ * The interaction owns selection, acceptance, dismissal and feedback; the
+ * embedded controller owns navigation and popup placement. A view renders immutable items
  * and reports pointer interaction through the listener used to create it.
  * Implementations must update Swing component state only on the Event Dispatch
  * Thread and must not invoke completion providers or mutate command lines.
  */
 public interface SwingShellSuggestionView {
+    /** View-owned number of rows used for viewport and page navigation. Must be positive. */
+    public val maximumVisibleSuggestions: Int get() = DEFAULT_MAX_VISIBLE_SUGGESTIONS
+
     /**
      * Component embedded and positioned by the owning Swing terminal.
      */
@@ -163,8 +177,8 @@ public interface SwingShellSuggestionView {
      * Replaces the complete immutable visual viewport on the Swing Event
      * Dispatch Thread.
      *
-     * Implementations may retain [snapshot] because it owns a defensive copy
-     * of its visible suggestions. They must not reinterpret provider ids or
+     * Implementations may retain [snapshot] because its visible suggestions are
+     * immutable. They must not reinterpret provider ids or
      * candidate kinds; all renderer semantics are already resolved.
      *
      * @param snapshot authoritative bounded presentation state.
@@ -180,13 +194,18 @@ public interface SwingShellSuggestionView {
      * A close failure propagates, or is suppressed on an earlier hiding failure.
      */
     public fun close(): Unit = Unit
+
+    public companion object {
+        /** Standard embedded popup row count; detached views may choose another size. */
+        public const val DEFAULT_MAX_VISIBLE_SUGGESTIONS: Int = 8
+    }
 }
 
 /**
  * Pointer-interaction callback used by a [SwingShellSuggestionView].
  *
- * Selection and acceptance remain controller semantics; the view reports only
- * the item index under the relevant pointer gesture.
+ * The view reports the displayed snapshot and local item index. The adapter rejects
+ * obsolete gestures before invoking the interaction's guarded actions.
  */
 public interface SwingShellSuggestionViewListener {
     /**
@@ -194,14 +213,20 @@ public interface SwingShellSuggestionViewListener {
      *
      * @param index zero-based index in the current visual snapshot.
      */
-    public fun onSuggestionHovered(index: Int)
+    public fun onSuggestionHovered(
+        snapshot: SwingShellSuggestionViewSnapshot,
+        index: Int,
+    )
 
     /**
      * Reports an explicit primary-button click on an item.
      *
      * @param index zero-based index in the current visual snapshot.
      */
-    public fun onSuggestionClicked(index: Int)
+    public fun onSuggestionClicked(
+        snapshot: SwingShellSuggestionViewSnapshot,
+        index: Int,
+    )
 
     /**
      * Requests relative keyboard-style navigation after a pointer-wheel gesture.
@@ -209,7 +234,10 @@ public interface SwingShellSuggestionViewListener {
      * @param delta negative for earlier suggestions and positive for later
      * suggestions. A zero delta is ignored.
      */
-    public fun onSuggestionScrollRequested(delta: Int): Unit = Unit
+    public fun onSuggestionScrollRequested(
+        snapshot: SwingShellSuggestionViewSnapshot,
+        delta: Int,
+    ): Unit = Unit
 }
 
 /**

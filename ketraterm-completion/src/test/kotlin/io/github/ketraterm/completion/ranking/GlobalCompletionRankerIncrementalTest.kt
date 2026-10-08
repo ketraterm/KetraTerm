@@ -70,6 +70,8 @@ class GlobalCompletionRankerIncrementalTest {
 
     @Test
     fun `primary presentation wins identical edit regardless of source arrival order`() {
+        val fallbackToken = Any()
+        val primaryToken = Any()
         val fallback =
             CompletionSourceCandidates(
                 sourceIndex = 0,
@@ -82,6 +84,7 @@ class GlobalCompletionRankerIncrementalTest {
                             score = 20,
                             source = "learned",
                             detail = "learned command",
+                            feedbackToken = fallbackToken,
                         ),
                     ),
             )
@@ -96,6 +99,7 @@ class GlobalCompletionRankerIncrementalTest {
                             score = 10,
                             source = "spec",
                             detail = "build automation tool",
+                            feedbackToken = primaryToken,
                         ),
                     ),
             )
@@ -104,6 +108,7 @@ class GlobalCompletionRankerIncrementalTest {
         fallbackFirst.ingest(fallback)
         val fallbackOnly = fallbackFirst.rankedCandidates()
         assertEquals("learned", fallbackOnly.single().source)
+        assertSame(fallbackToken, fallbackOnly.single().feedbackToken)
 
         fallbackFirst.ingest(primary)
         val fallbackThenPrimary = fallbackFirst.rankedCandidates()
@@ -117,6 +122,36 @@ class GlobalCompletionRankerIncrementalTest {
         assertEquals(fallbackThenPrimary, primaryThenFallback)
         assertEquals("spec", fallbackThenPrimary.single().source)
         assertEquals("build automation tool", fallbackThenPrimary.single().detail)
+        assertSame(primaryToken, fallbackThenPrimary.single().feedbackToken)
+        assertSame(primaryToken, primaryThenFallback.single().feedbackToken)
+    }
+
+    @Test
+    fun `equivalent outcomes retain the chosen edit token regardless of source arrival order`() {
+        val quotedToken = Any()
+        val bareToken = Any()
+        val quoted =
+            CompletionSourceCandidates(
+                sourceIndex = 0,
+                priority = 20,
+                candidates = listOf(candidate("'gradle'", 20, feedbackToken = quotedToken)),
+            )
+        val bare =
+            CompletionSourceCandidates(
+                sourceIndex = 1,
+                priority = 0,
+                candidates = listOf(candidate("gradle", 10, feedbackToken = bareToken)),
+            )
+
+        for (sourceOrder in listOf(listOf(quoted, bare), listOf(bare, quoted))) {
+            val state = requestState()
+            for (source in sourceOrder) state.ingest(source)
+
+            val candidate = state.rankedCandidates().single()
+            assertEquals("gradle", candidate.replacementText)
+            assertEquals("gradle", candidate.source)
+            assertSame(bareToken, candidate.feedbackToken)
+        }
     }
 
     private fun requestState(): GlobalCompletionRanker.RequestCompletionRankingState {
@@ -136,6 +171,7 @@ class GlobalCompletionRankerIncrementalTest {
         score: Int,
         source: String = replacement,
         detail: String = "",
+        feedbackToken: Any? = null,
     ): TerminalCompletionCandidate =
         TerminalCompletionCandidate(
             replacementText = replacement,
@@ -146,5 +182,6 @@ class GlobalCompletionRankerIncrementalTest {
             source = source,
             kind = TerminalCompletionCandidateKind.COMMAND,
             score = score,
+            feedbackToken = feedbackToken,
         )
 }

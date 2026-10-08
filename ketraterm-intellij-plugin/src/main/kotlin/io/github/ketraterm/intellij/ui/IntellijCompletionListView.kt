@@ -68,12 +68,14 @@ internal class IntellijCompletionListView(
     private val pointerAdapter =
         object : MouseAdapter() {
             override fun mouseMoved(event: MouseEvent) {
-                suggestionList.indexAt(event.point)?.let(listener::onSuggestionHovered)
+                val snapshot = currentSnapshot
+                suggestionList.indexAt(event.point)?.let { index -> listener.onSuggestionHovered(snapshot, index) }
             }
 
             override fun mousePressed(event: MouseEvent) {
                 if (!SwingUtilities.isLeftMouseButton(event)) return
-                suggestionList.indexAt(event.point)?.let(listener::onSuggestionClicked)
+                val snapshot = currentSnapshot
+                suggestionList.indexAt(event.point)?.let { index -> listener.onSuggestionClicked(snapshot, index) }
                 event.consume()
             }
         }
@@ -83,7 +85,7 @@ internal class IntellijCompletionListView(
             if (model.isEmpty) return@MouseWheelListener
             val delta = event.wheelRotation
             if (delta == 0) return@MouseWheelListener
-            listener.onSuggestionScrollRequested(delta)
+            listener.onSuggestionScrollRequested(currentSnapshot, delta)
             event.consume()
         }
 

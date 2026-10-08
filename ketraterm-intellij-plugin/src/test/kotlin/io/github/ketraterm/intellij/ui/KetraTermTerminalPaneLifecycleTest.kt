@@ -25,7 +25,6 @@ import io.github.ketraterm.session.TerminalSession
 import io.github.ketraterm.testkit.MockConnector
 import io.github.ketraterm.ui.swing.host.SwingCompletionResources
 import io.github.ketraterm.ui.swing.settings.TerminalClipboardHandler
-import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestion
 import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionRequest
 import io.github.ketraterm.workspace.TerminalProfile
 import io.github.ketraterm.workspace.TerminalWorkspaceTab
@@ -109,9 +108,9 @@ class KetraTermTerminalPaneLifecycleTest : BasePlatformTestCase() {
                         it.javaClass.name.contains("KetraTermTerminalShortcutController")
                     },
                 )
-                pane.terminal.showShellSuggestions(
-                    SwingShellSuggestionRequest("", 0, 0, 0),
-                    listOf(SwingShellSuggestion("test", 0, 0, "test", "COMMAND")),
+                assertNull(
+                    "Rolled-back terminal must reject interaction creation",
+                    pane.terminal.beginShellSuggestionInteraction(SwingShellSuggestionRequest("", 0)),
                 )
                 assertFalse("Rolled-back terminal must reject presentation", pane.terminal.currentShellSuggestionState().visible)
                 pane.close()

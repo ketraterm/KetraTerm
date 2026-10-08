@@ -19,10 +19,7 @@ import io.github.ketraterm.session.TerminalSession
 import io.github.ketraterm.session.TerminalSessionState
 import io.github.ketraterm.session.TerminalShellCommandLineSnapshot
 import io.github.ketraterm.ui.swing.api.SwingTerminal
-import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionEligibilityListener
-import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionFeedbackHandler
-import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionInvalidationListener
-import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionTrigger
+import io.github.ketraterm.ui.swing.suggestion.*
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -44,9 +41,8 @@ import javax.swing.SwingUtilities
  * owns only its observation job; completion providers, enablement, ranking
  * context, and feedback persistence remain host supplied.
  *
- * Construct the binding before the terminal so [suggestionFeedbackHandler] can
- * be passed through [io.github.ketraterm.ui.swing.api.SwingHostServices]. After
- * binding the terminal to the session, call [attach]. Call [close] from the EDT
+ * After binding the terminal to the session, call [attach]. External targets
+ * receive a captured interaction carrying [suggestionFeedbackHandler]. Call [close] from the EDT
  * before disposing the terminal. Before rebinding the terminal to another
  * session, close or detach this binding and create one for the new session;
  * this binding retains the session supplied at construction.
@@ -67,6 +63,7 @@ public class SwingLiveCompletionBinding
     ) : AutoCloseable {
         private var target: SwingLiveCompletionTarget? = null
         private var suggestionTarget: SwingShellSuggestionTarget? = null
+        private var automaticInteraction: SwingShellSuggestionInteraction? = null
         private var observationJob: Job? = null
         private var invalidatedRevision: Long? = null
         private val refreshes = MutableStateFlow<Long?>(null)
@@ -105,12 +102,12 @@ public class SwingLiveCompletionBinding
                     refreshes.value = null
                     lastRequest = null
                     // The embedded controller handles eligibility itself, including explicit requests.
-                    if (suggestionTarget !== target) suggestionTarget?.hideSuggestions()
+                    if (suggestionTarget != null) cancelAndHideInternal()
                 }
             }
 
         /**
-         * Feedback callback to install in the terminal's host services.
+         * Feedback callback captured by each external interaction or provider source.
          *
          * It makes an unchanged command eligible for a fresh ranking request
          * before forwarding the event to the host callback.
@@ -129,7 +126,8 @@ public class SwingLiveCompletionBinding
          * @param coroutineScope caller-owned lifecycle scope used for observation.
          * @param suggestionsEnabled returns whether automatic suggestions are enabled.
          * @param rankingContextKey host context that can change ranking for equal text.
-         * @param feedbackHandler host callback for suggestion feedback.
+         * @param feedbackHandler request observer captured by external targets. Embedded
+         * requests obtain their observer through the configured provider's source.
          */
         public constructor(
             session: TerminalSession,
@@ -166,7 +164,7 @@ public class SwingLiveCompletionBinding
          * retains target resources and explicit-request orchestration; this binding
          * cancels automatic work through [suggestionTarget] on invalidation, session
          * termination, or close.
-         * Configure the target's feedback through [suggestionFeedbackHandler].
+         * Each interaction captures [suggestionFeedbackHandler] before target work starts.
          */
         public fun attach(
             terminal: SwingTerminal,
@@ -177,7 +175,7 @@ public class SwingLiveCompletionBinding
 
         internal fun attach(
             target: SwingLiveCompletionTarget,
-            suggestionTarget: SwingShellSuggestionTarget = target,
+            suggestionTarget: SwingShellSuggestionTarget? = null,
         ) {
             check(SwingUtilities.isEventDispatchThread()) { "live completion must be attached on the EDT" }
             check(!closed) { "live completion binding is closed" }
@@ -245,14 +243,36 @@ public class SwingLiveCompletionBinding
             }
             val snapshot = activeCommandLine()
             if (snapshot == null || !shouldRequest(snapshot)) {
-                lastRequest = null
-                suggestionTarget?.hideSuggestions()
+                cancelAndHideInternal()
                 return
             }
             val request = RequestKey(snapshot, rankingContextKey())
             if (request == lastRequest) return
             lastRequest = request
-            suggestionTarget?.requestSuggestions(snapshot)
+            val customTarget = suggestionTarget
+            if (customTarget == null) {
+                target?.requestSuggestions(snapshot)
+            } else {
+                val interaction = target?.beginSuggestionInteraction(snapshot, suggestionFeedbackHandler)
+                if (interaction == null) {
+                    cancelAndHideInternal()
+                    return
+                }
+                val previousInteraction = automaticInteraction
+                automaticInteraction = interaction
+                try {
+                    previousInteraction?.close()
+                    customTarget.requestSuggestions(interaction)
+                } catch (failure: Throwable) {
+                    automaticInteraction = null
+                    try {
+                        interaction.close()
+                    } catch (cleanupFailure: Throwable) {
+                        if (cleanupFailure !== failure) failure.addSuppressed(cleanupFailure)
+                    }
+                    throw failure
+                }
+            }
         }
 
         /** Stops observation, removes focus wiring, and hides suggestions. */
@@ -280,6 +300,7 @@ public class SwingLiveCompletionBinding
             target?.removeEligibilityListener(eligibilityListener)
             target = null
             suggestionTarget = null
+            automaticInteraction = null
         }
 
         private fun onEdt(action: () -> Unit) {
@@ -301,7 +322,26 @@ public class SwingLiveCompletionBinding
         private fun cancelAndHideInternal() {
             refreshes.value = null
             lastRequest = null
-            suggestionTarget?.hideSuggestions()
+            val customTarget = suggestionTarget
+            val interaction = automaticInteraction
+            automaticInteraction = null
+            var failure: Throwable? = null
+            try {
+                if (customTarget == null) target?.hideSuggestions() else customTarget.hideSuggestions()
+            } catch (hideFailure: Throwable) {
+                failure = hideFailure
+            }
+            try {
+                if (interaction?.isActive == true) interaction.close()
+            } catch (closeFailure: Throwable) {
+                val previous = failure
+                if (previous == null) {
+                    failure = closeFailure
+                } else if (previous !== closeFailure) {
+                    previous.addSuppressed(closeFailure)
+                }
+            }
+            failure?.let { throw it }
         }
 
         private fun shouldRequest(snapshot: TerminalShellCommandLineSnapshot): Boolean {
@@ -342,7 +382,16 @@ public class SwingLiveCompletionBinding
         }
     }
 
-internal interface SwingLiveCompletionTarget : SwingShellSuggestionTarget {
+internal interface SwingLiveCompletionTarget {
+    fun requestSuggestions(snapshot: TerminalShellCommandLineSnapshot)
+
+    fun beginSuggestionInteraction(
+        snapshot: TerminalShellCommandLineSnapshot,
+        feedbackHandler: SwingShellSuggestionFeedbackHandler,
+    ): SwingShellSuggestionInteraction?
+
+    fun hideSuggestions()
+
     fun addFocusListener(listener: FocusListener)
 
     fun removeFocusListener(listener: FocusListener)
@@ -366,6 +415,16 @@ private class SwingTerminalLiveCompletionTarget(
     override fun requestSuggestions(snapshot: TerminalShellCommandLineSnapshot) {
         terminal.requestActiveShellSuggestions(SwingShellSuggestionTrigger.AUTOMATIC)
     }
+
+    override fun beginSuggestionInteraction(
+        snapshot: TerminalShellCommandLineSnapshot,
+        feedbackHandler: SwingShellSuggestionFeedbackHandler,
+    ): SwingShellSuggestionInteraction? =
+        terminal.beginShellSuggestionInteraction(
+            SwingShellSuggestionRequest(snapshot.commandText, snapshot.cursorOffset),
+            SwingShellSuggestionTrigger.AUTOMATIC,
+            feedbackHandler,
+        )
 
     override fun hideSuggestions() = terminal.hideShellSuggestions()
 

@@ -229,7 +229,8 @@ class IntellijCompletionListViewTest : BasePlatformTestCase() {
     fun testPointerWheelTooltipAndAccessibilityReportLocalRows() {
         val listener = RecordingListener()
         val view = IntellijCompletionListView(listener)
-        view.update(snapshot(suggestions(3)))
+        val publication = snapshot(suggestions(3))
+        view.update(publication)
         val list = view.suggestionList
         list.setSize(480, list.fixedCellHeight * 3)
         list.doLayout()
@@ -246,11 +247,43 @@ class IntellijCompletionListViewTest : BasePlatformTestCase() {
             assertEquals(1, listener.hoveredIndex)
             assertEquals(1, listener.clickedIndex)
             assertEquals(listOf(1), listener.scrollDeltas)
+            assertSame(publication, listener.hoveredSnapshot)
+            assertSame(publication, listener.clickedSnapshot)
+            assertSame(publication, listener.scrollSnapshot)
             assertNotNull(list.getToolTipText(moved))
             assertEquals(KetraTermBundle.message("completion.list.accessibleName"), list.accessibleContext.accessibleName)
             val item = list.model.getElementAt(1)
             val rendered = list.cellRenderer.getListCellRendererComponent(list, item, 1, false, false)
             assertEquals(item.accessibleText, rendered.accessibleContext.accessibleDescription)
+        } finally {
+            view.close()
+        }
+    }
+
+    fun testPointerCallbacksUseLatestPublicationWhenRowsAreReused() {
+        val listener = RecordingListener()
+        val view = IntellijCompletionListView(listener)
+        val items = suggestions(3)
+        view.update(snapshot(items))
+        val list = view.suggestionList
+        val preparedItem = list.model.getElementAt(1)
+        val publication = snapshot(items)
+        view.update(publication)
+        list.setSize(480, list.fixedCellHeight * 3)
+        list.doLayout()
+        val row = checkNotNull(list.getCellBounds(1, 1))
+        val x = row.x + row.width / 2
+        val y = row.y + row.height / 2
+
+        try {
+            assertSame(preparedItem, list.model.getElementAt(1))
+            list.dispatchEvent(mouseEvent(list, MouseEvent.MOUSE_MOVED, x, y, MouseEvent.NOBUTTON))
+            list.dispatchEvent(mouseEvent(list, MouseEvent.MOUSE_PRESSED, x, y, MouseEvent.BUTTON1))
+            list.dispatchEvent(mouseWheelEvent(list, x, y, rotation = 1))
+
+            assertSame(publication, listener.hoveredSnapshot)
+            assertSame(publication, listener.clickedSnapshot)
+            assertSame(publication, listener.scrollSnapshot)
         } finally {
             view.close()
         }
@@ -394,17 +427,35 @@ class IntellijCompletionListViewTest : BasePlatformTestCase() {
             private set
         var clickedIndex: Int = -1
             private set
+        var hoveredSnapshot: SwingShellSuggestionViewSnapshot? = null
+            private set
+        var clickedSnapshot: SwingShellSuggestionViewSnapshot? = null
+            private set
+        var scrollSnapshot: SwingShellSuggestionViewSnapshot? = null
+            private set
         val scrollDeltas = ArrayList<Int>()
 
-        override fun onSuggestionHovered(index: Int) {
+        override fun onSuggestionHovered(
+            snapshot: SwingShellSuggestionViewSnapshot,
+            index: Int,
+        ) {
+            hoveredSnapshot = snapshot
             hoveredIndex = index
         }
 
-        override fun onSuggestionClicked(index: Int) {
+        override fun onSuggestionClicked(
+            snapshot: SwingShellSuggestionViewSnapshot,
+            index: Int,
+        ) {
+            clickedSnapshot = snapshot
             clickedIndex = index
         }
 
-        override fun onSuggestionScrollRequested(delta: Int) {
+        override fun onSuggestionScrollRequested(
+            snapshot: SwingShellSuggestionViewSnapshot,
+            delta: Int,
+        ) {
+            scrollSnapshot = snapshot
             scrollDeltas += delta
         }
     }

@@ -60,7 +60,7 @@ class SwingCompletionBindingTest {
                     withContext(Dispatchers.Swing) {
                         val originalListeners = fixture.terminal.focusListeners.toList()
                         fixture.binding.update(resources(), true)
-                        fixture.terminal.showShellSuggestions(request, listOf(suggestion))
+                        fixture.showSuggestions()
                         val replacement = resources()
                         onHide = {
                             if (close) fixture.binding.close() else fixture.binding.update(replacement, false)
@@ -84,7 +84,10 @@ class SwingCompletionBindingTest {
                 val listeners = fixture.terminal.focusListeners.size
                 SwingUtilities.invokeAndWait {
                     fixture.binding.update(null, true)
-                    fixture.binding.feedbackHandler.onSuggestionFeedback(feedback())
+                    fixture.binding.provider
+                        .open(request)
+                        .feedbackHandler
+                        .onSuggestionFeedback(feedback())
                     assertFalse(fixture.binding.isEnabled)
                     assertEquals(listeners, fixture.terminal.focusListeners.size)
                 }
@@ -112,7 +115,11 @@ class SwingCompletionBindingTest {
                         feedbackHandler = { feedbackCount++ },
                     )
                 val listeners = fixture.terminal.focusListeners.size
-                SwingUtilities.invokeAndWait { fixture.binding.update(resources, false) }
+                val source =
+                    withContext(Dispatchers.Swing) {
+                        fixture.binding.update(resources, false)
+                        fixture.binding.provider.open(request)
+                    }
                 assertEquals(
                     listOf(listOf(suggestion)),
                     fixture.binding.provider
@@ -120,10 +127,13 @@ class SwingCompletionBindingTest {
                         .toList(),
                 )
                 SwingUtilities.invokeAndWait {
-                    fixture.binding.feedbackHandler.onSuggestionFeedback(feedback())
+                    source.feedbackHandler.onSuggestionFeedback(feedback())
                     assertEquals(listeners, fixture.terminal.focusListeners.size)
                     fixture.binding.update(null, false)
-                    fixture.binding.feedbackHandler.onSuggestionFeedback(feedback())
+                    fixture.binding.provider
+                        .open(request)
+                        .feedbackHandler
+                        .onSuggestionFeedback(feedback())
                 }
                 assertTrue(
                     fixture.binding.provider
@@ -133,6 +143,103 @@ class SwingCompletionBindingTest {
                 )
                 assertEquals(1, requests)
                 assertEquals(1, feedbackCount)
+            }
+        }
+
+    @Test
+    fun `request captures source and paired observers across reentrant resource replacement`() =
+        runBlocking {
+            Fixture().use { fixture ->
+                val observed = ArrayList<String>()
+                val replacement = resources { observed += "replacement" }
+                val original =
+                    SwingCompletionResources(
+                        provider =
+                            object : SwingShellSuggestionProvider {
+                                override fun suggestions(request: SwingShellSuggestionRequest) = flowOf(listOf(suggestion))
+
+                                override fun open(request: SwingShellSuggestionRequest): SwingShellSuggestionSource =
+                                    SwingShellSuggestionSource(
+                                        suggestions(request),
+                                        SwingShellSuggestionFeedbackHandler {
+                                            observed += "source"
+                                            fixture.binding.update(replacement, false)
+                                        },
+                                    )
+                            },
+                        feedbackHandler = { observed += "original" },
+                    )
+                withContext(Dispatchers.Swing) {
+                    fixture.binding.update(original, false)
+                    val source = fixture.binding.provider.open(request)
+                    source.feedbackHandler.onSuggestionFeedback(feedback())
+                    assertEquals(listOf("source", "original"), observed)
+                    fixture.binding.provider
+                        .open(request)
+                        .feedbackHandler
+                        .onSuggestionFeedback(feedback())
+                    assertEquals(listOf("source", "original", "replacement"), observed)
+                }
+            }
+        }
+
+    @Test
+    fun `source observer failure still reaches paired observer and preserves both failures`() =
+        runBlocking {
+            Fixture().use { fixture ->
+                val sourceFailure = IllegalStateException("source feedback failed")
+                val pairedFailure = IllegalArgumentException("host feedback failed")
+                var pairedCalls = 0
+                val resources =
+                    SwingCompletionResources(
+                        provider =
+                            object : SwingShellSuggestionProvider {
+                                override fun suggestions(request: SwingShellSuggestionRequest) = flowOf(listOf(suggestion))
+
+                                override fun open(request: SwingShellSuggestionRequest): SwingShellSuggestionSource =
+                                    SwingShellSuggestionSource(suggestions(request), { throw sourceFailure })
+                            },
+                        feedbackHandler = {
+                            pairedCalls++
+                            throw pairedFailure
+                        },
+                    )
+                withContext(Dispatchers.Swing) {
+                    fixture.binding.update(resources, false)
+                    val source = fixture.binding.provider.open(request)
+                    assertSame(
+                        sourceFailure,
+                        assertFailsWith<IllegalStateException> { source.feedbackHandler.onSuggestionFeedback(feedback()) },
+                    )
+                    assertEquals(1, pairedCalls)
+                    assertContentEquals(arrayOf(pairedFailure), sourceFailure.suppressed)
+                }
+            }
+        }
+
+    @Test
+    fun `replaced source never begins obsolete provider work`() =
+        runBlocking {
+            Fixture().use { fixture ->
+                var requests = 0
+                val source =
+                    withContext(Dispatchers.Swing) {
+                        fixture.binding.update(
+                            SwingCompletionResources(
+                                provider = {
+                                    requests++
+                                    flowOf(listOf(suggestion))
+                                },
+                                feedbackHandler = SwingShellSuggestionFeedbackHandler.NONE,
+                            ),
+                            false,
+                        )
+                        fixture.binding.provider.open(request).also {
+                            fixture.binding.update(resources(), false)
+                        }
+                    }
+                assertTrue(source.suggestions.toList().isEmpty())
+                assertEquals(0, requests)
             }
         }
 
@@ -234,7 +341,7 @@ class SwingCompletionBindingTest {
                 assertEquals(1, fixture.commandLine.subscriptionCount.value, "Automatic observation must be active before close")
                 withContext(Dispatchers.Swing) {
                     assertEquals(originalFocusListeners.size + 1, fixture.terminal.focusListeners.size)
-                    fixture.terminal.showShellSuggestions(request, listOf(suggestion))
+                    fixture.showSuggestions()
                     assertTrue(view.component.isVisible)
                     view.failure = failure
                     assertSame(failure, assertFailsWith<Exception> { fixture.binding.close() })
@@ -281,13 +388,16 @@ class SwingCompletionBindingTest {
                 runCurrent()
                 assertEquals(1, fixture.commandLine.subscriptionCount.value, "Automatic observation must be active before replacement")
                 withContext(Dispatchers.Swing) {
-                    fixture.terminal.showShellSuggestions(request, listOf(suggestion))
+                    fixture.showSuggestions()
                     assertTrue(view.component.isVisible)
                     view.failure = failure
                     assertSame(failure, assertFailsWith<Exception> { fixture.binding.update(replacement, false) })
                     assertTrue(fixture.binding.isEnabled)
                     assertFalse(view.component.isVisible)
-                    fixture.binding.feedbackHandler.onSuggestionFeedback(feedback())
+                    fixture.binding.provider
+                        .open(request)
+                        .feedbackHandler
+                        .onSuggestionFeedback(feedback())
                     assertEquals(0, oldFeedback, "Obsolete automatic binding must not receive replacement feedback")
                     assertEquals(1, replacementFeedback)
                     assertEquals(
@@ -366,7 +476,6 @@ class SwingCompletionBindingTest {
                 hostServices =
                     SwingHostServices.create { draft ->
                         draft.shellSuggestionProvider = binding.provider
-                        draft.shellSuggestionFeedbackHandler = binding.feedbackHandler
                         draft.shellSuggestionViewFactory = view?.let { supplied -> SwingShellSuggestionViewFactory { supplied } }
                             ?: SwingShellSuggestionViewFactory.DEFAULT
                     },
@@ -379,6 +488,12 @@ class SwingCompletionBindingTest {
             }
         }
 
+        fun showSuggestions() {
+            val interaction = assertNotNull(terminal.beginShellSuggestionInteraction(request))
+            interaction.publish(listOf(suggestion))
+            terminal.presentShellSuggestions(interaction)
+        }
+
         override fun close() {
             SwingUtilities.invokeAndWait {
                 binding.close()
@@ -389,7 +504,7 @@ class SwingCompletionBindingTest {
     }
 
     private companion object {
-        val request = SwingShellSuggestionRequest("git s", 5, 5, 0)
+        val request = SwingShellSuggestionRequest("git s", 5)
         val suggestion = SwingShellSuggestion("git status", 0, 5, "test", "COMMAND")
 
         fun feedback() = SwingShellSuggestionFeedback(SwingShellSuggestionFeedbackKind.ACCEPTED, suggestion, 0, request)

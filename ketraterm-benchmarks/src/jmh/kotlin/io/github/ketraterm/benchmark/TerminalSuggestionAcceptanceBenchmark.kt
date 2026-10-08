@@ -21,19 +21,9 @@ import io.github.ketraterm.input.api.TerminalInputEncoder
 import io.github.ketraterm.input.event.TerminalTextReplacementEvent
 import io.github.ketraterm.protocol.host.TerminalHostOutput
 import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestion
-import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionAcceptance
-import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionHandler
 import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionRequest
-import org.openjdk.jmh.annotations.Benchmark
-import org.openjdk.jmh.annotations.BenchmarkMode
-import org.openjdk.jmh.annotations.Fork
-import org.openjdk.jmh.annotations.Measurement
-import org.openjdk.jmh.annotations.Mode
-import org.openjdk.jmh.annotations.OutputTimeUnit
-import org.openjdk.jmh.annotations.Scope
-import org.openjdk.jmh.annotations.Setup
-import org.openjdk.jmh.annotations.State
-import org.openjdk.jmh.annotations.Warmup
+import io.github.ketraterm.ui.swing.suggestion.replacementFor
+import org.openjdk.jmh.annotations.*
 import org.openjdk.jmh.infra.Blackhole
 import java.util.concurrent.TimeUnit
 
@@ -48,8 +38,8 @@ open class TerminalSuggestionAcceptanceBenchmark {
     private lateinit var output: CountingHostOutput
     private lateinit var encoder: TerminalInputEncoder
     private lateinit var longReplacement: TerminalTextReplacementEvent
-    private lateinit var acceptanceHandler: SwingShellSuggestionHandler
-    private lateinit var unicodeAcceptance: SwingShellSuggestionAcceptance
+    private lateinit var unicodeSuggestion: SwingShellSuggestion
+    private lateinit var unicodeRequest: SwingShellSuggestionRequest
 
     @Setup
     open fun setUp() {
@@ -61,28 +51,19 @@ open class TerminalSuggestionAcceptanceBenchmark {
                 deleteBeforeCursorCount = 4_096,
                 replacementText = "replacement",
             )
-        acceptanceHandler = SwingShellSuggestionHandler.createDefault(encoder)
-
         val commandText = "\uD83D\uDC69\u200D\uD83D\uDCBB".repeat(512)
-        val request =
+        unicodeRequest =
             SwingShellSuggestionRequest(
                 commandText = commandText,
                 cursorOffset = commandText.length,
-                anchorColumn = 0,
-                anchorRow = 0,
             )
-        unicodeAcceptance =
-            SwingShellSuggestionAcceptance(
-                suggestion =
-                    SwingShellSuggestion(
-                        replacementText = "replacement",
-                        replacementStartOffset = 0,
-                        replacementEndOffset = commandText.length,
-                        source = "benchmark",
-                        kind = "ARGUMENT",
-                    ),
-                index = 0,
-                request = request,
+        unicodeSuggestion =
+            SwingShellSuggestion(
+                replacementText = "replacement",
+                replacementStartOffset = 0,
+                replacementEndOffset = commandText.length,
+                source = "benchmark",
+                kind = "ARGUMENT",
             )
     }
 
@@ -94,9 +75,16 @@ open class TerminalSuggestionAcceptanceBenchmark {
     }
 
     @Benchmark
-    open fun acceptLongUnicodeReplacement(blackhole: Blackhole) {
+    open fun planAndEncodeLongUnicodeReplacement(blackhole: Blackhole) {
         output.reset()
-        acceptanceHandler.onSuggestionAccepted(unicodeAcceptance)
+        val replacement = checkNotNull(unicodeSuggestion.replacementFor(unicodeRequest))
+        encoder.encodeTextReplacement(
+            TerminalTextReplacementEvent(
+                deleteAfterCursorCount = replacement.deleteAfterCursorCount,
+                deleteBeforeCursorCount = replacement.deleteBeforeCursorCount,
+                replacementText = replacement.replacementText,
+            ),
+        )
         blackhole.consume(output.byteCount)
     }
 

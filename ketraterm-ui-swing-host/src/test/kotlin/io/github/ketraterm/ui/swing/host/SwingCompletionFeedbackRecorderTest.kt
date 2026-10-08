@@ -17,10 +17,7 @@ package io.github.ketraterm.ui.swing.host
 
 import io.github.ketraterm.completion.api.*
 import io.github.ketraterm.completion.model.TerminalCompletionLearningSnapshot
-import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestion
-import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionFeedback
-import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionFeedbackKind
-import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionRequest
+import io.github.ketraterm.ui.swing.suggestion.*
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.last
 import kotlinx.coroutines.runBlocking
@@ -29,6 +26,23 @@ import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 class SwingCompletionFeedbackRecorderTest {
+    @Test
+    fun `rejected admission leaves completion learning unchanged`() {
+        val store = TerminalCompletionLearningStore()
+        val recorder = recorder(store, clockEpochMillis = { error("Rejected admission must not record a timestamp") })
+        recorder.record(
+            feedback(
+                kind = SwingShellSuggestionFeedbackKind.REJECTED,
+                commandText = "git s",
+                replacementText = "git status",
+                replacementStartOffset = 0,
+                replacementEndOffset = 5,
+            ),
+        )
+        assertTrue(store.snapshot().rankingStats.isEmpty())
+        assertTrue(store.snapshot().replayCommands.isEmpty())
+    }
+
     @Test
     fun `accepted range suggestion records opaque ranking evidence and publishes snapshot`() {
         val source = TerminalCompletionLearningStore()
@@ -217,7 +231,7 @@ class SwingCompletionFeedbackRecorderTest {
                         },
                     contextProvider = { context(workingDirectoryUri) },
                 )
-            val request = SwingShellSuggestionRequest("npm t", 5, 5, 0)
+            val request = SwingShellSuggestionRequest("npm t", 5)
             val suggestion = provider.suggestions(request).last().single()
 
             workingDirectoryUri = "file:///second"
@@ -318,12 +332,18 @@ class SwingCompletionFeedbackRecorderTest {
                     interactionContext = interactionContext,
                 ),
             index = 0,
+            acceptanceResult =
+                if (kind ==
+                    SwingShellSuggestionFeedbackKind.REJECTED
+                ) {
+                    SwingShellSuggestionAcceptanceResult.REJECTED
+                } else {
+                    null
+                },
             request =
                 SwingShellSuggestionRequest(
                     commandText = commandText,
                     cursorOffset = cursorOffset,
-                    anchorColumn = cursorOffset,
-                    anchorRow = 0,
                 ),
         )
 

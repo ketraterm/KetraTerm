@@ -15,23 +15,27 @@
  */
 package io.github.ketraterm.ui.swing.host
 
-import io.github.ketraterm.session.TerminalShellCommandLineSnapshot
+import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionInteraction
 
 /**
  * Host-owned request and presentation lifecycle for optional automatic completion.
  *
- * Calls run on the EDT. The target owns provider collection, selection, acceptance,
- * and its popup; the live binding owns focus, eligibility, debounce, invalidation,
- * and session-termination observation.
- * Check the current session snapshot before accepting a result. Native popups obtain
+ * Calls run on the EDT. The target owns provider collection and presentation;
+ * the supplied interaction owns selection, admission, and feedback. The live
+ * binding owns focus, eligibility, debounce, invalidation, and session termination.
+ * Capture occurs before target work begins. Native popups obtain
  * component-local anchors through SwingTerminal.copyCellBounds. Target exceptions
  * propagate to the calling operation or observation scope; close still detaches
  * the binding if hiding fails. Closing the binding never disposes target resources.
  */
 public interface SwingShellSuggestionTarget {
-    /** Replaces automatic work for [snapshot]; cancel any previous request first. */
-    public fun requestSuggestions(snapshot: TerminalShellCommandLineSnapshot)
+    /** Replaces automatic work for [interaction]; cancel and close any previous request first. */
+    public fun requestSuggestions(interaction: SwingShellSuggestionInteraction)
 
-    /** Cancels automatic work and hides its popup; must tolerate repeated calls. */
+    /**
+     * Cancels provider work and hides the surface; must tolerate repeated calls.
+     * The binding closes active interactions. Hiding during acceptance must not
+     * close its captured editing capability or report preference feedback.
+     */
     public fun hideSuggestions()
 }

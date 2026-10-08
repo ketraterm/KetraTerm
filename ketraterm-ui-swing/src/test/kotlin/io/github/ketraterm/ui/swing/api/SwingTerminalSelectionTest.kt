@@ -1124,8 +1124,8 @@ class SwingTerminalSelectionTest {
             component.addShellSuggestionInvalidationListener {
                 visibleDuringInvalidation += component.currentShellSuggestionState().visible
             }
-            component.showShellSuggestions(
-                SwingShellSuggestionRequest("git s", 5, 5, 0),
+            component.showSuggestions(
+                SwingShellSuggestionRequest("git s", 5),
                 listOf(SwingShellSuggestion("status", 4, 5, "spec", "SUBCOMMAND")),
             )
             assertTrue(component.pasteClipboardText())

@@ -104,7 +104,7 @@ class TerminalLibraryConsumerCompilationTest {
             "ui-swing-host",
             """
             import io.github.ketraterm.completion.api.TerminalCompletionEngine;
-            import io.github.ketraterm.session.TerminalShellCommandLineSnapshot;
+            import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionInteraction;
             import io.github.ketraterm.ui.swing.api.SwingTerminal;
             import io.github.ketraterm.ui.swing.host.*;
             import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionRequest;
@@ -112,15 +112,50 @@ class TerminalLibraryConsumerCompilationTest {
 
             final class Consumer {
                 static final class Popup implements SwingShellSuggestionTarget {
-                    @Override public void requestSuggestions(TerminalShellCommandLineSnapshot snapshot) {}
+                    @Override public void requestSuggestions(SwingShellSuggestionInteraction interaction) {}
                     @Override public void hideSuggestions() {}
                 }
                 void wire(SwingLiveCompletionBinding binding, SwingTerminal terminal,
                           TerminalCompletionEngine engine, Function0<SwingCompletionContext> context) {
                     binding.attach(terminal, new Popup());
                     var provider = new SwingCompletionSuggestionProvider(engine, context);
-                    provider.suggestions(new SwingShellSuggestionRequest("git", 3, 3, 0));
+                    provider.suggestions(new SwingShellSuggestionRequest("git", 3));
                     terminal.copyCellBounds(3, 0, new java.awt.Rectangle());
+                }
+            }
+            """.trimIndent(),
+        )
+    }
+
+    @Test
+    fun `Swing exports independent suggestion editing publication and presentation to Java`() {
+        assertCompilation(
+            "ui-swing",
+            """
+            import io.github.ketraterm.ui.swing.api.SwingHostServices;
+            import io.github.ketraterm.ui.swing.api.SwingTerminal;
+            import io.github.ketraterm.ui.swing.settings.SwingSettings;
+            import io.github.ketraterm.ui.swing.suggestion.*;
+            import java.util.List;
+
+            final class Consumer {
+                void suggestions(SwingShellSuggestionFeedbackHandler feedback) {
+                    var services = SwingHostServices.create(draft -> draft.setShellSuggestionEditTarget(request ->
+                        acceptance -> SwingShellSuggestionAcceptanceResult.REJECTED));
+                    var terminal = new SwingTerminal(SwingSettings::new, services);
+                    try {
+                        var interaction = terminal.beginShellSuggestionInteraction(
+                            new SwingShellSuggestionRequest("git st", 6),
+                            SwingShellSuggestionTrigger.EXPLICIT,
+                            feedback);
+                        if (interaction == null) return;
+                        interaction.publish(List.of(new SwingShellSuggestion("status", 4, 6, "native", "SUBCOMMAND")));
+                        terminal.presentShellSuggestions(interaction, 6, 0);
+                        interaction.tryAccept(interaction.getSnapshot(), 0);
+                        interaction.close();
+                    } finally {
+                        terminal.dispose();
+                    }
                 }
             }
             """.trimIndent(),

@@ -63,7 +63,7 @@ public class SwingCompletionSuggestionProvider(
     /**
      * Returns progressive candidate snapshots adapted to the reusable Swing popup contract.
      *
-     * @param request visible command text, cursor, and popup anchor supplied by Swing.
+     * @param request command text and cursor captured before provider work.
      * @return cold ordered Swing suggestion snapshots, or one empty snapshot when conversion is invalid.
      */
     override fun suggestions(request: SwingShellSuggestionRequest): Flow<List<SwingShellSuggestion>> {
@@ -97,6 +97,7 @@ public class SwingCompletionSuggestionProvider(
             detail = detail,
             accentRole = SwingShellSuggestionAccentRole.from(kind.name, source),
             interactionContext = requestContext,
+            feedbackToken = feedbackToken,
             matchedRanges =
                 SwingShellSuggestionMatchRanges.fromPackedOffsets(
                     displayText,

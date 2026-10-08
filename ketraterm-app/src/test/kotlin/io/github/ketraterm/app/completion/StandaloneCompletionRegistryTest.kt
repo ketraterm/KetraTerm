@@ -566,7 +566,5 @@ class StandaloneCompletionRegistryTest {
         SwingShellSuggestionRequest(
             commandText = commandText,
             cursorOffset = commandText.length,
-            anchorColumn = commandText.length,
-            anchorRow = 0,
         )
 }

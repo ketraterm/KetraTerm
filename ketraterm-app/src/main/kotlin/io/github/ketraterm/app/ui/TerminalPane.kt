@@ -21,7 +21,7 @@ import io.github.ketraterm.ui.swing.api.SwingTerminal
 import io.github.ketraterm.ui.swing.api.SwingTerminalContextMenuHandler
 import io.github.ketraterm.ui.swing.api.SwingTerminalContextMenuRequest
 import io.github.ketraterm.ui.swing.host.*
-import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionHandler
+import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionEditTarget
 import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionKeymap
 import io.github.ketraterm.workspace.TerminalWorkspaceTab
 import java.util.concurrent.atomic.AtomicBoolean
@@ -142,8 +142,7 @@ internal class TerminalPane private constructor(
                         hostServices =
                             SwingHostServices.create { draft ->
                                 draft.shellSuggestionProvider = completionBinding.provider
-                                draft.shellSuggestionHandler = SwingShellSuggestionHandler.createDefault(tab.session)
-                                draft.shellSuggestionFeedbackHandler = completionBinding.feedbackHandler
+                                draft.shellSuggestionEditTarget = SwingShellSuggestionEditTarget.createDefault(tab.session)
                                 draft.shellSuggestionKeymap = SwingShellSuggestionKeymap.STANDARD
                                 draft.hostKeyHandler = { event -> shortcutControllerRef[0]?.handleKeyPressed(event) == true }
                                 draft.contextMenuHandler =

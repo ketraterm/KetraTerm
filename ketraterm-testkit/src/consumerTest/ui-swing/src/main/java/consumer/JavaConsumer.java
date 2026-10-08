@@ -36,11 +36,19 @@ import io.github.ketraterm.ui.swing.api.SwingTerminal;
 import io.github.ketraterm.ui.swing.api.TerminalUiDispatcher;
 import io.github.ketraterm.ui.swing.settings.SwingSettings;
 import io.github.ketraterm.ui.swing.settings.TerminalClipboardHandler;
+import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestion;
+import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionAcceptanceResult;
+import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionFeedback;
+import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionFeedbackKind;
+import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionRequest;
+import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionTrigger;
 import java.awt.event.MouseEvent;
 import java.awt.Rectangle;
 import java.io.ByteArrayOutputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.ArrayList;
+import java.util.List;
 import javax.swing.SwingUtilities;
 
 public final class JavaConsumer {
@@ -136,6 +144,8 @@ public final class JavaConsumer {
             if (metadata == null || metadata.readAllBytes().length == 0) throw new AssertionError("Missing Kotlin metadata");
         }
         var opened = new AtomicInteger();
+        var suggestionAttempts = new AtomicInteger();
+        var suggestionFeedback = new ArrayList<SwingShellSuggestionFeedback>();
         SwingHyperlinkAction action = () -> {
             if (!SwingUtilities.isEventDispatchThread()) throw new AssertionError("Action must run on the EDT");
             opened.incrementAndGet();
@@ -145,11 +155,34 @@ public final class JavaConsumer {
 draft.setUiDispatcher(TerminalUiDispatcher.SWING);
 draft.setClipboardHandler(TerminalClipboardHandler.SYSTEM);
 draft.setHyperlinkHandler(uri -> uri.equals("https://example.test/java") && action.open());
+draft.setShellSuggestionEditTarget(request -> acceptance -> {
+    suggestionAttempts.incrementAndGet();
+    return SwingShellSuggestionAcceptanceResult.STALE_CONTEXT;
+});
 });
         SwingUtilities.invokeAndWait(() -> {
             new SwingTerminal().dispose();
-            var terminal = new SwingTerminal(SwingSettings::new, services);
+            var terminal = new SwingTerminal(() -> SwingSettings.create(draft -> draft.setSmartSuggestionsEnabled(true)), services);
             try {
+                var interaction = terminal.beginShellSuggestionInteraction(
+                    new SwingShellSuggestionRequest("git st", 6),
+                    SwingShellSuggestionTrigger.EXPLICIT,
+                    suggestionFeedback::add);
+                if (interaction == null) throw new AssertionError("Custom editing target was not captured");
+                var candidate = new SwingShellSuggestion("status", 4, 6, "native", "SUBCOMMAND");
+                interaction.publish(List.of(candidate));
+                var publication = interaction.getSnapshot();
+                if (interaction.tryAccept(publication, 0) != SwingShellSuggestionAcceptanceResult.STALE_CONTEXT
+                    || interaction.tryAccept(publication, 0) != SwingShellSuggestionAcceptanceResult.STALE_CONTEXT
+                    || suggestionAttempts.get() != 1 || suggestionFeedback.size() != 1) {
+                    throw new AssertionError("Detached custom admission must run exactly once");
+                }
+                var rejected = suggestionFeedback.getFirst();
+                if (rejected.getKind() != SwingShellSuggestionFeedbackKind.REJECTED
+                    || rejected.getAcceptanceResult() != SwingShellSuggestionAcceptanceResult.STALE_CONTEXT
+                    || rejected.getSuggestion() != candidate) {
+                    throw new AssertionError("Rejection feedback must report the captured admission result");
+                }
                 terminal.setShellSuggestionFailureHandler((request, failure) -> {
                     if (!SwingUtilities.isEventDispatchThread()) throw new AssertionError("Diagnostics must run on EDT");
                 });

@@ -31,10 +31,10 @@ class SwingShellSuggestionControllerTest {
     fun `reentrant replacement owns the popup state and publication`() =
         onEdt {
             val host = RecordingSuggestionHost()
-            lateinit var controller: SwingShellSuggestionController
+            lateinit var controller: SuggestionPresentationFixture
             var replace = true
             val replacement = suggestions(2)
-            val replacementRequest = request(anchorColumn = 8, anchorRow = 3)
+            val replacementRequest = request()
             val view =
                 object : SwingShellSuggestionView {
                     override val component = JPanel()
@@ -43,11 +43,11 @@ class SwingShellSuggestionControllerTest {
                         assertTrue(controller.state().visible, "State must be committed before notifying the host view")
                         if (replace) {
                             replace = false
-                            assertTrue(controller.show(replacementRequest, replacement, 1))
+                            assertTrue(controller.show(replacementRequest, replacement, 1, anchorColumn = 8, anchorRow = 3))
                         }
                     }
                 }
-            controller = SwingShellSuggestionController(host, viewFactory = { view })
+            controller = SuggestionPresentationFixture(host, viewFactory = { view })
             assertFalse(controller.show(request(), suggestions(3), 0), "The outer show was superseded")
             assertSame(replacement[1], controller.state().selectedSuggestion)
             assertEquals(8, controller.state().anchorColumn)
@@ -62,7 +62,7 @@ class SwingShellSuggestionControllerTest {
             val host = RecordingSuggestionHost()
             lateinit var view: RecordingSuggestionView
             val controller =
-                SwingShellSuggestionController(host, viewFactory = { listener ->
+                SuggestionPresentationFixture(host, viewFactory = { listener ->
                     RecordingSuggestionView(listener).also { view = it }
                 })
             controller.show(request(), suggestions(2), selectedIndex = 0)
@@ -71,7 +71,7 @@ class SwingShellSuggestionControllerTest {
                     draft.smartSuggestionsEnabled = false
                 }
             assertFalse(controller.handleKeyPressed(keyPressed(KeyEvent.VK_TAB)))
-            view.listener.onSuggestionClicked(0)
+            view.listener.onSuggestionClicked(view.snapshot, 0)
             assertTrue(host.acceptedSuggestions.isEmpty())
             assertTrue(host.feedbackKinds.isEmpty())
             assertFalse(controller.show(request(), suggestions(2), selectedIndex = 0))
@@ -81,11 +81,11 @@ class SwingShellSuggestionControllerTest {
     fun `show publishes visible state with explicit selection and anchor`() =
         onEdt {
             val host = RecordingSuggestionHost()
-            val controller = SwingShellSuggestionController(host)
+            val controller = SuggestionPresentationFixture(host)
             val suggestions = suggestions(3)
-            val request = request(anchorColumn = 7, anchorRow = 2)
+            val request = request()
 
-            val shown = controller.show(request, suggestions, selectedIndex = 2)
+            val shown = controller.show(request, suggestions, selectedIndex = 2, anchorColumn = 7, anchorRow = 2)
             val state = controller.state()
 
             assertTrue(shown)
@@ -102,7 +102,7 @@ class SwingShellSuggestionControllerTest {
         onEdt {
             lateinit var view: RecordingSuggestionView
             val controller =
-                SwingShellSuggestionController(
+                SuggestionPresentationFixture(
                     host = RecordingSuggestionHost(),
                     viewFactory =
                         { listener ->
@@ -112,7 +112,7 @@ class SwingShellSuggestionControllerTest {
             val items = suggestions(3)
 
             controller.show(request(), items, selectedIndex = -1)
-            view.listener.onSuggestionHovered(1)
+            view.listener.onSuggestionHovered(view.snapshot, 1)
 
             assertEquals(items, view.suggestions)
             assertEquals(1, view.selectedIndex)
@@ -120,14 +120,106 @@ class SwingShellSuggestionControllerTest {
         }
 
     @Test
-    fun `show keeps popup passive when no valid initial selection is supplied`() =
+    fun `delayed pointer action cannot accept a newer presentation`() =
         onEdt {
-            val controller = SwingShellSuggestionController(RecordingSuggestionHost())
+            val host = RecordingSuggestionHost()
+            lateinit var view: RecordingSuggestionView
+            val controller =
+                SuggestionPresentationFixture(host, viewFactory = { listener ->
+                    RecordingSuggestionView(listener).also { view = it }
+                })
+            controller.show(request(commandText = "first"), suggestions(2), selectedIndex = -1)
+            val obsolete = view.snapshot
 
-            controller.show(request(), suggestions(3), selectedIndex = 99)
+            controller.show(request(commandText = "second"), suggestions(2), selectedIndex = -1)
+            view.listener.onSuggestionClicked(obsolete, 0)
+            view.listener.onSuggestionHovered(obsolete, 1)
+            view.listener.onSuggestionScrollRequested(obsolete, 1)
 
+            assertTrue(controller.state().visible)
             assertEquals(-1, controller.state().selectedIndex)
-            assertNull(controller.state().selectedSuggestion)
+            assertTrue(host.acceptedSuggestions.isEmpty())
+            assertTrue(host.feedbackKinds.isEmpty())
+        }
+
+    @Test
+    fun `custom view capacity controls viewport and page navigation`() =
+        onEdt {
+            lateinit var view: RecordingSuggestionView
+            val controller =
+                SuggestionPresentationFixture(RecordingSuggestionHost(), viewFactory = { listener ->
+                    RecordingSuggestionView(listener, maximumVisibleSuggestions = 12).also { view = it }
+                })
+            controller.show(request(), suggestions(20), selectedIndex = 0)
+            assertEquals(12, view.snapshot.visibleSuggestions.size)
+
+            controller.handleKeyPressed(keyPressed(KeyEvent.VK_PAGE_DOWN))
+
+            assertEquals(12, controller.state().selectedIndex)
+            assertEquals(1, view.snapshot.viewportStartIndex)
+            assertEquals(12, view.snapshot.visibleSuggestions.size)
+            assertEquals(11, view.snapshot.selectedIndex)
+        }
+
+    @Test
+    fun `page down with maximum integer view capacity clamps to the final suggestion`() =
+        onEdt {
+            val controller =
+                SuggestionPresentationFixture(RecordingSuggestionHost(), viewFactory = { listener ->
+                    RecordingSuggestionView(listener, maximumVisibleSuggestions = Int.MAX_VALUE)
+                })
+            controller.show(request(), suggestions(3), selectedIndex = 1)
+
+            val event = keyPressed(KeyEvent.VK_PAGE_DOWN)
+            assertTrue(controller.handleKeyPressed(event))
+
+            assertEquals(2, controller.state().selectedIndex)
+            assertTrue(event.isConsumed)
+            controller.close()
+        }
+
+    @ParameterizedTest
+    @ValueSource(
+        ints = [
+            KeyEvent.VK_TAB, KeyEvent.VK_UP, KeyEvent.VK_DOWN, KeyEvent.VK_PAGE_UP,
+            KeyEvent.VK_PAGE_DOWN, KeyEvent.VK_HOME, KeyEvent.VK_END,
+        ],
+    )
+    fun `recognized navigation remains consumed when its presentation invalidates the request`(keyCode: Int) =
+        onEdt {
+            val interaction = SwingShellSuggestionInteraction(request())
+            interaction.publish(suggestions(12))
+            val view =
+                object : SwingShellSuggestionView {
+                    override val component = JPanel()
+
+                    override fun update(snapshot: SwingShellSuggestionViewSnapshot) {
+                        if (snapshot.selectedIndex >= 0) interaction.close(SwingShellSuggestionCloseReason.INVALIDATED)
+                    }
+                }
+            val controller = SwingShellSuggestionController(RecordingSuggestionHost(), viewFactory = { view })
+            controller.present(interaction)
+            val event = keyPressed(keyCode)
+
+            assertTrue(controller.handleKeyPressed(event))
+
+            assertTrue(event.isConsumed, "A selection gesture must not also reach shell input")
+            assertEquals(SwingShellSuggestionCloseReason.INVALIDATED, interaction.closeReason)
+            assertFalse(controller.state().visible)
+            controller.close()
+        }
+
+    @Test
+    fun `invalid initial selection is rejected before presentation`() =
+        onEdt {
+            val interaction = SwingShellSuggestionInteraction(request())
+
+            assertThrows(IllegalArgumentException::class.java) {
+                interaction.publish(suggestions(3), selectedIndex = 99)
+            }
+
+            assertTrue(interaction.snapshot.suggestions.isEmpty())
+            interaction.close()
         }
 
     @Test
@@ -141,7 +233,7 @@ class SwingShellSuggestionControllerTest {
                             draft.shellSuggestionsEnabled = false
                         },
                 )
-            val controller = SwingShellSuggestionController(host)
+            val controller = SuggestionPresentationFixture(host)
 
             val shown = controller.show(request(), suggestions(2), selectedIndex = 0)
 
@@ -154,7 +246,7 @@ class SwingShellSuggestionControllerTest {
     fun `navigation keys update selected suggestion and consume event`() =
         onEdt {
             val host = RecordingSuggestionHost()
-            val controller = SwingShellSuggestionController(host)
+            val controller = SuggestionPresentationFixture(host)
             controller.show(request(), suggestions(3), selectedIndex = -1)
             val down = keyPressed(KeyEvent.VK_DOWN)
             val up = keyPressed(KeyEvent.VK_UP)
@@ -178,7 +270,7 @@ class SwingShellSuggestionControllerTest {
                             if (event.keyCode == KeyEvent.VK_F2) SwingShellSuggestionAction.ACCEPT else null
                         },
                 )
-            val controller = SwingShellSuggestionController(host)
+            val controller = SuggestionPresentationFixture(host)
             controller.show(request(), suggestions(1), selectedIndex = 0)
 
             assertFalse(controller.handleKeyPressed(keyPressed(KeyEvent.VK_ENTER)))
@@ -190,7 +282,7 @@ class SwingShellSuggestionControllerTest {
     fun `up from a passive popup selects the last retained suggestion`() =
         onEdt {
             val host = RecordingSuggestionHost()
-            val controller = SwingShellSuggestionController(host)
+            val controller = SuggestionPresentationFixture(host)
 
             controller.show(request(), suggestions(20), selectedIndex = -1)
             controller.handleKeyPressed(keyPressed(KeyEvent.VK_UP))
@@ -204,7 +296,7 @@ class SwingShellSuggestionControllerTest {
         onEdt {
             lateinit var view: RecordingSuggestionView
             val controller =
-                SwingShellSuggestionController(
+                SuggestionPresentationFixture(
                     host = RecordingSuggestionHost(),
                     viewFactory = { listener -> RecordingSuggestionView(listener).also { view = it } },
                 )
@@ -222,7 +314,7 @@ class SwingShellSuggestionControllerTest {
             lateinit var view: RecordingSuggestionView
             val host = RecordingSuggestionHost()
             val controller =
-                SwingShellSuggestionController(
+                SuggestionPresentationFixture(
                     host = host,
                     viewFactory = { listener -> RecordingSuggestionView(listener).also { view = it } },
                 )
@@ -238,7 +330,7 @@ class SwingShellSuggestionControllerTest {
             assertEquals(20, view.snapshot.totalSuggestionCount)
             assertTrue(view.snapshot.hasSuggestionsBefore)
             assertTrue(view.snapshot.hasSuggestionsAfter)
-            view.listener.onSuggestionClicked(3)
+            view.listener.onSuggestionClicked(view.snapshot, 3)
             assertEquals(listOf(5), host.acceptedIndexes)
             assertEquals(listOf(items[5]), host.acceptedSuggestions)
         }
@@ -248,19 +340,19 @@ class SwingShellSuggestionControllerTest {
         onEdt {
             lateinit var view: RecordingSuggestionView
             val controller =
-                SwingShellSuggestionController(
+                SuggestionPresentationFixture(
                     host = RecordingSuggestionHost(),
                     viewFactory = { listener -> RecordingSuggestionView(listener).also { view = it } },
                 )
             controller.show(request(), suggestions(20), selectedIndex = -1)
 
-            view.listener.onSuggestionScrollRequested(-100)
+            view.listener.onSuggestionScrollRequested(view.snapshot, -100)
 
             assertEquals(0, controller.state().selectedIndex)
             assertEquals(0, view.snapshot.viewportStartIndex)
 
             controller.show(request(commandText = "different"), suggestions(20), selectedIndex = -1)
-            view.listener.onSuggestionScrollRequested(100)
+            view.listener.onSuggestionScrollRequested(view.snapshot, 100)
 
             assertEquals(2, controller.state().selectedIndex)
             assertEquals(0, view.snapshot.viewportStartIndex)
@@ -271,7 +363,7 @@ class SwingShellSuggestionControllerTest {
         onEdt {
             lateinit var view: RecordingSuggestionView
             val controller =
-                SwingShellSuggestionController(
+                SuggestionPresentationFixture(
                     host = RecordingSuggestionHost(),
                     viewFactory = { listener -> RecordingSuggestionView(listener).also { view = it } },
                 )
@@ -288,7 +380,7 @@ class SwingShellSuggestionControllerTest {
     @Test
     fun `progressive reranking preserves selected outcome only for the same request`() =
         onEdt {
-            val controller = SwingShellSuggestionController(RecordingSuggestionHost())
+            val controller = SuggestionPresentationFixture(RecordingSuggestionHost())
             val request = request(commandText = "git s")
             val first = suggestions(3, endOffset = request.commandText.length)
             controller.show(request, first, selectedIndex = 1)
@@ -312,7 +404,7 @@ class SwingShellSuggestionControllerTest {
     @Test
     fun `explicit passive display clears selection for the same request`() =
         onEdt {
-            val controller = SwingShellSuggestionController(RecordingSuggestionHost())
+            val controller = SuggestionPresentationFixture(RecordingSuggestionHost())
             val request = request(commandText = "git s")
             val items = suggestions(3, endOffset = request.commandText.length)
             controller.show(request, items, selectedIndex = 1)
@@ -327,7 +419,7 @@ class SwingShellSuggestionControllerTest {
     fun `enter passes through to the shell when no suggestion is selected`() =
         onEdt {
             val host = RecordingSuggestionHost()
-            val controller = SwingShellSuggestionController(host)
+            val controller = SuggestionPresentationFixture(host)
             val request = request(commandText = "git sw", cursorOffset = 6)
             val items = suggestions(2, endOffset = request.commandText.length)
             controller.show(request, items, selectedIndex = -1)
@@ -345,7 +437,7 @@ class SwingShellSuggestionControllerTest {
     fun `enter accepts an already-selected suggestion`() =
         onEdt {
             val host = RecordingSuggestionHost()
-            val controller = SwingShellSuggestionController(host)
+            val controller = SuggestionPresentationFixture(host)
             val request = request(commandText = "git sw", cursorOffset = 6)
             val items = suggestions(2, endOffset = request.commandText.length)
             controller.show(request, items, selectedIndex = 1)
@@ -366,7 +458,7 @@ class SwingShellSuggestionControllerTest {
     fun `failed acceptance handler does not emit accepted feedback`() =
         onEdt {
             val host = RecordingSuggestionHost(failAcceptance = true)
-            val controller = SwingShellSuggestionController(host)
+            val controller = SuggestionPresentationFixture(host)
             val items = suggestions(1)
             controller.show(request(), items, selectedIndex = 0)
 
@@ -390,7 +482,7 @@ class SwingShellSuggestionControllerTest {
                             draft.acceptSelectedSuggestionWithEnter = false
                         },
                 )
-            val controller = SwingShellSuggestionController(host)
+            val controller = SuggestionPresentationFixture(host)
             val items = suggestions(2)
             controller.show(request(), items, selectedIndex = 1)
             val enter = keyPressed(KeyEvent.VK_ENTER)
@@ -408,7 +500,7 @@ class SwingShellSuggestionControllerTest {
     fun `tab selects first suggestion before accepting it`() =
         onEdt {
             val host = RecordingSuggestionHost()
-            val controller = SwingShellSuggestionController(host)
+            val controller = SuggestionPresentationFixture(host)
             val request = request(commandText = "cd ", cursorOffset = 3)
             val items = suggestions(2, endOffset = request.commandText.length)
             controller.show(request, items, selectedIndex = -1)
@@ -435,7 +527,7 @@ class SwingShellSuggestionControllerTest {
     fun `tab on unique suggestion accepts immediately when passive`() =
         onEdt {
             val host = RecordingSuggestionHost()
-            val controller = SwingShellSuggestionController(host)
+            val controller = SuggestionPresentationFixture(host)
             val request = request(commandText = "cd ", cursorOffset = 3)
             val items = suggestions(1, endOffset = request.commandText.length)
             controller.show(request, items, selectedIndex = -1)
@@ -455,7 +547,7 @@ class SwingShellSuggestionControllerTest {
     fun `escape hides popup records dismissal without accepting`() =
         onEdt {
             val host = RecordingSuggestionHost()
-            val controller = SwingShellSuggestionController(host)
+            val controller = SuggestionPresentationFixture(host)
             val items = suggestions(2)
             controller.show(request(), items, selectedIndex = 0)
             val escape = keyPressed(KeyEvent.VK_ESCAPE)
@@ -474,7 +566,7 @@ class SwingShellSuggestionControllerTest {
     fun `ordinary popup closure with a selected suggestion records no dismissal`() =
         onEdt {
             val host = RecordingSuggestionHost()
-            val controller = SwingShellSuggestionController(host)
+            val controller = SuggestionPresentationFixture(host)
             controller.show(request(), suggestions(2), selectedIndex = 0)
 
             controller.hide()
@@ -487,7 +579,7 @@ class SwingShellSuggestionControllerTest {
     fun `popup replacement records no negative feedback`() =
         onEdt {
             val host = RecordingSuggestionHost()
-            val controller = SwingShellSuggestionController(host)
+            val controller = SuggestionPresentationFixture(host)
             controller.show(request(), suggestions(2), selectedIndex = 0)
 
             controller.show(request(commandText = "g"), suggestions(1), selectedIndex = -1)
@@ -512,7 +604,7 @@ class SwingShellSuggestionControllerTest {
     fun `continued typing replaces selected suggestion without negative feedback`() =
         onEdt {
             val host = RecordingSuggestionHost()
-            val controller = SwingShellSuggestionController(host)
+            val controller = SuggestionPresentationFixture(host)
             controller.show(request(commandText = "git s"), suggestions(2, endOffset = 5), selectedIndex = 0)
 
             controller.show(request(commandText = "git sw"), suggestions(1, endOffset = 6), selectedIndex = -1)
@@ -526,7 +618,7 @@ class SwingShellSuggestionControllerTest {
     fun `arrow navigation wraps cleanly at top and bottom boundaries`() =
         onEdt {
             val host = RecordingSuggestionHost()
-            val controller = SwingShellSuggestionController(host)
+            val controller = SuggestionPresentationFixture(host)
             controller.show(request(), suggestions(5), selectedIndex = 0)
 
             val upFromTop = keyPressed(KeyEvent.VK_UP)
@@ -542,7 +634,7 @@ class SwingShellSuggestionControllerTest {
     fun `repeated arrow presses continue one item at a time through wrap boundaries`() =
         onEdt {
             val host = RecordingSuggestionHost()
-            val controller = SwingShellSuggestionController(host)
+            val controller = SuggestionPresentationFixture(host)
             controller.show(request(), suggestions(5), selectedIndex = 4)
 
             repeat(3) { controller.handleKeyPressed(keyPressed(KeyEvent.VK_DOWN)) }
@@ -556,7 +648,7 @@ class SwingShellSuggestionControllerTest {
     fun `page down and page up navigate in blocks of maximum visible rows`() =
         onEdt {
             val host = RecordingSuggestionHost()
-            val controller = SwingShellSuggestionController(host)
+            val controller = SuggestionPresentationFixture(host)
             val items = suggestions(20)
             controller.show(request(), items, selectedIndex = 0)
 
@@ -578,14 +670,14 @@ class SwingShellSuggestionControllerTest {
             val host = RecordingSuggestionHost()
             lateinit var view: RecordingSuggestionView
             val controller =
-                SwingShellSuggestionController(
+                SuggestionPresentationFixture(
                     host = host,
                     viewFactory = { listener -> RecordingSuggestionView(listener).also { view = it } },
                 )
             val items = suggestions(4)
             controller.show(request(), items, selectedIndex = -1)
 
-            view.listener.onSuggestionClicked(2)
+            view.listener.onSuggestionClicked(view.snapshot, 2)
 
             assertEquals(1, host.acceptedSuggestions.size)
             assertEquals("command-2", host.acceptedSuggestions.single().replacementText)
@@ -596,7 +688,7 @@ class SwingShellSuggestionControllerTest {
     fun `empty suggestions list hides popup and clears selection cleanly`() =
         onEdt {
             val host = RecordingSuggestionHost()
-            val controller = SwingShellSuggestionController(host)
+            val controller = SuggestionPresentationFixture(host)
             controller.show(request(), suggestions(3), selectedIndex = 1)
             assertTrue(controller.state().visible)
 
@@ -613,7 +705,7 @@ class SwingShellSuggestionControllerTest {
             val host = RecordingSuggestionHost()
             lateinit var view: RecordingSuggestionView
             val controller =
-                SwingShellSuggestionController(host, viewFactory = { listener ->
+                SuggestionPresentationFixture(host, viewFactory = { listener ->
                     RecordingSuggestionView(listener).also { view = it }
                 })
             assertTrue(controller.show(request(), suggestions(2), selectedIndex = 1))
@@ -649,7 +741,7 @@ class SwingShellSuggestionControllerTest {
             val host = RecordingSuggestionHost()
             lateinit var view: RecordingSuggestionView
             val controller =
-                SwingShellSuggestionController(host, viewFactory = { listener ->
+                SuggestionPresentationFixture(host, viewFactory = { listener ->
                     RecordingSuggestionView(listener).also { view = it }
                 })
             assertTrue(controller.show(request(), suggestions(2), selectedIndex = 0))
@@ -678,7 +770,7 @@ class SwingShellSuggestionControllerTest {
         onEdt {
             lateinit var view: RecordingSuggestionView
             val controller =
-                SwingShellSuggestionController(RecordingSuggestionHost(), viewFactory = { listener ->
+                SuggestionPresentationFixture(RecordingSuggestionHost(), viewFactory = { listener ->
                     RecordingSuggestionView(listener).also { view = it }
                 })
             controller.show(request(), suggestions(2), selectedIndex = 0)
@@ -697,7 +789,7 @@ class SwingShellSuggestionControllerTest {
         onEdt {
             lateinit var view: RecordingSuggestionView
             val controller =
-                SwingShellSuggestionController(RecordingSuggestionHost(), viewFactory = { listener ->
+                SuggestionPresentationFixture(RecordingSuggestionHost(), viewFactory = { listener ->
                     RecordingSuggestionView(listener).also { view = it }
                 })
             controller.show(request(), suggestions(2), selectedIndex = 0)
@@ -720,7 +812,7 @@ class SwingShellSuggestionControllerTest {
         onEdt {
             lateinit var view: RecordingSuggestionView
             val controller =
-                SwingShellSuggestionController(RecordingSuggestionHost(), viewFactory = { listener ->
+                SuggestionPresentationFixture(RecordingSuggestionHost(), viewFactory = { listener ->
                     RecordingSuggestionView(listener).also { view = it }
                 })
             controller.show(request(), suggestions(2), selectedIndex = 0)
@@ -752,7 +844,7 @@ class SwingShellSuggestionControllerTest {
         onEdt {
             lateinit var view: RecordingSuggestionView
             val controller =
-                SwingShellSuggestionController(RecordingSuggestionHost(), viewFactory = { listener ->
+                SuggestionPresentationFixture(RecordingSuggestionHost(), viewFactory = { listener ->
                     RecordingSuggestionView(listener).also { view = it }
                 })
             controller.show(request(), suggestions(2), selectedIndex = 0)
@@ -772,7 +864,7 @@ class SwingShellSuggestionControllerTest {
 
     private fun assertPassiveHideIsNeutral() {
         val host = RecordingSuggestionHost()
-        val controller = SwingShellSuggestionController(host)
+        val controller = SuggestionPresentationFixture(host)
         controller.show(request(), suggestions(2), selectedIndex = 0)
 
         controller.hide()
@@ -801,14 +893,10 @@ class SwingShellSuggestionControllerTest {
     private fun request(
         commandText: String = "",
         cursorOffset: Int = commandText.length,
-        anchorColumn: Int = 0,
-        anchorRow: Int = 0,
     ): SwingShellSuggestionRequest =
         SwingShellSuggestionRequest(
             commandText = commandText,
             cursorOffset = cursorOffset,
-            anchorColumn = anchorColumn,
-            anchorRow = anchorRow,
         )
 
     private fun keyPressed(keyCode: Int): KeyEvent =
@@ -820,6 +908,49 @@ class SwingShellSuggestionControllerTest {
             keyCode,
             KeyEvent.CHAR_UNDEFINED,
         )
+
+    private class SuggestionPresentationFixture(
+        private val host: RecordingSuggestionHost,
+        viewFactory: SwingShellSuggestionViewFactory = SwingShellSuggestionViewFactory.DEFAULT,
+    ) {
+        private val presenter = SwingShellSuggestionController(host, viewFactory)
+        private var current: SwingShellSuggestionInteraction? = null
+
+        val popup get() = presenter.popup
+
+        fun show(
+            request: SwingShellSuggestionRequest,
+            suggestions: List<SwingShellSuggestion>,
+            selectedIndex: Int = -1,
+            anchorColumn: Int = 0,
+            anchorRow: Int = 0,
+        ): Boolean {
+            val interaction = newInteraction(request)
+            interaction.publish(suggestions, selectedIndex, preserveSelection = false)
+            return presenter.present(interaction, anchorColumn, anchorRow) && presenter.state().visible
+        }
+
+        fun showPreservingSelectedOutcome(
+            request: SwingShellSuggestionRequest,
+            suggestions: List<SwingShellSuggestion>,
+            fallbackSelectedIndex: Int,
+        ): Boolean {
+            val interaction = current?.takeIf { it.isActive && it.request == request } ?: newInteraction(request)
+            interaction.publish(suggestions, fallbackSelectedIndex)
+            return presenter.present(interaction) && presenter.state().visible
+        }
+
+        private fun newInteraction(request: SwingShellSuggestionRequest): SwingShellSuggestionInteraction =
+            SwingShellSuggestionInteraction(request, host.suggestionHandler, host.suggestionFeedbackHandler).also { current = it }
+
+        fun state(): SwingShellSuggestionState = presenter.state()
+
+        fun handleKeyPressed(event: KeyEvent): Boolean = presenter.handleKeyPressed(event)
+
+        fun hide(): Boolean = presenter.hide()
+
+        fun close() = presenter.close()
+    }
 
     private class RecordingSuggestionHost(
         override var settings: SwingSettings =
@@ -837,19 +968,19 @@ class SwingShellSuggestionControllerTest {
         var focusRequests = 0
         var revalidations = 0
         var repaints = 0
-        var invalidations = 0
         var revalidationFailure: Throwable? = null
         var repaintFailure: Throwable? = null
 
-        override val suggestionHandler: SwingShellSuggestionHandler =
+        val suggestionHandler: SwingShellSuggestionHandler =
             SwingShellSuggestionHandler { acceptance ->
                 if (failAcceptance) error("acceptance failed")
                 acceptedSuggestions += acceptance.suggestion
                 acceptedIndexes += acceptance.index
                 acceptedRequests += acceptance.request
+                SwingShellSuggestionAcceptanceResult.ACCEPTED
             }
 
-        override val suggestionFeedbackHandler: SwingShellSuggestionFeedbackHandler =
+        val suggestionFeedbackHandler: SwingShellSuggestionFeedbackHandler =
             SwingShellSuggestionFeedbackHandler { feedback ->
                 feedbackKinds += feedback.kind
                 feedbackSuggestions += feedback.suggestion
@@ -869,16 +1000,11 @@ class SwingShellSuggestionControllerTest {
             focusRequests++
             return true
         }
-
-        override fun invalidateSuggestions() {
-            invalidations++
-        }
-
-        override fun isSuggestionContextCurrent(): Boolean = true
     }
 
     private class RecordingSuggestionView(
         val listener: SwingShellSuggestionViewListener,
+        override val maximumVisibleSuggestions: Int = SwingShellSuggestionView.DEFAULT_MAX_VISIBLE_SUGGESTIONS,
     ) : SwingShellSuggestionView {
         override val component = JPanel()
         var suggestions: List<SwingShellSuggestion> = emptyList()

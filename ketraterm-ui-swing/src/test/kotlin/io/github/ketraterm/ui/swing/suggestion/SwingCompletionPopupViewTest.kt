@@ -175,7 +175,11 @@ class SwingCompletionPopupViewTest {
         onEdt {
             val listener = RecordingListener()
             val view = createView(listener)
-            view.update(snapshot(List(2) { suggestion("candidate-$it") }, selectedIndex = 0, total = 2, start = 0))
+            val suggestions = List(2) { suggestion("candidate-$it") }
+            val first = snapshot(suggestions, selectedIndex = 0, total = 2, start = 0)
+            val latest = snapshot(suggestions, selectedIndex = 0, total = 2, start = 0)
+            view.update(first)
+            view.update(latest)
             view.size = view.preferredSize
             view.doLayout()
 
@@ -210,6 +214,8 @@ class SwingCompletionPopupViewTest {
 
             assertEquals(0, listener.clickedIndex)
             assertEquals(2, listener.scrollDelta)
+            assertSame(latest, listener.clickedSnapshot)
+            assertSame(latest, listener.scrollSnapshot)
             assertTrue(wheel.isConsumed)
         }
 
@@ -424,17 +430,30 @@ class SwingCompletionPopupViewTest {
         var hoveredIndex = -1
         var clickedIndex = -1
         var scrollDelta = 0
+        var clickedSnapshot: SwingShellSuggestionViewSnapshot? = null
+        var scrollSnapshot: SwingShellSuggestionViewSnapshot? = null
 
-        override fun onSuggestionHovered(index: Int) {
+        override fun onSuggestionHovered(
+            snapshot: SwingShellSuggestionViewSnapshot,
+            index: Int,
+        ) {
             hoveredIndex = index
         }
 
-        override fun onSuggestionClicked(index: Int) {
+        override fun onSuggestionClicked(
+            snapshot: SwingShellSuggestionViewSnapshot,
+            index: Int,
+        ) {
             clickedIndex = index
+            clickedSnapshot = snapshot
         }
 
-        override fun onSuggestionScrollRequested(delta: Int) {
+        override fun onSuggestionScrollRequested(
+            snapshot: SwingShellSuggestionViewSnapshot,
+            delta: Int,
+        ) {
             scrollDelta = delta
+            scrollSnapshot = snapshot
         }
     }
 }

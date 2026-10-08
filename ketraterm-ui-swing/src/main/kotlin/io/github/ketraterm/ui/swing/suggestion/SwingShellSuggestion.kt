@@ -15,9 +15,9 @@
  */
 package io.github.ketraterm.ui.swing.suggestion
 
-import io.github.ketraterm.input.api.TerminalInputEncoder
-import io.github.ketraterm.input.event.TerminalTextReplacementEvent
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.emitAll
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOf
 import java.util.regex.Pattern
 
@@ -43,6 +43,7 @@ import java.util.regex.Pattern
  * from [kind] for generic providers.
  * @property interactionContext opaque host-owned request context preserved by
  * Swing and returned unchanged with acceptance or dismissal feedback.
+ * @property feedbackToken opaque native provider/item identity, preserved without interpretation.
  * @property replacementStartOffset inclusive UTF-16 start offset in the request
  * command text.
  * @property replacementEndOffset exclusive UTF-16 end offset in the request
@@ -67,6 +68,7 @@ public data class SwingShellSuggestion
         val matchedRanges: SwingShellSuggestionMatchRanges = SwingShellSuggestionMatchRanges.EMPTY,
         val sourceDisplayText: String = source,
         val interactionContext: Any? = null,
+        val feedbackToken: Any? = null,
     ) {
         init {
             require(replacementText.isNotEmpty()) { "replacementText must not be empty" }
@@ -257,34 +259,15 @@ public data class SwingShellSuggestionState(
  *
  * @property commandText visible command-line text known to the provider.
  * @property cursorOffset UTF-16 cursor offset within [commandText].
- * @property anchorColumn terminal-grid column used as the popup anchor.
- * @property anchorRow terminal-grid row used as the popup anchor.
  */
 public data class SwingShellSuggestionRequest(
     val commandText: String,
     val cursorOffset: Int,
-    val anchorColumn: Int,
-    val anchorRow: Int,
 ) {
     init {
         require(cursorOffset in 0..commandText.length) {
             "cursorOffset must be in 0..${commandText.length}, was $cursorOffset"
         }
-        require(anchorColumn >= 0) { "anchorColumn must be >= 0, was $anchorColumn" }
-        require(anchorRow >= 0) { "anchorRow must be >= 0, was $anchorRow" }
-    }
-
-    public companion object {
-        /**
-         * Empty request used only while the popup is hidden.
-         */
-        internal val EMPTY: SwingShellSuggestionRequest =
-            SwingShellSuggestionRequest(
-                commandText = "",
-                cursorOffset = 0,
-                anchorColumn = 0,
-                anchorRow = 0,
-            )
     }
 }
 
@@ -315,7 +298,7 @@ public data class SwingShellSuggestionAcceptance(
  */
 public enum class SwingShellSuggestionFeedbackKind {
     /**
-     * The user accepted the selected suggestion.
+     * The editing authority admitted or applied the selected suggestion.
      */
     ACCEPTED,
 
@@ -323,21 +306,26 @@ public enum class SwingShellSuggestionFeedbackKind {
      * The user explicitly dismissed the selected suggestion.
      */
     DISMISSED,
+
+    /** The editing authority rejected an acceptance attempt; this is not negative user preference. */
+    REJECTED,
 }
 
 /**
  * User feedback event for the selected shell suggestion.
  *
  * @property kind feedback category.
- * @property suggestion suggestion that was accepted or explicitly dismissed.
+ * @property suggestion candidate whose acceptance was attempted or which was explicitly dismissed.
  * @property index index of [suggestion] in the displayed list.
  * @property request command-line context that produced the suggestion.
+ * @property acceptanceResult editing outcome for acceptance attempts, or null for dismissal.
  */
 public data class SwingShellSuggestionFeedback(
     val kind: SwingShellSuggestionFeedbackKind,
     val suggestion: SwingShellSuggestion,
     val index: Int,
     val request: SwingShellSuggestionRequest,
+    val acceptanceResult: SwingShellSuggestionAcceptanceResult? = null,
 )
 
 /**
@@ -355,6 +343,14 @@ public fun interface SwingShellSuggestionProvider {
      * @return cold stream of ordered suggestion snapshots, best first.
      */
     public fun suggestions(request: SwingShellSuggestionRequest): Flow<List<SwingShellSuggestion>>
+
+    /**
+     * Captures this request's provider resources and feedback destination synchronously on the EDT.
+     * Keep this operation cheap; actual source work belongs in the returned cold flow.
+     * The default defers [suggestions] itself until background collection starts.
+     */
+    public fun open(request: SwingShellSuggestionRequest): SwingShellSuggestionSource =
+        SwingShellSuggestionSource(flow { emitAll(suggestions(request)) })
 
     public companion object {
         /**
@@ -421,56 +417,27 @@ public fun interface SwingShellSuggestionFeedbackHandler {
 }
 
 /**
- * Host callback invoked when the user accepts a shell suggestion.
+ * Request-owned synchronous editing capability, captured before suggestion work.
+ * Implementations run on the EDT and return the editing authority's actual result.
+ * The owning interaction derives feedback and closes the capability exactly once.
  */
-public fun interface SwingShellSuggestionHandler {
+public fun interface SwingShellSuggestionHandler : AutoCloseable {
     /**
-     * Handles an accepted suggestion.
+     * Attempts the complete edit against the originally captured context.
      *
      * @param acceptance accepted suggestion and the request that produced it.
      */
-    public fun onSuggestionAccepted(acceptance: SwingShellSuggestionAcceptance)
+    public fun tryAccept(acceptance: SwingShellSuggestionAcceptance): SwingShellSuggestionAcceptanceResult
+
+    /** Releases or cancels a captured capability; the default handler has no resources. */
+    override fun close(): Unit = Unit
 
     public companion object {
         /**
-         * Handler that ignores accepted suggestions.
+         * Display-only capability that reports unsupported editing.
          */
         @JvmField
-        public val NONE: SwingShellSuggestionHandler = SwingShellSuggestionHandler { }
-
-        /**
-         * Creates a standard command-line replacement suggestion handler.
-         *
-         * The default handler is Unicode-aware: it computes grapheme-cluster
-         * counts for generated Delete and Backspace events before pasting the
-         * accepted suggestion replacement.
-         * When [session] is a TerminalSession, Swing must capture a versioned
-         * editing context at request time. The handler rejects stale/unsupported
-         * edits and emits acceptance feedback only after successful admission.
-         * Direct invocation of that session-backed handler throws IllegalStateException;
-         * host-managed requests must use conditional session admission themselves.
-         *
-         * @param session active input encoder used to submit the replacement event.
-         * @return standard replacement suggestion handler.
-         */
-        @JvmStatic
-        public fun createDefault(session: TerminalInputEncoder): SwingShellSuggestionHandler =
-            if (session is io.github.ketraterm.session.TerminalSession) {
-                SessionShellSuggestionHandler(session)
-            } else {
-                SwingShellSuggestionHandler { acceptance ->
-                    val request = acceptance.request
-                    val replacement = acceptance.suggestion.replacementFor(request) ?: return@SwingShellSuggestionHandler
-
-                    session.encodeTextReplacement(
-                        TerminalTextReplacementEvent(
-                            deleteAfterCursorCount = replacement.deleteAfterCursorCount,
-                            deleteBeforeCursorCount = replacement.deleteBeforeCursorCount,
-                            replacementText = replacement.replacementText,
-                        ),
-                    )
-                }
-            }
+        public val NONE: SwingShellSuggestionHandler = SwingShellSuggestionHandler { SwingShellSuggestionAcceptanceResult.UNSUPPORTED }
     }
 }
 

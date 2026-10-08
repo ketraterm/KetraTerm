@@ -10,10 +10,10 @@ This document provides the technical architecture and implementation reference f
 
 The completion system is built on strict layer boundaries:
 
-- **`ketraterm-completion`**: Pure Kotlin completion engine with zero external dependencies (no Swing, no IntelliJ SDK, no disk I/O, no process execution). It owns lexical tokenization, command specification models, parallel source evaluation via structured concurrency, CamelHump/prefix matching, and evidence-fusion ranking.
+- **`ketraterm-completion`**: Kotlin completion engine without Swing, IntelliJ, session, or process dependencies. It owns lexical tokenization, command specification models, parallel source evaluation via structured concurrency, CamelHump/prefix matching, and evidence-fusion ranking. Host sources may perform bounded suspending I/O in the request scope.
 - **`ketraterm-completion-host`**: Host-neutral suspending abstractions for local path resolution and bounded directory scanning (`Files.newDirectoryStream`).
 - **`ketraterm-completion-persistence`**: Optional bounded local storage (`command-completion-learning-v3.tsv`) for opaque exact-command ranking evidence and separately approved replay rows. Learning updates memory synchronously; one worker checkpoints the latest dirty state every 30 seconds and at shutdown.
-- **`ketraterm-ui-swing`**: Shared completion interaction contract, bounded viewport controller, and the standalone custom-painted completion list. It owns selection and acceptance semantics, but not sources or ranking.
+- **`ketraterm-ui-swing`**: Public request-scoped completion interaction, immutable publications, and optional embedded presentation using a Swing `JList`. The interaction owns selection, admission, feedback, and closure; the presentation adapter owns navigation gestures and the visible viewport. Sources and ranking remain external.
 - **`ketraterm-ui-swing-host`**: Reusable adapter converting engine results into immutable renderer-neutral suggestions. It resolves semantic accent roles, match ranges, and source display labels once before either UI sees them.
 - **`ketraterm-intellij-plugin`**: IntelliJ Platform adapters delegating path, Git, and Gradle completion to IntelliJ project models and bounded Git history queries (`GotoFileModel`, `GitRepositoryManager`, `GitHistoryUtils`, `ChangeListManager`, `ProjectDataManager`, and `VirtualFileManager`). It owns a separate platform-native `JBList` completion renderer.
 
@@ -52,7 +52,7 @@ Shell capability contracts define tokenization, quote handling, and command sepa
 | **Gradle Tasks** | Universal lifecycle tasks | Universal tasks + dynamic `:module:task` from imported project model | `IntellijGradleTaskCompletionSource` |
 | **Fuzzy Matching** | CamelHump, Acronyms, Prefix, Exact | CamelHump, Acronyms, Prefix, Exact | `CompletionMatcher` |
 | **Match Highlighting** | Precomputed bold matched fragments + contrast-safe accent | Precomputed bold matched fragments + IDE theme accent | Renderer-neutral `SwingShellSuggestion.matchedRanges` |
-| **Completion Surface** | Compact custom-painted list with semantic vector icons | IntelliJ-native `JBList` with platform icons and footer | Host-owned renderers over `SwingShellSuggestionViewSnapshot` |
+| **Completion Surface** | Swing `JList` with themed cells, icons, and footer | IntelliJ-native `JBList` with platform icons and footer | Shared interaction; optional bounded `SwingShellSuggestionViewSnapshot` adapter |
 | **Keymap Integration** | Standard keys (Tab, Enter, Arrows, Esc) | Standard fallback plus actions resolved from the active IntelliJ Keymap | `SwingShellSuggestionKeymap` / `KetraTermShellSuggestionKeymap` |
 | **Stats Persistence** | Opt-in; in-memory by default | Opt-in; in-memory by default | `ketraterm-completion-persistence` |
 
@@ -60,7 +60,7 @@ Shell capability contracts define tokenization, quote handling, and command sepa
 
 ## 4. Matching & Scoring Engine
 
-Completion candidate filtering and ranking runs synchronously in memory without intermediate allocations:
+Completion matching and ranking use bounded in-memory candidate snapshots and a parsed context shared by every source:
 
 ### Matching Tiers
 
@@ -70,19 +70,59 @@ Completion candidate filtering and ranking runs synchronously in memory without 
 4. **Delimiter-Separated Acronym Match**: Matches words separated by hyphens or underscores (e.g. `d-c` or `dc` matches `docker-compose`, `k-g` matches `kubectl-get`).
 5. **Substring Match**: Fallback match when internal substrings align.
 
-### Zero-Allocation Match Ranges
+### Primitive Match Ranges
 
-`CompletionMatcher` returns bit-packed `IntArray` pairs (`[start0, end0, start1, end1]`) wrapped in `TerminalCompletionMatchRanges`. The Swing adapter copies them into the renderer-neutral presentation contract. Both physical renderers consume those exact ranges; the standalone renderer precomputes immutable `TextLayout` objects outside paint, while the IntelliJ renderer precomputes styled fragments before cell painting.
+`CompletionMatcher` returns packed `IntArray` pairs (`[start0, end0, start1, end1]`) wrapped in `TerminalCompletionMatchRanges`. The Swing adapter copies them into the presentation contract. Both physical renderers consume those exact ranges and prepare bounded display content before cell painting.
 
 ### Presentation Contract
 
-The standalone and IntelliJ products intentionally do not share a physical widget. Standalone uses `SwingCompletionPopupView`, a compact custom-painted list tuned for terminal rendering. The plugin uses `IntellijCompletionListView`, an IntelliJ-owned `JBList` that follows IDE colors, icons, scaling, and accessibility conventions.
+The standalone and IntelliJ products use separate physical widgets. Standalone uses `SwingCompletionPopupView`, a Swing `JList` with a custom cell renderer. The plugin uses `IntellijCompletionListView`, an IntelliJ-owned `JBList` that follows IDE colors, icons, scaling, and accessibility conventions.
 
-They do share one immutable semantic contract. `SwingShellSuggestionViewSnapshot` carries a bounded visible window, a local selected index, absolute viewport position, and total result count. Each `SwingShellSuggestion` supplies the authoritative display text, detail, stable provider id, user-facing source label, typed accent role, and validated match ranges. Renderers may choose native mechanics and visuals, but they must not reinterpret raw kind or source strings.
+`SwingShellSuggestionInteraction` is the shared semantic boundary. It retains one original command-line request and captured editing capability. Its immutable `SwingShellSuggestionSnapshot` contains the complete ranking and global selected index. Selection changes reuse candidate storage. Views retain the publication associated with a gesture and pass it to `select`, `tryAccept` or `dismiss`, so delayed actions cannot edit or penalize a different candidate after reranking.
 
-Automatic completion popups preselect the highest-ranked result when they open. Progressive provider updates preserve the user's selected outcome across reranking instead of resetting selection to the new first row.
+Each `SwingShellSuggestion` supplies authoritative display text, detail, stable source id, source display label, accent role, and validated match ranges. The optional embedded controller derives `SwingShellSuggestionViewSnapshot`: a bounded window with a local selection and absolute overflow metadata. Its default view shows eight rows; a custom view chooses its visible-row limit. Detached UI can consume the complete interaction snapshot directly and own placement and scrolling. Renderers must not reinterpret raw kind or source strings.
 
-The shared controller retains the complete ranked snapshot and owns navigation, acceptance, dismissal, and feedback. Renderer pointer indices are local to the published viewport. Provider creation and collection run off the EDT; progressive snapshots are conflated before the latest state is published on the EDT.
+A publication is passive when its selected index is `-1`; producers may supply an initial selection. Progressive updates preserve the user's selected replacement outcome by default. The interaction owns acceptance, explicit dismissal, feedback, and closure. The embedded adapter translates keyboard and pointer gestures into those operations.
+
+Capture and source opening run synchronously on the EDT before provider work. `SwingShellSuggestionEditTarget.capture(request)` returns the request's handler, and `SwingShellSuggestionProvider.open(request)` returns a `SwingShellSuggestionSource` containing a cold stream and its original feedback observer. Both operations must remain cheap. The default `open` defers `suggestions(request)` itself until background collection; provider work stays off the EDT. Progressive snapshots are conflated before publication back on the EDT.
+
+### Composing Providers and UI
+
+Hosts choose source production and presentation independently:
+
+| Integration | Composition |
+| :--- | :--- |
+| Custom provider with embedded UI | Configure the provider and edit target; use the terminal's normal request methods. |
+| Existing engine with custom UI | Adapt the engine with `SwingCompletionSuggestionProvider`, capture an interaction, and collect into it while the host surface observes its snapshots. |
+| Host-produced results with embedded UI | Capture an interaction before starting work, publish results on the EDT, and call `presentShellSuggestions`. |
+| Custom provider and custom UI | Capture an interaction, bind the custom surface, and call `requestShellSuggestions(interaction, provider)` without mounting the embedded view. |
+| Completion outside Swing | Consume `TerminalCompletionEngine.completions(request)` directly; the pure engine requires no Swing or terminal component. |
+
+The explicit embedded composition is:
+
+```kotlin
+fun requestEmbeddedSuggestions(
+    terminal: SwingTerminal,
+    provider: SwingShellSuggestionProvider,
+) {
+    check(SwingUtilities.isEventDispatchThread())
+    val interaction = terminal.beginActiveShellSuggestionInteraction() ?: return
+    terminal.presentShellSuggestions(interaction)
+    terminal.requestShellSuggestions(interaction, provider)
+}
+```
+
+For detached presentation, pass the captured interaction to the host's UI and omit `presentShellSuggestions`. `requestShellSuggestions(interaction, provider)` only opens and collects the source; it does not mount a popup. A host that already produces candidates can instead call `interaction.publish` on the EDT. Each interaction accepts one provider collection. A newer interaction, input, session rebinding, disposal, or loss of eligibility invalidates old work; closed interactions reject late publication. Stream completion leaves the last usable publication available.
+
+`SwingLiveCompletionBinding` supplies optional debounce, focus, eligibility, and session-lifetime coordination. Its custom `SwingShellSuggestionTarget` receives the already captured interaction rather than a command snapshot requiring another acceptance implementation. A standalone Swing surface without a terminal can construct `SwingShellSuggestionInteraction` with its own captured handler and observer, and owns its collection and disposal lifecycle.
+
+### Admission and Feedback
+
+`SwingShellSuggestionHandler.tryAccept` returns `SwingShellSuggestionAcceptanceResult`. `ACCEPTED` means that the configured editing authority admitted or applied the complete edit; it does not acknowledge transport completion or shell execution. The default session edit target captures a versioned context before provider work and submits the replacement through atomic conditional session admission. Custom editors capture their own capability at the same boundary.
+
+Request observers receive `ACCEPTED`, `REJECTED`, or explicit `DISMISSED` feedback. Acceptance-attempt events carry their result. Rejection is diagnostic and does not change completion learning; passive hiding, supersession, and cancellation also produce no negative preference feedback. Observers remain attached to their original request even if provider resources change reentrantly.
+
+An optional opaque `feedbackToken` travels from `TerminalCompletionCandidate` to `SwingShellSuggestion` and back in feedback. The merged engine preserves the selected presentation representative's token; it does not use it for ranking or outcome grouping. Providers can use the token to identify their original candidate without treating display labels or row indices as routing identities. Deduplicated contributors do not receive automatic broadcast feedback.
 
 ### Ranking Evidence
 

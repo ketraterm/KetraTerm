@@ -30,6 +30,34 @@ import kotlin.test.*
 
 class SwingCompletionSuggestionProviderTest {
     @Test
+    fun `provider feedback token survives adaptation independently of request context`() =
+        runBlocking {
+            val token = Any()
+            val context = SwingCompletionContext(profileId = "bash")
+            val provider =
+                SwingCompletionSuggestionProvider(
+                    engine = {
+                        flowOf(
+                            listOf(
+                                TerminalCompletionCandidate(
+                                    "status",
+                                    4,
+                                    5,
+                                    "custom-source",
+                                    TerminalCompletionCandidateKind.SUBCOMMAND,
+                                    feedbackToken = token,
+                                ),
+                            ),
+                        )
+                    },
+                    contextProvider = { context },
+                )
+            val suggestion = provider.suggestions(request("git s", 5)).last().single()
+            assertSame(token, suggestion.feedbackToken)
+            assertSame(context, suggestion.interactionContext)
+        }
+
+    @Test
     fun `host source labels are detached bounded and do not alter source identity`() =
         runBlocking {
             val labels = mutableMapOf("product-source" to "x".repeat(126) + "😀suffix")
@@ -213,7 +241,5 @@ class SwingCompletionSuggestionProviderTest {
         SwingShellSuggestionRequest(
             commandText = commandText,
             cursorOffset = cursorOffset,
-            anchorColumn = 0,
-            anchorRow = 0,
         )
 }

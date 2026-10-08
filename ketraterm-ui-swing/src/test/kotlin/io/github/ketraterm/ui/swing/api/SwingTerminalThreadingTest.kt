@@ -859,8 +859,8 @@ class SwingTerminalThreadingTest {
         try {
             edtCall {
                 component.bind(session)
-                component.showShellSuggestions(
-                    SwingShellSuggestionRequest.EMPTY,
+                component.showSuggestions(
+                    SwingShellSuggestionRequest("", 0),
                     listOf(SwingShellSuggestion("test", 0, 0, "test", "COMMAND")),
                 )
                 assertTrue(component.currentShellSuggestionState().visible)
@@ -936,7 +936,7 @@ class SwingTerminalThreadingTest {
         try {
             edtCall {
                 val suggestion = SwingShellSuggestion("test", 0, 0, "test", "COMMAND")
-                terminal.showShellSuggestions(SwingShellSuggestionRequest.EMPTY, listOf(suggestion))
+                terminal.showSuggestions(SwingShellSuggestionRequest("", 0), listOf(suggestion))
 
                 assertAll(
                     { assertFalse(armed, "The host view must perform the reentrant transition during show") },
@@ -947,7 +947,7 @@ class SwingTerminalThreadingTest {
                     { assertEquals(!dispose, terminal.isCoroutineScopeActive) },
                 )
 
-                terminal.showShellSuggestions(SwingShellSuggestionRequest.EMPTY, listOf(suggestion))
+                terminal.showSuggestions(SwingShellSuggestionRequest("", 0), listOf(suggestion))
                 assertEquals(!dispose, view.component.isVisible, "Hiding permits reuse; disposal rejects later show requests")
                 assertEquals(0, updatesAfterClose)
             }
@@ -990,8 +990,8 @@ class SwingTerminalThreadingTest {
         try {
             edtCall {
                 component.bind(session)
-                component.showShellSuggestions(
-                    SwingShellSuggestionRequest.EMPTY,
+                component.showSuggestions(
+                    SwingShellSuggestionRequest("", 0),
                     listOf(SwingShellSuggestion("test", 0, 0, "test", "COMMAND")),
                 )
                 failUpdates = true
@@ -1053,8 +1053,8 @@ class SwingTerminalThreadingTest {
             }
         try {
             edtCall {
-                component.showShellSuggestions(
-                    SwingShellSuggestionRequest.EMPTY,
+                component.showSuggestions(
+                    SwingShellSuggestionRequest("", 0),
                     listOf(SwingShellSuggestion("test", 0, 0, "test", "COMMAND")),
                 )
                 assertTrue(view.component.isVisible)
@@ -1150,8 +1150,8 @@ class SwingTerminalThreadingTest {
             }
         try {
             edtCall {
-                terminalComponent.showShellSuggestions(
-                    SwingShellSuggestionRequest.EMPTY,
+                terminalComponent.showSuggestions(
+                    SwingShellSuggestionRequest("", 0),
                     listOf(SwingShellSuggestion("test", 0, 0, "test", "COMMAND")),
                 )
                 terminalComponent.viewportState()
@@ -1183,8 +1183,8 @@ class SwingTerminalThreadingTest {
                         draft.smartSuggestionsEnabled = true
                     }
                 terminalComponent.reloadSettings()
-                terminalComponent.showShellSuggestions(
-                    SwingShellSuggestionRequest.EMPTY,
+                terminalComponent.showSuggestions(
+                    SwingShellSuggestionRequest("", 0),
                     listOf(SwingShellSuggestion("again", 0, 0, "test", "COMMAND")),
                 )
                 assertTrue(view.component.isVisible)

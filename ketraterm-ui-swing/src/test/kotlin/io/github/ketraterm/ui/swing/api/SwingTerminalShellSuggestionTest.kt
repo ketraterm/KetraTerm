@@ -46,6 +46,160 @@ import kotlin.time.Duration.Companion.milliseconds
 
 class SwingTerminalShellSuggestionTest {
     @Test
+    fun `request captured while hiding an older view supersedes the outer begin`() {
+        SwingUtilities.invokeAndWait {
+            lateinit var terminal: SwingTerminal
+            lateinit var newer: SwingShellSuggestionInteraction
+            var beginOnHide = false
+            val capturedRequests = ArrayList<String>()
+            val admittedRequests = ArrayList<String>()
+            val view =
+                object : SwingShellSuggestionView {
+                    override val component = JPanel()
+
+                    override fun update(snapshot: SwingShellSuggestionViewSnapshot) {
+                        if (beginOnHide && snapshot.visibleSuggestions.isEmpty()) {
+                            beginOnHide = false
+                            newer = checkNotNull(terminal.beginShellSuggestionInteraction(request("newer")))
+                            newer.publish(suggestions("newer"))
+                            terminal.presentShellSuggestions(newer)
+                        }
+                    }
+                }
+            terminal =
+                SwingTerminal(
+                    settingsProvider = { SwingSettings.create { it.smartSuggestionsEnabled = true } },
+                    hostServices =
+                        SwingHostServices.create { draft ->
+                            draft.shellSuggestionViewFactory = { view }
+                            draft.shellSuggestionEditTarget = { captured ->
+                                capturedRequests += captured.commandText
+                                SwingShellSuggestionHandler { acceptance ->
+                                    admittedRequests += acceptance.request.commandText
+                                    SwingShellSuggestionAcceptanceResult.ACCEPTED
+                                }
+                            }
+                        },
+                )
+            try {
+                val old = checkNotNull(terminal.beginShellSuggestionInteraction(request("old")))
+                old.publish(suggestions("old"))
+                terminal.presentShellSuggestions(old)
+                beginOnHide = true
+
+                val outer = terminal.beginShellSuggestionInteraction(request("outer"))
+
+                assertNull(outer)
+                assertEquals(SwingShellSuggestionCloseReason.SUPERSEDED, old.closeReason)
+                assertEquals(listOf("old", "newer"), capturedRequests)
+                assertTrue(newer.isActive)
+                assertTrue(newer.publish(suggestions("newer").reversed()))
+                assertTrue(newer.select(newer.snapshot, 1))
+                assertEquals(SwingShellSuggestionAcceptanceResult.ACCEPTED, newer.tryAccept(newer.snapshot, 1))
+                assertEquals(listOf("newer"), admittedRequests)
+            } finally {
+                terminal.dispose()
+            }
+        }
+    }
+
+    @Test
+    fun `detached provider capture is single use and feedback survives stream cancellation`() {
+        val started = CompletableDeferred<Unit>()
+        val cancelled = CompletableDeferred<Unit>()
+        val ownerFeedback = ArrayList<SwingShellSuggestionFeedback>()
+        val sourceFeedback = ArrayList<SwingShellSuggestionFeedback>()
+        var opens = 0
+        var attempts = 0
+        lateinit var terminal: SwingTerminal
+        lateinit var interaction: SwingShellSuggestionInteraction
+        val provider =
+            object : SwingShellSuggestionProvider {
+                override fun suggestions(request: SwingShellSuggestionRequest) = error("open owns this request")
+
+                override fun open(request: SwingShellSuggestionRequest): SwingShellSuggestionSource {
+                    assertTrue(SwingUtilities.isEventDispatchThread())
+                    opens++
+                    assertThrows(IllegalStateException::class.java) {
+                        terminal.requestShellSuggestions(interaction, this)
+                    }
+                    return SwingShellSuggestionSource(
+                        flow {
+                            started.complete(Unit)
+                            try {
+                                awaitCancellation()
+                            } finally {
+                                cancelled.complete(Unit)
+                            }
+                        },
+                        { sourceFeedback += it },
+                    )
+                }
+            }
+        SwingUtilities.invokeAndWait {
+            terminal =
+                SwingTerminal(
+                    settingsProvider = { SwingSettings.create { it.smartSuggestionsEnabled = true } },
+                    hostServices =
+                        SwingHostServices.create { draft ->
+                            draft.shellSuggestionEditTarget = {
+                                SwingShellSuggestionHandler {
+                                    attempts++
+                                    SwingShellSuggestionAcceptanceResult.REJECTED
+                                }
+                            }
+                            draft.shellSuggestionViewFactory = { error("Detached collection must not construct a view") }
+                        },
+                )
+            interaction = checkNotNull(terminal.beginShellSuggestionInteraction(request(), feedbackHandler = { ownerFeedback += it }))
+            terminal.requestShellSuggestions(interaction, provider)
+            assertThrows(IllegalStateException::class.java) { terminal.requestShellSuggestions(interaction, provider) }
+            assertEquals(1, opens)
+        }
+        try {
+            runBlocking { withTimeout(5_000.milliseconds) { started.await() } }
+            SwingUtilities.invokeAndWait {
+                interaction.publish(suggestions())
+                assertEquals(SwingShellSuggestionAcceptanceResult.REJECTED, interaction.tryAccept(interaction.snapshot, 0))
+                assertEquals(1, attempts)
+                assertEquals(1, ownerFeedback.size)
+                assertSame(ownerFeedback.single(), sourceFeedback.single())
+                assertEquals(SwingShellSuggestionFeedbackKind.REJECTED, sourceFeedback.single().kind)
+                assertFalse(terminal.currentShellSuggestionState().visible)
+            }
+            runBlocking { withTimeout(5_000.milliseconds) { cancelled.await() } }
+        } finally {
+            SwingUtilities.invokeAndWait { terminal.dispose() }
+        }
+    }
+
+    @Test
+    fun `source cannot attach after an owner publishes even an empty snapshot`() {
+        SwingUtilities.invokeAndWait {
+            val terminal =
+                SwingTerminal(
+                    settingsProvider = { SwingSettings.create { it.smartSuggestionsEnabled = true } },
+                    hostServices =
+                        SwingHostServices.create { draft ->
+                            draft.shellSuggestionEditTarget = { SwingShellSuggestionHandler.NONE }
+                        },
+                )
+            try {
+                val interaction = checkNotNull(terminal.beginShellSuggestionInteraction(request()))
+                interaction.publish(emptyList())
+                val provider = SwingShellSuggestionProvider { error("Late source was invoked") }
+
+                assertThrows(IllegalStateException::class.java) { terminal.requestShellSuggestions(interaction, provider) }
+
+                assertTrue(interaction.isActive)
+                interaction.close()
+            } finally {
+                terminal.dispose()
+            }
+        }
+    }
+
+    @Test
     fun `master off rejects supplied automatic and explicit suggestions`() {
         val connector = RecordingConnector()
         val session = activeSuggestionSession(connector)
@@ -57,14 +211,14 @@ class SwingTerminalShellSuggestionTest {
                         SwingHostServices.create { draft ->
                             draft.shellSuggestionProvider = SwingShellSuggestionProvider { error("Disabled provider was invoked") }
                             draft.shellSuggestionViewFactory = SwingShellSuggestionViewFactory { error("Disabled view was constructed") }
-                            draft.shellSuggestionHandler = SwingShellSuggestionHandler { error("Disabled suggestion was accepted") }
+                            draft.shellSuggestionEditTarget = { SwingShellSuggestionHandler { error("Disabled suggestion was accepted") } }
                         },
                 )
             try {
                 component.bind(session)
                 component.requestShellSuggestions("git s", 5, 5, 0)
                 component.requestActiveShellSuggestions()
-                component.showShellSuggestions(request(), suggestions())
+                component.showSuggestions(request(), suggestions())
                 assertFalse(component.currentShellSuggestionState().visible)
                 assertFalse(component.isAutomaticShellSuggestionEligible())
             } finally {
@@ -150,7 +304,7 @@ class SwingTerminalShellSuggestionTest {
                 for (height in listOf(12, 100, 200, 500)) {
                     terminal.setSize(250, height)
                     for (row in listOf(0, 2, 4, 8)) {
-                        terminal.showShellSuggestions(request(anchorColumn = 0, anchorRow = row), suggestions(), 0)
+                        terminal.showSuggestions(request(), suggestions(), 0, anchorColumn = 0, anchorRow = row)
                         terminal.doLayout()
                         val bounds = view.component.bounds
                         assertTrue(bounds.x >= 0 && bounds.y >= 0, "Popup starts outside terminal: $bounds")
@@ -207,7 +361,7 @@ class SwingTerminalShellSuggestionTest {
             runBlocking { withTimeout(5_000.milliseconds) { firstStarted.await() } }
             SwingUtilities.invokeAndWait { component.requestShellSuggestions("second", 6, 0, 0) }
             runBlocking { withTimeout(5_000.milliseconds) { firstCancelled.await() } }
-            val update = view.awaitUpdate()
+            val update = view.awaitVisibleUpdate()
 
             SwingUtilities.invokeAndWait {
                 val state = component.currentShellSuggestionState()
@@ -252,7 +406,7 @@ class SwingTerminalShellSuggestionTest {
             component.size = component.preferredGridSize(12, 4)
             component.requestShellSuggestions("git s", 5, 0, 0)
         }
-        val update = view.awaitUpdate()
+        val update = view.awaitVisibleUpdate()
 
         assertFalse(runBlocking { providerFactoryWasOnEdt.await() })
         assertFalse(runBlocking { providerWasOnEdt.await() })
@@ -302,9 +456,9 @@ class SwingTerminalShellSuggestionTest {
             component.size = component.preferredGridSize(12, 4)
             component.requestShellSuggestions("first", 5, 0, 0)
         }
-        view.awaitUpdate()
+        view.awaitVisibleUpdate()
         SwingUtilities.invokeAndWait { component.requestShellSuggestions("second", 6, 0, 0) }
-        view.awaitUpdate()
+        view.awaitVisibleUpdate()
         firstRelease.complete(Unit)
 
         runBlocking { withTimeout(5_000.milliseconds) { firstFinished.await() } }
@@ -332,7 +486,7 @@ class SwingTerminalShellSuggestionTest {
         SwingUtilities.invokeAndWait {
             component.size = component.preferredGridSize(12, 4)
             component.addShellSuggestionInvalidationListener(listener)
-            component.showShellSuggestions(request(), suggestions())
+            component.showSuggestions(request(), suggestions())
             component.keyListeners.forEach { it.keyPressed(keyPressed(component, KeyEvent.VK_BACK_SPACE)) }
         }
 
@@ -357,7 +511,7 @@ class SwingTerminalShellSuggestionTest {
             component.addShellSuggestionInvalidationListener {
                 visibleDuringInvalidation += component.currentShellSuggestionState().visible
             }
-            component.showShellSuggestions(request(), suggestions())
+            component.showSuggestions(request(), suggestions())
 
             assertTrue(component.clearScreen())
         }
@@ -382,19 +536,22 @@ class SwingTerminalShellSuggestionTest {
                 },
                 hostServices =
                     SwingHostServices.create { draft ->
-                        draft.shellSuggestionHandler = { acceptance ->
-                            accepted += acceptance.suggestion
-                            indexes += acceptance.index
-                            requests += acceptance.request
+                        draft.shellSuggestionEditTarget = { _ ->
+                            SwingShellSuggestionHandler { acceptance ->
+                                accepted += acceptance.suggestion
+                                indexes += acceptance.index
+                                requests += acceptance.request
+                                SwingShellSuggestionAcceptanceResult.ACCEPTED
+                            }
                         }
                     },
             )
-        val request = request(anchorColumn = 1, anchorRow = 1)
+        val request = request()
         val suggestions = suggestions(request.commandText)
 
         SwingUtilities.invokeAndWait {
             component.size = component.preferredGridSize(12, 4)
-            component.showShellSuggestions(request, suggestions)
+            component.showSuggestions(request, suggestions, anchorColumn = 1, anchorRow = 1)
 
             component.keyListeners.forEach { listener -> listener.keyPressed(keyPressed(component, KeyEvent.VK_DOWN)) }
             component.keyListeners.forEach { listener -> listener.keyPressed(keyPressed(component, KeyEvent.VK_TAB)) }
@@ -427,10 +584,12 @@ class SwingTerminalShellSuggestionTest {
                                 providerRequests += request
                                 flowOf(suggestions(request.commandText))
                             }
-                        draft.shellSuggestionHandler =
+                        draft.shellSuggestionEditTarget = { _ ->
                             SwingShellSuggestionHandler { acceptance ->
                                 acceptedRequests += acceptance.request
+                                SwingShellSuggestionAcceptanceResult.ACCEPTED
                             }
+                        }
                         draft.shellSuggestionViewFactory = view.factory()
                     },
             )
@@ -444,7 +603,7 @@ class SwingTerminalShellSuggestionTest {
                 anchorRow = 2,
             )
         }
-        view.awaitUpdate()
+        view.awaitVisibleUpdate()
 
         SwingUtilities.invokeAndWait {
             val state = component.currentShellSuggestionState()
@@ -472,15 +631,13 @@ class SwingTerminalShellSuggestionTest {
             SwingShellSuggestionRequest(
                 commandText = "git s",
                 cursorOffset = 5,
-                anchorColumn = 5,
-                anchorRow = 2,
             )
         assertEquals(listOf(expectedRequest), providerRequests)
         assertEquals(listOf(expectedRequest), acceptedRequests)
     }
 
     @Test
-    fun `enter on passive suggestions is not consumed and does not accept`() {
+    fun `enter on passive suggestions reaches the shell without accepting`() {
         val view = RecordingSuggestionView()
         val accepted = mutableListOf<SwingShellSuggestionAcceptance>()
         val connector = RecordingConnector()
@@ -496,7 +653,12 @@ class SwingTerminalShellSuggestionTest {
                 hostServices =
                     SwingHostServices.create { draft ->
                         draft.shellSuggestionProvider = { flowOf(suggestions("git s")) }
-                        draft.shellSuggestionHandler = { accepted += it }
+                        draft.shellSuggestionEditTarget = { _ ->
+                            SwingShellSuggestionHandler {
+                                accepted += it
+                                SwingShellSuggestionAcceptanceResult.ACCEPTED
+                            }
+                        }
                         draft.shellSuggestionViewFactory = view.factory()
                     },
             )
@@ -506,7 +668,7 @@ class SwingTerminalShellSuggestionTest {
             component.bind(session)
             component.requestShellSuggestions(commandText = "git s", cursorOffset = 5, anchorColumn = 5, anchorRow = 0)
         }
-        view.awaitUpdate()
+        view.awaitVisibleUpdate()
 
         val enterEvent = keyPressed(component, KeyEvent.VK_ENTER)
         SwingUtilities.invokeAndWait {
@@ -560,7 +722,7 @@ class SwingTerminalShellSuggestionTest {
                 component.requestShellSuggestions("git s", 5, 5, 0)
             }
             assertTrue(emissions.trySend(initial).isSuccess)
-            assertEquals(RecordedSuggestionUpdate(initial, selectedIndex = -1, onEdt = true), view.awaitUpdate())
+            assertEquals(RecordedSuggestionUpdate(initial, selectedIndex = -1, onEdt = true), view.awaitVisibleUpdate())
 
             for (selectedIndex in 0..1) {
                 SwingUtilities.invokeAndWait {
@@ -568,12 +730,12 @@ class SwingTerminalShellSuggestionTest {
                     component.keyListeners.forEach { listener -> listener.keyReleased(keyReleased(component, KeyEvent.VK_DOWN)) }
                     assertEquals(initial[selectedIndex], component.currentShellSuggestionState().selectedSuggestion)
                 }
-                assertEquals(RecordedSuggestionUpdate(initial, selectedIndex, onEdt = true), view.awaitUpdate())
+                assertEquals(RecordedSuggestionUpdate(initial, selectedIndex, onEdt = true), view.awaitVisibleUpdate())
             }
 
             val reranked = listOf(initial[2], initial[0], initial[1])
             assertTrue(emissions.trySend(reranked).isSuccess)
-            assertEquals(RecordedSuggestionUpdate(reranked, selectedIndex = 2, onEdt = true), view.awaitUpdate())
+            assertEquals(RecordedSuggestionUpdate(reranked, selectedIndex = 2, onEdt = true), view.awaitVisibleUpdate())
 
             SwingUtilities.invokeAndWait {
                 val state = component.currentShellSuggestionState()
@@ -611,7 +773,7 @@ class SwingTerminalShellSuggestionTest {
         }
         val initialSuggestions = suggestions("missing")
         assertTrue(emissions.trySend(initialSuggestions).isSuccess)
-        assertEquals(initialSuggestions, view.awaitUpdate().suggestions)
+        assertEquals(initialSuggestions, view.awaitVisibleUpdate().suggestions)
 
         SwingUtilities.invokeAndWait {
             val state = component.currentShellSuggestionState()
@@ -629,7 +791,7 @@ class SwingTerminalShellSuggestionTest {
 
         val laterSuggestions = initialSuggestions.reversed()
         assertTrue(emissions.trySend(laterSuggestions).isSuccess)
-        view.awaitUpdate()
+        view.awaitVisibleUpdate()
 
         SwingUtilities.invokeAndWait {
             val state = component.currentShellSuggestionState()
@@ -671,13 +833,15 @@ class SwingTerminalShellSuggestionTest {
             component.bind(session)
             component.requestActiveShellSuggestions()
         }
-        view.awaitUpdate()
+        view.awaitVisibleUpdate()
 
         SwingUtilities.invokeAndWait {
             val state = component.currentShellSuggestionState()
             assertTrue(state.visible)
             assertEquals(-1, state.selectedIndex)
             assertNull(state.selectedSuggestion)
+            assertEquals("PS> git s".length, state.anchorColumn)
+            assertEquals(0, state.anchorRow)
         }
 
         assertEquals(
@@ -685,8 +849,6 @@ class SwingTerminalShellSuggestionTest {
                 SwingShellSuggestionRequest(
                     commandText = "git s",
                     cursorOffset = 5,
-                    anchorColumn = "PS> git s".length,
-                    anchorRow = 0,
                 ),
             ),
             providerRequests,
@@ -716,7 +878,7 @@ class SwingTerminalShellSuggestionTest {
         SwingUtilities.invokeAndWait {
             component.size = component.preferredGridSize(30, 4)
             component.bind(session)
-            component.showShellSuggestions(request(), suggestions())
+            component.showSuggestions(request(), suggestions())
             assertTrue(component.currentShellSuggestionState().visible)
 
             component.requestActiveShellSuggestions()
@@ -780,7 +942,7 @@ class SwingTerminalShellSuggestionTest {
             component.bind(session)
             component.requestActiveShellSuggestions()
         }
-        view.awaitUpdate()
+        view.awaitVisibleUpdate()
 
         SwingUtilities.invokeAndWait {
             assertTrue(component.currentShellSuggestionState().visible)
@@ -870,7 +1032,7 @@ class SwingTerminalShellSuggestionTest {
                 visibleDuringCallback += component.currentShellSuggestionState().visible
             }
             assertTrue(component.viewportState().historySize > 0)
-            component.showShellSuggestions(request(), suggestions())
+            component.showSuggestions(request(), suggestions())
             assertTrue(component.currentShellSuggestionState().visible)
 
             component.scrollToScrollbackOffset(1)
@@ -892,12 +1054,12 @@ class SwingTerminalShellSuggestionTest {
                     draft.padding = SwingPadding(0, 0, 0, 0)
                 }
             })
-        val request = request(anchorColumn = 2, anchorRow = 1)
+        val request = request()
         val suggestions = suggestions(request.commandText)
 
         SwingUtilities.invokeAndWait {
             component.size = component.preferredGridSize(12, 4)
-            component.showShellSuggestions(request, suggestions, selectedIndex = 1)
+            component.showSuggestions(request, suggestions, selectedIndex = 1, anchorColumn = 2, anchorRow = 1)
 
             val state = component.currentShellSuggestionState()
             assertTrue(state.visible)
@@ -908,9 +1070,8 @@ class SwingTerminalShellSuggestionTest {
     }
 
     @Test
-    fun `default handler deletes standard ASCII prefix and pastes replacement`() {
+    fun `replacement plan deletes standard ASCII prefix and pastes replacement`() {
         val session = RecordingInputEncoder()
-        val handler = SwingShellSuggestionHandler.createDefault(session)
 
         val request = request(commandText = "git s")
         val suggestion =
@@ -918,9 +1079,7 @@ class SwingTerminalShellSuggestionTest {
                 replacementText = "git status",
                 commandText = request.commandText,
             )
-        val acceptance = SwingShellSuggestionAcceptance(suggestion, 0, request)
-
-        handler.onSuggestionAccepted(acceptance)
+        session.encodeSuggestionReplacement(suggestion, request)
 
         assertEquals(5, session.keys.size)
         assertTrue(session.keys.all { it.key == TerminalKey.BACKSPACE })
@@ -929,9 +1088,8 @@ class SwingTerminalShellSuggestionTest {
     }
 
     @Test
-    fun `default handler deletes emoji prefix using grapheme clusters count`() {
+    fun `replacement plan deletes emoji prefix using grapheme clusters count`() {
         val session = RecordingInputEncoder()
-        val handler = SwingShellSuggestionHandler.createDefault(session)
         val commandText = "a\uD83D\uDE02"
 
         val request = request(commandText = commandText)
@@ -940,9 +1098,7 @@ class SwingTerminalShellSuggestionTest {
                 replacementText = "$commandText b",
                 commandText = commandText,
             )
-        val acceptance = SwingShellSuggestionAcceptance(suggestion, 0, request)
-
-        handler.onSuggestionAccepted(acceptance)
+        session.encodeSuggestionReplacement(suggestion, request)
 
         assertEquals(2, session.keys.size)
         assertTrue(session.keys.all { it.key == TerminalKey.BACKSPACE })
@@ -951,9 +1107,8 @@ class SwingTerminalShellSuggestionTest {
     }
 
     @Test
-    fun `default handler deletes combining accents prefix using grapheme clusters count`() {
+    fun `replacement plan deletes combining accents prefix using grapheme clusters count`() {
         val session = RecordingInputEncoder()
-        val handler = SwingShellSuggestionHandler.createDefault(session)
         val commandText = "e\u0301"
 
         val request = request(commandText = commandText)
@@ -962,9 +1117,7 @@ class SwingTerminalShellSuggestionTest {
                 replacementText = "$commandText test",
                 commandText = commandText,
             )
-        val acceptance = SwingShellSuggestionAcceptance(suggestion, 0, request)
-
-        handler.onSuggestionAccepted(acceptance)
+        session.encodeSuggestionReplacement(suggestion, request)
 
         assertEquals(1, session.keys.size)
         assertTrue(session.keys.all { it.key == TerminalKey.BACKSPACE })
@@ -973,16 +1126,15 @@ class SwingTerminalShellSuggestionTest {
     }
 
     @Test
-    fun `default handler treats extended emoji sequences as single grapheme clusters`() {
+    fun `replacement plan treats extended emoji sequences as single grapheme clusters`() {
         val clusters = listOf("\uD83D\uDC69\u200D\uD83D\uDCBB", "\uD83C\uDDE6\uD83C\uDDF2", "\uD83D\uDC4D\uD83C\uDFFD")
 
         for (cluster in clusters) {
             val session = RecordingInputEncoder()
-            val handler = SwingShellSuggestionHandler.createDefault(session)
             val request = request(commandText = cluster)
             val suggestion = suggestion(replacementText = "$cluster accepted", commandText = cluster)
 
-            handler.onSuggestionAccepted(SwingShellSuggestionAcceptance(suggestion, 0, request))
+            session.encodeSuggestionReplacement(suggestion, request)
 
             assertEquals(1, session.keys.size, "cluster=$cluster")
             assertEquals(TerminalKey.BACKSPACE, session.keys.single().key, "cluster=$cluster")
@@ -991,9 +1143,8 @@ class SwingTerminalShellSuggestionTest {
     }
 
     @Test
-    fun `default handler rejects replacement range inside grapheme cluster`() {
+    fun `replacement plan rejects replacement range inside grapheme cluster`() {
         val session = RecordingInputEncoder()
-        val handler = SwingShellSuggestionHandler.createDefault(session)
         val commandText = "e\u0301"
         val request = request(commandText = commandText)
         val suggestion =
@@ -1003,7 +1154,8 @@ class SwingTerminalShellSuggestionTest {
                 endOffset = commandText.length,
             )
 
-        handler.onSuggestionAccepted(SwingShellSuggestionAcceptance(suggestion, 0, request))
+        assertNull(suggestion.replacementFor(request))
+        session.encodeSuggestionReplacement(suggestion, request)
 
         assertTrue(session.replacements.isEmpty())
         assertTrue(session.keys.isEmpty())
@@ -1011,9 +1163,8 @@ class SwingTerminalShellSuggestionTest {
     }
 
     @Test
-    fun `default handler replaces token range`() {
+    fun `replacement plan replaces token range`() {
         val session = RecordingInputEncoder()
-        val handler = SwingShellSuggestionHandler.createDefault(session)
 
         val request = request(commandText = "git s")
         val suggestion =
@@ -1024,9 +1175,7 @@ class SwingTerminalShellSuggestionTest {
                 source = "spec",
                 kind = "SUBCOMMAND",
             )
-        val acceptance = SwingShellSuggestionAcceptance(suggestion, 0, request)
-
-        handler.onSuggestionAccepted(acceptance)
+        session.encodeSuggestionReplacement(suggestion, request)
 
         assertEquals(1, session.keys.size)
         assertEquals(TerminalKey.BACKSPACE, session.keys[0].key)
@@ -1035,9 +1184,8 @@ class SwingTerminalShellSuggestionTest {
     }
 
     @Test
-    fun `default handler replaces explicit range around cursor`() {
+    fun `replacement plan replaces explicit range around cursor`() {
         val session = RecordingInputEncoder()
-        val handler = SwingShellSuggestionHandler.createDefault(session)
 
         val request = request(commandText = "git che", cursorOffset = 6)
         val suggestion =
@@ -1048,9 +1196,7 @@ class SwingTerminalShellSuggestionTest {
                 source = "spec",
                 kind = "SUBCOMMAND",
             )
-        val acceptance = SwingShellSuggestionAcceptance(suggestion, 0, request)
-
-        handler.onSuggestionAccepted(acceptance)
+        session.encodeSuggestionReplacement(suggestion, request)
 
         assertEquals(
             listOf(TerminalKey.DELETE, TerminalKey.BACKSPACE, TerminalKey.BACKSPACE),
@@ -1069,9 +1215,8 @@ class SwingTerminalShellSuggestionTest {
     }
 
     @Test
-    fun `default handler ignores explicit range outside request text`() {
+    fun `replacement plan ignores explicit range outside request text`() {
         val session = RecordingInputEncoder()
-        val handler = SwingShellSuggestionHandler.createDefault(session)
 
         val request = request(commandText = "git che", cursorOffset = 6)
         val suggestion =
@@ -1082,12 +1227,25 @@ class SwingTerminalShellSuggestionTest {
                 source = "spec",
                 kind = "SUBCOMMAND",
             )
-        val acceptance = SwingShellSuggestionAcceptance(suggestion, 0, request)
-
-        handler.onSuggestionAccepted(acceptance)
+        assertNull(suggestion.replacementFor(request))
+        session.encodeSuggestionReplacement(suggestion, request)
 
         assertTrue(session.keys.isEmpty())
         assertTrue(session.pastes.isEmpty())
+    }
+
+    private fun RecordingInputEncoder.encodeSuggestionReplacement(
+        suggestion: SwingShellSuggestion,
+        request: SwingShellSuggestionRequest,
+    ) {
+        val replacement = suggestion.replacementFor(request) ?: return
+        encodeTextReplacement(
+            TerminalTextReplacementEvent(
+                deleteAfterCursorCount = replacement.deleteAfterCursorCount,
+                deleteBeforeCursorCount = replacement.deleteBeforeCursorCount,
+                replacementText = replacement.replacementText,
+            ),
+        )
     }
 
     private class RecordingInputEncoder : TerminalInputEncoder {
@@ -1161,6 +1319,13 @@ class SwingTerminalShellSuggestionTest {
         fun factory(): SwingShellSuggestionViewFactory = SwingShellSuggestionViewFactory { this }
 
         fun awaitUpdate(): RecordedSuggestionUpdate = updates.poll(5, TimeUnit.SECONDS) ?: fail("Suggestion view update was not published")
+
+        fun awaitVisibleUpdate(): RecordedSuggestionUpdate {
+            while (true) {
+                val update = awaitUpdate()
+                if (update.suggestions.isNotEmpty()) return update
+            }
+        }
     }
 
     private data class RecordedSuggestionUpdate(
@@ -1215,14 +1380,10 @@ class SwingTerminalShellSuggestionTest {
     private fun request(
         commandText: String = "git s",
         cursorOffset: Int = commandText.length,
-        anchorColumn: Int = cursorOffset,
-        anchorRow: Int = 0,
     ): SwingShellSuggestionRequest =
         SwingShellSuggestionRequest(
             commandText = commandText,
             cursorOffset = cursorOffset,
-            anchorColumn = anchorColumn,
-            anchorRow = anchorRow,
         )
 
     private fun keyPressed(

@@ -29,16 +29,22 @@ fun main() =
                 .single()
                 .replacementText == "hello",
         )
+        val nativeItem = Any()
         val source =
             TerminalCompletionSource { _, _, _ ->
-                listOf(TerminalCompletionCandidate("help", 0, 2, "fixture", TerminalCompletionCandidateKind.COMMAND))
+                listOf(
+                    TerminalCompletionCandidate(
+                        "help",
+                        0,
+                        2,
+                        "fixture",
+                        TerminalCompletionCandidateKind.COMMAND,
+                        feedbackToken = nativeItem,
+                    ),
+                )
             }
         val engine = TerminalCompletionEngines.fromSources(listOf(TerminalCompletionSourceEntry(source)))
-        check(
-            engine
-                .completions(TerminalCompletionRequest("he", 2))
-                .last()
-                .single()
-                .replacementText == "help",
-        )
+        val result = engine.completions(TerminalCompletionRequest("he", 2)).last().single()
+        check(result.replacementText == "help" && result.feedbackToken === nativeItem)
+        check(result.copy(score = result.score + 1).feedbackToken === nativeItem)
     }
