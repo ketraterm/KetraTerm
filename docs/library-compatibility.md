@@ -193,10 +193,36 @@ requires a separate compatibility decision.
 
 The construction changes deliberately replace earlier development signatures:
 
+- The completion lifecycle refactor removes `SwingHostServices.shellSuggestionProvider`
+  and `shellSuggestionEditTarget`, plus the host-side `SwingCompletionBinding`,
+  `SwingCompletionResources`, and `SwingLiveCompletionBinding` wrappers. Install
+  providers with EDT `SwingTerminal.setShellSuggestionProvider`; null disables
+  configured provider requests. Automatic observation stops when neither a provider
+  nor a custom target is configured. Providers survive rebinding, while
+  request editing and observation follow the actual bound session. Custom editors
+  pass an `editTarget` to `beginShellSuggestionInteraction` instead of installing a
+  session-specific constructor service. Move `SwingShellSuggestionTarget` imports
+  from `ui.swing.host` to `ui.swing.suggestion` and install the target with
+  `setShellSuggestionTarget`. Supply learning feedback to the provider source;
+  `SwingCompletionSuggestionProvider` accepts an optional feedback handler and
+  captures host context on the EDT in `open`. Use `refreshShellSuggestions` for
+  external host metadata changes. Recompile consumers of the removed APIs;
+  this is an intentional pre-stable source and binary break. Before the reviewed
+  pre-freeze refresh, the 46-case upgrade suite recorded exactly four failures:
+  the retained `ui-swing-host` client could not load the removed
+  `io.github.ketraterm.ui.swing.host.SwingShellSuggestionTarget` in either metadata
+  mode or Kotlin runtime (`NoClassDefFoundError`). Only that client/provenance pair
+  is refreshed. The other ten pairs, including the retained Swing client, remain
+  byte-identical; their recorded binaries pass despite newer source-fixture
+  migration. The reset establishes a new development baseline and does not
+  demonstrate binary compatibility with the removed APIs. See
+  [construction and lifecycle ownership](library-configuration.md#session-independent-completion-construction).
 - The suggestion interaction migration deliberately replaces the pre-stable
-  completion/Swing contracts. Replace `shellSuggestionHandler` with
-  `shellSuggestionEditTarget`, which captures a request-owned handler before
-  source work. Implement `tryAccept` with an actual admission/application result;
+  completion/Swing contracts. Its original replacement for `shellSuggestionHandler`
+  was the constructor's `shellSuggestionEditTarget`; the lifecycle refactor above
+  moves custom targets to the explicit `editTarget` request argument and derives
+  normal editing from the bound session. Both capture a request-owned handler
+  before source work. Implement `tryAccept` with an actual admission/application result;
   the session factory now takes `TerminalSession`. Replace the global
   `shellSuggestionFeedbackHandler` with the observer in `SwingShellSuggestionSource`,
   captured by `provider.open`, or the interaction's request observer. Rejected
@@ -252,7 +278,9 @@ Construction commit `025ccb1a` replaced the host and Swing clients for these
 intentional breaks. Parser client bytes remain identical;
 D02/D03 additionally refreshes Swing and PTY; D04/D05 refreshes Swing and
 render-cache as described above. The suggestion interaction migration refreshes
-completion and Swing host after its eight expected linkage failures. Eight additional clients established
+completion and Swing host after its eight expected linkage failures. The completion
+lifecycle refactor subsequently refreshes only Swing host after its four recorded
+class-linkage failures, preserving the other ten client/provenance pairs. Eight additional clients established
 separate extension baselines, producing the historical thirteen-client suite.
 The support-boundary change removes the workspace and completion-persistence
 clients from current publication checks. Eleven retained clients now define

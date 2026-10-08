@@ -17,7 +17,7 @@ package consumer;
 
 import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionInteraction;
 import io.github.ketraterm.ui.swing.host.SwingDialogRequest;
-import io.github.ketraterm.ui.swing.host.SwingShellSuggestionTarget;
+import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionTarget;
 import io.github.ketraterm.ui.swing.host.SwingTerminalSearchColors;
 import io.github.ketraterm.ui.swing.host.SwingCompletionSuggestionProvider;
 import io.github.ketraterm.ui.swing.host.SwingCompletionContext;

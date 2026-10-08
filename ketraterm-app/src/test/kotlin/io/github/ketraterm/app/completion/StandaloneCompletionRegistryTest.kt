@@ -21,9 +21,12 @@ import io.github.ketraterm.completion.model.TerminalCommandSpec
 import io.github.ketraterm.completion.model.TerminalCommandSpecs
 import io.github.ketraterm.completion.model.TerminalCompletionFeedbackKind
 import io.github.ketraterm.ui.swing.suggestion.*
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.last
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.swing.Swing
+import kotlinx.coroutines.withContext
 import java.nio.file.Files
 import kotlin.test.*
 
@@ -371,19 +374,20 @@ class StandaloneCompletionRegistryTest {
             val registry = registry(learningStore = learningStore)
             var workingDirectoryUri = "file:///repo-a"
             val resources =
-                registry.createResources(
+                registry.createProvider(
                     profileId = "bash",
                     workingDirectoryUriProvider = { workingDirectoryUri },
                 )
             val request = request("git s")
+            val source = withContext(Dispatchers.Swing) { resources.open(request) }
             val suggestion =
-                resources.provider
-                    .suggestions(request)
+                source
+                    .suggestions
                     .last()
                     .first { it.replacementText == "status" }
 
             workingDirectoryUri = "file:///repo-b"
-            resources.feedbackHandler.onSuggestionFeedback(
+            source.feedbackHandler.onSuggestionFeedback(
                 SwingShellSuggestionFeedback(
                     kind = SwingShellSuggestionFeedbackKind.ACCEPTED,
                     suggestion = suggestion,
@@ -491,7 +495,7 @@ class StandaloneCompletionRegistryTest {
             registry.closeAndFlush()
 
             assertTrue(completionJob.isCancelled)
-            assertFailsWith<IllegalStateException> { registry.createResources() }
+            assertFailsWith<IllegalStateException> { registry.createProvider() }
         }
 
     private fun registry(
@@ -511,11 +515,11 @@ class StandaloneCompletionRegistryTest {
         shellCapabilities: TerminalShellCapabilities = TerminalShellCapabilities.PLAIN,
         workingDirectoryUriProvider: () -> String? = { null },
     ): SwingShellSuggestionProvider =
-        createResources(
+        createProvider(
             profileId = profileId,
             shellCapabilities = shellCapabilities,
             workingDirectoryUriProvider = workingDirectoryUriProvider,
-        ).provider
+        )
 
     private fun StandaloneCompletionRegistry.recordSuccess(
         commandLine: String,

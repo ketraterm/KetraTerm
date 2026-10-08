@@ -660,7 +660,10 @@ class KetraTermProjectTerminalService internal constructor(
             tab: TerminalWorkspaceTab,
             uri: String,
         ) {
-            invokeLaterIfAlive { persistence?.capture() }
+            invokeLaterIfAlive {
+                panesByTabId[tab.id]?.terminal?.refreshShellSuggestions()
+                persistence?.capture()
+            }
         }
 
         override fun startupCommandCancelled(tab: TerminalWorkspaceTab) {

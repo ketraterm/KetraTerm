@@ -23,8 +23,8 @@ import io.github.ketraterm.intellij.services.KetraTermCompletionService
 import io.github.ketraterm.intellij.settings.KetraTermIntellijSettings
 import io.github.ketraterm.session.TerminalSession
 import io.github.ketraterm.testkit.MockConnector
-import io.github.ketraterm.ui.swing.host.SwingCompletionResources
 import io.github.ketraterm.ui.swing.settings.TerminalClipboardHandler
+import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionProvider
 import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionRequest
 import io.github.ketraterm.workspace.TerminalProfile
 import io.github.ketraterm.workspace.TerminalWorkspaceTab
@@ -55,8 +55,8 @@ class KetraTermTerminalPaneLifecycleTest : BasePlatformTestCase() {
         // Observe the actual private registration to inspect resources acquired before create returns.
         // No production factory hook is needed for this failing service boundary.
         val resources =
-            object : IdentityHashMap<TerminalWorkspaceTab, SwingCompletionResources>() {
-                override fun get(key: TerminalWorkspaceTab): SwingCompletionResources? {
+            object : IdentityHashMap<TerminalWorkspaceTab, SwingShellSuggestionProvider>() {
+                override fun get(key: TerminalWorkspaceTab): SwingShellSuggestionProvider? {
                     val listener = listeners.single()
                     acquiredPane =
                         listener.javaClass.declaredFields
@@ -66,12 +66,12 @@ class KetraTermTerminalPaneLifecycleTest : BasePlatformTestCase() {
                     throw failure
                 }
 
-                override fun remove(key: TerminalWorkspaceTab): SwingCompletionResources? {
+                override fun remove(key: TerminalWorkspaceTab): SwingShellSuggestionProvider? {
                     cleanupFailure?.let { throw it }
                     return super.remove(key)
                 }
             }
-        for ((name, value) in listOf("resourceListeners" to listeners, "resourcesByTab" to resources)) {
+        for ((name, value) in listOf("providerListeners" to listeners, "providersByTab" to resources)) {
             KetraTermCompletionService::class.java
                 .getDeclaredField(name)
                 .apply { isAccessible = true }

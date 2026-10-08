@@ -119,12 +119,13 @@ expected path kind, expected dynamic value domain, repeatable subcommand source,
 static value candidates, replacement offsets,
 or active quote state from raw command text.
 
-Swing hosts share one `SwingLiveCompletionBinding`. Its debounced,
+`SwingTerminal` owns automatic suggestion scheduling under its current binding. Its debounced,
 text-only predicate is deliberately a cheap UX gate: it never tokenizes,
 resolves command specs, or duplicates source eligibility. The merged engine is
 the sole semantic authority and returns an empty result when completion is not
-valid. The binding retains only the last primitive request identity so equal
-render frames do not republish work.
+valid. The scheduler retains the last immutable command snapshot so unchanged
+command state does not repeat provider work. Provider replacement and explicit
+host-context refresh invalidate that deduplication.
 
 `TerminalShellCapabilities` is the single host-to-engine dialect contract. It
 contains `TerminalShellSyntax` for segment lexing and
@@ -289,8 +290,12 @@ parser. A small non-whitespace threshold plus common trigger characters keeps
 typing responsive, while the merged engine parses once and suppresses invalid
 operator, command, option, path, and value-domain requests authoritatively.
 
-Swing hosts share optional `SwingLiveCompletionBinding`, whose lifecycle-bound
-Flow debounces refreshes on the EDT. Automatic targets receive one captured
+`SwingTerminal` debounces automatic refreshes on the EDT and owns their observation
+under the current session binding. Hosts configure a provider with
+`setShellSuggestionProvider` before or after binding; it survives rebinding, while
+active requests and observation follow the bound session, settings, and disposal.
+No separate completion binding or observer attachment is required. Automatic targets
+installed with `setShellSuggestionTarget` receive one captured
 `SwingShellSuggestionInteraction`; they do not recapture the editing context at
 acceptance. The interaction owns the original command request, captured edit
 handler, complete immutable `SwingShellSuggestionSnapshot`, selection, admission,
@@ -329,10 +334,15 @@ editing capability before source work and uses final atomic conditional
 admission. `ACCEPTED` describes admission, not transport completion or shell
 execution. Request feedback distinguishes admitted acceptance, rejected
 attempts, and explicit dismissal. Rejection and passive closure do not change
-learning. `SwingCompletionBinding` captures the source and paired host observer
-together, so replacement cannot reroute feedback to another provider runtime.
-`SwingCompletionSuggestionProvider` preserves candidate feedback tokens
-independently of its captured host metadata. Feedback routing and privacy remain
+learning. `SwingShellSuggestionProvider.open` captures the source and paired host
+observer together, so replacement cannot reroute feedback to another provider runtime.
+Normal terminal requests capture editing from the actual bound session; custom
+editors pass an explicit request-scoped edit target. The optional feedback observer
+on `SwingCompletionSuggestionProvider` is captured with the source, along with an
+immutable host-context snapshot taken synchronously on the EDT. Engine work starts
+only on collection. Direct `suggestions` callers capture metadata in their own
+calling thread. The adapter preserves candidate feedback tokens independently of
+that metadata. Feedback routing and privacy remain
 host-owned; completion sources never own UI callbacks or terminal state.
 
 Static bounded option domains belong in `TerminalOptionSpec.valueCandidates`.
@@ -413,11 +423,11 @@ providers with the shared learning store, maps host events into the learning coo
 owns the persistence shutdown boundary, so completion files are never loaded on the Swing event-dispatch thread.
 
 The engine-to-Swing request/candidate bridge and Swing-feedback-to-statistics mapping live in `ketraterm-ui-swing-host`.
-Product hosts inject context, privacy, scheduling, and persistence policy instead of copying the vocabulary conversion
-logic.
+Product hosts inject context, privacy, and persistence policy instead of copying the vocabulary conversion
+logic. Automatic Swing scheduling belongs to the terminal component.
 
-Standalone owns one stateless completion engine and local-filesystem provider per application registry. Pane resources
-add only their request-context supplier and feedback binding.
+Standalone owns one stateless completion engine and local-filesystem provider per application registry. Each pane
+adds only its request-context supplier and source feedback observer.
 
 Both hosts should map their data into the shared request/candidate/source
 contracts and let the shared engine resolve outcomes, fuse provider evidence,

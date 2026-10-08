@@ -92,6 +92,7 @@ public class SwingTerminal
         private val pointerPosition: (JComponent) -> Point? = {
             if (it.isShowing && !GraphicsEnvironment.isHeadless()) it.mousePosition else null
         },
+        private val suggestionDispatcher: CoroutineDispatcher? = null,
     ) : JComponent(),
         SwingScrollbarScroller {
         @JvmOverloads
@@ -130,9 +131,14 @@ public class SwingTerminal
         private var suggestionFailureHandler: SwingShellSuggestionFailureHandler = SwingShellSuggestionFailureHandler.LOGGING
         private var activeSuggestionInteraction: SwingShellSuggestionInteraction? = null
         private var suggestionRevision = 0L
+        private var shellSuggestionProvider: SwingShellSuggestionProvider? = null
+        private var shellSuggestionTarget: SwingShellSuggestionTarget? = null
+        private var suggestionConfigurationRevision = 0L
+        private var suggestionScheduler: SwingShellSuggestionScheduler? = null
         private var suggestionAnchorColumn = 0
         private var suggestionAnchorRow = 0
         private var activeSuggestionIsAutomatic: Boolean = false
+        private var activeSuggestionTarget: SwingShellSuggestionTarget? = null
         private val suggestionInvalidationListeners = CopyOnWriteArraySet<SwingShellSuggestionInvalidationListener>()
         private val suggestionEligibilityListeners = CopyOnWriteArraySet<SwingShellSuggestionEligibilityListener>()
         private val automaticSuggestionEligible = AtomicBoolean(settings.smartSuggestionsEnabled && settings.shellSuggestionsEnabled)
@@ -421,6 +427,7 @@ public class SwingTerminal
 
                     override fun setTerminalFocused(focused: Boolean) {
                         this@SwingTerminal.terminalFocused = focused
+                        if (focused) suggestionScheduler?.onFocusGained() else suggestionScheduler?.onFocusLost()
                         if (focused) reconcileHyperlinksOnEdt() else clearPointerHover()
                     }
 
@@ -1197,6 +1204,7 @@ public class SwingTerminal
 
         private fun bindOnEdt(session: TerminalSession) =
             selectionController.deferChanges {
+                suggestionScheduler?.stop()
                 if (disposed) return@deferChanges
                 bindingJob?.cancel(CancellationException("Terminal session binding replaced"))
                 mouseController.resetInput()
@@ -1226,6 +1234,8 @@ public class SwingTerminal
                         launch {
                             session.state.filterIsInstance<TerminalSessionState.Closed>().take(1).collect {
                                 if (this@SwingTerminal.session === session) {
+                                    suggestionScheduler?.stop()
+                                    cancelAndHideShellSuggestionsOnEdt("Terminal session closed")
                                     mouseController.resetInput()
                                     renderFrameController.handlePublishedFrame()
                                 }
@@ -1278,12 +1288,14 @@ public class SwingTerminal
                 requestRenderFromSession(session)
                 reconcileHyperlinksOnEdt()
                 publishViewportState(renderCache.historySize)
+                reconcileSuggestionSchedulerOnEdt()
                 repaint()
             }
 
         private fun unbindOnEdt() =
             selectionController.deferChanges {
                 cleanupSwingResources(
+                    { suggestionScheduler?.stop() },
                     {
                         val job = bindingJob
                         bindingJob = null
@@ -1334,6 +1346,11 @@ public class SwingTerminal
                 selectionController::removeListeners,
                 suggestionInvalidationListeners::clear,
                 suggestionEligibilityListeners::clear,
+                {
+                    shellSuggestionProvider = null
+                    shellSuggestionTarget = null
+                    suggestionScheduler = null
+                },
                 { suggestionFailureHandler = SwingShellSuggestionFailureHandler.LOGGING },
                 {
                     val controller = shellSuggestionController
@@ -1395,6 +1412,7 @@ public class SwingTerminal
                 revalidate()
             }
             updateAutomaticSuggestionEligibilityOnEdt()
+            reconcileSuggestionSchedulerOnEdt()
             if (next.osc8HyperlinkPresentation != previous.osc8HyperlinkPresentation ||
                 next.mouseReportingEnabled != previous.mouseReportingEnabled ||
                 next.osc8HyperlinkActivation != previous.osc8HyperlinkActivation
@@ -1698,6 +1716,112 @@ public class SwingTerminal
          */
         public val searchState: StateFlow<TerminalSearchState> get() = searchController.states
 
+        /** Whether a configured suggestion provider is available. Read on the EDT. */
+        public val hasShellSuggestionProvider: Boolean
+            get() {
+                check(SwingUtilities.isEventDispatchThread()) { "suggestion configuration must be read on the EDT" }
+                return shellSuggestionProvider != null
+            }
+
+        /**
+         * Installs a host-owned provider or disables configured suggestions with null.
+         * Call on the EDT, before or after binding. Replacement cancels existing requests
+         * without closing either provider. The provider survives unbinding and rebinding;
+         * host metadata must describe the current session when [SwingShellSuggestionProvider.open] captures it.
+         * Automatic observation runs only while a session, provider or custom target, and
+         * the automatic-suggestion setting are available. Explicit custom interactions remain independent.
+         */
+        public fun setShellSuggestionProvider(provider: SwingShellSuggestionProvider?) {
+            check(SwingUtilities.isEventDispatchThread()) { "suggestion providers must be configured on the EDT" }
+            if (disposed) return
+            if (shellSuggestionProvider === provider) {
+                reconcileSuggestionSchedulerOnEdt()
+                return
+            }
+            shellSuggestionProvider = provider
+            val revision = ++suggestionConfigurationRevision
+            suggestionScheduler?.stop()
+            cancelAndHideShellSuggestionsOnEdt("Shell suggestion provider replaced")
+            if (!disposed && suggestionConfigurationRevision == revision) reconcileSuggestionSchedulerOnEdt()
+        }
+
+        /**
+         * Routes automatic captured interactions to a host-owned surface; null selects embedded presentation.
+         * Call on the EDT. Replacement cancels pending requests and hides the old surface.
+         * The host owns target resources. Explicit interaction and presentation methods are unaffected.
+         */
+        public fun setShellSuggestionTarget(target: SwingShellSuggestionTarget?) {
+            check(SwingUtilities.isEventDispatchThread()) { "suggestion targets must be configured on the EDT" }
+            if (disposed || shellSuggestionTarget === target) return
+            val previous = shellSuggestionTarget
+            shellSuggestionTarget = target
+            val revision = ++suggestionConfigurationRevision
+            suggestionScheduler?.stop()
+            val cancellationRevision = suggestionRevision + 1
+            cleanupSwingResources(
+                { cancelAndHideShellSuggestionsOnEdt("Shell suggestion target replaced") },
+                { hideCapturedSuggestionTarget(previous, cancellationRevision) },
+            )
+            if (!disposed && suggestionConfigurationRevision == revision) reconcileSuggestionSchedulerOnEdt()
+        }
+
+        /**
+         * Invalidates automatic request deduplication after host ranking context changes.
+         * Call on the EDT. The next eligible automatic request runs after the normal debounce interval.
+         */
+        public fun refreshShellSuggestions() {
+            check(SwingUtilities.isEventDispatchThread()) { "suggestions must refresh on the EDT" }
+            if (!disposed) suggestionScheduler?.refresh()
+        }
+
+        private fun reconcileSuggestionSchedulerOnEdt() {
+            val bound = session
+            if (disposed ||
+                bound == null ||
+                bound.isClosed ||
+                !settings.smartSuggestionsEnabled ||
+                !settings.shellSuggestionsEnabled ||
+                shellSuggestionProvider == null &&
+                shellSuggestionTarget == null
+            ) {
+                suggestionScheduler?.stop()
+                return
+            }
+            val scheduler =
+                suggestionScheduler ?: SwingShellSuggestionScheduler(
+                    observationScope = componentScope,
+                    edtDispatcher = suggestionDispatcher ?: uiCoroutineDispatcher,
+                    isFocused = { terminalFocused },
+                    isEligible = { isAutomaticShellSuggestionEligible() },
+                    requestSuggestions = { _, feedback ->
+                        val provider = shellSuggestionProvider
+                        val target = shellSuggestionTarget
+                        val interaction = beginActiveShellSuggestionInteraction(SwingShellSuggestionTrigger.AUTOMATIC, feedback)
+                        if (interaction != null) {
+                            if (target != null) {
+                                try {
+                                    target.requestSuggestions(interaction)
+                                } catch (failure: Throwable) {
+                                    try {
+                                        interaction.close()
+                                    } catch (cleanupFailure: Throwable) {
+                                        preserveSwingFailure(failure, cleanupFailure)
+                                    }
+                                    throw failure
+                                }
+                            } else if (provider != null) {
+                                presentShellSuggestions(interaction)
+                                requestShellSuggestions(interaction, provider)
+                            }
+                        }
+                    },
+                    hideSuggestions = {
+                        if (activeSuggestionIsAutomatic) cancelAndHideShellSuggestionsOnEdt("Automatic shell suggestions hidden")
+                    },
+                ).also { suggestionScheduler = it }
+            scheduler.start(bound)
+        }
+
         /**
          * Captures one command-line editing capability before asynchronous provider work.
          *
@@ -1706,12 +1830,15 @@ public class SwingTerminal
          * A new request supersedes the previous interaction. Input, session rebinding, disposal,
          * and ineligible viewport/settings close it. Null means the request or editing target is
          * unavailable. Source completion does not invalidate a displayed final publication.
+         * By default editing is captured from the bound session; an unbound view is display-only.
+         * Supply [editTarget] for a host editor, or [SwingShellSuggestionEditTarget.NONE] for display-only results.
          */
         @JvmOverloads
         public fun beginShellSuggestionInteraction(
             request: SwingShellSuggestionRequest,
             trigger: SwingShellSuggestionTrigger = SwingShellSuggestionTrigger.EXPLICIT,
             feedbackHandler: SwingShellSuggestionFeedbackHandler = SwingShellSuggestionFeedbackHandler.NONE,
+            editTarget: SwingShellSuggestionEditTarget? = null,
         ): SwingShellSuggestionInteraction? {
             check(SwingUtilities.isEventDispatchThread()) { "suggestion capture must run on the EDT" }
             val automatic = trigger == SwingShellSuggestionTrigger.AUTOMATIC
@@ -1724,7 +1851,12 @@ public class SwingTerminal
             val revision = suggestionRevision + 1
             cancelAndHideShellSuggestionsOnEdt("Shell suggestion request replaced", SwingShellSuggestionCloseReason.SUPERSEDED)
             if (suggestionRevision != revision || session !== bound || !prepareShellSuggestionRequestOnEdt(automatic)) return null
-            val captured = hostServices.shellSuggestionEditTarget.capture(request) ?: return null
+            val captured =
+                when {
+                    editTarget != null -> editTarget.capture(request)
+                    bound != null -> SwingShellSuggestionEditTarget.captureSessionEdit(bound, request)
+                    else -> SwingShellSuggestionHandler.NONE
+                } ?: return null
             if (disposed ||
                 suggestionRevision != revision ||
                 session !== bound ||
@@ -1751,6 +1883,8 @@ public class SwingTerminal
             val scope = CoroutineScope(componentScope.coroutineContext + Job(componentJob) + CoroutineName("shell-suggestions"))
             activeSuggestionInteraction = interaction
             activeSuggestionIsAutomatic = automatic
+            val presentationTarget = shellSuggestionTarget.takeIf { automatic }
+            activeSuggestionTarget = presentationTarget
             suggestionScope = scope
             suggestionAnchorColumn = 0
             suggestionAnchorRow = 0
@@ -1760,14 +1894,17 @@ public class SwingTerminal
                         if (interaction.isActive) return
                         interaction.removeChangeListener(this)
                         if (activeSuggestionInteraction !== interaction) return
-                        scope.cancel(CancellationException("Shell suggestion interaction ended"))
                         activeSuggestionInteraction = null
                         activeSuggestionIsAutomatic = false
+                        activeSuggestionTarget = null
                         suggestionScope = null
+                        scope.cancel(CancellationException("Shell suggestion interaction ended"))
                         cleanupSwingResources(
                             { shellSuggestionController?.hide() },
+                            { hideCapturedSuggestionTarget(presentationTarget, revision) },
                             {
                                 if (!interaction.isClosed || interaction.closeReason == SwingShellSuggestionCloseReason.DISMISSED) {
+                                    if (suggestionRevision == revision) suggestionScheduler?.onInvalidated()
                                     for (listener in suggestionInvalidationListeners) {
                                         if (suggestionRevision != revision) break
                                         listener.onShellSuggestionsInvalidated()
@@ -1801,6 +1938,7 @@ public class SwingTerminal
         public fun beginActiveShellSuggestionInteraction(
             trigger: SwingShellSuggestionTrigger = SwingShellSuggestionTrigger.EXPLICIT,
             feedbackHandler: SwingShellSuggestionFeedbackHandler = SwingShellSuggestionFeedbackHandler.NONE,
+            editTarget: SwingShellSuggestionEditTarget? = null,
         ): SwingShellSuggestionInteraction? {
             check(SwingUtilities.isEventDispatchThread()) { "suggestion capture must run on the EDT" }
             if (!prepareShellSuggestionRequestOnEdt(trigger == SwingShellSuggestionTrigger.AUTOMATIC)) return null
@@ -1814,6 +1952,7 @@ public class SwingTerminal
                     SwingShellSuggestionRequest(snapshot.commandText, snapshot.cursorOffset),
                     trigger,
                     feedbackHandler,
+                    editTarget,
                 ) ?: return null
             suggestionAnchorColumn = snapshot.cursorColumn
             suggestionAnchorRow = snapshot.cursorRow
@@ -1903,23 +2042,29 @@ public class SwingTerminal
             anchorColumn: Int,
             anchorRow: Int,
             trigger: SwingShellSuggestionTrigger = SwingShellSuggestionTrigger.AUTOMATIC,
+            editTarget: SwingShellSuggestionEditTarget? = null,
         ) {
             require(anchorColumn >= 0 && anchorRow >= 0) { "suggestion anchor must be nonnegative" }
             val request = SwingShellSuggestionRequest(commandText, cursorOffset)
             runOnEdt {
-                val interaction = beginShellSuggestionInteraction(request, trigger) ?: return@runOnEdt
+                val provider = shellSuggestionProvider ?: return@runOnEdt
+                val interaction = beginShellSuggestionInteraction(request, trigger, editTarget = editTarget) ?: return@runOnEdt
                 presentShellSuggestions(interaction, anchorColumn, anchorRow)
-                requestShellSuggestions(interaction, hostServices.shellSuggestionProvider)
+                requestShellSuggestions(interaction, provider)
             }
         }
 
         /** Queries and presents the bound session's active command line using the configured provider. */
         @JvmOverloads
-        public fun requestActiveShellSuggestions(trigger: SwingShellSuggestionTrigger = SwingShellSuggestionTrigger.EXPLICIT) {
+        public fun requestActiveShellSuggestions(
+            trigger: SwingShellSuggestionTrigger = SwingShellSuggestionTrigger.EXPLICIT,
+            editTarget: SwingShellSuggestionEditTarget? = null,
+        ) {
             runOnEdt {
-                val interaction = beginActiveShellSuggestionInteraction(trigger) ?: return@runOnEdt
+                val provider = shellSuggestionProvider ?: return@runOnEdt
+                val interaction = beginActiveShellSuggestionInteraction(trigger, editTarget = editTarget) ?: return@runOnEdt
                 presentShellSuggestions(interaction)
-                requestShellSuggestions(interaction, hostServices.shellSuggestionProvider)
+                requestShellSuggestions(interaction, provider)
             }
         }
 
@@ -2183,6 +2328,7 @@ public class SwingTerminal
 
         private fun invalidateShellSuggestionsOnEdt() {
             cancelAndHideShellSuggestionsOnEdt("Shell suggestions invalidated by input")
+            suggestionScheduler?.onInvalidated()
             suggestionInvalidationListeners.forEach { listener ->
                 listener.onShellSuggestionsInvalidated()
             }
@@ -2477,6 +2623,11 @@ public class SwingTerminal
             if (changed && revision == automaticSuggestionEligibilityRevision) {
                 val eligible = automaticSuggestionEligible.get()
                 try {
+                    suggestionScheduler?.onEligibilityChanged(eligible)
+                } catch (next: Throwable) {
+                    failure = preserveSwingFailure(failure, next)
+                }
+                try {
                     for (listener in suggestionEligibilityListeners) {
                         if (revision != automaticSuggestionEligibilityRevision) break
                         listener.onAutomaticShellSuggestionEligibilityChanged(eligible)
@@ -2497,14 +2648,24 @@ public class SwingTerminal
             val revision = ++suggestionRevision
             val interaction = activeSuggestionInteraction
             val scope = suggestionScope
+            val target = activeSuggestionTarget
             activeSuggestionInteraction = null
             suggestionScope = null
             activeSuggestionIsAutomatic = false
+            activeSuggestionTarget = null
             scope?.cancel(CancellationException(reason))
             cleanupSwingResources(
                 { interaction?.close(closeReason) },
                 { if (suggestionRevision == revision) shellSuggestionController?.hide() },
+                { hideCapturedSuggestionTarget(target, revision) },
             )
+        }
+
+        private fun hideCapturedSuggestionTarget(
+            target: SwingShellSuggestionTarget?,
+            revision: Long,
+        ) {
+            if (suggestionRevision == revision || activeSuggestionTarget !== target) target?.hideSuggestions()
         }
 
         /**

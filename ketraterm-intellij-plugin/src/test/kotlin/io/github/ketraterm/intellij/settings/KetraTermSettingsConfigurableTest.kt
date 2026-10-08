@@ -57,7 +57,7 @@ class KetraTermSettingsConfigurableTest : BasePlatformTestCase() {
                 assertFalse(configurable.isModified())
                 combo.selectedIndex = (combo.selectedIndex + 1) % combo.itemCount
                 configurable.reset()
-                assertEquals(label, combo.selectedItem.toString())
+                assertEquals(label, combo.selectedItem?.toString())
                 assertFalse(configurable.isModified())
             }
         } finally {
@@ -362,7 +362,7 @@ class KetraTermSettingsConfigurableTest : BasePlatformTestCase() {
         val completion = KetraTermCompletionService.getInstance()
         var resourceChanges = 0
         val listener: () -> Unit = { resourceChanges++ }
-        completion.addResourceListener(listener)
+        completion.addProviderListener(listener)
         try {
             settings.loadState(original.copy(smartSuggestionsEnabled = !original.smartSuggestionsEnabled))
             UIUtil.dispatchAllInvocationEvents()
@@ -371,7 +371,7 @@ class KetraTermSettingsConfigurableTest : BasePlatformTestCase() {
             UIUtil.dispatchAllInvocationEvents()
             assertEquals(1, resourceChanges)
         } finally {
-            completion.removeResourceListener(listener)
+            completion.removeProviderListener(listener)
             settings.replaceState(original)
         }
     }

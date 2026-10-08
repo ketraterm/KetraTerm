@@ -10,7 +10,8 @@ records such as `SwingPadding` retain their intentional data-class contracts.
 | Setting | Owner |
 | --- | --- |
 | Fonts, colors, padding, cursor presentation, input interaction | `SwingSettings` |
-| Clipboard, font resolver, hyperlink and suggestion services | `SwingHostServices`; service lifetimes remain host-owned |
+| Clipboard, font resolver, and hyperlink services | Immutable `SwingHostServices`; service lifetimes remain host-owned |
+| Suggestion provider and optional automatic presentation target | EDT `SwingTerminal` setters; engines and popup resources remain host-owned |
 | Scrollback capacity | Core creation, selected through `PtyOptions.maxHistory` by local-session hosts |
 | Shell window permissions | Session `HostPolicy` and product window handling |
 | Standalone TOML schema, paths, load/save and defaults | Internal application `KetraTermConfig` and `KetraTermConfigManager` |
@@ -57,6 +58,51 @@ Default alternate padding derives from the final primary padding and gutter.
 A copied builder retains the resolved alternate padding; assign null to request
 recalculation. Rendering reads resolved values without consulting a builder.
 
+## Session-independent completion construction
+
+Configure completion through the component's lifecycle API, independently of its
+immutable environment services. The provider can be installed before or after
+binding. Both operations run on the EDT:
+
+```kotlin
+// Session first: the host has already started the session.
+val terminal = SwingTerminal(settingsProvider, hostServices)
+terminal.bind(session)
+terminal.setShellSuggestionProvider(provider)
+```
+
+```kotlin
+// Component first: a framework needs the component during asynchronous startup.
+val terminal = SwingTerminal(settingsProvider, hostServices)
+terminal.setShellSuggestionProvider(provider)
+// Add terminal to the host layout; when session startup completes, on the EDT:
+terminal.bind(session)
+```
+
+No session forwarding callback or mutable replacement of `SwingHostServices` is
+needed. The provider survives `unbind` and rebinding. Automatic observation and
+request work follow the current binding, settings, focus, and session lifetime.
+Normal completion captures the actual bound session's editing capability before
+provider work; rebinding invalidates the old interaction even when both sessions
+show identical command text.
+
+```kotlin
+terminal.setShellSuggestionProvider(replacementProvider) // Cancels old work.
+terminal.refreshShellSuggestions() // External host metadata changed.
+terminal.setShellSuggestionProvider(null) // Disables configured provider requests.
+terminal.dispose() // Releases view work; the host closes its session separately.
+```
+
+`setShellSuggestionTarget(target)` routes automatic requests to a host-owned popup;
+null restores embedded presentation. The target receives the captured interaction.
+Targets can collect through their own provider or engine without configuring a
+terminal provider. Automatic observation stops when neither is installed.
+Custom editors supply an `editTarget` per interaction through
+`beginShellSuggestionInteraction`; default bound editing requires no host adapter.
+An unbound interaction without a custom edit target can display results but cannot
+accept an edit. Provider replacement preserves the original source's feedback
+observer for every already captured request.
+
 ## Optional host chrome and labels
 
 User-facing text lives in UTF-8 `.properties` catalogs. `SwingHostMessages`,
@@ -95,13 +141,17 @@ no-argument refresh and reopening retain the last supplied colors. Defaults keep
 the original dark styling. Theme observation and snapshot replacement belong to
 the host, with no theme callback during painting.
 
-`SwingCompletionSuggestionProvider(engine, contextProvider, sourceLabels)` takes
+`SwingCompletionSuggestionProvider(engine, contextProvider, sourceLabels, feedbackHandler)` takes
 an exact source-ID-to-label map. It copies and bounds labels at construction;
 blank values fail with `IllegalArgumentException`. Unknown IDs use neutral
 humanization, without removing product prefixes. Display labels never change
 source IDs, ranking or feedback. IntelliJ supplies its product labels at registry
 composition; standalone uses the bundled source labels. Published Kotlin and Java consumers
-exercise both APIs alongside the existing host-owned suggestion target.
+exercise both APIs alongside the host-owned suggestion target. The optional
+feedback observer is captured with the source by `open(request)`. Opening a
+terminal request snapshots `contextProvider` synchronously on the EDT; keep that
+supplier cheap and return immutable metadata. Direct `suggestions(request)` calls
+snapshot context in their caller's thread. Engine work starts on stream collection.
 
 `TerminalCommandSpecs.defaults(locale)` builds a localized immutable command
 catalog once, before engine construction. `defaults(bundle)` supports partial

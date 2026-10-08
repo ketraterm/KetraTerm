@@ -17,18 +17,54 @@ package io.github.ketraterm.ui.swing.host
 
 import io.github.ketraterm.completion.api.*
 import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionAccentRole
+import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionFeedbackHandler
 import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionRequest
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.last
 import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.swing.Swing
 import kotlinx.coroutines.withContext
 import java.util.concurrent.atomic.AtomicReference
 import javax.swing.SwingUtilities
 import kotlin.test.*
 
 class SwingCompletionSuggestionProviderTest {
+    @Test
+    fun `opening captures context and feedback before deferred engine work`() =
+        runBlocking {
+            val initial = SwingCompletionContext(profileId = "bash", workingDirectoryUri = "file:///first")
+            var context = initial
+            var reads = 0
+            var calls = 0
+            val feedback = SwingShellSuggestionFeedbackHandler { }
+            val provider =
+                SwingCompletionSuggestionProvider(
+                    engine = { request ->
+                        assertFalse(SwingUtilities.isEventDispatchThread())
+                        assertEquals("file:///first", request.workingDirectoryUri)
+                        calls++
+                        flowOf(listOf(TerminalCompletionCandidate("status", 4, 5, "spec", TerminalCompletionCandidateKind.SUBCOMMAND)))
+                    },
+                    contextProvider = {
+                        assertTrue(SwingUtilities.isEventDispatchThread())
+                        reads++
+                        context
+                    },
+                    feedbackHandler = feedback,
+                )
+            val source = withContext(Dispatchers.Swing) { provider.open(request("git s", 5)) }
+            assertEquals(1, reads)
+            assertEquals(0, calls)
+            assertSame(feedback, source.feedbackHandler)
+            context = initial.copy(workingDirectoryUri = "file:///second")
+            val suggestions = withContext(Dispatchers.Default) { source.suggestions.last() }
+            assertEquals(1, reads)
+            assertEquals(1, calls)
+            assertSame(initial, suggestions.single().interactionContext)
+        }
+
     @Test
     fun `provider feedback token survives adaptation independently of request context`() =
         runBlocking {
@@ -58,7 +94,7 @@ class SwingCompletionSuggestionProviderTest {
         }
 
     @Test
-    fun `host source labels are detached bounded and do not alter source identity`() =
+    fun `host source labels are detached bounded and do not alter source identity`(): Unit =
         runBlocking {
             val labels = mutableMapOf("product-source" to "x".repeat(126) + "😀suffix")
             val engine =

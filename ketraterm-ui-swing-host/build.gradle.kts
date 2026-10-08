@@ -26,11 +26,10 @@ dependencies {
     api(project(":ketraterm-ui-swing"))
     api("org.jetbrains.kotlinx:kotlinx-coroutines-core:$kotlinxCoroutinesVersion")
 
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-swing:$kotlinxCoroutinesVersion")
-
     testImplementation(kotlin("test"))
     testImplementation(project(":ketraterm-testkit"))
     testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:$kotlinxCoroutinesVersion")
+    testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-swing:$kotlinxCoroutinesVersion")
 }
 
 tasks.test {

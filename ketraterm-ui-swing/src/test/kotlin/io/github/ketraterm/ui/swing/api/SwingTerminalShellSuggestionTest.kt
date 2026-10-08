@@ -53,6 +53,13 @@ class SwingTerminalShellSuggestionTest {
             var beginOnHide = false
             val capturedRequests = ArrayList<String>()
             val admittedRequests = ArrayList<String>()
+            val editTarget: SwingShellSuggestionEditTarget = { captured ->
+                capturedRequests += captured.commandText
+                SwingShellSuggestionHandler { acceptance ->
+                    admittedRequests += acceptance.request.commandText
+                    SwingShellSuggestionAcceptanceResult.ACCEPTED
+                }
+            }
             val view =
                 object : SwingShellSuggestionView {
                     override val component = JPanel()
@@ -60,7 +67,7 @@ class SwingTerminalShellSuggestionTest {
                     override fun update(snapshot: SwingShellSuggestionViewSnapshot) {
                         if (beginOnHide && snapshot.visibleSuggestions.isEmpty()) {
                             beginOnHide = false
-                            newer = checkNotNull(terminal.beginShellSuggestionInteraction(request("newer")))
+                            newer = checkNotNull(terminal.beginShellSuggestionInteraction(request("newer"), editTarget = editTarget))
                             newer.publish(suggestions("newer"))
                             terminal.presentShellSuggestions(newer)
                         }
@@ -72,22 +79,15 @@ class SwingTerminalShellSuggestionTest {
                     hostServices =
                         SwingHostServices.create { draft ->
                             draft.shellSuggestionViewFactory = { view }
-                            draft.shellSuggestionEditTarget = { captured ->
-                                capturedRequests += captured.commandText
-                                SwingShellSuggestionHandler { acceptance ->
-                                    admittedRequests += acceptance.request.commandText
-                                    SwingShellSuggestionAcceptanceResult.ACCEPTED
-                                }
-                            }
                         },
                 )
             try {
-                val old = checkNotNull(terminal.beginShellSuggestionInteraction(request("old")))
+                val old = checkNotNull(terminal.beginShellSuggestionInteraction(request("old"), editTarget = editTarget))
                 old.publish(suggestions("old"))
                 terminal.presentShellSuggestions(old)
                 beginOnHide = true
 
-                val outer = terminal.beginShellSuggestionInteraction(request("outer"))
+                val outer = terminal.beginShellSuggestionInteraction(request("outer"), editTarget = editTarget)
 
                 assertNull(outer)
                 assertEquals(SwingShellSuggestionCloseReason.SUPERSEDED, old.closeReason)
@@ -137,21 +137,24 @@ class SwingTerminalShellSuggestionTest {
                 }
             }
         SwingUtilities.invokeAndWait {
+            val editTarget: SwingShellSuggestionEditTarget = {
+                SwingShellSuggestionHandler {
+                    attempts++
+                    SwingShellSuggestionAcceptanceResult.REJECTED
+                }
+            }
             terminal =
                 SwingTerminal(
                     settingsProvider = { SwingSettings.create { it.smartSuggestionsEnabled = true } },
                     hostServices =
                         SwingHostServices.create { draft ->
-                            draft.shellSuggestionEditTarget = {
-                                SwingShellSuggestionHandler {
-                                    attempts++
-                                    SwingShellSuggestionAcceptanceResult.REJECTED
-                                }
-                            }
                             draft.shellSuggestionViewFactory = { error("Detached collection must not construct a view") }
                         },
                 )
-            interaction = checkNotNull(terminal.beginShellSuggestionInteraction(request(), feedbackHandler = { ownerFeedback += it }))
+            interaction =
+                checkNotNull(
+                    terminal.beginShellSuggestionInteraction(request(), feedbackHandler = { ownerFeedback += it }, editTarget = editTarget),
+                )
             terminal.requestShellSuggestions(interaction, provider)
             assertThrows(IllegalStateException::class.java) { terminal.requestShellSuggestions(interaction, provider) }
             assertEquals(1, opens)
@@ -176,16 +179,13 @@ class SwingTerminalShellSuggestionTest {
     @Test
     fun `source cannot attach after an owner publishes even an empty snapshot`() {
         SwingUtilities.invokeAndWait {
+            val editTarget: SwingShellSuggestionEditTarget = { SwingShellSuggestionHandler.NONE }
             val terminal =
                 SwingTerminal(
                     settingsProvider = { SwingSettings.create { it.smartSuggestionsEnabled = true } },
-                    hostServices =
-                        SwingHostServices.create { draft ->
-                            draft.shellSuggestionEditTarget = { SwingShellSuggestionHandler.NONE }
-                        },
                 )
             try {
-                val interaction = checkNotNull(terminal.beginShellSuggestionInteraction(request()))
+                val interaction = checkNotNull(terminal.beginShellSuggestionInteraction(request(), editTarget = editTarget))
                 interaction.publish(emptyList())
                 val provider = SwingShellSuggestionProvider { error("Late source was invoked") }
 
@@ -205,20 +205,20 @@ class SwingTerminalShellSuggestionTest {
         val session = activeSuggestionSession(connector)
         connector.feedFromHost("\u001B]133;A\u0007PS> \u001B]133;B\u0007git s".utf8())
         SwingUtilities.invokeAndWait {
+            val provider = SwingShellSuggestionProvider { error("Disabled provider was invoked") }
+            val editTarget: SwingShellSuggestionEditTarget = { SwingShellSuggestionHandler { error("Disabled suggestion was accepted") } }
             val component =
                 SwingTerminal(
                     hostServices =
                         SwingHostServices.create { draft ->
-                            draft.shellSuggestionProvider = SwingShellSuggestionProvider { error("Disabled provider was invoked") }
                             draft.shellSuggestionViewFactory = SwingShellSuggestionViewFactory { error("Disabled view was constructed") }
-                            draft.shellSuggestionEditTarget = { SwingShellSuggestionHandler { error("Disabled suggestion was accepted") } }
                         },
-                )
+                ).withSuggestionProvider(provider)
             try {
                 component.bind(session)
-                component.requestShellSuggestions("git s", 5, 5, 0)
+                component.requestShellSuggestions("git s", 5, 5, 0, editTarget = editTarget)
                 component.requestActiveShellSuggestions()
-                component.showSuggestions(request(), suggestions())
+                component.showSuggestions(request(), suggestions(), editTarget = editTarget)
                 assertFalse(component.currentShellSuggestionState().visible)
                 assertFalse(component.isAutomaticShellSuggestionEligible())
             } finally {
@@ -240,23 +240,20 @@ class SwingTerminalShellSuggestionTest {
             }
         val started = CompletableDeferred<Unit>()
         val cancelled = CompletableDeferred<Unit>()
+        val provider: SwingShellSuggestionProvider = {
+            flow {
+                started.complete(Unit)
+                try {
+                    awaitCancellation()
+                } finally {
+                    cancelled.complete(Unit)
+                }
+            }
+        }
         val component =
             SwingTerminal(
                 settingsProvider = { settings },
-                hostServices =
-                    SwingHostServices.create { draft ->
-                        draft.shellSuggestionProvider = {
-                            flow {
-                                started.complete(Unit)
-                                try {
-                                    awaitCancellation()
-                                } finally {
-                                    cancelled.complete(Unit)
-                                }
-                            }
-                        }
-                    },
-            )
+            ).withSuggestionProvider(provider)
         try {
             SwingUtilities.invokeAndWait {
                 component.bind(session)
@@ -326,6 +323,19 @@ class SwingTerminalShellSuggestionTest {
         val firstStarted = CompletableDeferred<Unit>()
         val firstCancelled = CompletableDeferred<Unit>()
         val view = RecordingSuggestionView()
+        val provider: SwingShellSuggestionProvider = { request ->
+            flow {
+                if (request.commandText == "first") {
+                    firstStarted.complete(Unit)
+                    try {
+                        awaitCancellation()
+                    } finally {
+                        firstCancelled.complete(Unit)
+                    }
+                }
+                emit(suggestions(request.commandText))
+            }
+        }
         val component =
             SwingTerminal(
                 settingsProvider = {
@@ -336,22 +346,9 @@ class SwingTerminalShellSuggestionTest {
                 },
                 hostServices =
                     SwingHostServices.create { draft ->
-                        draft.shellSuggestionProvider = { request ->
-                            flow {
-                                if (request.commandText == "first") {
-                                    firstStarted.complete(Unit)
-                                    try {
-                                        awaitCancellation()
-                                    } finally {
-                                        firstCancelled.complete(Unit)
-                                    }
-                                }
-                                emit(suggestions(request.commandText))
-                            }
-                        }
                         draft.shellSuggestionViewFactory = view.factory()
                     },
-            )
+            ).withSuggestionProvider(provider)
 
         try {
             SwingUtilities.invokeAndWait {
@@ -380,6 +377,14 @@ class SwingTerminalShellSuggestionTest {
         val providerWasOnEdt = CompletableDeferred<Boolean>()
         val providerDispatcher = CompletableDeferred<ContinuationInterceptor?>()
         val view = RecordingSuggestionView()
+        val provider: SwingShellSuggestionProvider = { request ->
+            providerFactoryWasOnEdt.complete(SwingUtilities.isEventDispatchThread())
+            flow {
+                providerWasOnEdt.complete(SwingUtilities.isEventDispatchThread())
+                providerDispatcher.complete(currentCoroutineContext()[ContinuationInterceptor])
+                emit(suggestions(request.commandText))
+            }
+        }
         val component =
             SwingTerminal(
                 settingsProvider = {
@@ -390,17 +395,9 @@ class SwingTerminalShellSuggestionTest {
                 },
                 hostServices =
                     SwingHostServices.create { draft ->
-                        draft.shellSuggestionProvider = { request ->
-                            providerFactoryWasOnEdt.complete(SwingUtilities.isEventDispatchThread())
-                            flow {
-                                providerWasOnEdt.complete(SwingUtilities.isEventDispatchThread())
-                                providerDispatcher.complete(currentCoroutineContext()[ContinuationInterceptor])
-                                emit(suggestions(request.commandText))
-                            }
-                        }
                         draft.shellSuggestionViewFactory = view.factory()
                     },
-            )
+            ).withSuggestionProvider(provider)
 
         SwingUtilities.invokeAndWait {
             component.size = component.preferredGridSize(12, 4)
@@ -423,6 +420,21 @@ class SwingTerminalShellSuggestionTest {
         val firstRelease = CompletableDeferred<Unit>()
         val firstFinished = CompletableDeferred<Unit>()
         val view = RecordingSuggestionView()
+        val provider: SwingShellSuggestionProvider = { request ->
+            flow {
+                try {
+                    emit(suggestions(request.commandText))
+                    if (request.commandText == "first") {
+                        firstRelease.await()
+                        emit(listOf(suggestion("stale", commandText = request.commandText)))
+                    }
+                } finally {
+                    if (request.commandText == "first") {
+                        firstFinished.complete(Unit)
+                    }
+                }
+            }
+        }
         val component =
             SwingTerminal(
                 settingsProvider = {
@@ -433,24 +445,9 @@ class SwingTerminalShellSuggestionTest {
                 },
                 hostServices =
                     SwingHostServices.create { draft ->
-                        draft.shellSuggestionProvider = { request ->
-                            flow {
-                                try {
-                                    emit(suggestions(request.commandText))
-                                    if (request.commandText == "first") {
-                                        firstRelease.await()
-                                        emit(listOf(suggestion("stale", commandText = request.commandText)))
-                                    }
-                                } finally {
-                                    if (request.commandText == "first") {
-                                        firstFinished.complete(Unit)
-                                    }
-                                }
-                            }
-                        }
                         draft.shellSuggestionViewFactory = view.factory()
                     },
-            )
+            ).withSuggestionProvider(provider)
 
         SwingUtilities.invokeAndWait {
             component.size = component.preferredGridSize(12, 4)
@@ -526,6 +523,14 @@ class SwingTerminalShellSuggestionTest {
         val accepted = ArrayList<SwingShellSuggestion>()
         val indexes = ArrayList<Int>()
         val requests = ArrayList<SwingShellSuggestionRequest>()
+        val editTarget: SwingShellSuggestionEditTarget = { _ ->
+            SwingShellSuggestionHandler { acceptance ->
+                accepted += acceptance.suggestion
+                indexes += acceptance.index
+                requests += acceptance.request
+                SwingShellSuggestionAcceptanceResult.ACCEPTED
+            }
+        }
         val component =
             SwingTerminal(
                 settingsProvider = {
@@ -534,24 +539,13 @@ class SwingTerminalShellSuggestionTest {
                         draft.padding = SwingPadding(0, 0, 0, 0)
                     }
                 },
-                hostServices =
-                    SwingHostServices.create { draft ->
-                        draft.shellSuggestionEditTarget = { _ ->
-                            SwingShellSuggestionHandler { acceptance ->
-                                accepted += acceptance.suggestion
-                                indexes += acceptance.index
-                                requests += acceptance.request
-                                SwingShellSuggestionAcceptanceResult.ACCEPTED
-                            }
-                        }
-                    },
             )
         val request = request()
         val suggestions = suggestions(request.commandText)
 
         SwingUtilities.invokeAndWait {
             component.size = component.preferredGridSize(12, 4)
-            component.showSuggestions(request, suggestions, anchorColumn = 1, anchorRow = 1)
+            component.showSuggestions(request, suggestions, anchorColumn = 1, anchorRow = 1, editTarget = editTarget)
 
             component.keyListeners.forEach { listener -> listener.keyPressed(keyPressed(component, KeyEvent.VK_DOWN)) }
             component.keyListeners.forEach { listener -> listener.keyPressed(keyPressed(component, KeyEvent.VK_TAB)) }
@@ -569,6 +563,17 @@ class SwingTerminalShellSuggestionTest {
         val providerRequests = ArrayList<SwingShellSuggestionRequest>()
         val acceptedRequests = ArrayList<SwingShellSuggestionRequest>()
         val view = RecordingSuggestionView()
+        val provider =
+            SwingShellSuggestionProvider { request ->
+                providerRequests += request
+                flowOf(suggestions(request.commandText))
+            }
+        val editTarget: SwingShellSuggestionEditTarget = { _ ->
+            SwingShellSuggestionHandler { acceptance ->
+                acceptedRequests += acceptance.request
+                SwingShellSuggestionAcceptanceResult.ACCEPTED
+            }
+        }
         val component =
             SwingTerminal(
                 settingsProvider = {
@@ -579,20 +584,9 @@ class SwingTerminalShellSuggestionTest {
                 },
                 hostServices =
                     SwingHostServices.create { draft ->
-                        draft.shellSuggestionProvider =
-                            SwingShellSuggestionProvider { request ->
-                                providerRequests += request
-                                flowOf(suggestions(request.commandText))
-                            }
-                        draft.shellSuggestionEditTarget = { _ ->
-                            SwingShellSuggestionHandler { acceptance ->
-                                acceptedRequests += acceptance.request
-                                SwingShellSuggestionAcceptanceResult.ACCEPTED
-                            }
-                        }
                         draft.shellSuggestionViewFactory = view.factory()
                     },
-            )
+            ).withSuggestionProvider(provider)
 
         SwingUtilities.invokeAndWait {
             component.size = component.preferredGridSize(12, 4)
@@ -601,6 +595,7 @@ class SwingTerminalShellSuggestionTest {
                 cursorOffset = 5,
                 anchorColumn = 5,
                 anchorRow = 2,
+                editTarget = editTarget,
             )
         }
         view.awaitVisibleUpdate()
@@ -642,6 +637,13 @@ class SwingTerminalShellSuggestionTest {
         val accepted = mutableListOf<SwingShellSuggestionAcceptance>()
         val connector = RecordingConnector()
         val session = activeSuggestionSession(connector)
+        val provider: SwingShellSuggestionProvider = { flowOf(suggestions("git s")) }
+        val editTarget: SwingShellSuggestionEditTarget = { _ ->
+            SwingShellSuggestionHandler {
+                accepted += it
+                SwingShellSuggestionAcceptanceResult.ACCEPTED
+            }
+        }
         val component =
             SwingTerminal(
                 settingsProvider = {
@@ -652,21 +654,20 @@ class SwingTerminalShellSuggestionTest {
                 },
                 hostServices =
                     SwingHostServices.create { draft ->
-                        draft.shellSuggestionProvider = { flowOf(suggestions("git s")) }
-                        draft.shellSuggestionEditTarget = { _ ->
-                            SwingShellSuggestionHandler {
-                                accepted += it
-                                SwingShellSuggestionAcceptanceResult.ACCEPTED
-                            }
-                        }
                         draft.shellSuggestionViewFactory = view.factory()
                     },
-            )
+            ).withSuggestionProvider(provider)
 
         SwingUtilities.invokeAndWait {
             component.size = component.preferredGridSize(12, 4)
             component.bind(session)
-            component.requestShellSuggestions(commandText = "git s", cursorOffset = 5, anchorColumn = 5, anchorRow = 0)
+            component.requestShellSuggestions(
+                commandText = "git s",
+                cursorOffset = 5,
+                anchorColumn = 5,
+                anchorRow = 0,
+                editTarget = editTarget,
+            )
         }
         view.awaitVisibleUpdate()
 
@@ -693,6 +694,7 @@ class SwingTerminalShellSuggestionTest {
     fun `progressive provider rankings preserve the selected outcome across reranking updates`() {
         val emissions = Channel<List<SwingShellSuggestion>>(Channel.UNLIMITED)
         val view = RecordingSuggestionView()
+        val provider: SwingShellSuggestionProvider = { emissions.receiveAsFlow() }
         val component =
             SwingTerminal(
                 settingsProvider = {
@@ -703,10 +705,9 @@ class SwingTerminalShellSuggestionTest {
                 },
                 hostServices =
                     SwingHostServices.create { draft ->
-                        draft.shellSuggestionProvider = { emissions.receiveAsFlow() }
                         draft.shellSuggestionViewFactory = view.factory()
                     },
-            )
+            ).withSuggestionProvider(provider)
         val initial =
             suggestions() +
                 suggestion(
@@ -752,6 +753,7 @@ class SwingTerminalShellSuggestionTest {
     fun `provider empty result hides popup and later results reopen in passive state`() {
         val emissions = Channel<List<SwingShellSuggestion>>(Channel.UNLIMITED)
         val view = RecordingSuggestionView()
+        val provider: SwingShellSuggestionProvider = { emissions.receiveAsFlow() }
         val component =
             SwingTerminal(
                 settingsProvider = {
@@ -762,10 +764,9 @@ class SwingTerminalShellSuggestionTest {
                 },
                 hostServices =
                     SwingHostServices.create { draft ->
-                        draft.shellSuggestionProvider = { emissions.receiveAsFlow() }
                         draft.shellSuggestionViewFactory = view.factory()
                     },
-            )
+            ).withSuggestionProvider(provider)
 
         SwingUtilities.invokeAndWait {
             component.size = component.preferredGridSize(12, 4)
@@ -810,6 +811,10 @@ class SwingTerminalShellSuggestionTest {
         connector.feedFromHost("\u001B]133;A\u0007PS> \u001B]133;B\u0007git s".utf8())
         val providerRequests = ArrayList<SwingShellSuggestionRequest>()
         val view = RecordingSuggestionView()
+        val provider: SwingShellSuggestionProvider = { request ->
+            providerRequests += request
+            flowOf(suggestions(request.commandText))
+        }
         val component =
             SwingTerminal(
                 settingsProvider = {
@@ -820,18 +825,14 @@ class SwingTerminalShellSuggestionTest {
                 },
                 hostServices =
                     SwingHostServices.create { draft ->
-                        draft.shellSuggestionProvider = { request ->
-                            providerRequests += request
-                            flowOf(suggestions(request.commandText))
-                        }
                         draft.shellSuggestionViewFactory = view.factory()
                     },
-            )
+            ).withSuggestionProvider(provider)
 
         SwingUtilities.invokeAndWait {
             component.size = component.preferredGridSize(30, 4)
             component.bind(session)
-            component.requestActiveShellSuggestions()
+            component.requestActiveShellSuggestions(editTarget = SwingShellSuggestionEditTarget.NONE)
         }
         view.awaitVisibleUpdate()
 
@@ -861,6 +862,7 @@ class SwingTerminalShellSuggestionTest {
         val connector = RecordingConnector()
         val session = activeSuggestionSession(connector)
         connector.feedFromHost("\u001B]133;A\u0007PS> \u001B]133;B\u0007git s\u001B]133;C\u0007".utf8())
+        val provider: SwingShellSuggestionProvider = { request -> flowOf(suggestions(request.commandText)) }
         val component =
             SwingTerminal(
                 settingsProvider = {
@@ -869,11 +871,7 @@ class SwingTerminalShellSuggestionTest {
                         draft.padding = SwingPadding(0, 0, 0, 0)
                     }
                 },
-                hostServices =
-                    SwingHostServices.create { draft ->
-                        draft.shellSuggestionProvider = { request -> flowOf(suggestions(request.commandText)) }
-                    },
-            )
+            ).withSuggestionProvider(provider)
 
         SwingUtilities.invokeAndWait {
             component.size = component.preferredGridSize(30, 4)
@@ -891,6 +889,7 @@ class SwingTerminalShellSuggestionTest {
 
     @Test
     fun `disabled automatic suggestions setting ignores automatic provider requests`() {
+        val provider: SwingShellSuggestionProvider = { flowOf(suggestions(it.commandText)) }
         val component =
             SwingTerminal(
                 settingsProvider = {
@@ -899,11 +898,7 @@ class SwingTerminalShellSuggestionTest {
                         draft.shellSuggestionsEnabled = false
                     }
                 },
-                hostServices =
-                    SwingHostServices.create { draft ->
-                        draft.shellSuggestionProvider = { flowOf(suggestions(it.commandText)) }
-                    },
-            )
+            ).withSuggestionProvider(provider)
 
         SwingUtilities.invokeAndWait {
             component.requestShellSuggestions(commandText = "git s", cursorOffset = 5, anchorColumn = 5, anchorRow = 0)
@@ -919,6 +914,10 @@ class SwingTerminalShellSuggestionTest {
         connector.feedFromHost("\u001B]133;A\u0007PS> \u001B]133;B\u0007git s".utf8())
         val providerRequests = ArrayList<SwingShellSuggestionRequest>()
         val view = RecordingSuggestionView()
+        val provider: SwingShellSuggestionProvider = { request ->
+            providerRequests += request
+            flowOf(suggestions(request.commandText))
+        }
         val component =
             SwingTerminal(
                 settingsProvider = {
@@ -929,13 +928,9 @@ class SwingTerminalShellSuggestionTest {
                 },
                 hostServices =
                     SwingHostServices.create { draft ->
-                        draft.shellSuggestionProvider = { request ->
-                            providerRequests += request
-                            flowOf(suggestions(request.commandText))
-                        }
                         draft.shellSuggestionViewFactory = view.factory()
                     },
-            )
+            ).withSuggestionProvider(provider)
 
         SwingUtilities.invokeAndWait {
             component.size = component.preferredGridSize(30, 4)
@@ -962,23 +957,20 @@ class SwingTerminalShellSuggestionTest {
         val providerStarted = CompletableDeferred<Unit>()
         val providerCancelled = CompletableDeferred<Unit>()
         val eligibilityDuringCallback = ArrayList<Boolean>()
+        val provider: SwingShellSuggestionProvider = { _ ->
+            flow {
+                providerStarted.complete(Unit)
+                try {
+                    awaitCancellation()
+                } finally {
+                    providerCancelled.complete(Unit)
+                }
+            }
+        }
         val component =
             SwingTerminal(
                 settingsProvider = { currentSettings },
-                hostServices =
-                    SwingHostServices.create { draft ->
-                        draft.shellSuggestionProvider = { _ ->
-                            flow {
-                                providerStarted.complete(Unit)
-                                try {
-                                    awaitCancellation()
-                                } finally {
-                                    providerCancelled.complete(Unit)
-                                }
-                            }
-                        }
-                    },
-            )
+            ).withSuggestionProvider(provider)
 
         try {
             SwingUtilities.invokeAndWait {

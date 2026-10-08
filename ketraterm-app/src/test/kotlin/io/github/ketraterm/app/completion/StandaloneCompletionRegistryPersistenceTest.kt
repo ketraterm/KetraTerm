@@ -118,7 +118,7 @@ class StandaloneCompletionRegistryPersistenceTest {
         assertFailsWith<IOException> { registry.closeAndFlush() }
         assertTrue(completionJob.isCancelled)
         assertFailsWith<IOException> { registry.closeAndFlush() }
-        assertFailsWith<IllegalStateException> { registry.createResources() }
+        assertFailsWith<IllegalStateException> { registry.createProvider() }
         registry.recordFinishedCommand("late command", true, null, null, 3L)
         assertFalse(learning.snapshot().replayCommands.any { it.commandLine == "late command" })
     }
