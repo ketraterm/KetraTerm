@@ -79,24 +79,95 @@ public data class SwingTerminalHostShortcut(
 /**
  * Immutable mapping from host-owned terminal actions to Swing shortcuts.
  *
- * @property shortcuts action-to-shortcut map.
+ * Each action has at most one shortcut, and each shortcut belongs to at most one
+ * action. Unspecified actions are unbound. Hosts explicitly install bindings
+ * using [forEachShortcut] or dispatch key events using [actionFor].
  */
 public class SwingTerminalHostShortcutMap private constructor(
-    private val shortcuts: EnumMap<SwingTerminalHostAction, SwingTerminalHostShortcut>,
+    private val shortcuts: Array<SwingTerminalHostShortcut?>,
 ) {
+    /**
+     * Creates a detached snapshot of [shortcuts], including an empty map.
+     * Subsequent changes to the supplied map do not affect this instance.
+     *
+     * @param shortcuts bindings using extended keyboard modifier masks.
+     * @throws IllegalArgumentException if two actions share a shortcut or a
+     * shortcut contains legacy, mouse-button, or unknown modifier bits.
+     */
+    public constructor(shortcuts: Map<SwingTerminalHostAction, SwingTerminalHostShortcut>) :
+        this(arrayOfNulls(SwingTerminalHostAction.entries.size)) {
+        for ((action, shortcut) in shortcuts) {
+            validateShortcut(action, shortcut)
+            this.shortcuts[action.ordinal] = shortcut
+        }
+    }
+
     /**
      * Returns the configured shortcut for [action].
      *
      * @param action host action to query.
-     * @return configured shortcut.
+     * @return configured shortcut, or `null` when the action is unbound.
      */
-    public fun shortcut(action: SwingTerminalHostAction): SwingTerminalHostShortcut = shortcuts.getValue(action)
+    public fun shortcut(action: SwingTerminalHostAction): SwingTerminalHostShortcut? = shortcuts[action.ordinal]
+
+    /**
+     * Returns a map with [action] bound to [shortcut], replacing its previous
+     * binding. This instance is unchanged.
+     *
+     * To reassign another action's shortcut, first remove that binding with
+     * [withoutShortcut]. An unchanged binding may return this instance.
+     *
+     * @param action host action to bind.
+     * @param shortcut binding using an extended keyboard modifier mask.
+     * @return map containing the updated binding.
+     * @throws IllegalArgumentException if another action has this shortcut or
+     * it contains legacy, mouse-button, or unknown modifier bits.
+     */
+    public fun withShortcut(
+        action: SwingTerminalHostAction,
+        shortcut: SwingTerminalHostShortcut,
+    ): SwingTerminalHostShortcutMap {
+        validateShortcut(action, shortcut)
+        if (shortcuts[action.ordinal] == shortcut) return this
+        val updated = shortcuts.copyOf()
+        updated[action.ordinal] = shortcut
+        return SwingTerminalHostShortcutMap(updated)
+    }
+
+    /**
+     * Returns a map with [action] unbound. This instance is unchanged.
+     *
+     * @param action host action to unbind.
+     * @return map without the binding, or this instance if already unbound.
+     */
+    public fun withoutShortcut(action: SwingTerminalHostAction): SwingTerminalHostShortcutMap {
+        if (shortcuts[action.ordinal] == null) return this
+        val updated = shortcuts.copyOf()
+        updated[action.ordinal] = null
+        return SwingTerminalHostShortcutMap(updated)
+    }
+
+    private fun validateShortcut(
+        action: SwingTerminalHostAction,
+        shortcut: SwingTerminalHostShortcut,
+    ) {
+        require(shortcut.modifiers and RELEVANT_MODIFIERS == shortcut.modifiers) {
+            "Shortcut modifiers must contain only extended keyboard modifier bits, was ${shortcut.modifiers}"
+        }
+        var index = 0
+        while (index < shortcuts.size) {
+            require(index == action.ordinal || shortcuts[index] != shortcut) {
+                "Shortcut $shortcut is already bound to ${SwingTerminalHostAction.entries[index]}"
+            }
+            index++
+        }
+    }
 
     /**
      * Returns the host action requested by [keyCode] and [modifiersEx].
      *
      * @param keyCode Swing virtual key code.
-     * @param modifiersEx extended Swing modifier mask.
+     * @param modifiersEx extended Swing modifier mask; non-keyboard bits are ignored.
      * @return matching action, or `null` when the key event is not a host
      * terminal shortcut.
      */
@@ -105,23 +176,29 @@ public class SwingTerminalHostShortcutMap private constructor(
         modifiersEx: Int,
     ): SwingTerminalHostAction? {
         val normalizedModifiers = modifiersEx and RELEVANT_MODIFIERS
-        for (entry in shortcuts.entries) {
-            val shortcut = entry.value
-            if (shortcut.keyCode == keyCode && shortcut.modifiers == normalizedModifiers) {
-                return entry.key
+        var index = 0
+        while (index < shortcuts.size) {
+            val shortcut = shortcuts[index]
+            if (shortcut != null && shortcut.keyCode == keyCode && shortcut.modifiers == normalizedModifiers) {
+                return SwingTerminalHostAction.entries[index]
             }
+            index++
         }
         return null
     }
 
     /**
-     * Invokes [consumer] for each configured action shortcut.
+     * Invokes [consumer] once for each configured binding in action enum order.
+     * Unbound actions are omitted.
      *
      * @param consumer callback receiving each action and shortcut.
      */
     public fun forEachShortcut(consumer: (SwingTerminalHostAction, SwingTerminalHostShortcut) -> Unit) {
-        for (entry in shortcuts.entries) {
-            consumer(entry.key, entry.value)
+        var index = 0
+        while (index < shortcuts.size) {
+            val shortcut = shortcuts[index]
+            if (shortcut != null) consumer(SwingTerminalHostAction.entries[index], shortcut)
+            index++
         }
     }
 

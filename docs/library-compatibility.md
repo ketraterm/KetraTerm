@@ -325,6 +325,14 @@ lifetime, concurrency, ownership, terminal semantics or public constant values.
 Those properties remain covered by source review, module regressions,
 compiled consumer assertions and the documented contracts.
 
+`SwingTerminalHostShortcutMap.shortcut(action)` now returns a nullable shortcut
+for legitimately unbound actions, including the default `SELECT_ALL` and
+`CLEAR_SCREEN`. This pre-stable correction preserves the JVM method descriptor
+but changes Kotlin metadata: source callers must handle `null`. Custom maps
+snapshot their input; `withShortcut` and `withoutShortcut` return immutable
+updates. Reassigning another action's shortcut requires removing its binding
+first. Configured shortcuts accept only extended keyboard modifier masks.
+
 Generated Java overloads also require consumer coverage: Kotlin's validator omits
 the scanner's generated no-argument secondary-constructor overload. The isolated
 Java consumer checks every supported scanner constructor. These checks remain

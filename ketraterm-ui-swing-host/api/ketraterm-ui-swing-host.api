@@ -161,10 +161,13 @@ public final class io/github/ketraterm/ui/swing/host/SwingTerminalHostShortcut {
 
 public final class io/github/ketraterm/ui/swing/host/SwingTerminalHostShortcutMap {
 	public static final field Companion Lio/github/ketraterm/ui/swing/host/SwingTerminalHostShortcutMap$Companion;
+	public fun <init> (Ljava/util/Map;)V
 	public final fun actionFor (II)Lio/github/ketraterm/ui/swing/host/SwingTerminalHostAction;
 	public final fun forEachShortcut (Lkotlin/jvm/functions/Function2;)V
 	public static final fun platformDefault ()Lio/github/ketraterm/ui/swing/host/SwingTerminalHostShortcutMap;
 	public final fun shortcut (Lio/github/ketraterm/ui/swing/host/SwingTerminalHostAction;)Lio/github/ketraterm/ui/swing/host/SwingTerminalHostShortcut;
+	public final fun withShortcut (Lio/github/ketraterm/ui/swing/host/SwingTerminalHostAction;Lio/github/ketraterm/ui/swing/host/SwingTerminalHostShortcut;)Lio/github/ketraterm/ui/swing/host/SwingTerminalHostShortcutMap;
+	public final fun withoutShortcut (Lio/github/ketraterm/ui/swing/host/SwingTerminalHostAction;)Lio/github/ketraterm/ui/swing/host/SwingTerminalHostShortcutMap;
 }
 
 public final class io/github/ketraterm/ui/swing/host/SwingTerminalHostShortcutMap$Companion {
