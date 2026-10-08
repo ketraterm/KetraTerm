@@ -102,6 +102,33 @@ class ValueDomainCompletionSourceTest {
             )
         }
 
+    @Test
+    fun `POSIX dynamic values remain literal shell arguments in every quote context`() =
+        runBlocking {
+            val literal = "a|b<>*?[c]{d,e}~#!\$HOME`id`"
+            val literalSource =
+                TerminalCompletionSources.valueDomain(
+                    domain = TerminalCompletionValueDomain.GIT_BRANCH,
+                    sourceId = "git",
+                    valuesProvider = { _, _ -> listOf(TerminalCompletionDomainValue(literal)) },
+                )
+            val cases =
+                listOf(
+                    "git switch a" to "a\\|b\\<\\>\\*\\?\\[c\\]\\{d,e\\}\\~\\#\\!\\\$HOME\\`id\\`",
+                    "git switch 'a" to "'a|b<>*?[c]{d,e}~#!\$HOME`id`'",
+                    "git switch \"a" to "\"a|b<>*?[c]{d,e}~#\"\\!\"\\\$HOME\\`id\\`\"",
+                )
+            for ((commandLine, expected) in cases) {
+                val candidate = literalSource.complete(request(commandLine)).single()
+
+                assertEquals(expected, candidate.replacementText, commandLine)
+                assertEquals(literal, candidate.displayText)
+                assertEquals(11, candidate.replacementStartOffset)
+                assertEquals(commandLine.length, candidate.replacementEndOffset)
+            }
+            assertTrue(literalSource.complete(request("git switch a", TerminalShellCapabilities.PLAIN)).isEmpty())
+        }
+
     /** Verifies that exact values are not suggested as no-op replacements. */
     @Test
     fun `does not return an already complete value`() =

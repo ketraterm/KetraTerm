@@ -178,6 +178,78 @@ class TerminalCompletionContextResolverTest {
     }
 
     @Test
+    fun `active option NONE metadata overrides positional defaults`() {
+        for (commandLine in listOf("tool --label ", "tool --label x", "tool --label=", "tool --label=x")) {
+            val context = resolve(commandLine, listOf(optionMetadataSpec))
+
+            assertEquals(TerminalCompletionActivePosition.OPTION_VALUE, context.activePosition, commandLine)
+            assertEquals("--label", context.activeOption?.names?.single())
+            assertEquals(null, context.activePositionalArgument)
+            assertEquals(TerminalPathArgumentKind.NONE, context.expectedPathKind, commandLine)
+            assertEquals(TerminalCompletionValueDomain.NONE, context.expectedValueDomain, commandLine)
+            assertEquals(TerminalHiddenPathPolicy.DEFAULT, context.expectedHiddenPathPolicy, commandLine)
+            assertEquals(listOf("x-label"), context.staticValueCandidates)
+        }
+    }
+
+    @Test
+    fun `option path domain and hidden metadata are independently authoritative`() {
+        for (option in optionMetadataSpec.options.drop(1)) {
+            for (separator in listOf(" ", "=")) {
+                val commandLine = "tool ${option.names.single()}${separator}x"
+                val context = resolve(commandLine, listOf(optionMetadataSpec))
+
+                assertEquals(TerminalCompletionActivePosition.OPTION_VALUE, context.activePosition, commandLine)
+                assertEquals(option, context.activeOption)
+                assertEquals(option.valuePathKind, context.expectedPathKind, commandLine)
+                assertEquals(option.valueDomain, context.expectedValueDomain, commandLine)
+                assertEquals(option.valueHiddenPathPolicy, context.expectedHiddenPathPolicy, commandLine)
+            }
+        }
+    }
+
+    @Test
+    fun `inherited options do not inherit subcommand positional metadata`() {
+        val spec =
+            optionMetadataSpec.copy(
+                subcommands = listOf(optionMetadataSpec.copy(name = "open", options = emptyList())),
+            )
+        for (commandLine in listOf("tool open --label x", "tool open --label=x")) {
+            val context = resolve(commandLine, listOf(spec))
+
+            assertEquals(listOf("tool", "open"), context.commandPath.map { it.name })
+            assertEquals("--label", context.activeOption?.names?.single())
+            assertEquals(TerminalPathArgumentKind.NONE, context.expectedPathKind, commandLine)
+            assertEquals(TerminalCompletionValueDomain.NONE, context.expectedValueDomain, commandLine)
+            assertEquals(TerminalHiddenPathPolicy.DEFAULT, context.expectedHiddenPathPolicy, commandLine)
+        }
+    }
+
+    @Test
+    fun `positional metadata resumes after option values and the option terminator`() {
+        val commandLines = listOf("tool x", "tool --label value x", "tool --label=value x", "tool -- --label")
+        for (commandLine in commandLines) {
+            val context = resolve(commandLine, listOf(optionMetadataSpec))
+
+            assertEquals(TerminalCompletionActivePosition.POSITIONAL_ARGUMENT, context.activePosition, commandLine)
+            assertEquals(null, context.activeOption)
+            assertEquals(TerminalPathArgumentKind.DIRECTORY, context.expectedPathKind, commandLine)
+            assertEquals(TerminalCompletionValueDomain.GIT_BRANCH, context.expectedValueDomain, commandLine)
+            assertEquals(TerminalHiddenPathPolicy.INCLUDE, context.expectedHiddenPathPolicy, commandLine)
+        }
+
+        val orderedSpec = optionMetadataSpec.copy(positionalArguments = listOf(TerminalArgumentSpec(name = "literal")))
+        for (commandLine in commandLines) {
+            val context = resolve(commandLine, listOf(orderedSpec))
+
+            assertEquals("literal", context.activePositionalArgument?.name, commandLine)
+            assertEquals(TerminalPathArgumentKind.NONE, context.expectedPathKind, commandLine)
+            assertEquals(TerminalCompletionValueDomain.NONE, context.expectedValueDomain, commandLine)
+            assertEquals(TerminalHiddenPathPolicy.DEFAULT, context.expectedHiddenPathPolicy, commandLine)
+        }
+    }
+
+    @Test
     fun `dynamic positional value domain is exposed through context`() {
         val context = resolve("git switch mai")
 
@@ -286,5 +358,33 @@ class TerminalCompletionContextResolverTest {
 
     private companion object {
         private val specs: List<TerminalCommandSpec> = TerminalCommandSpecs.defaults()
+
+        private val optionMetadataSpec =
+            TerminalCommandSpec(
+                name = "tool",
+                positionalArgumentPathKind = TerminalPathArgumentKind.DIRECTORY,
+                positionalArgumentValueDomain = TerminalCompletionValueDomain.GIT_BRANCH,
+                positionalArgumentHiddenPathPolicy = TerminalHiddenPathPolicy.INCLUDE,
+                options =
+                    listOf(
+                        TerminalOptionSpec(listOf("--label"), requiresValue = true, valueCandidates = listOf("x-label")),
+                        TerminalOptionSpec(
+                            listOf("--config"),
+                            requiresValue = true,
+                            valuePathKind = TerminalPathArgumentKind.FILE,
+                            valueHiddenPathPolicy = TerminalHiddenPathPolicy.EXCLUDE,
+                        ),
+                        TerminalOptionSpec(
+                            names = listOf("--branch"),
+                            requiresValue = true,
+                            valueDomain = TerminalCompletionValueDomain.GIT_COMMIT,
+                        ),
+                        TerminalOptionSpec(
+                            names = listOf("--hidden"),
+                            requiresValue = true,
+                            valueHiddenPathPolicy = TerminalHiddenPathPolicy.EXCLUDE,
+                        ),
+                    ),
+            )
     }
 }

@@ -16,9 +16,7 @@
 package io.github.ketraterm.completion.engine
 
 import io.github.ketraterm.completion.api.*
-import io.github.ketraterm.completion.model.TerminalCommandSpec
-import io.github.ketraterm.completion.model.TerminalCommandSpecs
-import io.github.ketraterm.completion.model.TerminalCompletionValueDomain
+import io.github.ketraterm.completion.model.*
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.test.StandardTestDispatcher
@@ -29,6 +27,71 @@ import kotlin.test.*
 import kotlin.time.Duration.Companion.milliseconds
 
 class MergedCompletionEngineTest {
+    @Test
+    fun `option values do not activate positional providers but retain explicit path completion`() =
+        runBlocking {
+            var directoryCalls = 0
+            var branchCalls = 0
+            val pathSource =
+                TerminalCompletionSources.path {
+                    directoryCalls++
+                    listOf(
+                        TerminalFileEntry("x-directory", true),
+                        TerminalFileEntry("x-file", false),
+                        TerminalFileEntry(".hidden", true),
+                    )
+                }
+            val branchSource =
+                TerminalCompletionSources.valueDomain(
+                    domain = TerminalCompletionValueDomain.GIT_BRANCH,
+                    sourceId = "branches",
+                    valuesProvider = { _, _ ->
+                        branchCalls++
+                        listOf(TerminalCompletionDomainValue("x-branch"))
+                    },
+                )
+            val engine =
+                TerminalCompletionEngines.fromSources(
+                    sources = listOf(TerminalCompletionSourceEntry(pathSource), TerminalCompletionSourceEntry(branchSource)),
+                    commandSpecs =
+                        listOf(
+                            TerminalCommandSpec(
+                                name = "tool",
+                                options =
+                                    listOf(
+                                        TerminalOptionSpec(
+                                            names = listOf("--label"),
+                                            requiresValue = true,
+                                            valueCandidates = listOf("x-label"),
+                                        ),
+                                    ),
+                                positionalArgumentPathKind = TerminalPathArgumentKind.DIRECTORY,
+                                positionalArgumentValueDomain = TerminalCompletionValueDomain.GIT_BRANCH,
+                                positionalArgumentHiddenPathPolicy = TerminalHiddenPathPolicy.INCLUDE,
+                            ),
+                        ),
+                )
+            for (commandLine in listOf("tool --label x", "tool --label=x")) {
+                val candidates = engine.complete(request(commandLine).copy(workingDirectoryUri = "file:///project"))
+
+                assertEquals(listOf("x-label"), candidates.map { it.replacementText }, commandLine)
+                assertEquals(0, directoryCalls, commandLine)
+                assertEquals(0, branchCalls, commandLine)
+            }
+            for (commandLine in listOf("tool --label done x", "tool --label=done x")) {
+                val candidates = engine.complete(request(commandLine).copy(workingDirectoryUri = "file:///project"))
+
+                assertEquals(setOf("x-directory/", "x-branch"), candidates.map { it.replacementText }.toSet(), commandLine)
+            }
+            assertEquals(2, directoryCalls)
+            assertEquals(2, branchCalls)
+
+            val pathCandidates = engine.complete(request("tool --label ./").copy(workingDirectoryUri = "file:///project"))
+            assertEquals(setOf("./x-directory/", "./x-file"), pathCandidates.map { it.replacementText }.toSet())
+            assertEquals(3, directoryCalls)
+            assertEquals(2, branchCalls)
+        }
+
     @Test
     fun `fast source publishes before slow source and final emission reranks all results`(): Unit =
         runBlocking {

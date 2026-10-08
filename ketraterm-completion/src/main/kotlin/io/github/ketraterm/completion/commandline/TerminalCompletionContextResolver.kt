@@ -172,33 +172,23 @@ internal object TerminalCompletionContextResolver {
         activePositionalArgument: TerminalArgumentSpec?,
         lastCommand: TerminalCommandSpec,
     ): TerminalPathArgumentKind =
-        if (activeOption != null && activeOption.valuePathKind != TerminalPathArgumentKind.NONE) {
-            activeOption.valuePathKind
-        } else if (activePositionalArgument != null) {
-            activePositionalArgument.pathKind
-        } else {
-            lastCommand.positionalArgumentPathKind
-        }
+        activeOption?.valuePathKind
+            ?: (activePositionalArgument?.pathKind ?: lastCommand.positionalArgumentPathKind)
 
     private fun determineExpectedValueDomain(
         activeOption: TerminalOptionSpec?,
         activePositionalArgument: TerminalArgumentSpec?,
         lastCommand: TerminalCommandSpec,
     ): TerminalCompletionValueDomain =
-        if (activeOption != null && activeOption.valueDomain != TerminalCompletionValueDomain.NONE) {
-            activeOption.valueDomain
-        } else if (activePositionalArgument != null) {
-            activePositionalArgument.valueDomain
-        } else {
-            lastCommand.positionalArgumentValueDomain
-        }
+        activeOption?.valueDomain
+            ?: (activePositionalArgument?.valueDomain ?: lastCommand.positionalArgumentValueDomain)
 
     private fun determineExpectedHiddenPathPolicy(
         activeOption: TerminalOptionSpec?,
         activePositionalArgument: TerminalArgumentSpec?,
         lastCommand: TerminalCommandSpec,
     ): TerminalHiddenPathPolicy =
-        if (activeOption != null && activeOption.valuePathKind != TerminalPathArgumentKind.NONE) {
+        if (activeOption != null) {
             activeOption.valueHiddenPathPolicy
         } else if (activePositionalArgument != null) {
             activePositionalArgument.hiddenPathPolicy

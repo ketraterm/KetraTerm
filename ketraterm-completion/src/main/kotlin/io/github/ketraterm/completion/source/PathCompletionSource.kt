@@ -62,6 +62,13 @@ internal class PathCompletionSource(
             )
 
         val pathSeparator = if (prefix.contains('\\')) '\\' else '/'
+        val expandHome =
+            directoryPortion.startsWith("~/") &&
+                pathSeparator == '/' &&
+                context.activeTokenQuote == '\u0000' &&
+                request.shellCapabilities.quoting == TerminalShellQuotingPolicy.POSIX
+        // Only the request's home prefix is shell syntax; provider names remain literal.
+        val literalDirectoryPortion = if (expandHome) directoryPortion.substring(2) else directoryPortion
         val candidates = BoundedCompletionCandidateCollector(limit)
         var orderIndex = 0
 
@@ -71,7 +78,7 @@ internal class PathCompletionSource(
             val match = CompletionMatcher.match(name, filePrefix) ?: continue
             if (!match.matchedRanges.isEmpty() && match.matchedRanges.startOffset(0) != 0) continue
             val rawSuffix = if (isDirectory) "$pathSeparator" else ""
-            val rawReplacement = directoryPortion + name + rawSuffix
+            val rawReplacement = literalDirectoryPortion + name + rawSuffix
             val normalizedReplacement = if (pathSeparator == '\\') rawReplacement.replace('/', '\\') else rawReplacement
             if (!ShellReplacementText.canEncode(
                     normalizedReplacement,
@@ -92,7 +99,7 @@ internal class PathCompletionSource(
 
             candidates.offer(
                 TerminalCompletionCandidate(
-                    replacementText = replacementText,
+                    replacementText = if (expandHome) "~/$replacementText" else replacementText,
                     replacementStartOffset = context.replacementStartOffset,
                     replacementEndOffset = context.replacementEndOffset,
                     displayText = name + rawSuffix,

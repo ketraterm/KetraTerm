@@ -21,6 +21,7 @@ import io.github.ketraterm.completion.internal.TERMINAL_COMPLETION_CANDIDATE_ORD
 import io.github.ketraterm.completion.matching.CompletionMatcher
 import io.github.ketraterm.completion.model.TerminalCommandSpec
 import io.github.ketraterm.completion.model.TerminalOptionSpec
+import io.github.ketraterm.completion.source.ShellReplacementText
 
 internal class SpecCompletionSource(
     specs: List<TerminalCommandSpec>,
@@ -42,9 +43,10 @@ internal class SpecCompletionSource(
                 TerminalCompletionActivePosition.OPERATOR -> emptyList()
                 TerminalCompletionActivePosition.COMMAND -> completeCommands(context.commandLineContext)
                 TerminalCompletionActivePosition.OPTION_NAME -> completeOptions(context)
-                TerminalCompletionActivePosition.OPTION_VALUE -> completeOptionValues(context)
+                TerminalCompletionActivePosition.OPTION_VALUE,
+                TerminalCompletionActivePosition.POSITIONAL_ARGUMENT,
+                -> completeValues(request, context)
                 TerminalCompletionActivePosition.SUBCOMMAND -> completeSubcommands(context)
-                TerminalCompletionActivePosition.POSITIONAL_ARGUMENT -> completePositionalValues(context)
             }
         return candidates
             .sortedWith(TERMINAL_COMPLETION_CANDIDATE_ORDER)
@@ -134,9 +136,18 @@ internal class SpecCompletionSource(
         return candidates
     }
 
-    private fun completeOptionValues(context: TerminalCompletionContext): List<TerminalCompletionCandidate> {
+    private fun completeValues(
+        request: TerminalCompletionRequest,
+        context: TerminalCompletionContext,
+    ): List<TerminalCompletionCandidate> {
         val values = context.staticValueCandidates
         if (values.isEmpty()) return emptyList()
+        val detail =
+            if (context.activePosition == TerminalCompletionActivePosition.OPTION_VALUE) {
+                context.activeOption?.description.orEmpty()
+            } else {
+                context.activePositionalArgument?.description.orEmpty()
+            }
         val prefix = context.activePrefix
         val candidates = ArrayList<TerminalCompletionCandidate>()
         var orderIndex = 0
@@ -144,35 +155,13 @@ internal class SpecCompletionSource(
             val value = values[i]
             if (prefix.isNotEmpty() && value.equals(prefix, ignoreCase = true)) continue
             val match = CompletionMatcher.match(value, prefix) ?: continue
+            val replacementText =
+                ShellReplacementText.encode(value, context.activeTokenQuote, request.shellCapabilities.quoting) ?: continue
             candidates +=
                 candidate(
-                    replacementText = value,
+                    replacementText = replacementText,
                     displayText = value,
-                    detail = context.activeOption?.description.orEmpty(),
-                    kind = TerminalCompletionCandidateKind.ARGUMENT,
-                    context = context,
-                    score = match.sourceScore(OPTION_VALUE_BASE_SCORE, prefix, orderIndex++),
-                    matchedRanges = match.matchedRanges,
-                )
-        }
-        return candidates
-    }
-
-    private fun completePositionalValues(context: TerminalCompletionContext): List<TerminalCompletionCandidate> {
-        val values = context.staticValueCandidates
-        if (values.isEmpty()) return emptyList()
-        val prefix = context.activePrefix
-        val candidates = ArrayList<TerminalCompletionCandidate>()
-        var orderIndex = 0
-        for (i in values.indices) {
-            val value = values[i]
-            if (prefix.isNotEmpty() && value.equals(prefix, ignoreCase = true)) continue
-            val match = CompletionMatcher.match(value, prefix) ?: continue
-            candidates +=
-                candidate(
-                    replacementText = value,
-                    displayText = value,
-                    detail = context.activePositionalArgument?.description.orEmpty(),
+                    detail = detail,
                     kind = TerminalCompletionCandidateKind.ARGUMENT,
                     context = context,
                     score = match.sourceScore(OPTION_VALUE_BASE_SCORE, prefix, orderIndex++),
