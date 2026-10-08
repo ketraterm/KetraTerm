@@ -294,6 +294,7 @@ public final class io/github/ketraterm/ui/swing/api/SwingTerminal : javax/swing/
 	public final fun hideShellSuggestions ()V
 	public final fun isAutomaticShellSuggestionEligible ()Z
 	public final fun pasteClipboardText ()Z
+	public final fun pasteText (Ljava/lang/String;)Z
 	public final fun preferredGridSize (II)Ljava/awt/Dimension;
 	public final fun preferredGridSize (IILio/github/ketraterm/render/api/TerminalRenderBufferKind;)Ljava/awt/Dimension;
 	public static synthetic fun preferredGridSize$default (Lio/github/ketraterm/ui/swing/api/SwingTerminal;IILio/github/ketraterm/render/api/TerminalRenderBufferKind;ILjava/lang/Object;)Ljava/awt/Dimension;
