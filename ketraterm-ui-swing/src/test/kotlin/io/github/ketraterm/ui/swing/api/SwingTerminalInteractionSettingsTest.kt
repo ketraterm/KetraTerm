@@ -16,7 +16,9 @@
 package io.github.ketraterm.ui.swing.api
 
 import io.github.ketraterm.core.TerminalBuffers
+import io.github.ketraterm.input.event.TerminalPasteEvent
 import io.github.ketraterm.input.policy.PasteControlPolicy
+import io.github.ketraterm.session.TerminalInputAdmission
 import io.github.ketraterm.session.TerminalSession
 import io.github.ketraterm.transport.TerminalConnector
 import io.github.ketraterm.transport.TerminalConnectorListener
@@ -85,6 +87,73 @@ class SwingTerminalInteractionSettingsTest {
             assertEquals("\u001b[200~ab\n\u001b[201~", output.toString(Charsets.UTF_8))
             assertEquals(1, reads)
             assertNull(view.currentSelectionRange())
+        }
+
+    @Test
+    fun `clipboard paste reports rejection before session startup`() =
+        fixture(startSession = false) {
+            assertFalse(view.pasteClipboardText())
+            dispatcher.scheduler.runCurrent()
+            assertEquals(0, output.size())
+        }
+
+    @Test
+    fun `clear screen reports rejection before session startup`() =
+        fixture(startSession = false) {
+            assertFalse(view.clearScreen())
+            dispatcher.scheduler.runCurrent()
+            assertEquals(0, output.size())
+        }
+
+    @Test
+    fun `clear screen reports rejection after session closure`() =
+        fixture {
+            session.close()
+            assertFalse(view.clearScreen())
+            dispatcher.scheduler.runCurrent()
+            assertEquals(0, output.size())
+        }
+
+    @Test
+    fun `clipboard paste reports rejection when the bulk operation queue is full`() =
+        fixture {
+            repeat(16) {
+                assertEquals(TerminalInputAdmission.ACCEPTED, session.submitInput(TerminalPasteEvent("queued")))
+            }
+            assertFalse(view.pasteClipboardText())
+            assertEquals(1, reads)
+            assertTrue(session.isClosed)
+            dispatcher.scheduler.runCurrent()
+            assertEquals(0, output.size())
+        }
+
+    @Test
+    fun `clear screen reports rejection when the outbound byte queue is full`() =
+        fixture {
+            assertEquals(TerminalInputAdmission.ACCEPTED, session.submitBytes(ByteArray(8 * 1024 * 1024)))
+            assertFalse(view.clearScreen())
+            assertTrue(session.isClosed)
+            dispatcher.scheduler.runCurrent()
+            assertEquals(0, output.size())
+        }
+
+    @Test
+    fun `clear screen reports admission and sends Ctrl L`() =
+        fixture {
+            assertTrue(view.clearScreen())
+            dispatcher.scheduler.runCurrent()
+            assertEquals("\u000c", output.toString(Charsets.UTF_8))
+        }
+
+    @Test
+    fun `clipboard paste reports admission and preserves bracketed paste policy`() =
+        fixture {
+            feed("\u001b[?2004h")
+            clipboardText = "a\u0001b\n"
+            assertTrue(view.pasteClipboardText())
+            dispatcher.scheduler.runCurrent()
+            assertEquals("\u001b[200~ab\n\u001b[201~", output.toString(Charsets.UTF_8))
+            assertEquals(1, reads)
         }
 
     @Test
@@ -183,9 +252,12 @@ class SwingTerminalInteractionSettingsTest {
             assertEquals("defg", clipboardText)
         }
 
-    private fun fixture(action: Fixture.() -> Unit) {
+    private fun fixture(
+        startSession: Boolean = true,
+        action: Fixture.() -> Unit,
+    ) {
         SwingUtilities.invokeAndWait {
-            val fixture = Fixture()
+            val fixture = Fixture(startSession)
             try {
                 fixture.action()
             } finally {
@@ -196,7 +268,9 @@ class SwingTerminalInteractionSettingsTest {
         }
     }
 
-    private class Fixture {
+    private class Fixture(
+        startSession: Boolean,
+    ) {
         val dispatcher = StandardTestDispatcher()
         val output = ByteArrayOutputStream()
         val session =
@@ -263,8 +337,10 @@ class SwingTerminalInteractionSettingsTest {
             )
 
         init {
-            session.start(10, 2)
-            feed("hello")
+            if (startSession) {
+                session.start(10, 2)
+                feed("hello")
+            }
             view.size = view.preferredGridSize(10, 2)
             view.bind(session)
         }

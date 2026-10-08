@@ -24,6 +24,7 @@ import io.github.ketraterm.input.event.TerminalPasteEvent
 import io.github.ketraterm.protocol.MouseTrackingMode
 import io.github.ketraterm.render.api.TerminalRenderBufferKind
 import io.github.ketraterm.render.cache.TerminalRenderCache
+import io.github.ketraterm.session.TerminalInputAdmission
 import io.github.ketraterm.session.TerminalSession
 import io.github.ketraterm.session.TerminalSessionState
 import io.github.ketraterm.session.TerminalShellIntegrationCommandRecord
@@ -2010,7 +2011,7 @@ public class SwingTerminal
             scope.launch {
                 try {
                     publications.collect { suggestions ->
-                        ensureActive()
+                        this@launch.ensureActive()
                         if (activeSuggestionInteraction === interaction && interaction.isActive) {
                             interaction.publish(suggestions)
                         }
@@ -2249,15 +2250,15 @@ public class SwingTerminal
          * Call on the EDT. Clipboard callbacks run synchronously and propagate their failures.
          * Unbound and closed sessions do not read the clipboard.
          *
-         * @return `true` if clipboard text was read and sent to the session, `false` otherwise.
+         * @return `true` when nonempty clipboard text was admitted by the bound session,
+         *   `false` otherwise. Admission does not promise transport completion.
          */
         public fun pasteClipboardText(): Boolean {
             val boundSession = session?.takeUnless { it.isClosed } ?: return false
             val text = hostServices.clipboardHandler.readText() ?: return false
             if (text.isEmpty() || session !== boundSession || boundSession.isClosed) return false
             invalidateShellSuggestionsOnEdt()
-            boundSession.encodePaste(TerminalPasteEvent(text))
-            return true
+            return boundSession.submitInput(TerminalPasteEvent(text)) == TerminalInputAdmission.ACCEPTED
         }
 
         private fun getOrCreateShellSuggestionController(): SwingShellSuggestionController =
@@ -2322,8 +2323,7 @@ public class SwingTerminal
             selectionController.clearSelection()
             searchController.clear()
             invalidateShellSuggestionsOnEdt()
-            boundSession.encodeKey(CLEAR_SCREEN_KEY_EVENT)
-            return true
+            return boundSession.submitInput(CLEAR_SCREEN_KEY_EVENT) == TerminalInputAdmission.ACCEPTED
         }
 
         private fun invalidateShellSuggestionsOnEdt() {
