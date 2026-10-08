@@ -71,7 +71,8 @@ public data class TerminalCommandSpec
  * @property isVariadic whether this declaration applies to every remaining
  * positional argument after its ordinal position.
  * @property pathKind filesystem path category accepted by this argument.
- * @property valueCandidates bounded static values accepted by this argument.
+ * @property valueCandidates bounded, unescaped literal values accepted by this
+ * argument. Completion applies the request's shell quoting policy on insertion.
  * @property valueDomain dynamic host-owned value domain accepted by this argument.
  * @property hiddenPathPolicy hidden-entry policy used when [pathKind] accepts a path.
  * @throws IllegalArgumentException if [valueCandidates] contains a blank value.
@@ -102,8 +103,9 @@ public data class TerminalArgumentSpec
  * value.
  * @property valuePathKind file-system path kind accepted by the option's
  * separate value token when [requiresValue] is true.
- * @property valueCandidates static bounded option values, such as log levels or
- * output modes. Dynamic host-owned domains belong in host providers instead.
+ * @property valueCandidates bounded, unescaped literal option values, such as
+ * log levels or output modes. Completion applies the request's shell quoting
+ * policy on insertion. Dynamic host-owned domains belong in host providers instead.
  * @property valueDomain dynamic host-owned value domain accepted by the option's
  * separate value token when [requiresValue] is true.
  * @property valueHiddenPathPolicy hidden-entry policy used when

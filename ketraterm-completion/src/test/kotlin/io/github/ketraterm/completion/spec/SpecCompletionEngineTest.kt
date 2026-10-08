@@ -16,12 +16,14 @@
 package io.github.ketraterm.completion.spec
 
 import io.github.ketraterm.completion.api.*
+import io.github.ketraterm.completion.commandline.resolveCompletionContext
 import io.github.ketraterm.completion.model.TerminalArgumentSpec
 import io.github.ketraterm.completion.model.TerminalCommandSpec
 import io.github.ketraterm.completion.model.TerminalCommandSpecs
 import io.github.ketraterm.completion.model.TerminalOptionSpec
 import kotlinx.coroutines.runBlocking
 import kotlin.test.Test
+import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
@@ -206,6 +208,144 @@ class SpecCompletionEngineTest {
 
             assertEquals(listOf("alpha"), engine.complete(request("tool a")).map { it.replacementText })
             assertEquals(listOf("dev"), engine.complete(request("tool alpha d")).map { it.replacementText })
+        }
+
+    @Test
+    fun `static values with spaces use shell encoding in every argument position`() =
+        runBlocking {
+            val engine = TerminalCompletionEngines.fromSources(emptyList(), valueSpecs(listOf("hello world")))
+            val cases =
+                listOf(
+                    TerminalShellCapabilities.POSIX to "hello\\ world",
+                    TerminalShellCapabilities.POWERSHELL to "'hello world'",
+                )
+            for ((capabilities, expected) in cases) {
+                for ((prefix, detail) in valuePositions) {
+                    val commandLine = prefix + "he"
+                    val candidate = engine.complete(request(commandLine, shellCapabilities = capabilities)).single()
+
+                    assertEquals(expected, candidate.replacementText, commandLine)
+                    assertEquals("hello world", candidate.displayText)
+                    assertEquals(detail, candidate.detail)
+                    assertEquals("spec", candidate.source)
+                    assertEquals(TerminalCompletionCandidateKind.ARGUMENT, candidate.kind)
+                    assertEquals(prefix.length, candidate.replacementStartOffset)
+                    assertEquals(commandLine.length, candidate.replacementEndOffset)
+                    assertContentEquals(intArrayOf(0, 2), candidate.matchedRanges.copyPackedOffsets())
+                }
+            }
+        }
+
+    @Test
+    fun `quoted static values escape embedded apostrophes according to the shell`() =
+        runBlocking {
+            val engine = TerminalCompletionEngines.fromSources(emptyList(), valueSpecs(listOf("O'Brien")))
+            val cases =
+                listOf(
+                    Triple(TerminalShellCapabilities.POSIX, "'", "'O'\\''Brien'"),
+                    Triple(TerminalShellCapabilities.POSIX, "\"", "\"O'Brien\""),
+                    Triple(TerminalShellCapabilities.POWERSHELL, "'", "'O''Brien'"),
+                    Triple(TerminalShellCapabilities.POWERSHELL, "\"", "\"O'Brien\""),
+                )
+            for ((capabilities, quote, expected) in cases) {
+                for ((prefix, _) in valuePositions) {
+                    val commandLine = prefix + quote + "O"
+                    val candidate = engine.complete(request(commandLine, shellCapabilities = capabilities)).single()
+
+                    assertEquals(expected, candidate.replacementText, commandLine)
+                    assertEquals("O'Brien", candidate.displayText)
+                    assertEquals(prefix.length, candidate.replacementStartOffset)
+                    assertEquals(commandLine.length, candidate.replacementEndOffset)
+                    assertContentEquals(intArrayOf(0, 1), candidate.matchedRanges.copyPackedOffsets())
+                }
+            }
+        }
+
+    @Test
+    fun `static values protect shell operators and expansions in every quote context`() =
+        runBlocking {
+            val literal = "a|b<>\$HOME`id`"
+            val engine = TerminalCompletionEngines.fromSources(emptyList(), valueSpecs(listOf(literal)))
+            val cases =
+                listOf(
+                    Triple(TerminalShellCapabilities.POSIX, "", "a\\|b\\<\\>\\\$HOME\\`id\\`"),
+                    Triple(TerminalShellCapabilities.POSIX, "'", "'a|b<>\$HOME`id`'"),
+                    Triple(TerminalShellCapabilities.POSIX, "\"", "\"a|b<>\\\$HOME\\`id\\`\""),
+                    Triple(TerminalShellCapabilities.POWERSHELL, "", "'a|b<>\$HOME`id`'"),
+                    Triple(TerminalShellCapabilities.POWERSHELL, "'", "'a|b<>\$HOME`id`'"),
+                    Triple(TerminalShellCapabilities.POWERSHELL, "\"", "\"a|b<>`\$HOME``id``\""),
+                )
+            for ((capabilities, quote, expected) in cases) {
+                for ((prefix, _) in valuePositions) {
+                    val candidate = engine.complete(request(prefix + quote + "a", shellCapabilities = capabilities)).single()
+
+                    assertEquals(expected, candidate.replacementText, prefix + quote)
+                    assertEquals(literal, candidate.displayText)
+                }
+            }
+        }
+
+    @Test
+    fun `conservative static values reject unsafe replacements before the candidate limit`() =
+        runBlocking {
+            val specs = valueSpecs(listOf("hello world", "hello|pipe", "hello-safe"))
+            val source = SpecCompletionSource(specs)
+            for ((prefix, _) in valuePositions) {
+                val request = request(prefix + "he")
+                val candidates = source.complete(request, request.resolveCompletionContext(specs), limit = 1)
+
+                assertEquals(listOf("hello-safe"), candidates.map { it.replacementText }, prefix)
+            }
+        }
+
+    @Test
+    fun `conservative static values preserve safe existing quotes and reject unsafe quote content`() =
+        runBlocking {
+            val engine = TerminalCompletionEngines.fromSources(emptyList(), valueSpecs(listOf("hello world")))
+            val apostropheEngine = TerminalCompletionEngines.fromSources(emptyList(), valueSpecs(listOf("hello'world")))
+            val expansionEngine = TerminalCompletionEngines.fromSources(emptyList(), valueSpecs(listOf("hello\$world")))
+            for ((prefix, _) in valuePositions) {
+                assertTrue(engine.complete(request(prefix + "he")).isEmpty(), prefix)
+                assertEquals("'hello world'", engine.complete(request(prefix + "'he")).single().replacementText, prefix)
+                assertEquals("\"hello world\"", engine.complete(request(prefix + "\"he")).single().replacementText, prefix)
+                assertTrue(apostropheEngine.complete(request(prefix + "'he")).isEmpty(), prefix)
+                assertTrue(expansionEngine.complete(request(prefix + "\"he")).isEmpty(), prefix)
+            }
+        }
+
+    @Test
+    fun `static value replacement preserves the rest of the command at a mid-token cursor`() =
+        runBlocking {
+            val engine = TerminalCompletionEngines.fromSources(emptyList(), valueSpecs(listOf("hello world")))
+            for ((prefix, _) in valuePositions) {
+                val commandLine = prefix + "\"heZZ\" tail"
+                val candidate =
+                    engine
+                        .complete(
+                            request(commandLine, cursorOffset = prefix.length + 3, shellCapabilities = TerminalShellCapabilities.POSIX),
+                        ).single()
+
+                assertEquals(prefix.length, candidate.replacementStartOffset)
+                assertEquals(prefix.length + 6, candidate.replacementEndOffset)
+                val completed =
+                    commandLine.replaceRange(
+                        candidate.replacementStartOffset,
+                        candidate.replacementEndOffset,
+                        candidate.replacementText,
+                    )
+                assertEquals(prefix + "\"hello world\" tail", completed)
+            }
+        }
+
+    @Test
+    fun `already complete static literals remain omitted after shell encoding`() =
+        runBlocking {
+            val engine = TerminalCompletionEngines.fromSources(emptyList(), valueSpecs(listOf("hello world")))
+            for (capabilities in listOf(TerminalShellCapabilities.POSIX, TerminalShellCapabilities.POWERSHELL)) {
+                for ((prefix, _) in valuePositions) {
+                    assertTrue(engine.complete(request(prefix + "'hello world'", shellCapabilities = capabilities)).isEmpty(), prefix)
+                }
+            }
         }
 
     @Test
@@ -429,7 +569,7 @@ class SpecCompletionEngineTest {
             val candidates = engine().complete(request("git c"))
             assertEquals(listOf("commit", "checkout"), candidates.map { it.replacementText })
             val commit = candidates.first { it.replacementText == "commit" }
-            kotlin.test.assertContentEquals(intArrayOf(0, 1), commit.matchedRanges.copyPackedOffsets())
+            assertContentEquals(intArrayOf(0, 1), commit.matchedRanges.copyPackedOffsets())
         }
 
     private fun engine(): TerminalCompletionEngine {
@@ -478,12 +618,41 @@ class SpecCompletionEngineTest {
         )
     }
 
+    private val valuePositions =
+        listOf(
+            "tool " to "positional value",
+            "tool --label " to "option value",
+            "tool --label=" to "option value",
+        )
+
+    private fun valueSpecs(values: List<String>): List<TerminalCommandSpec> =
+        listOf(
+            TerminalCommandSpec(
+                name = "tool",
+                options =
+                    listOf(
+                        TerminalOptionSpec(
+                            names = listOf("--label"),
+                            description = "option value",
+                            requiresValue = true,
+                            valueCandidates = values,
+                        ),
+                    ),
+                positionalArguments =
+                    listOf(
+                        TerminalArgumentSpec(name = "value", description = "positional value", valueCandidates = values),
+                    ),
+            ),
+        )
+
     private fun request(
         commandLine: String,
         cursorOffset: Int = commandLine.length,
+        shellCapabilities: TerminalShellCapabilities = TerminalShellCapabilities.PLAIN,
     ): TerminalCompletionRequest =
         TerminalCompletionRequest(
             commandLine = commandLine,
             cursorOffset = cursorOffset,
+            shellCapabilities = shellCapabilities,
         )
 }

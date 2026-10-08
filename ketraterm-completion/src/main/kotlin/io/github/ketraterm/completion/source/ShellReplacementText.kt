@@ -20,8 +20,8 @@ import io.github.ketraterm.completion.api.TerminalShellQuotingPolicy
 /**
  * Encodes literal completion values for insertion into the active shell token.
  *
- * This helper is pure and shared by path and dynamic-domain sources so both
- * features apply identical quoting and escaping rules.
+ * This helper is pure and shared by path, static-spec, and dynamic-domain
+ * sources so all literal values apply identical quoting and escaping rules.
  */
 internal object ShellReplacementText {
     /**
