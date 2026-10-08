@@ -239,9 +239,10 @@ public final class io/github/ketraterm/ui/swing/api/SwingHyperlinkTextRange {
 	public fun toString ()Ljava/lang/String;
 }
 
-public final class io/github/ketraterm/ui/swing/api/SwingScrollbarAdapter : io/github/ketraterm/ui/swing/api/TerminalViewportListener {
+public final class io/github/ketraterm/ui/swing/api/SwingScrollbarAdapter : io/github/ketraterm/ui/swing/api/TerminalViewportListener, java/lang/AutoCloseable {
 	public fun <init> (Ljavax/swing/JScrollBar;)V
 	public final fun attach (Lio/github/ketraterm/ui/swing/api/SwingScrollbarScroller;)V
+	public fun close ()V
 	public fun viewportChanged (IDIII)V
 	public fun viewportStateChanged (Lio/github/ketraterm/ui/swing/api/TerminalViewportState;)V
 }

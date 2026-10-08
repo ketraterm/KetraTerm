@@ -16,7 +16,9 @@
 package io.github.ketraterm.ui.swing.api
 
 import java.awt.event.AdjustmentEvent
+import java.awt.event.AdjustmentListener
 import javax.swing.JScrollBar
+import javax.swing.SwingUtilities
 import kotlin.math.roundToInt
 
 /**
@@ -33,12 +35,19 @@ import kotlin.math.roundToInt
  * Hiding it after session start would shrink the terminal component and can
  * make PTY/core width synchronization lag by one cell.
  *
+ * Construct and use this adapter on the Swing Event Dispatch Thread (EDT).
+ * The host owns this adapter and must [close] it when its attachment ends.
+ * The scrollbar and scrolling destination remain host-owned.
+ *
  * @param scrollbar host-owned vertical scrollbar.
  */
 public class SwingScrollbarAdapter(
     private val scrollbar: JScrollBar,
-) : TerminalViewportListener {
+) : TerminalViewportListener,
+    AutoCloseable {
+    private val adjustmentListener = AdjustmentListener(::handleAdjustment)
     private var viewportScroller: SwingScrollbarScroller? = null
+    private var closed = false
     private var updatingFromTerminal = false
     private var historySize = 0
     private var visualRangePixels = 0
@@ -48,16 +57,35 @@ public class SwingScrollbarAdapter(
     init {
         scrollbar.isVisible = true
         scrollbar.isEnabled = false
-        scrollbar.addAdjustmentListener(::handleAdjustment)
+        scrollbar.addAdjustmentListener(adjustmentListener)
     }
 
     /**
      * Attaches the terminal controlled by this adapter.
      *
+     * Replaces the previous scrolling destination without adding another listener.
+     *
      * @param viewportScroller shared row-scrolling destination.
+     * @throws IllegalStateException if this adapter has been closed.
      */
     public fun attach(viewportScroller: SwingScrollbarScroller) {
+        check(!closed) { "scrollbar adapter is closed" }
         this.viewportScroller = viewportScroller
+    }
+
+    /**
+     * Releases the scrolling destination and removes only this adapter's adjustment listener.
+     *
+     * Call on the EDT. Repeated calls are safe. Later viewport notifications and
+     * adjustment callbacks are ignored, and [attach] rejects further attachments.
+     * The scrollbar's current model and presentation are preserved.
+     */
+    override fun close() {
+        check(SwingUtilities.isEventDispatchThread()) { "scrollbar adapter must close on the EDT" }
+        if (closed) return
+        closed = true
+        viewportScroller = null
+        scrollbar.removeAdjustmentListener(adjustmentListener)
     }
 
     override fun viewportChanged(
@@ -90,6 +118,7 @@ public class SwingScrollbarAdapter(
         viewportHeightPixels: Int,
         cellHeightPixels: Int,
     ) {
+        if (closed) return
         this.historySize = historySize
         this.cellHeightPixels = cellHeightPixels
         this.viewportHeightPixels = viewportHeightPixels
@@ -119,7 +148,7 @@ public class SwingScrollbarAdapter(
     }
 
     private fun handleAdjustment(event: AdjustmentEvent) {
-        if (updatingFromTerminal || historySize == 0) return
+        if (closed || updatingFromTerminal || historySize == 0) return
 
         val value = event.value.coerceIn(0, visualRangePixels)
         val topRow = (value / cellHeightPixels).coerceIn(0, historySize)

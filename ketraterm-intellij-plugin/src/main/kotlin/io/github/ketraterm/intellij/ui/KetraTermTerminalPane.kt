@@ -53,6 +53,7 @@ internal class KetraTermTerminalPane private constructor(
     val tab: TerminalWorkspaceTab,
     val terminal: SwingTerminal,
     val component: JPanel,
+    private val scrollbarAdapter: SwingScrollbarAdapter,
     private val searchBar: SwingTerminalSearchBar,
     private val hostActions: KetraTermTerminalPaneHostActions,
     private val project: Project,
@@ -289,6 +290,7 @@ internal class KetraTermTerminalPane private constructor(
         failure = captureCleanupFailure(failure) { service?.removeProviderListener(completionChanged) }
         failure = captureCleanupFailure(failure, searchBar::close)
         failure = captureCleanupFailure(failure) { shortcuts?.dispose() }
+        failure = captureCleanupFailure(failure, scrollbarAdapter::close)
         failure = captureCleanupFailure(failure, terminal::dispose)
         failure?.let { throw it }
     }
@@ -410,6 +412,7 @@ internal class KetraTermTerminalPane private constructor(
                         tab = tab,
                         terminal = terminal,
                         component = component,
+                        scrollbarAdapter = scrollbarAdapter,
                         searchBar = searchBar,
                         hostActions = hostActions,
                         project = project,
@@ -428,6 +431,7 @@ internal class KetraTermTerminalPane private constructor(
                 } else {
                     captureCleanupFailure(failure) { clipboardReadPrompt?.close() }
                     captureCleanupFailure(failure) { searchBar?.close() }
+                    captureCleanupFailure(failure, scrollbarAdapter::close)
                     captureCleanupFailure(failure, terminal::dispose)
                 }
                 throw failure
