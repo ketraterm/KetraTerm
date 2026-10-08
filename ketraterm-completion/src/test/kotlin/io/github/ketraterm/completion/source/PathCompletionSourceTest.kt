@@ -109,7 +109,7 @@ class PathCompletionSourceTest {
                     }
                     add(TerminalFileEntry("a-target-directory", isDirectory = true))
                 }
-            val source = PathCompletionSource(TerminalFileSystemProvider { entries })
+            val source = PathCompletionSource({ entries })
 
             val candidates = source.complete(request("cd a", "file:///project"))
 
@@ -279,6 +279,62 @@ class PathCompletionSourceTest {
         }
 
     @Test
+    fun `POSIX path entries remain literal shell arguments`() =
+        runBlocking {
+            val cases =
+                listOf(
+                    "a|b<c>d" to "a\\|b\\<c\\>d",
+                    "a*?[b]{c,d}" to "a\\*\\?\\[b\\]\\{c,d\\}",
+                    "a\$HOME`id`!b" to "a\\\$HOME\\`id\\`\\!b",
+                    "~user" to "\\~user",
+                    "#note" to "\\#note",
+                    "=ls" to "\\=ls",
+                    "^a" to "\\^a",
+                    "a\nb" to "'a\nb'",
+                )
+            for ((name, expected) in cases) {
+                val literalSource = PathCompletionSource({ listOf(TerminalFileEntry(name, false)) })
+                val candidate = literalSource.complete(request("cat ", "file:///project")).single()
+
+                assertEquals(expected, candidate.replacementText, name)
+                assertEquals(name, candidate.displayText)
+                assertEquals(4, candidate.replacementStartOffset)
+                assertEquals(4, candidate.replacementEndOffset)
+                assertTrue(literalSource.complete(request("cat ", "file:///project", TerminalShellCapabilities.PLAIN)).isEmpty(), name)
+            }
+        }
+
+    @Test
+    fun `POSIX home paths preserve expansion while encoding literal entries`() =
+        runBlocking {
+            for ((name, expected) in listOf("a|b" to "~/a\\|b", "a\nb" to "~/'a\nb'", "~user" to "~/\\~user")) {
+                val literalSource = PathCompletionSource({ listOf(TerminalFileEntry(name, false)) })
+
+                assertEquals(expected, literalSource.complete(request("cat ~/", "file:///project")).single().replacementText, name)
+            }
+        }
+
+    @Test
+    fun `POSIX quoted path entries preserve quote context and literal expansions`() =
+        runBlocking {
+            val name = "a|b\$HOME`id`!c"
+            val literalSource = PathCompletionSource({ listOf(TerminalFileEntry(name, false)) })
+            val cases =
+                listOf(
+                    "cat 'a" to "'a|b\$HOME`id`!c'",
+                    "cat \"a" to "\"a|b\\\$HOME\\`id\\`\"\\!\"c\"",
+                )
+            for ((commandLine, expected) in cases) {
+                val candidate = literalSource.complete(request(commandLine, "file:///project")).single()
+
+                assertEquals(expected, candidate.replacementText, commandLine)
+                assertEquals(name, candidate.displayText)
+                assertEquals(4, candidate.replacementStartOffset)
+                assertEquals(commandLine.length, candidate.replacementEndOffset)
+            }
+        }
+
+    @Test
     fun `powershell path completion quotes unquoted paths with spaces`() =
         runBlocking {
             val request =
@@ -335,7 +391,7 @@ class PathCompletionSourceTest {
             var captured: TerminalDirectoryListingRequest? = null
             val source =
                 PathCompletionSource(
-                    TerminalFileSystemProvider { request ->
+                    { request ->
                         captured = request
                         listOf(TerminalFileEntry("Documents", isDirectory = true))
                     },
@@ -354,7 +410,7 @@ class PathCompletionSourceTest {
             var captured: TerminalDirectoryListingRequest? = null
             val source =
                 PathCompletionSource(
-                    TerminalFileSystemProvider { request ->
+                    { request ->
                         captured = request
                         listOf(TerminalFileEntry("Gagik", isDirectory = true))
                     },
@@ -380,7 +436,7 @@ class PathCompletionSourceTest {
             var captured: TerminalDirectoryListingRequest? = null
             val source =
                 PathCompletionSource(
-                    TerminalFileSystemProvider { request ->
+                    { request ->
                         captured = request
                         listOf(TerminalFileEntry("Docs", isDirectory = true))
                     },
@@ -441,7 +497,7 @@ class PathCompletionSourceTest {
             val cancellation = CancellationException("obsolete completion request")
             val cancellingSource =
                 PathCompletionSource(
-                    TerminalFileSystemProvider { throw cancellation },
+                    { throw cancellation },
                 )
 
             val thrown =
@@ -456,7 +512,7 @@ class PathCompletionSourceTest {
     fun `propagates operational file-system provider failure`() =
         runBlocking {
             val failure = IOException("directory access failed")
-            val failingSource = PathCompletionSource(TerminalFileSystemProvider { throw failure })
+            val failingSource = PathCompletionSource({ throw failure })
 
             val thrown =
                 assertFailsWith<IOException> {

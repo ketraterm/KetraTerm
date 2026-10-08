@@ -55,7 +55,7 @@ internal object ShellReplacementText {
             SINGLE_QUOTE -> policy != TerminalShellQuotingPolicy.CONSERVATIVE || !value.contains(SINGLE_QUOTE)
             DOUBLE_QUOTE ->
                 policy != TerminalShellQuotingPolicy.CONSERVATIVE ||
-                    value.none { it == DOUBLE_QUOTE || it == DOLLAR || it == BACKTICK }
+                    value.none { it == DOUBLE_QUOTE || it == DOLLAR || it == BACKTICK || it == EXCLAMATION }
             else -> !needsEscaping(value, policy) || policy != TerminalShellQuotingPolicy.CONSERVATIVE
         }
 
@@ -66,7 +66,9 @@ internal object ShellReplacementText {
         if (!needsEscaping(value, policy)) return value
         return when (policy) {
             TerminalShellQuotingPolicy.CONSERVATIVE -> null
-            TerminalShellQuotingPolicy.POSIX -> escapePosixUnquoted(value)
+            TerminalShellQuotingPolicy.POSIX ->
+                // Backslash-newline is line continuation, so preserve literal newlines inside quotes.
+                if (value.contains('\n')) quoteSingle(value, policy) else escapePosixUnquoted(value)
             TerminalShellQuotingPolicy.POWERSHELL -> quoteSingle(value, policy)
         }
     }
@@ -89,7 +91,7 @@ internal object ShellReplacementText {
     ): String? =
         when (policy) {
             TerminalShellQuotingPolicy.CONSERVATIVE ->
-                if (value.any { it == DOUBLE_QUOTE || it == DOLLAR || it == BACKTICK }) null else "\"$value\""
+                if (value.any { it == DOUBLE_QUOTE || it == DOLLAR || it == BACKTICK || it == EXCLAMATION }) null else "\"$value\""
 
             TerminalShellQuotingPolicy.POWERSHELL ->
                 buildString(value.length + 2) {
@@ -105,8 +107,16 @@ internal object ShellReplacementText {
                 buildString(value.length + 2) {
                     append(DOUBLE_QUOTE)
                     for (ch in value) {
-                        if (ch == DOUBLE_QUOTE || ch == BACKSLASH || ch == DOLLAR || ch == BACKTICK) append(BACKSLASH)
-                        append(ch)
+                        if (ch == EXCLAMATION) {
+                            // Bash retains a backslash before ! inside double quotes.
+                            append(DOUBLE_QUOTE)
+                            append(BACKSLASH)
+                            append(ch)
+                            append(DOUBLE_QUOTE)
+                        } else {
+                            if (ch == DOUBLE_QUOTE || ch == BACKSLASH || ch == DOLLAR || ch == BACKTICK) append(BACKSLASH)
+                            append(ch)
+                        }
                     }
                     append(DOUBLE_QUOTE)
                 }
@@ -141,7 +151,21 @@ internal object ShellReplacementText {
             this == SEMICOLON ||
             this == AMPERSAND ||
             this == LEFT_PAREN ||
-            this == RIGHT_PAREN
+            this == RIGHT_PAREN ||
+            this == LESS_THAN ||
+            this == GREATER_THAN ||
+            this == PIPE ||
+            this == ASTERISK ||
+            this == QUESTION_MARK ||
+            this == LEFT_BRACKET ||
+            this == RIGHT_BRACKET ||
+            this == LEFT_BRACE ||
+            this == RIGHT_BRACE ||
+            this == TILDE ||
+            this == HASH ||
+            this == EXCLAMATION ||
+            this == EQUALS ||
+            this == CARET
 
     private fun Char.needsPowerShellUnquotedEscape(): Boolean =
         isShellWhitespace() ||
@@ -185,4 +209,10 @@ internal object ShellReplacementText {
     private const val COMMA = ','
     private const val AT = '@'
     private const val HASH = '#'
+    private const val ASTERISK = '*'
+    private const val QUESTION_MARK = '?'
+    private const val TILDE = '~'
+    private const val EXCLAMATION = '!'
+    private const val EQUALS = '='
+    private const val CARET = '^'
 }
