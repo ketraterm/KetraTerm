@@ -177,7 +177,5 @@ class SwingShellSuggestionReplacementTest {
         SwingShellSuggestionRequest(
             commandText = commandText,
             cursorOffset = cursorOffset,
-            anchorColumn = cursorOffset,
-            anchorRow = 0,
         )
 }

@@ -58,12 +58,19 @@ class SwingShellSuggestionViewSnapshotTest {
     }
 
     @Test
+    fun `viewport size is chosen by the view rather than the snapshot model`() {
+        val suggestions = List(12) { suggestion("candidate-$it") }
+        val snapshot = SwingShellSuggestionViewSnapshot.create(suggestions, 11, 0, 12)
+
+        assertEquals(12, snapshot.visibleSuggestions.size)
+        assertEquals(11, snapshot.absoluteSelectedIndex)
+        assertSame(suggestions[11], snapshot.selectedSuggestion)
+    }
+
+    @Test
     fun `rejects malformed viewport state`() {
         val suggestion = suggestion("candidate")
 
-        assertThrows(IllegalArgumentException::class.java) {
-            SwingShellSuggestionViewSnapshot.create(List(9) { suggestion }, 0, 0, 9)
-        }
         assertThrows(IllegalArgumentException::class.java) {
             SwingShellSuggestionViewSnapshot.create(listOf(suggestion), 1, 0, 1)
         }

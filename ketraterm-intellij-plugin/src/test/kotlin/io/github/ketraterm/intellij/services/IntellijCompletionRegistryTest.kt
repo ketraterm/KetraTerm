@@ -284,5 +284,5 @@ class IntellijCompletionRegistryTest {
         directoryScanner = scanner,
     )
 
-    private fun request(command: String) = SwingShellSuggestionRequest(command, command.length, 0, 0)
+    private fun request(command: String) = SwingShellSuggestionRequest(command, command.length)
 }

@@ -40,24 +40,24 @@ internal class SwingCompletionPopupView(
     private val selectionListener =
         javax.swing.event.ListSelectionListener {
             if (!updating && !closed && !it.valueIsAdjusting && list.selectedIndex >= 0) {
-                listener.onSuggestionHovered(list.selectedIndex)
+                listener.onSuggestionHovered(snapshot, list.selectedIndex)
             }
         }
     private val pointerHandler =
         object : MouseAdapter() {
             override fun mousePressed(event: MouseEvent) {
                 if (!closed && SwingUtilities.isLeftMouseButton(event)) {
-                    rowAt(event)?.let(listener::onSuggestionClicked)
+                    rowAt(event)?.let { listener.onSuggestionClicked(snapshot, it) }
                 }
             }
 
             override fun mouseMoved(event: MouseEvent) {
-                if (!closed) rowAt(event)?.let(listener::onSuggestionHovered)
+                if (!closed) rowAt(event)?.let { listener.onSuggestionHovered(snapshot, it) }
             }
 
             override fun mouseWheelMoved(event: MouseWheelEvent) {
                 if (!closed && event.wheelRotation != 0) {
-                    listener.onSuggestionScrollRequested(event.wheelRotation.coerceIn(-3, 3))
+                    listener.onSuggestionScrollRequested(snapshot, event.wheelRotation.coerceIn(-3, 3))
                     event.consume()
                 }
             }
@@ -68,7 +68,7 @@ internal class SwingCompletionPopupView(
         list.isFocusable = false
         list.selectionMode = ListSelectionModel.SINGLE_SELECTION
         list.cellRenderer = renderer
-        list.visibleRowCount = SwingShellSuggestionViewSnapshot.MAX_VISIBLE_SUGGESTIONS
+        list.visibleRowCount = maximumVisibleSuggestions
         list.accessibleContext.accessibleName = messages.message("completion.accessibleName")
         list.addListSelectionListener(selectionListener)
         list.addMouseListener(pointerHandler)

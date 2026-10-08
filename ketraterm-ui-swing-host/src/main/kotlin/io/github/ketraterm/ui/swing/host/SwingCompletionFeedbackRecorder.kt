@@ -45,11 +45,17 @@ public class SwingCompletionFeedbackRecorder(
     public fun createHandler(): SwingShellSuggestionFeedbackHandler = SwingShellSuggestionFeedbackHandler(::record)
 
     /**
-     * Validates and records one accepted or dismissed suggestion.
+     * Records accepted or explicitly dismissed suggestions. Admission rejection does not change learning.
      *
      * @param feedback Swing popup feedback event.
      */
     public fun record(feedback: SwingShellSuggestionFeedback) {
+        val completionKind =
+            when (feedback.kind) {
+                SwingShellSuggestionFeedbackKind.ACCEPTED -> TerminalCompletionFeedbackKind.ACCEPTED
+                SwingShellSuggestionFeedbackKind.DISMISSED -> TerminalCompletionFeedbackKind.DISMISSED
+                SwingShellSuggestionFeedbackKind.REJECTED -> return
+            }
         val context = feedback.suggestion.interactionContext as? SwingCompletionContext ?: return
         val commandLine =
             feedback.suggestion
@@ -59,18 +65,10 @@ public class SwingCompletionFeedbackRecorder(
         val feedbackAtEpochMillis = clockEpochMillis()
         recordSuggestionFeedback(
             commandLine,
-            feedback.kind.toCompletionKind(),
+            completionKind,
             context.profileId,
             context.workingDirectoryUri,
             feedbackAtEpochMillis,
         )
-    }
-
-    private companion object {
-        private fun SwingShellSuggestionFeedbackKind.toCompletionKind(): TerminalCompletionFeedbackKind =
-            when (this) {
-                SwingShellSuggestionFeedbackKind.ACCEPTED -> TerminalCompletionFeedbackKind.ACCEPTED
-                SwingShellSuggestionFeedbackKind.DISMISSED -> TerminalCompletionFeedbackKind.DISMISSED
-            }
     }
 }

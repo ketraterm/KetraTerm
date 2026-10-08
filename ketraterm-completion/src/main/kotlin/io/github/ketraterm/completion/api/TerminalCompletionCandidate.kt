@@ -58,6 +58,10 @@ public enum class TerminalCompletionCandidateKind {
  * host-owned providers.
  * @property matchedRanges immutable ordered UTF-16 intervals relative to
  * [displayText] used by UI components to highlight matching fragments.
+ * @property feedbackToken optional provider-owned runtime token for correlating
+ * feedback with a native provider and item. The engine does not interpret it
+ * for ranking or outcome equivalence. Fusion preserves the token of the chosen
+ * presentation candidate, and [copy] preserves its reference by default.
  * @throws IllegalArgumentException if text/source fields are empty, replacement
  * offsets do not form a nonnegative ordered range, or [matchedRanges] do not
  * address [displayText].
@@ -75,6 +79,7 @@ public data class TerminalCompletionCandidate
         val score: Int = 0,
         val valueDomain: TerminalCompletionValueDomain = TerminalCompletionValueDomain.NONE,
         val matchedRanges: TerminalCompletionMatchRanges = TerminalCompletionMatchRanges.EMPTY,
+        val feedbackToken: Any? = null,
     ) {
         init {
             require(replacementText.isNotEmpty()) { "replacementText must not be empty" }

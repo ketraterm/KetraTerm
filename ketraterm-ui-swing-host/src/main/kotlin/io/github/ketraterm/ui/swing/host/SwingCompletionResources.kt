@@ -22,7 +22,8 @@ import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionProvider
  * Host-selected completion resources for one terminal pane.
  *
  * @property provider source of progressive completion results.
- * @property feedbackHandler learning callback paired with this provider's runtime.
+ * @property feedbackHandler request observer paired with this provider's runtime,
+ * captured alongside the provider's source observer before collection starts.
  */
 public data class SwingCompletionResources(
     val provider: SwingShellSuggestionProvider,

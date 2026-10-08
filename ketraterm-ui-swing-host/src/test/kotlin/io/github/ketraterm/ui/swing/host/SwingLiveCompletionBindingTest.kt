@@ -317,13 +317,57 @@ class SwingLiveCompletionBindingTest {
     }
 
     @Test
+    fun `acceptance invalidation preserves the captured handler until final admission`() =
+        onEdtTest {
+            var handlerClosed = false
+            var admissions = 0
+            val handler =
+                object : SwingShellSuggestionHandler {
+                    override fun tryAccept(acceptance: SwingShellSuggestionAcceptance): SwingShellSuggestionAcceptanceResult {
+                        assertFalse(handlerClosed, "Hiding the accepting interaction must preserve its editing capability")
+                        admissions++
+                        return SwingShellSuggestionAcceptanceResult.ACCEPTED
+                    }
+
+                    override fun close() {
+                        handlerClosed = true
+                    }
+                }
+            val terminal = RecordingTarget(suggestionHandler = handler)
+            var openedInteraction: SwingShellSuggestionInteraction? = null
+            val popup =
+                object : SwingShellSuggestionTarget {
+                    override fun requestSuggestions(interaction: SwingShellSuggestionInteraction) {
+                        openedInteraction = interaction
+                        interaction.addChangeListener {
+                            if (!it.isActive) terminal.invalidateSuggestions()
+                        }
+                    }
+
+                    override fun hideSuggestions() = Unit
+                }
+            val events = ArrayList<SwingShellSuggestionFeedback>()
+            val binding = binding(backgroundScope, feedbackHandler = { events += it })
+            binding.attach(terminal, popup)
+            binding.refreshNow()
+            val captured = assertNotNull(openedInteraction)
+            captured.publish(listOf(feedback().suggestion), selectedIndex = 0)
+
+            assertEquals(SwingShellSuggestionAcceptanceResult.ACCEPTED, captured.tryAccept(captured.snapshot, 0))
+            assertEquals(1, admissions)
+            assertTrue(handlerClosed)
+            assertEquals(listOf(SwingShellSuggestionFeedbackKind.ACCEPTED), events.map { it.kind })
+            binding.close()
+        }
+
+    @Test
     fun `host popup failure during close still removes observers and pending debounce`() =
         onEdtTest {
             val target = RecordingTarget()
             val failure = IllegalStateException("host popup hide failed")
             val popup =
                 object : SwingShellSuggestionTarget {
-                    override fun requestSuggestions(snapshot: TerminalShellCommandLineSnapshot) {
+                    override fun requestSuggestions(interaction: SwingShellSuggestionInteraction) {
                         error("Closed binding requested suggestions")
                     }
 
@@ -347,12 +391,14 @@ class SwingLiveCompletionBindingTest {
             val revisions = MutableStateFlow(-1L)
             var active = snapshot("git s")
             val terminal = RecordingTarget()
-            val popupRequests = mutableListOf<TerminalShellCommandLineSnapshot>()
+            val popupRequests = mutableListOf<SwingShellSuggestionRequest>()
+            val interactions = mutableListOf<SwingShellSuggestionInteraction>()
             var hides = 0
             val popup =
                 object : SwingShellSuggestionTarget {
-                    override fun requestSuggestions(snapshot: TerminalShellCommandLineSnapshot) {
-                        popupRequests += snapshot
+                    override fun requestSuggestions(interaction: SwingShellSuggestionInteraction) {
+                        popupRequests += interaction.request
+                        interactions += interaction
                     }
 
                     override fun hideSuggestions() {
@@ -366,11 +412,13 @@ class SwingLiveCompletionBindingTest {
             runCurrent()
             advanceTimeBy(75.milliseconds)
             runCurrent()
-            assertEquals(listOf(active), popupRequests)
+            assertEquals(listOf(SwingShellSuggestionRequest(active.commandText, active.cursorOffset)), popupRequests)
             assertTrue(terminal.requests.isEmpty())
             val initialHides = hides
             terminal.loseFocus()
             assertEquals(initialHides + 1, hides)
+            assertTrue(interactions.single().isClosed)
+            assertFalse(interactions.single().publish(listOf(feedback().suggestion)))
             active = snapshot("git st")
             revisions.value = 2
             runCurrent()
@@ -381,10 +429,14 @@ class SwingLiveCompletionBindingTest {
             runCurrent()
             advanceTimeBy(75.milliseconds)
             runCurrent()
-            assertEquals(listOf(snapshot("git s"), active), popupRequests)
+            assertEquals(
+                listOf(SwingShellSuggestionRequest("git s", 5), SwingShellSuggestionRequest(active.commandText, active.cursorOffset)),
+                popupRequests,
+            )
             val beforeDisabled = hides
             terminal.setAutomaticSuggestionEligible(false)
             assertEquals(beforeDisabled + 1, hides)
+            assertTrue(interactions.last().isClosed)
             val disabledHides = hides
             binding.close()
             assertEquals(disabledHides + 1, hides)
@@ -918,7 +970,7 @@ class SwingLiveCompletionBindingTest {
         TerminalShellCommandLineSnapshot(command, command.length, command.length, cursorRow = 2)
 
     private fun feedback(): SwingShellSuggestionFeedback {
-        val request = SwingShellSuggestionRequest("git s", 5, 5, 2)
+        val request = SwingShellSuggestionRequest("git s", 5)
         return SwingShellSuggestionFeedback(
             kind = SwingShellSuggestionFeedbackKind.ACCEPTED,
             suggestion =
@@ -1018,7 +1070,7 @@ class SwingLiveCompletionBindingTest {
     private class ThrowingPopup : SwingShellSuggestionTarget {
         var failure: Exception? = null
 
-        override fun requestSuggestions(snapshot: TerminalShellCommandLineSnapshot) = Unit
+        override fun requestSuggestions(interaction: SwingShellSuggestionInteraction) = Unit
 
         override fun hideSuggestions() {
             assertTrue(SwingUtilities.isEventDispatchThread())
@@ -1029,7 +1081,7 @@ class SwingLiveCompletionBindingTest {
     private class RecordingPopup(
         private val parentJob: Job?,
     ) : SwingShellSuggestionTarget {
-        val requests = ArrayList<TerminalShellCommandLineSnapshot>()
+        val requests = ArrayList<SwingShellSuggestionRequest>()
         var requestJob: Job? = null
             private set
         var visible = false
@@ -1037,11 +1089,11 @@ class SwingLiveCompletionBindingTest {
         var hideCount = 0
             private set
 
-        override fun requestSuggestions(snapshot: TerminalShellCommandLineSnapshot) {
+        override fun requestSuggestions(interaction: SwingShellSuggestionInteraction) {
             assertTrue(SwingUtilities.isEventDispatchThread())
             requestJob?.cancel()
             requestJob = Job(parentJob)
-            requests += snapshot
+            requests += interaction.request
             visible = true
         }
 
@@ -1056,6 +1108,7 @@ class SwingLiveCompletionBindingTest {
     private class RecordingTarget(
         private val failOnAttach: Boolean = false,
         private val onRequest: () -> Unit = {},
+        private val suggestionHandler: SwingShellSuggestionHandler = SwingShellSuggestionHandler.NONE,
     ) : SwingLiveCompletionTarget {
         val requests = ArrayList<TerminalShellCommandLineSnapshot>()
         var hideCount = 0
@@ -1071,6 +1124,16 @@ class SwingLiveCompletionBindingTest {
             requests += snapshot
             onRequest()
         }
+
+        override fun beginSuggestionInteraction(
+            snapshot: TerminalShellCommandLineSnapshot,
+            feedbackHandler: SwingShellSuggestionFeedbackHandler,
+        ): SwingShellSuggestionInteraction =
+            SwingShellSuggestionInteraction(
+                SwingShellSuggestionRequest(snapshot.commandText, snapshot.cursorOffset),
+                handler = suggestionHandler,
+                feedbackHandler = feedbackHandler,
+            )
 
         override fun hideSuggestions() {
             assertTrue(SwingUtilities.isEventDispatchThread())

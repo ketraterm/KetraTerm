@@ -35,7 +35,7 @@ import io.github.ketraterm.intellij.settings.KetraTermIntellijSettings
 import io.github.ketraterm.ui.swing.api.*
 import io.github.ketraterm.ui.swing.host.*
 import io.github.ketraterm.ui.swing.settings.TerminalClipboardHandler
-import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionHandler
+import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionEditTarget
 import io.github.ketraterm.workspace.TerminalWorkspaceTab
 import kotlinx.coroutines.CancellationException
 import java.awt.Adjustable
@@ -371,8 +371,7 @@ internal class KetraTermTerminalPane private constructor(
                             draft.viewportListener = scrollbarAdapter
                             draft.scrollbarOverlayEnabled = false
                             draft.shellSuggestionProvider = completionBinding.provider
-                            draft.shellSuggestionHandler = SwingShellSuggestionHandler.createDefault(tab.session)
-                            draft.shellSuggestionFeedbackHandler = completionBinding.feedbackHandler
+                            draft.shellSuggestionEditTarget = SwingShellSuggestionEditTarget.createDefault(tab.session)
                             draft.shellSuggestionKeymap = KetraTermShellSuggestionKeymap
                             draft.shellSuggestionViewFactory = IntellijCompletionListViewFactory
                             draft.uiDispatcher =

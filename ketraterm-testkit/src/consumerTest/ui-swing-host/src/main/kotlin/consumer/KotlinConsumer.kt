@@ -21,6 +21,7 @@ import io.github.ketraterm.session.*
 import io.github.ketraterm.transport.*
 import io.github.ketraterm.ui.swing.api.SwingTerminal
 import io.github.ketraterm.ui.swing.host.*
+import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionInteraction
 import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionRequest
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.*
@@ -51,21 +52,34 @@ private class Connector : TerminalConnector {
 fun main() =
     runBlocking {
         JavaConsumer.verify()
+        val nativeItem = Any()
         val engine =
             TerminalCompletionEngine { request ->
                 check(request.commandLine == "git st")
-                flowOf(listOf(TerminalCompletionCandidate("status", 4, 6, "host", TerminalCompletionCandidateKind.SUBCOMMAND)))
+                flowOf(
+                    listOf(
+                        TerminalCompletionCandidate(
+                            "status",
+                            4,
+                            6,
+                            "host",
+                            TerminalCompletionCandidateKind.SUBCOMMAND,
+                            feedbackToken = nativeItem,
+                        ),
+                    ),
+                )
             }
         val provider = SwingCompletionSuggestionProvider(engine, { SwingCompletionContext.EMPTY }, mapOf("host" to "Product source"))
         // A host-owned controller consumes our provider without automatic coordination.
-        val results = provider.suggestions(SwingShellSuggestionRequest("git st", 6, 6, 0)).single()
+        val results = provider.suggestions(SwingShellSuggestionRequest("git st", 6)).single()
         check(results.single().replacementText == "status" && results.single().replacementStartOffset == 4)
         check(results.single().source == "host" && results.single().sourceDisplayText == "Product source")
+        check(results.single().feedbackToken === nativeItem)
         check(
             JavaConsumer
                 .labeledProvider(
                     engine,
-                ).suggestions(SwingShellSuggestionRequest("git st", 6, 6, 0))
+                ).suggestions(SwingShellSuggestionRequest("git st", 6))
                 .single()
                 .single()
                 .sourceDisplayText ==
@@ -95,10 +109,12 @@ fun main() =
                         check(searchBar.component.foreground == Color.WHITE)
                         terminal.bind(session)
                         binding.attach(terminal, target)
-                        target.requestSuggestions(TerminalShellCommandLineSnapshot("git st", 6, 6, 0))
-                        check(target.requested.commandText == "git st")
-                        binding.close()
-                        check(target.hides > 0 && target.requested == null && !connector.closed)
+                        SwingShellSuggestionInteraction(SwingShellSuggestionRequest("git st", 6)).use { interaction ->
+                            target.requestSuggestions(interaction)
+                            check(target.requested.request.commandText == "git st")
+                            binding.close()
+                            check(target.hides > 0 && target.requested == null && !connector.closed)
+                        }
                     } finally {
                         searchBar.close()
                         binding.close()

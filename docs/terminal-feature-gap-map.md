@@ -292,7 +292,7 @@ closures remain historical evidence for their tested paths.
 - **M02 — `DONE(session)`**: unexpected writer cancellation closes the session, retaining the cause without retrying output. Regressions pass.
 - **M03 — `DONE(transport)`**: PTY byte-listener exceptions report the original failure and dispose the process and streams once. Regressions pass.
 - **M04 — `DONE(completion)`**: unexpected source errors are reported and terminate collection with sibling cancellation; independently cancelled sources complete accounting. Regressions pass.
-- **M05 — `DONE(ui)`**: completion replacement and close detach observation before popup callbacks; replacement keeps provider and feedback ownership coherent.
+- **M05 — `DONE(ui)`**: completion replacement and close detach observation before popup callbacks; request-owned interactions capture editing authority and source feedback before collection. Embedded and detached Swing/IntelliJ surfaces share result-aligned acceptance, snapshot guards and neutral lifecycle cleanup. Rejection cannot produce accepted feedback or negative learning; provider replacement cannot redirect old feedback.
 - **M06 — `DONE(ui)`**: popup state is committed before view callbacks, and reentrant transitions supersede unfinished shows.
 - **M07 — `DONE(host/profile)`**: optional workspace observers are supervised independently of shell and session-close observation.
 - **M08 — `DONE(host/profile)`**: reentrant tab selection or closure supersedes pending selection notifications.

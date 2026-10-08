@@ -15,7 +15,7 @@
  */
 package consumer;
 
-import io.github.ketraterm.session.TerminalShellCommandLineSnapshot;
+import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionInteraction;
 import io.github.ketraterm.ui.swing.host.SwingDialogRequest;
 import io.github.ketraterm.ui.swing.host.SwingShellSuggestionTarget;
 import io.github.ketraterm.ui.swing.host.SwingTerminalSearchColors;
@@ -54,9 +54,9 @@ public final class JavaConsumer {
     }
 
     public static final class NativeTarget implements SwingShellSuggestionTarget {
-        public TerminalShellCommandLineSnapshot requested;
+        public SwingShellSuggestionInteraction requested;
         public int hides;
-        @Override public void requestSuggestions(TerminalShellCommandLineSnapshot snapshot) { requested = snapshot; }
+        @Override public void requestSuggestions(SwingShellSuggestionInteraction interaction) { requested = interaction; }
         @Override public void hideSuggestions() { requested = null; hides++; }
     }
     public static void verify() {

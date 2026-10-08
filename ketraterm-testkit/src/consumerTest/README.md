@@ -164,3 +164,11 @@ integer-lease descriptor. The other eleven jars remain unchanged for this migrat
 The new baseline exercises scoped session borrowing and cache-reference leases,
 including concurrent Kotlin/Java readers and failure cleanup. The removed buffer
 representation is not retained. See [reader ownership](../../../docs/render-reader-ownership.md).
+
+The suggestion interaction migration deliberately refreshes only completion and
+Swing host after eight expected upgrade failures: completion's changed candidate
+default constructor and Swing host's removed four-argument request constructor,
+each across both metadata modes and Kotlin runtimes. The other nine retained jars
+remain byte-identical. Current source consumers cover native feedback-token
+identity, request-owned editing results, detached interactions and independent
+presentation. See the [suggestion API migration](../../../docs/library-compatibility.md#verification-and-baseline-changes).

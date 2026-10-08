@@ -6,20 +6,18 @@ Release notes for library consumers and embedders. Product-specific changes are 
 
 ### Improvements and fixes
 
+- Completion acceptance now reports the actual edit admission result, so custom handlers rejecting stale or invalid edits cannot emit accepted feedback. Rejection does not penalize learning, and feedback retains the originating request and provider token.
+- Separated suggestion sources, interaction state, edit admission, and presentation so embedders can combine custom providers with the built-in popup or independent Swing/IntelliJ surfaces. Immutable publications protect against stale UI actions; selection changes reuse the candidate list.
 - Moved reusable search, context-menu, clipboard-consent, and completion-popup labels, tooltips, status, and accessibility text into UTF-8 `.properties` catalogs. Search chrome accommodates longer translated labels and status messages; message lookup and formatting occur outside painting. Clipboard consent retains payload privacy and the safe Deny default.
 - Added gutter, divider, and undecorated prompt presentation through `SwingPromptDecoration`. Divider bands share painting and interaction geometry without changing terminal rows or copied text; alternate screens suppress prompt decorations.
 - Exposed the selected shell producer's immutable `promptMarkersExpected` startup expectation. Configured launches reserve gutters at binding; unconfirmed sessions retain metadata-based activation without losing the first prompt anchor.
 - Centered the installed alternate-screen grid on both axes, including leftover pixels, while retaining configured insets for grid sizing and exact explicit padding overrides.
-
 - Batched printable ASCII runs through the parser, host adapter, and core to reduce per-character work during large log ingestion. Core writes eligible spans directly into empty cells while preserving wrapping, scrolling, attributes, charset mapping, and grapheme continuations across input chunks; complex grid operations retain their existing behavior.
 - Reduced ASCII output parsing cost by avoiding unnecessary Unicode property searches while preserving charset mapping and grapheme assembly. Added a fresh-terminal log ingestion benchmark with retained-cell validation and separate parser/core measurements.
 - Replaced repeated Unicode grapheme/emoji range searches with a single packed, deduplicated lookup reused throughout grapheme assembly. Added a fast boundary check for consecutive ordinary bases, exhaustive Unicode 17 property verification, and a separate first-input benchmark; segmentation rules and core width policy are unchanged.
-
 - Swing can bind and resize after session exit. It projects retained rows without reflow, preserves selection across font changes, and keeps transport closed.
 - Added `TerminalSession.tryResizeViewport` for explicit resize admission during closure. Strict resize APIs retain their rejection contract.
-
 - Added headless and Swing dependencies and a Maven BOM to align library versions.
-
 - Preserve application cursor shapes in unfocused Swing terminals: blocks become thin hollow outlines, while bars and underlines remain steady. Device-aligned beams and underlines keep thickness consistent across panes at fractional display scales. Focus restores application blinking; cursor visibility, wide-cell ownership, bidi placement, and blinking-text behavior are preserved.
 - Reworked hyperlink retention and discovery to preserve prepared links through scrolling and focus changes, keep ordered filters from consuming unused rows, and validate hover and activation against the displayed occurrence. Hosts can configure OSC 8 styles and direct or modifier activation through immutable Swing settings; link cursors reflect activation eligibility.
 - Stopped frame-triggered terminal resizing on buffer switches. Default alternate-screen sizing retains the primary total insets while presentation centers the installed grid, so physical resizing retains the same grid dimensions in either buffer. Explicit alternate-padding overrides remain supported.
@@ -40,6 +38,7 @@ Release notes for library consumers and embedders. Product-specific changes are 
 
 ### API changes
 
+- **Breaking:** Replaced `SwingHostServices.shellSuggestionHandler` with request-captured `shellSuggestionEditTarget` handlers returning `SwingShellSuggestionAcceptanceResult` from `tryAccept`. Added `SwingShellSuggestionInteraction`, immutable snapshots, and `SwingShellSuggestionSource` for independently composed source collection and UI. Feedback observers are captured per source or interaction; request anchors move to presentation, and `showShellSuggestions` is replaced by begin/publish/present operations. Optional opaque feedback tokens change completion and Swing candidate constructor/copy signatures; recompile consumers. See the [completion guide](docs/completion-guide.md) and [migration notes](docs/library-compatibility.md).
 - Added `SwingHostMessages`, `SwingTerminalMessages`, and `TerminalCompletionMessages` with locale-aware resource-bundle factories, English fallback for missing custom keys, and integration with host message providers. Added message-aware search, clipboard, context-menu, completion-view, source, and engine overloads while preserving existing constructors and factories. See [localization configuration](docs/library-configuration.md#optional-host-chrome-and-labels).
 - Added `TerminalCommandSpecs.defaults` overloads for locales, resource bundles, and localization callbacks. Command descriptions and argument display labels can be translated when constructing the catalog while insertion tokens, source IDs, replacement ranges, and ranking remain unchanged.
 - Added optional `TerminalAsciiCommandSink` for synchronous consumption of borrowed printable ASCII byte slices. Existing `TerminalCommandSink` implementations continue receiving scalar commands. Added `TerminalWriter.writeAscii` with range/content validation before mutation and a scalar default for existing writer implementations; `HostCommandAdapter` uses the optimized core path.

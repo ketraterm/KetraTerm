@@ -17,15 +17,12 @@ package io.github.ketraterm.ui.swing.host
 
 import io.github.ketraterm.session.TerminalSession
 import io.github.ketraterm.ui.swing.api.SwingTerminal
-import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionFeedbackHandler
-import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionProvider
+import io.github.ketraterm.ui.swing.suggestion.*
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
-import kotlinx.coroutines.flow.emitAll
-import kotlinx.coroutines.flow.flow
-import kotlinx.coroutines.flow.takeWhile
+import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.swing.Swing
 import javax.swing.SwingUtilities
 
@@ -49,20 +46,45 @@ public class SwingCompletionBinding(
 
     /** Stable provider installed in host services before the terminal is attached. */
     public val provider: SwingShellSuggestionProvider =
-        SwingShellSuggestionProvider { request ->
-            flow {
-                val current = resources ?: return@flow
-                emitAll(current.provider.suggestions(request).takeWhile { resources === current })
-            }
-        }
+        object : SwingShellSuggestionProvider {
+            override fun suggestions(request: SwingShellSuggestionRequest): Flow<List<SwingShellSuggestion>> =
+                flow {
+                    val current = resources ?: return@flow
+                    emitAll(current.provider.suggestions(request).takeWhile { resources === current })
+                }
 
-    /** Stable callback; obsolete or disabled bindings cannot record feedback. */
-    public val feedbackHandler: SwingShellSuggestionFeedbackHandler =
-        SwingShellSuggestionFeedbackHandler { feedback ->
-            checkEdt()
-            val current = resources
-            if (current != null) {
-                (liveBinding?.suggestionFeedbackHandler ?: current.feedbackHandler).onSuggestionFeedback(feedback)
+            override fun open(request: SwingShellSuggestionRequest): SwingShellSuggestionSource {
+                checkEdt()
+                val current = resources ?: return SwingShellSuggestionSource(flowOf(emptyList()))
+                val feedback = liveBinding?.suggestionFeedbackHandler ?: current.feedbackHandler
+                val source = current.provider.open(request)
+                return SwingShellSuggestionSource(
+                    suggestions =
+                        flow {
+                            if (resources === current) emitAll(source.suggestions.takeWhile { resources === current })
+                        },
+                    feedbackHandler =
+                        SwingShellSuggestionFeedbackHandler { event ->
+                            checkEdt()
+                            var failure: Throwable? = null
+                            try {
+                                source.feedbackHandler.onSuggestionFeedback(event)
+                            } catch (observerFailure: Throwable) {
+                                failure = observerFailure
+                            }
+                            try {
+                                feedback.onSuggestionFeedback(event)
+                            } catch (observerFailure: Throwable) {
+                                val previous = failure
+                                if (previous == null) {
+                                    failure = observerFailure
+                                } else if (previous !== observerFailure) {
+                                    previous.addSuppressed(observerFailure)
+                                }
+                            }
+                            failure?.let { throw it }
+                        },
+                )
             }
         }
 

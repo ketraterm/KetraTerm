@@ -92,11 +92,20 @@ class SwingTerminalSuggestionContextTest {
                             "close" -> fixture.session.close()
                         }
                     }
-                    fixture.view.listener.onSuggestionClicked(0)
+                    fixture.view.listener.onSuggestionClicked(fixture.view.snapshot, 0)
                 }
                 runCurrent()
                 assertEquals(if (change == "fresh") "\u007f\u007f\u007f\u007f\u007freplacement" else "", output.toString(Charsets.UTF_8))
-                assertEquals(if (change == "fresh") 1 else 0, fixture.feedback.size)
+                val feedback = fixture.feedback.single()
+                assertEquals(
+                    if (change == "fresh") SwingShellSuggestionFeedbackKind.ACCEPTED else SwingShellSuggestionFeedbackKind.REJECTED,
+                    feedback.kind,
+                )
+                if (change == "fresh") {
+                    assertEquals(SwingShellSuggestionAcceptanceResult.ACCEPTED, feedback.acceptanceResult)
+                } else {
+                    assertTrue(feedback.acceptanceResult != SwingShellSuggestionAcceptanceResult.ACCEPTED)
+                }
             }
         }
 
@@ -134,11 +143,12 @@ class SwingTerminalSuggestionContextTest {
                     fixture.terminal.addShellSuggestionInvalidationListener {
                         fixture.session.submitBytes("x".toByteArray())
                     }
-                    fixture.view.listener.onSuggestionClicked(0)
+                    fixture.view.listener.onSuggestionClicked(fixture.view.snapshot, 0)
                 }
                 runCurrent()
                 assertEquals("x", output.toString(Charsets.UTF_8))
-                assertTrue(fixture.feedback.isEmpty())
+                assertEquals(SwingShellSuggestionFeedbackKind.REJECTED, fixture.feedback.single().kind)
+                assertEquals(SwingShellSuggestionAcceptanceResult.STALE_CONTEXT, fixture.feedback.single().acceptanceResult)
             }
         }
 
@@ -262,12 +272,12 @@ class SwingTerminalSuggestionContextTest {
     @Test
     fun `explicit supplied context uses provider and acceptance without a bound session or automatic popup`() {
         Fixture(bind = false).use { fixture ->
-            val request = SwingShellSuggestionRequest("host --flag", 4, 9, 2)
+            val request = SwingShellSuggestionRequest("host --flag", 4)
             onEdt { fixture.request(request, SwingShellSuggestionTrigger.EXPLICIT) }
             assertEquals(request, fixture.awaitRequest())
             fixture.view.awaitVisible()
             onEdt {
-                fixture.view.listener.onSuggestionClicked(0)
+                fixture.view.listener.onSuggestionClicked(fixture.view.snapshot, 0)
                 assertEquals(request, fixture.accepted.single().request)
                 assertEquals(request, fixture.feedback.single().request)
                 assertFalse(fixture.terminal.currentShellSuggestionState().visible)
@@ -317,14 +327,14 @@ class SwingTerminalSuggestionContextTest {
                 emit(listOf(suggestion(request)))
             }
         }).use { fixture ->
-            val supplied = SwingShellSuggestionRequest("host --flag", 4, 9, 2)
+            val supplied = SwingShellSuggestionRequest("host --flag", 4)
             onEdt { fixture.request(supplied, SwingShellSuggestionTrigger.EXPLICIT) }
             assertEquals(supplied, fixture.awaitRequest())
             fixture.source.value = null
             release.complete(Unit)
             fixture.view.awaitVisible()
             onEdt {
-                fixture.view.listener.onSuggestionClicked(0)
+                fixture.view.listener.onSuggestionClicked(fixture.view.snapshot, 0)
                 assertEquals(supplied, fixture.accepted.single().request)
             }
             assertEquals(0, fixture.source.subscriptionCount.value)
@@ -364,7 +374,7 @@ class SwingTerminalSuggestionContextTest {
             assertEquals("second", fixture.awaitRequest().commandText)
             fixture.view.awaitVisible()
             onEdt {
-                fixture.view.listener.onSuggestionClicked(0)
+                fixture.view.listener.onSuggestionClicked(fixture.view.snapshot, 0)
                 assertEquals(
                     "second",
                     fixture.accepted
@@ -425,7 +435,7 @@ class SwingTerminalSuggestionContextTest {
             release.complete(Unit)
             fixture.view.awaitVisible()
             onEdt {
-                fixture.view.listener.onSuggestionClicked(0)
+                fixture.view.listener.onSuggestionClicked(fixture.view.snapshot, 0)
                 assertEquals(
                     "explicit",
                     fixture.accepted
@@ -550,7 +560,7 @@ class SwingTerminalSuggestionContextTest {
             assertEquals("git log", fixture.awaitRequest().commandText)
             fixture.view.awaitVisible()
             onEdt {
-                fixture.view.listener.onSuggestionClicked(0)
+                fixture.view.listener.onSuggestionClicked(fixture.view.snapshot, 0)
                 assertEquals(
                     "git log",
                     fixture.accepted
@@ -697,7 +707,7 @@ class SwingTerminalSuggestionContextTest {
             fixture.view.awaitVisible()
             onEdt {
                 fixture.source.value = change.apply(snapshot())
-                fixture.view.listener.onSuggestionClicked(0)
+                fixture.view.listener.onSuggestionClicked(fixture.view.snapshot, 0)
                 assertTrue(fixture.accepted.isEmpty())
                 assertTrue(fixture.feedback.isEmpty())
                 assertFalse(fixture.terminal.currentShellSuggestionState().visible)
@@ -739,7 +749,7 @@ class SwingTerminalSuggestionContextTest {
                 fixture.terminal.dispose()
                 fixture.request(request(), SwingShellSuggestionTrigger.EXPLICIT)
                 fixture.terminal.requestActiveShellSuggestions()
-                fixture.terminal.showShellSuggestions(request(), listOf(suggestion(request())))
+                fixture.terminal.showSuggestions(request(), listOf(suggestion(request())))
                 assertFalse(fixture.terminal.currentShellSuggestionState().visible)
             }
             assertTrue(fixture.requests.isEmpty())
@@ -820,19 +830,31 @@ class SwingTerminalSuggestionContextTest {
                     hostServices =
                         SwingHostServices.create { draft ->
                             draft.uiDispatcher = uiDispatcher
-                            draft.shellSuggestionProvider = { request ->
-                                flow {
-                                    requests += request
-                                    emitAll(provider.suggestions(request))
+                            draft.shellSuggestionProvider =
+                                object : SwingShellSuggestionProvider {
+                                    override fun suggestions(request: SwingShellSuggestionRequest): Flow<List<SwingShellSuggestion>> =
+                                        flow {
+                                            requests += request
+                                            emitAll(provider.suggestions(request))
+                                        }
+
+                                    override fun open(request: SwingShellSuggestionRequest): SwingShellSuggestionSource =
+                                        SwingShellSuggestionSource(
+                                            suggestions = suggestions(request),
+                                            feedbackHandler = { feedback += it },
+                                        )
                                 }
-                            }
-                            draft.shellSuggestionHandler =
+                            draft.shellSuggestionEditTarget =
                                 if (sessionHandler) {
-                                    SwingShellSuggestionHandler.createDefault(session)
+                                    SwingShellSuggestionEditTarget.createDefault(session)
                                 } else {
-                                    SwingShellSuggestionHandler { accepted += it }
+                                    SwingShellSuggestionEditTarget { _ ->
+                                        SwingShellSuggestionHandler {
+                                            accepted += it
+                                            SwingShellSuggestionAcceptanceResult.ACCEPTED
+                                        }
+                                    }
                                 }
-                            draft.shellSuggestionFeedbackHandler = { feedback += it }
                             draft.shellSuggestionViewFactory = { listener -> view.apply { this.listener = listener } }
                         },
                 ).also { terminal ->
@@ -845,7 +867,7 @@ class SwingTerminalSuggestionContextTest {
             request: SwingShellSuggestionRequest,
             trigger: SwingShellSuggestionTrigger,
         ) {
-            terminal.requestShellSuggestions(request.commandText, request.cursorOffset, request.anchorColumn, request.anchorRow, trigger)
+            terminal.requestShellSuggestions(request.commandText, request.cursorOffset, 9, 0, trigger)
         }
 
         fun awaitRequest(): SwingShellSuggestionRequest = requests.poll(5, TimeUnit.SECONDS) ?: error("Provider was not requested")
@@ -890,10 +912,13 @@ class SwingTerminalSuggestionContextTest {
     private class RecordingView : SwingShellSuggestionView {
         override val component = JPanel()
         lateinit var listener: SwingShellSuggestionViewListener
+        var snapshot = SwingShellSuggestionViewSnapshot.EMPTY
+            private set
         private val updates = LinkedBlockingQueue<SwingShellSuggestionViewSnapshot>()
 
         override fun update(snapshot: SwingShellSuggestionViewSnapshot) {
             assertTrue(SwingUtilities.isEventDispatchThread())
+            this.snapshot = snapshot
             updates += snapshot
         }
 
@@ -930,7 +955,7 @@ class SwingTerminalSuggestionContextTest {
     private companion object {
         fun snapshot() = TerminalShellCommandLineSnapshot("git s", 5, 9, 0)
 
-        fun request(text: String = "git s") = SwingShellSuggestionRequest(text, text.length, 9, 0)
+        fun request(text: String = "git s") = SwingShellSuggestionRequest(text, text.length)
 
         fun suggestion(request: SwingShellSuggestionRequest) =
             SwingShellSuggestion(

@@ -18,7 +18,10 @@ package io.github.ketraterm.ui.swing.api
 import io.github.ketraterm.ui.swing.api.TerminalUiDispatcher.Companion.SWING
 import io.github.ketraterm.ui.swing.settings.TerminalClipboardHandler
 import io.github.ketraterm.ui.swing.settings.TerminalHyperlinkHandler
-import io.github.ketraterm.ui.swing.suggestion.*
+import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionEditTarget
+import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionKeymap
+import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionProvider
+import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionViewFactory
 import java.awt.event.KeyEvent
 import javax.swing.SwingUtilities
 
@@ -100,10 +103,8 @@ public fun interface SwingTerminalHostKeyHandler {
  * scrollbar should set this to `false`.
  * @property shellSuggestionProvider host provider queried for bounded
  * command-line suggestion snapshots.
- * @property shellSuggestionHandler host callback invoked after the user accepts
- * a shell suggestion from the reusable popup.
- * @property shellSuggestionFeedbackHandler host callback invoked when the user
- * accepts or explicitly dismisses a shell suggestion.
+ * @property shellSuggestionEditTarget captures request-owned editing authority before
+ * asynchronous provider work. Acceptance returns the actual admission or application result.
  * @property shellSuggestionKeymap host-owned mapping from Swing key events to
  * semantic suggestion actions. Standalone hosts may retain the standard map;
  * platform integrations should resolve their active application keymap.
@@ -130,8 +131,7 @@ public class SwingHostServices private constructor(
     public val viewportListener: TerminalViewportListener = builder.viewportListener
     public val scrollbarOverlayEnabled: Boolean = builder.scrollbarOverlayEnabled
     public val shellSuggestionProvider: SwingShellSuggestionProvider = builder.shellSuggestionProvider
-    public val shellSuggestionHandler: SwingShellSuggestionHandler = builder.shellSuggestionHandler
-    public val shellSuggestionFeedbackHandler: SwingShellSuggestionFeedbackHandler = builder.shellSuggestionFeedbackHandler
+    public val shellSuggestionEditTarget: SwingShellSuggestionEditTarget = builder.shellSuggestionEditTarget
     public val shellSuggestionKeymap: SwingShellSuggestionKeymap = builder.shellSuggestionKeymap
     public val shellSuggestionViewFactory: SwingShellSuggestionViewFactory = builder.shellSuggestionViewFactory
     public val hostKeyHandler: SwingTerminalHostKeyHandler = builder.hostKeyHandler
@@ -173,12 +173,9 @@ public class SwingHostServices private constructor(
         public var shellSuggestionProvider: SwingShellSuggestionProvider =
             source?.shellSuggestionProvider ?: SwingShellSuggestionProvider.NONE
 
-        /** Draft value for [SwingHostServices.shellSuggestionHandler]; validated when [build] is called. */
-        public var shellSuggestionHandler: SwingShellSuggestionHandler = source?.shellSuggestionHandler ?: SwingShellSuggestionHandler.NONE
-
-        /** Draft value for [SwingHostServices.shellSuggestionFeedbackHandler]; validated when [build] is called. */
-        public var shellSuggestionFeedbackHandler: SwingShellSuggestionFeedbackHandler =
-            source?.shellSuggestionFeedbackHandler ?: SwingShellSuggestionFeedbackHandler.NONE
+        /** Draft value for [SwingHostServices.shellSuggestionEditTarget]; validated when [build] is called. */
+        public var shellSuggestionEditTarget: SwingShellSuggestionEditTarget =
+            source?.shellSuggestionEditTarget ?: SwingShellSuggestionEditTarget.NONE
 
         /** Draft value for [SwingHostServices.shellSuggestionKeymap]; validated when [build] is called. */
         public var shellSuggestionKeymap: SwingShellSuggestionKeymap = source?.shellSuggestionKeymap ?: SwingShellSuggestionKeymap.STANDARD
@@ -210,8 +207,7 @@ public class SwingHostServices private constructor(
             viewportListener == other.viewportListener &&
             scrollbarOverlayEnabled == other.scrollbarOverlayEnabled &&
             shellSuggestionProvider == other.shellSuggestionProvider &&
-            shellSuggestionHandler == other.shellSuggestionHandler &&
-            shellSuggestionFeedbackHandler == other.shellSuggestionFeedbackHandler &&
+            shellSuggestionEditTarget == other.shellSuggestionEditTarget &&
             shellSuggestionKeymap == other.shellSuggestionKeymap &&
             shellSuggestionViewFactory == other.shellSuggestionViewFactory &&
             hostKeyHandler == other.hostKeyHandler &&
@@ -227,8 +223,7 @@ public class SwingHostServices private constructor(
         result = 31 * result + viewportListener.hashCode()
         result = 31 * result + scrollbarOverlayEnabled.hashCode()
         result = 31 * result + shellSuggestionProvider.hashCode()
-        result = 31 * result + shellSuggestionHandler.hashCode()
-        result = 31 * result + shellSuggestionFeedbackHandler.hashCode()
+        result = 31 * result + shellSuggestionEditTarget.hashCode()
         result = 31 * result + shellSuggestionKeymap.hashCode()
         result = 31 * result + shellSuggestionViewFactory.hashCode()
         result = 31 * result + hostKeyHandler.hashCode()

@@ -36,6 +36,14 @@ non-overlapping UTF-16 scalar boundaries and takes ownership through defensive
 copying at public boundaries; hosts use indexed access when adapting or painting
 to avoid exposing mutable array state.
 
+`TerminalCompletionCandidate.feedbackToken` is optional opaque provider-owned
+feedback context. The engine never interprets it for matching, ranking, or outcome
+grouping. Fusion preserves the chosen presentation representative's complete
+candidate, including its token, while replacing only the fused score. Hosts may
+route interaction feedback using that token; source labels and row indices are
+not provider identities. The engine does not broadcast feedback to contributors
+hidden by outcome deduplication.
+
 `TerminalCompletionSourcePrior` is the single reviewed cold-start policy for
 built-in source families. Standalone and IntelliJ composition use these named
 values instead of maintaining duplicated numeric constants. They remain small
@@ -185,6 +193,10 @@ The standalone app and IntelliJ plugin should compose completion sources through
 `TerminalCompletionSources` and `TerminalCompletionEngines`, then adapt returned
 candidates to their own UI presentation.
 
+The pure engine is also usable directly by any other UI or headless caller.
+Swing request interaction and terminal edit admission remain in their owning
+modules; they are not requirements for source evaluation or learning.
+
 The public API should not grow by convenience. New public functions must be
 durable host contracts, used by standalone/plugin integration, or explicitly
 documented persistence/model contracts.
@@ -277,21 +289,51 @@ parser. A small non-whitespace threshold plus common trigger characters keeps
 typing responsive, while the merged engine parses once and suppresses invalid
 operator, command, option, path, and value-domain requests authoritatively.
 
-Swing hosts share `SwingLiveCompletionBinding`, whose lifecycle-bound Flow
-debounces refreshes on the EDT. `SwingTerminal` owns exactly one replaceable
-`suggestionJob`; a new request or popup hide cancels it. The provider and engine
-remain suspending end to end. Provider construction and flow collection execute
-off the EDT, and progressive rankings are conflated before the latest immutable
-snapshot is published back to Swing.
+Swing hosts share optional `SwingLiveCompletionBinding`, whose lifecycle-bound
+Flow debounces refreshes on the EDT. Automatic targets receive one captured
+`SwingShellSuggestionInteraction`; they do not recapture the editing context at
+acceptance. The interaction owns the original command request, captured edit
+handler, complete immutable `SwingShellSuggestionSnapshot`, selection, admission,
+feedback, and closure. Selection updates share the publication's candidate
+storage. UI gestures retain their publication so stale row indices cannot act on
+a newer ranking.
 
-Presentation is intentionally platform-owned. The reusable Swing view uses a
-`JList`; the IntelliJ plugin owns a separate native `JBList`.
-Both consume `SwingShellSuggestionViewSnapshot` and the same authoritative
-display text, detail, source label, semantic accent role, and matched ranges.
-The Swing adapter maps the products' stable source identities through one private
-exact table; unknown identities use a bounded human-readable fallback.
-Physical renderers may follow their platform's visuals and mechanics but do not
-reparse engine kinds or provider identifiers.
+`SwingShellSuggestionEditTarget.capture(request)` and
+`SwingShellSuggestionProvider.open(request)` run cheaply on the EDT before
+provider work starts. Opening returns a `SwingShellSuggestionSource` pairing its
+cold progressive flow with its request-specific observer. The default `open`
+defers invocation of `suggestions(request)` until collection off the EDT. The
+terminal collects in an interaction-owned child scope, conflates progressive
+snapshots, and publishes on the EDT. Each interaction accepts one provider
+collection. Supersession, input, invalidation, rebinding, and disposal close
+obsolete interactions and cancel collection; late publications are declined.
+Normal stream completion preserves a usable final publication.
+
+Presentation is platform-owned and independent of collection.
+`SwingTerminal.presentShellSuggestions` mounts the optional embedded view;
+`requestShellSuggestions(interaction, provider)` only opens and collects the
+source. Hosts can publish their own candidates or use the existing provider with
+a detached window, popup, or panel consuming the same full interaction snapshot.
+The default Swing view uses a `JList`; the IntelliJ plugin owns a separate native
+`JBList`. Their embedded adapters consume bounded
+`SwingShellSuggestionViewSnapshot` windows with authoritative display text,
+detail, source label, accent role, match ranges, and overflow metadata. Detached
+presentation owns its viewport and placement directly. The Swing adapter maps
+stable source identities through one private exact display-label table; unknown
+identities use a bounded human-readable fallback. Renderers do not reparse
+engine kinds or provider identifiers.
+
+Acceptance returns an explicit `SwingShellSuggestionAcceptanceResult` from the
+configured editing authority. The session-backed target captures its versioned
+editing capability before source work and uses final atomic conditional
+admission. `ACCEPTED` describes admission, not transport completion or shell
+execution. Request feedback distinguishes admitted acceptance, rejected
+attempts, and explicit dismissal. Rejection and passive closure do not change
+learning. `SwingCompletionBinding` captures the source and paired host observer
+together, so replacement cannot reroute feedback to another provider runtime.
+`SwingCompletionSuggestionProvider` preserves candidate feedback tokens
+independently of its captured host metadata. Feedback routing and privacy remain
+host-owned; completion sources never own UI callbacks or terminal state.
 
 Static bounded option domains belong in `TerminalOptionSpec.valueCandidates`.
 Examples are output formats, log levels, or other values that are stable and do

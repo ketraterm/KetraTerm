@@ -193,6 +193,27 @@ requires a separate compatibility decision.
 
 The construction changes deliberately replace earlier development signatures:
 
+- The suggestion interaction migration deliberately replaces the pre-stable
+  completion/Swing contracts. Replace `shellSuggestionHandler` with
+  `shellSuggestionEditTarget`, which captures a request-owned handler before
+  source work. Implement `tryAccept` with an actual admission/application result;
+  the session factory now takes `TerminalSession`. Replace the global
+  `shellSuggestionFeedbackHandler` with the observer in `SwingShellSuggestionSource`,
+  captured by `provider.open`, or the interaction's request observer. Rejected
+  edits report `REJECTED`, which must not penalize learning. Remove grid anchors
+  from `SwingShellSuggestionRequest`; pass them to presentation instead. Replace
+  `showShellSuggestions` with begin/publish/present; source collection can run
+  independently of mounting. View callbacks now carry their displayed snapshot,
+  and custom views own `maximumVisibleSuggestions`. Native automatic targets
+  receive the captured interaction. Optional opaque feedback tokens change the
+  generated constructor/copy signatures of completion and Swing candidates;
+  recompile consumers. Existing configuration builder/copy entry points remain,
+  but the removed service properties intentionally do not have forwarding shims.
+  Before refresh, exactly eight retained-client cases failed: completion cases
+  5/6/15/16 at the candidate's removed Kotlin default constructor, and Swing-host
+  cases 41/42/43/44 at the four-argument request constructor, across both metadata
+  modes and both runtimes. Only `completion` and `ui-swing-host` client/provenance
+  pairs are refreshed; the other nine client jars remain byte-identical.
 - D04/D05 removes session publisher access, returns `TerminalShellIntegrationView`
   from session/integration shell properties, and replaces publisher integer leases
   and exposed bookkeeping with cache-reference acquisition/release. Recompile
@@ -228,9 +249,10 @@ The construction changes deliberately replace earlier development signatures:
 
 The original five client/provenance pairs remain available in Git at `e37f5d7f`.
 Construction commit `025ccb1a` replaced the host and Swing clients for these
-intentional breaks. Parser and completion client bytes remain identical;
+intentional breaks. Parser client bytes remain identical;
 D02/D03 additionally refreshes Swing and PTY; D04/D05 refreshes Swing and
-render-cache as described above. Eight additional clients established
+render-cache as described above. The suggestion interaction migration refreshes
+completion and Swing host after its eight expected linkage failures. Eight additional clients established
 separate extension baselines, producing the historical thirteen-client suite.
 The support-boundary change removes the workspace and completion-persistence
 clients from current publication checks. Eleven retained clients now define
