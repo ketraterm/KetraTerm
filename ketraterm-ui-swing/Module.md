@@ -57,9 +57,9 @@ Routine painting never calls `TerminalSession.readRenderFrame`; it reads only th
 
 ### Binding and configuration ownership
 
-`SwingTerminal` requires a `TerminalSession`. Binding applies the component's ambiguous-width policy, palette, cursor shape, and paste policy to the session. When the component has positive bounds, it resizes both the terminal grid and connector to the visible cell dimensions. Component and font/geometry changes can resize them again. `reloadSettings()` reapplies only changed settings; unchanged palette and cursor settings preserve application-controlled values.
+`SwingTerminal` can be constructed before its `TerminalSession` exists. Binding applies the component's ambiguous-width policy, palette, cursor shape, and paste policy to the session. When the component has positive bounds, it resizes both the terminal grid and connector to the visible cell dimensions. Component and font/geometry changes can resize them again. `reloadSettings()` reapplies only changed settings; unchanged palette and cursor settings preserve application-controlled values.
 
-The host owns session creation and lifetime. Binding starts render observation and selects the live viewport; rebinding cancels the old view work and clears view state. `unbind()` and `dispose()` cancel rendering and suggestion requests without closing the session or restoring its previous settings or dimensions. Dispose the view when its host closes, and close the session separately when its process or connection should end. Stop session-specific host observers, including a `SwingLiveCompletionBinding`, before rebinding the view or disposing it.
+The host owns session creation and lifetime. Binding starts render observation and selects the live viewport; rebinding cancels the old view work and clears view state. `unbind()` and `dispose()` cancel rendering, automatic suggestion observation, and suggestion requests without closing the session or restoring its previous settings or dimensions. Dispose the view when its host closes, and close the session separately when its process or connection should end.
 
 Create and access the component on the EDT. `bind`, `unbind`, `dispose`, and `reloadSettings` also accept calls from other threads, which enqueue their work on the EDT; calls already on the EDT execute immediately.
 
@@ -67,9 +67,13 @@ Shell metadata comes from the integration selected when the session is created. 
 
 ### Suggestion request ownership
 
-`requestActiveShellSuggestions()` uses the bound session's selected command source, including a host-owned source. It defaults to an explicit request; automatic observers pass `SwingShellSuggestionTrigger.AUTOMATIC`. Pending results and acceptance are checked against that session and command context, and context observation stops when the request and popup end.
+Configure a view-lifetime provider with `setShellSuggestionProvider(provider)` on the EDT, before or after session binding. Replacing it cancels current work; passing null disables configured provider requests. Automatic observation stops when neither a provider nor a custom target is configured. The provider survives rebinding, while each interaction captures editing authority from the actual bound session. Host services remain immutable and contain environment services such as clipboard, fonts, and hyperlinks.
 
-For context kept outside the session, call `requestShellSuggestions(commandText, cursorOffset, anchorColumn, anchorRow, trigger = SwingShellSuggestionTrigger.EXPLICIT)`. The default trigger remains automatic. Both methods use the same cancellable provider pipeline and require the master suggestion setting; explicit requests remain available when automatic popups are disabled. With directly supplied context, the host must replace the request or call `hideShellSuggestions()` when its editor state changes. `showShellSuggestions()` remains available when the host owns provider collection itself.
+The terminal owns automatic focus, eligibility, debounce, and session observation. This work follows binding, settings, session closure, and disposal. `refreshShellSuggestions()` reconciles external host metadata changes. Engines, sources, persistence, and custom popup resources remain host-owned.
+
+`requestActiveShellSuggestions()` uses the bound session's selected command source, including a host-owned source, and defaults to an explicit request. Explicit requests remain available when automatic popups are disabled; the master suggestion setting gates both. For context kept outside the session, use `requestShellSuggestions(commandText, cursorOffset, anchorColumn, anchorRow, trigger = SwingShellSuggestionTrigger.EXPLICIT)` and replace or hide the request when that context changes. A custom editor supplies an explicit `editTarget`; normal terminal completion needs no separately bound editing service.
+
+Source opening and edit capture run synchronously on the EDT before provider collection. Custom `SwingShellSuggestionTarget` implementations receive captured interactions for independent presentation; `setShellSuggestionTarget(null)` restores the embedded view. See the [Swing README](README.md#suggestion-request-ownership) for the full request and presentation contract and [construction examples](../docs/library-configuration.md#session-independent-completion-construction) for both initialization orders.
 
 ---
 

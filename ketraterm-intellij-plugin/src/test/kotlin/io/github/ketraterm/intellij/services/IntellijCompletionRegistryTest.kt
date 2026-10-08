@@ -26,6 +26,7 @@ import io.github.ketraterm.session.TerminalShellIntegrationCommandMetadata
 import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionFeedback
 import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionFeedbackKind
 import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionRequest
+import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionSource
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.last
 import kotlinx.coroutines.runBlocking
@@ -33,6 +34,8 @@ import org.junit.Assert.*
 import org.junit.Test
 import java.nio.file.Files
 import java.nio.file.Path
+import java.util.concurrent.atomic.AtomicReference
+import javax.swing.SwingUtilities
 
 class IntellijCompletionRegistryTest {
     @Test
@@ -66,7 +69,7 @@ class IntellijCompletionRegistryTest {
                     coroutineScope = this,
                 )
             val resources =
-                registry.createResources(
+                registry.createProvider(
                     context(
                         scanner =
                             TerminalDirectoryScanner { _, _ ->
@@ -76,7 +79,7 @@ class IntellijCompletionRegistryTest {
                     ),
                 )
 
-            val suggestions = resources.provider.suggestions(request("cd s")).last()
+            val suggestions = resources.suggestions(request("cd s")).last()
 
             assertEquals(1, scans)
             assertEquals("src/", suggestions.first { it.source == "path" }.replacementText)
@@ -103,9 +106,9 @@ class IntellijCompletionRegistryTest {
                     coroutineScope = this,
                 )
             val resources =
-                registry.createResources(context(additionalSources = listOf(TerminalCompletionSourceEntry(source, 20))))
+                registry.createProvider(context(additionalSources = listOf(TerminalCompletionSourceEntry(source, 20))))
 
-            val suggestions = resources.provider.suggestions(request("git switch m")).last()
+            val suggestions = resources.suggestions(request("git switch m")).last()
             assertEquals("Git", suggestions.first { it.source == "intellij-git-branch" }.sourceDisplayText)
 
             assertEquals(1, loads)
@@ -121,8 +124,8 @@ class IntellijCompletionRegistryTest {
                     persistenceEnabled = false,
                     coroutineScope = this,
                 )
-            val first = registry.createResources(context())
-            val second = registry.createResources(context())
+            val first = registry.createProvider(context())
+            val second = registry.createProvider(context())
             registry.recordFinishedCommand(
                 "bash",
                 TerminalShellIntegrationCommandMetadata(
@@ -137,13 +140,13 @@ class IntellijCompletionRegistryTest {
             )
 
             assertTrue(
-                first.provider
+                first
                     .suggestions(request("git s"))
                     .last()
                     .any { it.source == "learned" },
             )
             assertTrue(
-                second.provider
+                second
                     .suggestions(request("git s"))
                     .last()
                     .any { it.source == "learned" },
@@ -171,18 +174,21 @@ class IntellijCompletionRegistryTest {
                 )
             var workingDirectoryUri = "file:///repo-a"
             val resources =
-                registry.createResources(
+                registry.createProvider(
                     context(workingDirectoryUriProvider = { workingDirectoryUri }),
                 )
             val request = request("git s")
+            val opened = AtomicReference<SwingShellSuggestionSource>()
+            SwingUtilities.invokeAndWait { opened.set(resources.open(request)) }
+            val source = opened.get()
             val suggestion =
-                resources.provider
-                    .suggestions(request)
+                source
+                    .suggestions
                     .last()
                     .first { it.replacementText == "status" }
 
             workingDirectoryUri = "file:///repo-b"
-            resources.feedbackHandler.onSuggestionFeedback(
+            source.feedbackHandler.onSuggestionFeedback(
                 SwingShellSuggestionFeedback(
                     kind = SwingShellSuggestionFeedbackKind.ACCEPTED,
                     suggestion = suggestion,
@@ -213,7 +219,7 @@ class IntellijCompletionRegistryTest {
             registry.closeAndFlush()
             registry.closeAndFlush()
 
-            assertThrows(IllegalStateException::class.java) { registry.createResources(context()) }
+            assertThrows(IllegalStateException::class.java) { registry.createProvider(context()) }
         }
 
     @Test

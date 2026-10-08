@@ -507,8 +507,8 @@ internal class TabManager(
     private fun createTerminalPane(workspaceTab: TerminalWorkspaceTab): TerminalPane =
         try {
             val registry = ensureCompletionRegistry()
-            val completionResources =
-                registry?.createResources(
+            val completionProvider =
+                registry?.createProvider(
                     profileId = workspaceTab.profile.id,
                     workingDirectoryUriProvider = { workspaceTab.currentWorkingDirectoryUri },
                     shellCapabilities = workspaceTab.profile.kind.completionShellCapabilities(),
@@ -516,7 +516,7 @@ internal class TabManager(
             TerminalPane.create(
                 tab = workspaceTab,
                 settings = settings,
-                completionResources = completionResources,
+                completionProvider = completionProvider,
             ) { pane, request ->
                 showPaneContextMenu(pane, request)
             }
@@ -886,6 +886,15 @@ internal class TabManager(
     }
 
     private inner class StandaloneWorkspaceListener : TerminalWorkspaceListener {
+        override fun currentWorkingDirectoryChanged(
+            tab: TerminalWorkspaceTab,
+            uri: String,
+        ) {
+            SwingUtilities.invokeLater {
+                panes.firstOrNull { it.tab == tab }?.terminal?.refreshShellSuggestions()
+            }
+        }
+
         override fun commandFinished(
             tab: TerminalWorkspaceTab,
             metadata: TerminalShellIntegrationCommandMetadata,
@@ -1122,7 +1131,7 @@ internal class TabManager(
 
     private fun reconcileCompletion() {
         if (!settings.config.smartSuggestionsEnabled) {
-            panes.forEach { it.setCompletionResources(null) }
+            panes.forEach { it.setCompletionProvider(null) }
             val retiring = completionRegistry ?: return
             completionRegistry = null
             completionShutdown =
@@ -1144,8 +1153,8 @@ internal class TabManager(
         registry.setPersistenceEnabled(settings.config.persistentSuggestionLearningEnabled)
         if (previous === registry) return
         panes.forEach { pane ->
-            pane.setCompletionResources(
-                registry.createResources(
+            pane.setCompletionProvider(
+                registry.createProvider(
                     profileId = pane.tab.profile.id,
                     workingDirectoryUriProvider = { pane.tab.currentWorkingDirectoryUri },
                     shellCapabilities =

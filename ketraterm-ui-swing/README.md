@@ -55,9 +55,9 @@ Routine painting never calls `TerminalSession.readRenderFrame`; it reads only th
 
 ### Binding and configuration ownership
 
-`SwingTerminal` requires a `TerminalSession`. Binding applies the component's ambiguous-width policy, palette, cursor shape, and paste policy to the session. When the component has positive bounds, it resizes both the terminal grid and connector to the visible cell dimensions. Component and font/geometry changes can resize them again. `reloadSettings()` reapplies only changed settings; unchanged palette and cursor settings preserve application-controlled values.
+`SwingTerminal` can be constructed before its `TerminalSession` exists. Binding applies the component's ambiguous-width policy, palette, cursor shape, and paste policy to the session. When the component has positive bounds, it resizes both the terminal grid and connector to the visible cell dimensions. Component and font/geometry changes can resize them again. `reloadSettings()` reapplies only changed settings; unchanged palette and cursor settings preserve application-controlled values.
 
-The host owns session creation and lifetime. Binding starts render observation and selects the live viewport; rebinding cancels the old view work and clears view state. `unbind()` and `dispose()` cancel rendering and suggestion requests without closing the session or restoring its previous settings or dimensions. Dispose the view when its host closes, and close the session separately when its process or connection should end. Stop session-specific host observers, including a `SwingLiveCompletionBinding`, before rebinding the view or disposing it.
+The host owns session creation and lifetime. Binding starts render observation and selects the live viewport; rebinding cancels the old view work and clears view state. `unbind()` and `dispose()` cancel rendering, automatic suggestion observation, and suggestion requests without closing the session or restoring its previous settings or dimensions. Dispose the view when its host closes, and close the session separately when its process or connection should end.
 
 Create and access the component on the EDT. `bind`, `unbind`, `dispose`, and `reloadSettings` also accept calls from other threads, which enqueue their work on the EDT; calls already on the EDT execute immediately.
 
@@ -73,33 +73,38 @@ The cursor uses the existing shared cursor/text blink timer. Inactive cursors ig
 
 ### Suggestion request ownership
 
-`requestActiveShellSuggestions()` uses the bound session's selected command source, including a host-owned source. It defaults to an explicit request; automatic observers pass `SwingShellSuggestionTrigger.AUTOMATIC`. Pending results and acceptance are checked against that session and command context, and context observation stops when the request and popup end.
+Install or replace a provider with `setShellSuggestionProvider(provider)` on the EDT, before or after binding. The provider belongs to the view and survives rebinding; each request captures its source and feedback observer before background collection. Replacement cancels old work. Passing null disables configured provider requests; `hasShellSuggestionProvider` reports whether one is configured. Automatic observation stops when neither a provider nor a custom target is configured. Hosts retain ownership of engines, sources, and persistence.
 
-For context kept outside the session, call `requestShellSuggestions(commandText, cursorOffset, anchorColumn, anchorRow, trigger = SwingShellSuggestionTrigger.EXPLICIT)`. The default trigger remains automatic. Both methods use the same cancellable provider pipeline and require the master suggestion setting; explicit requests remain available when automatic popups are disabled. With directly supplied context, the host must replace the request or call `hideShellSuggestions()` when its editor state changes. `showShellSuggestions()` remains available when the host owns provider collection itself.
+`SwingTerminal` owns focus, eligibility, debounce, and session observation for automatic suggestions. Its lifecycle follows binding, settings, session closure, and disposal; no host observer needs to be attached or detached. Changing host metadata outside the session can request reconciliation with `refreshShellSuggestions()` on the EDT.
+
+`requestActiveShellSuggestions()` uses the bound session's selected command source, including a host-owned source. It defaults to an explicit request. Pending results and acceptance are checked against that same session and command context. Explicit requests remain available when automatic popups are disabled, while the master suggestion setting gates both.
+
+For context kept outside the session, call `requestShellSuggestions(commandText, cursorOffset, anchorColumn, anchorRow, trigger = SwingShellSuggestionTrigger.EXPLICIT)`. Its default trigger remains automatic. With directly supplied context, the host must replace the request or call `hideShellSuggestions()` when its editor state changes. A custom editor supplies a request-scoped `editTarget` to `beginShellSuggestionInteraction` or this request method; ordinary terminal completion captures editing authority from the bound session automatically.
 
 The default session-backed handler additionally requires a synchronized revisioned
 command source: use `TerminalShellCommandLineState` with the host factory, or the
 optional OSC producer. StateFlow-only host models remain readable but cannot admit
 conditional edits. The view captures before provider work and revalidates at queue
-admission; rejected edits produce no prefix or accepted feedback. Hosts using
-`showShellSuggestions()` or invoking handlers directly must provide a custom handler,
-capture `session.captureCommandEdit()` before provider work, and apply through
-`session.submitInput(expected, events)`. The default session handler rejects such
-uncaptured acceptance. See the [conditional edit contract](../ketraterm-session/docs/session-concurrency-locks.md#conditional-command-edits).
+admission; rejected edits produce no prefix or accepted feedback. Host-produced
+results use `beginShellSuggestionInteraction` before starting work, then publish
+through the captured interaction on the EDT. The default unbound interaction is
+display-only; a custom editor must capture its editing authority with an explicit
+`editTarget`. See the [conditional edit contract](../ketraterm-session/docs/session-concurrency-locks.md#conditional-command-edits).
 
 Choose controller and presentation ownership independently:
 
 | Controller | Presentation | Automatic coordination |
 | --- | --- | --- |
-| Reusable Swing controller | Embedded `SwingShellSuggestionView` | Optional `SwingLiveCompletionBinding.attach(terminal)` |
-| Host controller | Host-owned native popup | Optional `attach(terminal, SwingShellSuggestionTarget)` |
+| Reusable Swing controller | Embedded `SwingShellSuggestionView` | Built into the terminal when a provider is configured |
+| Host controller | Host-owned native popup | `setShellSuggestionTarget(SwingShellSuggestionTarget)` |
 | Host controller | Host-owned results UI | Host orchestration using `SwingCompletionSuggestionProvider` or the completion engine directly |
 
-The coordinator lives in optional `ketraterm-ui-swing-host`. Its request/hide port
+The `SwingShellSuggestionTarget` request/hide port lives in `ketraterm-ui-swing`. It
 leaves provider collection, selection, acceptance and popup lifetime with the host;
-it supplies focus, eligibility, debounce and invalidation. Close the binding before
-rebinding or disposing the terminal, then release host popup resources separately.
-Detach stops observation while leaving explicit presentation to the host.
+the terminal supplies focus, eligibility, debounce and invalidation. A custom target
+receives the captured interaction and starts collection through
+`requestShellSuggestions(interaction, provider)`. Passing null restores embedded
+presentation. Release host popup resources separately when the host closes.
 
 On the EDT, `copyCellBounds(column, row, destination)` copies the current frame's
 zero-based logical cell into a caller-owned `Rectangle`, using component-local
@@ -111,9 +116,10 @@ Wide leading and trailing cells each describe one physical grid cell.
 Install view-owned diagnostics with `setShellSuggestionFailureHandler` on the
 EDT. Current provider failures are reported once after cleanup; cancellation and
 obsolete requests are excluded. Null restores logging, rebinding retains the
-handler, and disposal releases it. Completion context suppliers execute in the
-caller's context, normally off the EDT; publish immutable host metadata to
-thread-safe storage instead of reading UI state from those suppliers.
+handler, and disposal releases it. `SwingCompletionSuggestionProvider.open` captures
+host context synchronously on the EDT; keep that supplier cheap. Direct callers of
+`suggestions` capture context in their own calling thread. Engine work begins only
+when the returned source is collected, normally off the EDT.
 
 ---
 
@@ -127,11 +133,13 @@ For detailed specifications on Swing painting and text pipelines:
 
 ## How to Use
 
-Call this function on the EDT with a started session, then add the returned component
+Call `createTerminalView` on the EDT with a started session, then add the returned component
 to your host's layout. The host retains the component so it can call `dispose()` on
 the EDT when the view closes. Disposal releases view work; it does not close the
 session. The host separately closes the session when the connection should end.
-The published-consumer gate extracts, compiles, and exercises this exact example.
+When a framework constructs the component first, call `createUnboundTerminalView`
+and bind the started session later on the EDT. Both orders use the same view-lifetime
+provider API. The published-consumer gate compiles and exercises both patterns.
 
 <!-- compiled-example:terminal-view -->
 ```kotlin
@@ -139,10 +147,17 @@ import io.github.ketraterm.session.TerminalSession
 import io.github.ketraterm.ui.swing.api.SwingTerminal
 import io.github.ketraterm.ui.swing.settings.SwingSettings
 import io.github.ketraterm.ui.swing.settings.TerminalTheme
+import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionProvider
 import java.awt.Font
 import javax.swing.SwingUtilities
 
 fun createTerminalView(session: TerminalSession): SwingTerminal {
+    return createUnboundTerminalView().apply { bind(session) }
+}
+
+fun createUnboundTerminalView(
+    provider: SwingShellSuggestionProvider? = null,
+): SwingTerminal {
     check(SwingUtilities.isEventDispatchThread()) { "Create terminal views on the EDT" }
 
     val settings = SwingSettings.create {
@@ -153,7 +168,7 @@ fun createTerminalView(session: TerminalSession): SwingTerminal {
     }
 
     return SwingTerminal(settingsProvider = { settings }).apply {
-        bind(session)
+        setShellSuggestionProvider(provider)
     }
 }
 ```

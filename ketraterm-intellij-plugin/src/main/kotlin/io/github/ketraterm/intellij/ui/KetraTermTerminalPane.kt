@@ -35,7 +35,6 @@ import io.github.ketraterm.intellij.settings.KetraTermIntellijSettings
 import io.github.ketraterm.ui.swing.api.*
 import io.github.ketraterm.ui.swing.host.*
 import io.github.ketraterm.ui.swing.settings.TerminalClipboardHandler
-import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionEditTarget
 import io.github.ketraterm.workspace.TerminalWorkspaceTab
 import kotlinx.coroutines.CancellationException
 import java.awt.Adjustable
@@ -57,7 +56,6 @@ internal class KetraTermTerminalPane private constructor(
     private val searchBar: SwingTerminalSearchBar,
     private val hostActions: KetraTermTerminalPaneHostActions,
     private val project: Project,
-    private val completionBinding: SwingCompletionBinding,
     val clipboardReadPrompt: SwingClipboardReadPrompt,
 ) {
     private var closed = false
@@ -94,18 +92,18 @@ internal class KetraTermTerminalPane private constructor(
         if (closed) return
         val settings = KetraTermIntellijSettings.getInstance().state
         if (!settings.smartSuggestionsEnabled) {
-            completionBinding.update(null, false)
-            completionService?.releaseResources(tab)
-            completionService?.removeResourceListener(completionChanged)
+            terminal.setShellSuggestionProvider(null)
+            completionService?.releaseProvider(tab)
+            completionService?.removeProviderListener(completionChanged)
             completionService = null
             return
         }
         val service =
             completionService ?: KetraTermCompletionService.getInstance().also {
                 completionService = it
-                it.addResourceListener(completionChanged)
+                it.addProviderListener(completionChanged)
             }
-        completionBinding.update(service.resourcesFor(project, tab), settings.shellSuggestionsEnabled)
+        terminal.setShellSuggestionProvider(service.providerFor(project, tab))
     }
 
     /**
@@ -123,7 +121,7 @@ internal class KetraTermTerminalPane private constructor(
             SwingTerminalHostAction.OPEN_SEARCH -> fromContextMenu || KetraTermIntellijSettings.getInstance().overrideIdeShortcuts()
             SwingTerminalHostAction.REQUEST_SUGGESTIONS ->
                 KetraTermIntellijSettings.getInstance().state.smartSuggestionsEnabled &&
-                    completionBinding.isEnabled
+                    terminal.hasShellSuggestionProvider
             SwingTerminalHostAction.SELECT_ALL,
             SwingTerminalHostAction.CLEAR_SCREEN,
             SwingTerminalHostAction.PASTE_CLIPBOARD,
@@ -287,9 +285,8 @@ internal class KetraTermTerminalPane private constructor(
         shortcutController = null
         var failure: Throwable? = null
         failure = captureCleanupFailure(failure, clipboardReadPrompt::close)
-        failure = captureCleanupFailure(failure) { service?.releaseResources(tab) }
-        failure = captureCleanupFailure(failure) { service?.removeResourceListener(completionChanged) }
-        failure = captureCleanupFailure(failure, completionBinding::close)
+        failure = captureCleanupFailure(failure) { service?.releaseProvider(tab) }
+        failure = captureCleanupFailure(failure) { service?.removeProviderListener(completionChanged) }
         failure = captureCleanupFailure(failure, searchBar::close)
         failure = captureCleanupFailure(failure) { shortcuts?.dispose() }
         failure = captureCleanupFailure(failure, terminal::dispose)
@@ -344,7 +341,6 @@ internal class KetraTermTerminalPane private constructor(
             clipboard: TerminalClipboardHandler,
             hostActions: KetraTermTerminalPaneHostActions = KetraTermTerminalPaneHostActions.NONE,
         ): KetraTermTerminalPane {
-            val completionBinding = SwingCompletionBinding(tab.session) { tab.currentWorkingDirectoryUri }
             val scrollbar = JBScrollBar(Adjustable.VERTICAL)
             val scrollbarAdapter = SwingScrollbarAdapter(scrollbar)
             val shortcutControllerRef = arrayOfNulls<KetraTermTerminalShortcutController>(1)
@@ -370,8 +366,6 @@ internal class KetraTermTerminalPane private constructor(
                                 }
                             draft.viewportListener = scrollbarAdapter
                             draft.scrollbarOverlayEnabled = false
-                            draft.shellSuggestionProvider = completionBinding.provider
-                            draft.shellSuggestionEditTarget = SwingShellSuggestionEditTarget.createDefault(tab.session)
                             draft.shellSuggestionKeymap = KetraTermShellSuggestionKeymap
                             draft.shellSuggestionViewFactory = IntellijCompletionListViewFactory
                             draft.uiDispatcher =
@@ -419,14 +413,12 @@ internal class KetraTermTerminalPane private constructor(
                         searchBar = searchBar,
                         hostActions = hostActions,
                         project = project,
-                        completionBinding = completionBinding,
                         clipboardReadPrompt = clipboardReadPrompt,
                     )
                 pane = created
                 created.shortcutController = KetraTermTerminalShortcutController(created)
                 shortcutControllerRef[0] = created.shortcutController
                 paneRef[0] = created
-                completionBinding.attach(terminal)
                 created.reconcileCompletion()
                 return created
             } catch (failure: Throwable) {
@@ -435,7 +427,6 @@ internal class KetraTermTerminalPane private constructor(
                     captureCleanupFailure(failure, created::close)
                 } else {
                     captureCleanupFailure(failure) { clipboardReadPrompt?.close() }
-                    captureCleanupFailure(failure, completionBinding::close)
                     captureCleanupFailure(failure) { searchBar?.close() }
                     captureCleanupFailure(failure, terminal::dispose)
                 }

@@ -22,8 +22,8 @@ import io.github.ketraterm.completion.model.TerminalCommandSpecs
 import io.github.ketraterm.completion.persistence.TerminalCompletionLearningCoordinator
 import io.github.ketraterm.ui.swing.host.SwingCompletionContext
 import io.github.ketraterm.ui.swing.host.SwingCompletionFeedbackRecorder
-import io.github.ketraterm.ui.swing.host.SwingCompletionResources
 import io.github.ketraterm.ui.swing.host.SwingCompletionSuggestionProvider
+import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionProvider
 import kotlinx.coroutines.*
 import java.nio.file.Path
 import java.util.*
@@ -92,7 +92,7 @@ internal class StandaloneCompletionRegistry private constructor(
         )
 
     /**
-     * Creates completion resources for one standalone terminal pane.
+     * Creates a completion provider for one standalone terminal pane.
      *
      * The returned provider reads [workingDirectoryUriProvider] every time
      * suggestions are requested so ranking can react to OSC 7 directory updates
@@ -101,14 +101,14 @@ internal class StandaloneCompletionRegistry private constructor(
      * @param profileId stable standalone profile id for this session.
      * @param shellCapabilities shell lexical and replacement rules selected from the profile.
      * @param workingDirectoryUriProvider supplier for the latest current-working-directory URI.
-     * @return provider and feedback resources for the pane.
+     * @return provider with request-owned learning feedback for the pane.
      * @throws IllegalStateException if this registry is closed.
      */
-    fun createResources(
+    fun createProvider(
         profileId: String? = null,
         shellCapabilities: TerminalShellCapabilities = TerminalShellCapabilities.PLAIN,
         workingDirectoryUriProvider: () -> String? = { null },
-    ): SwingCompletionResources =
+    ): SwingShellSuggestionProvider =
         synchronized(lifecycleLock) {
             check(!closed) { "standalone completion registry is closed" }
             val contextProvider = {
@@ -118,8 +118,9 @@ internal class StandaloneCompletionRegistry private constructor(
                     shellCapabilities = shellCapabilities,
                 )
             }
-            SwingCompletionResources(
-                provider = SwingCompletionSuggestionProvider(engine, contextProvider),
+            SwingCompletionSuggestionProvider(
+                engine = engine,
+                contextProvider = contextProvider,
                 feedbackHandler = feedbackRecorder.createHandler(),
             )
         }

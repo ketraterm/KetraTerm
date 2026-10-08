@@ -16,6 +16,7 @@
 package consumer
 
 import consumer.documentation.createTerminalView
+import consumer.documentation.createUnboundTerminalView
 import io.github.ketraterm.core.TerminalBuffers
 import io.github.ketraterm.core.api.TerminalBuffer
 import io.github.ketraterm.core.api.TerminalRenderBuffer
@@ -37,9 +38,11 @@ import io.github.ketraterm.ui.swing.api.*
 import io.github.ketraterm.ui.swing.settings.SwingPadding
 import io.github.ketraterm.ui.swing.settings.SwingSettings
 import io.github.ketraterm.ui.swing.settings.SwingSettingsProvider
+import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionProvider
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.onCompletion
 import kotlinx.coroutines.flow.onSubscription
 import kotlinx.coroutines.runBlocking
@@ -143,6 +146,18 @@ fun main() =
                     check(documentedView.preferredSize.width > 0)
                 } finally {
                     documentedView.dispose()
+                }
+                val provider = SwingShellSuggestionProvider { flowOf(emptyList()) }
+                val componentFirst = createUnboundTerminalView(provider)
+                try {
+                    check(componentFirst.hasShellSuggestionProvider)
+                    componentFirst.bind(session)
+                    componentFirst.unbind()
+                    check(componentFirst.hasShellSuggestionProvider)
+                    componentFirst.setShellSuggestionProvider(null)
+                    check(!componentFirst.hasShellSuggestionProvider)
+                } finally {
+                    componentFirst.dispose()
                 }
             }
             check(!session.isClosed && !connector.closed.get())

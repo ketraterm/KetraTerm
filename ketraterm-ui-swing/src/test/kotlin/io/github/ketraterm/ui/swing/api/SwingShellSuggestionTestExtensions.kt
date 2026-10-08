@@ -16,7 +16,19 @@
 package io.github.ketraterm.ui.swing.api
 
 import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestion
+import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionEditTarget
+import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionProvider
 import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionRequest
+import javax.swing.SwingUtilities
+
+internal fun SwingTerminal.withSuggestionProvider(provider: SwingShellSuggestionProvider): SwingTerminal {
+    if (SwingUtilities.isEventDispatchThread()) {
+        setShellSuggestionProvider(provider)
+    } else {
+        SwingUtilities.invokeAndWait { setShellSuggestionProvider(provider) }
+    }
+    return this
+}
 
 internal fun SwingTerminal.showSuggestions(
     request: SwingShellSuggestionRequest,
@@ -24,8 +36,9 @@ internal fun SwingTerminal.showSuggestions(
     selectedIndex: Int = -1,
     anchorColumn: Int = 0,
     anchorRow: Int = 0,
+    editTarget: SwingShellSuggestionEditTarget = SwingShellSuggestionEditTarget.NONE,
 ) {
-    val interaction = beginShellSuggestionInteraction(request) ?: return
+    val interaction = beginShellSuggestionInteraction(request, editTarget = editTarget) ?: return
     interaction.publish(suggestions, selectedIndex)
     presentShellSuggestions(interaction, anchorColumn, anchorRow)
 }

@@ -20,9 +20,12 @@ import io.github.ketraterm.ui.swing.api.SwingHostServices
 import io.github.ketraterm.ui.swing.api.SwingTerminal
 import io.github.ketraterm.ui.swing.api.SwingTerminalContextMenuHandler
 import io.github.ketraterm.ui.swing.api.SwingTerminalContextMenuRequest
-import io.github.ketraterm.ui.swing.host.*
-import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionEditTarget
+import io.github.ketraterm.ui.swing.host.SwingClipboardReadPrompt
+import io.github.ketraterm.ui.swing.host.SwingMessageDialogs
+import io.github.ketraterm.ui.swing.host.SwingTerminalOverlayPane
+import io.github.ketraterm.ui.swing.host.SwingTerminalSearchBar
 import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionKeymap
+import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionProvider
 import io.github.ketraterm.workspace.TerminalWorkspaceTab
 import java.util.concurrent.atomic.AtomicBoolean
 import javax.swing.JPanel
@@ -38,8 +41,6 @@ internal class TerminalPane private constructor(
     val terminal: SwingTerminal,
     val component: JPanel,
     private val settings: KetraTermSettings,
-    private var completionResources: SwingCompletionResources?,
-    private val completionBinding: SwingCompletionBinding,
     private val searchBar: SwingTerminalSearchBar,
     val clipboardReadPrompt: SwingClipboardReadPrompt,
 ) : TerminalPaneActionTarget {
@@ -55,19 +56,14 @@ internal class TerminalPane private constructor(
         component.background = terminal.background
         searchBar.refreshColors(Chrome.searchColors())
         tab.session.setHostPolicy(settings.createHostPolicy())
-        completionBinding.update(
-            completionResources.takeIf { settings.config.smartSuggestionsEnabled },
-            settings.config.shellSuggestionsEnabled,
-        )
     }
 
-    fun setCompletionResources(resources: SwingCompletionResources?) {
+    fun setCompletionProvider(provider: SwingShellSuggestionProvider?) {
         if (closed.get()) return
-        completionResources = resources
-        completionBinding.update(resources.takeIf { settings.config.smartSuggestionsEnabled }, settings.config.shellSuggestionsEnabled)
+        terminal.setShellSuggestionProvider(provider)
     }
 
-    override fun suggestionsEnabled(): Boolean = settings.config.smartSuggestionsEnabled && completionBinding.isEnabled
+    override fun suggestionsEnabled(): Boolean = settings.config.smartSuggestionsEnabled && terminal.hasShellSuggestionProvider
 
     override fun hasSelection(): Boolean = terminal.currentSelection() != null
 
@@ -113,8 +109,6 @@ internal class TerminalPane private constructor(
         shortcutController = null
         var failure: Throwable? = null
         failure = captureCleanupFailure(failure, clipboardReadPrompt::close)
-        failure = captureCleanupFailure(failure, completionBinding::close)
-        completionResources = null
         failure = captureCleanupFailure(failure, searchBar::close)
         failure = captureCleanupFailure(failure) { shortcut?.dispose() }
         failure = captureCleanupFailure(failure, terminal::dispose)
@@ -125,12 +119,11 @@ internal class TerminalPane private constructor(
         fun create(
             tab: TerminalWorkspaceTab,
             settings: KetraTermSettings,
-            completionResources: SwingCompletionResources?,
+            completionProvider: SwingShellSuggestionProvider?,
             onContextMenu: (TerminalPane, SwingTerminalContextMenuRequest) -> Unit,
         ): TerminalPane {
             val shortcutControllerRef = arrayOfNulls<TerminalPaneShortcutController>(1)
             val paneRef = arrayOfNulls<TerminalPane>(1)
-            val completionBinding = SwingCompletionBinding(tab.session) { tab.currentWorkingDirectoryUri }
             var ownedTerminal: SwingTerminal? = null
             var ownedSearchBar: SwingTerminalSearchBar? = null
             var ownedClipboardReadPrompt: SwingClipboardReadPrompt? = null
@@ -141,8 +134,6 @@ internal class TerminalPane private constructor(
                         settingsProvider = { settings.current() },
                         hostServices =
                             SwingHostServices.create { draft ->
-                                draft.shellSuggestionProvider = completionBinding.provider
-                                draft.shellSuggestionEditTarget = SwingShellSuggestionEditTarget.createDefault(tab.session)
                                 draft.shellSuggestionKeymap = SwingShellSuggestionKeymap.STANDARD
                                 draft.hostKeyHandler = { event -> shortcutControllerRef[0]?.handleKeyPressed(event) == true }
                                 draft.contextMenuHandler =
@@ -155,6 +146,7 @@ internal class TerminalPane private constructor(
                     )
 
                 ownedTerminal = terminal
+                terminal.setShellSuggestionProvider(completionProvider)
                 terminal.bind(tab.session)
 
                 val searchBar = SwingTerminalSearchBar(terminal).apply { refreshColors(Chrome.searchColors()) }
@@ -171,8 +163,6 @@ internal class TerminalPane private constructor(
                         terminal = terminal,
                         component = component,
                         settings = settings,
-                        completionResources = completionResources,
-                        completionBinding = completionBinding,
                         searchBar = searchBar,
                         clipboardReadPrompt = clipboardReadPrompt,
                     )
@@ -181,8 +171,6 @@ internal class TerminalPane private constructor(
                 shortcutControllerRef[0] = pane.shortcutController
                 paneRef[0] = pane
                 tab.session.requestRender(scrollbackOffset = 0)
-                completionBinding.attach(terminal)
-                pane.setCompletionResources(completionResources)
                 pane
             } catch (failure: Throwable) {
                 var cleanupFailure: Throwable? = failure
@@ -190,7 +178,6 @@ internal class TerminalPane private constructor(
                 if (pane != null) {
                     cleanupFailure = captureCleanupFailure(cleanupFailure, pane::close)
                 } else {
-                    cleanupFailure = captureCleanupFailure(cleanupFailure, completionBinding::close)
                     cleanupFailure = captureCleanupFailure(cleanupFailure) { ownedClipboardReadPrompt?.close() }
                     cleanupFailure = captureCleanupFailure(cleanupFailure) { ownedSearchBar?.close() }
                     cleanupFailure = captureCleanupFailure(cleanupFailure) { ownedTerminal?.dispose() }

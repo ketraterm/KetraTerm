@@ -36,45 +36,50 @@ public fun interface SwingShellSuggestionEditTarget {
          */
         @JvmStatic
         public fun createDefault(session: TerminalSession): SwingShellSuggestionEditTarget =
-            SwingShellSuggestionEditTarget { request ->
-                val expected = session.captureCommandEdit() ?: return@SwingShellSuggestionEditTarget null
-                if (expected.commandLine.commandText != request.commandText ||
-                    expected.commandLine.cursorOffset != request.cursorOffset
-                ) {
-                    expected.cancel()
-                    return@SwingShellSuggestionEditTarget null
-                }
-                object : SwingShellSuggestionHandler {
-                    override fun tryAccept(acceptance: SwingShellSuggestionAcceptance): SwingShellSuggestionAcceptanceResult {
-                        if (acceptance.request != request) return SwingShellSuggestionAcceptanceResult.STALE_CONTEXT
-                        val replacement =
-                            acceptance.suggestion.replacementFor(request)
-                                ?: return SwingShellSuggestionAcceptanceResult.INVALID_EDIT
-                        return when (
-                            session.submitInput(
-                                expected,
-                                listOf(
-                                    TerminalTextReplacementEvent(
-                                        replacement.deleteAfterCursorCount,
-                                        replacement.deleteBeforeCursorCount,
-                                        replacement.replacementText,
-                                    ),
-                                ),
-                            )
-                        ) {
-                            TerminalInputAdmission.ACCEPTED -> SwingShellSuggestionAcceptanceResult.ACCEPTED
-                            TerminalInputAdmission.STALE_CONTEXT,
-                            TerminalInputAdmission.CANCELLED,
-                            -> SwingShellSuggestionAcceptanceResult.STALE_CONTEXT
-                            TerminalInputAdmission.UNSUPPORTED_CONTEXT -> SwingShellSuggestionAcceptanceResult.UNSUPPORTED
-                            TerminalInputAdmission.NOT_RUNNING, TerminalInputAdmission.CLOSED,
-                            TerminalInputAdmission.CAPACITY_EXCEEDED,
-                            -> SwingShellSuggestionAcceptanceResult.UNAVAILABLE
-                        }
-                    }
+            SwingShellSuggestionEditTarget { request -> captureSessionEdit(session, request) }
 
-                    override fun close() = expected.cancel()
-                }
+        internal fun captureSessionEdit(
+            session: TerminalSession,
+            request: SwingShellSuggestionRequest,
+        ): SwingShellSuggestionHandler? {
+            val expected = session.captureCommandEdit() ?: return null
+            if (expected.commandLine.commandText != request.commandText ||
+                expected.commandLine.cursorOffset != request.cursorOffset
+            ) {
+                expected.cancel()
+                return null
             }
+            return object : SwingShellSuggestionHandler {
+                override fun tryAccept(acceptance: SwingShellSuggestionAcceptance): SwingShellSuggestionAcceptanceResult {
+                    if (acceptance.request != request) return SwingShellSuggestionAcceptanceResult.STALE_CONTEXT
+                    val replacement =
+                        acceptance.suggestion.replacementFor(request)
+                            ?: return SwingShellSuggestionAcceptanceResult.INVALID_EDIT
+                    return when (
+                        session.submitInput(
+                            expected,
+                            listOf(
+                                TerminalTextReplacementEvent(
+                                    replacement.deleteAfterCursorCount,
+                                    replacement.deleteBeforeCursorCount,
+                                    replacement.replacementText,
+                                ),
+                            ),
+                        )
+                    ) {
+                        TerminalInputAdmission.ACCEPTED -> SwingShellSuggestionAcceptanceResult.ACCEPTED
+                        TerminalInputAdmission.STALE_CONTEXT,
+                        TerminalInputAdmission.CANCELLED,
+                        -> SwingShellSuggestionAcceptanceResult.STALE_CONTEXT
+                        TerminalInputAdmission.UNSUPPORTED_CONTEXT -> SwingShellSuggestionAcceptanceResult.UNSUPPORTED
+                        TerminalInputAdmission.NOT_RUNNING, TerminalInputAdmission.CLOSED,
+                        TerminalInputAdmission.CAPACITY_EXCEEDED,
+                        -> SwingShellSuggestionAcceptanceResult.UNAVAILABLE
+                    }
+                }
+
+                override fun close() = expected.cancel()
+            }
+        }
     }
 }

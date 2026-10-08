@@ -155,10 +155,6 @@ public final class JavaConsumer {
 draft.setUiDispatcher(TerminalUiDispatcher.SWING);
 draft.setClipboardHandler(TerminalClipboardHandler.SYSTEM);
 draft.setHyperlinkHandler(uri -> uri.equals("https://example.test/java") && action.open());
-draft.setShellSuggestionEditTarget(request -> acceptance -> {
-    suggestionAttempts.incrementAndGet();
-    return SwingShellSuggestionAcceptanceResult.STALE_CONTEXT;
-});
 });
         SwingUtilities.invokeAndWait(() -> {
             new SwingTerminal().dispose();
@@ -167,7 +163,11 @@ draft.setShellSuggestionEditTarget(request -> acceptance -> {
                 var interaction = terminal.beginShellSuggestionInteraction(
                     new SwingShellSuggestionRequest("git st", 6),
                     SwingShellSuggestionTrigger.EXPLICIT,
-                    suggestionFeedback::add);
+                    suggestionFeedback::add,
+                    request -> acceptance -> {
+                        suggestionAttempts.incrementAndGet();
+                        return SwingShellSuggestionAcceptanceResult.STALE_CONTEXT;
+                    });
                 if (interaction == null) throw new AssertionError("Custom editing target was not captured");
                 var candidate = new SwingShellSuggestion("status", 4, 6, "native", "SUBCOMMAND");
                 interaction.publish(List.of(candidate));

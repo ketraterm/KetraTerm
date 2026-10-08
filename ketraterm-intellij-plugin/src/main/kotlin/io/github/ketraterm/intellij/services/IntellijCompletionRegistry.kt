@@ -24,8 +24,8 @@ import io.github.ketraterm.intellij.KetraTermBundle
 import io.github.ketraterm.session.TerminalShellIntegrationCommandLifecycle
 import io.github.ketraterm.session.TerminalShellIntegrationCommandMetadata
 import io.github.ketraterm.ui.swing.host.SwingCompletionFeedbackRecorder
-import io.github.ketraterm.ui.swing.host.SwingCompletionResources
 import io.github.ketraterm.ui.swing.host.SwingCompletionSuggestionProvider
+import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionProvider
 import kotlinx.coroutines.CoroutineScope
 import java.nio.file.Path
 
@@ -77,13 +77,13 @@ internal class IntellijCompletionRegistry(
         )
 
     /**
-     * Creates completion resources for one terminal pane.
+     * Creates a completion provider for one terminal pane.
      *
      * @param context host capabilities and additional suspending sources for the session.
-     * @return provider and feedback resources for the pane.
+     * @return provider with request-owned learning feedback for the pane.
      * @throws IllegalStateException if this registry is closed.
      */
-    fun createResources(context: IntellijCompletionContext): SwingCompletionResources {
+    fun createProvider(context: IntellijCompletionContext): SwingShellSuggestionProvider {
         synchronized(lock) {
             check(!closed) { "IntelliJ completion registry is closed" }
             val fileSystemProvider = TerminalLocalFileSystemProvider(scanner = context.directoryScanner)
@@ -104,25 +104,22 @@ internal class IntellijCompletionRegistry(
                     commandSpecs = commandSpecs,
                     learningStore = learningStore,
                 )
-            return SwingCompletionResources(
-                provider =
-                    SwingCompletionSuggestionProvider(
-                        engine,
-                        context::swingContext,
-                        mapOf(
-                            "spec" to KetraTermBundle.message("completion.source.builtin"),
-                            "learned" to KetraTermBundle.message("completion.source.learned"),
-                            "observed" to KetraTermBundle.message("completion.source.learned"),
-                            "path" to KetraTermBundle.message("completion.source.path"),
-                            "intellij-project-file" to KetraTermBundle.message("completion.source.project"),
-                            "intellij-gradle-task" to KetraTermBundle.message("completion.source.gradle"),
-                            "intellij-git-branch" to KetraTermBundle.message("completion.source.git"),
-                            "intellij-git-remote-branch" to KetraTermBundle.message("completion.source.git"),
-                            "intellij-git-tag" to KetraTermBundle.message("completion.source.git"),
-                            "intellij-git-commit" to KetraTermBundle.message("completion.source.git"),
-                            "intellij-git-status-path" to KetraTermBundle.message("completion.source.git"),
-                        ),
-                    ),
+            return SwingCompletionSuggestionProvider(
+                engine,
+                context::swingContext,
+                mapOf(
+                    "spec" to KetraTermBundle.message("completion.source.builtin"),
+                    "learned" to KetraTermBundle.message("completion.source.learned"),
+                    "observed" to KetraTermBundle.message("completion.source.learned"),
+                    "path" to KetraTermBundle.message("completion.source.path"),
+                    "intellij-project-file" to KetraTermBundle.message("completion.source.project"),
+                    "intellij-gradle-task" to KetraTermBundle.message("completion.source.gradle"),
+                    "intellij-git-branch" to KetraTermBundle.message("completion.source.git"),
+                    "intellij-git-remote-branch" to KetraTermBundle.message("completion.source.git"),
+                    "intellij-git-tag" to KetraTermBundle.message("completion.source.git"),
+                    "intellij-git-commit" to KetraTermBundle.message("completion.source.git"),
+                    "intellij-git-status-path" to KetraTermBundle.message("completion.source.git"),
+                ),
                 feedbackHandler = feedbackRecorder.createHandler(),
             )
         }

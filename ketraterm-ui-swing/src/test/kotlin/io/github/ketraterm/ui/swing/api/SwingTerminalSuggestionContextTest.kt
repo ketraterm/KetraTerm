@@ -79,7 +79,7 @@ class SwingTerminalSuggestionContextTest {
             ).use { fixture ->
                 fixture.session.start(30, 4)
                 if (change == "span") fixture.editableSource.value = TerminalShellCommandLineSnapshot("e\u0301", 2, 2, 0)
-                onEdt { fixture.terminal.requestActiveShellSuggestions() }
+                onEdt { fixture.terminal.requestActiveShellSuggestions(editTarget = fixture.editTarget) }
                 fixture.view.awaitVisible()
                 onEdt {
                     fixture.terminal.addShellSuggestionInvalidationListener {
@@ -114,7 +114,7 @@ class SwingTerminalSuggestionContextTest {
         Fixture(sessionHandler = true, versionedModel = false).use { fixture ->
             fixture.session.start(30, 4)
             onEdt {
-                fixture.terminal.requestActiveShellSuggestions()
+                fixture.terminal.requestActiveShellSuggestions(editTarget = fixture.editTarget)
                 assertFalse(fixture.terminal.currentShellSuggestionState().visible)
                 assertTrue(fixture.requests.isEmpty())
             }
@@ -137,7 +137,7 @@ class SwingTerminalSuggestionContextTest {
                 }
             Fixture(sessionHandler = true, connector = connector, ioDispatcher = StandardTestDispatcher(testScheduler)).use { fixture ->
                 fixture.session.start(30, 4)
-                onEdt { fixture.terminal.requestActiveShellSuggestions() }
+                onEdt { fixture.terminal.requestActiveShellSuggestions(editTarget = fixture.editTarget) }
                 fixture.view.awaitVisible()
                 onEdt {
                     fixture.terminal.addShellSuggestionInvalidationListener {
@@ -185,7 +185,7 @@ class SwingTerminalSuggestionContextTest {
             }).use { fixture ->
                 onEdt {
                     fixture.terminal.setShellSuggestionFailureHandler { _, failure -> reports += failure }
-                    fixture.terminal.requestActiveShellSuggestions()
+                    fixture.terminal.requestActiveShellSuggestions(editTarget = fixture.editTarget)
                 }
                 fixture.view.awaitVisible()
                 fixture.awaitObservation(active = true)
@@ -297,7 +297,7 @@ class SwingTerminalSuggestionContextTest {
         ).use { fixture ->
             onEdt {
                 fixture.request(request(), trigger)
-                fixture.terminal.requestActiveShellSuggestions(trigger)
+                fixture.terminal.requestActiveShellSuggestions(trigger, editTarget = fixture.editTarget)
                 assertFalse(fixture.terminal.currentShellSuggestionState().visible)
             }
             assertTrue(fixture.requests.isEmpty())
@@ -310,7 +310,7 @@ class SwingTerminalSuggestionContextTest {
         Fixture().use { fixture ->
             onEdt {
                 fixture.request(request(), SwingShellSuggestionTrigger.AUTOMATIC)
-                fixture.terminal.requestActiveShellSuggestions(SwingShellSuggestionTrigger.AUTOMATIC)
+                fixture.terminal.requestActiveShellSuggestions(SwingShellSuggestionTrigger.AUTOMATIC, editTarget = fixture.editTarget)
                 assertFalse(fixture.terminal.currentShellSuggestionState().visible)
             }
             assertTrue(fixture.requests.isEmpty())
@@ -401,7 +401,7 @@ class SwingTerminalSuggestionContextTest {
                 }
             },
         ).use { fixture ->
-            onEdt { fixture.terminal.requestActiveShellSuggestions() }
+            onEdt { fixture.terminal.requestActiveShellSuggestions(editTarget = fixture.editTarget) }
             fixture.awaitRequest()
             onEdt {
                 fixture.settings =
@@ -430,7 +430,7 @@ class SwingTerminalSuggestionContextTest {
             onEdt {
                 fixture.source.value = null
                 fixture.request(request("automatic"), SwingShellSuggestionTrigger.AUTOMATIC)
-                fixture.terminal.requestActiveShellSuggestions(SwingShellSuggestionTrigger.AUTOMATIC)
+                fixture.terminal.requestActiveShellSuggestions(SwingShellSuggestionTrigger.AUTOMATIC, editTarget = fixture.editTarget)
             }
             release.complete(Unit)
             fixture.view.awaitVisible()
@@ -456,7 +456,7 @@ class SwingTerminalSuggestionContextTest {
             onEdt {
                 fixture.source.value = null
                 fixture.request(request("automatic"), SwingShellSuggestionTrigger.AUTOMATIC)
-                fixture.terminal.requestActiveShellSuggestions(SwingShellSuggestionTrigger.AUTOMATIC)
+                fixture.terminal.requestActiveShellSuggestions(SwingShellSuggestionTrigger.AUTOMATIC, editTarget = fixture.editTarget)
                 assertTrue(fixture.terminal.currentShellSuggestionState().visible)
             }
             assertTrue(fixture.requests.isEmpty())
@@ -478,7 +478,7 @@ class SwingTerminalSuggestionContextTest {
                 }
             }
         }).use { fixture ->
-            onEdt { fixture.terminal.requestActiveShellSuggestions() }
+            onEdt { fixture.terminal.requestActiveShellSuggestions(editTarget = fixture.editTarget) }
             fixture.awaitRequest()
             started.awaitCompletion()
             fixture.awaitObservation(active = true)
@@ -506,12 +506,14 @@ class SwingTerminalSuggestionContextTest {
                 }
             },
         ).use { fixture ->
-            onEdt { fixture.terminal.requestActiveShellSuggestions(trigger) }
+            onEdt { fixture.terminal.requestActiveShellSuggestions(trigger, editTarget = fixture.editTarget) }
             fixture.view.awaitVisible()
             finished.awaitCompletion()
             fixture.awaitObservation(active = true)
             fixture.source.value = null
             fixture.view.awaitHidden()
+            // Configured automatic completion retains its own session observation until disabled.
+            onEdt { fixture.terminal.setShellSuggestionProvider(null) }
             fixture.awaitObservation(active = false)
         }
     }
@@ -525,7 +527,7 @@ class SwingTerminalSuggestionContextTest {
                 emit(emptyList())
             }
         }).use { fixture ->
-            onEdt { fixture.terminal.requestActiveShellSuggestions() }
+            onEdt { fixture.terminal.requestActiveShellSuggestions(editTarget = fixture.editTarget) }
             fixture.awaitRequest()
             fixture.awaitObservation(active = true)
             release.complete(Unit)
@@ -546,7 +548,7 @@ class SwingTerminalSuggestionContextTest {
                 }
             }
         }).use { fixture ->
-            onEdt { fixture.terminal.requestActiveShellSuggestions() }
+            onEdt { fixture.terminal.requestActiveShellSuggestions(editTarget = fixture.editTarget) }
             assertEquals("git s", fixture.awaitRequest().commandText)
             fixture.view.awaitVisible()
             fixture.awaitObservation(active = true)
@@ -556,7 +558,7 @@ class SwingTerminalSuggestionContextTest {
             fixture.awaitObservation(active = false)
 
             fixture.source.value = snapshot().copy(commandText = "git log", cursorOffset = 7, cursorColumn = 11)
-            onEdt { fixture.terminal.requestActiveShellSuggestions() }
+            onEdt { fixture.terminal.requestActiveShellSuggestions(editTarget = fixture.editTarget) }
             assertEquals("git log", fixture.awaitRequest().commandText)
             fixture.view.awaitVisible()
             onEdt {
@@ -591,7 +593,7 @@ class SwingTerminalSuggestionContextTest {
                     }
                 }
             }).use { fixture ->
-                onEdt { fixture.terminal.requestActiveShellSuggestions() }
+                onEdt { fixture.terminal.requestActiveShellSuggestions(editTarget = fixture.editTarget) }
                 fixture.view.awaitVisible()
                 fixture.awaitObservation(active = true)
                 onEdt {
@@ -627,7 +629,7 @@ class SwingTerminalSuggestionContextTest {
                     }
                 },
             ).use { fixture ->
-                onEdt { fixture.terminal.requestActiveShellSuggestions() }
+                onEdt { fixture.terminal.requestActiveShellSuggestions(editTarget = fixture.editTarget) }
                 fixture.awaitRequest()
                 onEdt { while (true) (dispatches.poll() ?: break).run() }
                 assertEquals(0, fixture.source.subscriptionCount.value)
@@ -667,7 +669,7 @@ class SwingTerminalSuggestionContextTest {
             onEdt { fixture.request(request(), SwingShellSuggestionTrigger.EXPLICIT) }
             fixture.awaitRequest()
             started.awaitCompletion()
-            onEdt { fixture.terminal.requestActiveShellSuggestions() }
+            onEdt { fixture.terminal.requestActiveShellSuggestions(editTarget = fixture.editTarget) }
             cancelled.awaitCompletion()
             onEdt { assertFalse(fixture.terminal.currentShellSuggestionState().visible) }
         }
@@ -688,7 +690,7 @@ class SwingTerminalSuggestionContextTest {
                 }
             }
         }).use { fixture ->
-            onEdt { fixture.terminal.requestActiveShellSuggestions() }
+            onEdt { fixture.terminal.requestActiveShellSuggestions(editTarget = fixture.editTarget) }
             fixture.awaitRequest()
             started.awaitCompletion()
             fixture.awaitObservation(active = true)
@@ -703,7 +705,7 @@ class SwingTerminalSuggestionContextTest {
     @EnumSource(ContextChange::class)
     fun `acceptance checks current authoritative context before queued revision callbacks`(change: ContextChange) {
         Fixture().use { fixture ->
-            onEdt { fixture.terminal.requestActiveShellSuggestions() }
+            onEdt { fixture.terminal.requestActiveShellSuggestions(editTarget = fixture.editTarget) }
             fixture.view.awaitVisible()
             onEdt {
                 fixture.source.value = change.apply(snapshot())
@@ -718,7 +720,7 @@ class SwingTerminalSuggestionContextTest {
     @Test
     fun `stale dismissal does not send feedback for obsolete context`() {
         Fixture().use { fixture ->
-            onEdt { fixture.terminal.requestActiveShellSuggestions() }
+            onEdt { fixture.terminal.requestActiveShellSuggestions(editTarget = fixture.editTarget) }
             fixture.view.awaitVisible()
             onEdt {
                 fixture.press(KeyEvent.VK_DOWN)
@@ -733,7 +735,7 @@ class SwingTerminalSuggestionContextTest {
     @Test
     fun `session closure hides a popup after its provider has completed`() {
         Fixture().use { fixture ->
-            onEdt { fixture.terminal.requestActiveShellSuggestions() }
+            onEdt { fixture.terminal.requestActiveShellSuggestions(editTarget = fixture.editTarget) }
             fixture.view.awaitVisible()
             fixture.awaitObservation(active = true)
             fixture.session.close()
@@ -748,7 +750,7 @@ class SwingTerminalSuggestionContextTest {
             onEdt {
                 fixture.terminal.dispose()
                 fixture.request(request(), SwingShellSuggestionTrigger.EXPLICIT)
-                fixture.terminal.requestActiveShellSuggestions()
+                fixture.terminal.requestActiveShellSuggestions(editTarget = fixture.editTarget)
                 fixture.terminal.showSuggestions(request(), listOf(suggestion(request())))
                 assertFalse(fixture.terminal.currentShellSuggestionState().visible)
             }
@@ -823,6 +825,31 @@ class SwingTerminalSuggestionContextTest {
         val accepted = ArrayList<SwingShellSuggestionAcceptance>()
         val feedback = ArrayList<SwingShellSuggestionFeedback>()
         val view = RecordingView()
+        val editTarget: SwingShellSuggestionEditTarget? =
+            if (sessionHandler) {
+                null
+            } else {
+                SwingShellSuggestionEditTarget { _ ->
+                    SwingShellSuggestionHandler {
+                        accepted += it
+                        SwingShellSuggestionAcceptanceResult.ACCEPTED
+                    }
+                }
+            }
+        private val suggestionProvider: SwingShellSuggestionProvider =
+            object : SwingShellSuggestionProvider {
+                override fun suggestions(request: SwingShellSuggestionRequest): Flow<List<SwingShellSuggestion>> =
+                    flow {
+                        requests += request
+                        emitAll(provider.suggestions(request))
+                    }
+
+                override fun open(request: SwingShellSuggestionRequest): SwingShellSuggestionSource =
+                    SwingShellSuggestionSource(
+                        suggestions = suggestions(request),
+                        feedbackHandler = { feedback += it },
+                    )
+            }
         val terminal =
             onEdt {
                 SwingTerminal(
@@ -830,35 +857,11 @@ class SwingTerminalSuggestionContextTest {
                     hostServices =
                         SwingHostServices.create { draft ->
                             draft.uiDispatcher = uiDispatcher
-                            draft.shellSuggestionProvider =
-                                object : SwingShellSuggestionProvider {
-                                    override fun suggestions(request: SwingShellSuggestionRequest): Flow<List<SwingShellSuggestion>> =
-                                        flow {
-                                            requests += request
-                                            emitAll(provider.suggestions(request))
-                                        }
-
-                                    override fun open(request: SwingShellSuggestionRequest): SwingShellSuggestionSource =
-                                        SwingShellSuggestionSource(
-                                            suggestions = suggestions(request),
-                                            feedbackHandler = { feedback += it },
-                                        )
-                                }
-                            draft.shellSuggestionEditTarget =
-                                if (sessionHandler) {
-                                    SwingShellSuggestionEditTarget.createDefault(session)
-                                } else {
-                                    SwingShellSuggestionEditTarget { _ ->
-                                        SwingShellSuggestionHandler {
-                                            accepted += it
-                                            SwingShellSuggestionAcceptanceResult.ACCEPTED
-                                        }
-                                    }
-                                }
                             draft.shellSuggestionViewFactory = { listener -> view.apply { this.listener = listener } }
                         },
                 ).also { terminal ->
                     terminal.size = terminal.preferredGridSize(30, 4)
+                    terminal.setShellSuggestionProvider(suggestionProvider)
                     if (bind) terminal.bind(session)
                 }
             }
@@ -867,7 +870,7 @@ class SwingTerminalSuggestionContextTest {
             request: SwingShellSuggestionRequest,
             trigger: SwingShellSuggestionTrigger,
         ) {
-            terminal.requestShellSuggestions(request.commandText, request.cursorOffset, 9, 0, trigger)
+            terminal.requestShellSuggestions(request.commandText, request.cursorOffset, 9, 0, trigger, editTarget)
         }
 
         fun awaitRequest(): SwingShellSuggestionRequest = requests.poll(5, TimeUnit.SECONDS) ?: error("Provider was not requested")

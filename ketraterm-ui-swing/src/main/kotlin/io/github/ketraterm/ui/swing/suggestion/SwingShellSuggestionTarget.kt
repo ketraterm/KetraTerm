@@ -13,28 +13,26 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.github.ketraterm.ui.swing.host
-
-import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionInteraction
+package io.github.ketraterm.ui.swing.suggestion
 
 /**
- * Host-owned request and presentation lifecycle for optional automatic completion.
+ * Host-owned request and presentation lifecycle for optional automatic suggestions.
  *
- * Calls run on the EDT. The target owns provider collection and presentation;
- * the supplied interaction owns selection, admission, and feedback. The live
- * binding owns focus, eligibility, debounce, invalidation, and session termination.
- * Capture occurs before target work begins. Native popups obtain
- * component-local anchors through SwingTerminal.copyCellBounds. Target exceptions
- * propagate to the calling operation or observation scope; close still detaches
- * the binding if hiding fails. Closing the binding never disposes target resources.
+ * Calls run on the EDT. The target owns source collection and presentation;
+ * the supplied interaction owns selection, admission, and feedback. The terminal
+ * owns focus, eligibility, debounce, invalidation, and session termination.
+ * Capture occurs before target work begins. Native popups obtain component-local
+ * anchors through [io.github.ketraterm.ui.swing.api.SwingTerminal.copyCellBounds].
+ * Target exceptions propagate to the calling operation or component observation scope.
+ * Changing the target or disposing the view never disposes host-owned target resources.
  */
 public interface SwingShellSuggestionTarget {
     /** Replaces automatic work for [interaction]; cancel and close any previous request first. */
     public fun requestSuggestions(interaction: SwingShellSuggestionInteraction)
 
     /**
-     * Cancels provider work and hides the surface; must tolerate repeated calls.
-     * The binding closes active interactions. Hiding during acceptance must not
+     * Cancels source work and hides the surface; must tolerate repeated calls.
+     * The terminal closes active interactions. Hiding during acceptance must not
      * close its captured editing capability or report preference feedback.
      */
     public fun hideSuggestions()

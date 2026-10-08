@@ -87,43 +87,44 @@ fun main() =
         )
         val buffer = TerminalBuffers.create(80, 3, 0)
         val connector = Connector()
-        val scope = CoroutineScope(SupervisorJob())
-        try {
-            TerminalSession.create(buffer, buffer, connector).use { session ->
-                SwingUtilities.invokeAndWait {
-                    val terminal = SwingTerminal()
-                    val searchBar = SwingTerminalSearchBar(terminal, JavaConsumer.hostMessages())
-                    val target = JavaConsumer.NativeTarget()
-                    val binding = SwingLiveCompletionBinding(session, scope, { false })
-                    try {
-                        val light = JavaConsumer.lightSearchColors()
-                        searchBar.refreshColors(light)
-                        check(searchBar.component.foreground == Color.BLACK)
-                        searchBar.refreshColors(
-                            light.copy {
-                                it.foreground = Color.WHITE
-                                it.panelBackground = Color.BLACK
-                            },
-                        )
-                        searchBar.refreshColors()
-                        check(searchBar.component.foreground == Color.WHITE)
-                        terminal.bind(session)
-                        binding.attach(terminal, target)
-                        SwingShellSuggestionInteraction(SwingShellSuggestionRequest("git st", 6)).use { interaction ->
-                            target.requestSuggestions(interaction)
-                            check(target.requested.request.commandText == "git st")
-                            binding.close()
-                            check(target.hides > 0 && target.requested == null && !connector.closed)
-                        }
-                    } finally {
-                        searchBar.close()
-                        binding.close()
-                        terminal.dispose()
+        TerminalSession.create(buffer, buffer, connector).use { session ->
+            SwingUtilities.invokeAndWait {
+                val terminal = SwingTerminal()
+                val searchBar = SwingTerminalSearchBar(terminal, JavaConsumer.hostMessages())
+                val target = JavaConsumer.NativeTarget()
+                try {
+                    terminal.setShellSuggestionProvider(provider)
+                    terminal.setShellSuggestionTarget(target)
+                    check(terminal.hasShellSuggestionProvider)
+                    val light = JavaConsumer.lightSearchColors()
+                    searchBar.refreshColors(light)
+                    check(searchBar.component.foreground == Color.BLACK)
+                    searchBar.refreshColors(
+                        light.copy {
+                            it.foreground = Color.WHITE
+                            it.panelBackground = Color.BLACK
+                        },
+                    )
+                    searchBar.refreshColors()
+                    check(searchBar.component.foreground == Color.WHITE)
+                    terminal.bind(session)
+                    SwingShellSuggestionInteraction(SwingShellSuggestionRequest("git st", 6)).use { interaction ->
+                        target.requestSuggestions(interaction)
+                        check(target.requested.request.commandText == "git st")
+                        terminal.setShellSuggestionTarget(null)
+                        check(target.hides > 0 && target.requested == null && !connector.closed)
                     }
+                    terminal.unbind()
+                    check(terminal.hasShellSuggestionProvider && !connector.closed)
+                    terminal.bind(session)
+                    terminal.refreshShellSuggestions()
+                    terminal.setShellSuggestionProvider(null)
+                    check(!terminal.hasShellSuggestionProvider)
+                } finally {
+                    searchBar.close()
+                    terminal.dispose()
                 }
             }
-        } finally {
-            scope.cancel()
         }
         check(connector.closed)
     }

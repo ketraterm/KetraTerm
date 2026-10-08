@@ -26,15 +26,17 @@ reflection, internal constructors or extra library dependencies. The Java smoke
 uses functional actions and public host wiring, without adapting coroutines.
 
 The Swing-host consumer also supplies product source labels and switches prepared
-search colors through Kotlin and Java construction/update APIs. It retains the
-existing host-owned suggestion target; these styling and labeling needs do not
-require new popup timing or capacity controls.
+search colors through Kotlin and Java construction/update APIs. It configures a
+provider and host-owned suggestion target directly on the terminal, exercising
+both component-first construction and provider retention across unbinding. These
+styling and labeling needs do not require popup timing or capacity controls.
 
 `extractSwingReadmeExample` also extracts the marked Kotlin usage fence directly
 from `ketraterm-ui-swing/README.md` into the staged Swing consumer. A missing or
 duplicate example fails extraction; API drift fails compilation in every compiler
 and metadata combination. The smoke invokes it on the EDT, rejects off-EDT use,
-disposes its returned view and verifies that the host-owned session stays open.
+exercises both session-first and component-first construction, disposes the
+returned views, and verifies that the host-owned session stays open.
 It also checks the documented enabled default for system fallback fonts.
 
 The PTY consumer supplies an in-memory implementation of the exported pty4j
@@ -172,3 +174,16 @@ each across both metadata modes and Kotlin runtimes. The other nine retained jar
 remain byte-identical. Current source consumers cover native feedback-token
 identity, request-owned editing results, detached interactions and independent
 presentation. See the [suggestion API migration](../../../docs/library-compatibility.md#verification-and-baseline-changes).
+
+The completion lifecycle refactor intentionally refreshes only the retained
+`ui-swing-host` client/provenance pair. The 46-case upgrade suite recorded exactly
+four failures, all `NoClassDefFoundError` for the removed
+`io.github.ketraterm.ui.swing.host.SwingShellSuggestionTarget`, spanning both
+metadata modes and Kotlin runtimes. The other ten pairs, including Swing, remain
+byte-identical and their recorded binaries pass; newer source-fixture migration
+does not itself require a baseline reset. Current source consumers exercise direct provider
+and target configuration, explicit request edit targets, and both documented
+construction orders. Review the affected ABI snapshots, client sources, jars, and
+provenance together; the reset establishes a new pre-freeze development baseline
+and does not claim binary compatibility with the removed APIs. See the
+[lifecycle migration decision](../../../docs/library-compatibility.md#verification-and-baseline-changes).
