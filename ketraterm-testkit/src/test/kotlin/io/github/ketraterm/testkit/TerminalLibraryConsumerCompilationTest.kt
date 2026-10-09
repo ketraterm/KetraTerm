@@ -375,6 +375,26 @@ class TerminalLibraryConsumerCompilationTest {
     }
 
     @Test
+    fun `Java completion providers can use preceding arguments without implementation types`() {
+        assertCompilation(
+            "completion",
+            """
+            import io.github.ketraterm.completion.api.TerminalCompletionContext;
+            import java.util.List;
+
+            final class Consumer {
+                String selectDataset(TerminalCompletionContext context) {
+                    List<String> words = context.getPrecedingArguments();
+                    List<String> repositories = context.getPrecedingPositionalArguments();
+                    List<String> clusters = context.precedingOptionValues("--context");
+                    return clusters.isEmpty() ? "default" : clusters.getLast();
+                }
+            }
+            """.trimIndent(),
+        )
+    }
+
+    @Test
     fun `Swing dependency exports session and flow types needed by host integration`() {
         assertCompilation(
             "ui-swing",

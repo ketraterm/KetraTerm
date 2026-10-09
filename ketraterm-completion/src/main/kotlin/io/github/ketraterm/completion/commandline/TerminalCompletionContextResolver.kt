@@ -108,7 +108,7 @@ internal object TerminalCompletionContextResolver {
             attachedOptionValue?.option ?: if (optionsTerminated) null else analysis.pendingOptionValue
         val activePositionalArgument =
             if (activeOption == null) {
-                commandPath.last().positionalArgumentAt(analysis.positionalArgumentCount)
+                commandPath.last().positionalArgumentAt(analysis.positionalArguments.size)
             } else {
                 null
             }
@@ -145,6 +145,8 @@ internal object TerminalCompletionContextResolver {
             staticValueCandidates = activeOption?.valueCandidates ?: activePositionalArgument?.valueCandidates ?: emptyList(),
             activeTokenQuote = attachedOptionValue?.quote ?: activeTokenQuote,
             attachedOptionValue = attachedOptionValue,
+            optionValuesBeforeCursor = analysis.optionValues,
+            precedingPositionalArguments = analysis.positionalArguments,
         )
     }
 

@@ -23,10 +23,17 @@ import io.github.ketraterm.completion.spec.findOptionSpec
 /** Semantic state produced by one pass over tokens following a known command. */
 internal class CommandLineSemanticState(
     val commandPath: List<TerminalCommandSpec>,
-    val positionalArgumentCount: Int,
     val usedOptionExclusiveGroupIds: Set<String>,
     val optionsTerminated: Boolean,
     val pendingOptionValue: TerminalOptionSpec?,
+    val optionValues: List<ResolvedOptionValue>,
+    val positionalArguments: List<String>,
+)
+
+/** One completed option value associated with the spec resolved at its occurrence. */
+internal class ResolvedOptionValue(
+    val option: TerminalOptionSpec,
+    val value: String,
 )
 
 /** Analyzes a known command path once, retaining the state needed by completion. */
@@ -39,9 +46,10 @@ internal fun analyzeCommandTokens(
     val commandPath = ArrayList<TerminalCommandSpec>(TERMINAL_COMMAND_LIST_CAPACITY)
     var usedExclusiveGroupIds: LinkedHashSet<String>? = null
     var pendingOptionValue: TerminalOptionSpec? = null
-    var positionalArgumentCount = 0
     var acceptingSubcommands = true
     var optionsTerminated = false
+    var optionValues: ArrayList<ResolvedOptionValue>? = null
+    var positionalArguments: ArrayList<String>? = null
     commandPath += rootSpec
 
     var tokenIndex = startIndex
@@ -49,55 +57,69 @@ internal fun analyzeCommandTokens(
     while (tokenIndex < safeEnd) {
         val token = tokens[tokenIndex].text
         val normalized = normalizeTerminalCommandToken(token)
-        if (normalized.isBlank()) {
-            tokenIndex++
-            continue
-        }
-
-        when {
-            pendingOptionValue != null -> pendingOptionValue = null
-
-            normalized == TERMINAL_COMMAND_OPTION_TERMINATOR -> {
-                acceptingSubcommands = false
-                optionsTerminated = true
-            }
-
-            !optionsTerminated && normalized.isTerminalOptionToken() -> {
-                val option = findOptionSpec(commandPath, token)
-                if (option != null) {
-                    if (option.exclusiveGroupIds.isNotEmpty()) {
-                        if (usedExclusiveGroupIds == null) {
-                            usedExclusiveGroupIds = LinkedHashSet(option.exclusiveGroupIds.size)
-                        }
-                        usedExclusiveGroupIds.addAll(option.exclusiveGroupIds)
-                    }
-                    if (option.requiresValue && !token.hasAttachedOptionValue()) {
-                        pendingOptionValue = option
-                    }
+        val isPositional =
+            when {
+                pendingOptionValue != null -> {
+                    val values = optionValues ?: ArrayList<ResolvedOptionValue>().also { optionValues = it }
+                    values += ResolvedOptionValue(pendingOptionValue, token)
+                    pendingOptionValue = null
+                    false
                 }
-            }
 
-            acceptingSubcommands -> {
-                val next = findNextCommandSpec(commandPath, normalized)
-                if (next != null) {
-                    commandPath += next
-                } else {
-                    positionalArgumentCount++
+                !optionsTerminated && normalized == TERMINAL_COMMAND_OPTION_TERMINATOR -> {
                     acceptingSubcommands = false
+                    optionsTerminated = true
+                    false
                 }
-            }
 
-            else -> positionalArgumentCount++
+                !optionsTerminated && normalized.isTerminalOptionToken() -> {
+                    val option = findOptionSpec(commandPath, token)
+                    if (option != null) {
+                        if (option.exclusiveGroupIds.isNotEmpty()) {
+                            if (usedExclusiveGroupIds == null) {
+                                usedExclusiveGroupIds = LinkedHashSet(option.exclusiveGroupIds.size)
+                            }
+                            usedExclusiveGroupIds.addAll(option.exclusiveGroupIds)
+                        }
+                        if (option.requiresValue) {
+                            if (token.hasAttachedOptionValue()) {
+                                val values = optionValues ?: ArrayList<ResolvedOptionValue>().also { optionValues = it }
+                                values += ResolvedOptionValue(option, token.substringAfter(OPTION_VALUE_SEPARATOR))
+                            } else {
+                                pendingOptionValue = option
+                            }
+                        }
+                    }
+                    false
+                }
+
+                acceptingSubcommands -> {
+                    val next = findNextCommandSpec(commandPath, normalized)
+                    if (next != null) {
+                        commandPath += next
+                        false
+                    } else {
+                        acceptingSubcommands = false
+                        true
+                    }
+                }
+
+                else -> true
+            }
+        if (isPositional) {
+            val values = positionalArguments ?: ArrayList<String>().also { positionalArguments = it }
+            values += token
         }
         tokenIndex++
     }
 
     return CommandLineSemanticState(
         commandPath = commandPath,
-        positionalArgumentCount = positionalArgumentCount,
         usedOptionExclusiveGroupIds = usedExclusiveGroupIds ?: emptySet(),
         optionsTerminated = optionsTerminated,
         pendingOptionValue = pendingOptionValue,
+        optionValues = optionValues ?: emptyList(),
+        positionalArguments = positionalArguments ?: emptyList(),
     )
 }
 

@@ -119,6 +119,21 @@ expected path kind, expected dynamic value domain, repeatable subcommand source,
 static value candidates, replacement offsets,
 or active quote state from raw command text.
 
+`TerminalCompletionContext.precedingArguments` exposes immutable decoded words
+after the executable and before the active word in the cursor's command segment,
+including subcommands, options and their values. `precedingPositionalArguments`
+and `precedingOptionValues(name)` use the same semantic pass as active-position
+resolution; providers can use preceding repository or cluster selections without
+another parser. Option queries accept declared aliases and retain every occurrence
+in input order, including separate, attached and empty values. Unknown commands
+still expose lexical words, but have no inferred option or positional ownership.
+The active word and later words are excluded even when the cursor is at the active
+word's end. Quotes/escapes follow the request's syntax; no shell expansion occurs.
+After the first `--`, further words (including another `--`) are positional.
+These request-owned collections reject mutation and may survive suspension or
+overlapping requests. Positional count is derived from retained positional values;
+there is no second count or provider-owned AST to keep synchronized.
+
 `SwingTerminal` owns automatic suggestion scheduling under its current binding. Its debounced,
 text-only predicate is deliberately a cheap UX gate: it never tokenizes,
 resolves command specs, or duplicates source eligibility. The merged engine is

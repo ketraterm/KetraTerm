@@ -16,8 +16,12 @@
 package io.github.ketraterm.completion.api
 
 import io.github.ketraterm.completion.commandline.AttachedOptionValue
+import io.github.ketraterm.completion.commandline.ResolvedOptionValue
 import io.github.ketraterm.completion.commandline.TerminalCommandLineContext
+import io.github.ketraterm.completion.commandline.normalizeTerminalCommandToken
 import io.github.ketraterm.completion.model.*
+import java.util.Collections.unmodifiableList
+import java.util.List.copyOf
 
 /** Semantic position of the active completion token. */
 public enum class TerminalCompletionActivePosition {
@@ -84,7 +88,63 @@ public class TerminalCompletionContext
         public val staticValueCandidates: List<String> = emptyList(),
         public val activeTokenQuote: Char = NO_QUOTE,
         internal val attachedOptionValue: AttachedOptionValue? = null,
+        optionValuesBeforeCursor: List<ResolvedOptionValue> = emptyList(),
+        precedingPositionalArguments: List<String> = emptyList(),
     ) {
+        private val optionValuesBeforeCursor = copyOf(optionValuesBeforeCursor)
+
+        /**
+         * Decoded words after the executable and strictly before the active token,
+         * in input order. Includes subcommands, option names, values, and `--`.
+         * Leading environment assignments and the executable are excluded.
+         * Available even without a command spec; empty at command/operator positions.
+         *
+         * Only the cursor's command segment is included, according to the request's
+         * shell syntax. Quotes and escapes follow the shared tokenizer; empty quoted
+         * words remain empty strings. No variable, glob, or command expansion is performed.
+         * The active word (even at its end) and all later words are excluded.
+         * This immutable, request-owned list may be retained across suspension or later
+         * requests; its size is bounded by the words in the parsed prefix.
+         */
+        public val precedingArguments: List<String> = precedingArguments()
+
+        /**
+         * Decoded preceding positional values in input order, using the matched
+         * command spec's analysis. Excludes resolved subcommands, option names,
+         * option values, and the option terminator. After `--`, words are positional.
+         * Empty when the command is unknown; use [precedingArguments] in that case.
+         * Unknown options have no inferred value ownership. The immutable list has
+         * the same segment, active-word exclusion, and lifetime as [precedingArguments].
+         */
+        public val precedingPositionalArguments: List<String> = copyOf(precedingPositionalArguments)
+
+        /**
+         * Returns every completed value for a known option in input order, including
+         * repeats and empty values. [optionName] may be any declared alias; matching
+         * follows command-spec lookup (trimmed and case-insensitive). Separate values
+         * and `--name=value` use the same resolved option and decoded value semantics.
+         *
+         * Only occurrences resolved by the spec at their position are included,
+         * including inherited options. Unknown options, valueless flags, pending
+         * values, and the active word are excluded. No last-value-wins policy is imposed;
+         * callers can select the first, last, or all occurrences. The immutable result
+         * has the same segment and lifetime as [precedingArguments].
+         *
+         * @param optionName declared option name or alias.
+         * @return decoded values, or an empty list when no matching value precedes the cursor.
+         */
+        public fun precedingOptionValues(optionName: String): List<String> {
+            val normalizedName = normalizeTerminalCommandToken(optionName)
+            var result: ArrayList<String>? = null
+            for (entry in optionValuesBeforeCursor) {
+                if (entry.option.names.any { normalizeTerminalCommandToken(it) == normalizedName }) {
+                    val values = result ?: ArrayList<String>().also { result = it }
+                    values += entry.value
+                }
+            }
+            return result?.let(::unmodifiableList) ?: emptyList()
+        }
+
         public val activePrefix: String get() = attachedOptionValue?.prefix ?: commandLineContext.activePrefix
 
         public val replacementStartOffset: Int
@@ -93,6 +153,15 @@ public class TerminalCompletionContext
         public val replacementEndOffset: Int get() = commandLineContext.replacementEndOffset
 
         public val currentCommand: TerminalCommandSpec? get() = commandPath.lastOrNull()
+
+        private fun precedingArguments(): List<String> {
+            val end = minOf(commandLineContext.activeTokenIndex, commandLineContext.tokens.size)
+            val start = commandTokenIndex + 1
+            if (start >= end) return emptyList()
+            val result = ArrayList<String>(end - start)
+            for (index in start until end) result += commandLineContext.tokens[index].text
+            return unmodifiableList(result)
+        }
 
         private companion object {
             private const val NO_QUOTE = '\u0000'

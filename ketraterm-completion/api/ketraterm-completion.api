@@ -73,11 +73,14 @@ public final class io/github/ketraterm/completion/api/TerminalCompletionContext 
 	public final fun getExpectedPathKind ()Lio/github/ketraterm/completion/model/TerminalPathArgumentKind;
 	public final fun getExpectedValueDomain ()Lio/github/ketraterm/completion/model/TerminalCompletionValueDomain;
 	public final fun getOptionsTerminated ()Z
+	public final fun getPrecedingArguments ()Ljava/util/List;
+	public final fun getPrecedingPositionalArguments ()Ljava/util/List;
 	public final fun getReplacementEndOffset ()I
 	public final fun getReplacementStartOffset ()I
 	public final fun getStaticValueCandidates ()Ljava/util/List;
 	public final fun getSubcommandCandidateSource ()Lio/github/ketraterm/completion/model/TerminalCommandSpec;
 	public final fun getUsedOptionExclusiveGroupIds ()Ljava/util/Set;
+	public final fun precedingOptionValues (Ljava/lang/String;)Ljava/util/List;
 }
 
 public abstract interface class io/github/ketraterm/completion/api/TerminalCompletionEngine {
