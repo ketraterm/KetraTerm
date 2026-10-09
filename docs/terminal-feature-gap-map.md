@@ -335,6 +335,23 @@ the review records the execution order and acceptance criteria.
 - **D10 — `DONE(host)`**: line-feed and Kitty flag inspection use primitive mode reads.
 - **D11 — `DONE(host/profile)`**: workspace snapshots reject undefined mode-capability bits through `create`, `copy` and `build`; regressions cover invalid bits, valid subsets and snapshot isolation.
 
+### Public API Ergonomics Review
+
+The [2026-10-09 public API audit](reviews/terminal-public-api-audit-2026-10-09.md)
+records declaration-only evidence, concrete consumer workflows, workarounds, and
+acceptance criteria. These entries track the seven retained findings; they do
+not reopen completed selection, mode, or lifecycle work. Tentative and withdrawn
+concerns remain in the audit without implementation TODOs. Priorities describe
+API adoption impact, not reproduced runtime defects.
+
+- **API01 — P2 — `TODO(ui)` — Selected text without clipboard**: expose selected-text extraction for host actions without invoking clipboard behavior or duplicating selection reconstruction. Preserve existing linear/block, wrapping, and cluster semantics. See [evidence and acceptance criteria](reviews/terminal-public-api-audit-2026-10-09.md#api01-selected-text-without-clipboard).
+- **API02 — P2 — `TODO(completion)` — Independent replay retention control**: allow opaque ranking evidence while disabling or further restricting plaintext replay retention, including imported snapshots. Keep the decision in the learning store rather than relying on persistence filtering. See [evidence and acceptance criteria](reviews/terminal-public-api-audit-2026-10-09.md#api02-independent-replay-retention-control).
+- **API03 — P2 — `TODO(core)` — Constructible packed input modes**: provide primitive semantic packing for every published modifier/format resource so independent `TerminalInputState` producers can reuse the stock encoder without unpublished masks or a shadow core. Preserve coherent snapshots and unrelated bits. See [evidence and acceptance criteria](reviews/terminal-public-api-audit-2026-10-09.md#api03-constructible-packed-input-modes).
+- **API04 — P2 — `TODO(completion)` — Preceding arguments in completion context**: expose read-only parsed argument access for providers whose values depend on earlier options or positionals, avoiding a second parser in each provider. Define ordering, command boundaries, and asynchronous lifetime. See [evidence and acceptance criteria](reviews/terminal-public-api-audit-2026-10-09.md#api04-preceding-arguments-in-completion-context).
+- **API05 — P3 — `TODO(ui)` — Pixel-to-cell hit testing**: expose an allocation-free inverse of cell-bound geometry for custom pointer actions, with logical coordinates and explicit out-of-content behavior. Rectangle scanning remains an available workaround. See [evidence and acceptance criteria](reviews/terminal-public-api-audit-2026-10-09.md#api05-pixel-to-cell-hit-testing).
+- **API06 — P3 — `TODO(completion)` — Context resolution for custom engines**: make context resolution reusable when a host-owned engine invokes stock sources; preserve derived-field invariants and share parsing with API04. Stock-engine composition remains available. See [evidence and acceptance criteria](reviews/terminal-public-api-audit-2026-10-09.md#api06-completion-context-resolution-for-custom-engines).
+- **API07 — P3 — `TODO(core)` — Capacity discovery for direct cluster reads**: provide a focused sizing/read operation for reusable single-cell cluster buffers within the existing serialization boundary. This is direct-read ergonomics; render-frame cluster sinks already support complete reads, and parser retention limits are unchanged. See [evidence and acceptance criteria](reviews/terminal-public-api-audit-2026-10-09.md#api07-capacity-discovery-for-direct-cluster-reads).
+
 ### IntelliJ Integration Experiment Follow-ups
 
 The [integration report](reviews/intellij-integration-experiment-2026-10-04.md) supplies a real embedding use case.
