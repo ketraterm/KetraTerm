@@ -49,6 +49,7 @@ import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
 import kotlinx.coroutines.yield
 import java.awt.Cursor
+import java.awt.Point
 import java.awt.Rectangle
 import java.awt.event.MouseEvent
 import java.io.ByteArrayOutputStream
@@ -215,6 +216,9 @@ fun main() =
                     check(terminal.currentSelectionRange() == null)
                     val bounds = Rectangle()
                     check(terminal.copyCellBounds(0, 0, bounds) && bounds.width > 0 && bounds.height > 0)
+                    val cell = Point()
+                    check(terminal.copyCellPositionAt(bounds.x + bounds.width / 2, bounds.y + bounds.height / 2, cell))
+                    check(cell.x == 0 && cell.y == 0)
                     check(terminal.cursor.type == Cursor.HAND_CURSOR)
                     terminal.dispatchPointer(MouseEvent.MOUSE_PRESSED, MouseEvent.BUTTON1)
                     terminal.dispatchPointer(MouseEvent.MOUSE_RELEASED, MouseEvent.BUTTON1)

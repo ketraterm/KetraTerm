@@ -190,6 +190,10 @@ draft.setHyperlinkHandler(uri -> uri.equals("https://example.test/java") && acti
                 if (terminal.copyCellBounds(0, 0, bounds) || !bounds.isEmpty()) {
                     throw new AssertionError("Unbound geometry must clear caller bounds");
                 }
+                var cell = new java.awt.Point(7, 8);
+                if (terminal.copyCellPositionAt(0, 0, cell) || cell.x != -1 || cell.y != -1) {
+                    throw new AssertionError("Unbound hit testing must clear caller coordinates");
+                }
                 terminal.setShellSuggestionFailureHandler(null);
                 if (!services.getHyperlinkHandler().openHyperlink("https://example.test/java")) {
                     throw new AssertionError("Host navigation callback was not invoked");

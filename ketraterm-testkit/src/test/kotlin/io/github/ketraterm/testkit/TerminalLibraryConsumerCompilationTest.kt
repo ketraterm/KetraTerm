@@ -38,6 +38,25 @@ class TerminalLibraryConsumerCompilationTest {
     lateinit var directory: Path
 
     @Test
+    fun `Java Swing hosts hit test cells with reusable standard point storage`() {
+        assertCompilation(
+            "ui-swing",
+            """
+            import io.github.ketraterm.ui.swing.api.SwingTerminal;
+            import java.awt.Point;
+            import java.awt.Rectangle;
+
+            final class Consumer {
+                boolean hit(SwingTerminal terminal, int x, int y, Point cell, Rectangle bounds) {
+                    return terminal.copyCellPositionAt(x, y, cell)
+                        && terminal.copyCellBounds(cell.x, cell.y, bounds);
+                }
+            }
+            """.trimIndent(),
+        )
+    }
+
+    @Test
     fun `Java core readers size reusable cluster buffers without implementation imports`() {
         assertCompilation(
             "core",

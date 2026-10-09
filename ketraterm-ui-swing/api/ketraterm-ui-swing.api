@@ -276,6 +276,7 @@ public final class io/github/ketraterm/ui/swing/api/SwingTerminal : javax/swing/
 	public final fun commandOutputText (I)Ljava/lang/String;
 	public final fun commandRecordAt (II)I
 	public final fun copyCellBounds (IILjava/awt/Rectangle;)Z
+	public final fun copyCellPositionAt (IILjava/awt/Point;)Z
 	public final fun copyCommandOutputToClipboard (I)Z
 	public final fun copyCommandTextToClipboard (I)Z
 	public final fun copySelectionToClipboard ()Z

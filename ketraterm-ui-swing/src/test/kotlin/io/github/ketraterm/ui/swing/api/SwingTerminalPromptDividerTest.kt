@@ -33,6 +33,7 @@ import org.junit.jupiter.api.Test
 import org.junit.jupiter.params.ParameterizedTest
 import org.junit.jupiter.params.provider.EnumSource
 import org.junit.jupiter.params.provider.ValueSource
+import java.awt.Point
 import java.awt.Rectangle
 import java.awt.event.MouseEvent
 import java.awt.image.BufferedImage
@@ -45,6 +46,44 @@ import kotlin.test.assertTrue
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class SwingTerminalPromptDividerTest {
+    @ParameterizedTest
+    @EnumSource(SwingPromptDecoration::class)
+    fun `public cell hit tests reject prompt decorations and preserve logical cell identity`(mode: SwingPromptDecoration) =
+        edt {
+            Fixture(mode).use { f ->
+                f.prompt("אב界")
+                val bounds = Rectangle()
+                val destination = Point()
+                for (column in 0 until f.component.visibleGridSize().width) {
+                    assertTrue(f.component.copyCellBounds(column, 0, bounds))
+                    assertTrue(f.component.copyCellPositionAt(bounds.x + bounds.width / 2, bounds.y + bounds.height / 2, destination))
+                    assertEquals(Point(column, 0), destination)
+                }
+                assertTrue(f.component.copyCellBounds(0, 0, bounds))
+                when (mode) {
+                    SwingPromptDecoration.GUTTER -> {
+                        assertFalse(
+                            f.component.copyCellPositionAt(f.settings.shellIntegrationDecorationGutterWidth - 1, bounds.y, destination),
+                        )
+                        assertEquals(Point(-1, -1), destination)
+                    }
+                    SwingPromptDecoration.DIVIDER -> {
+                        assertFalse(f.component.copyCellPositionAt(bounds.x, bounds.y - f.cellHeight / 2, destination))
+                        assertEquals(Point(-1, -1), destination)
+                    }
+                    SwingPromptDecoration.NONE -> Unit
+                }
+                val writes = f.connector.writes.toList()
+                val resizes = f.connector.resizes.toList()
+                repeat(20) {
+                    assertTrue(f.component.copyCellPositionAt(bounds.x, bounds.y, destination))
+                    assertEquals(Point(0, 0), destination)
+                }
+                assertEquals(writes, f.connector.writes)
+                assertEquals(resizes, f.connector.resizes)
+            }
+        }
+
     @ParameterizedTest
     @EnumSource(SwingPromptDecoration::class)
     fun `configured prompt layout precedes OSC metadata without a first prompt resize`(mode: SwingPromptDecoration) =

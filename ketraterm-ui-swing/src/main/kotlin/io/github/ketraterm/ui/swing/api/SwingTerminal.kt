@@ -1622,6 +1622,57 @@ public class SwingTerminal
         }
 
         /**
+         * Copies the displayed cell under component-local Swing pixels [x], [y]
+         * into caller-owned [destination] on the EDT.
+         *
+         * The point's x is a zero-based logical column, before bidi permutation;
+         * its y is a zero-based row of the displayed frame, matching [copyCellBounds].
+         * Rows are not absolute retained-history rows or live-screen coordinates.
+         * The position describes the currently displayed frame and can change after
+         * scrolling, frame publication, or layout changes.
+         *
+         * Active-buffer padding, prompt gutters/dividers, fractional scrolling and
+         * clipping follow the shared display geometry. Wide leading and trailing
+         * halves return their own physical grid cells; blank cells are valid hits.
+         * Fractionally rounded adjacent cell bounds may share a boundary pixel;
+         * row selection follows the same fractional mapping as pointer input.
+         *
+         * Returns `false` and sets [destination] to `(-1, -1)` outside displayed
+         * cells, including decoration bands, or for unavailable frames and
+         * unbound/disposed views. Points are never clamped to a nearby cell.
+         * Reuse one [Point] across calls; no result object is allocated. Existing
+         * bidi caches may rebuild for changed text. This performs no frame refresh
+         * or transport work.
+         *
+         * @return `true` when [destination] contains a displayed physical cell.
+         * @throws IllegalStateException when called outside the EDT.
+         */
+        public fun copyCellPositionAt(
+            x: Int,
+            y: Int,
+            destination: Point,
+        ): Boolean {
+            check(SwingUtilities.isEventDispatchThread()) { "cell positions must be read on the EDT" }
+            if (disposed || session == null) {
+                destination.setLocation(-1, -1)
+                return false
+            }
+            updateChromeLayout()
+            val buffer = renderCache.activeBuffer
+            return visualGeometry.copyCellPositionAt(
+                renderCache,
+                metrics,
+                x,
+                y,
+                chrome.left(settings, buffer),
+                chrome.top(settings, buffer),
+                width - chrome.right(settings, buffer),
+                height - chrome.bottom(settings, buffer),
+                destination,
+            )
+        }
+
+        /**
          * Selects provider diagnostics for this view on the EDT; null restores logging.
          *
          * Reports each current provider failure once, after cancelling its work and

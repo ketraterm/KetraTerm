@@ -29,6 +29,7 @@ import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.params.ParameterizedTest
 import org.junit.jupiter.params.provider.ValueSource
+import java.awt.Point
 import java.awt.Rectangle
 import java.awt.event.ComponentEvent
 import java.awt.event.MouseEvent
@@ -144,6 +145,17 @@ class SwingTerminalClosedSessionTest {
                 component.scrollToScrollbackOffset(Int.MAX_VALUE)
                 assertEquals(component.viewportState().historySize.toDouble(), component.viewportState().scrollbackOffset)
                 selectWord(component, clipboard, if (alternate) "ALTONE" else "oldest")
+                val cellBounds = Rectangle()
+                val cellPosition = Point()
+                assertTrue(component.copyCellBounds(0, 0, cellBounds))
+                assertTrue(
+                    component.copyCellPositionAt(
+                        cellBounds.x + cellBounds.width / 2,
+                        cellBounds.y + cellBounds.height / 2,
+                        cellPosition,
+                    ),
+                )
+                assertEquals(Point(0, 0), cellPosition, "hit rows index the displayed frame, not retained history")
 
                 assertTrue(component.selectAll())
                 assertTrue(component.copySelectionToClipboard())
@@ -164,6 +176,15 @@ class SwingTerminalClosedSessionTest {
                 resize(component, 12, 8, buffer)
                 assertEquals(0, component.viewportState().historySize)
                 assertTrue(component.copyCellBounds(8, 0, Rectangle()))
+                assertTrue(component.copyCellBounds(8, 0, cellBounds))
+                assertTrue(
+                    component.copyCellPositionAt(
+                        cellBounds.x + cellBounds.width / 2,
+                        cellBounds.y + cellBounds.height / 2,
+                        cellPosition,
+                    ),
+                )
+                assertEquals(Point(8, 0), cellPosition)
                 assertTrue(component.copySelectionToClipboard())
                 assertEquals(expected, clipboard.text.trimEnd())
 
