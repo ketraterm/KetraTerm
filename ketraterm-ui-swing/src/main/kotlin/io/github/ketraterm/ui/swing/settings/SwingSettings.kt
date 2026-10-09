@@ -188,9 +188,17 @@ public class SwingSettings private constructor(
      * Allows application mouse reports from this view. Defaults to true.
      * Disabling preserves terminal modes and permits local selection, links, and menus.
      * Shift forces local interaction. A started button gesture retains its route until release.
-     * Wheel-to-arrow input in the alternate buffer remains independent of this setting.
+     * Alternate-buffer wheel input is controlled separately by [alternateScreenWheelToArrowEnabled].
      */
     public val mouseReportingEnabled: Boolean = builder.mouseReportingEnabled
+
+    /**
+     * Converts local wheel motion to arrow keys in the alternate buffer. Defaults to true.
+     * Application mouse reporting takes priority. Shift bypasses reporting and respects this setting.
+     * When false, wheel motion uses local viewport scrolling, allowing unhandled motion to reach the host.
+     * Primary-buffer scrolling is unaffected. Reloading a changed value clears partial wheel-to-arrow input.
+     */
+    public val alternateScreenWheelToArrowEnabled: Boolean = builder.alternateScreenWheelToArrowEnabled
 
     /**
      * Copies a nonempty selection once when a local primary-button gesture completes.
@@ -348,6 +356,9 @@ public class SwingSettings private constructor(
         /** Draft value for [SwingSettings.mouseReportingEnabled]. */
         public var mouseReportingEnabled: Boolean = source?.mouseReportingEnabled ?: true
 
+        /** Draft value for [SwingSettings.alternateScreenWheelToArrowEnabled]. */
+        public var alternateScreenWheelToArrowEnabled: Boolean = source?.alternateScreenWheelToArrowEnabled ?: true
+
         /** Draft value for [SwingSettings.copyOnSelection]. */
         public var copyOnSelection: Boolean = source?.copyOnSelection ?: false
 
@@ -423,6 +434,7 @@ public class SwingSettings private constructor(
             columnSpacing == other.columnSpacing &&
             lineHeight == other.lineHeight &&
             mouseReportingEnabled == other.mouseReportingEnabled &&
+            alternateScreenWheelToArrowEnabled == other.alternateScreenWheelToArrowEnabled &&
             copyOnSelection == other.copyOnSelection &&
             middleClickPaste == other.middleClickPaste &&
             middleClickPasteSource == other.middleClickPasteSource &&
@@ -470,6 +482,7 @@ public class SwingSettings private constructor(
         result = 31 * result + columnSpacing
         result = 31 * result + lineHeight.hashCode()
         result = 31 * result + mouseReportingEnabled.hashCode()
+        result = 31 * result + alternateScreenWheelToArrowEnabled.hashCode()
         result = 31 * result + copyOnSelection.hashCode()
         result = 31 * result + middleClickPaste.hashCode()
         result = 31 * result + middleClickPasteSource.hashCode()

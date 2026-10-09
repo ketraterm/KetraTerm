@@ -116,8 +116,11 @@ public final class JavaConsumer {
     }
 
     public static void verify() throws Exception {
+        if (!new SwingSettings().getAlternateScreenWheelToArrowEnabled())
+            throw new AssertionError("Java alternate-screen wheel input must be enabled by default");
         var interactionSettings = SwingSettings.create(draft -> {
             draft.setMouseReportingEnabled(false);
+            draft.setAlternateScreenWheelToArrowEnabled(false);
             draft.setCopyOnSelection(true);
             draft.setMiddleClickPaste(true);
             draft.setMiddleClickPasteSource(SwingPasteSource.PRIMARY_SELECTION);
@@ -125,10 +128,18 @@ public final class JavaConsumer {
         });
         var copiedSettings = interactionSettings.toBuilder().build();
         if (copiedSettings.getMouseReportingEnabled() || !copiedSettings.getCopyOnSelection()
+            || copiedSettings.getAlternateScreenWheelToArrowEnabled()
             || !copiedSettings.getMiddleClickPaste() || copiedSettings.getColumnSpacing() != -1
             || copiedSettings.getMiddleClickPasteSource() != SwingPasteSource.PRIMARY_SELECTION
-            || !interactionSettings.equals(copiedSettings))
+            || !interactionSettings.equals(copiedSettings)
+            || interactionSettings.hashCode() != copiedSettings.hashCode())
             throw new AssertionError("Java interaction settings did not survive copying");
+        var arrowSettings = interactionSettings.copy(draft -> draft.setAlternateScreenWheelToArrowEnabled(true));
+        if (!arrowSettings.getAlternateScreenWheelToArrowEnabled()
+            || interactionSettings.getAlternateScreenWheelToArrowEnabled()
+            || interactionSettings.toBuilder().getAlternateScreenWheelToArrowEnabled()
+            || arrowSettings.equals(interactionSettings))
+            throw new AssertionError("Java alternate-screen wheel input copy changed the original snapshot");
         var condensedSettings = interactionSettings.copy(draft -> draft.setColumnSpacing(-2));
         if (condensedSettings.getColumnSpacing() != -2 || interactionSettings.getColumnSpacing() != -1)
             throw new AssertionError("Java condensed spacing copy changed the original snapshot");

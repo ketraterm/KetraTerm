@@ -177,10 +177,11 @@ internal class SwingTerminalMouseController(
             handleMouseTracking(event, TerminalMouseEventType.WHEEL)
             return
         }
-        val alternateScreen =
-            host.renderCache.activeBuffer == TerminalRenderBufferKind.ALTERNATE &&
+        val alternateWheelInput =
+            host.settings.alternateScreenWheelToArrowEnabled &&
+                host.renderCache.activeBuffer == TerminalRenderBufferKind.ALTERNATE &&
                 (host.session != null || host.renderCache.historySize == 0)
-        selectWheelRoute(if (alternateScreen) WheelRoute.ALTERNATE else WheelRoute.VIEWPORT)
+        selectWheelRoute(if (alternateWheelInput) WheelRoute.ALTERNATE else WheelRoute.VIEWPORT)
         val delta = wheelScrollLines(event)
         if (!delta.isFinite() || delta == 0.0) {
             if (!delta.isFinite()) alternateWheelAccumulator.reset()
@@ -188,7 +189,7 @@ internal class SwingTerminalMouseController(
             return
         }
 
-        if (alternateScreen) {
+        if (alternateWheelInput) {
             val wheelSteps = alternateWheelAccumulator.accumulate(delta)
             val count = min(kotlin.math.abs(wheelSteps.toLong()), MAX_WHEEL_STEPS_PER_EVENT.toLong()).toInt()
             val session = host.session

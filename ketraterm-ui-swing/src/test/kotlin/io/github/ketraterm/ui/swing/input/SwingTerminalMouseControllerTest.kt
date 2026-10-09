@@ -316,6 +316,111 @@ class SwingTerminalMouseControllerTest {
             assertTrue(event.isConsumed)
         }
 
+        @ParameterizedTest
+        @ValueSource(booleans = [false, true])
+        fun `disabled alternate-screen arrows use local viewport consumption`(scrollResult: Boolean) {
+            val session = RecordingInputEncoder()
+            val host = RecordingMouseHost(scrollResult = scrollResult, session = session)
+            host.settings = host.settings.copy { it.alternateScreenWheelToArrowEnabled = false }
+            host.renderCache.updateFrom(
+                FakeFrameReader(FakeFrame(historySize = 0, rows = 24, activeBuffer = TerminalRenderBufferKind.ALTERNATE)),
+            )
+            val controller = SwingTerminalMouseController(host)
+            val event = mouseWheel(rotation = -1.0)
+
+            controller.wheelListener.mouseWheelMoved(event)
+
+            assertTrue(session.encodedKeys.isEmpty())
+            assertTrue(host.mouseReports.isEmpty())
+            assertEquals(1, host.scrollCount)
+            assertEquals(3.0, host.lastScrollDelta)
+            assertEquals(scrollResult, event.isConsumed)
+        }
+
+        @ParameterizedTest
+        @ValueSource(booleans = [false, true])
+        fun `alternate-screen mouse reports take priority over arrow fallback`(arrowsEnabled: Boolean) {
+            val session = RecordingInputEncoder()
+            val host = RecordingMouseHost(mouseTrackingMode = MouseTrackingMode.NORMAL, session = session)
+            host.settings = host.settings.copy { it.alternateScreenWheelToArrowEnabled = arrowsEnabled }
+            host.renderCache.updateFrom(
+                FakeFrameReader(FakeFrame(historySize = 0, rows = 24, activeBuffer = TerminalRenderBufferKind.ALTERNATE)),
+            )
+            val controller = SwingTerminalMouseController(host)
+            val event = mouseWheel(rotation = -1.0)
+
+            controller.wheelListener.mouseWheelMoved(event)
+
+            assertTrue(session.encodedKeys.isEmpty())
+            assertEquals(listOf(TerminalMouseButton.WHEEL_UP), host.mouseReports.map { it.button })
+            assertEquals(listOf(TerminalMouseEventType.WHEEL), host.mouseReports.map { it.type })
+            assertEquals(0, host.scrollCount)
+            assertTrue(event.isConsumed)
+        }
+
+        @Test
+        fun `disabling mouse reports preserves enabled alternate-screen arrows`() {
+            val session = RecordingInputEncoder()
+            val host = RecordingMouseHost(mouseTrackingMode = MouseTrackingMode.NORMAL, session = session)
+            host.settings = host.settings.copy { it.mouseReportingEnabled = false }
+            host.renderCache.updateFrom(
+                FakeFrameReader(FakeFrame(historySize = 0, rows = 24, activeBuffer = TerminalRenderBufferKind.ALTERNATE)),
+            )
+            val controller = SwingTerminalMouseController(host)
+            val event = mouseWheel(rotation = -1.0)
+
+            controller.wheelListener.mouseWheelMoved(event)
+
+            assertEquals(listOf(TerminalKey.UP, TerminalKey.UP, TerminalKey.UP), session.encodedKeys.map { it.key })
+            assertTrue(host.mouseReports.isEmpty())
+            assertEquals(0, host.scrollCount)
+            assertTrue(event.isConsumed)
+        }
+
+        @ParameterizedTest
+        @ValueSource(booleans = [false, true])
+        fun `shift bypasses alternate-screen mouse reports and respects arrow policy`(arrowsEnabled: Boolean) {
+            val session = RecordingInputEncoder()
+            val host = RecordingMouseHost(mouseTrackingMode = MouseTrackingMode.NORMAL, session = session)
+            host.settings = host.settings.copy { it.alternateScreenWheelToArrowEnabled = arrowsEnabled }
+            host.renderCache.updateFrom(
+                FakeFrameReader(FakeFrame(historySize = 0, rows = 24, activeBuffer = TerminalRenderBufferKind.ALTERNATE)),
+            )
+            val controller = SwingTerminalMouseController(host)
+            val event = mouseWheel(rotation = -1.0, modifiers = InputEvent.SHIFT_DOWN_MASK)
+
+            controller.wheelListener.mouseWheelMoved(event)
+
+            assertTrue(host.mouseReports.isEmpty())
+            if (arrowsEnabled) {
+                assertEquals(listOf(TerminalKey.UP, TerminalKey.UP, TerminalKey.UP), session.encodedKeys.map { it.key })
+                assertEquals(0, host.scrollCount)
+            } else {
+                assertTrue(session.encodedKeys.isEmpty())
+                assertEquals(1, host.scrollCount)
+                assertEquals(3.0, host.lastScrollDelta)
+            }
+            assertTrue(event.isConsumed)
+        }
+
+        @Test
+        fun `disabled alternate-screen arrows preserve primary history scrolling`() {
+            val session = RecordingInputEncoder()
+            val host = RecordingMouseHost(session = session)
+            host.settings = host.settings.copy { it.alternateScreenWheelToArrowEnabled = false }
+            host.renderCache.updateFrom(FakeFrameReader(FakeFrame(historySize = 7, rows = 24)))
+            val controller = SwingTerminalMouseController(host)
+            val event = mouseWheel(rotation = 1.0)
+
+            controller.wheelListener.mouseWheelMoved(event)
+
+            assertTrue(session.encodedKeys.isEmpty())
+            assertTrue(host.mouseReports.isEmpty())
+            assertEquals(1, host.scrollCount)
+            assertEquals(-3.0, host.lastScrollDelta)
+            assertTrue(event.isConsumed)
+        }
+
         @Test
         fun `scroll in alternate screen buffer does not crash and consumes event when session is null`() {
             val host = RecordingMouseHost(session = null)
@@ -424,6 +529,32 @@ class SwingTerminalMouseControllerTest {
             controller.wheelListener.mouseWheelMoved(mouseWheel(rotation = -0.1))
             assertEquals(listOf(TerminalKey.UP), secondSession.encodedKeys.map { it.key })
         }
+
+        @Test
+        fun `disabled wheel routing discards accumulated alternate-screen arrows`() {
+            val session = RecordingInputEncoder()
+            val host = RecordingMouseHost(session = session)
+            host.renderCache.updateFrom(
+                FakeFrameReader(FakeFrame(historySize = 0, rows = 24, activeBuffer = TerminalRenderBufferKind.ALTERNATE)),
+            )
+            val controller = SwingTerminalMouseController(host)
+            repeat(3) { controller.wheelListener.mouseWheelMoved(mouseWheel(rotation = -0.1)) }
+
+            host.settings = host.settings.copy { it.alternateScreenWheelToArrowEnabled = false }
+            controller.wheelListener.mouseWheelMoved(mouseWheel(rotation = -0.1))
+
+            assertTrue(session.encodedKeys.isEmpty())
+            assertEquals(1, host.scrollCount)
+            assertEquals(0.3, host.lastScrollDelta, 1.0e-12)
+
+            host.settings = host.settings.copy { it.alternateScreenWheelToArrowEnabled = true }
+            repeat(3) { controller.wheelListener.mouseWheelMoved(mouseWheel(rotation = -0.1)) }
+
+            assertTrue(session.encodedKeys.isEmpty())
+            controller.wheelListener.mouseWheelMoved(mouseWheel(rotation = -0.1))
+            assertEquals(listOf(TerminalKey.UP), session.encodedKeys.map { it.key })
+            assertEquals(1, host.scrollCount)
+        }
     }
 
     @Nested
@@ -531,12 +662,15 @@ class SwingTerminalMouseControllerTest {
             MouseEvent.NOBUTTON,
         )
 
-    private fun mouseWheel(rotation: Double): MouseWheelEvent =
+    private fun mouseWheel(
+        rotation: Double,
+        modifiers: Int = 0,
+    ): MouseWheelEvent =
         MouseWheelEvent(
             source,
             MouseEvent.MOUSE_WHEEL,
             System.currentTimeMillis(),
-            0,
+            modifiers,
             25,
             35,
             25,

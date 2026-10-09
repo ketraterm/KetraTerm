@@ -223,9 +223,29 @@ class SwingSettingsTest {
     fun interactionSettingsPreserveExistingDefaults() {
         val settings = SwingSettings()
         assertEquals(true, settings.mouseReportingEnabled)
+        assertEquals(true, settings.alternateScreenWheelToArrowEnabled)
         assertEquals(false, settings.copyOnSelection)
         assertEquals(false, settings.middleClickPaste)
         assertEquals(SwingPasteSource.CLIPBOARD, settings.middleClickPasteSource)
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = [false, true])
+    fun alternateScreenWheelToArrowSettingSurvivesIndependentSettingsSnapshots(enabled: Boolean) {
+        val original = SwingSettings()
+        val builder = original.toBuilder()
+        builder.alternateScreenWheelToArrowEnabled = enabled
+        val snapshot = builder.build()
+        builder.alternateScreenWheelToArrowEnabled = !enabled
+
+        assertEquals(enabled, snapshot.alternateScreenWheelToArrowEnabled)
+        assertEquals(snapshot, snapshot.toBuilder().build())
+        assertEquals(snapshot, original.copy { it.alternateScreenWheelToArrowEnabled = enabled })
+        assertEquals(snapshot.hashCode(), snapshot.copy {}.hashCode())
+        assertEquals(original, snapshot.copy { it.alternateScreenWheelToArrowEnabled = true })
+        assertTrue(snapshot.mouseReportingEnabled)
+        assertTrue(original.alternateScreenWheelToArrowEnabled)
+        if (!enabled) assertNotEquals(original, snapshot)
     }
 
     @ParameterizedTest

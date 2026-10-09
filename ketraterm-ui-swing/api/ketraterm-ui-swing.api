@@ -556,6 +556,7 @@ public final class io/github/ketraterm/ui/swing/settings/SwingSettings {
 	public fun equals (Ljava/lang/Object;)Z
 	public final fun getAcceptSelectedSuggestionWithEnter ()Z
 	public final fun getAlternateScreenPadding ()Lio/github/ketraterm/ui/swing/settings/SwingPadding;
+	public final fun getAlternateScreenWheelToArrowEnabled ()Z
 	public final fun getColumnSpacing ()I
 	public final fun getColumns ()I
 	public final fun getCopyOnSelection ()Z
@@ -607,6 +608,7 @@ public final class io/github/ketraterm/ui/swing/settings/SwingSettings$Builder {
 	public final fun build ()Lio/github/ketraterm/ui/swing/settings/SwingSettings;
 	public final fun getAcceptSelectedSuggestionWithEnter ()Z
 	public final fun getAlternateScreenPadding ()Lio/github/ketraterm/ui/swing/settings/SwingPadding;
+	public final fun getAlternateScreenWheelToArrowEnabled ()Z
 	public final fun getColumnSpacing ()I
 	public final fun getColumns ()I
 	public final fun getCopyOnSelection ()Z
@@ -650,6 +652,7 @@ public final class io/github/ketraterm/ui/swing/settings/SwingSettings$Builder {
 	public final fun getVisualBellEnabled ()Z
 	public final fun setAcceptSelectedSuggestionWithEnter (Z)V
 	public final fun setAlternateScreenPadding (Lio/github/ketraterm/ui/swing/settings/SwingPadding;)V
+	public final fun setAlternateScreenWheelToArrowEnabled (Z)V
 	public final fun setColumnSpacing (I)V
 	public final fun setColumns (I)V
 	public final fun setCopyOnSelection (Z)V

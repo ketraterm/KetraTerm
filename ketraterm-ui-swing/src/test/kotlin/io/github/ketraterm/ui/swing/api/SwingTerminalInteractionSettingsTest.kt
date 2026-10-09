@@ -37,6 +37,7 @@ import java.awt.Point
 import java.awt.Rectangle
 import java.awt.event.InputEvent
 import java.awt.event.MouseEvent
+import java.awt.event.MouseWheelEvent
 import java.io.ByteArrayOutputStream
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
@@ -815,6 +816,155 @@ class SwingTerminalInteractionSettingsTest {
 
     @ParameterizedTest
     @ValueSource(booleans = [false, true])
+    fun `default alternate wheel input accumulates fractions and uses current cursor mode`(applicationCursor: Boolean) =
+        fixture {
+            assertTrue(settings.alternateScreenWheelToArrowEnabled)
+            feed("\u001b[?1049h" + if (applicationCursor) "\u001b[?1h" else "")
+            view.bind(session)
+
+            repeat(3) { assertTrue(wheel(-0.25).isConsumed) }
+            dispatcher.scheduler.runCurrent()
+            assertEquals(0, output.size())
+            assertTrue(wheel(-0.25).isConsumed)
+            dispatcher.scheduler.runCurrent()
+            val up = if (applicationCursor) "\u001bOA" else "\u001b[A"
+            assertEquals(up, output.toString(Charsets.UTF_8))
+
+            repeat(4) { assertTrue(wheel(0.25).isConsumed) }
+            dispatcher.scheduler.runCurrent()
+            val down = if (applicationCursor) "\u001bOB" else "\u001b[B"
+            assertEquals(up + down, output.toString(Charsets.UTF_8))
+        }
+
+    @ParameterizedTest
+    @ValueSource(booleans = [false, true])
+    fun `disabled alternate wheel input leaves unhandled local motion available to the host`(shift: Boolean) =
+        fixture {
+            settings = settings.copy { it.alternateScreenWheelToArrowEnabled = false }
+            view.reloadSettings()
+            feed("\u001b[?1049h")
+            view.bind(session)
+
+            val modifiers = if (shift) InputEvent.SHIFT_DOWN_MASK else 0
+            assertFalse(wheel(-0.25, modifiers).isConsumed)
+            assertFalse(wheel(-1.0, modifiers).isConsumed)
+            assertFalse(wheel(1.0, modifiers).isConsumed)
+            dispatcher.scheduler.runCurrent()
+            assertEquals(0, output.size())
+            assertEquals(0.0, view.viewportState().scrollbackOffset)
+        }
+
+    @Test
+    fun `alternate wheel policy preserves application reports and Shift selects the configured fallback`() =
+        fixture {
+            settings = settings.copy { it.alternateScreenWheelToArrowEnabled = false }
+            view.reloadSettings()
+            feed("\u001b[?1049h\u001b[?1000h\u001b[?1006h")
+            view.bind(session)
+
+            assertTrue(wheel(-1.0).isConsumed)
+            dispatcher.scheduler.runCurrent()
+            assertEquals("\u001b[<64;1;1M", output.toString(Charsets.UTF_8))
+            output.reset()
+
+            assertFalse(wheel(-1.0, InputEvent.SHIFT_DOWN_MASK).isConsumed)
+            dispatcher.scheduler.runCurrent()
+            assertEquals(0, output.size())
+            settings = settings.copy { it.alternateScreenWheelToArrowEnabled = true }
+            view.reloadSettings()
+            assertTrue(wheel(-1.0, InputEvent.SHIFT_DOWN_MASK).isConsumed)
+            dispatcher.scheduler.runCurrent()
+            assertEquals("\u001b[A", output.toString(Charsets.UTF_8))
+        }
+
+    @ParameterizedTest
+    @ValueSource(strings = ["alternate-wheel", "mouse-reporting"])
+    fun `live wheel policy changes discard partial arrows without an intervening wheel event`(policy: String) =
+        fixture {
+            feed("\u001b[?1049h")
+            view.bind(session)
+            repeat(3) { wheel(-0.25) }
+            dispatcher.scheduler.runCurrent()
+            assertEquals(0, output.size())
+
+            for (enabled in listOf(false, true)) {
+                settings =
+                    settings.copy {
+                        if (policy == "alternate-wheel") {
+                            it.alternateScreenWheelToArrowEnabled = enabled
+                        } else {
+                            it.mouseReportingEnabled = enabled
+                        }
+                    }
+                view.reloadSettings()
+            }
+
+            wheel(-0.25)
+            dispatcher.scheduler.runCurrent()
+            assertEquals(0, output.size())
+            repeat(3) { wheel(-0.25) }
+            dispatcher.scheduler.runCurrent()
+            assertEquals("\u001b[A", output.toString(Charsets.UTF_8))
+        }
+
+    @ParameterizedTest
+    @ValueSource(strings = ["same-session", "unbind-rebind"])
+    fun `rebinding clears partial alternate wheel input even when the session is reused`(change: String) =
+        fixture {
+            feed("\u001b[?1049h")
+            view.bind(session)
+            repeat(3) { wheel(-0.25) }
+            if (change == "unbind-rebind") view.unbind()
+            view.bind(session)
+
+            wheel(-0.25)
+            dispatcher.scheduler.runCurrent()
+            assertEquals(0, output.size())
+            repeat(3) { wheel(-0.25) }
+            dispatcher.scheduler.runCurrent()
+            assertEquals("\u001b[A", output.toString(Charsets.UTF_8))
+        }
+
+    @ParameterizedTest
+    @ValueSource(strings = ["unbound", "closed", "disposed", "no-frame"])
+    fun `unavailable alternate wheel input never submits arrows`(state: String) =
+        fixture(startSession = state != "no-frame") {
+            if (state != "no-frame") {
+                feed("\u001b[?1049h")
+                view.bind(session)
+                repeat(3) { wheel(-0.25) }
+            }
+            when (state) {
+                "unbound" -> view.unbind()
+                "closed" -> session.close()
+                "disposed" -> view.dispose()
+            }
+
+            wheel(-0.25)
+            wheel(-1.0)
+            dispatcher.scheduler.runCurrent()
+            assertEquals(0, output.size())
+        }
+
+    @ParameterizedTest
+    @ValueSource(booleans = [false, true])
+    fun `alternate wheel policy preserves local primary history input`(enabled: Boolean) =
+        fixture {
+            settings = settings.copy { it.alternateScreenWheelToArrowEnabled = enabled }
+            view.reloadSettings()
+            feed("\r\nsecond\r\nthird\r\nfourth")
+            view.bind(session)
+            assertTrue(view.viewportState().historySize > 0)
+
+            assertTrue(wheel(-0.25).isConsumed)
+            assertTrue(wheel(-0.25).isConsumed)
+            dispatcher.scheduler.runCurrent()
+            assertEquals(0, output.size())
+            assertEquals(0.0, view.viewportState().scrollbackOffset)
+        }
+
+    @ParameterizedTest
+    @ValueSource(booleans = [false, true])
     fun `copy on selection works with live and closed output and ignores host selection changes`(closed: Boolean) =
         fixture {
             if (closed) session.onClosed(0)
@@ -1122,6 +1272,27 @@ class SwingTerminalInteractionSettingsTest {
             modifiers: Int = 0,
             x: Int = 1,
         ): MouseEvent = MouseEvent(view, id, 0L, modifiers, x, 1, clicks, false, button)
+
+        fun wheel(
+            rotation: Double,
+            modifiers: Int = 0,
+        ): MouseWheelEvent =
+            MouseWheelEvent(
+                view,
+                MouseEvent.MOUSE_WHEEL,
+                0L,
+                modifiers,
+                1,
+                1,
+                1,
+                1,
+                0,
+                false,
+                MouseWheelEvent.WHEEL_UNIT_SCROLL,
+                1,
+                rotation.toInt(),
+                rotation,
+            ).also { event -> view.mouseWheelListeners.forEach { it.mouseWheelMoved(event) } }
 
         fun click(
             button: Int,

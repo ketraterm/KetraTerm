@@ -1388,6 +1388,11 @@ public class SwingTerminal
                     next.promptDecoration != previous.promptDecoration
             if (geometryChanged) viewportController.finishScroll()
             settings = next
+            if (next.mouseReportingEnabled != previous.mouseReportingEnabled ||
+                next.alternateScreenWheelToArrowEnabled != previous.alternateScreenWheelToArrowEnabled
+            ) {
+                mouseController.resetWheelInput()
+            }
             metrics = nextMetrics
             if (next.font != previous.font) font = next.font
             if (next.palette != previous.palette) {

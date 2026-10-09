@@ -38,7 +38,7 @@ class TerminalLibraryConsumerCompilationTest {
     lateinit var directory: Path
 
     @Test
-    fun `Java Swing hosts can defer source aware middle click paste without Swing event retention`() {
+    fun `Java Swing hosts configure local input and defer source aware middle click paste`() {
         assertCompilation(
             "ui-swing",
             """
@@ -62,6 +62,7 @@ class TerminalLibraryConsumerCompilationTest {
                 void cancel() { pending.cancel(); }
                 void wire() {
                     var settings = SwingSettings.create(draft -> {
+                        draft.setAlternateScreenWheelToArrowEnabled(false);
                         draft.setMiddleClickPaste(true);
                         draft.setMiddleClickPasteSource(SwingPasteSource.PRIMARY_SELECTION);
                     });
@@ -69,6 +70,9 @@ class TerminalLibraryConsumerCompilationTest {
                     new SwingTerminal(() -> settings, services);
                     services.copy(draft -> draft.setMiddleClickPasteHandler(null));
                     settings.toBuilder().setMiddleClickPasteSource(SwingPasteSource.CLIPBOARD);
+                    boolean arrowsEnabled = settings.getAlternateScreenWheelToArrowEnabled();
+                    var enabled = settings.copy(draft -> draft.setAlternateScreenWheelToArrowEnabled(true));
+                    enabled.toBuilder().getAlternateScreenWheelToArrowEnabled();
                 }
             }
             """.trimIndent(),

@@ -70,15 +70,23 @@ private const val HOST_PASTE = "primary selection from published consumer"
 
 fun main() =
     runBlocking {
+        check(SwingSettings().alternateScreenWheelToArrowEnabled)
         val interactionSettings =
             SwingSettings.create {
                 it.mouseReportingEnabled = false
+                it.alternateScreenWheelToArrowEnabled = false
                 it.copyOnSelection = true
                 it.middleClickPaste = true
                 it.middleClickPasteSource = SwingPasteSource.PRIMARY_SELECTION
                 it.columnSpacing = -1
             }
         check(interactionSettings == interactionSettings.copy {})
+        check(interactionSettings.hashCode() == interactionSettings.copy {}.hashCode())
+        check(!interactionSettings.alternateScreenWheelToArrowEnabled)
+        check(!interactionSettings.toBuilder().build().alternateScreenWheelToArrowEnabled)
+        val arrowSettings = interactionSettings.copy { it.alternateScreenWheelToArrowEnabled = true }
+        check(arrowSettings.alternateScreenWheelToArrowEnabled && arrowSettings != interactionSettings)
+        check(!interactionSettings.alternateScreenWheelToArrowEnabled)
         check(interactionSettings.columnSpacing == -1 && interactionSettings.middleClickPaste && interactionSettings.copyOnSelection)
         val condensedSettings = interactionSettings.copy { it.columnSpacing = -2 }
         check(condensedSettings.columnSpacing == -2 && interactionSettings.columnSpacing == -1)
