@@ -25,6 +25,7 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.StandardTestDispatcher
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.params.ParameterizedTest
+import org.junit.jupiter.params.provider.CsvSource
 import org.junit.jupiter.params.provider.ValueSource
 import java.awt.Point
 import java.awt.Rectangle
@@ -38,8 +39,11 @@ import kotlin.test.assertTrue
 @OptIn(ExperimentalCoroutinesApi::class)
 class SwingTerminalCellBoundsTest {
     @ParameterizedTest
-    @ValueSource(doubles = [1.0, 1.25, 1.5, 1.75, 2.0])
-    fun `hit testing uses component pixels through fractional paint scales and font metrics`(scale: Double) {
+    @CsvSource("1.0, 3", "1.25, 3", "1.5, 3", "1.75, 3", "2.0, 3", "1.0, -1", "1.25, -1", "1.5, -1", "1.75, -1", "2.0, -1")
+    fun `hit testing uses component pixels through fractional paint scales and font metrics`(
+        scale: Double,
+        columnSpacing: Int,
+    ) {
         SwingUtilities.invokeAndWait {
             val buffer = TerminalBuffers.create(7, 2)
             buffer.writeText("Aאב界")
@@ -48,7 +52,7 @@ class SwingTerminalCellBoundsTest {
             val settings =
                 SwingSettings.create {
                     it.font = it.font.deriveFont(13.25f)
-                    it.columnSpacing = 3
+                    it.columnSpacing = columnSpacing
                     it.padding = SwingPadding(3, 5, 7, 9)
                     it.useSystemFallbackFonts = false
                     it.cursorBlinkMillis = 0

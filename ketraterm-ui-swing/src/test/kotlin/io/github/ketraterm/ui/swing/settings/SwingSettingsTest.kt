@@ -103,6 +103,23 @@ class SwingSettingsTest {
         assertEquals(0, SwingSettings().columnSpacing)
     }
 
+    @ParameterizedTest
+    @ValueSource(ints = [Int.MIN_VALUE, -5, -1, 0, 5, Int.MAX_VALUE])
+    fun signedColumnSpacingIsRetainedBySettingsSnapshots(spacing: Int) {
+        val original = SwingSettings()
+        val builder = original.toBuilder()
+        builder.columnSpacing = spacing
+        val snapshot = builder.build()
+        builder.columnSpacing = 10
+
+        assertEquals(spacing, snapshot.columnSpacing)
+        assertEquals(spacing, snapshot.toBuilder().build().columnSpacing)
+        assertEquals(snapshot, original.copy { it.columnSpacing = spacing })
+        assertEquals(0, original.columnSpacing)
+        assertEquals(spacing, snapshot.copy {}.columnSpacing)
+        assertEquals(snapshot.hashCode(), snapshot.copy {}.hashCode())
+    }
+
     @Test
     fun spacingUsesOneGeometryAndRejectsOverflowBeforeApplyingSettings() {
         SwingUtilities.invokeAndWait {
@@ -123,12 +140,16 @@ class SwingSettingsTest {
                 assertEquals(original.width + 30, component.preferredGridSize(10, 2).width)
                 assertEquals(original.height, component.preferredGridSize(10, 2).height)
                 assertTrue(component.visibleGridSize().width < 10)
-                assertFailsWith<IllegalArgumentException> { settings.copy { it.columnSpacing = -1 } }
+                settings = settings.copy { it.columnSpacing = -1 }
+                component.reloadSettings()
+                assertEquals(originalFont, component.font)
+                assertEquals(original.width - 10, component.preferredGridSize(10, 2).width)
+                assertEquals(original.height, component.preferredGridSize(10, 2).height)
                 assertFailsWith<IllegalArgumentException> { component.preferredGridSize(Int.MAX_VALUE, 1) }
-                val expanded = component.preferredGridSize(10, 2)
+                val condensed = component.preferredGridSize(10, 2)
                 settings = settings.copy { it.columnSpacing = Int.MAX_VALUE }
                 assertFailsWith<IllegalArgumentException> { component.reloadSettings() }
-                assertEquals(expanded, component.preferredGridSize(10, 2))
+                assertEquals(condensed, component.preferredGridSize(10, 2))
             } finally {
                 component.dispose()
             }
@@ -139,8 +160,60 @@ class SwingSettingsTest {
     fun spacingDoesNotChangeVerticalMetricsOrCursorStroke() {
         val metrics = Canvas().getFontMetrics(Font(Font.MONOSPACED, Font.PLAIN, 14))
         val original = SwingMetrics.from(metrics)
-        val expanded = SwingMetrics.from(metrics, columnSpacing = 10)
-        assertEquals(original.copy(cellWidth = original.cellWidth + 10), expanded)
+        for (spacing in listOf(-1, 10)) {
+            val adjusted = SwingMetrics.from(metrics, columnSpacing = spacing)
+            assertEquals(
+                original.copy(cellWidth = original.cellWidth + spacing),
+                adjusted,
+            )
+            assertEquals(original.fontCellWidth, adjusted.fontCellWidth)
+            assertEquals(
+                if (spacing < 0) original.textCellWidth else original.cellWidth + spacing,
+                adjusted.textCellWidth,
+            )
+        }
+    }
+
+    @Test
+    fun metricsAcceptTheEntirePositiveCellWidthRange() {
+        val fontMetrics = Canvas().getFontMetrics(Font(Font.MONOSPACED, Font.PLAIN, 14))
+        val original = SwingMetrics.from(fontMetrics)
+
+        val minimum = SwingMetrics.from(fontMetrics, columnSpacing = 1 - original.cellWidth)
+        val maximum = SwingMetrics.from(fontMetrics, columnSpacing = Int.MAX_VALUE - original.cellWidth)
+        assertEquals(original.copy(cellWidth = 1, cursorStrokeWidth = 1), minimum)
+        assertEquals(original.fontCellWidth, minimum.fontCellWidth)
+        assertEquals(original.textCellWidth, minimum.textCellWidth)
+        assertEquals(original.copy(cellWidth = Int.MAX_VALUE), maximum)
+        assertEquals(original.fontCellWidth, maximum.fontCellWidth)
+        assertEquals(Int.MAX_VALUE, maximum.textCellWidth)
+    }
+
+    @Test
+    fun condensedLargeFontRetainsGlyphWidthAndFitsTheCursorInsideOnePixelCells() {
+        val fontMetrics = Canvas().getFontMetrics(Font(Font.MONOSPACED, Font.PLAIN, 72))
+        val original = SwingMetrics.from(fontMetrics)
+        assertTrue(original.cursorStrokeWidth > 1)
+
+        val condensed = SwingMetrics.from(fontMetrics, columnSpacing = 1 - original.cellWidth)
+
+        assertEquals(original.copy(cellWidth = 1, cursorStrokeWidth = 1), condensed)
+        assertEquals(original.fontCellWidth, condensed.fontCellWidth)
+        assertEquals(original.textCellWidth, condensed.textCellWidth)
+        assertEquals(1, condensed.cursorStrokeWidth)
+        assertEquals(condensed.cellWidth, condensed.cursorStrokeWidth)
+    }
+
+    @Test
+    fun metricsRejectZeroNegativeAndOverflowingCellWidths() {
+        val fontMetrics = Canvas().getFontMetrics(Font(Font.MONOSPACED, Font.PLAIN, 14))
+        val original = SwingMetrics.from(fontMetrics)
+
+        for (spacing in listOf(-original.cellWidth, -original.cellWidth - 1, Int.MIN_VALUE, Int.MAX_VALUE)) {
+            assertFailsWith<IllegalArgumentException>("spacing=$spacing") {
+                SwingMetrics.from(fontMetrics, columnSpacing = spacing)
+            }
+        }
     }
 
     @Test

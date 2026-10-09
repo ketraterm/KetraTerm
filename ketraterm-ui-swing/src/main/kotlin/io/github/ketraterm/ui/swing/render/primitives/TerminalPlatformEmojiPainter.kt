@@ -70,7 +70,7 @@ internal class TerminalPlatformEmojiPainter(
     private fun pixelSize(
         metrics: SwingMetrics,
         columnSpan: Int,
-    ): Int = maxOf(1, min(metrics.cellWidth * columnSpan, metrics.cellHeight))
+    ): Int = maxOf(1, min(metrics.textCellWidth.toLong() * columnSpan, metrics.cellHeight.toLong()).toInt())
 
     private fun paintImage(
         g: Graphics2D,

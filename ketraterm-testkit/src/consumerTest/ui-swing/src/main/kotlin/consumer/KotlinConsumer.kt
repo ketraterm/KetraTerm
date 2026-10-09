@@ -72,10 +72,12 @@ fun main() =
                 it.mouseReportingEnabled = false
                 it.copyOnSelection = true
                 it.middleClickPaste = true
-                it.columnSpacing = 3
+                it.columnSpacing = -1
             }
         check(interactionSettings == interactionSettings.copy {})
-        check(interactionSettings.columnSpacing == 3 && interactionSettings.middleClickPaste && interactionSettings.copyOnSelection)
+        check(interactionSettings.columnSpacing == -1 && interactionSettings.middleClickPaste && interactionSettings.copyOnSelection)
+        val condensedSettings = interactionSettings.copy { it.columnSpacing = -2 }
+        check(condensedSettings.columnSpacing == -2 && interactionSettings.columnSpacing == -1)
         check(!interactionSettings.mouseReportingEnabled)
         JavaConsumer.verify()
         JavaConsumer.verifySessionConstruction(ConsumerConnector())
@@ -169,6 +171,7 @@ fun main() =
                             SwingSettings.create { draft ->
                                 draft.columns = COLUMNS
                                 draft.rows = ROWS
+                                draft.columnSpacing = -1
                                 draft.padding = SwingPadding()
                                 draft.shellIntegrationDecorationGutterWidth = 0
                                 draft.osc8HyperlinkActivation = SwingHyperlinkActivation.DIRECT

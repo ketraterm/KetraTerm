@@ -6,6 +6,7 @@ Release notes for library consumers and embedders. Product-specific changes are 
 
 ### Improvements and fixes
 
+- `SwingSettings.columnSpacing` now accepts negative logical pixels for condensed cells. Text keeps its uncondensed glyph-fitting size while painting, selection, mouse coordinates, and resizing share the adjusted cell advance. Component construction and settings reload reject nonpositive or overflowing geometry; rejected reloads preserve the previous settings. The integer API and zero default are unchanged.
 - Serialized parser-requested 80/132-column transport resizing with session disposal, preserving transport-before-grid ordering and preventing resizing of a disposed connector.
 - Admitted viewport resizes now request render publication even when viewport metadata capture or connector resizing fails, preserving the original exception.
 - `SwingTerminal.pasteClipboardText` and `clearScreen` now report actual session input admission, returning `false` when startup, closure, or queue capacity prevents acceptance. Successful admission does not promise transport completion.

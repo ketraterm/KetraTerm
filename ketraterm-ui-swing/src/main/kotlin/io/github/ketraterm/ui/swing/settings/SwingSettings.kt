@@ -170,12 +170,17 @@ public class SwingSettings private constructor(
     public val lineHeight: Float = builder.lineHeight
 
     /**
-     * Adds logical pixels to each cell's horizontal advance without scaling the font.
-     * Defaults to zero and must be nonnegative. Wide characters occupy two expanded cells.
-     * Painting and hit testing use the expanded width. Text retains its existing alignment within each cell.
-     * At a fixed component width, extra spacing reduces the visible column count.
+     * Adjusts each cell's horizontal advance by signed logical pixels without scaling the font.
+     * Defaults to zero. Negative values condense spacing; positive values expand it.
+     * Wide characters occupy two adjusted cells. Painting and hit testing share the adjusted width.
+     * Text retains its uncondensed glyph-fitting size; existing paint-span clipping still applies.
+     * Adjacent glyphs can overlap within a run. Cell-native primitives follow the adjusted cells.
+     * At a fixed component width, condensed spacing increases the visible column count.
      * Live sessions resize normally. Closed sessions preserve their final grid and clip columns.
-     * Component construction and settings reload reject geometry that exceeds the integer pixel range.
+     * Component construction and settings reload validate the resolved font metrics and reject
+     * a cell width below one pixel or geometry that exceeds the integer pixel range.
+     * Rejected reloads preserve the previous settings and geometry. Settings snapshots alone
+     * cannot validate the resulting width before the component resolves its font metrics.
      */
     public val columnSpacing: Int = builder.columnSpacing
 
@@ -494,7 +499,6 @@ public class SwingSettings private constructor(
         require(visualBellEdgeThicknessPixels >= 0) {
             "visualBellEdgeThicknessPixels must be >= 0, was $visualBellEdgeThicknessPixels"
         }
-        require(columnSpacing >= 0) { "columnSpacing must be nonnegative" }
         require(lineHeight.isFinite() && lineHeight > 0f) {
             "lineHeight must be finite and > 0, was $lineHeight"
         }

@@ -32,6 +32,7 @@ import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.params.ParameterizedTest
 import org.junit.jupiter.params.provider.ValueSource
+import java.awt.Point
 import java.awt.Rectangle
 import java.awt.event.InputEvent
 import java.awt.event.MouseEvent
@@ -39,14 +40,20 @@ import java.io.ByteArrayOutputStream
 import javax.swing.SwingUtilities
 
 class SwingTerminalInteractionSettingsTest {
-    @Test
-    fun `live spacing resize clears selection and preserves output`() =
+    @ParameterizedTest
+    @ValueSource(ints = [-3, 5])
+    fun `live spacing resize clears selection and preserves output`(spacing: Int) =
         fixture {
             assertTrue(view.selectAll())
-            settings = settings.copy { it.columnSpacing = 5 }
+            val originalSize = view.preferredGridSize(10, 2)
+            val originalFont = view.font
+            settings = settings.copy { it.columnSpacing = spacing }
             view.reloadSettings()
             val visibleColumns = view.visibleGridSize().width
-            assertTrue(visibleColumns < 10)
+            assertEquals(originalSize.width + 10 * spacing, view.preferredGridSize(10, 2).width)
+            assertEquals(originalSize.height, view.preferredGridSize(10, 2).height)
+            assertEquals(originalFont, view.font)
+            if (spacing < 0) assertTrue(visibleColumns > 10) else assertTrue(visibleColumns < 10)
             session.readRenderFrame { assertEquals(visibleColumns, it.columns) }
             assertNull(view.currentSelectionRange())
             assertEquals(0, copies)
@@ -403,7 +410,7 @@ class SwingTerminalInteractionSettingsTest {
         }
 
     @ParameterizedTest
-    @ValueSource(ints = [0, 5])
+    @ValueSource(ints = [-3, 0, 5])
     fun `spaced cell bounds and mouse selection use the same columns`(spacing: Int) =
         fixture {
             settings = settings.copy { it.columnSpacing = spacing }
@@ -413,14 +420,131 @@ class SwingTerminalInteractionSettingsTest {
             feed("\u001b[Habcdefghij")
             view.bind(session)
             val bounds = Rectangle()
+            val position = Point()
             assertTrue(view.copyCellBounds(3, 0, bounds))
-            val press = event(MouseEvent.MOUSE_PRESSED, MouseEvent.BUTTON1, x = bounds.x + 1)
+            val startX = bounds.x + bounds.width / 2
+            assertTrue(view.copyCellPositionAt(startX, 1, position))
+            assertEquals(Point(3, 0), position)
+            val press = event(MouseEvent.MOUSE_PRESSED, MouseEvent.BUTTON1, x = startX)
             view.mouseListeners.forEach { it.mousePressed(press) }
             assertTrue(view.copyCellBounds(6, 0, bounds))
-            val drag = event(MouseEvent.MOUSE_DRAGGED, MouseEvent.BUTTON1, modifiers = InputEvent.BUTTON1_DOWN_MASK, x = bounds.x + 1)
+            val endX = bounds.x + bounds.width / 2
+            assertTrue(view.copyCellPositionAt(endX, 1, position))
+            assertEquals(Point(6, 0), position)
+            val drag = event(MouseEvent.MOUSE_DRAGGED, MouseEvent.BUTTON1, modifiers = InputEvent.BUTTON1_DOWN_MASK, x = endX)
             view.mouseMotionListeners.forEach { it.mouseDragged(drag) }
             release(MouseEvent.BUTTON1)
             assertEquals("defg", clipboardText)
+        }
+
+    @ParameterizedTest
+    @ValueSource(ints = [-3, 0, 5])
+    fun `cell spacing maps pointer positions to terminal mouse coordinates`(spacing: Int) =
+        fixture {
+            settings = settings.copy { it.columnSpacing = spacing }
+            view.reloadSettings()
+            view.size = view.preferredGridSize(10, 2)
+            view.bind(session)
+            feed("\u001b[?1000h\u001b[?1006h")
+            view.bind(session)
+            val bounds = Rectangle()
+            assertTrue(view.copyCellBounds(7, 0, bounds))
+            val x = bounds.x + bounds.width / 2
+            val position = Point()
+            assertTrue(view.copyCellPositionAt(x, 1, position))
+            assertEquals(Point(7, 0), position)
+
+            val press = event(MouseEvent.MOUSE_PRESSED, MouseEvent.BUTTON1, x = x)
+            view.mouseListeners.forEach { it.mousePressed(press) }
+            val release = event(MouseEvent.MOUSE_RELEASED, MouseEvent.BUTTON1, x = x)
+            view.mouseListeners.forEach { it.mouseReleased(release) }
+            dispatcher.scheduler.runCurrent()
+
+            assertEquals("\u001b[<0;8;1M\u001b[<0;8;1m", output.toString(Charsets.UTF_8))
+            assertEquals(0, copies)
+        }
+
+    @Test
+    fun `one pixel cells remain distinct in bounds and hit testing`() =
+        fixture {
+            val originalBounds = Rectangle()
+            assertTrue(view.copyCellBounds(0, 0, originalBounds))
+            val originalFont = view.font
+            settings = settings.copy { it.columnSpacing = 1 - originalBounds.width }
+            view.reloadSettings()
+            dispatcher.scheduler.runCurrent()
+            view.bind(session)
+            assertEquals(originalFont, view.font)
+            assertEquals(10, view.preferredGridSize(10, 2).width)
+            val bounds = Rectangle()
+            val position = Point()
+            for (column in 0 until 10) {
+                assertTrue(view.copyCellBounds(column, 0, bounds))
+                assertEquals(Rectangle(column, 0, 1, originalBounds.height), bounds)
+                assertTrue(view.copyCellPositionAt(column, 1, position))
+                assertEquals(Point(column, 0), position)
+            }
+        }
+
+    @ParameterizedTest
+    @ValueSource(strings = ["zero", "negative", "underflow", "overflow"])
+    fun `invalid spacing reload retains the previous view and permits recovery`(invalidWidth: String) =
+        fixture {
+            feed("\u001b[?1000h\u001b[?1006h")
+            view.bind(session)
+            assertTrue(view.selectAll())
+            val originalSelection = view.currentSelectionRange()
+            val originalSettings = settings
+            val originalSize = view.preferredGridSize(10, 2)
+            val originalVisibleSize = view.visibleGridSize()
+            val originalFont = view.font
+            val originalBounds = Rectangle()
+            assertTrue(view.copyCellBounds(3, 0, originalBounds))
+            val replacementFont = originalFont.deriveFont(originalFont.size2D + 2f)
+            val replacementFontWidth = maxOf(1, view.getFontMetrics(replacementFont).charWidth('W'))
+            settings =
+                settings.copy {
+                    it.font = replacementFont
+                    it.padding = SwingPadding(3, 7, 2, 5)
+                    it.mouseReportingEnabled = false
+                    it.columnSpacing =
+                        when (invalidWidth) {
+                            "zero" -> -replacementFontWidth
+                            "negative" -> -replacementFontWidth - 1
+                            "underflow" -> Int.MIN_VALUE
+                            else -> Int.MAX_VALUE
+                        }
+                }
+
+            assertThrows(IllegalArgumentException::class.java) { view.reloadSettings() }
+            assertEquals(originalFont, view.font)
+            assertEquals(originalSize, view.preferredGridSize(10, 2))
+            assertEquals(originalVisibleSize, view.visibleGridSize())
+            assertSame(originalSelection, view.currentSelectionRange())
+            val bounds = Rectangle()
+            assertTrue(view.copyCellBounds(3, 0, bounds))
+            assertEquals(originalBounds, bounds)
+            val x = bounds.x + bounds.width / 2
+            val position = Point()
+            assertTrue(view.copyCellPositionAt(x, 1, position))
+            assertEquals(Point(3, 0), position)
+            val press = event(MouseEvent.MOUSE_PRESSED, MouseEvent.BUTTON1, x = x)
+            view.mouseListeners.forEach { it.mousePressed(press) }
+            val release = event(MouseEvent.MOUSE_RELEASED, MouseEvent.BUTTON1, x = x)
+            view.mouseListeners.forEach { it.mouseReleased(release) }
+            dispatcher.scheduler.runCurrent()
+            assertEquals("\u001b[<0;4;1M\u001b[<0;4;1m", output.toString(Charsets.UTF_8))
+
+            settings = originalSettings.copy { it.columnSpacing = -1 }
+            view.reloadSettings()
+            dispatcher.scheduler.runCurrent()
+            view.bind(session)
+            assertEquals(originalSize.width - 10, view.preferredGridSize(10, 2).width)
+            assertEquals(originalSize.height, view.preferredGridSize(10, 2).height)
+            assertTrue(view.copyCellBounds(3, 0, bounds))
+            assertEquals(originalBounds.width - 1, bounds.width)
+            assertTrue(view.copyCellPositionAt(bounds.x + bounds.width / 2, 1, position))
+            assertEquals(Point(3, 0), position)
         }
 
     private fun fixture(

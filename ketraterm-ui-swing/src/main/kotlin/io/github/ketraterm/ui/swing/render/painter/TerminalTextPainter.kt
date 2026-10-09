@@ -390,7 +390,7 @@ internal class TerminalTextPainter(
                     length,
                     fontStyle,
                     visualColumn * metrics.cellWidth,
-                    metrics.cellWidth * columnSpan,
+                    metrics.textCellWidth.toFloat() * columnSpan,
                     baselineY,
                     fontRenderContext,
                 )
@@ -407,7 +407,7 @@ internal class TerminalTextPainter(
                 codePoint,
                 fontStyle,
                 visualColumn * metrics.cellWidth,
-                metrics.cellWidth * columnSpan,
+                metrics.textCellWidth.toFloat() * columnSpan,
                 baselineY,
                 fontRenderContext,
             )
@@ -447,7 +447,7 @@ internal class TerminalTextPainter(
         length: Int,
         fontStyle: Int,
         x: Int,
-        cellPixelWidth: Int,
+        textPixelWidth: Float,
         baselineY: Int,
         fontRenderContext: FontRenderContext,
     ) {
@@ -458,8 +458,8 @@ internal class TerminalTextPainter(
         val layout =
             complexTextLayouts
                 .clusterLayout(codepoints, offset, shapedLength, fontStyle, fontRenderContext, fontCache)
-        drawFittedLayout(g, layout, drawX, baseline, x + cellPixelWidth)
-        drawX += minOf(layout.advance, cellPixelWidth.toFloat())
+        drawFittedLayout(g, layout, drawX, baseline, x + textPixelWidth)
+        drawX += minOf(layout.advance, textPixelWidth)
 
         var index = offset + shapedLength
         val end = offset + length
@@ -467,8 +467,8 @@ internal class TerminalTextPainter(
             val codePointLayout =
                 complexTextLayouts
                     .codePointLayout(codepoints[index], fontStyle, fontRenderContext, fontCache)
-            drawFittedLayout(g, codePointLayout, drawX, baseline, x + cellPixelWidth)
-            drawX += minOf(codePointLayout.advance, maxOf(0f, x + cellPixelWidth - drawX))
+            drawFittedLayout(g, codePointLayout, drawX, baseline, x + textPixelWidth)
+            drawX += minOf(codePointLayout.advance, maxOf(0f, x + textPixelWidth - drawX))
             index++
         }
     }
@@ -478,14 +478,14 @@ internal class TerminalTextPainter(
         codePoint: Int,
         fontStyle: Int,
         x: Int,
-        cellPixelWidth: Int,
+        textPixelWidth: Float,
         baselineY: Int,
         fontRenderContext: FontRenderContext,
     ) {
         val layout =
             complexTextLayouts
                 .codePointLayout(codePoint, fontStyle, fontRenderContext, fontCache)
-        drawFittedLayout(g, layout, x.toFloat(), baselineY.toFloat(), x + cellPixelWidth)
+        drawFittedLayout(g, layout, x.toFloat(), baselineY.toFloat(), x + textPixelWidth)
     }
 
     private fun drawFittedLayout(
@@ -493,7 +493,7 @@ internal class TerminalTextPainter(
         layout: TextLayout,
         x: Float,
         baselineY: Float,
-        spanEndX: Int,
+        spanEndX: Float,
     ) {
         val available = spanEndX - x
         val advance = layout.advance

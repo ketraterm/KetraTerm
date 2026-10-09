@@ -111,13 +111,16 @@ public final class JavaConsumer {
             draft.setMouseReportingEnabled(false);
             draft.setCopyOnSelection(true);
             draft.setMiddleClickPaste(true);
-            draft.setColumnSpacing(3);
+            draft.setColumnSpacing(-1);
         });
         var copiedSettings = interactionSettings.toBuilder().build();
         if (copiedSettings.getMouseReportingEnabled() || !copiedSettings.getCopyOnSelection()
-            || !copiedSettings.getMiddleClickPaste() || copiedSettings.getColumnSpacing() != 3
+            || !copiedSettings.getMiddleClickPaste() || copiedSettings.getColumnSpacing() != -1
             || !interactionSettings.equals(copiedSettings))
             throw new AssertionError("Java interaction settings did not survive copying");
+        var condensedSettings = interactionSettings.copy(draft -> draft.setColumnSpacing(-2));
+        if (condensedSettings.getColumnSpacing() != -2 || interactionSettings.getColumnSpacing() != -1)
+            throw new AssertionError("Java condensed spacing copy changed the original snapshot");
         var resolver = new io.github.ketraterm.ui.swing.api.TerminalFontResolver() {
             public java.awt.Font resolveFallbackFont(int codePoint, int style, float size) { return null; }
             public java.awt.Font resolveFallbackFont(String text, int style, float size) { return null; }
@@ -158,7 +161,10 @@ draft.setHyperlinkHandler(uri -> uri.equals("https://example.test/java") && acti
 });
         SwingUtilities.invokeAndWait(() -> {
             new SwingTerminal().dispose();
-            var terminal = new SwingTerminal(() -> SwingSettings.create(draft -> draft.setSmartSuggestionsEnabled(true)), services);
+            var terminal = new SwingTerminal(() -> SwingSettings.create(draft -> {
+                draft.setSmartSuggestionsEnabled(true);
+                draft.setColumnSpacing(-1);
+            }), services);
             try {
                 var interaction = terminal.beginShellSuggestionInteraction(
                     new SwingShellSuggestionRequest("git st", 6),

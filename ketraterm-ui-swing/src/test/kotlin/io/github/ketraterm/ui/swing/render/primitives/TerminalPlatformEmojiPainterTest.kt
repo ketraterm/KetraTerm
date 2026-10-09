@@ -25,6 +25,7 @@ import org.junit.jupiter.api.Test
 import org.junit.jupiter.params.ParameterizedTest
 import org.junit.jupiter.params.provider.CsvSource
 import org.junit.jupiter.params.provider.ValueSource
+import java.awt.AlphaComposite
 import java.awt.image.BufferedImage
 import kotlin.test.*
 
@@ -220,7 +221,7 @@ class TerminalPlatformEmojiPainterTest {
         val rasterizer = FakeEmojiRasterizer(supported = supported)
         val painter = TerminalPlatformEmojiPainter(rasterizer)
         val codepoints = intArrayOf(0x41, 0x1F600, 0x42)
-        val narrowerMetrics = METRICS.copy(cellWidth = 5)
+        val narrowerMetrics = METRICS.copy(cellWidth = 5, fontCellWidth = 5)
         val image = BufferedImage(60, 60, BufferedImage.TYPE_INT_ARGB)
         val g = image.createGraphics()
         try {
@@ -368,6 +369,63 @@ class TerminalPlatformEmojiPainterTest {
                 assertTrue(painter.paintCluster(g, codepoints, 1, 2, 0, 0, 1, METRICS))
             }
             assertEquals(listOf("\u2764\uFE0F", "\u2764\uFE0F"), calls)
+        } finally {
+            g.dispose()
+        }
+    }
+
+    @ParameterizedTest
+    @CsvSource("false, 1", "false, 2", "true, 1", "true, 2")
+    fun `condensed cells retain native emoji raster size and physical placement`(
+        cluster: Boolean,
+        columnSpan: Int,
+    ) {
+        val rasterizer = FakeEmojiRasterizer()
+        val painter = TerminalPlatformEmojiPainter(rasterizer)
+        val image = BufferedImage(40, 40, BufferedImage.TYPE_INT_ARGB)
+        val g = image.createGraphics()
+        val condensed = METRICS.copy(cellWidth = 7)
+        val codepoints = intArrayOf(0x1F600)
+        try {
+            assertTrue(painter.paintCodePoint(g, 0x1F600, 0, 0, columnSpan, METRICS))
+            g.composite = AlphaComposite.Clear
+            g.fillRect(0, 0, image.width, image.height)
+            g.composite = AlphaComposite.SrcOver
+            g.clipRect(condensed.cellWidth, condensed.cellHeight, condensed.cellWidth * columnSpan, condensed.cellHeight)
+            val painted =
+                if (cluster) {
+                    painter.paintCluster(g, codepoints, 0, codepoints.size, 1, 1, columnSpan, condensed)
+                } else {
+                    painter.paintCodePoint(g, 0x1F600, 1, 1, columnSpan, condensed)
+                }
+            assertTrue(painted)
+            assertEquals(listOf(10 * columnSpan), rasterizer.pixelSizes, "Condensation must reuse the nominal raster")
+            assertEquals(TEST_RED, image.getRGB(if (columnSpan == 1) 11 else 14, 30))
+            for (y in 0 until image.height) {
+                for (x in 0 until image.width) {
+                    if (x !in condensed.cellWidth until condensed.cellWidth * (1 + columnSpan) ||
+                        y !in condensed.cellHeight until condensed.cellHeight * 2
+                    ) {
+                        assertEquals(0, image.getRGB(x, y), "Emoji must respect the physical clip at ($x,$y)")
+                    }
+                }
+            }
+        } finally {
+            g.dispose()
+        }
+    }
+
+    @Test
+    fun `native emoji fitting handles a font budget beyond integer span width`() {
+        val rasterizer = FakeEmojiRasterizer()
+        val painter = TerminalPlatformEmojiPainter(rasterizer)
+        val image = BufferedImage(2, 20, BufferedImage.TYPE_INT_ARGB)
+        val g = image.createGraphics()
+        try {
+            val metrics = METRICS.copy(cellWidth = 1, fontCellWidth = Int.MAX_VALUE)
+            assertTrue(painter.paintCodePoint(g, 0x1F600, 0, 0, 2, metrics))
+            assertEquals(listOf(20), rasterizer.pixelSizes)
+            assertEquals(TEST_RED, image.getRGB(1, 10))
         } finally {
             g.dispose()
         }

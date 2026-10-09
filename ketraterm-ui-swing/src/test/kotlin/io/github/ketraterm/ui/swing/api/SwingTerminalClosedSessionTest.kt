@@ -28,7 +28,7 @@ import kotlinx.coroutines.test.StandardTestDispatcher
 import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.params.ParameterizedTest
-import org.junit.jupiter.params.provider.ValueSource
+import org.junit.jupiter.params.provider.CsvSource
 import java.awt.Point
 import java.awt.Rectangle
 import java.awt.event.ComponentEvent
@@ -114,8 +114,11 @@ class SwingTerminalClosedSessionTest {
     }
 
     @ParameterizedTest
-    @ValueSource(strings = ["primary", "alternate", "restored"])
-    fun `closed output supports scrolling selection font changes and rebinding`(screen: String) {
+    @CsvSource("primary, 4", "alternate, 4", "restored, 4", "primary, -1", "alternate, -1", "restored, -1")
+    fun `closed output supports scrolling selection font changes and rebinding`(
+        screen: String,
+        columnSpacing: Int,
+    ) {
         val connector = RecordingConnector()
         val session = session(connector)
         feed(session, "oldest\r\nsecond\r\nthird\r\nlast")
@@ -165,7 +168,7 @@ class SwingTerminalClosedSessionTest {
                 assertEquals(expected, clipboard.text.trimEnd())
                 assertFalse(component.copyCellBounds(8, 0, Rectangle()), "narrow views clip columns")
 
-                settings = settings.copy { it.columnSpacing = 4 }
+                settings = settings.copy { it.columnSpacing = columnSpacing }
                 component.reloadSettings()
                 assertTrue(component.copySelectionToClipboard())
                 assertEquals(expected, clipboard.text.trimEnd())
