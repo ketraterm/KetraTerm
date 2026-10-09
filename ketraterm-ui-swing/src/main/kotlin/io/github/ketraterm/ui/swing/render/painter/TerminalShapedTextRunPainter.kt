@@ -310,6 +310,7 @@ internal class TerminalShapedTextRunPainter(
             columns = endColumn - startColumn,
             style = terminalFontStyle(cache.attrWords[rowOffset + startColumn]),
             cellWidth = metrics.cellWidth,
+            textCellWidth = metrics.textCellWidth,
             fontCache = fontCache,
             fontRenderContext = fontRenderContext,
             rtl = rtl,

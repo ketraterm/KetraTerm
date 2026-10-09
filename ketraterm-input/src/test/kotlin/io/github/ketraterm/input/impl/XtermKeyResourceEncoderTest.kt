@@ -17,6 +17,7 @@ package io.github.ketraterm.input.impl
 
 import io.github.ketraterm.core.TerminalBuffers
 import io.github.ketraterm.core.api.TerminalInputState
+import io.github.ketraterm.input.TerminalInputEncoders
 import io.github.ketraterm.input.event.TerminalKey
 import io.github.ketraterm.input.event.TerminalKeyEvent
 import io.github.ketraterm.input.event.TerminalKeyEventType
@@ -30,6 +31,55 @@ import org.junit.jupiter.params.provider.ValueSource
 import java.io.ByteArrayOutputStream
 
 class XtermKeyResourceEncoderTest {
+    @ParameterizedTest
+    @CsvSource(
+        "UP,0,15,0,[1;5A",
+        "UP,0,15,1,[1;5A",
+        "UP,1,4,0,[27;5;57938~",
+        "UP,1,4,1,[57938;5u",
+        "F1,2,4,0,[27;5;58046~",
+        "F1,2,4,1,[58046;5u",
+        "NUMPAD_1,3,4,0,[27;5;58033~",
+        "NUMPAD_1,3,4,1,[58033;5u",
+        "a,4,3,0,[27;5;97~",
+        "a,4,3,1,[97;5u",
+        "LEFT_SHIFT,6,4,0,[27;5;58081~",
+        "LEFT_SHIFT,6,4,1,[58081;5u",
+        "ENTER,7,4,0,[27;5;13~",
+        "ENTER,7,4,1,[13;5u",
+        "UP,1,-1,0,[A",
+        "UP,1,2,0,[1;5A",
+    )
+    fun `independent mode producers can configure every key resource using public packing`(
+        key: String,
+        resource: Int,
+        level: Int,
+        format: Int,
+        expected: String,
+    ) {
+        val bits = TerminalInputState.withKeyFormatOption(TerminalInputState.withKeyModifierOption(0L, resource, level), resource, format)
+        var reads = 0
+        val state =
+            object : TerminalInputState {
+                override fun getInputModeBits(): Long {
+                    reads++
+                    return bits
+                }
+            }
+        val event =
+            if (key == "a") {
+                TerminalKeyEvent.codepoint('a'.code, TerminalModifiers.CTRL)
+            } else {
+                TerminalKeyEvent.key(TerminalKey.valueOf(key), TerminalModifiers.CTRL)
+            }
+        val output = RecordingOutput()
+
+        TerminalInputEncoders.create(state, output).encodeKey(event)
+
+        assertEquals("\u001B$expected", output.text())
+        assertEquals(1, reads)
+    }
+
     @ParameterizedTest
     @ValueSource(ints = [-1, 0, 1, 2, 3, 4])
     fun `function resource levels preserve modified PF keypad sequences`(functionLevel: Int) {

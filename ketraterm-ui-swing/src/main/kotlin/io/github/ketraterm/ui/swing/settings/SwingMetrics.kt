@@ -27,6 +27,7 @@ import java.awt.FontMetrics
  * @property strikethroughY strikethrough y offset inside a cell in pixels.
  * @property overlineY overline y offset inside a cell in pixels.
  * @property cursorStrokeWidth stroke width for bar and underline cursors.
+ * @property fontCellWidth unadjusted primary-font cell width, retained for glyph fitting when spacing is condensed.
  */
 internal data class SwingMetrics(
     val cellWidth: Int,
@@ -36,9 +37,14 @@ internal data class SwingMetrics(
     val strikethroughY: Int,
     val overlineY: Int,
     val cursorStrokeWidth: Int,
+    val fontCellWidth: Int = cellWidth,
 ) {
+    /** Glyph fitting keeps its original budget when cell advances are condensed. */
+    val textCellWidth: Int get() = maxOf(cellWidth, fontCellWidth)
+
     init {
         require(cellWidth > 0) { "cellWidth must be > 0, was $cellWidth" }
+        require(fontCellWidth > 0) { "fontCellWidth must be > 0, was $fontCellWidth" }
         require(cellHeight > 0) { "cellHeight must be > 0, was $cellHeight" }
         require(baseline in 0..cellHeight) {
             "baseline must be within cell height: baseline=$baseline cellHeight=$cellHeight"
@@ -61,11 +67,11 @@ internal data class SwingMetrics(
             lineHeight: Float = 1.0f,
             columnSpacing: Int = 0,
         ): SwingMetrics {
-            require(columnSpacing >= 0) { "columnSpacing must be nonnegative" }
             val fontWidth = maxOf(1, fontMetrics.charWidth('W'))
-            val expandedWidth = fontWidth.toLong() + columnSpacing
-            require(expandedWidth <= Int.MAX_VALUE) { "cell width exceeds the integer pixel range" }
-            val cellWidth = expandedWidth.toInt()
+            val adjustedWidth = fontWidth.toLong() + columnSpacing
+            require(adjustedWidth > 0) { "cell width must be positive, was $adjustedWidth" }
+            require(adjustedWidth <= Int.MAX_VALUE) { "cell width exceeds the integer pixel range" }
+            val cellWidth = adjustedWidth.toInt()
             val originalHeight = fontMetrics.height
             val cellHeight = maxOf(1, (originalHeight * lineHeight).toInt())
             val baseline = (fontMetrics.ascent + (cellHeight - originalHeight) / 2).coerceIn(0, cellHeight)
@@ -78,7 +84,8 @@ internal data class SwingMetrics(
                 underlineY = underlineY,
                 strikethroughY = strikethroughY,
                 overlineY = 0,
-                cursorStrokeWidth = maxOf(1, fontWidth / 8),
+                cursorStrokeWidth = minOf(cellWidth, maxOf(1, fontWidth / 8)),
+                fontCellWidth = fontWidth,
             )
         }
     }

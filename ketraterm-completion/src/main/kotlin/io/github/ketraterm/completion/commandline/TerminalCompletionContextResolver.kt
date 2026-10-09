@@ -17,7 +17,6 @@ package io.github.ketraterm.completion.commandline
 
 import io.github.ketraterm.completion.api.TerminalCompletionActivePosition
 import io.github.ketraterm.completion.api.TerminalCompletionContext
-import io.github.ketraterm.completion.api.TerminalCompletionRequest
 import io.github.ketraterm.completion.api.TerminalShellSyntax
 import io.github.ketraterm.completion.model.*
 
@@ -27,12 +26,6 @@ internal data class AttachedOptionValue(
     val replacementStartOffset: Int,
     val quote: Char,
 )
-
-/** Parses and resolves one request against the engine's single command-spec set. */
-internal fun TerminalCompletionRequest.resolveCompletionContext(commandSpecs: List<TerminalCommandSpec>): TerminalCompletionContext {
-    val lineContext = TerminalCommandLineTokenizer.parse(commandLine, cursorOffset, shellCapabilities.syntax)
-    return TerminalCompletionContextResolver.resolve(commandLine, lineContext, commandSpecs)
-}
 
 internal object TerminalCompletionContextResolver {
     fun resolve(
@@ -108,7 +101,7 @@ internal object TerminalCompletionContextResolver {
             attachedOptionValue?.option ?: if (optionsTerminated) null else analysis.pendingOptionValue
         val activePositionalArgument =
             if (activeOption == null) {
-                commandPath.last().positionalArgumentAt(analysis.positionalArgumentCount)
+                commandPath.last().positionalArgumentAt(analysis.positionalArguments.size)
             } else {
                 null
             }
@@ -145,6 +138,8 @@ internal object TerminalCompletionContextResolver {
             staticValueCandidates = activeOption?.valueCandidates ?: activePositionalArgument?.valueCandidates ?: emptyList(),
             activeTokenQuote = attachedOptionValue?.quote ?: activeTokenQuote,
             attachedOptionValue = attachedOptionValue,
+            optionValuesBeforeCursor = analysis.optionValues,
+            precedingPositionalArguments = analysis.positionalArguments,
         )
     }
 

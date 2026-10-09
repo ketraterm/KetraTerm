@@ -28,7 +28,8 @@ public fun interface TerminalCompletionSource {
      * merged engine owns parallel collection.
      *
      * @param request command-line completion context.
-     * @param context parsed semantic context shared by the merged engine.
+     * @param context semantic context resolved for [request] using the caller's command catalog.
+     * Custom engines obtain it through [TerminalCompletionContext.resolve] and share it across sources.
      * @param limit maximum candidates this source may return.
      * @return ordered candidates from this source.
      */

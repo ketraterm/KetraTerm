@@ -53,17 +53,47 @@ public interface TerminalLine {
     public fun isCluster(col: Int): Boolean = false
 
     /**
+     * Returns the number of codepoints in the cluster at [col], or `0` for a
+     * scalar, blank, or wide spacer cell. This is the capacity required by
+     * [readCluster], not a UTF-16 length or a display width.
+     *
+     * Core-owned lines answer in constant time without allocating or copying.
+     * Grow a reusable destination only when this count exceeds its capacity.
+     * Keep the owning terminal serialized against mutation continuously from
+     * obtaining this borrowed line through sizing and copying; the count does
+     * not remain valid across mutation and the line must not escape that boundary.
+     *
+     * Implementations with cluster storage must override this operation together
+     * with [isCluster] and [readCluster]. The default returns `0` when [isCluster]
+     * is false and rejects cluster cells rather than reporting an incorrect size.
+     *
+     * @param col Column index (0-based), within this physical line's width.
+     * @return Exact cluster codepoint count, or `0` for a non-cluster cell.
+     * A core-owned void line returns `0` for any column.
+     * @throws IndexOutOfBoundsException for an invalid column in a core-owned physical line.
+     * @throws UnsupportedOperationException if a clustered implementation has not
+     * provided capacity discovery.
+     */
+    public fun getClusterLength(col: Int): Int {
+        if (isCluster(col)) {
+            throw UnsupportedOperationException("Clustered lines must implement getClusterLength")
+        }
+        return 0
+    }
+
+    /**
      * Copies all codepoints of the grapheme cluster at [col] into [dest] and
      * returns the number of codepoints written.
      *
      * The copy itself does not allocate. The caller owns capacity and may reuse
-     * [dest] while it remains large enough; no fixed public cluster-length bound
-     * makes one startup allocation sufficient for every directly written cluster.
-     * For complete reads without a capacity guess, use
+     * [dest] while it remains large enough. Use [getClusterLength] to discover
+     * required capacity before copying, under the same uninterrupted serialization;
+     * directly written clusters have no fixed public length bound. Alternatively, use
      * [io.github.ketraterm.render.api.TerminalRenderFrame.copyLine] with a
      * [io.github.ketraterm.render.api.TerminalRenderClusterDataSink]. Its callback
      * supplies the full length and a borrowed primitive range to copy before returning.
-     * Keep the owning terminal serialized for either read path.
+     * Keep the owning terminal serialized for either read path. An insufficient
+     * destination is rejected by core-owned lines before any elements are changed.
      *
      * Returns `0` for non-cluster cells; callers should check [isCluster] first
      * or treat a return value of `0` as "use [getCodepoint] instead".

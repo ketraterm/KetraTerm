@@ -53,12 +53,15 @@ tasks.test {
     useJUnitPlatform()
 }
 
-tasks.processResources {
-    val appVersion = project.version.toString()
-    inputs.property("version", appVersion)
-    filesMatching("**/version.properties") {
-        expand(mapOf("version" to appVersion))
+val appVersionResources = layout.buildDirectory.dir("generated/resources/app-version")
+val generateAppVersionProperties =
+    tasks.register<WriteProperties>("generateAppVersionProperties") {
+        destinationFile.set(appVersionResources.map { it.file("io/github/ketraterm/app/version.properties") })
+        property("version", project.version.toString())
     }
+
+sourceSets.main {
+    resources.srcDir(files(appVersionResources).builtBy(generateAppVersionProperties))
 }
 
 val printNativeVersion =

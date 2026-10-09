@@ -51,5 +51,12 @@ public final class JavaConsumer {
                 || reader.getLine(-1).getWidth() != 0 || reader.getLine(0).isCluster(0)
                 || reader.getLine(0).readCluster(0, new int[0]) != 0) throw new AssertionError("Independent core reader");
         if (reader.getPalette() != reader.getPalette()) throw new AssertionError("Retained immutable palette");
+        if (reader.getLine(0).getClusterLength(0) != 0) throw new AssertionError("Scalar line defaults");
+    }
+    public static void verifyCluster(TerminalLine line, int[] expected) {
+        int length = line.getClusterLength(0);
+        int[] copy = new int[length];
+        if (length != expected.length || line.readCluster(0, copy) != length
+                || !java.util.Arrays.equals(expected, copy)) throw new AssertionError("Complete direct cluster read");
     }
 }

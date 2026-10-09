@@ -50,9 +50,16 @@ fun main() {
     val reader = KotlinReader()
     check(reader.getCodepointAt(0, 0) == 'K'.code && reader.getCodepointAt(Int.MIN_VALUE, 0) == 0)
     check(reader.getLine(Int.MAX_VALUE).width == 0 && reader.getLine(0).readCluster(0, IntArray(0)) == 0)
+    check(reader.getLine(0).getClusterLength(0) == 0)
     val buffer = TerminalBuffers.create(2, 1, 0)
     val expected = IntArray(4097) { if (it == 0) 'e'.code else 0x0301 }
     buffer.writeCluster(expected, expected.size)
+    val line = buffer.getLine(0)
+    val required = line.getClusterLength(0)
+    check(required == expected.size && line.getClusterLength(1) == 0)
+    val directCopy = IntArray(required)
+    check(line.readCluster(0, directCopy) == required && directCopy.contentEquals(expected))
+    JavaConsumer.verifyCluster(line, expected)
     val tooSmall = intArrayOf(-1)
     try {
         buffer.getLine(0).readCluster(0, tooSmall)

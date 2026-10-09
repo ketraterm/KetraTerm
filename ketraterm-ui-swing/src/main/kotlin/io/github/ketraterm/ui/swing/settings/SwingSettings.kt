@@ -170,12 +170,17 @@ public class SwingSettings private constructor(
     public val lineHeight: Float = builder.lineHeight
 
     /**
-     * Adds logical pixels to each cell's horizontal advance without scaling the font.
-     * Defaults to zero and must be nonnegative. Wide characters occupy two expanded cells.
-     * Painting and hit testing use the expanded width. Text retains its existing alignment within each cell.
-     * At a fixed component width, extra spacing reduces the visible column count.
+     * Adjusts each cell's horizontal advance by signed logical pixels without scaling the font.
+     * Defaults to zero. Negative values condense spacing; positive values expand it.
+     * Wide characters occupy two adjusted cells. Painting and hit testing share the adjusted width.
+     * Text retains its uncondensed glyph-fitting size; existing paint-span clipping still applies.
+     * Adjacent glyphs can overlap within a run. Cell-native primitives follow the adjusted cells.
+     * At a fixed component width, condensed spacing increases the visible column count.
      * Live sessions resize normally. Closed sessions preserve their final grid and clip columns.
-     * Component construction and settings reload reject geometry that exceeds the integer pixel range.
+     * Component construction and settings reload validate the resolved font metrics and reject
+     * a cell width below one pixel or geometry that exceeds the integer pixel range.
+     * Rejected reloads preserve the previous settings and geometry. Settings snapshots alone
+     * cannot validate the resulting width before the component resolves its font metrics.
      */
     public val columnSpacing: Int = builder.columnSpacing
 
@@ -183,9 +188,17 @@ public class SwingSettings private constructor(
      * Allows application mouse reports from this view. Defaults to true.
      * Disabling preserves terminal modes and permits local selection, links, and menus.
      * Shift forces local interaction. A started button gesture retains its route until release.
-     * Wheel-to-arrow input in the alternate buffer remains independent of this setting.
+     * Alternate-buffer wheel input is controlled separately by [alternateScreenWheelToArrowEnabled].
      */
     public val mouseReportingEnabled: Boolean = builder.mouseReportingEnabled
+
+    /**
+     * Converts local wheel motion to arrow keys in the alternate buffer. Defaults to true.
+     * Application mouse reporting takes priority. Shift bypasses reporting and respects this setting.
+     * When false, wheel motion uses local viewport scrolling, allowing unhandled motion to reach the host.
+     * Primary-buffer scrolling is unaffected. Reloading a changed value clears partial wheel-to-arrow input.
+     */
+    public val alternateScreenWheelToArrowEnabled: Boolean = builder.alternateScreenWheelToArrowEnabled
 
     /**
      * Copies a nonempty selection once when a local primary-button gesture completes.
@@ -196,12 +209,22 @@ public class SwingSettings private constructor(
     public val copyOnSelection: Boolean = builder.copyOnSelection
 
     /**
-     * Pastes through the supplied clipboard handler on a local middle-button press.
+     * Enables paste on a local middle-button press, using [middleClickPasteSource].
      * Defaults to false. Application mouse tracking takes priority unless Shift forces local input.
      * Uses the normal paste policy and bracketed-paste handling. Closed sessions do not read the clipboard.
-     * Clipboard callbacks run on the EDT and propagate failures.
+     * Without a [io.github.ketraterm.ui.swing.api.SwingHostServices.middleClickPasteHandler],
+     * clipboard callbacks run on the EDT and propagate failures. A supplied hook owns clipboard access
+     * and may complete later. Changing this setting does not cancel requests already issued to a hook.
      */
     public val middleClickPaste: Boolean = builder.middleClickPaste
+
+    /**
+     * Clipboard source captured on an enabled local middle-button press. Defaults to [SwingPasteSource.CLIPBOARD].
+     * The built-in path reads only this source; unavailable PRIMARY never falls back to the ordinary clipboard.
+     * A host paste hook receives the captured source and owns obtaining or declining the text.
+     * Keyboard, menu, and programmatic clipboard paste continue using the ordinary clipboard.
+     */
+    public val middleClickPasteSource: SwingPasteSource = builder.middleClickPasteSource
     public val smartSuggestionsEnabled: Boolean = builder.smartSuggestionsEnabled
     public val shellSuggestionsEnabled: Boolean = builder.shellSuggestionsEnabled
     public val acceptSelectedSuggestionWithEnter: Boolean = builder.acceptSelectedSuggestionWithEnter
@@ -333,11 +356,17 @@ public class SwingSettings private constructor(
         /** Draft value for [SwingSettings.mouseReportingEnabled]. */
         public var mouseReportingEnabled: Boolean = source?.mouseReportingEnabled ?: true
 
+        /** Draft value for [SwingSettings.alternateScreenWheelToArrowEnabled]. */
+        public var alternateScreenWheelToArrowEnabled: Boolean = source?.alternateScreenWheelToArrowEnabled ?: true
+
         /** Draft value for [SwingSettings.copyOnSelection]. */
         public var copyOnSelection: Boolean = source?.copyOnSelection ?: false
 
         /** Draft value for [SwingSettings.middleClickPaste]. */
         public var middleClickPaste: Boolean = source?.middleClickPaste ?: false
+
+        /** Draft value for [SwingSettings.middleClickPasteSource]. */
+        public var middleClickPasteSource: SwingPasteSource = source?.middleClickPasteSource ?: SwingPasteSource.CLIPBOARD
 
         /** Draft value for [SwingSettings.lineHeight]; validated when [build] is called. */
         public var lineHeight: Float = source?.lineHeight ?: 1.0f
@@ -405,8 +434,10 @@ public class SwingSettings private constructor(
             columnSpacing == other.columnSpacing &&
             lineHeight == other.lineHeight &&
             mouseReportingEnabled == other.mouseReportingEnabled &&
+            alternateScreenWheelToArrowEnabled == other.alternateScreenWheelToArrowEnabled &&
             copyOnSelection == other.copyOnSelection &&
             middleClickPaste == other.middleClickPaste &&
+            middleClickPasteSource == other.middleClickPasteSource &&
             smartSuggestionsEnabled == other.smartSuggestionsEnabled &&
             shellSuggestionsEnabled == other.shellSuggestionsEnabled &&
             acceptSelectedSuggestionWithEnter == other.acceptSelectedSuggestionWithEnter &&
@@ -451,8 +482,10 @@ public class SwingSettings private constructor(
         result = 31 * result + columnSpacing
         result = 31 * result + lineHeight.hashCode()
         result = 31 * result + mouseReportingEnabled.hashCode()
+        result = 31 * result + alternateScreenWheelToArrowEnabled.hashCode()
         result = 31 * result + copyOnSelection.hashCode()
         result = 31 * result + middleClickPaste.hashCode()
+        result = 31 * result + middleClickPasteSource.hashCode()
         result = 31 * result + smartSuggestionsEnabled.hashCode()
         result = 31 * result + shellSuggestionsEnabled.hashCode()
         result = 31 * result + acceptSelectedSuggestionWithEnter.hashCode()
@@ -494,7 +527,6 @@ public class SwingSettings private constructor(
         require(visualBellEdgeThicknessPixels >= 0) {
             "visualBellEdgeThicknessPixels must be >= 0, was $visualBellEdgeThicknessPixels"
         }
-        require(columnSpacing >= 0) { "columnSpacing must be nonnegative" }
         require(lineHeight.isFinite() && lineHeight > 0f) {
             "lineHeight must be finite and > 0, was $lineHeight"
         }

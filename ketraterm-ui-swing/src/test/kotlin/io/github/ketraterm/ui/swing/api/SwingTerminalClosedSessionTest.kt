@@ -28,7 +28,8 @@ import kotlinx.coroutines.test.StandardTestDispatcher
 import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.params.ParameterizedTest
-import org.junit.jupiter.params.provider.ValueSource
+import org.junit.jupiter.params.provider.CsvSource
+import java.awt.Point
 import java.awt.Rectangle
 import java.awt.event.ComponentEvent
 import java.awt.event.MouseEvent
@@ -113,8 +114,11 @@ class SwingTerminalClosedSessionTest {
     }
 
     @ParameterizedTest
-    @ValueSource(strings = ["primary", "alternate", "restored"])
-    fun `closed output supports scrolling selection font changes and rebinding`(screen: String) {
+    @CsvSource("primary, 4", "alternate, 4", "restored, 4", "primary, -1", "alternate, -1", "restored, -1")
+    fun `closed output supports scrolling selection font changes and rebinding`(
+        screen: String,
+        columnSpacing: Int,
+    ) {
         val connector = RecordingConnector()
         val session = session(connector)
         feed(session, "oldest\r\nsecond\r\nthird\r\nlast")
@@ -144,6 +148,17 @@ class SwingTerminalClosedSessionTest {
                 component.scrollToScrollbackOffset(Int.MAX_VALUE)
                 assertEquals(component.viewportState().historySize.toDouble(), component.viewportState().scrollbackOffset)
                 selectWord(component, clipboard, if (alternate) "ALTONE" else "oldest")
+                val cellBounds = Rectangle()
+                val cellPosition = Point()
+                assertTrue(component.copyCellBounds(0, 0, cellBounds))
+                assertTrue(
+                    component.copyCellPositionAt(
+                        cellBounds.x + cellBounds.width / 2,
+                        cellBounds.y + cellBounds.height / 2,
+                        cellPosition,
+                    ),
+                )
+                assertEquals(Point(0, 0), cellPosition, "hit rows index the displayed frame, not retained history")
 
                 assertTrue(component.selectAll())
                 assertTrue(component.copySelectionToClipboard())
@@ -153,7 +168,7 @@ class SwingTerminalClosedSessionTest {
                 assertEquals(expected, clipboard.text.trimEnd())
                 assertFalse(component.copyCellBounds(8, 0, Rectangle()), "narrow views clip columns")
 
-                settings = settings.copy { it.columnSpacing = 4 }
+                settings = settings.copy { it.columnSpacing = columnSpacing }
                 component.reloadSettings()
                 assertTrue(component.copySelectionToClipboard())
                 assertEquals(expected, clipboard.text.trimEnd())
@@ -164,6 +179,15 @@ class SwingTerminalClosedSessionTest {
                 resize(component, 12, 8, buffer)
                 assertEquals(0, component.viewportState().historySize)
                 assertTrue(component.copyCellBounds(8, 0, Rectangle()))
+                assertTrue(component.copyCellBounds(8, 0, cellBounds))
+                assertTrue(
+                    component.copyCellPositionAt(
+                        cellBounds.x + cellBounds.width / 2,
+                        cellBounds.y + cellBounds.height / 2,
+                        cellPosition,
+                    ),
+                )
+                assertEquals(Point(8, 0), cellPosition)
                 assertTrue(component.copySelectionToClipboard())
                 assertEquals(expected, clipboard.text.trimEnd())
 

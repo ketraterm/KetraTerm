@@ -16,7 +16,6 @@
 package io.github.ketraterm.completion.source
 
 import io.github.ketraterm.completion.api.*
-import io.github.ketraterm.completion.commandline.resolveCompletionContext
 import io.github.ketraterm.completion.internal.CompletionLearningIndexCache
 import io.github.ketraterm.completion.model.TerminalCommandSpec
 import io.github.ketraterm.completion.model.TerminalCompletionLearningSnapshot
@@ -195,7 +194,7 @@ class LearnedObservedTokenIndexTest {
                         TerminalShellSyntax.POWERSHELL -> TerminalShellCapabilities.POWERSHELL
                     },
             )
-        val context = request.resolveCompletionContext(commandSpecs)
+        val context = TerminalCompletionContext.resolve(request, commandSpecs)
         return buildList {
             index.appendCandidates(
                 request = request,

@@ -17,7 +17,6 @@ package io.github.ketraterm.completion.source
 
 import io.github.ketraterm.completion.api.*
 import io.github.ketraterm.completion.commandline.TerminalCommandLineTokenizer
-import io.github.ketraterm.completion.commandline.resolveCompletionContext
 import io.github.ketraterm.completion.internal.CompletionLearningContextKey
 import io.github.ketraterm.completion.model.TerminalCommandSpec
 import io.github.ketraterm.completion.model.TerminalCompletionFeedbackKind
@@ -124,7 +123,7 @@ class TerminalCompletionLearningStoreTest {
         val observedCandidates = mutableListOf<TerminalCompletionCandidate>()
         indexes.observed.appendCandidates(
             observedRequest,
-            observedRequest.resolveCompletionContext(emptyList()),
+            TerminalCompletionContext.resolve(observedRequest, emptyList()),
             observedCandidates,
         )
         assertTrue(observedCandidates.isEmpty())

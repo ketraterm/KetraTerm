@@ -21,6 +21,7 @@ import io.github.ketraterm.ui.swing.render.TerminalVisualViewportGeometry
 import io.github.ketraterm.ui.swing.render.forEachVisualCellSpan
 import io.github.ketraterm.ui.swing.settings.SwingMetrics
 import org.openjdk.jmh.annotations.*
+import java.awt.Point
 import java.awt.Rectangle
 import java.util.concurrent.TimeUnit
 
@@ -40,6 +41,7 @@ open class TerminalBidiBenchmark {
     private lateinit var layout: TerminalBidiLayout
     private lateinit var geometry: TerminalVisualViewportGeometry
     private val cellBounds = Rectangle()
+    private val cellPosition = Point()
     private val metrics = SwingMetrics(8, 16, 12, 13, 8, 0, 1)
     private var nextFrame = 0
 
@@ -76,6 +78,13 @@ open class TerminalBidiBenchmark {
     open fun cachedCellBounds(): Int {
         geometry.copyCellBounds(cache, metrics, 3, 0, 0, 0, 640, 384, cellBounds)
         return cellBounds.x + cellBounds.height
+    }
+
+    /** Isolates warmed inverse geometry with caller-owned storage; excludes AWT event dispatch and painting. */
+    @Benchmark
+    open fun cachedCellPositionAt(): Int {
+        geometry.copyCellPositionAt(cache, metrics, 25, 8, 0, 0, 640, 384, cellPosition)
+        return cellPosition.x + cellPosition.y
     }
 
     /** Includes accepting the frame; compare with [copyOverscanFrame] to separate that work. */

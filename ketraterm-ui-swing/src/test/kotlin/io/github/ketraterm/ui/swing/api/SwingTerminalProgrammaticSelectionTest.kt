@@ -37,6 +37,92 @@ import java.util.concurrent.TimeUnit
 import javax.swing.SwingUtilities
 
 class SwingTerminalProgrammaticSelectionTest {
+    @ParameterizedTest
+    @ValueSource(booleans = [false, true])
+    fun `selected text is independent of clipboard and leaves interaction unchanged`(closed: Boolean) =
+        fixture("first\r\nsecond\r\nthird\r\nlast", closed = closed) {
+            assertTrue(view.setSelection(range(1, 0, 4, 1)))
+            val selected = view.currentSelectionRange()
+            val viewport = view.viewportState()
+            val generation = session.renderGeneration.value
+            var changes = 0
+            view.addSelectionListener { _, _ -> changes++ }
+
+            assertEquals("irst\nseco", view.selectedText())
+            assertEquals("irst\nseco", view.selectedText())
+            assertSame(selected, view.currentSelectionRange())
+            assertEquals(viewport.scrollbackOffset, view.viewportState().scrollbackOffset)
+            assertEquals(generation, session.renderGeneration.value)
+            assertEquals(0, changes)
+            assertEquals(0, clipboardCopies)
+            assertEquals(0, clipboardReads)
+            assertEquals(0, connector.writes)
+
+            assertTrue(view.copySelectionToClipboard())
+            assertEquals("irst\nseco", clipboardText)
+            assertEquals(1, clipboardCopies)
+            assertEquals(0, clipboardReads)
+        }
+
+    @Test
+    fun `selected text distinguishes no selection from selected blank cells`() =
+        fixture("hello") {
+            assertNull(view.selectedText())
+            assertTrue(view.setSelection(range(0, 0, 5, 0)))
+            assertEquals("hello", view.selectedText())
+            assertTrue(view.setSelection(range(1, 0, 1, 0)))
+            assertNull(view.selectedText())
+            assertTrue(view.setSelection(range(0, 1, 3, 1)))
+            assertEquals("", view.selectedText())
+            view.unbind()
+            assertNull(view.selectedText())
+            view.bind(session)
+            assertTrue(view.setSelection(range(0, 0, 5, 0)))
+            view.dispose()
+            assertNull(view.selectedText())
+            assertEquals(0, clipboardCopies)
+            assertEquals(0, clipboardReads)
+        }
+
+    @Test
+    fun `selected text reads current content before render publication`() =
+        fixture("hello", closed = false) {
+            assertTrue(view.setSelection(range(0, 0, 5, 0)))
+            feed("\rHELLO")
+            assertEquals("HELLO", view.selectedText())
+            assertEquals(0, clipboardCopies)
+        }
+
+    @ParameterizedTest
+    @ValueSource(booleans = [false, true])
+    fun `selected text joins soft wraps only for linear selection`(block: Boolean) =
+        fixture("abcdefghijklmno\r\nhard") {
+            assertTrue(view.setSelection(range(0, 0, 4, 2, block)))
+            assertEquals(if (block) "abcd\nklmn\nhard" else "abcdefghijklmno\nhard", view.selectedText())
+            assertEquals(0, clipboardCopies)
+            assertEquals(view.selectedText(), copiedText())
+        }
+
+    @Test
+    fun `selected text clears stale selection before buffer or layout publication`() =
+        fixture("hello", closed = false) {
+            var changes = 0
+            view.addSelectionListener { _, _ -> changes++ }
+            assertTrue(view.setSelection(range(0, 0, 5, 0)))
+            feed("\u001B[?1049hALT")
+            assertNull(view.selectedText())
+            assertNull(view.currentSelectionRange())
+            assertEquals(2, changes)
+
+            publish()
+            assertTrue(view.setSelection(range(0, 0, 3, 0)))
+            session.resize(5, 2)
+            assertNull(view.selectedText())
+            assertNull(view.currentSelectionRange())
+            assertEquals(4, changes)
+            assertEquals(0, clipboardCopies)
+        }
+
     @Test
     fun `host can select restore and clear without input or scrolling`() =
         fixture("first\r\nsecond\r\nthird\r\nlast") {
@@ -192,6 +278,7 @@ class SwingTerminalProgrammaticSelectionTest {
             val saved = range(1, 0, 3, 1, block)
             assertTrue(view.setSelection(saved))
             feed("\r\nthree\r\nfour")
+            assertEquals(if (block) "wo" else "two", view.selectedText())
             publish()
             val clipped = requireNotNull(view.currentSelectionRange())
             assertEquals(1L, clipped.anchorAbsoluteRow)
@@ -200,6 +287,7 @@ class SwingTerminalProgrammaticSelectionTest {
             assertFalse(view.setSelection(saved))
             assertSame(clipped, view.currentSelectionRange())
             feed("\r\nfive")
+            assertNull(view.selectedText())
             publish()
             assertNull(view.currentSelectionRange())
             assertFalse(view.copySelectionToClipboard())
@@ -395,6 +483,7 @@ class SwingTerminalProgrammaticSelectionTest {
         val view = edt { SwingTerminal() }
         try {
             assertThrows(IllegalStateException::class.java) { view.currentSelectionRange() }
+            assertThrows(IllegalStateException::class.java) { view.selectedText() }
             assertThrows(IllegalStateException::class.java) { view.createSelectionRange(0, 0, 1, 0) }
             assertThrows(IllegalStateException::class.java) { view.clearSelection() }
             assertThrows(IllegalStateException::class.java) { view.addSelectionListener { _, _ -> } }
@@ -437,6 +526,8 @@ class SwingTerminalProgrammaticSelectionTest {
                 ioDispatcher = dispatcher,
             )
         var clipboardText = ""
+        var clipboardCopies = 0
+        var clipboardReads = 0
         var settings =
             SwingSettings.create {
                 it.padding = SwingPadding(0, 0, 0, 0)
@@ -450,10 +541,14 @@ class SwingTerminalProgrammaticSelectionTest {
                     it.clipboardHandler =
                         object : TerminalClipboardHandler {
                             override fun copyText(text: String) {
+                                clipboardCopies++
                                 clipboardText = text
                             }
 
-                            override fun readText(): String? = null
+                            override fun readText(): String? {
+                                clipboardReads++
+                                return null
+                            }
                         }
                 },
             )
@@ -476,7 +571,9 @@ class SwingTerminalProgrammaticSelectionTest {
         ): TerminalSelectionRange = requireNotNull(view.createSelectionRange(ac, ar, cc, cr, block))
 
         fun copiedText(): String {
+            val selectedText = requireNotNull(view.selectedText())
             assertTrue(view.copySelectionToClipboard())
+            assertEquals(selectedText, clipboardText)
             return clipboardText
         }
 

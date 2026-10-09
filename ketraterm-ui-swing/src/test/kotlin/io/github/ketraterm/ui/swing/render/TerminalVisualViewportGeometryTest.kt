@@ -15,10 +15,14 @@
  */
 package io.github.ketraterm.ui.swing.render
 
+import io.github.ketraterm.core.TerminalBuffers
 import io.github.ketraterm.render.api.*
 import io.github.ketraterm.render.cache.TerminalRenderCache
 import io.github.ketraterm.session.TerminalShellIntegrationState
 import io.github.ketraterm.ui.swing.settings.SwingMetrics
+import org.junit.jupiter.params.ParameterizedTest
+import org.junit.jupiter.params.provider.ValueSource
+import java.awt.Point
 import java.awt.Rectangle
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -26,6 +30,82 @@ import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 class TerminalVisualViewportGeometryTest {
+    @ParameterizedTest
+    @ValueSource(doubles = [-32.0, -16.5, -0.5, 0.0, 0.5, 6.25, 31.5])
+    fun `inverse projection matches clipped bidi cells through fractional scrolling`(origin: Double) {
+        val cells = Array(3) { Array(3) { TestCell(codeWord = 0x05D0 + it, flags = TerminalRenderCellFlags.CODEPOINT) } }
+        val cache = renderCache(TestRenderFrame(cells))
+        val geometry = TerminalVisualViewportGeometry()
+        geometry.updateLayout(METRICS, 3, 40)
+        geometry.updateContentOrigin(origin)
+        val bounds = Rectangle()
+        val destination = Point(99, 99)
+        for (row in 0 until 3) {
+            for (column in 0 until 3) {
+                if (geometry.copyCellBounds(cache, METRICS, column, row, 10, 4, 32, 44, bounds)) {
+                    val x = bounds.x + bounds.width / 2
+                    val y = bounds.y + bounds.height / 2
+                    assertTrue(geometry.copyCellPositionAt(cache, METRICS, x, y, 10, 4, 32, 44, destination))
+                    assertEquals(Point(column, row), destination)
+                }
+            }
+        }
+        for (y in -1..48) {
+            for (x in 8..34) {
+                val hit = geometry.copyCellPositionAt(cache, METRICS, x, y, 10, 4, 32, 44, destination)
+                if (hit) {
+                    assertTrue(geometry.copyCellBounds(cache, METRICS, destination.x, destination.y, 10, 4, 32, 44, bounds))
+                    assertTrue(bounds.contains(x, y), "resolved bounds must contain ($x, $y) at origin $origin")
+                } else {
+                    assertEquals(Point(-1, -1), destination)
+                }
+            }
+        }
+    }
+
+    @ParameterizedTest
+    @ValueSource(doubles = [-0.5, 0.0, 0.5])
+    fun `inverse projection excludes prompt bands between displayed rows`(origin: Double) {
+        val buffer = TerminalBuffers.create(4, 3)
+        val state = TerminalShellIntegrationState()
+        buffer.readRenderFrame { frame ->
+            for (row in 0 until frame.rows) state.recordPromptStart(frame.lineId(row))
+        }
+        val dividers = PromptDividerLayout()
+        dividers.updateFrom(buffer, state, 3)
+        val cache = TerminalRenderCache(4, 3)
+        cache.updateFrom(buffer)
+        val geometry = TerminalVisualViewportGeometry()
+        geometry.updateLayout(METRICS, 3, 96, dividers)
+        geometry.updateContentOrigin(origin)
+        val destination = Point()
+        for (row in 0 until 3) {
+            val dividerY = kotlin.math.floor(4 + origin + geometry.rowTop(row) - 8).toInt()
+            assertFalse(geometry.copyCellPositionAt(cache, METRICS, 6, dividerY, 5, 4, 37, 100, destination))
+            assertEquals(Point(-1, -1), destination)
+            val textY = kotlin.math.floor(4 + origin + geometry.rowTop(row) + 8).toInt()
+            assertTrue(geometry.copyCellPositionAt(cache, METRICS, 6, textY, 5, 4, 37, 100, destination))
+            assertEquals(Point(0, row), destination)
+        }
+    }
+
+    @Test
+    fun `fractional shared edge follows pointer row mapping and unused grid space is not clamped`() {
+        val cache = renderCache(TestRenderFrame(Array(2) { Array(2) { TestCell(codeWord = 'A'.code) } }))
+        val geometry = TerminalVisualViewportGeometry()
+        geometry.updateLayout(METRICS, 2, 40)
+        geometry.updateContentOrigin(-0.5)
+        val destination = Point()
+        assertTrue(geometry.copyCellPositionAt(cache, METRICS, 0, 15, 0, 0, 24, 40, destination))
+        assertEquals(Point(0, 0), destination)
+        assertTrue(geometry.copyCellPositionAt(cache, METRICS, 0, 16, 0, 0, 24, 40, destination))
+        assertEquals(Point(0, 1), destination)
+        for ((x, y) in listOf(16 to 0, 0 to 32, -1 to 0, 0 to -1, Int.MAX_VALUE to Int.MAX_VALUE)) {
+            assertFalse(geometry.copyCellPositionAt(cache, METRICS, x, y, 0, 0, 24, 40, destination))
+            assertEquals(Point(-1, -1), destination)
+        }
+    }
+
     @Test
     fun `cell bounds follow visual bidi order and fractional viewport clipping`() {
         val cells = Array(2) { Array(3) { TestCell(codeWord = 0x05D0 + it, flags = TerminalRenderCellFlags.CODEPOINT) } }
@@ -63,6 +143,11 @@ class TerminalVisualViewportGeometryTest {
         assertEquals(Rectangle(0, 0, 8, 16), bounds)
         assertTrue(layout.copyCellBounds(cache, METRICS, 1, 0, 0, 0, 16, 16, bounds))
         assertEquals(Rectangle(8, 0, 8, 16), bounds)
+        val position = Point()
+        assertTrue(layout.copyCellPositionAt(cache, METRICS, 4, 8, 0, 0, 16, 16, position))
+        assertEquals(Point(0, 0), position)
+        assertTrue(layout.copyCellPositionAt(cache, METRICS, 12, 8, 0, 0, 16, 16, position))
+        assertEquals(Point(1, 0), position)
     }
 
     @Test
@@ -78,6 +163,11 @@ class TerminalVisualViewportGeometryTest {
         assertEquals(Rectangle(left, 0, 4, 16), bounds)
         assertFalse(layout.copyCellBounds(cache, METRICS, 1, 0, left, 0, Int.MAX_VALUE, 16, bounds))
         assertEquals(Rectangle(), bounds)
+        val position = Point()
+        assertTrue(layout.copyCellPositionAt(cache, METRICS, Int.MAX_VALUE - 1, 8, left, 0, Int.MAX_VALUE, 16, position))
+        assertEquals(Point(0, 0), position)
+        assertFalse(layout.copyCellPositionAt(cache, METRICS, Int.MIN_VALUE, 8, left, 0, Int.MAX_VALUE, 16, position))
+        assertEquals(Point(-1, -1), position)
     }
 
     @Test

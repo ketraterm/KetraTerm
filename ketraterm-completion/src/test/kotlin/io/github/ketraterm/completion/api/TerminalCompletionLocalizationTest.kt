@@ -15,7 +15,6 @@
  */
 package io.github.ketraterm.completion.api
 
-import io.github.ketraterm.completion.commandline.resolveCompletionContext
 import io.github.ketraterm.completion.model.TerminalCommandSpecs
 import kotlinx.coroutines.flow.last
 import kotlinx.coroutines.runBlocking
@@ -178,7 +177,7 @@ class TerminalCompletionLocalizationTest {
         request: TerminalCompletionRequest,
         details: Map<String, String>,
     ) {
-        val context = request.resolveCompletionContext(TerminalCommandSpecs.defaults())
+        val context = TerminalCompletionContext.resolve(request, TerminalCommandSpecs.defaults())
         val english = original.complete(request, context, 256)
         val translated = localized.complete(request, context, 256)
         assertEquals(english.map { it.copy(detail = "") }, translated.map { it.copy(detail = "") })

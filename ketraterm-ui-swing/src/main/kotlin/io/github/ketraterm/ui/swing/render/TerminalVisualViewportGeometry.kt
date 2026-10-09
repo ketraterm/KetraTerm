@@ -17,6 +17,7 @@ package io.github.ketraterm.ui.swing.render
 
 import io.github.ketraterm.render.cache.TerminalRenderCache
 import io.github.ketraterm.ui.swing.settings.SwingMetrics
+import java.awt.Point
 import java.awt.Rectangle
 import kotlin.math.ceil
 import kotlin.math.floor
@@ -150,14 +151,60 @@ internal class TerminalVisualViewportGeometry {
         val x = left.toLong() + visualColumn.toLong() * metrics.cellWidth
         val xStart = maxOf(left.toLong(), x)
         val xEnd = minOf(right.toLong(), x + metrics.cellWidth)
-        val origin = if (rowCount == cache.rows) contentOriginY else 0.0
-        val cellTop = if (rowCount == cache.rows) rowTop(row) else row * metrics.cellHeight
-        val yStart = maxOf(top, floor(top.toDouble() + origin + cellTop).toInt())
-        val yEnd = minOf(bottom, ceil(top.toDouble() + origin + cellTop + metrics.cellHeight).toInt())
+        val cellTop = cellTopOffset(cache, metrics, row)
+        val yStart = maxOf(top, floor(top.toDouble() + cellTop).toInt())
+        val yEnd = minOf(bottom, ceil(top.toDouble() + cellTop + metrics.cellHeight).toInt())
         if (xEnd <= xStart || yEnd <= yStart) return false
         destination.setBounds(xStart.toInt(), yStart, (xEnd - xStart).toInt(), yEnd - yStart)
         return true
     }
+
+    /** Resolves one displayed physical cell without clamping points outside content or divider bands. */
+    fun copyCellPositionAt(
+        cache: TerminalRenderCache,
+        metrics: SwingMetrics,
+        x: Int,
+        y: Int,
+        left: Int,
+        top: Int,
+        right: Int,
+        bottom: Int,
+        destination: Point,
+    ): Boolean {
+        destination.setLocation(-1, -1)
+        if (!cache.hasFrame ||
+            cache.columns <= 0 ||
+            cache.rows <= 0 ||
+            x < left ||
+            x >= right ||
+            y < top ||
+            y >= bottom
+        ) {
+            return false
+        }
+        val visualColumn = (x.toLong() - left) / metrics.cellWidth
+        if (visualColumn >= cache.columns) return false
+
+        val hasRowLayout = rowCount == cache.rows
+        val origin = if (hasRowLayout) contentOriginY else 0.0
+        val localY = floor(y.toDouble() - top - origin).toInt()
+        val row =
+            if (hasRowLayout) rowAt(localY) else (localY / metrics.cellHeight).coerceIn(0, cache.rows - 1)
+        val cellTop = cellTopOffset(cache, metrics, row)
+        val yStart = maxOf(top, floor(top.toDouble() + cellTop).toInt())
+        val yEnd = minOf(bottom, ceil(top.toDouble() + cellTop + metrics.cellHeight).toInt())
+        if (y < yStart || y >= yEnd) return false
+
+        val column = bidiLayout.row(cache, row)?.logicalColumn(visualColumn.toInt()) ?: visualColumn.toInt()
+        destination.setLocation(column, row)
+        return true
+    }
+
+    private fun cellTopOffset(
+        cache: TerminalRenderCache,
+        metrics: SwingMetrics,
+        row: Int,
+    ): Double = if (rowCount == cache.rows) contentOriginY + rowTop(row) else row.toDouble() * metrics.cellHeight
 
     /**
      * Returns the visual top of terminal [row], excluding [contentOriginY].

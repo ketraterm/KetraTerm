@@ -73,12 +73,14 @@ internal class TerminalShapedGlyphVectorCache(
         fontCache: FontCache,
         fontRenderContext: FontRenderContext,
         rtl: Boolean,
+        textCellWidth: Int = cellWidth,
     ): Run {
         require(length in 1..MAX_RUN_LENGTH && length <= chars.size && length <= charColumns.size)
         require(columns in 1..MAX_RUN_LENGTH * 2 && cellWidth > 0)
+        require(textCellWidth >= cellWidth)
         fontCache.refreshSystemFallbackFonts()
         prepare(fontCache, fontRenderContext)
-        lookupKey.update(chars, length, charColumns, columns, style and STYLE_MASK, cellWidth, rtl)
+        lookupKey.update(chars, length, charColumns, columns, style and STYLE_MASK, cellWidth, textCellWidth, rtl)
         layouts[lookupKey]?.let { return it }
 
         val key = lookupKey.snapshot()
@@ -159,7 +161,7 @@ internal class TerminalShapedGlyphVectorCache(
         while (owner < key.columns) {
             val end = ends[owner]
             if (end > 0) {
-                val available = (end - owner) * key.cellWidth.toFloat()
+                val available = (end - owner) * key.textCellWidth.toFloat()
                 val advance = advanceEnds[owner] - origins[owner]
                 if (advance > available) {
                     scales[owner] = available / advance
@@ -321,6 +323,8 @@ internal class TerminalShapedGlyphVectorCache(
             private set
         var cellWidth = 0
             private set
+        var textCellWidth = 0
+            private set
         var rtl = false
             private set
         private var hash = 0
@@ -332,6 +336,7 @@ internal class TerminalShapedGlyphVectorCache(
             columns: Int,
             style: Int,
             cellWidth: Int,
+            textCellWidth: Int,
             rtl: Boolean,
         ) {
             this.chars = chars
@@ -340,8 +345,9 @@ internal class TerminalShapedGlyphVectorCache(
             this.columns = columns
             this.style = style
             this.cellWidth = cellWidth
+            this.textCellWidth = textCellWidth
             this.rtl = rtl
-            var result = 31 * (31 * (31 * columns + style) + cellWidth) + if (rtl) 1 else 0
+            var result = 31 * (31 * (31 * (31 * columns + style) + cellWidth) + textCellWidth) + if (rtl) 1 else 0
             var index = 0
             while (index < length) {
                 result = 31 * result + chars[index].code
@@ -360,6 +366,7 @@ internal class TerminalShapedGlyphVectorCache(
                     this@Key.columns,
                     this@Key.style,
                     this@Key.cellWidth,
+                    this@Key.textCellWidth,
                     this@Key.rtl,
                 )
             }
@@ -374,6 +381,7 @@ internal class TerminalShapedGlyphVectorCache(
                 columns != other.columns ||
                 style != other.style ||
                 cellWidth != other.cellWidth ||
+                textCellWidth != other.textCellWidth ||
                 rtl != other.rtl
             ) {
                 return false

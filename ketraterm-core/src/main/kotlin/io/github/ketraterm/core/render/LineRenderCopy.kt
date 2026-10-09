@@ -125,8 +125,7 @@ internal class RenderClusterScratch {
         line: Line,
         col: Int,
     ): Int {
-        val raw = line.rawCodepoint(col)
-        val length = line.store.length(raw)
+        val length = line.getClusterLength(col)
         if (codepoints.size < length) {
             codepoints = IntArray(length)
         }

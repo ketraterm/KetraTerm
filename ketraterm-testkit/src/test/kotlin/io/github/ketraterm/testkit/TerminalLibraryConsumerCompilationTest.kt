@@ -30,11 +30,101 @@ import javax.tools.ToolProvider
 import kotlin.io.path.extension
 import kotlin.io.path.listDirectoryEntries
 import kotlin.io.path.writeText
+import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 class TerminalLibraryConsumerCompilationTest {
     @TempDir
     lateinit var directory: Path
+
+    @Test
+    fun `Java Swing hosts configure local input and defer source aware middle click paste`() {
+        assertCompilation(
+            "ui-swing",
+            """
+            import io.github.ketraterm.ui.swing.api.SwingHostServices;
+            import io.github.ketraterm.ui.swing.api.SwingTerminal;
+            import io.github.ketraterm.ui.swing.api.SwingTerminalMiddleClickPasteHandler;
+            import io.github.ketraterm.ui.swing.api.SwingTerminalMiddleClickPasteRequest;
+            import io.github.ketraterm.ui.swing.settings.SwingPasteSource;
+            import io.github.ketraterm.ui.swing.settings.SwingSettings;
+
+            final class Consumer implements SwingTerminalMiddleClickPasteHandler {
+                private SwingTerminalMiddleClickPasteRequest pending;
+                @Override public void handlePaste(SwingTerminalMiddleClickPasteRequest request) {
+                    SwingTerminal terminal = request.getTerminal();
+                    SwingPasteSource source = request.getSource();
+                    int x = request.getX(), y = request.getY();
+                    boolean forced = request.getForcedByShift();
+                    pending = request;
+                }
+                boolean complete(String text) { return pending.complete(text); }
+                void cancel() { pending.cancel(); }
+                void wire() {
+                    var settings = SwingSettings.create(draft -> {
+                        draft.setAlternateScreenWheelToArrowEnabled(false);
+                        draft.setMiddleClickPaste(true);
+                        draft.setMiddleClickPasteSource(SwingPasteSource.PRIMARY_SELECTION);
+                    });
+                    var services = SwingHostServices.create(draft -> draft.setMiddleClickPasteHandler(this));
+                    new SwingTerminal(() -> settings, services);
+                    services.copy(draft -> draft.setMiddleClickPasteHandler(null));
+                    settings.toBuilder().setMiddleClickPasteSource(SwingPasteSource.CLIPBOARD);
+                    boolean arrowsEnabled = settings.getAlternateScreenWheelToArrowEnabled();
+                    var enabled = settings.copy(draft -> draft.setAlternateScreenWheelToArrowEnabled(true));
+                    enabled.toBuilder().getAlternateScreenWheelToArrowEnabled();
+                }
+            }
+            """.trimIndent(),
+        )
+    }
+
+    @Test
+    fun `Java Swing hosts hit test cells with reusable standard point storage`() {
+        assertCompilation(
+            "ui-swing",
+            """
+            import io.github.ketraterm.ui.swing.api.SwingTerminal;
+            import java.awt.Point;
+            import java.awt.Rectangle;
+
+            final class Consumer {
+                boolean hit(SwingTerminal terminal, int x, int y, Point cell, Rectangle bounds) {
+                    return terminal.copyCellPositionAt(x, y, cell)
+                        && terminal.copyCellBounds(cell.x, cell.y, bounds);
+                }
+            }
+            """.trimIndent(),
+        )
+    }
+
+    @Test
+    fun `Java core readers size reusable cluster buffers without implementation imports`() {
+        assertCompilation(
+            "core",
+            """
+            import io.github.ketraterm.core.api.TerminalLine;
+
+            final class Consumer {
+                static int[] copy(TerminalLine line, int column, int[] scratch) {
+                    int length = line.getClusterLength(column);
+                    if (scratch.length < length) scratch = new int[length];
+                    if (line.readCluster(column, scratch) != length) throw new AssertionError("Cluster length");
+                    return scratch;
+                }
+
+                static final class PlainLine implements TerminalLine {
+                    @Override public int getWidth() { return 1; }
+                    @Override public int getCodepoint(int column) { return 'A'; }
+                }
+
+                static int scalarLength() {
+                    return new PlainLine().getClusterLength(0);
+                }
+            }
+            """.trimIndent(),
+        )
+    }
 
     @ParameterizedTest
     @CsvSource(
@@ -94,6 +184,21 @@ class TerminalLibraryConsumerCompilationTest {
             final class Consumer {
                 Class<?> libraryType() { return $publicType.class; }
                 Object runtimeValue() { return kotlin.Unit.INSTANCE; }
+            }
+            """.trimIndent(),
+        )
+    }
+
+    @Test
+    fun `Swing exports clipboard independent selected text to Java`() {
+        assertCompilation(
+            "ui-swing",
+            """
+            import io.github.ketraterm.ui.swing.api.SwingTerminal;
+            final class Consumer {
+                String readSelection(SwingTerminal terminal) {
+                    return terminal.selectedText();
+                }
             }
             """.trimIndent(),
         )
@@ -282,6 +387,66 @@ class TerminalLibraryConsumerCompilationTest {
     }
 
     @Test
+    fun `completion exports restrictive replay construction to Java with existing defaults`() {
+        assertCompilation(
+            "completion",
+            """
+            import io.github.ketraterm.completion.api.TerminalCompletionLearningStore;
+            final class Consumer {
+                TerminalCompletionLearningStore[] stores() {
+                    return new TerminalCompletionLearningStore[] {
+                        new TerminalCompletionLearningStore(),
+                        new TerminalCompletionLearningStore(128),
+                        new TerminalCompletionLearningStore(command -> false),
+                        new TerminalCompletionLearningStore(command -> !command.startsWith("acme "), 128)
+                    };
+                }
+            }
+            """.trimIndent(),
+        )
+    }
+
+    @Test
+    fun `independent Java input state can pack every key resource without a terminal buffer`() {
+        assertCompilation(
+            "input",
+            """
+            import io.github.ketraterm.core.api.TerminalInputState;
+            import io.github.ketraterm.input.TerminalInputEncoders;
+            import io.github.ketraterm.input.event.TerminalKey;
+            import io.github.ketraterm.input.event.TerminalKeyEvent;
+            import io.github.ketraterm.protocol.keyboard.XtermKeyResource;
+            import io.github.ketraterm.protocol.host.TerminalHostOutput;
+
+            final class Consumer implements TerminalInputState {
+                private volatile long bits;
+
+                void configure() {
+                    long next = 0L;
+                    int[] resources = {
+                        XtermKeyResource.KEYBOARD, XtermKeyResource.CURSOR_KEYS,
+                        XtermKeyResource.FUNCTION_KEYS, XtermKeyResource.KEYPAD_KEYS,
+                        XtermKeyResource.OTHER_KEYS, XtermKeyResource.MODIFIER_KEYS,
+                        XtermKeyResource.SPECIAL_KEYS
+                    };
+                    for (int resource : resources) {
+                        next = TerminalInputState.withKeyModifierOption(next, resource, -1);
+                        next = TerminalInputState.withKeyFormatOption(next, resource, 1);
+                    }
+                    bits = next;
+                }
+
+                @Override public long getInputModeBits() { return bits; }
+
+                void encode(TerminalHostOutput output) {
+                    TerminalInputEncoders.create(this, output).encodeKey(TerminalKeyEvent.key(TerminalKey.UP));
+                }
+            }
+            """.trimIndent(),
+        )
+    }
+
+    @Test
     fun `completion dependency exports the flow returned by its engine`() {
         assertCompilation(
             "completion",
@@ -292,6 +457,55 @@ class TerminalLibraryConsumerCompilationTest {
             final class Consumer {
                 Object stream(TerminalCompletionEngine engine, TerminalCompletionRequest request) {
                     return engine.completions(request);
+                }
+            }
+            """.trimIndent(),
+        )
+    }
+
+    @Test
+    fun `Java custom engines resolve contexts and invoke stock sources through public APIs`() {
+        assertCompilation(
+            "completion",
+            """
+            import io.github.ketraterm.completion.api.TerminalCompletionCandidate;
+            import io.github.ketraterm.completion.api.TerminalCompletionContext;
+            import io.github.ketraterm.completion.api.TerminalCompletionRequest;
+            import io.github.ketraterm.completion.api.TerminalCompletionSource;
+            import io.github.ketraterm.completion.model.TerminalCommandSpec;
+            import java.util.List;
+            import kotlin.coroutines.Continuation;
+
+            final class Consumer {
+                TerminalCompletionContext defaultContext(TerminalCompletionRequest request) {
+                    return TerminalCompletionContext.resolve(request);
+                }
+
+                Object complete(TerminalCompletionSource source, TerminalCompletionRequest request,
+                                List<TerminalCommandSpec> catalog,
+                                Continuation<? super List<TerminalCompletionCandidate>> continuation) {
+                    TerminalCompletionContext context = TerminalCompletionContext.resolve(request, catalog);
+                    return source.complete(request, context, 8, continuation);
+                }
+            }
+            """.trimIndent(),
+        )
+    }
+
+    @Test
+    fun `Java completion providers can use preceding arguments without implementation types`() {
+        assertCompilation(
+            "completion",
+            """
+            import io.github.ketraterm.completion.api.TerminalCompletionContext;
+            import java.util.List;
+
+            final class Consumer {
+                String selectDataset(TerminalCompletionContext context) {
+                    List<String> words = context.getPrecedingArguments();
+                    List<String> repositories = context.getPrecedingPositionalArguments();
+                    List<String> clusters = context.precedingOptionValues("--context");
+                    return clusters.isEmpty() ? "default" : clusters.getLast();
                 }
             }
             """.trimIndent(),
@@ -375,8 +589,9 @@ class TerminalLibraryConsumerCompilationTest {
                         null,
                         fileManager.getJavaFileObjects(sourceFile.toFile()),
                     ).call()
-            assertTrue(
-                compiled == expectedSuccess,
+            assertEquals(
+                compiled,
+                expectedSuccess,
                 "Consumer of ketraterm-$module expected compilation success=$expectedSuccess:\n" +
                     diagnostics.diagnostics.joinToString("\n") { it.getMessage(Locale.ROOT) },
             )

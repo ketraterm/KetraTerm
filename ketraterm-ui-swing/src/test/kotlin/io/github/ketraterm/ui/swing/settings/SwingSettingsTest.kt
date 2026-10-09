@@ -16,11 +16,14 @@
 package io.github.ketraterm.ui.swing.settings
 
 import io.github.ketraterm.render.api.TerminalRenderBufferKind
+import io.github.ketraterm.ui.swing.api.SwingHostServices
 import io.github.ketraterm.ui.swing.api.SwingTerminal
+import io.github.ketraterm.ui.swing.api.SwingTerminalMiddleClickPasteHandler
 import io.github.ketraterm.ui.swing.render.cache.FontCache
 import kotlinx.collections.immutable.persistentListOf
 import kotlinx.collections.immutable.toImmutableList
 import org.junit.jupiter.params.ParameterizedTest
+import org.junit.jupiter.params.provider.EnumSource
 import org.junit.jupiter.params.provider.ValueSource
 import java.awt.Canvas
 import java.awt.Font
@@ -103,6 +106,23 @@ class SwingSettingsTest {
         assertEquals(0, SwingSettings().columnSpacing)
     }
 
+    @ParameterizedTest
+    @ValueSource(ints = [Int.MIN_VALUE, -5, -1, 0, 5, Int.MAX_VALUE])
+    fun signedColumnSpacingIsRetainedBySettingsSnapshots(spacing: Int) {
+        val original = SwingSettings()
+        val builder = original.toBuilder()
+        builder.columnSpacing = spacing
+        val snapshot = builder.build()
+        builder.columnSpacing = 10
+
+        assertEquals(spacing, snapshot.columnSpacing)
+        assertEquals(spacing, snapshot.toBuilder().build().columnSpacing)
+        assertEquals(snapshot, original.copy { it.columnSpacing = spacing })
+        assertEquals(0, original.columnSpacing)
+        assertEquals(spacing, snapshot.copy {}.columnSpacing)
+        assertEquals(snapshot.hashCode(), snapshot.copy {}.hashCode())
+    }
+
     @Test
     fun spacingUsesOneGeometryAndRejectsOverflowBeforeApplyingSettings() {
         SwingUtilities.invokeAndWait {
@@ -123,12 +143,16 @@ class SwingSettingsTest {
                 assertEquals(original.width + 30, component.preferredGridSize(10, 2).width)
                 assertEquals(original.height, component.preferredGridSize(10, 2).height)
                 assertTrue(component.visibleGridSize().width < 10)
-                assertFailsWith<IllegalArgumentException> { settings.copy { it.columnSpacing = -1 } }
+                settings = settings.copy { it.columnSpacing = -1 }
+                component.reloadSettings()
+                assertEquals(originalFont, component.font)
+                assertEquals(original.width - 10, component.preferredGridSize(10, 2).width)
+                assertEquals(original.height, component.preferredGridSize(10, 2).height)
                 assertFailsWith<IllegalArgumentException> { component.preferredGridSize(Int.MAX_VALUE, 1) }
-                val expanded = component.preferredGridSize(10, 2)
+                val condensed = component.preferredGridSize(10, 2)
                 settings = settings.copy { it.columnSpacing = Int.MAX_VALUE }
                 assertFailsWith<IllegalArgumentException> { component.reloadSettings() }
-                assertEquals(expanded, component.preferredGridSize(10, 2))
+                assertEquals(condensed, component.preferredGridSize(10, 2))
             } finally {
                 component.dispose()
             }
@@ -139,16 +163,127 @@ class SwingSettingsTest {
     fun spacingDoesNotChangeVerticalMetricsOrCursorStroke() {
         val metrics = Canvas().getFontMetrics(Font(Font.MONOSPACED, Font.PLAIN, 14))
         val original = SwingMetrics.from(metrics)
-        val expanded = SwingMetrics.from(metrics, columnSpacing = 10)
-        assertEquals(original.copy(cellWidth = original.cellWidth + 10), expanded)
+        for (spacing in listOf(-1, 10)) {
+            val adjusted = SwingMetrics.from(metrics, columnSpacing = spacing)
+            assertEquals(
+                original.copy(cellWidth = original.cellWidth + spacing),
+                adjusted,
+            )
+            assertEquals(original.fontCellWidth, adjusted.fontCellWidth)
+            assertEquals(
+                if (spacing < 0) original.textCellWidth else original.cellWidth + spacing,
+                adjusted.textCellWidth,
+            )
+        }
+    }
+
+    @Test
+    fun metricsAcceptTheEntirePositiveCellWidthRange() {
+        val fontMetrics = Canvas().getFontMetrics(Font(Font.MONOSPACED, Font.PLAIN, 14))
+        val original = SwingMetrics.from(fontMetrics)
+
+        val minimum = SwingMetrics.from(fontMetrics, columnSpacing = 1 - original.cellWidth)
+        val maximum = SwingMetrics.from(fontMetrics, columnSpacing = Int.MAX_VALUE - original.cellWidth)
+        assertEquals(original.copy(cellWidth = 1, cursorStrokeWidth = 1), minimum)
+        assertEquals(original.fontCellWidth, minimum.fontCellWidth)
+        assertEquals(original.textCellWidth, minimum.textCellWidth)
+        assertEquals(original.copy(cellWidth = Int.MAX_VALUE), maximum)
+        assertEquals(original.fontCellWidth, maximum.fontCellWidth)
+        assertEquals(Int.MAX_VALUE, maximum.textCellWidth)
+    }
+
+    @Test
+    fun condensedLargeFontRetainsGlyphWidthAndFitsTheCursorInsideOnePixelCells() {
+        val fontMetrics = Canvas().getFontMetrics(Font(Font.MONOSPACED, Font.PLAIN, 72))
+        val original = SwingMetrics.from(fontMetrics)
+        assertTrue(original.cursorStrokeWidth > 1)
+
+        val condensed = SwingMetrics.from(fontMetrics, columnSpacing = 1 - original.cellWidth)
+
+        assertEquals(original.copy(cellWidth = 1, cursorStrokeWidth = 1), condensed)
+        assertEquals(original.fontCellWidth, condensed.fontCellWidth)
+        assertEquals(original.textCellWidth, condensed.textCellWidth)
+        assertEquals(1, condensed.cursorStrokeWidth)
+        assertEquals(condensed.cellWidth, condensed.cursorStrokeWidth)
+    }
+
+    @Test
+    fun metricsRejectZeroNegativeAndOverflowingCellWidths() {
+        val fontMetrics = Canvas().getFontMetrics(Font(Font.MONOSPACED, Font.PLAIN, 14))
+        val original = SwingMetrics.from(fontMetrics)
+
+        for (spacing in listOf(-original.cellWidth, -original.cellWidth - 1, Int.MIN_VALUE, Int.MAX_VALUE)) {
+            assertFailsWith<IllegalArgumentException>("spacing=$spacing") {
+                SwingMetrics.from(fontMetrics, columnSpacing = spacing)
+            }
+        }
     }
 
     @Test
     fun interactionSettingsPreserveExistingDefaults() {
         val settings = SwingSettings()
         assertEquals(true, settings.mouseReportingEnabled)
+        assertEquals(true, settings.alternateScreenWheelToArrowEnabled)
         assertEquals(false, settings.copyOnSelection)
         assertEquals(false, settings.middleClickPaste)
+        assertEquals(SwingPasteSource.CLIPBOARD, settings.middleClickPasteSource)
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = [false, true])
+    fun alternateScreenWheelToArrowSettingSurvivesIndependentSettingsSnapshots(enabled: Boolean) {
+        val original = SwingSettings()
+        val builder = original.toBuilder()
+        builder.alternateScreenWheelToArrowEnabled = enabled
+        val snapshot = builder.build()
+        builder.alternateScreenWheelToArrowEnabled = !enabled
+
+        assertEquals(enabled, snapshot.alternateScreenWheelToArrowEnabled)
+        assertEquals(snapshot, snapshot.toBuilder().build())
+        assertEquals(snapshot, original.copy { it.alternateScreenWheelToArrowEnabled = enabled })
+        assertEquals(snapshot.hashCode(), snapshot.copy {}.hashCode())
+        assertEquals(original, snapshot.copy { it.alternateScreenWheelToArrowEnabled = true })
+        assertTrue(snapshot.mouseReportingEnabled)
+        assertTrue(original.alternateScreenWheelToArrowEnabled)
+        if (!enabled) assertNotEquals(original, snapshot)
+    }
+
+    @ParameterizedTest
+    @EnumSource(SwingPasteSource::class)
+    fun middleClickPasteSourceSurvivesIndependentSettingsSnapshots(source: SwingPasteSource) {
+        val original = SwingSettings()
+        val builder = original.toBuilder()
+        builder.middleClickPasteSource = source
+        val snapshot = builder.build()
+        builder.middleClickPasteSource = SwingPasteSource.CLIPBOARD
+
+        assertEquals(source, snapshot.middleClickPasteSource)
+        assertEquals(snapshot, snapshot.toBuilder().build())
+        assertEquals(snapshot, original.copy { it.middleClickPasteSource = source })
+        assertEquals(snapshot.hashCode(), snapshot.copy {}.hashCode())
+        assertFalse(snapshot.middleClickPaste)
+        assertEquals(SwingPasteSource.CLIPBOARD, original.middleClickPasteSource)
+        if (source != SwingPasteSource.CLIPBOARD) assertNotEquals(original, snapshot)
+    }
+
+    @Test
+    fun middleClickPasteServiceSnapshotsRetainAndClearTheHostHandler() {
+        val handler = SwingTerminalMiddleClickPasteHandler { error("Building services must not invoke host policy") }
+        val original = SwingHostServices()
+        assertNull(original.middleClickPasteHandler)
+        val builder = original.toBuilder()
+        builder.middleClickPasteHandler = handler
+        val configured = builder.build()
+        builder.middleClickPasteHandler = null
+
+        assertSame(handler, configured.middleClickPasteHandler)
+        assertEquals(configured, configured.toBuilder().build())
+        assertEquals(configured, original.copy { it.middleClickPasteHandler = handler })
+        assertEquals(configured.hashCode(), configured.copy {}.hashCode())
+        assertNotEquals(original, configured)
+        assertEquals(original, configured.copy { it.middleClickPasteHandler = null })
+        assertNull(original.middleClickPasteHandler)
+        assertSame(original.clipboardHandler, configured.clipboardHandler)
     }
 
     @Test

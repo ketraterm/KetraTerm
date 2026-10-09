@@ -110,8 +110,11 @@ paths may opt in to empty-prefix suggestions.
 and resolved Gradle context, traverses an imported model under its own visit budget, and returns the complete bounded task
 snapshot. Canonical Gradle matching and the final candidate limit are shared-engine responsibilities.
 
-`TerminalCompletionContextResolver` is the shared internal command-line context
-resolver. The merged engine parses and resolves once from its one command-spec set, then passes
+`TerminalCompletionContext.resolve(request, commandSpecs)` is the public synchronous
+entry point for command-line context resolution. It delegates to the shared internal
+`TerminalCompletionContextResolver`; both the merged engine and custom engines use
+the same tokenizer and semantic analysis. The merged engine resolves once from its
+one command-spec set, then passes
 that same immutable context to every source and the global ranker instead of independently
 guessing command position, subcommand position, option-name position,
 option-value position, positional-argument position, active option metadata,
@@ -119,11 +122,38 @@ expected path kind, expected dynamic value domain, repeatable subcommand source,
 static value candidates, replacement offsets,
 or active quote state from raw command text.
 
+Custom engines resolve once and pass the returned context and the same request to
+stock sources or candidate projectors, without constructing a merged engine. The
+catalog defaults to bundled specs; an explicit empty catalog provides lexical
+context without inferred spec metadata. Partial input produces a partial context,
+and `OPERATOR` signals callers to skip source evaluation. Resolution performs no
+host I/O and owns no scheduling, ranking, source limits, or lifecycle. Context-owned
+command paths, option conflict groups, static candidates, and preceding argument
+collections reject mutation and may be retained across suspension or overlapping
+requests. Spec models remain catalog-owned references; callers keep their nested
+collections unchanged during resolution and while contexts are in use. Internal
+tokenizer/semantic types and the derived-field constructor remain unpublished.
+
+`TerminalCompletionContext.precedingArguments` exposes immutable decoded words
+after the executable and before the active word in the cursor's command segment,
+including subcommands, options and their values. `precedingPositionalArguments`
+and `precedingOptionValues(name)` use the same semantic pass as active-position
+resolution; providers can use preceding repository or cluster selections without
+another parser. Option queries accept declared aliases and retain every occurrence
+in input order, including separate, attached and empty values. Unknown commands
+still expose lexical words, but have no inferred option or positional ownership.
+The active word and later words are excluded even when the cursor is at the active
+word's end. Quotes/escapes follow the request's syntax; no shell expansion occurs.
+After the first `--`, further words (including another `--`) are positional.
+These request-owned collections reject mutation and may survive suspension or
+overlapping requests. Positional count is derived from retained positional values;
+there is no second count or provider-owned AST to keep synchronized.
+
 `SwingTerminal` owns automatic suggestion scheduling under its current binding. Its debounced,
 text-only predicate is deliberately a cheap UX gate: it never tokenizes,
-resolves command specs, or duplicates source eligibility. The merged engine is
-the sole semantic authority and returns an empty result when completion is not
-valid. The scheduler retains the last immutable command snapshot so unchanged
+resolves command specs, or duplicates source eligibility. Context resolution is
+the semantic authority; the merged engine returns an empty result when completion
+is not valid. The scheduler retains the last immutable command snapshot so unchanged
 command state does not repeat provider work. Provider replacement and explicit
 host-context refresh invalidate that deduplication.
 

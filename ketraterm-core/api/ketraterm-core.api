@@ -79,6 +79,8 @@ public abstract interface class io/github/ketraterm/core/api/TerminalInputState 
 	public static fun modifyOtherKeysMode (J)I
 	public static fun mouseEncodingMode (J)I
 	public static fun mouseTrackingMode (J)I
+	public static fun withKeyFormatOption (JII)J
+	public static fun withKeyModifierOption (JII)J
 }
 
 public final class io/github/ketraterm/core/api/TerminalInputState$Companion {
@@ -97,6 +99,8 @@ public final class io/github/ketraterm/core/api/TerminalInputState$Companion {
 	public final fun modifyOtherKeysMode (J)I
 	public final fun mouseEncodingMode (J)I
 	public final fun mouseTrackingMode (J)I
+	public final fun withKeyFormatOption (JII)J
+	public final fun withKeyModifierOption (JII)J
 }
 
 public abstract interface class io/github/ketraterm/core/api/TerminalInspector {
@@ -107,6 +111,7 @@ public abstract interface class io/github/ketraterm/core/api/TerminalInspector {
 }
 
 public abstract interface class io/github/ketraterm/core/api/TerminalLine {
+	public fun getClusterLength (I)I
 	public abstract fun getCodepoint (I)I
 	public abstract fun getWidth ()I
 	public fun isCluster (I)Z
@@ -114,6 +119,7 @@ public abstract interface class io/github/ketraterm/core/api/TerminalLine {
 }
 
 public final class io/github/ketraterm/core/api/TerminalLine$DefaultImpls {
+	public static fun getClusterLength (Lio/github/ketraterm/core/api/TerminalLine;I)I
 	public static fun isCluster (Lio/github/ketraterm/core/api/TerminalLine;I)Z
 	public static fun readCluster (Lio/github/ketraterm/core/api/TerminalLine;I[I)I
 }

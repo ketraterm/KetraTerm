@@ -104,6 +104,7 @@ public class SwingTerminal
 
         private val chrome = SwingTerminalChrome()
         private var session: TerminalSession? = null
+        private var bindingIdentity: Any = Any()
         private var retainedViewport: RetainedFrameViewport? = null
         private var disposed: Boolean = false
         private var settings: SwingSettings = settingsProvider.currentSettings()
@@ -465,8 +466,8 @@ public class SwingTerminal
                             ),
                         ]
 
-                    override fun pasteClipboardText() {
-                        this@SwingTerminal.pasteClipboardText()
+                    override fun handleMiddleClickPaste(event: MouseEvent) {
+                        handleMiddleClickPasteOnEdt(event)
                     }
 
                     override fun encodeMouse(event: TerminalMouseEvent) {
@@ -1205,8 +1206,9 @@ public class SwingTerminal
 
         private fun bindOnEdt(session: TerminalSession) =
             selectionController.deferChanges {
-                suggestionScheduler?.stop()
                 if (disposed) return@deferChanges
+                bindingIdentity = Any()
+                suggestionScheduler?.stop()
                 bindingJob?.cancel(CancellationException("Terminal session binding replaced"))
                 mouseController.resetInput()
                 this.session = session
@@ -1295,6 +1297,7 @@ public class SwingTerminal
 
         private fun unbindOnEdt() =
             selectionController.deferChanges {
+                bindingIdentity = Any()
                 cleanupSwingResources(
                     { suggestionScheduler?.stop() },
                     {
@@ -1385,6 +1388,11 @@ public class SwingTerminal
                     next.promptDecoration != previous.promptDecoration
             if (geometryChanged) viewportController.finishScroll()
             settings = next
+            if (next.mouseReportingEnabled != previous.mouseReportingEnabled ||
+                next.alternateScreenWheelToArrowEnabled != previous.alternateScreenWheelToArrowEnabled
+            ) {
+                mouseController.resetWheelInput()
+            }
             metrics = nextMetrics
             if (next.font != previous.font) font = next.font
             if (next.palette != previous.palette) {
@@ -1461,6 +1469,29 @@ public class SwingTerminal
             check(SwingUtilities.isEventDispatchThread()) { "selection access requires the EDT" }
             if (disposed || session == null) return null
             return selectionController.currentRange()
+        }
+
+        /**
+         * Returns the complete retained selection's text on the EDT, or null when unavailable.
+         *
+         * Includes offscreen rows and closed-session output. Reads current session content,
+         * joining soft-wrapped rows for linear selections and preserving row breaks for
+         * block selections. Wide cells and grapheme clusters are copied completely.
+         * A nonempty selection may return an empty string when only trimmed blanks remain.
+         * Unbound and disposed components return null.
+         *
+         * Uses the same extraction as [copySelectionToClipboard] without accessing the
+         * clipboard, scrolling, focusing, or sending input. Eviction may clip selection;
+         * invalidated layouts or buffer changes clear it. Resulting selection changes
+         * notify listeners outside the frame lease. The returned string may be retained.
+         *
+         * @throws IllegalStateException outside the EDT.
+         */
+        public fun selectedText(): String? {
+            check(SwingUtilities.isEventDispatchThread()) { "selection access requires the EDT" }
+            if (disposed) return null
+            val boundSession = session ?: return null
+            return selectionController.getSelectedText(boundSession)
         }
 
         /**
@@ -1590,6 +1621,57 @@ public class SwingTerminal
                 metrics,
                 column,
                 row,
+                chrome.left(settings, buffer),
+                chrome.top(settings, buffer),
+                width - chrome.right(settings, buffer),
+                height - chrome.bottom(settings, buffer),
+                destination,
+            )
+        }
+
+        /**
+         * Copies the displayed cell under component-local Swing pixels [x], [y]
+         * into caller-owned [destination] on the EDT.
+         *
+         * The point's x is a zero-based logical column, before bidi permutation;
+         * its y is a zero-based row of the displayed frame, matching [copyCellBounds].
+         * Rows are not absolute retained-history rows or live-screen coordinates.
+         * The position describes the currently displayed frame and can change after
+         * scrolling, frame publication, or layout changes.
+         *
+         * Active-buffer padding, prompt gutters/dividers, fractional scrolling and
+         * clipping follow the shared display geometry. Wide leading and trailing
+         * halves return their own physical grid cells; blank cells are valid hits.
+         * Fractionally rounded adjacent cell bounds may share a boundary pixel;
+         * row selection follows the same fractional mapping as pointer input.
+         *
+         * Returns `false` and sets [destination] to `(-1, -1)` outside displayed
+         * cells, including decoration bands, or for unavailable frames and
+         * unbound/disposed views. Points are never clamped to a nearby cell.
+         * Reuse one [Point] across calls; no result object is allocated. Existing
+         * bidi caches may rebuild for changed text. This performs no frame refresh
+         * or transport work.
+         *
+         * @return `true` when [destination] contains a displayed physical cell.
+         * @throws IllegalStateException when called outside the EDT.
+         */
+        public fun copyCellPositionAt(
+            x: Int,
+            y: Int,
+            destination: Point,
+        ): Boolean {
+            check(SwingUtilities.isEventDispatchThread()) { "cell positions must be read on the EDT" }
+            if (disposed || session == null) {
+                destination.setLocation(-1, -1)
+                return false
+            }
+            updateChromeLayout()
+            val buffer = renderCache.activeBuffer
+            return visualGeometry.copyCellPositionAt(
+                renderCache,
+                metrics,
+                x,
+                y,
                 chrome.left(settings, buffer),
                 chrome.top(settings, buffer),
                 width - chrome.right(settings, buffer),
@@ -2223,9 +2305,8 @@ public class SwingTerminal
                 SwingUtilities.invokeAndWait { copied = copySelectionToClipboard() }
                 return copied
             }
-            val boundSession = session ?: return false
-            val selectedText = selectionController.getSelectedText(boundSession) ?: return false
-            hostServices.clipboardHandler.copyText(selectedText)
+            val text = selectedText() ?: return false
+            hostServices.clipboardHandler.copyText(text)
             return true
         }
 
@@ -2254,11 +2335,41 @@ public class SwingTerminal
          * @return `true` when nonempty clipboard text was admitted by the bound session,
          *   `false` otherwise, including outside the EDT. Admission does not promise transport completion.
          */
-        public fun pasteClipboardText(): Boolean {
+        public fun pasteClipboardText(): Boolean = pasteFromClipboardOnEdt(SwingPasteSource.CLIPBOARD)
+
+        private fun pasteFromClipboardOnEdt(source: SwingPasteSource): Boolean {
             if (!SwingUtilities.isEventDispatchThread() || disposed) return false
             val boundSession = session?.takeUnless { it.isClosed } ?: return false
-            val text = hostServices.clipboardHandler.readText() ?: return false
-            return session === boundSession && pasteText(text)
+            val identity = bindingIdentity
+            val text =
+                when (source) {
+                    SwingPasteSource.CLIPBOARD -> hostServices.clipboardHandler.readText()
+                    SwingPasteSource.PRIMARY_SELECTION -> hostServices.clipboardHandler.readPrimarySelectionText()
+                } ?: return false
+            return pasteTextOnEdt(text, boundSession, identity)
+        }
+
+        private fun handleMiddleClickPasteOnEdt(event: MouseEvent) {
+            if (!SwingUtilities.isEventDispatchThread() || disposed) return
+            val handler = hostServices.middleClickPasteHandler
+            val source = settings.middleClickPasteSource
+            if (handler == null) {
+                pasteFromClipboardOnEdt(source)
+                return
+            }
+            if (session?.isClosed != false) return
+            val identity = bindingIdentity
+            val request =
+                SwingTerminalMiddleClickPasteRequest(this, source, event.x, event.y, event.isShiftDown) { text ->
+                    bindingIdentity === identity && pasteText(text)
+                }
+            var delivered = false
+            try {
+                handler.handlePaste(request)
+                delivered = true
+            } finally {
+                if (!delivered) request.cancel()
+            }
         }
 
         /**
@@ -2270,7 +2381,7 @@ public class SwingTerminal
          *
          * Nonempty input invalidates shell suggestions before admission. Invalidation callbacks
          * run synchronously and propagate their failures; if they change or remove the bound
-         * session, or close it, no paste is submitted.
+         * session, rebind even the same session, or close it, no paste is submitted.
          *
          * @param text host-supplied paste text.
          * @return `true` when the bound session admits the paste, `false` for empty input,
@@ -2280,10 +2391,24 @@ public class SwingTerminal
         public fun pasteText(text: String): Boolean {
             if (!SwingUtilities.isEventDispatchThread() || disposed || text.isEmpty()) return false
             val boundSession = session?.takeUnless { it.isClosed } ?: return false
+            return pasteTextOnEdt(text, boundSession, bindingIdentity)
+        }
+
+        private fun pasteTextOnEdt(
+            text: String,
+            boundSession: TerminalSession,
+            identity: Any,
+        ): Boolean {
+            if (text.isEmpty() || !isCurrentPasteBinding(boundSession, identity)) return false
             invalidateShellSuggestionsOnEdt()
-            return !(disposed || session !== boundSession || boundSession.isClosed) &&
+            return isCurrentPasteBinding(boundSession, identity) &&
                 boundSession.submitInput(TerminalPasteEvent(text)) == TerminalInputAdmission.ACCEPTED
         }
+
+        private fun isCurrentPasteBinding(
+            boundSession: TerminalSession,
+            identity: Any,
+        ): Boolean = !disposed && session === boundSession && bindingIdentity === identity && !boundSession.isClosed
 
         private fun getOrCreateShellSuggestionController(): SwingShellSuggestionController =
             shellSuggestionController ?: SwingShellSuggestionController(

@@ -54,7 +54,7 @@ open class TerminalTextRenderingBenchmark {
     @JvmField
     var antialiased: Boolean = false
 
-    @Param("0", "3")
+    @Param("-1", "0", "3")
     @JvmField
     var columnSpacing: Int = 0
 

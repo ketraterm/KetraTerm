@@ -161,6 +161,37 @@ class TerminalShapedGlyphVectorCacheTest {
         assertNotSame(base, cache.shape("אב", owners, columns = 2, cellWidth = CELL_WIDTH + 1))
     }
 
+    @ParameterizedTest
+    @ValueSource(booleans = [false, true])
+    fun `glyph fitting budgets are cached independently from physical advances`(rtl: Boolean) {
+        val cache = TerminalShapedGlyphVectorCache()
+        val text = "WWW"
+        val owners = intArrayOf(0, 1, 2)
+        val natural = naturalVector(text, rtl)
+        val cellWidth = 4
+        val textCellWidth = kotlin.math.ceil(natural.getGlyphMetrics(0).advanceX.toDouble()).toInt()
+        assertTrue(textCellWidth > cellWidth, "The natural glyph must exceed the condensed cell")
+        val fitted = cache.shape(text, owners, columns = 3, cellWidth = cellWidth, rtl = rtl)
+        val nominal = cache.shape(text, owners, columns = 3, cellWidth = cellWidth, rtl = rtl, textCellWidth = textCellWidth)
+
+        assertNotSame(fitted, nominal, "Changing only the fitting budget must not reuse compressed glyphs")
+        assertSame(fitted, cache.shape(text, owners, columns = 3, cellWidth = cellWidth, rtl = rtl))
+        assertSame(nominal, cache.shape(text, owners, columns = 3, cellWidth = cellWidth, rtl = rtl, textCellWidth = textCellWidth))
+        assertArrayEquals(natural.getGlyphCodes(0, natural.numGlyphs, null), nominal.getGlyphCodes(0, nominal.numGlyphs, null))
+        for (glyph in 0 until nominal.numGlyphs) {
+            val owner = nominal.getGlyphCharIndex(glyph)
+            val visualColumn = if (rtl) 2 - owner else owner
+            assertEquals(visualColumn * cellWidth.toDouble(), fitted.getGlyphPosition(glyph).x, 0.0)
+            assertEquals(fitted.getGlyphPosition(glyph), nominal.getGlyphPosition(glyph), "A fitting change must retain column origins")
+            assertTrue(fitted.getGlyphTransform(glyph).scaleX < 1.0, "The physical-width fit must compress glyph $glyph")
+            assertEquals(1.0, nominal.getGlyphTransform(glyph)?.scaleX ?: 1.0, 0.0, "The nominal-width fit must retain glyph $glyph")
+        }
+        assertEquals(3 * cellWidth.toDouble(), nominal.getGlyphPosition(nominal.numGlyphs).x, 0.0)
+        assertThrows<IllegalArgumentException> {
+            cache.shape(text, owners, columns = 3, cellWidth = cellWidth, rtl = rtl, textCellWidth = cellWidth - 1)
+        }
+    }
+
     @Test
     fun `stored text and ownership do not retain mutable caller storage`() {
         val cache = TerminalShapedGlyphVectorCache()
@@ -319,7 +350,9 @@ class TerminalShapedGlyphVectorCacheTest {
         rtl: Boolean = false,
         fontCache: FontCache = fonts,
         renderContext: FontRenderContext = context,
-    ): GlyphVector = run(text.toCharArray(), text.length, owners, columns, style, cellWidth, fontCache, renderContext, rtl).glyphVector
+        textCellWidth: Int = cellWidth,
+    ): GlyphVector =
+        run(text.toCharArray(), text.length, owners, columns, style, cellWidth, fontCache, renderContext, rtl, textCellWidth).glyphVector
 
     private fun naturalVector(
         text: String,

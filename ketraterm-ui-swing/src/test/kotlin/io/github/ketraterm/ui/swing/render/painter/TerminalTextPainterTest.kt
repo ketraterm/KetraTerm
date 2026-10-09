@@ -49,13 +49,33 @@ import kotlin.test.assertTrue
  */
 class TerminalTextPainterTest {
     @ParameterizedTest
-    @CsvSource("AAA, 1.0", "ééé, 1.0", "אבג, 1.0", "AAA, 0.5", "ééé, 0.5", "אבג, 0.5")
-    fun `spacing aligns glyphs with expanded cells and refreshes retained layouts`(
+    @CsvSource(
+        "AAA, 1.0, 4",
+        "ééé, 1.0, 4",
+        "אבג, 1.0, 4",
+        "AAA, 0.5, 4",
+        "ééé, 0.5, 4",
+        "אבג, 0.5, 4",
+        "AAA, 1.0, -1",
+        "ééé, 1.0, -1",
+        "אבג, 1.0, -1",
+        "AAA, 0.5, -1",
+        "ééé, 0.5, -1",
+        "אבג, 0.5, -1",
+        "AAA, 1.0, -3",
+        "ééé, 1.0, -3",
+        "אבג, 1.0, -3",
+        "AAA, 0.5, -3",
+        "ééé, 0.5, -3",
+        "אבג, 0.5, -3",
+    )
+    fun `spacing aligns glyphs with changed cell advances and refreshes retained layouts`(
         text: String,
         opacity: Float,
+        columnSpacing: Int,
     ) {
         val original = fixture(width = 160)
-        val spaced = fixture(width = 160, settings = original.settings.copy { it.columnSpacing = 4 })
+        val spaced = fixture(width = 160, settings = original.settings.copy { it.columnSpacing = columnSpacing })
         val cache = renderCache(TestRenderFrame.text(text))
         val composite = AlphaComposite.SrcOver.derive(opacity)
         try {
@@ -92,6 +112,75 @@ class TerminalTextPainterTest {
         } finally {
             original.g.dispose()
             spaced.g.dispose()
+        }
+    }
+
+    @ParameterizedTest
+    @CsvSource("W, -1", "W, -3", "é, -1", "é, -3", "א, -1", "א, -3", "界, -1", "界, -3", "á, -1", "á, -3")
+    fun `condensed advance retains nominal glyph fitting and clips at physical cell bounds`(
+        text: String,
+        columnSpacing: Int,
+    ) {
+        val original = fixture(width = 160)
+        val condensed = fixture(width = 160, settings = original.settings.copy { it.columnSpacing = columnSpacing })
+        val wide = text == "界"
+        val cluster = text.codePointCount(0, text.length) > 1
+        val span = if (wide) 2 else 1
+        val cells = Array(6) { TestCell(codeWord = ' '.code, flags = TerminalRenderCellFlags.CODEPOINT) }
+        cells[0] =
+            TestCell(
+                codeWord = text.codePointAt(0),
+                flags =
+                    (if (cluster) TerminalRenderCellFlags.CLUSTER else TerminalRenderCellFlags.CODEPOINT) or
+                        (if (wide) TerminalRenderCellFlags.WIDE_LEADING else 0),
+                cluster = if (cluster) text else null,
+            )
+        if (wide) cells[1] = TestCell(flags = TerminalRenderCellFlags.WIDE_TRAILING)
+        val cache = renderCache(TestRenderFrame(arrayOf(cells)))
+        val visualColumn = TerminalBidiLayout().row(cache, 0)?.visualColumn(0) ?: 0
+        try {
+            original.paintRow(cache)
+            condensed.paintRow(cache)
+            assertEquals(original.settings.font, condensed.settings.font)
+            assertEquals(original.metrics.cellWidth + columnSpacing, condensed.metrics.cellWidth)
+            assertEquals(original.metrics.cellHeight, condensed.metrics.cellHeight)
+            assertEquals(original.metrics.baseline, condensed.metrics.baseline)
+            val comparisonWidth = condensed.metrics.cellWidth * span
+            assertTrue(
+                original.image.containsPaintedPixelInRange(
+                    visualColumn * original.metrics.cellWidth,
+                    visualColumn * original.metrics.cellWidth + comparisonWidth,
+                ),
+                "The nominal glyph must cover the compared area for $text",
+            )
+            assertContentEquals(
+                original.image.getRGB(
+                    visualColumn * original.metrics.cellWidth,
+                    0,
+                    comparisonWidth,
+                    original.metrics.cellHeight,
+                    null,
+                    0,
+                    comparisonWidth,
+                ),
+                condensed.image.getRGB(
+                    visualColumn * condensed.metrics.cellWidth,
+                    0,
+                    comparisonWidth,
+                    condensed.metrics.cellHeight,
+                    null,
+                    0,
+                    comparisonWidth,
+                ),
+                "Spacing $columnSpacing changed the nominal glyph raster for $text",
+            )
+            assertTrue(
+                !condensed.image.containsPaintedPixelInRange(cache.columns * condensed.metrics.cellWidth, condensed.image.width),
+                "Condensed text must retain the displayed row's clip",
+            )
+        } finally {
+            original.g.dispose()
+            condensed.g.dispose()
         }
     }
 
