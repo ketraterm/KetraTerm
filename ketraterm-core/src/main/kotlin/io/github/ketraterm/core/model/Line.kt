@@ -209,6 +209,11 @@ internal class Line(
      */
     override fun isCluster(col: Int): Boolean = codepoints[col] <= TerminalConstants.CLUSTER_HANDLE_MAX
 
+    override fun getClusterLength(col: Int): Int {
+        val raw = codepoints[col]
+        return if (raw <= TerminalConstants.CLUSTER_HANDLE_MAX) store.length(raw) else 0
+    }
+
     /**
      * Copies the full codepoint sequence of the cluster at [col] into [dest].
      * Returns the number of codepoints written, or 0 if the cell is not a cluster.

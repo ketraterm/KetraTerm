@@ -37,6 +37,34 @@ class TerminalLibraryConsumerCompilationTest {
     @TempDir
     lateinit var directory: Path
 
+    @Test
+    fun `Java core readers size reusable cluster buffers without implementation imports`() {
+        assertCompilation(
+            "core",
+            """
+            import io.github.ketraterm.core.api.TerminalLine;
+
+            final class Consumer {
+                static int[] copy(TerminalLine line, int column, int[] scratch) {
+                    int length = line.getClusterLength(column);
+                    if (scratch.length < length) scratch = new int[length];
+                    if (line.readCluster(column, scratch) != length) throw new AssertionError("Cluster length");
+                    return scratch;
+                }
+
+                static final class PlainLine implements TerminalLine {
+                    @Override public int getWidth() { return 1; }
+                    @Override public int getCodepoint(int column) { return 'A'; }
+                }
+
+                static int scalarLength() {
+                    return new PlainLine().getClusterLength(0);
+                }
+            }
+            """.trimIndent(),
+        )
+    }
+
     @ParameterizedTest
     @CsvSource(
         "getShellIntegrationState().clear()",

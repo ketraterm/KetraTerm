@@ -330,11 +330,24 @@ Guaranteed behavior:
 - blank cells read as `0`
 - wide spacers read as `-1`
 - cluster cells return the leading/base codepoint through `getCodepointAt`
+- `TerminalLine.getClusterLength(col)` reports the exact stored codepoint count
+  in constant time without allocation, or `0` for scalar, blank and spacer cells;
+  the void line returns `0` for any column, while physical lines reject invalid columns
 - `readCluster` copies complete clusters into caller-owned arrays of known sufficient
-  capacity; directly written clusters have no fixed public length bound
+  capacity; insufficient capacity is rejected before changing the destination.
+  Size with `getClusterLength` and grow reusable scratch only when needed, keeping
+  the same terminal serialization continuously across obtaining the line, sizing
+  and copying. A length is not stable across mutation, and borrowed lines must not
+  escape that boundary. Directly written clusters have no fixed public length bound
 - for complete reads without guessing capacity, `TerminalRenderFrame.copyLine` and
   its primitive cluster sink supply the full length and a borrowed range; copy it
   before the callback returns, under the same terminal serialization
+
+Independent scalar-only `TerminalLine` implementations inherit a zero length.
+Clustered implementations must override `getClusterLength` alongside `isCluster`
+and `readCluster`; the inherited sizing operation throws `UnsupportedOperationException`
+for cluster cells rather than silently returning an incorrect count. Existing
+copy operations remain available to implementations that have not added sizing.
 
 Not guaranteed:
 
