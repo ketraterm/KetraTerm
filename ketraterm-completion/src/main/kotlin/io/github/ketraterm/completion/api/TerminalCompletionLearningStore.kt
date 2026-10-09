@@ -22,6 +22,7 @@ import io.github.ketraterm.completion.model.TerminalCompletionFeedbackKind
 import io.github.ketraterm.completion.model.TerminalCompletionLearningSnapshot
 import io.github.ketraterm.completion.stats.CompletionLearningStatsIndex
 import io.github.ketraterm.completion.stats.isRecordableStatsEvent
+import java.util.function.Predicate
 
 /**
  * Mutable, bounded in-memory store for exact command completion learning.
@@ -31,17 +32,31 @@ import io.github.ketraterm.completion.stats.isRecordableStatsEvent
  * [snapshot] values. The store performs no I/O and does not emit candidates.
  * Mutations are serialized around one mutable exact index. Ranking rows retain
  * only opaque identities; plaintext replay is attached only to successful
- * commands that [TerminalCompletionReplayPolicy] approves. Published
+ * commands that both [TerminalCompletionReplayPolicy] and [replayFilter] approve. Published
  * snapshots are immutable and retain identity until their contents change.
  *
+ * The host filter is an additional admission restriction for executions and
+ * imported replay rows. Returning false for every command disables plaintext
+ * replay while preserving opaque ranking evidence. The filter runs synchronously
+ * outside the store lock, only after the built-in policy approves a command.
+ * It may run concurrently and must be thread-safe and consistent for this store's
+ * lifetime. Failures propagate before the operation records or merges evidence.
+ * Admission filtering does not retroactively remove previously retained rows.
+ *
+ * @param replayFilter additional host restriction on plaintext replay retention.
  * @param capacity maximum distinct exact-command rows retained.
  * @throws IllegalArgumentException if [capacity] is not positive.
  */
 public class TerminalCompletionLearningStore
     @JvmOverloads
     constructor(
+        private val replayFilter: Predicate<String>,
         capacity: Int = DEFAULT_CAPACITY,
     ) {
+        /** Creates a store using only the built-in plaintext replay policy. */
+        @JvmOverloads
+        public constructor(capacity: Int = DEFAULT_CAPACITY) : this(DEFAULT_REPLAY_FILTER, capacity)
+
         private val lock = Any()
         private val learningStats = CompletionLearningStatsIndex(capacity)
         private val learningIndexCache = CompletionLearningIndexCache()
@@ -56,9 +71,9 @@ public class TerminalCompletionLearningStore
          * Adds distinct aggregate events from [snapshot] to retained learning.
          *
          * Opaque rows sharing an identity and canonical context have counters
-         * added with saturation. Replay rows are rechecked against the plaintext
-         * policy and must reference retained positive evidence. Callers must not merge the
-         * same aggregate event set more than once.
+         * added with saturation. Replay rows must pass the built-in policy and host
+         * filter and reference retained positive evidence. Callers must not merge
+         * the same aggregate event set more than once.
          *
          * @param snapshot aggregate events not already represented by this store.
          */
@@ -68,7 +83,7 @@ public class TerminalCompletionLearningStore
                 snapshot.copy(
                     replayCommands =
                         snapshot.replayCommands.filter { replay ->
-                            TerminalCompletionReplayPolicy.allowsPlaintext(replay.commandLine)
+                            allowsReplay(replay.commandLine)
                         },
                 )
             synchronized(lock) {
@@ -130,7 +145,7 @@ public class TerminalCompletionLearningStore
             val identityDigest = terminalCompletionRankingIdentity(commandLine)
             val replayCommand =
                 commandLine.takeIf {
-                    successful && TerminalCompletionReplayPolicy.allowsPlaintext(commandLine)
+                    successful && allowsReplay(commandLine)
                 }
             return synchronized(lock) {
                 val changed =
@@ -180,7 +195,11 @@ public class TerminalCompletionLearningStore
             }
         }
 
+        private fun allowsReplay(commandLine: String): Boolean =
+            TerminalCompletionReplayPolicy.allowsPlaintext(commandLine) && replayFilter.test(commandLine)
+
         private companion object {
             private const val DEFAULT_CAPACITY = 2048
+            private val DEFAULT_REPLAY_FILTER = Predicate<String> { true }
         }
     }

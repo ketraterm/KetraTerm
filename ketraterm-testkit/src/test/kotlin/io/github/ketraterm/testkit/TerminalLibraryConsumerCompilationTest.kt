@@ -298,6 +298,26 @@ class TerminalLibraryConsumerCompilationTest {
     }
 
     @Test
+    fun `completion exports restrictive replay construction to Java with existing defaults`() {
+        assertCompilation(
+            "completion",
+            """
+            import io.github.ketraterm.completion.api.TerminalCompletionLearningStore;
+            final class Consumer {
+                TerminalCompletionLearningStore[] stores() {
+                    return new TerminalCompletionLearningStore[] {
+                        new TerminalCompletionLearningStore(),
+                        new TerminalCompletionLearningStore(128),
+                        new TerminalCompletionLearningStore(command -> false),
+                        new TerminalCompletionLearningStore(command -> !command.startsWith("acme "), 128)
+                    };
+                }
+            }
+            """.trimIndent(),
+        )
+    }
+
+    @Test
     fun `completion dependency exports the flow returned by its engine`() {
         assertCompilation(
             "completion",
@@ -392,8 +412,11 @@ class TerminalLibraryConsumerCompilationTest {
                         fileManager.getJavaFileObjects(sourceFile.toFile()),
                     ).call()
             assertEquals(
-                compiled, expectedSuccess, "Consumer of ketraterm-$module expected compilation success=$expectedSuccess:\n" +
-                        diagnostics.diagnostics.joinToString("\n") { it.getMessage(Locale.ROOT) })
+                compiled,
+                expectedSuccess,
+                "Consumer of ketraterm-$module expected compilation success=$expectedSuccess:\n" +
+                    diagnostics.diagnostics.joinToString("\n") { it.getMessage(Locale.ROOT) },
+            )
         }
     }
 }

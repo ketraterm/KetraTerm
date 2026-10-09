@@ -21,6 +21,8 @@ import io.github.ketraterm.completion.model.TerminalCommandSpecs
 import io.github.ketraterm.completion.testing.commandLearning
 import io.github.ketraterm.completion.testing.learningSnapshot
 import kotlinx.coroutines.runBlocking
+import org.junit.jupiter.params.ParameterizedTest
+import org.junit.jupiter.params.provider.ValueSource
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -157,10 +159,11 @@ class LearnedHistoryCompletionEngineTest {
             assertEquals(listOf("z-new", "a-old"), candidates.map { it.replacementText })
         }
 
-    @Test
-    fun `learned evidence promotes a specification result without replacing its presentation`() =
+    @ParameterizedTest
+    @ValueSource(booleans = [false, true])
+    fun `learned evidence promotes specification results regardless of replay retention`(replayEnabled: Boolean) =
         runBlocking {
-            val learningStore = TerminalCompletionLearningStore()
+            val learningStore = TerminalCompletionLearningStore(replayFilter = { replayEnabled })
             val request = request("./gradlew ")
             val coldCandidate = engine(learningStore).complete(request).single { it.replacementText == "test" }
             repeat(3) { index ->
@@ -173,6 +176,25 @@ class LearnedHistoryCompletionEngineTest {
             assertEquals("spec", learnedCandidate.source)
             assertEquals(TerminalCompletionCandidateKind.SUBCOMMAND, learnedCandidate.kind)
             assertEquals("run tests", learnedCandidate.detail)
+        }
+
+    @Test
+    fun `opaque-only learning creates neither history nor observed-token candidates`() =
+        runBlocking {
+            val learningStore = TerminalCompletionLearningStore(replayFilter = { false })
+            learningStore.recordCommandResult("abc deploy --fast", true, null, null, 10L)
+            val engine = engine(learningStore, commandSpecs = emptyList())
+
+            assertTrue(engine.complete(request("abc d")).isEmpty())
+            assertTrue(engine.complete(request("abc deploy --f")).isEmpty())
+            assertEquals(
+                1,
+                learningStore
+                    .snapshot()
+                    .rankingStats
+                    .single()
+                    .successCount,
+            )
         }
 
     @Test
