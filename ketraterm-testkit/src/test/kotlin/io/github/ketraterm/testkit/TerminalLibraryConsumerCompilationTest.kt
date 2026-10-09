@@ -318,6 +318,46 @@ class TerminalLibraryConsumerCompilationTest {
     }
 
     @Test
+    fun `independent Java input state can pack every key resource without a terminal buffer`() {
+        assertCompilation(
+            "input",
+            """
+            import io.github.ketraterm.core.api.TerminalInputState;
+            import io.github.ketraterm.input.TerminalInputEncoders;
+            import io.github.ketraterm.input.event.TerminalKey;
+            import io.github.ketraterm.input.event.TerminalKeyEvent;
+            import io.github.ketraterm.protocol.keyboard.XtermKeyResource;
+            import io.github.ketraterm.protocol.host.TerminalHostOutput;
+
+            final class Consumer implements TerminalInputState {
+                private volatile long bits;
+
+                void configure() {
+                    long next = 0L;
+                    int[] resources = {
+                        XtermKeyResource.KEYBOARD, XtermKeyResource.CURSOR_KEYS,
+                        XtermKeyResource.FUNCTION_KEYS, XtermKeyResource.KEYPAD_KEYS,
+                        XtermKeyResource.OTHER_KEYS, XtermKeyResource.MODIFIER_KEYS,
+                        XtermKeyResource.SPECIAL_KEYS
+                    };
+                    for (int resource : resources) {
+                        next = TerminalInputState.withKeyModifierOption(next, resource, -1);
+                        next = TerminalInputState.withKeyFormatOption(next, resource, 1);
+                    }
+                    bits = next;
+                }
+
+                @Override public long getInputModeBits() { return bits; }
+
+                void encode(TerminalHostOutput output) {
+                    TerminalInputEncoders.create(this, output).encodeKey(TerminalKeyEvent.key(TerminalKey.UP));
+                }
+            }
+            """.trimIndent(),
+        )
+    }
+
+    @Test
     fun `completion dependency exports the flow returned by its engine`() {
         assertCompilation(
             "completion",

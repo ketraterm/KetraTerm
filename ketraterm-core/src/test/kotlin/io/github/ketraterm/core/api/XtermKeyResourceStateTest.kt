@@ -19,9 +19,127 @@ import io.github.ketraterm.core.TerminalBuffers
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertThrows
 import org.junit.jupiter.api.Test
+import org.junit.jupiter.params.ParameterizedTest
+import org.junit.jupiter.params.provider.CsvSource
+import org.junit.jupiter.params.provider.ValueSource
 
 class XtermKeyResourceStateTest {
     private val resources = intArrayOf(0, 1, 2, 3, 4, 6, 7)
+
+    @ParameterizedTest
+    @CsvSource("0,0", "1,2", "2,2", "3,0", "4,0", "6,0", "7,0")
+    fun `zero word and explicit defaults agree`(
+        resource: Int,
+        defaultLevel: Int,
+    ) {
+        assertEquals(defaultLevel, TerminalInputState.keyModifierOption(0L, resource))
+        assertEquals(0, TerminalInputState.keyFormatOption(0L, resource))
+        assertEquals(0L, TerminalInputState.withKeyModifierOption(0L, resource, defaultLevel))
+        assertEquals(0L, TerminalInputState.withKeyFormatOption(0L, resource, 0))
+    }
+
+    @ParameterizedTest
+    @CsvSource("0,15", "1,4", "2,4", "3,4", "4,3", "6,4", "7,4")
+    fun `public modifier packing round trips every value and preserves other fields`(
+        resource: Int,
+        maximum: Int,
+    ) {
+        val before = independentlyConfiguredBits()
+        val originalLevel = TerminalInputState.keyModifierOption(before, resource)
+        for (value in -1..maximum) {
+            val updated = TerminalInputState.withKeyModifierOption(before, resource, value)
+            assertEquals(value, TerminalInputState.keyModifierOption(updated, resource))
+            for (other in resources) {
+                if (other != resource) {
+                    assertEquals(TerminalInputState.keyModifierOption(before, other), TerminalInputState.keyModifierOption(updated, other))
+                }
+                assertEquals(TerminalInputState.keyFormatOption(before, other), TerminalInputState.keyFormatOption(updated, other))
+            }
+            assertEquals(before, TerminalInputState.withKeyModifierOption(updated, resource, originalLevel))
+        }
+    }
+
+    @ParameterizedTest
+    @ValueSource(ints = [0, 1, 2, 3, 4, 6, 7])
+    fun `public format packing replaces both values and preserves other fields`(resource: Int) {
+        val before = independentlyConfiguredBits()
+        for (value in 0..1) {
+            val updated = TerminalInputState.withKeyFormatOption(before, resource, value)
+            assertEquals(value, TerminalInputState.keyFormatOption(updated, resource))
+            for (other in resources) {
+                assertEquals(TerminalInputState.keyModifierOption(before, other), TerminalInputState.keyModifierOption(updated, other))
+                if (other != resource) {
+                    assertEquals(TerminalInputState.keyFormatOption(before, other), TerminalInputState.keyFormatOption(updated, other))
+                }
+            }
+            assertEquals(before, TerminalInputState.withKeyFormatOption(updated, resource, 1))
+        }
+    }
+
+    @ParameterizedTest
+    @ValueSource(ints = [Int.MIN_VALUE, -1, 5, 8, Int.MAX_VALUE])
+    fun `public packing rejects unsupported resources`(resource: Int) {
+        assertThrows(IllegalArgumentException::class.java) { TerminalInputState.withKeyModifierOption(0L, resource, 0) }
+        assertThrows(IllegalArgumentException::class.java) { TerminalInputState.withKeyFormatOption(0L, resource, 0) }
+    }
+
+    @ParameterizedTest
+    @CsvSource("0,15", "1,4", "2,4", "3,4", "4,3", "6,4", "7,4")
+    fun `public packing rejects out of range values rather than truncating them`(
+        resource: Int,
+        maximum: Int,
+    ) {
+        for (value in intArrayOf(Int.MIN_VALUE, -2, maximum + 1, Int.MAX_VALUE)) {
+            assertThrows(IllegalArgumentException::class.java) { TerminalInputState.withKeyModifierOption(0L, resource, value) }
+        }
+        for (value in intArrayOf(Int.MIN_VALUE, -1, 2, Int.MAX_VALUE)) {
+            assertThrows(IllegalArgumentException::class.java) { TerminalInputState.withKeyFormatOption(0L, resource, value) }
+        }
+    }
+
+    @Test
+    fun `independently packed resources match stock core state`() {
+        val terminal = TerminalBuffers.create(10, 3)
+        var bits = terminal.getInputModeBits()
+        for (resource in resources) {
+            val maximum =
+                if (resource == 0) {
+                    15
+                } else if (resource == 4) {
+                    3
+                } else {
+                    4
+                }
+            for (value in -1..maximum) {
+                bits = TerminalInputState.withKeyModifierOption(bits, resource, value)
+                terminal.setKeyModifierOption(resource, value)
+                assertEquals(terminal.getInputModeBits(), bits)
+            }
+            for (value in 0..1) {
+                bits = TerminalInputState.withKeyFormatOption(bits, resource, value)
+                terminal.setKeyFormatOption(resource, value)
+                assertEquals(terminal.getInputModeBits(), bits)
+            }
+        }
+    }
+
+    private fun independentlyConfiguredBits(): Long {
+        // Preserve unassigned bits as well as unrelated published input modes.
+        var bits = Long.MIN_VALUE or (1L shl 19) or TerminalModeBits.APPLICATION_CURSOR_KEYS or TerminalModeBits.BRACKETED_PASTE
+        bits = TerminalModeBits.withPackedValue(bits, TerminalModeBits.MOUSE_TRACKING_MASK, TerminalModeBits.MOUSE_TRACKING_SHIFT, 3)
+        bits =
+            TerminalModeBits.withPackedValue(
+                bits,
+                TerminalModeBits.KITTY_KEYBOARD_FLAGS_MASK,
+                TerminalModeBits.KITTY_KEYBOARD_FLAGS_SHIFT,
+                9,
+            )
+        for (resource in resources) {
+            bits = TerminalInputState.withKeyModifierOption(bits, resource, -1)
+            bits = TerminalInputState.withKeyFormatOption(bits, resource, 1)
+        }
+        return bits
+    }
 
     @Test
     fun `all resources have independent state and family resets preserve other modes`() {

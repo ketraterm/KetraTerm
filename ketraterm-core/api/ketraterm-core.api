@@ -79,6 +79,8 @@ public abstract interface class io/github/ketraterm/core/api/TerminalInputState 
 	public static fun modifyOtherKeysMode (J)I
 	public static fun mouseEncodingMode (J)I
 	public static fun mouseTrackingMode (J)I
+	public static fun withKeyFormatOption (JII)J
+	public static fun withKeyModifierOption (JII)J
 }
 
 public final class io/github/ketraterm/core/api/TerminalInputState$Companion {
@@ -97,6 +99,8 @@ public final class io/github/ketraterm/core/api/TerminalInputState$Companion {
 	public final fun modifyOtherKeysMode (J)I
 	public final fun mouseEncodingMode (J)I
 	public final fun mouseTrackingMode (J)I
+	public final fun withKeyFormatOption (JII)J
+	public final fun withKeyModifierOption (JII)J
 }
 
 public abstract interface class io/github/ketraterm/core/api/TerminalInspector {

@@ -15,6 +15,8 @@
  */
 package io.github.ketraterm.core.api
 
+import io.github.ketraterm.protocol.keyboard.XtermKeyResource
+
 /**
  * Primitive, read-only access to the published packed mode subset used by input encoders.
  * Factory-created buffers read this word atomically without constructing a snapshot object.
@@ -32,7 +34,7 @@ public interface TerminalInputState {
     public fun getInputModeBits(): Long
 
     /**
-     * Helper methods for decoding packed input mode snapshots.
+     * Helper methods for constructing and decoding packed input mode snapshots.
      */
     public companion object {
         /**
@@ -52,6 +54,43 @@ public interface TerminalInputState {
             bits: Long,
             resource: Int,
         ): Int = XtermKeyResourceBits.format(bits, resource)
+
+        /**
+         * Returns [bits] with one XTMODKEYS resource replaced, preserving all other bits.
+         * This pure primitive operation does not publish or mutate an input state.
+         * A zero word encodes defaults: 2 for cursor/function keys and 0 otherwise.
+         * Use those values to restore an individual resource to its default.
+         *
+         * @param bits original coherent packed mode snapshot.
+         * @param resource a supported [XtermKeyResource] identifier; string-action resource 5 is excluded.
+         * @param value -1 for explicit disable, 0..15 for keyboard, 0..3 for ordinary keys,
+         * or 0..4 for cursor, function, keypad, modifier, and special keys.
+         * @return updated packed word, ready for an independent [TerminalInputState] to publish.
+         * @throws IllegalArgumentException if the resource or value is unsupported.
+         */
+        @JvmStatic
+        public fun withKeyModifierOption(
+            bits: Long,
+            resource: Int,
+            value: Int,
+        ): Long = XtermKeyResourceBits.withModifier(bits, resource, value)
+
+        /**
+         * Returns [bits] with one XTFMTKEYS resource replaced, preserving all other bits.
+         * This pure primitive operation does not publish or mutate an input state.
+         *
+         * @param bits original coherent packed mode snapshot.
+         * @param resource a supported [XtermKeyResource] identifier; string-action resource 5 is excluded.
+         * @param value 0 for the default xterm report format, or 1 for CSI-u.
+         * @return updated packed word, ready for an independent [TerminalInputState] to publish.
+         * @throws IllegalArgumentException if the resource or value is unsupported.
+         */
+        @JvmStatic
+        public fun withKeyFormatOption(
+            bits: Long,
+            resource: Int,
+            value: Int,
+        ): Long = XtermKeyResourceBits.withFormat(bits, resource, value)
 
         /**
          * Resolves the unmodified legacy Backspace selection. An explicit DECBKM

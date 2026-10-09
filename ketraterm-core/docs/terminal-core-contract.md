@@ -241,6 +241,11 @@ readers ignore them. Neither representation promises to hold every future mode;
 introduce a focused capability only when a new state family needs one.
 Xterm resource reads use `TerminalInputState.getInputModeBits()` with
 `keyModifierOption` and `keyFormatOption` to decode one coherent primitive snapshot.
+Independent producers construct those resources through `withKeyModifierOption`
+and `withKeyFormatOption`, which validate semantic values and preserve every other
+bit. A zero word encodes cursor/function modifier defaults of 2 and all other
+modifier/format defaults of 0. These pure helpers return a word; the producer owns
+coherent publication and synchronization.
 
 Durable mode state currently exposed by core:
 
