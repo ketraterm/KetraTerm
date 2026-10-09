@@ -17,7 +17,6 @@ package io.github.ketraterm.completion.commandline
 
 import io.github.ketraterm.completion.api.TerminalCompletionActivePosition
 import io.github.ketraterm.completion.api.TerminalCompletionContext
-import io.github.ketraterm.completion.api.TerminalCompletionRequest
 import io.github.ketraterm.completion.api.TerminalShellSyntax
 import io.github.ketraterm.completion.model.*
 
@@ -27,12 +26,6 @@ internal data class AttachedOptionValue(
     val replacementStartOffset: Int,
     val quote: Char,
 )
-
-/** Parses and resolves one request against the engine's single command-spec set. */
-internal fun TerminalCompletionRequest.resolveCompletionContext(commandSpecs: List<TerminalCommandSpec>): TerminalCompletionContext {
-    val lineContext = TerminalCommandLineTokenizer.parse(commandLine, cursorOffset, shellCapabilities.syntax)
-    return TerminalCompletionContextResolver.resolve(commandLine, lineContext, commandSpecs)
-}
 
 internal object TerminalCompletionContextResolver {
     fun resolve(

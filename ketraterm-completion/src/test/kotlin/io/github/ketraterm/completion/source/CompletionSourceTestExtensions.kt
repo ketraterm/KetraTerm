@@ -15,15 +15,15 @@
  */
 package io.github.ketraterm.completion.source
 
+import io.github.ketraterm.completion.api.TerminalCompletionContext
 import io.github.ketraterm.completion.api.TerminalCompletionRequest
 import io.github.ketraterm.completion.api.TerminalCompletionSource
-import io.github.ketraterm.completion.commandline.resolveCompletionContext
 import io.github.ketraterm.completion.model.*
 
 internal suspend fun TerminalCompletionSource.complete(request: TerminalCompletionRequest) =
     complete(
         request = request,
-        context = request.resolveCompletionContext(TEST_COMMAND_SPECS),
+        context = TerminalCompletionContext.resolve(request, TEST_COMMAND_SPECS),
         limit = 256,
     )
 

@@ -375,6 +375,35 @@ class TerminalLibraryConsumerCompilationTest {
     }
 
     @Test
+    fun `Java custom engines resolve contexts and invoke stock sources through public APIs`() {
+        assertCompilation(
+            "completion",
+            """
+            import io.github.ketraterm.completion.api.TerminalCompletionCandidate;
+            import io.github.ketraterm.completion.api.TerminalCompletionContext;
+            import io.github.ketraterm.completion.api.TerminalCompletionRequest;
+            import io.github.ketraterm.completion.api.TerminalCompletionSource;
+            import io.github.ketraterm.completion.model.TerminalCommandSpec;
+            import java.util.List;
+            import kotlin.coroutines.Continuation;
+
+            final class Consumer {
+                TerminalCompletionContext defaultContext(TerminalCompletionRequest request) {
+                    return TerminalCompletionContext.resolve(request);
+                }
+
+                Object complete(TerminalCompletionSource source, TerminalCompletionRequest request,
+                                List<TerminalCommandSpec> catalog,
+                                Continuation<? super List<TerminalCompletionCandidate>> continuation) {
+                    TerminalCompletionContext context = TerminalCompletionContext.resolve(request, catalog);
+                    return source.complete(request, context, 8, continuation);
+                }
+            }
+            """.trimIndent(),
+        )
+    }
+
+    @Test
     fun `Java completion providers can use preceding arguments without implementation types`() {
         assertCompilation(
             "completion",

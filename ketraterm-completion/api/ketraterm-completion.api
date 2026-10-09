@@ -60,6 +60,7 @@ public final class io/github/ketraterm/completion/api/TerminalCompletionCandidat
 }
 
 public final class io/github/ketraterm/completion/api/TerminalCompletionContext {
+	public static final field Companion Lio/github/ketraterm/completion/api/TerminalCompletionContext$Companion;
 	public final fun getActiveOption ()Lio/github/ketraterm/completion/model/TerminalOptionSpec;
 	public final fun getActivePosition ()Lio/github/ketraterm/completion/api/TerminalCompletionActivePosition;
 	public final fun getActivePositionalArgument ()Lio/github/ketraterm/completion/model/TerminalArgumentSpec;
@@ -81,6 +82,14 @@ public final class io/github/ketraterm/completion/api/TerminalCompletionContext 
 	public final fun getSubcommandCandidateSource ()Lio/github/ketraterm/completion/model/TerminalCommandSpec;
 	public final fun getUsedOptionExclusiveGroupIds ()Ljava/util/Set;
 	public final fun precedingOptionValues (Ljava/lang/String;)Ljava/util/List;
+	public static final fun resolve (Lio/github/ketraterm/completion/api/TerminalCompletionRequest;)Lio/github/ketraterm/completion/api/TerminalCompletionContext;
+	public static final fun resolve (Lio/github/ketraterm/completion/api/TerminalCompletionRequest;Ljava/util/List;)Lio/github/ketraterm/completion/api/TerminalCompletionContext;
+}
+
+public final class io/github/ketraterm/completion/api/TerminalCompletionContext$Companion {
+	public final fun resolve (Lio/github/ketraterm/completion/api/TerminalCompletionRequest;)Lio/github/ketraterm/completion/api/TerminalCompletionContext;
+	public final fun resolve (Lio/github/ketraterm/completion/api/TerminalCompletionRequest;Ljava/util/List;)Lio/github/ketraterm/completion/api/TerminalCompletionContext;
+	public static synthetic fun resolve$default (Lio/github/ketraterm/completion/api/TerminalCompletionContext$Companion;Lio/github/ketraterm/completion/api/TerminalCompletionRequest;Ljava/util/List;ILjava/lang/Object;)Lio/github/ketraterm/completion/api/TerminalCompletionContext;
 }
 
 public abstract interface class io/github/ketraterm/completion/api/TerminalCompletionEngine {

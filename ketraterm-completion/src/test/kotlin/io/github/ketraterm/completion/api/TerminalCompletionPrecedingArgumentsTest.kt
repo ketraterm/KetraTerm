@@ -15,7 +15,6 @@
  */
 package io.github.ketraterm.completion.api
 
-import io.github.ketraterm.completion.commandline.TerminalCompletionContextResolver
 import io.github.ketraterm.completion.model.*
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.async
@@ -282,7 +281,11 @@ class TerminalCompletionPrecedingArgumentsTest {
         cursor: Int = line.length,
         syntax: TerminalShellSyntax = TerminalShellSyntax.POSIX,
         catalog: List<TerminalCommandSpec> = listOf(tool),
-    ): TerminalCompletionContext = TerminalCompletionContextResolver.resolve(line, cursor, catalog, syntax)
+    ): TerminalCompletionContext =
+        TerminalCompletionContext.resolve(
+            TerminalCompletionRequest(line, cursor, shellCapabilities = TerminalShellCapabilities(syntax = syntax)),
+            catalog,
+        )
 
     private val tool =
         TerminalCommandSpec(

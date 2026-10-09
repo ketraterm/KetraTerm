@@ -15,13 +15,11 @@
  */
 package io.github.ketraterm.completion.api
 
-import io.github.ketraterm.completion.commandline.AttachedOptionValue
-import io.github.ketraterm.completion.commandline.ResolvedOptionValue
-import io.github.ketraterm.completion.commandline.TerminalCommandLineContext
-import io.github.ketraterm.completion.commandline.normalizeTerminalCommandToken
+import io.github.ketraterm.completion.commandline.*
 import io.github.ketraterm.completion.model.*
 import java.util.Collections.unmodifiableList
 import java.util.List.copyOf
+import java.util.Set.copyOf as copySetOf
 
 /** Semantic position of the active completion token. */
 public enum class TerminalCompletionActivePosition {
@@ -47,9 +45,13 @@ public enum class TerminalCompletionActivePosition {
 /**
  * One parsed, spec-resolved completion context shared by every source.
  *
- * The merged engine constructs this object once per request. Source
+ * The merged engine constructs this object once per request through [resolve]. Custom
+ * engines use the same operation with their own command catalog. Source
  * implementations consume it directly to determine eligibility, prefix matching,
  * replacement ranges, and semantic argument kinds without re-tokenizing the command line.
+ * Context-owned collections reject mutation and are never reused by later requests.
+ * Command specifications remain catalog-owned; keep their nested collections unchanged
+ * while any context referencing them is in use.
  *
  * @property activePosition semantic position of the active completion token (e.g. COMMAND, SUBCOMMAND, OPTION_NAME, OPTION_VALUE, POSITIONAL_ARGUMENT, OPERATOR).
  * @property commandTokenIndex token index of the executable in the active command segment.
@@ -76,21 +78,24 @@ public class TerminalCompletionContext
         public val activePosition: TerminalCompletionActivePosition,
         public val commandTokenIndex: Int = 0,
         public val command: TerminalCommandSpec? = null,
-        public val commandPath: List<TerminalCommandSpec> = emptyList(),
+        commandPath: List<TerminalCommandSpec> = emptyList(),
         public val activeOption: TerminalOptionSpec? = null,
         public val activePositionalArgument: TerminalArgumentSpec? = null,
-        public val usedOptionExclusiveGroupIds: Set<String> = emptySet(),
+        usedOptionExclusiveGroupIds: Set<String> = emptySet(),
         public val optionsTerminated: Boolean = false,
         public val expectedPathKind: TerminalPathArgumentKind = TerminalPathArgumentKind.NONE,
         public val expectedHiddenPathPolicy: TerminalHiddenPathPolicy = TerminalHiddenPathPolicy.DEFAULT,
         public val expectedValueDomain: TerminalCompletionValueDomain = TerminalCompletionValueDomain.NONE,
         public val subcommandCandidateSource: TerminalCommandSpec? = null,
-        public val staticValueCandidates: List<String> = emptyList(),
+        staticValueCandidates: List<String> = emptyList(),
         public val activeTokenQuote: Char = NO_QUOTE,
         internal val attachedOptionValue: AttachedOptionValue? = null,
         optionValuesBeforeCursor: List<ResolvedOptionValue> = emptyList(),
         precedingPositionalArguments: List<String> = emptyList(),
     ) {
+        public val commandPath: List<TerminalCommandSpec> = copyOf(commandPath)
+        public val usedOptionExclusiveGroupIds: Set<String> = copySetOf(usedOptionExclusiveGroupIds)
+        public val staticValueCandidates: List<String> = copyOf(staticValueCandidates)
         private val optionValuesBeforeCursor = copyOf(optionValuesBeforeCursor)
 
         /**
@@ -163,7 +168,45 @@ public class TerminalCompletionContext
             return unmodifiableList(result)
         }
 
-        private companion object {
+        public companion object {
+            /**
+             * Parses and resolves one request using the same operation as the stock engine.
+             * Custom engines can resolve once, then share this context with stock or custom
+             * sources and candidate projectors using the same [request].
+             *
+             * Uses the request's captured shell syntax and the supplied command catalog.
+             * Empty, unknown, and incomplete command lines produce a valid partial context;
+             * no shell is executed and no host I/O, scheduling, ranking, or caching occurs.
+             * At an operator position, [activePosition] is [TerminalCompletionActivePosition.OPERATOR];
+             * callers should skip source evaluation there, as the stock engine does.
+             *
+             * The context and its owned collections may be retained across suspension and
+             * overlapping requests. Specifications are referenced rather than deep-copied:
+             * do not mutate the catalog or its nested collections during resolution, and keep
+             * referenced specs unchanged while a returned context is in use. Supplying a new
+             * catalog for later requests does not invalidate earlier contexts. Concurrent resolutions
+             * are safe with an unchanged catalog. Candidate limits and source lifecycle remain the
+             * custom engine's responsibility.
+             *
+             * @param request validated command line, cursor, and captured shell capabilities.
+             * @param commandSpecs the same catalog used by the caller's spec-aware sources;
+             * defaults to the bundled command specifications. An empty catalog resolves lexical
+             * context without inferred command, option, or positional metadata.
+             * @return request-owned context with consistent derived fields and replacement offsets.
+             */
+            @JvmStatic
+            @JvmOverloads
+            public fun resolve(
+                request: TerminalCompletionRequest,
+                commandSpecs: List<TerminalCommandSpec> = TerminalCommandSpecs.defaults(),
+            ): TerminalCompletionContext =
+                TerminalCompletionContextResolver.resolve(
+                    commandLine = request.commandLine,
+                    cursorOffset = request.cursorOffset,
+                    commandSpecs = commandSpecs,
+                    shellSyntax = request.shellCapabilities.syntax,
+                )
+
             private const val NO_QUOTE = '\u0000'
         }
     }

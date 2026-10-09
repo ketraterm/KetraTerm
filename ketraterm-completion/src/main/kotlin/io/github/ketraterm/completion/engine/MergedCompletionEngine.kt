@@ -16,8 +16,6 @@
 package io.github.ketraterm.completion.engine
 
 import io.github.ketraterm.completion.api.*
-import io.github.ketraterm.completion.commandline.TerminalCommandLineTokenizer
-import io.github.ketraterm.completion.commandline.TerminalCompletionContextResolver
 import io.github.ketraterm.completion.internal.TERMINAL_COMPLETION_CANDIDATE_ORDER
 import io.github.ketraterm.completion.internal.boundedTo
 import io.github.ketraterm.completion.internal.hasValidReplacementRangeFor
@@ -64,18 +62,7 @@ internal class MergedCompletionEngine(
                 return@channelFlow
             }
 
-            val commandLineContext =
-                TerminalCommandLineTokenizer.parse(
-                    request.commandLine,
-                    request.cursorOffset,
-                    request.shellCapabilities.syntax,
-                )
-            val completionContext =
-                TerminalCompletionContextResolver.resolve(
-                    commandLine = request.commandLine,
-                    lineContext = commandLineContext,
-                    commandSpecs = commandSpecs,
-                )
+            val completionContext = TerminalCompletionContext.resolve(request, commandSpecs)
             if (completionContext.activePosition == TerminalCompletionActivePosition.OPERATOR) {
                 send(emptyList())
                 return@channelFlow
@@ -172,7 +159,7 @@ internal class MergedCompletionEngine(
                                         request = request,
                                         context = completionContext,
                                     ).also { coroutineContext.ensureActive() }
-                                } catch (cancellation: CancellationException) {
+                                } catch (_: CancellationException) {
                                     this@coroutineScope.ensureActive()
                                     emptyList()
                                 } catch (failure: Throwable) {

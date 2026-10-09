@@ -16,7 +16,6 @@
 package io.github.ketraterm.completion.spec
 
 import io.github.ketraterm.completion.api.*
-import io.github.ketraterm.completion.commandline.resolveCompletionContext
 import io.github.ketraterm.completion.model.TerminalArgumentSpec
 import io.github.ketraterm.completion.model.TerminalCommandSpec
 import io.github.ketraterm.completion.model.TerminalCommandSpecs
@@ -292,7 +291,7 @@ class SpecCompletionEngineTest {
             val source = SpecCompletionSource(specs)
             for ((prefix, _) in valuePositions) {
                 val request = request(prefix + "he")
-                val candidates = source.complete(request, request.resolveCompletionContext(specs), limit = 1)
+                val candidates = source.complete(request, TerminalCompletionContext.resolve(request, specs), limit = 1)
 
                 assertEquals(listOf("hello-safe"), candidates.map { it.replacementText }, prefix)
             }
