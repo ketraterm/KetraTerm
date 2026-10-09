@@ -25,6 +25,8 @@ import io.github.ketraterm.transport.TerminalConnectorListener
 import io.github.ketraterm.ui.swing.settings.SwingPadding
 import io.github.ketraterm.ui.swing.settings.SwingSettings
 import io.github.ketraterm.ui.swing.settings.TerminalClipboardHandler
+import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestion
+import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionRequest
 import kotlinx.coroutines.test.StandardTestDispatcher
 import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.Test
@@ -89,10 +91,16 @@ class SwingTerminalInteractionSettingsTest {
             assertNull(view.currentSelectionRange())
         }
 
-    @Test
-    fun `clipboard paste reports rejection before session startup`() =
+    @ParameterizedTest
+    @ValueSource(booleans = [false, true])
+    fun `paste reports rejection before session startup`(suppliedText: Boolean) =
         fixture(startSession = false) {
-            assertFalse(view.pasteClipboardText())
+            var invalidations = 0
+            view.addShellSuggestionInvalidationListener { invalidations++ }
+
+            assertFalse(paste(suppliedText))
+            assertEquals(1, invalidations)
+            assertEquals(if (suppliedText) 0 else 1, reads)
             dispatcher.scheduler.runCurrent()
             assertEquals(0, output.size())
         }
@@ -114,14 +122,15 @@ class SwingTerminalInteractionSettingsTest {
             assertEquals(0, output.size())
         }
 
-    @Test
-    fun `clipboard paste reports rejection when the bulk operation queue is full`() =
+    @ParameterizedTest
+    @ValueSource(booleans = [false, true])
+    fun `paste reports rejection when the bulk operation queue is full`(suppliedText: Boolean) =
         fixture {
             repeat(16) {
                 assertEquals(TerminalInputAdmission.ACCEPTED, session.submitInput(TerminalPasteEvent("queued")))
             }
-            assertFalse(view.pasteClipboardText())
-            assertEquals(1, reads)
+            assertFalse(paste(suppliedText))
+            assertEquals(if (suppliedText) 0 else 1, reads)
             assertTrue(session.isClosed)
             dispatcher.scheduler.runCurrent()
             assertEquals(0, output.size())
@@ -145,16 +154,178 @@ class SwingTerminalInteractionSettingsTest {
             assertEquals("\u000c", output.toString(Charsets.UTF_8))
         }
 
-    @Test
-    fun `clipboard paste reports admission and preserves bracketed paste policy`() =
+    @ParameterizedTest
+    @ValueSource(booleans = [false, true])
+    fun `paste invalidates before admission and preserves bracketed paste policy`(suppliedText: Boolean) =
         fixture {
+            settings = settings.copy { it.smartSuggestionsEnabled = true }
+            view.reloadSettings()
             feed("\u001b[?2004h")
             clipboardText = "a\u0001b\n"
-            assertTrue(view.pasteClipboardText())
+            view.showSuggestions(
+                SwingShellSuggestionRequest("git s", 5),
+                listOf(SwingShellSuggestion("status", 4, 5, "test", "SUBCOMMAND")),
+            )
+            assertTrue(view.currentShellSuggestionState().visible)
+            var invalidations = 0
+            view.addShellSuggestionInvalidationListener {
+                invalidations++
+                assertFalse(view.currentShellSuggestionState().visible)
+                dispatcher.scheduler.runCurrent()
+                assertEquals(0, output.size())
+            }
+
+            assertTrue(paste(suppliedText))
+            assertEquals(1, invalidations)
             dispatcher.scheduler.runCurrent()
             assertEquals("\u001b[200~ab\n\u001b[201~", output.toString(Charsets.UTF_8))
-            assertEquals(1, reads)
+            assertEquals(if (suppliedText) 0 else 1, reads)
         }
+
+    @Test
+    fun `empty supplied text and empty or unavailable clipboard text do not invalidate`() =
+        fixture {
+            var invalidations = 0
+            view.addShellSuggestionInvalidationListener { invalidations++ }
+
+            assertFalse(view.pasteText(""))
+            assertEquals(0, reads)
+            clipboardText = ""
+            assertFalse(view.pasteClipboardText())
+            clipboardAvailable = false
+            clipboardText = "unavailable"
+            assertFalse(view.pasteClipboardText())
+
+            assertEquals(0, invalidations)
+            assertEquals(2, reads)
+            dispatcher.scheduler.runCurrent()
+            assertEquals(0, output.size())
+        }
+
+    @ParameterizedTest
+    @ValueSource(strings = ["unbound", "closed", "disposed"])
+    fun `unavailable sessions reject paste before clipboard access and invalidation`(state: String) =
+        fixture {
+            var invalidations = 0
+            view.addShellSuggestionInvalidationListener { invalidations++ }
+            when (state) {
+                "unbound" -> view.unbind()
+                "closed" -> session.close()
+                "disposed" -> view.dispose()
+            }
+
+            assertFalse(view.pasteText("candidate"))
+            assertFalse(view.pasteClipboardText())
+            assertEquals(0, invalidations)
+            assertEquals(0, reads)
+            dispatcher.scheduler.runCurrent()
+            assertEquals(0, output.size())
+        }
+
+    @ParameterizedTest
+    @ValueSource(booleans = [false, true])
+    fun `paste invalidation failures propagate without submitting input`(suppliedText: Boolean) =
+        fixture {
+            val failure = IllegalStateException("invalidation failed")
+            var invalidations = 0
+            view.addShellSuggestionInvalidationListener {
+                invalidations++
+                dispatcher.scheduler.runCurrent()
+                assertEquals(0, output.size())
+                throw failure
+            }
+
+            assertSame(failure, assertThrows(IllegalStateException::class.java) { paste(suppliedText) })
+            assertEquals(1, invalidations)
+            assertEquals(if (suppliedText) 0 else 1, reads)
+            dispatcher.scheduler.runCurrent()
+            assertEquals(0, output.size())
+        }
+
+    @ParameterizedTest
+    @ValueSource(strings = ["unbind", "close", "dispose", "rebind"])
+    fun `paste rechecks session after invalidation callbacks`(change: String) {
+        for (suppliedText in listOf(false, true)) {
+            fixture {
+                val replacementOutput = ByteArrayOutputStream()
+                val replacement = if (change == "rebind") createSession(replacementOutput) else null
+                try {
+                    replacement?.start(10, 2)
+                    dispatcher.scheduler.runCurrent()
+                    var invalidations = 0
+                    view.addShellSuggestionInvalidationListener {
+                        invalidations++
+                        when (change) {
+                            "unbind" -> view.unbind()
+                            "close" -> session.close()
+                            "dispose" -> view.dispose()
+                            "rebind" -> view.bind(requireNotNull(replacement))
+                        }
+                    }
+
+                    assertFalse(paste(suppliedText), "suppliedText=$suppliedText")
+                    assertEquals(1, invalidations)
+                    assertEquals(if (suppliedText) 0 else 1, reads)
+                    dispatcher.scheduler.runCurrent()
+                    assertEquals(0, output.size())
+                    assertEquals(0, replacementOutput.size())
+                } finally {
+                    replacement?.close()
+                }
+            }
+        }
+    }
+
+    @Test
+    fun `clipboard read reentry cannot paste into a replacement session`() =
+        fixture {
+            val replacementOutput = ByteArrayOutputStream()
+            val replacement = createSession(replacementOutput)
+            try {
+                replacement.start(10, 2)
+                dispatcher.scheduler.runCurrent()
+                var invalidations = 0
+                view.addShellSuggestionInvalidationListener { invalidations++ }
+                onRead = { view.bind(replacement) }
+
+                assertFalse(view.pasteClipboardText())
+                assertEquals(1, reads)
+                assertEquals(0, invalidations)
+                dispatcher.scheduler.runCurrent()
+                assertEquals(0, output.size())
+                assertEquals(0, replacementOutput.size())
+            } finally {
+                replacement.close()
+            }
+        }
+
+    @ParameterizedTest
+    @ValueSource(booleans = [false, true])
+    fun `paste rejects calls outside the EDT without side effects`(suppliedText: Boolean) {
+        lateinit var fixture: Fixture
+        var invalidations = 0
+        SwingUtilities.invokeAndWait {
+            fixture = Fixture(startSession = true)
+            fixture.view.addShellSuggestionInvalidationListener { invalidations++ }
+        }
+        try {
+            assertFalse(SwingUtilities.isEventDispatchThread())
+            assertFalse(fixture.paste(suppliedText))
+
+            SwingUtilities.invokeAndWait {
+                fixture.dispatcher.scheduler.runCurrent()
+                assertEquals(0, invalidations)
+                assertEquals(0, fixture.reads)
+                assertEquals(0, fixture.output.size())
+            }
+        } finally {
+            SwingUtilities.invokeAndWait {
+                fixture.view.dispose()
+                fixture.session.close()
+                fixture.dispatcher.scheduler.runCurrent()
+            }
+        }
+    }
 
     @Test
     fun `mouse reporting can be disabled without changing application modes`() =
@@ -273,7 +444,9 @@ class SwingTerminalInteractionSettingsTest {
     ) {
         val dispatcher = StandardTestDispatcher()
         val output = ByteArrayOutputStream()
-        val session =
+        val session = createSession(output)
+
+        fun createSession(destination: ByteArrayOutputStream): TerminalSession =
             TerminalSession.create(
                 TerminalBuffers.create(10, 2, 10),
                 object : TerminalConnector {
@@ -291,12 +464,13 @@ class SwingTerminalInteractionSettingsTest {
                         offset: Int,
                         length: Int,
                     ) {
-                        output.write(bytes, offset, length)
+                        destination.write(bytes, offset, length)
                     }
                 },
                 workerDispatcher = dispatcher,
                 ioDispatcher = dispatcher,
             )
+
         var settings =
             SwingSettings.create {
                 it.columns = 10
@@ -310,6 +484,7 @@ class SwingTerminalInteractionSettingsTest {
                 it.pasteControlPolicy = PasteControlPolicy.STRIP_C0_EXCEPT_TAB_CR_LF
             }
         var clipboardText = "clipboard"
+        var clipboardAvailable = true
         var reads = 0
         var copies = 0
         var onRead: () -> Unit = {}
@@ -321,10 +496,10 @@ class SwingTerminalInteractionSettingsTest {
                     it.scrollbarOverlayEnabled = true
                     it.clipboardHandler =
                         object : TerminalClipboardHandler {
-                            override fun readText(): String {
+                            override fun readText(): String? {
                                 reads++
                                 onRead()
-                                return clipboardText
+                                return clipboardText.takeIf { clipboardAvailable }
                             }
 
                             override fun copyText(text: String) {
@@ -351,6 +526,8 @@ class SwingTerminalInteractionSettingsTest {
             session.requestRender(0)
             dispatcher.scheduler.runCurrent()
         }
+
+        fun paste(suppliedText: Boolean): Boolean = if (suppliedText) view.pasteText(clipboardText) else view.pasteClipboardText()
 
         fun event(
             id: Int,

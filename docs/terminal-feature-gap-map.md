@@ -242,6 +242,9 @@ semantics, not claiming arbitrary chunk-independent placement.
 
 ### Embedding Contracts
 
+- `DONE(ui/host/profile)`: Swing host shortcut maps support detached custom construction and immutable binding/removal updates. Unbound actions are explicit, and conflicting or invalid bindings fail at configuration time. See the [supported shortcut contract](terminal-feature-map.md#7-embedding--swing-ui).
+- `DONE(ui)`: Swing accepts host-supplied paste text without synchronous clipboard access, sharing clipboard-paste invalidation, paste policy, and admission behavior. Hosts own asynchronous reads and completion identity checks. See the [supported paste contract](terminal-feature-map.md#7-embedding--swing-ui).
+- `DONE(host/input)`: Java hosts can omit trailing adapter configuration and construct key events through static factories with default arguments. Existing full-argument and Kotlin factory entry points remain. See the [Java API contract](terminal-feature-map.md#7-embedding--swing-ui).
 - `DONE(ui/host/profile/completion)`: reusable UI and completion localization has message-bundle hooks, locale selection and partial-bundle English fallback; products use resource catalogs and the IDE uses `DynamicBundle`. English catalogs are supplied. Additional translations and native standalone companion-script help remain distribution-owned. See the [supported localization contract](terminal-feature-map.md#7-embedding--swing-ui).
 
 The [IntelliJ embedding audit](reviews/intellij-embedding-audit-2026-09-27.md) distinguishes supported host customization from these composition decisions. The optional OSC producer is separated from the neutral session contract; its dependency is selected by the host.

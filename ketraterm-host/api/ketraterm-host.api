@@ -1,4 +1,9 @@
 public final class io/github/ketraterm/host/HostCommandAdapter : io/github/ketraterm/parser/spi/TerminalAsciiCommandSink {
+	public fun <init> (Lio/github/ketraterm/core/api/TerminalBuffer;)V
+	public fun <init> (Lio/github/ketraterm/core/api/TerminalBuffer;Lio/github/ketraterm/host/HostEventSink;)V
+	public fun <init> (Lio/github/ketraterm/core/api/TerminalBuffer;Lio/github/ketraterm/host/HostEventSink;Lio/github/ketraterm/host/HostPolicy;)V
+	public fun <init> (Lio/github/ketraterm/core/api/TerminalBuffer;Lio/github/ketraterm/host/HostEventSink;Lio/github/ketraterm/host/HostPolicy;I)V
+	public fun <init> (Lio/github/ketraterm/core/api/TerminalBuffer;Lio/github/ketraterm/host/HostEventSink;Lio/github/ketraterm/host/HostPolicy;II)V
 	public fun <init> (Lio/github/ketraterm/core/api/TerminalBuffer;Lio/github/ketraterm/host/HostEventSink;Lio/github/ketraterm/host/HostPolicy;IIZ)V
 	public synthetic fun <init> (Lio/github/ketraterm/core/api/TerminalBuffer;Lio/github/ketraterm/host/HostEventSink;Lio/github/ketraterm/host/HostPolicy;IIZILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public fun applyKittyKeyboardFlags (II)V

@@ -180,6 +180,13 @@ public final class io/github/ketraterm/input/event/TerminalKeyEvent : io/github/
 	public fun <init> ()V
 	public fun <init> (Lio/github/ketraterm/input/event/TerminalKey;IIIILjava/lang/String;ILio/github/ketraterm/input/event/TerminalKeyEventType;)V
 	public synthetic fun <init> (Lio/github/ketraterm/input/event/TerminalKey;IIIILjava/lang/String;ILio/github/ketraterm/input/event/TerminalKeyEventType;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public static final fun codepoint (I)Lio/github/ketraterm/input/event/TerminalKeyEvent;
+	public static final fun codepoint (II)Lio/github/ketraterm/input/event/TerminalKeyEvent;
+	public static final fun codepoint (III)Lio/github/ketraterm/input/event/TerminalKeyEvent;
+	public static final fun codepoint (IIII)Lio/github/ketraterm/input/event/TerminalKeyEvent;
+	public static final fun codepoint (IIIII)Lio/github/ketraterm/input/event/TerminalKeyEvent;
+	public static final fun codepoint (IIIIILjava/lang/String;)Lio/github/ketraterm/input/event/TerminalKeyEvent;
+	public static final fun codepoint (IIIIILjava/lang/String;Lio/github/ketraterm/input/event/TerminalKeyEventType;)Lio/github/ketraterm/input/event/TerminalKeyEvent;
 	public final fun component1 ()Lio/github/ketraterm/input/event/TerminalKey;
 	public final fun component2 ()I
 	public final fun component3 ()I
@@ -200,14 +207,30 @@ public final class io/github/ketraterm/input/event/TerminalKeyEvent : io/github/
 	public final fun getType ()Lio/github/ketraterm/input/event/TerminalKeyEventType;
 	public final fun getUnshiftedCodepoint ()I
 	public fun hashCode ()I
+	public static final fun key (Lio/github/ketraterm/input/event/TerminalKey;)Lio/github/ketraterm/input/event/TerminalKeyEvent;
+	public static final fun key (Lio/github/ketraterm/input/event/TerminalKey;I)Lio/github/ketraterm/input/event/TerminalKeyEvent;
+	public static final fun key (Lio/github/ketraterm/input/event/TerminalKey;ILio/github/ketraterm/input/event/TerminalKeyEventType;)Lio/github/ketraterm/input/event/TerminalKeyEvent;
+	public static final fun text (Ljava/lang/String;)Lio/github/ketraterm/input/event/TerminalKeyEvent;
+	public static final fun text (Ljava/lang/String;I)Lio/github/ketraterm/input/event/TerminalKeyEvent;
+	public static final fun text (Ljava/lang/String;ILio/github/ketraterm/input/event/TerminalKeyEventType;)Lio/github/ketraterm/input/event/TerminalKeyEvent;
 	public fun toString ()Ljava/lang/String;
 }
 
 public final class io/github/ketraterm/input/event/TerminalKeyEvent$Companion {
+	public final fun codepoint (I)Lio/github/ketraterm/input/event/TerminalKeyEvent;
+	public final fun codepoint (II)Lio/github/ketraterm/input/event/TerminalKeyEvent;
+	public final fun codepoint (III)Lio/github/ketraterm/input/event/TerminalKeyEvent;
+	public final fun codepoint (IIII)Lio/github/ketraterm/input/event/TerminalKeyEvent;
+	public final fun codepoint (IIIII)Lio/github/ketraterm/input/event/TerminalKeyEvent;
+	public final fun codepoint (IIIIILjava/lang/String;)Lio/github/ketraterm/input/event/TerminalKeyEvent;
 	public final fun codepoint (IIIIILjava/lang/String;Lio/github/ketraterm/input/event/TerminalKeyEventType;)Lio/github/ketraterm/input/event/TerminalKeyEvent;
 	public static synthetic fun codepoint$default (Lio/github/ketraterm/input/event/TerminalKeyEvent$Companion;IIIIILjava/lang/String;Lio/github/ketraterm/input/event/TerminalKeyEventType;ILjava/lang/Object;)Lio/github/ketraterm/input/event/TerminalKeyEvent;
+	public final fun key (Lio/github/ketraterm/input/event/TerminalKey;)Lio/github/ketraterm/input/event/TerminalKeyEvent;
+	public final fun key (Lio/github/ketraterm/input/event/TerminalKey;I)Lio/github/ketraterm/input/event/TerminalKeyEvent;
 	public final fun key (Lio/github/ketraterm/input/event/TerminalKey;ILio/github/ketraterm/input/event/TerminalKeyEventType;)Lio/github/ketraterm/input/event/TerminalKeyEvent;
 	public static synthetic fun key$default (Lio/github/ketraterm/input/event/TerminalKeyEvent$Companion;Lio/github/ketraterm/input/event/TerminalKey;ILio/github/ketraterm/input/event/TerminalKeyEventType;ILjava/lang/Object;)Lio/github/ketraterm/input/event/TerminalKeyEvent;
+	public final fun text (Ljava/lang/String;)Lio/github/ketraterm/input/event/TerminalKeyEvent;
+	public final fun text (Ljava/lang/String;I)Lio/github/ketraterm/input/event/TerminalKeyEvent;
 	public final fun text (Ljava/lang/String;ILio/github/ketraterm/input/event/TerminalKeyEventType;)Lio/github/ketraterm/input/event/TerminalKeyEvent;
 	public static synthetic fun text$default (Lio/github/ketraterm/input/event/TerminalKeyEvent$Companion;Ljava/lang/String;ILio/github/ketraterm/input/event/TerminalKeyEventType;ILjava/lang/Object;)Lio/github/ketraterm/input/event/TerminalKeyEvent;
 }

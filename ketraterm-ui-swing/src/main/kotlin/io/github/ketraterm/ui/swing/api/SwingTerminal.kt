@@ -2247,18 +2247,42 @@ public class SwingTerminal
         /**
          * Pastes text from the host clipboard into the active terminal session.
          *
-         * Call on the EDT. Clipboard callbacks run synchronously and propagate their failures.
+         * Call on the EDT. Clipboard callbacks run synchronously and propagate their failures;
+         * hosts reading the clipboard asynchronously can complete through [pasteText].
          * Unbound and closed sessions do not read the clipboard.
          *
          * @return `true` when nonempty clipboard text was admitted by the bound session,
-         *   `false` otherwise. Admission does not promise transport completion.
+         *   `false` otherwise, including outside the EDT. Admission does not promise transport completion.
          */
         public fun pasteClipboardText(): Boolean {
+            if (!SwingUtilities.isEventDispatchThread() || disposed) return false
             val boundSession = session?.takeUnless { it.isClosed } ?: return false
             val text = hostServices.clipboardHandler.readText() ?: return false
-            if (text.isEmpty() || session !== boundSession || boundSession.isClosed) return false
+            return session === boundSession && pasteText(text)
+        }
+
+        /**
+         * Pastes supplied [text] into the active terminal session without reading the clipboard.
+         *
+         * Call on the EDT. Hosts may read the clipboard off-thread, then verify their intended
+         * session is still bound on the EDT before calling this method. The session's normal
+         * paste policies, mode snapshot, ordering, and bounded admission apply.
+         *
+         * Nonempty input invalidates shell suggestions before admission. Invalidation callbacks
+         * run synchronously and propagate their failures; if they change or remove the bound
+         * session, or close it, no paste is submitted.
+         *
+         * @param text host-supplied paste text.
+         * @return `true` when the bound session admits the paste, `false` for empty input,
+         *   unavailable sessions, calls outside the EDT, or rejected admission.
+         *   Admission does not promise transport completion.
+         */
+        public fun pasteText(text: String): Boolean {
+            if (!SwingUtilities.isEventDispatchThread() || disposed || text.isEmpty()) return false
+            val boundSession = session?.takeUnless { it.isClosed } ?: return false
             invalidateShellSuggestionsOnEdt()
-            return boundSession.submitInput(TerminalPasteEvent(text)) == TerminalInputAdmission.ACCEPTED
+            return !(disposed || session !== boundSession || boundSession.isClosed) &&
+                boundSession.submitInput(TerminalPasteEvent(text)) == TerminalInputAdmission.ACCEPTED
         }
 
         private fun getOrCreateShellSuggestionController(): SwingShellSuggestionController =
@@ -2433,7 +2457,7 @@ public class SwingTerminal
             endRow: Int,
             endColumn: Int,
         ) {
-            if (startRow < 0 || endRow < startRow || renderCache.rows <= 0 || renderCache.columns <= 0) return
+            if (startRow !in 0..endRow || renderCache.rows <= 0 || renderCache.columns <= 0) return
             val firstRow = startRow.coerceAtLeast(0)
             val lastRow = endRow.coerceAtMost(renderCache.rows - 1)
             if (firstRow > lastRow) return

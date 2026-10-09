@@ -63,6 +63,12 @@ Create and access the component on the EDT. `bind`, `unbind`, `dispose`, and `re
 
 Shell metadata comes from the integration selected when the session is created. A host can supply `TerminalShellIntegrationFactory.host(...)` without depending on the optional OSC integration module. The binding observes model revisions and refreshes decorations against its copied frame even when no new terminal output arrives. This observation ends on session closure, unbinding, rebinding, or disposal; it never owns the host's model or producer.
 
+### Manual paste
+
+`pasteText(text)` admits host-supplied text on the EDT without accessing the clipboard. Hosts can capture their intended session on the EDT, read clipboard text asynchronously through their platform service, then return to the EDT and discard the result if their current session has changed before calling `pasteText`. Hosts own the asynchronous work and binding identity check.
+
+Supplied text and `pasteClipboardText()` share suggestion invalidation and normal session paste policies, admission-time modes, ordering, and queue limits. Invalidation callbacks run synchronously; a callback that changes or removes the session, closes it, or disposes the view prevents submission. Callback failures propagate. A `true` result promises admission, not transport completion; empty input, unavailable sessions, calls outside the EDT, and rejected admission return `false`. `pasteClipboardText()` still reads the configured clipboard synchronously on the EDT.
+
 ### Cursor presentation
 
 The terminal with keyboard focus displays the application's block, bar, or underline cursor using the configured blink interval. When unfocused, block cursors become thin hollow outlines; bars and underlines retain their shape without blinking. All shapes use the resolved cursor color and preserve the underlying text, backgrounds, and selection. Outlines use Java2D's normalized stroke rendering. Filled beams and underlines align to device pixels, with thickness rounded independently of pane position at fractional display scales. All shapes follow the same wide-cell ownership and bidi geometry as focused cursors and stay within their visual cell bounds.
