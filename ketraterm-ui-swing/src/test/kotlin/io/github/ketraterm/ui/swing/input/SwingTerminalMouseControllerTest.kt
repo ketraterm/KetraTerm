@@ -592,7 +592,7 @@ class SwingTerminalMouseControllerTest {
 
         var pasteCount = 0
 
-        override fun pasteClipboardText() {
+        override fun handleMiddleClickPaste(event: MouseEvent) {
             pasteCount++
         }
 

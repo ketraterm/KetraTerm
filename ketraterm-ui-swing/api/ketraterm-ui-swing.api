@@ -36,6 +36,7 @@ public final class io/github/ketraterm/ui/swing/api/SwingHostServices {
 	public final fun getHostKeyHandler ()Lio/github/ketraterm/ui/swing/api/SwingTerminalHostKeyHandler;
 	public final fun getHyperlinkDetector ()Lio/github/ketraterm/ui/swing/api/SwingHyperlinkDetector;
 	public final fun getHyperlinkHandler ()Lio/github/ketraterm/ui/swing/settings/TerminalHyperlinkHandler;
+	public final fun getMiddleClickPasteHandler ()Lio/github/ketraterm/ui/swing/api/SwingTerminalMiddleClickPasteHandler;
 	public final fun getScrollbarOverlayEnabled ()Z
 	public final fun getShellSuggestionKeymap ()Lio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionKeymap;
 	public final fun getShellSuggestionViewFactory ()Lio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionViewFactory;
@@ -53,6 +54,7 @@ public final class io/github/ketraterm/ui/swing/api/SwingHostServices$Builder {
 	public final fun getHostKeyHandler ()Lio/github/ketraterm/ui/swing/api/SwingTerminalHostKeyHandler;
 	public final fun getHyperlinkDetector ()Lio/github/ketraterm/ui/swing/api/SwingHyperlinkDetector;
 	public final fun getHyperlinkHandler ()Lio/github/ketraterm/ui/swing/settings/TerminalHyperlinkHandler;
+	public final fun getMiddleClickPasteHandler ()Lio/github/ketraterm/ui/swing/api/SwingTerminalMiddleClickPasteHandler;
 	public final fun getScrollbarOverlayEnabled ()Z
 	public final fun getShellSuggestionKeymap ()Lio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionKeymap;
 	public final fun getShellSuggestionViewFactory ()Lio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionViewFactory;
@@ -64,6 +66,7 @@ public final class io/github/ketraterm/ui/swing/api/SwingHostServices$Builder {
 	public final fun setHostKeyHandler (Lio/github/ketraterm/ui/swing/api/SwingTerminalHostKeyHandler;)V
 	public final fun setHyperlinkDetector (Lio/github/ketraterm/ui/swing/api/SwingHyperlinkDetector;)V
 	public final fun setHyperlinkHandler (Lio/github/ketraterm/ui/swing/settings/TerminalHyperlinkHandler;)V
+	public final fun setMiddleClickPasteHandler (Lio/github/ketraterm/ui/swing/api/SwingTerminalMiddleClickPasteHandler;)V
 	public final fun setScrollbarOverlayEnabled (Z)V
 	public final fun setShellSuggestionKeymap (Lio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionKeymap;)V
 	public final fun setShellSuggestionViewFactory (Lio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionViewFactory;)V
@@ -396,6 +399,20 @@ public final class io/github/ketraterm/ui/swing/api/SwingTerminalMessages$Compan
 	public static synthetic fun forLocale$default (Lio/github/ketraterm/ui/swing/api/SwingTerminalMessages$Companion;Ljava/util/Locale;Ljava/util/ResourceBundle;ILjava/lang/Object;)Lio/github/ketraterm/ui/swing/api/SwingTerminalMessages;
 }
 
+public abstract interface class io/github/ketraterm/ui/swing/api/SwingTerminalMiddleClickPasteHandler {
+	public abstract fun handlePaste (Lio/github/ketraterm/ui/swing/api/SwingTerminalMiddleClickPasteRequest;)V
+}
+
+public final class io/github/ketraterm/ui/swing/api/SwingTerminalMiddleClickPasteRequest {
+	public final fun cancel ()V
+	public final fun complete (Ljava/lang/String;)Z
+	public final fun getForcedByShift ()Z
+	public final fun getSource ()Lio/github/ketraterm/ui/swing/settings/SwingPasteSource;
+	public final fun getTerminal ()Lio/github/ketraterm/ui/swing/api/SwingTerminal;
+	public final fun getX ()I
+	public final fun getY ()I
+}
+
 public abstract interface class io/github/ketraterm/ui/swing/api/TerminalFontResolver {
 	public abstract fun resolveFallbackFont (IIF)Ljava/awt/Font;
 	public abstract fun resolveFallbackFont (Ljava/lang/String;IF)Ljava/awt/Font;
@@ -510,6 +527,14 @@ public final class io/github/ketraterm/ui/swing/settings/SwingPadding {
 	public fun toString ()Ljava/lang/String;
 }
 
+public final class io/github/ketraterm/ui/swing/settings/SwingPasteSource : java/lang/Enum {
+	public static final field CLIPBOARD Lio/github/ketraterm/ui/swing/settings/SwingPasteSource;
+	public static final field PRIMARY_SELECTION Lio/github/ketraterm/ui/swing/settings/SwingPasteSource;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public static fun valueOf (Ljava/lang/String;)Lio/github/ketraterm/ui/swing/settings/SwingPasteSource;
+	public static fun values ()[Lio/github/ketraterm/ui/swing/settings/SwingPasteSource;
+}
+
 public final class io/github/ketraterm/ui/swing/settings/SwingPromptDecoration : java/lang/Enum {
 	public static final field DIVIDER Lio/github/ketraterm/ui/swing/settings/SwingPromptDecoration;
 	public static final field GUTTER Lio/github/ketraterm/ui/swing/settings/SwingPromptDecoration;
@@ -542,6 +567,7 @@ public final class io/github/ketraterm/ui/swing/settings/SwingSettings {
 	public final fun getHyperlinkActivationForeground ()I
 	public final fun getLineHeight ()F
 	public final fun getMiddleClickPaste ()Z
+	public final fun getMiddleClickPasteSource ()Lio/github/ketraterm/ui/swing/settings/SwingPasteSource;
 	public static final fun getMonospaceFontFamilies ()Ljava/util/List;
 	public final fun getMouseReportingEnabled ()Z
 	public final fun getOsc8HyperlinkActivation ()Lio/github/ketraterm/ui/swing/api/SwingHyperlinkActivation;
@@ -592,6 +618,7 @@ public final class io/github/ketraterm/ui/swing/settings/SwingSettings$Builder {
 	public final fun getHyperlinkActivationForeground ()I
 	public final fun getLineHeight ()F
 	public final fun getMiddleClickPaste ()Z
+	public final fun getMiddleClickPasteSource ()Lio/github/ketraterm/ui/swing/settings/SwingPasteSource;
 	public final fun getMouseReportingEnabled ()Z
 	public final fun getOsc8HyperlinkActivation ()Lio/github/ketraterm/ui/swing/api/SwingHyperlinkActivation;
 	public final fun getOsc8HyperlinkPresentation ()Lio/github/ketraterm/ui/swing/api/SwingHyperlinkPresentation;
@@ -634,6 +661,7 @@ public final class io/github/ketraterm/ui/swing/settings/SwingSettings$Builder {
 	public final fun setHyperlinkActivationForeground (I)V
 	public final fun setLineHeight (F)V
 	public final fun setMiddleClickPaste (Z)V
+	public final fun setMiddleClickPasteSource (Lio/github/ketraterm/ui/swing/settings/SwingPasteSource;)V
 	public final fun setMouseReportingEnabled (Z)V
 	public final fun setOsc8HyperlinkActivation (Lio/github/ketraterm/ui/swing/api/SwingHyperlinkActivation;)V
 	public final fun setOsc8HyperlinkPresentation (Lio/github/ketraterm/ui/swing/api/SwingHyperlinkPresentation;)V

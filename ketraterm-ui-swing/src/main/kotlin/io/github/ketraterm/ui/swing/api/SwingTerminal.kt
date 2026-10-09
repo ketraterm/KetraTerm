@@ -104,6 +104,7 @@ public class SwingTerminal
 
         private val chrome = SwingTerminalChrome()
         private var session: TerminalSession? = null
+        private var bindingIdentity: Any = Any()
         private var retainedViewport: RetainedFrameViewport? = null
         private var disposed: Boolean = false
         private var settings: SwingSettings = settingsProvider.currentSettings()
@@ -465,8 +466,8 @@ public class SwingTerminal
                             ),
                         ]
 
-                    override fun pasteClipboardText() {
-                        this@SwingTerminal.pasteClipboardText()
+                    override fun handleMiddleClickPaste(event: MouseEvent) {
+                        handleMiddleClickPasteOnEdt(event)
                     }
 
                     override fun encodeMouse(event: TerminalMouseEvent) {
@@ -1205,8 +1206,9 @@ public class SwingTerminal
 
         private fun bindOnEdt(session: TerminalSession) =
             selectionController.deferChanges {
-                suggestionScheduler?.stop()
                 if (disposed) return@deferChanges
+                bindingIdentity = Any()
+                suggestionScheduler?.stop()
                 bindingJob?.cancel(CancellationException("Terminal session binding replaced"))
                 mouseController.resetInput()
                 this.session = session
@@ -1295,6 +1297,7 @@ public class SwingTerminal
 
         private fun unbindOnEdt() =
             selectionController.deferChanges {
+                bindingIdentity = Any()
                 cleanupSwingResources(
                     { suggestionScheduler?.stop() },
                     {
@@ -2327,11 +2330,41 @@ public class SwingTerminal
          * @return `true` when nonempty clipboard text was admitted by the bound session,
          *   `false` otherwise, including outside the EDT. Admission does not promise transport completion.
          */
-        public fun pasteClipboardText(): Boolean {
+        public fun pasteClipboardText(): Boolean = pasteFromClipboardOnEdt(SwingPasteSource.CLIPBOARD)
+
+        private fun pasteFromClipboardOnEdt(source: SwingPasteSource): Boolean {
             if (!SwingUtilities.isEventDispatchThread() || disposed) return false
             val boundSession = session?.takeUnless { it.isClosed } ?: return false
-            val text = hostServices.clipboardHandler.readText() ?: return false
-            return session === boundSession && pasteText(text)
+            val identity = bindingIdentity
+            val text =
+                when (source) {
+                    SwingPasteSource.CLIPBOARD -> hostServices.clipboardHandler.readText()
+                    SwingPasteSource.PRIMARY_SELECTION -> hostServices.clipboardHandler.readPrimarySelectionText()
+                } ?: return false
+            return pasteTextOnEdt(text, boundSession, identity)
+        }
+
+        private fun handleMiddleClickPasteOnEdt(event: MouseEvent) {
+            if (!SwingUtilities.isEventDispatchThread() || disposed) return
+            val handler = hostServices.middleClickPasteHandler
+            val source = settings.middleClickPasteSource
+            if (handler == null) {
+                pasteFromClipboardOnEdt(source)
+                return
+            }
+            if (session?.isClosed != false) return
+            val identity = bindingIdentity
+            val request =
+                SwingTerminalMiddleClickPasteRequest(this, source, event.x, event.y, event.isShiftDown) { text ->
+                    bindingIdentity === identity && pasteText(text)
+                }
+            var delivered = false
+            try {
+                handler.handlePaste(request)
+                delivered = true
+            } finally {
+                if (!delivered) request.cancel()
+            }
         }
 
         /**
@@ -2343,7 +2376,7 @@ public class SwingTerminal
          *
          * Nonempty input invalidates shell suggestions before admission. Invalidation callbacks
          * run synchronously and propagate their failures; if they change or remove the bound
-         * session, or close it, no paste is submitted.
+         * session, rebind even the same session, or close it, no paste is submitted.
          *
          * @param text host-supplied paste text.
          * @return `true` when the bound session admits the paste, `false` for empty input,
@@ -2353,10 +2386,24 @@ public class SwingTerminal
         public fun pasteText(text: String): Boolean {
             if (!SwingUtilities.isEventDispatchThread() || disposed || text.isEmpty()) return false
             val boundSession = session?.takeUnless { it.isClosed } ?: return false
+            return pasteTextOnEdt(text, boundSession, bindingIdentity)
+        }
+
+        private fun pasteTextOnEdt(
+            text: String,
+            boundSession: TerminalSession,
+            identity: Any,
+        ): Boolean {
+            if (text.isEmpty() || !isCurrentPasteBinding(boundSession, identity)) return false
             invalidateShellSuggestionsOnEdt()
-            return !(disposed || session !== boundSession || boundSession.isClosed) &&
+            return isCurrentPasteBinding(boundSession, identity) &&
                 boundSession.submitInput(TerminalPasteEvent(text)) == TerminalInputAdmission.ACCEPTED
         }
+
+        private fun isCurrentPasteBinding(
+            boundSession: TerminalSession,
+            identity: Any,
+        ): Boolean = !disposed && session === boundSession && bindingIdentity === identity && !boundSession.isClosed
 
         private fun getOrCreateShellSuggestionController(): SwingShellSuggestionController =
             shellSuggestionController ?: SwingShellSuggestionController(

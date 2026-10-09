@@ -33,8 +33,11 @@ import io.github.ketraterm.protocol.host.TerminalHostOutput;
 import io.github.ketraterm.ui.swing.api.SwingHostServices;
 import io.github.ketraterm.ui.swing.api.SwingHyperlinkAction;
 import io.github.ketraterm.ui.swing.api.SwingTerminal;
+import io.github.ketraterm.ui.swing.api.SwingTerminalMiddleClickPasteHandler;
+import io.github.ketraterm.ui.swing.api.SwingTerminalMiddleClickPasteRequest;
 import io.github.ketraterm.ui.swing.api.TerminalUiDispatcher;
 import io.github.ketraterm.ui.swing.settings.SwingSettings;
+import io.github.ketraterm.ui.swing.settings.SwingPasteSource;
 import io.github.ketraterm.ui.swing.settings.TerminalClipboardHandler;
 import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestion;
 import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionAcceptanceResult;
@@ -81,6 +84,12 @@ public final class JavaConsumer {
             throw new AssertionError("Java conditional admission must validate the captured command");
     }
 
+    public static void verifyMiddleClickPasteRequest(SwingTerminalMiddleClickPasteRequest request, SwingTerminal terminal) {
+        if (request.getTerminal() != terminal || request.getSource() != SwingPasteSource.PRIMARY_SELECTION
+            || request.getX() != 1 || request.getY() != 1 || request.getForcedByShift())
+            throw new AssertionError("Java middle-click request must snapshot the local primary-selection gesture");
+    }
+
     public static TerminalInputEncoderFactory inputEncoderFactory() {
         return TerminalInputEncoders::create;
     }
@@ -111,23 +120,40 @@ public final class JavaConsumer {
             draft.setMouseReportingEnabled(false);
             draft.setCopyOnSelection(true);
             draft.setMiddleClickPaste(true);
+            draft.setMiddleClickPasteSource(SwingPasteSource.PRIMARY_SELECTION);
             draft.setColumnSpacing(-1);
         });
         var copiedSettings = interactionSettings.toBuilder().build();
         if (copiedSettings.getMouseReportingEnabled() || !copiedSettings.getCopyOnSelection()
             || !copiedSettings.getMiddleClickPaste() || copiedSettings.getColumnSpacing() != -1
+            || copiedSettings.getMiddleClickPasteSource() != SwingPasteSource.PRIMARY_SELECTION
             || !interactionSettings.equals(copiedSettings))
             throw new AssertionError("Java interaction settings did not survive copying");
         var condensedSettings = interactionSettings.copy(draft -> draft.setColumnSpacing(-2));
         if (condensedSettings.getColumnSpacing() != -2 || interactionSettings.getColumnSpacing() != -1)
             throw new AssertionError("Java condensed spacing copy changed the original snapshot");
+        var ordinaryPaste = interactionSettings.copy(draft -> draft.setMiddleClickPasteSource(SwingPasteSource.CLIPBOARD));
+        if (ordinaryPaste.getMiddleClickPasteSource() != SwingPasteSource.CLIPBOARD
+            || interactionSettings.getMiddleClickPasteSource() != SwingPasteSource.PRIMARY_SELECTION)
+            throw new AssertionError("Java paste source copy changed the original snapshot");
         var resolver = new io.github.ketraterm.ui.swing.api.TerminalFontResolver() {
             public java.awt.Font resolveFallbackFont(int codePoint, int style, float size) { return null; }
             public java.awt.Font resolveFallbackFont(String text, int style, float size) { return null; }
         };
-        var custom = SwingHostServices.create(b -> b.setFontResolver(resolver));
-        var cleared = custom.copy(b -> b.setFontResolver(null));
-        if (custom.getFontResolver() != resolver || cleared.getFontResolver() != null)
+        SwingTerminalMiddleClickPasteHandler pasteHandler = request -> request.cancel();
+        var custom = SwingHostServices.create(b -> {
+            b.setFontResolver(resolver);
+            b.setMiddleClickPasteHandler(pasteHandler);
+        });
+        var customDraft = custom.toBuilder();
+        customDraft.setMiddleClickPasteHandler(null);
+        var cleared = custom.copy(b -> {
+            b.setFontResolver(null);
+            b.setMiddleClickPasteHandler(null);
+        });
+        if (custom.getFontResolver() != resolver || cleared.getFontResolver() != null
+            || custom.getMiddleClickPasteHandler() != pasteHandler || cleared.getMiddleClickPasteHandler() != null
+            || customDraft.build().getMiddleClickPasteHandler() != null)
             throw new AssertionError("Selective host service construction and immutable clearing");
         var settings = SwingSettings.create(b -> b.setLineHeight(1.25f));
         try {

@@ -110,6 +110,9 @@ public fun interface SwingTerminalHostKeyHandler {
  * @property contextMenuHandler host-owned right-click popup policy. The
  * reusable terminal invokes it only when terminal UI owns the right-click
  * gesture; application mouse reporting takes precedence unless Shift is held.
+ * @property middleClickPasteHandler optional host-owned local middle-button paste hook.
+ * A supplied hook owns clipboard access and deferred completion; null uses the configured
+ * clipboard handler synchronously. Other paste actions are unaffected.
  * @property fontResolver custom host font resolver policy.
  */
 public class SwingHostServices private constructor(
@@ -128,6 +131,7 @@ public class SwingHostServices private constructor(
     public val shellSuggestionViewFactory: SwingShellSuggestionViewFactory = builder.shellSuggestionViewFactory
     public val hostKeyHandler: SwingTerminalHostKeyHandler = builder.hostKeyHandler
     public val contextMenuHandler: SwingTerminalContextMenuHandler = builder.contextMenuHandler
+    public val middleClickPasteHandler: SwingTerminalMiddleClickPasteHandler? = builder.middleClickPasteHandler
     public val fontResolver: TerminalFontResolver? = builder.fontResolver
 
     /** Returns a detached mutable draft. Builders are caller-confined and never retained by snapshots. */
@@ -174,6 +178,9 @@ public class SwingHostServices private constructor(
         /** Draft value for [SwingHostServices.contextMenuHandler]; validated when [build] is called. */
         public var contextMenuHandler: SwingTerminalContextMenuHandler = source?.contextMenuHandler ?: SwingTerminalContextMenuHandler.NONE
 
+        /** Draft value for [SwingHostServices.middleClickPasteHandler]. */
+        public var middleClickPasteHandler: SwingTerminalMiddleClickPasteHandler? = source?.middleClickPasteHandler
+
         /** Draft value for [SwingHostServices.fontResolver]; validated when [build] is called. */
         public var fontResolver: TerminalFontResolver? = source?.fontResolver
 
@@ -194,6 +201,7 @@ public class SwingHostServices private constructor(
             shellSuggestionViewFactory == other.shellSuggestionViewFactory &&
             hostKeyHandler == other.hostKeyHandler &&
             contextMenuHandler == other.contextMenuHandler &&
+            middleClickPasteHandler == other.middleClickPasteHandler &&
             fontResolver == other.fontResolver
 
     override fun hashCode(): Int {
@@ -208,6 +216,7 @@ public class SwingHostServices private constructor(
         result = 31 * result + shellSuggestionViewFactory.hashCode()
         result = 31 * result + hostKeyHandler.hashCode()
         result = 31 * result + contextMenuHandler.hashCode()
+        result = 31 * result + middleClickPasteHandler.hashCode()
         result = 31 * result + fontResolver.hashCode()
         return result
     }

@@ -106,7 +106,7 @@ internal class SwingTerminalMouseController(
                 if (SwingUtilities.isMiddleMouseButton(event) && host.settings.middleClickPaste) {
                     middlePaste = true
                     event.consume()
-                    if (host.session != null) host.pasteClipboardText()
+                    if (host.session != null) host.handleMiddleClickPaste(event)
                     return
                 }
                 if (host.handleHyperlinkMousePressed(event)) return

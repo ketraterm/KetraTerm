@@ -36,8 +36,10 @@ import io.github.ketraterm.transport.TerminalConnector
 import io.github.ketraterm.transport.TerminalConnectorListener
 import io.github.ketraterm.ui.swing.api.*
 import io.github.ketraterm.ui.swing.settings.SwingPadding
+import io.github.ketraterm.ui.swing.settings.SwingPasteSource
 import io.github.ketraterm.ui.swing.settings.SwingSettings
 import io.github.ketraterm.ui.swing.settings.SwingSettingsProvider
+import io.github.ketraterm.ui.swing.settings.TerminalClipboardHandler
 import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionProvider
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -64,6 +66,7 @@ import javax.swing.SwingUtilities
 private const val URL = "https://example.test/consumer"
 private const val COLUMNS = 80
 private const val ROWS = 3
+private const val HOST_PASTE = "primary selection from published consumer"
 
 fun main() =
     runBlocking {
@@ -72,6 +75,7 @@ fun main() =
                 it.mouseReportingEnabled = false
                 it.copyOnSelection = true
                 it.middleClickPaste = true
+                it.middleClickPasteSource = SwingPasteSource.PRIMARY_SELECTION
                 it.columnSpacing = -1
             }
         check(interactionSettings == interactionSettings.copy {})
@@ -79,6 +83,12 @@ fun main() =
         val condensedSettings = interactionSettings.copy { it.columnSpacing = -2 }
         check(condensedSettings.columnSpacing == -2 && interactionSettings.columnSpacing == -1)
         check(!interactionSettings.mouseReportingEnabled)
+        check(interactionSettings.toBuilder().build().middleClickPasteSource == SwingPasteSource.PRIMARY_SELECTION)
+        check(
+            interactionSettings.copy { it.middleClickPasteSource = SwingPasteSource.CLIPBOARD }.middleClickPasteSource ==
+                SwingPasteSource.CLIPBOARD,
+        )
+        check(interactionSettings.middleClickPasteSource == SwingPasteSource.PRIMARY_SELECTION)
         JavaConsumer.verify()
         JavaConsumer.verifySessionConstruction(ConsumerConnector())
         val selection = checkNotNull(TerminalClipboardSelection.parse("cp"))
@@ -164,6 +174,7 @@ fun main() =
                 }
             }
             check(!session.isClosed && !connector.closed.get())
+            var pasteRequest: SwingTerminalMiddleClickPasteRequest? = null
             val terminal =
                 onEdt {
                     SwingTerminal(
@@ -172,6 +183,8 @@ fun main() =
                                 draft.columns = COLUMNS
                                 draft.rows = ROWS
                                 draft.columnSpacing = -1
+                                draft.middleClickPaste = true
+                                draft.middleClickPasteSource = SwingPasteSource.PRIMARY_SELECTION
                                 draft.padding = SwingPadding()
                                 draft.shellIntegrationDecorationGutterWidth = 0
                                 draft.osc8HyperlinkActivation = SwingHyperlinkActivation.DIRECT
@@ -184,6 +197,20 @@ fun main() =
                         SwingHostServices.create { draft ->
                             draft.hyperlinkDetector = detector
                             draft.scrollbarOverlayEnabled = false
+                            draft.clipboardHandler =
+                                object : TerminalClipboardHandler {
+                                    override fun copyText(text: String) = Unit
+
+                                    override fun readText(): String? = error("Custom paste must not read the clipboard")
+
+                                    override fun readPrimarySelectionText(): String? = error("Custom paste must not read primary selection")
+                                }
+                            draft.middleClickPasteHandler =
+                                SwingTerminalMiddleClickPasteHandler { request ->
+                                    check(SwingUtilities.isEventDispatchThread())
+                                    check(pasteRequest == null)
+                                    pasteRequest = request
+                                }
                         },
                     ).apply { size = preferredSize }
                 }
@@ -226,7 +253,18 @@ fun main() =
                     terminal.dispatchPointer(MouseEvent.MOUSE_PRESSED, MouseEvent.BUTTON1)
                     terminal.dispatchPointer(MouseEvent.MOUSE_RELEASED, MouseEvent.BUTTON1)
                     check(detector.openedGeneration.get() == 0L)
+                    terminal.dispatchPointer(MouseEvent.MOUSE_PRESSED, MouseEvent.BUTTON2)
+                    terminal.dispatchPointer(MouseEvent.MOUSE_RELEASED, MouseEvent.BUTTON2)
+                    checkNotNull(pasteRequest).also { JavaConsumer.verifyMiddleClickPasteRequest(it, terminal) }
                 }
+                val deferredPaste = checkNotNull(pasteRequest)
+                check(!SwingUtilities.isEventDispatchThread())
+                check(!deferredPaste.complete("wrong thread"))
+                onEdt {
+                    check(deferredPaste.complete(HOST_PASTE))
+                    check(!deferredPaste.complete("duplicate"))
+                }
+                withTimeout(20_000) { check(connector.pasteWritten.await() == HOST_PASTE) }
                 withTimeout(20_000) { detector.subscribed.await() }
                 detector.updateConfiguration()
                 withTimeout(20_000) { detector.refreshedHover.await() }
@@ -319,6 +357,7 @@ private class ConsumerHyperlinkDetector : SwingHyperlinkDetector {
 
 private class ConsumerConnector : TerminalConnector {
     val closed = AtomicBoolean()
+    val pasteWritten = CompletableDeferred<String>()
     private val started = AtomicBoolean()
     private val input = ByteArrayOutputStream()
 
@@ -336,6 +375,7 @@ private class ConsumerConnector : TerminalConnector {
         length: Int,
     ) {
         input.write(bytes, offset, length)
+        if (input.size() >= HOST_PASTE.length) pasteWritten.complete(input.toString(Charsets.UTF_8))
     }
 
     override fun resize(

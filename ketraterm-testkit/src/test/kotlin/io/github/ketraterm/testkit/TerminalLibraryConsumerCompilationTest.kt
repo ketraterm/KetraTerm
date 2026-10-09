@@ -38,6 +38,44 @@ class TerminalLibraryConsumerCompilationTest {
     lateinit var directory: Path
 
     @Test
+    fun `Java Swing hosts can defer source aware middle click paste without Swing event retention`() {
+        assertCompilation(
+            "ui-swing",
+            """
+            import io.github.ketraterm.ui.swing.api.SwingHostServices;
+            import io.github.ketraterm.ui.swing.api.SwingTerminal;
+            import io.github.ketraterm.ui.swing.api.SwingTerminalMiddleClickPasteHandler;
+            import io.github.ketraterm.ui.swing.api.SwingTerminalMiddleClickPasteRequest;
+            import io.github.ketraterm.ui.swing.settings.SwingPasteSource;
+            import io.github.ketraterm.ui.swing.settings.SwingSettings;
+
+            final class Consumer implements SwingTerminalMiddleClickPasteHandler {
+                private SwingTerminalMiddleClickPasteRequest pending;
+                @Override public void handlePaste(SwingTerminalMiddleClickPasteRequest request) {
+                    SwingTerminal terminal = request.getTerminal();
+                    SwingPasteSource source = request.getSource();
+                    int x = request.getX(), y = request.getY();
+                    boolean forced = request.getForcedByShift();
+                    pending = request;
+                }
+                boolean complete(String text) { return pending.complete(text); }
+                void cancel() { pending.cancel(); }
+                void wire() {
+                    var settings = SwingSettings.create(draft -> {
+                        draft.setMiddleClickPaste(true);
+                        draft.setMiddleClickPasteSource(SwingPasteSource.PRIMARY_SELECTION);
+                    });
+                    var services = SwingHostServices.create(draft -> draft.setMiddleClickPasteHandler(this));
+                    new SwingTerminal(() -> settings, services);
+                    services.copy(draft -> draft.setMiddleClickPasteHandler(null));
+                    settings.toBuilder().setMiddleClickPasteSource(SwingPasteSource.CLIPBOARD);
+                }
+            }
+            """.trimIndent(),
+        )
+    }
+
+    @Test
     fun `Java Swing hosts hit test cells with reusable standard point storage`() {
         assertCompilation(
             "ui-swing",

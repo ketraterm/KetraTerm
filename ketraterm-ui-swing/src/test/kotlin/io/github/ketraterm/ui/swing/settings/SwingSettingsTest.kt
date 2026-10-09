@@ -16,11 +16,14 @@
 package io.github.ketraterm.ui.swing.settings
 
 import io.github.ketraterm.render.api.TerminalRenderBufferKind
+import io.github.ketraterm.ui.swing.api.SwingHostServices
 import io.github.ketraterm.ui.swing.api.SwingTerminal
+import io.github.ketraterm.ui.swing.api.SwingTerminalMiddleClickPasteHandler
 import io.github.ketraterm.ui.swing.render.cache.FontCache
 import kotlinx.collections.immutable.persistentListOf
 import kotlinx.collections.immutable.toImmutableList
 import org.junit.jupiter.params.ParameterizedTest
+import org.junit.jupiter.params.provider.EnumSource
 import org.junit.jupiter.params.provider.ValueSource
 import java.awt.Canvas
 import java.awt.Font
@@ -222,6 +225,45 @@ class SwingSettingsTest {
         assertEquals(true, settings.mouseReportingEnabled)
         assertEquals(false, settings.copyOnSelection)
         assertEquals(false, settings.middleClickPaste)
+        assertEquals(SwingPasteSource.CLIPBOARD, settings.middleClickPasteSource)
+    }
+
+    @ParameterizedTest
+    @EnumSource(SwingPasteSource::class)
+    fun middleClickPasteSourceSurvivesIndependentSettingsSnapshots(source: SwingPasteSource) {
+        val original = SwingSettings()
+        val builder = original.toBuilder()
+        builder.middleClickPasteSource = source
+        val snapshot = builder.build()
+        builder.middleClickPasteSource = SwingPasteSource.CLIPBOARD
+
+        assertEquals(source, snapshot.middleClickPasteSource)
+        assertEquals(snapshot, snapshot.toBuilder().build())
+        assertEquals(snapshot, original.copy { it.middleClickPasteSource = source })
+        assertEquals(snapshot.hashCode(), snapshot.copy {}.hashCode())
+        assertFalse(snapshot.middleClickPaste)
+        assertEquals(SwingPasteSource.CLIPBOARD, original.middleClickPasteSource)
+        if (source != SwingPasteSource.CLIPBOARD) assertNotEquals(original, snapshot)
+    }
+
+    @Test
+    fun middleClickPasteServiceSnapshotsRetainAndClearTheHostHandler() {
+        val handler = SwingTerminalMiddleClickPasteHandler { error("Building services must not invoke host policy") }
+        val original = SwingHostServices()
+        assertNull(original.middleClickPasteHandler)
+        val builder = original.toBuilder()
+        builder.middleClickPasteHandler = handler
+        val configured = builder.build()
+        builder.middleClickPasteHandler = null
+
+        assertSame(handler, configured.middleClickPasteHandler)
+        assertEquals(configured, configured.toBuilder().build())
+        assertEquals(configured, original.copy { it.middleClickPasteHandler = handler })
+        assertEquals(configured.hashCode(), configured.copy {}.hashCode())
+        assertNotEquals(original, configured)
+        assertEquals(original, configured.copy { it.middleClickPasteHandler = null })
+        assertNull(original.middleClickPasteHandler)
+        assertSame(original.clipboardHandler, configured.clipboardHandler)
     }
 
     @Test

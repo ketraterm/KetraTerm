@@ -201,12 +201,22 @@ public class SwingSettings private constructor(
     public val copyOnSelection: Boolean = builder.copyOnSelection
 
     /**
-     * Pastes through the supplied clipboard handler on a local middle-button press.
+     * Enables paste on a local middle-button press, using [middleClickPasteSource].
      * Defaults to false. Application mouse tracking takes priority unless Shift forces local input.
      * Uses the normal paste policy and bracketed-paste handling. Closed sessions do not read the clipboard.
-     * Clipboard callbacks run on the EDT and propagate failures.
+     * Without a [io.github.ketraterm.ui.swing.api.SwingHostServices.middleClickPasteHandler],
+     * clipboard callbacks run on the EDT and propagate failures. A supplied hook owns clipboard access
+     * and may complete later. Changing this setting does not cancel requests already issued to a hook.
      */
     public val middleClickPaste: Boolean = builder.middleClickPaste
+
+    /**
+     * Clipboard source captured on an enabled local middle-button press. Defaults to [SwingPasteSource.CLIPBOARD].
+     * The built-in path reads only this source; unavailable PRIMARY never falls back to the ordinary clipboard.
+     * A host paste hook receives the captured source and owns obtaining or declining the text.
+     * Keyboard, menu, and programmatic clipboard paste continue using the ordinary clipboard.
+     */
+    public val middleClickPasteSource: SwingPasteSource = builder.middleClickPasteSource
     public val smartSuggestionsEnabled: Boolean = builder.smartSuggestionsEnabled
     public val shellSuggestionsEnabled: Boolean = builder.shellSuggestionsEnabled
     public val acceptSelectedSuggestionWithEnter: Boolean = builder.acceptSelectedSuggestionWithEnter
@@ -344,6 +354,9 @@ public class SwingSettings private constructor(
         /** Draft value for [SwingSettings.middleClickPaste]. */
         public var middleClickPaste: Boolean = source?.middleClickPaste ?: false
 
+        /** Draft value for [SwingSettings.middleClickPasteSource]. */
+        public var middleClickPasteSource: SwingPasteSource = source?.middleClickPasteSource ?: SwingPasteSource.CLIPBOARD
+
         /** Draft value for [SwingSettings.lineHeight]; validated when [build] is called. */
         public var lineHeight: Float = source?.lineHeight ?: 1.0f
 
@@ -412,6 +425,7 @@ public class SwingSettings private constructor(
             mouseReportingEnabled == other.mouseReportingEnabled &&
             copyOnSelection == other.copyOnSelection &&
             middleClickPaste == other.middleClickPaste &&
+            middleClickPasteSource == other.middleClickPasteSource &&
             smartSuggestionsEnabled == other.smartSuggestionsEnabled &&
             shellSuggestionsEnabled == other.shellSuggestionsEnabled &&
             acceptSelectedSuggestionWithEnter == other.acceptSelectedSuggestionWithEnter &&
@@ -458,6 +472,7 @@ public class SwingSettings private constructor(
         result = 31 * result + mouseReportingEnabled.hashCode()
         result = 31 * result + copyOnSelection.hashCode()
         result = 31 * result + middleClickPaste.hashCode()
+        result = 31 * result + middleClickPasteSource.hashCode()
         result = 31 * result + smartSuggestionsEnabled.hashCode()
         result = 31 * result + shellSuggestionsEnabled.hashCode()
         result = 31 * result + acceptSelectedSuggestionWithEnter.hashCode()
