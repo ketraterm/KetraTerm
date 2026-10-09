@@ -30,6 +30,7 @@ import javax.tools.ToolProvider
 import kotlin.io.path.extension
 import kotlin.io.path.listDirectoryEntries
 import kotlin.io.path.writeText
+import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 class TerminalLibraryConsumerCompilationTest {
@@ -94,6 +95,21 @@ class TerminalLibraryConsumerCompilationTest {
             final class Consumer {
                 Class<?> libraryType() { return $publicType.class; }
                 Object runtimeValue() { return kotlin.Unit.INSTANCE; }
+            }
+            """.trimIndent(),
+        )
+    }
+
+    @Test
+    fun `Swing exports clipboard independent selected text to Java`() {
+        assertCompilation(
+            "ui-swing",
+            """
+            import io.github.ketraterm.ui.swing.api.SwingTerminal;
+            final class Consumer {
+                String readSelection(SwingTerminal terminal) {
+                    return terminal.selectedText();
+                }
             }
             """.trimIndent(),
         )
@@ -375,11 +391,9 @@ class TerminalLibraryConsumerCompilationTest {
                         null,
                         fileManager.getJavaFileObjects(sourceFile.toFile()),
                     ).call()
-            assertTrue(
-                compiled == expectedSuccess,
-                "Consumer of ketraterm-$module expected compilation success=$expectedSuccess:\n" +
-                    diagnostics.diagnostics.joinToString("\n") { it.getMessage(Locale.ROOT) },
-            )
+            assertEquals(
+                compiled, expectedSuccess, "Consumer of ketraterm-$module expected compilation success=$expectedSuccess:\n" +
+                        diagnostics.diagnostics.joinToString("\n") { it.getMessage(Locale.ROOT) })
         }
     }
 }

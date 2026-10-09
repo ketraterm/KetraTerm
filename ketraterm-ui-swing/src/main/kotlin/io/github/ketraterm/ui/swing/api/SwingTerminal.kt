@@ -1464,6 +1464,29 @@ public class SwingTerminal
         }
 
         /**
+         * Returns the complete retained selection's text on the EDT, or null when unavailable.
+         *
+         * Includes offscreen rows and closed-session output. Reads current session content,
+         * joining soft-wrapped rows for linear selections and preserving row breaks for
+         * block selections. Wide cells and grapheme clusters are copied completely.
+         * A nonempty selection may return an empty string when only trimmed blanks remain.
+         * Unbound and disposed components return null.
+         *
+         * Uses the same extraction as [copySelectionToClipboard] without accessing the
+         * clipboard, scrolling, focusing, or sending input. Eviction may clip selection;
+         * invalidated layouts or buffer changes clear it. Resulting selection changes
+         * notify listeners outside the frame lease. The returned string may be retained.
+         *
+         * @throws IllegalStateException outside the EDT.
+         */
+        public fun selectedText(): String? {
+            check(SwingUtilities.isEventDispatchThread()) { "selection access requires the EDT" }
+            if (disposed) return null
+            val boundSession = session ?: return null
+            return selectionController.getSelectedText(boundSession)
+        }
+
+        /**
          * Creates a range in the current binding and layout without changing selection.
          *
          * Use absolute retained rows and half-open cell edges, as defined by
@@ -2223,9 +2246,8 @@ public class SwingTerminal
                 SwingUtilities.invokeAndWait { copied = copySelectionToClipboard() }
                 return copied
             }
-            val boundSession = session ?: return false
-            val selectedText = selectionController.getSelectedText(boundSession) ?: return false
-            hostServices.clipboardHandler.copyText(selectedText)
+            val text = selectedText() ?: return false
+            hostServices.clipboardHandler.copyText(text)
             return true
         }
 

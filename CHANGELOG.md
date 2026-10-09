@@ -42,6 +42,7 @@ Release notes for library consumers and embedders. Product-specific changes are 
 
 ### API changes
 
+- Added EDT-only `SwingTerminal.selectedText()` for clipboard-independent text extraction, including offscreen selections and closed-session output. It shares clipboard-copy semantics for wrapping, block selection, wide cells, and grapheme clusters. Unavailable selection returns `null`; a nonempty selection can return an empty string.
 - Added detached custom construction and immutable `withShortcut`/`withoutShortcut` updates to `SwingTerminalHostShortcutMap`. Unbound actions now return `null` from `shortcut`, including valid actions absent from platform defaults; callers must handle unbound results. Conflicting keystrokes and unsupported modifier bits are rejected during configuration.
 - Added EDT-only `SwingTerminal.pasteText(String)` for host-supplied text, preserving clipboard-paste invalidation, session paste policy, ordering, and admission results without reading the native clipboard. Hosts can read asynchronously and verify session identity before completing the paste on the EDT.
 - Added Java constructor overloads for `HostCommandAdapter` and static `TerminalKeyEvent.key`, `codepoint`, and `text` factories with trailing-default overloads. Java callers share Kotlin defaults and validation; existing full constructors, companion factories, and Kotlin default-call entry points remain available.

@@ -329,6 +329,7 @@ public final class io/github/ketraterm/ui/swing/api/SwingTerminal : javax/swing/
 	public final fun selectCommandOutputAt (II)Z
 	public final fun selectNextSearchResult ()V
 	public final fun selectPreviousSearchResult ()V
+	public final fun selectedText ()Ljava/lang/String;
 	public final fun setSearchCaseSensitive (Z)V
 	public final fun setSelection (Lio/github/ketraterm/ui/swing/api/TerminalSelectionRange;)Z
 	public final fun setShellSuggestionFailureHandler (Lio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionFailureHandler;)V
