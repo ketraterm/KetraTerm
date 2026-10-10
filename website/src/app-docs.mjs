@@ -73,9 +73,13 @@ export function renderAppDocumentation({ root, id, ref, write, corrections }) {
         title,
         version: `${id} · Stable release`,
         sidebar,
+        breadcrumbs: [
+          { label: "KetraTerm", href: relative(file, "index.html") },
+          { label: title },
+        ],
       }),
     );
-    index.push({ title, file, text: content.text });
+    index.push({ title, file, text: content.text, context: "App help" });
   }
   write("search.json", JSON.stringify(index));
   write("app-version.json", JSON.stringify({ id, ref }, null, 2));

@@ -15,7 +15,7 @@ npm run preview
 ```
 
 Open `http://localhost:4173`. Output is written to `build/website` at the repository
-root. Run `./gradlew dokkaGenerate` from the root first to include local API docs.
+root. Run `./gradlew :dokkaGenerate` from the root first to include local API docs.
 
 ## Content
 
@@ -23,8 +23,10 @@ root. Run `./gradlew dokkaGenerate` from the root first to include local API doc
 - `/library/`: library installation, module guides, API versions, library changelog,
   and contributor material.
 
-Each site has its own navigation and search index. Their footers link to the
-other product. Technical guides may link to relevant product references.
+Each site has its own navigation and search index. The header switch and footer
+link to the other product. Technical guides may link to relevant product references.
+API pages keep Dokka's type navigation and search, with links to the library,
+app, and version archive. Publication checks site, guide, and API links.
 
 - `src/pages.mjs`: landing pages, downloads, screenshots, and API archive index.
 - `src/app-docs.mjs`: publishes the app's user guide, settings, and changelog.
@@ -41,6 +43,8 @@ other product. Technical guides may link to relevant product references.
 The build reuses the app's `icons/logo.svg` for the header, footer, and favicon.
 The palette uses its green and charcoal, with darker green text on light surfaces
 for readable contrast.
+The self-hosted Manrope font is distributed under the
+[SIL Open Font License](assets/fonts/Manrope-OFL.txt).
 
 Edit documentation in its owning Markdown file. Relative links between published
 guides stay within their version; source links point to the recorded Git revision.

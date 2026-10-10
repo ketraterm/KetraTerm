@@ -17,6 +17,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {parseHTML} from "linkedom";
+import {layout} from "../src/layout.mjs";
 import {pages} from "../src/pages.mjs";
 
 test("the app owns the root and the library can be hosted independently", () => {
@@ -39,7 +40,13 @@ test("the app owns the root and the library can be hosted independently", () => 
     ),
   );
   assert.equal(app.querySelector("main pre"), null);
-  assert.equal(app.querySelector('header a[href*="library"]'), null);
+  assert.ok(app.querySelector("main [data-download]"));
+  for (const id of ["download-os", "download-arch", "download-options"])
+    assert.equal(app.querySelectorAll(`#${id}`).length, 1);
+  assert.equal(
+    app.querySelector('nav[aria-label="App navigation"] a[href*="library"]'),
+    null,
+  );
   assert.ok(
     library.querySelector(
       'nav[aria-label="Library navigation"] a[href="versions.html"]',
@@ -78,6 +85,45 @@ test("the app owns the root and the library can be hosted independently", () => 
     assert.ok(
       !link.startsWith("../") && !link.startsWith("/"),
       `Library depends on parent site: ${link}`,
+    );
+  }
+});
+
+test("the product switch connects both sites from landing pages and nested guides", () => {
+  const appUrl = "https://app.example.com/KetraTerm/";
+  const cases = [
+    ["index.html", "App", "index.html", "library/index.html"],
+    ["guide.html", "App", "index.html", "library/index.html"],
+    ["library/index.html", "Library", appUrl, "index.html"],
+    ["library/versions.html", "Library", appUrl, "index.html"],
+    [
+      "library/guides/v1.0.0/ketraterm-session/README.html",
+      "Library",
+      appUrl,
+      "../../../index.html",
+    ],
+  ];
+  for (const [file, current, appHome, libraryHome] of cases) {
+    const { document } = parseHTML(
+      layout({ file, title: "Test", body: "", appUrl }),
+    );
+    const products = document.querySelector(
+      'header nav[aria-label="KetraTerm products"]',
+    );
+    assert.ok(products, `Missing product switch: ${file}`);
+    assert.equal(products.closest("details"), null);
+    const links = [...products.querySelectorAll("a")];
+    assert.deepEqual(
+      links.map((link) => [link.textContent, link.getAttribute("href")]),
+      [
+        ["App", appHome],
+        ["Library", libraryHome],
+      ],
+    );
+    assert.equal(products.querySelectorAll("[aria-current]").length, 1);
+    assert.equal(
+      products.querySelector('[aria-current="true"]').textContent,
+      current,
     );
   }
 });

@@ -22,6 +22,8 @@ import {renderDocumentation} from "../src/docs.mjs";
 import {appDocuments, renderAppDocumentation} from "../src/app-docs.mjs";
 import {copyArchives, inventory, releaseId} from "../src/archive.mjs";
 import {pages} from "../src/pages.mjs";
+import {addApiNavigation} from "../src/api-navigation.mjs";
+import {repairApiLinks} from "../src/api-links.mjs";
 import {escape, relative} from "../src/layout.mjs";
 import {exportRelease, latestAppRelease} from "../src/release-sources.mjs";
 
@@ -144,6 +146,8 @@ export function buildSite({
     );
   } else if (!fs.existsSync(path.join(output, "library/api/latest/index.html")))
     redirect("library/api/latest/index.html", "../../versions.html");
+  repairApiLinks({ output, versions });
+  addApiNavigation({ output, versions, latest: latest?.id, appUrl: baseUrl });
   redirect("library/api/index.html", "../versions.html");
   redirect("library/guides/index.html", `${guideId}/docs/README.html`);
   redirect("app.html", "./");

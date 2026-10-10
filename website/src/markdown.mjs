@@ -86,7 +86,12 @@ export function renderMarkdown({
   return {
     title: markdown.match(/^# (.+)/m)?.[1].replace(/[`*]/g, "") || source,
     body: `<div class="prose">${content}</div><div class="source-link"><a href="${repository}/blob/${encodeURIComponent(ref)}/${source}">View source on GitHub ↗</a></div>`,
-    toc: `<strong>On this page</strong>${headings.map((h) => `<a class="depth-${h.depth}" href="#${escape(h.slug)}">${escape(h.text)}</a>`).join("")}`,
+    toc: headings
+      .map(
+        (h) =>
+          `<a class="depth-${h.depth}" href="#${escape(h.slug)}">${escape(h.text)}</a>`,
+      )
+      .join(""),
     text: decodeHTML(content.replace(/<[^>]*>/g, " ")).replace(/\s+/g, " "),
   };
 }

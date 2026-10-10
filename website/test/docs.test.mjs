@@ -31,6 +31,9 @@ test("publishes module docs once, preserves heading anchors, and rewrites links 
       "# Test library\n\n| Guide | Source |\n|---|---|\n| [Core](ketraterm-core/README.md#usage) | [Code](ketraterm-core/src/Core.kt) |\n\n## Usage\n\n## Usage\n\n[Repeat](#usage-1)",
     "AGENTS.md": "# Agent instructions",
     "docs/README.md": "# Documentation",
+    "docs/library/configuration.md": "# Library configuration",
+    "ketraterm-swing/README.md": "# Swing entry point",
+    "ketraterm-headless/README.md": "# Headless entry point",
     "ketraterm-core/README.md":
       "# Core\n\n## Usage\n\n[Home](../README.md)\n\n![Diagram](docs/image.png)",
     "ketraterm-core/Module.md":
@@ -84,12 +87,72 @@ test("publishes module docs once, preserves heading anchors, and rewrites links 
   ).document;
   assert.ok(moduleDocument.getElementById("bounds--limits"));
   assert.ok(moduleDocument.getElementById("more--less"));
+  const moduleBreadcrumbs = moduleDocument.querySelector(
+    'nav[aria-label="Breadcrumb"]',
+  );
+  assert.deepEqual(
+    [...moduleBreadcrumbs.querySelectorAll("a")].map((link) => [
+      link.textContent,
+      link.getAttribute("href"),
+    ]),
+    [
+      ["Library", "../../../index.html"],
+      ["Modules", "../modules.html"],
+      ["ketraterm-core", "README.html"],
+    ],
+  );
+  assert.ok(moduleBreadcrumbs.textContent.includes("Core structure"));
+  const moduleReadme = parseHTML(
+    output.get("library/guides/v1.0.0/ketraterm-core/README.html"),
+  ).document;
+  assert.equal(
+    moduleReadme.querySelectorAll('nav[aria-label="Breadcrumb"] a').length,
+    2,
+  );
   assert.ok(
     output.has("library/guides/v1.0.0/ketraterm-core/docs/contract.html"),
   );
+  const contract = parseHTML(
+    output.get("library/guides/v1.0.0/ketraterm-core/docs/contract.html"),
+  ).document;
+  assert.ok(
+    contract.querySelector(
+      'nav[aria-label="Breadcrumb"] a[href="../README.html"]',
+    ),
+  );
+  const libraryIndex = JSON.parse(
+    output.get("library/guides/v1.0.0/search.json"),
+  );
+  assert.equal(libraryIndex.length, 8);
+  assert.deepEqual(
+    libraryIndex
+      .filter((entry) => entry.file.startsWith("ketraterm-core/"))
+      .map(({ context }) => context),
+    [
+      "Module guide · ketraterm-core",
+      "Module notes · ketraterm-core",
+      "Module contract · ketraterm-core",
+    ],
+  );
   assert.equal(
-    JSON.parse(output.get("library/guides/v1.0.0/search.json")).length,
-    5,
+    libraryIndex.find(
+      (entry) => entry.file === "docs/library/configuration.html",
+    ).context,
+    "Embedding guides",
+  );
+  const guideIndex = parseHTML(
+    output.get("library/guides/v1.0.0/docs/README.html"),
+  ).document;
+  assert.deepEqual(
+    [...guideIndex.querySelectorAll(".guide-starts a")].map((link) => [
+      link.querySelector("strong").textContent,
+      link.getAttribute("href"),
+    ]),
+    [
+      ["Embed a Swing terminal", "../ketraterm-swing/README.html"],
+      ["Create a headless session", "../ketraterm-headless/README.html"],
+      ["Configure host services", "library/configuration.html"],
+    ],
   );
   assert.ok(
     [...output.keys()].every(
@@ -109,13 +172,43 @@ test("publishes module docs once, preserves heading anchors, and rewrites links 
     appIndex.map((entry) => entry.file),
     ["guide.html", "settings.html", "changelog.html"],
   );
+  assert.ok(appIndex.every((entry) => entry.context === "App help"));
   const appGuide = parseHTML(output.get("guide.html")).document;
   assert.ok(appGuide.querySelector('main a[href="settings.html"]'));
-  assert.equal(appGuide.querySelector('nav a[href*="library"]'), null);
+  assert.equal(
+    appGuide.querySelector(
+      'nav[aria-label="App navigation"] a[href*="library"]',
+    ),
+    null,
+  );
+  assert.ok(
+    appGuide.querySelector('nav[aria-label="Breadcrumb"] a[href="index.html"]'),
+  );
   assert.equal(
     JSON.parse(output.get("library/guides/v1.0.0/search.json")).some((entry) =>
       entry.text.includes("Unique app setting"),
     ),
     false,
+  );
+  for (const source of [
+    "ketraterm-swing/README.md",
+    "ketraterm-headless/README.md",
+    "docs/library/configuration.md",
+  ])
+    fs.unlinkSync(path.join(root, source));
+  renderDocumentation({
+    root,
+    id: "v0.9.0",
+    ref: "older123",
+    write: (file, body) => output.set(file, body),
+  });
+  const olderGuideIndex = parseHTML(
+    output.get("library/guides/v0.9.0/docs/README.html"),
+  ).document;
+  assert.equal(olderGuideIndex.querySelector(".guide-starts"), null);
+  assert.ok(
+    [...olderGuideIndex.querySelectorAll("a")].every(
+      (link) => !link.getAttribute("href").includes("v1.0.0"),
+    ),
   );
 });

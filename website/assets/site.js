@@ -18,14 +18,36 @@ import {detectOS, releaseAssets, releasesUrl, selectAssets,} from "./downloads.j
 import {latestReleaseApi} from "./releases.js";
 
 const themeButton = document.querySelector(".theme-toggle");
-const navigation = document.querySelector(".nav-disclosure");
-if (navigation) {
+const navigation = document.querySelectorAll(
+  ".nav-disclosure, .site-navigation",
+);
+if (navigation.length) {
   const mobile = matchMedia("(max-width: 800px)");
   const updateNavigation = () => {
-    navigation.open = !mobile.matches;
+    for (const item of navigation) item.open = !mobile.matches;
   };
   updateNavigation();
   mobile.addEventListener("change", updateNavigation);
+  for (const item of navigation)
+    if (item.classList.contains("site-navigation")) {
+      item.addEventListener("keydown", (event) => {
+        if (mobile.matches && event.key === "Escape") {
+          item.open = false;
+          item.querySelector("summary").focus();
+        }
+      });
+      document.addEventListener("pointerdown", (event) => {
+        if (mobile.matches && item.open && !item.contains(event.target))
+          item.open = false;
+      });
+    }
+}
+const outline = document.querySelector(".page-outline");
+if (outline) {
+  const compact = matchMedia("(max-width: 1150px)");
+  const updateOutline = () => (outline.open = !compact.matches);
+  updateOutline();
+  compact.addEventListener("change", updateOutline);
 }
 try {
   const saved = localStorage.getItem("ketraterm-theme");
@@ -34,19 +56,52 @@ try {
 } catch {
   /* Storage is optional in private browsing. */
 }
+const updateThemeButton = () => {
+  if (!themeButton) return;
+  const light = document.documentElement.dataset.theme === "light";
+  themeButton.textContent = light ? "Dark" : "Light";
+  themeButton.setAttribute(
+    "aria-label",
+    `Switch to ${light ? "dark" : "light"} theme`,
+  );
+};
+updateThemeButton();
 themeButton?.addEventListener("click", () => {
-  const dark =
-    document.documentElement.dataset.theme === "dark" ||
-    (!document.documentElement.dataset.theme &&
-      matchMedia("(prefers-color-scheme: dark)").matches);
+  const dark = document.documentElement.dataset.theme !== "light";
   const theme = dark ? "light" : "dark";
   document.documentElement.dataset.theme = theme;
+  updateThemeButton();
   try {
     localStorage.setItem("ketraterm-theme", theme);
   } catch {
     /* Keep the in-page choice. */
   }
 });
+
+const previewButtons = [...document.querySelectorAll("[data-preview-switch]")];
+const terminalShot = document.querySelector("#terminal-shot");
+const terminalCaption = document.querySelector("#terminal-caption");
+if (terminalShot && terminalCaption)
+  for (const button of previewButtons)
+    button.addEventListener("click", () => {
+      terminalShot.src = button.dataset.src;
+      terminalShot.alt = button.dataset.caption;
+      terminalCaption.textContent = button.dataset.caption;
+      for (const item of previewButtons)
+        item.setAttribute("aria-pressed", String(item === button));
+    });
+
+const entryButtons = [...document.querySelectorAll("[data-library-entry]")];
+const libraryDependency = document.querySelector("#library-dependency");
+const libraryEntryLink = document.querySelector("#library-entry-link");
+if (libraryDependency && libraryEntryLink)
+  for (const button of entryButtons)
+    button.addEventListener("click", () => {
+      libraryDependency.textContent = `ketraterm-${button.dataset.libraryEntry}`;
+      libraryEntryLink.href = button.dataset.guide;
+      for (const item of entryButtons)
+        item.setAttribute("aria-pressed", String(item === button));
+    });
 
 if (navigator.clipboard)
   for (const block of document.querySelectorAll("pre")) {
@@ -57,15 +112,20 @@ if (navigator.clipboard)
     button.className = "copy-button";
     button.textContent = "Copy";
     button.setAttribute("aria-label", "Copy code");
+    button.setAttribute("aria-live", "polite");
     button.addEventListener("click", async () => {
+      let feedback;
       try {
         await navigator.clipboard.writeText(code.textContent);
-        button.textContent = "Copied";
+        feedback = "Copied";
       } catch {
-        button.textContent = "Select text to copy";
+        feedback = "Select text to copy";
       }
+      button.textContent = feedback;
+      button.setAttribute("aria-label", feedback);
       setTimeout(() => {
         button.textContent = "Copy";
+        button.setAttribute("aria-label", "Copy code");
       }, 2500);
     });
     block.prepend(button);
@@ -95,7 +155,7 @@ if (search) {
         const matches = index
           .filter((item) =>
             terms.every((term) =>
-              `${item.title} ${item.file} ${item.text}`
+              `${item.title} ${item.context || ""} ${item.file} ${item.text}`
                 .toLowerCase()
                 .includes(term),
             ),
@@ -112,8 +172,20 @@ if (search) {
           link.href = new URL(item.file, indexUrl).href;
           link.textContent = item.title;
           const detail = document.createElement("small");
-          detail.textContent = item.file.replace(/\.html$/, "");
+          detail.textContent = item.context || "Guide";
           link.append(detail);
+          if (item.text) {
+            const text = item.text.trim();
+            let start = Math.max(0, text.toLowerCase().indexOf(terms[0]) - 40);
+            if (start) start = text.indexOf(" ", start) + 1;
+            const excerpt = document.createElement("span");
+            excerpt.className = "search-excerpt";
+            excerpt.textContent =
+              (start ? "…" : "") +
+              text.slice(start, start + 140).trim() +
+              (text.length > start + 140 ? "…" : "");
+            link.append(excerpt);
+          }
           results.append(link);
         }
         if (!matches.length) results.textContent = "No matching guides.";
@@ -151,7 +223,9 @@ if (diagrams.length) {
   }
 }
 
-if (document.querySelector("[data-download]")) {
+const downloadRoot = document.querySelector("[data-download]");
+if (downloadRoot) {
+  const compact = downloadRoot.dataset.download === "compact";
   const os = document.querySelector("#download-os");
   const arch = document.querySelector("#download-arch");
   const archField = document.querySelector("#arch-field");
@@ -159,50 +233,104 @@ if (document.querySelector("[data-download]")) {
   const status = document.querySelector("#release-status");
   const options = document.querySelector("#download-options");
   const detected = detectOS(navigator);
-  os.value = detected || "java";
+  os.value = detected || "";
   let assets = [];
   let loaded = false;
   let failed = false;
   function render() {
+    const platform = {
+      windows: "Windows",
+      macos: "macOS",
+      linux: "Linux",
+    }[os.value];
     archField.hidden = os.value !== "macos";
-    note.textContent =
-      os.value === "macos"
-        ? "Choose Apple silicon or Intel; browsers cannot reliably detect Mac architecture."
+    note.textContent = !os.value
+      ? "Select the computer you’ll use KetraTerm on."
+      : os.value === "macos"
+        ? "Choose the chip in your Mac: Apple silicon or Intel."
         : os.value === "java"
           ? "Requires a local Java 25 installation. Choose a desktop OS for bundled-runtime packages."
-          : `${os.value === "windows" ? "Windows" : "Linux"} packages are built for x64. You can change the operating system above.`;
+          : os.value === detected
+            ? `Detected ${platform}. Choose another OS for a different computer.`
+            : `Packages for ${platform} x64.`;
     options.replaceChildren();
     if (failed) {
+      const primary = document.createElement("div");
+      primary.className = "download-primary";
       const fallback = document.createElement("a");
       fallback.href = releasesUrl;
+      fallback.className = "button download-button download-fallback";
       fallback.textContent = "Download from GitHub Releases ↗";
-      options.append(fallback);
+      primary.append(fallback);
+      options.append(primary);
       return;
     }
-    if (!loaded) return;
-    const selected = selectAssets(assets, os.value, arch.value);
-    for (const asset of selected) {
-      const row = document.createElement("div");
-      row.className = "download-asset";
-      const link = document.createElement("a");
-      link.href = asset.browser_download_url;
-      link.textContent = `${asset.label} ↓`;
-      const size = document.createElement("small");
-      size.textContent = `${(asset.size / 1024 / 1024).toFixed(1)} MB`;
-      row.append(link, size);
-      options.append(row);
+    if (!loaded) {
+      const pending = document.createElement("button");
+      pending.type = "button";
+      pending.className = "button download-button";
+      pending.disabled = true;
+      pending.textContent = "Finding download…";
+      options.append(pending);
+      return;
     }
-    if (!selected.length)
-      options.textContent =
-        os.value === "macos" && !arch.value
+    const [recommended, ...alternatives] = selectAssets(
+      assets,
+      os.value,
+      arch.value,
+    );
+    if (!recommended) {
+      options.textContent = !os.value
+        ? "Choose an operating system to see downloads."
+        : os.value === "macos" && !arch.value
           ? "Select your Mac architecture to see downloads."
           : "No matching package is attached to the latest stable release. Check all releases below.";
+      return;
+    }
+    const primary = document.createElement("div");
+    primary.className = "download-primary";
+    const download = document.createElement("a");
+    download.className = "button download-button";
+    download.href = recommended.browser_download_url;
+    download.textContent =
+      os.value === "java"
+        ? "Download Java archive"
+        : recommended.label.includes("portable")
+          ? `Download portable for ${platform}`
+          : os.value === "linux"
+            ? `Download ${recommended.name.endsWith(".deb") ? ".deb" : ".rpm"} for Linux`
+            : `Download for ${platform}`;
+    const meta = document.createElement("p");
+    meta.className = "download-meta";
+    meta.textContent = `${recommended.label} · ${(recommended.size / 1024 / 1024).toFixed(1)} MB${os.value === "java" ? "" : " · Runtime included"}`;
+    primary.append(download, meta);
+    options.append(primary);
+    if (compact) return;
+    if (alternatives.length) {
+      const details = document.createElement("details");
+      details.className = "download-alternatives";
+      const summary = document.createElement("summary");
+      summary.textContent = "Other packages";
+      details.append(summary);
+      for (const asset of alternatives) {
+        const row = document.createElement("div");
+        row.className = "download-asset";
+        const link = document.createElement("a");
+        link.href = asset.browser_download_url;
+        link.textContent = `${asset.label} ↓`;
+        const size = document.createElement("small");
+        size.textContent = `${(asset.size / 1024 / 1024).toFixed(1)} MB`;
+        row.append(link, size);
+        details.append(row);
+      }
+      options.append(details);
+    }
     const checksum = assets.find((asset) => asset.name === "SHA256SUMS");
-    if (checksum && selected.length) {
+    if (checksum) {
       const link = document.createElement("a");
       link.href = checksum.browser_download_url;
       link.textContent = "SHA-256 checksums ↗";
-      link.className = "small";
+      link.className = "checksum-link";
       options.append(link);
     }
   }

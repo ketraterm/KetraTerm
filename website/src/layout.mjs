@@ -37,6 +37,7 @@ export function layout({
   sidebar = "",
   toc = "",
   version = "",
+  breadcrumbs = [],
   guideId = "dev",
   appUrl = defaultSiteUrl,
 }) {
@@ -46,20 +47,37 @@ export function layout({
   const brand = library ? "KetraTerm Library" : "KetraTerm";
   const navigation = library
     ? [
-        [`guides/${guideId}/README.html`, "Get started"],
         [`guides/${guideId}/docs/README.html`, "Guides"],
         [`guides/${guideId}/modules.html`, "Modules"],
         ["versions.html", "API & versions"],
         [`guides/${guideId}/CHANGELOG.html`, "Changelog"],
+        [`guides/${guideId}/README.html`, "Get started"],
       ]
     : [
-        ["download.html", "Download"],
         ["gallery.html", "Screenshots"],
         ["guide.html", "Guide"],
         ["settings.html", "Settings"],
         ["changelog.html", "Changelog"],
+        ["download.html", "Download"],
       ];
-  const crossLink = library ? `${appUrl.replace(/\/$/, "")}/` : url("library/");
+  let current = file;
+  const guideRoot = `${root}guides/${guideId}/`;
+  if (
+    library &&
+    file.startsWith(guideRoot) &&
+    !navigation.some(([target]) => root + target === file)
+  )
+    current =
+      guideRoot +
+      (file.startsWith(`${guideRoot}ketraterm-`)
+        ? "modules.html"
+        : "docs/README.html");
+  const breadcrumb = breadcrumbs.length
+    ? `<nav class="breadcrumb" aria-label="Breadcrumb"><ol>${breadcrumbs.map(({ label, href }, index) => `<li>${href ? `<a href="${escape(href)}">${escape(label)}</a>` : `<span${index === breadcrumbs.length - 1 ? ' aria-current="page"' : ""}>${escape(label)}</span>`}</li>`).join("")}</ol></nav>`
+    : `<span>${library ? "Library" : "Desktop app"}</span>`;
+  const crossLink = library
+    ? `${appUrl.replace(/\/$/, "")}/`
+    : url("library/index.html");
   const descriptionText =
     description ||
     (library
@@ -74,6 +92,7 @@ export function layout({
   <meta name="color-scheme" content="light dark">
   <title>${escape(title)} · ${brand}</title>
   <link rel="icon" href="${url("assets/logo.svg")}" type="image/svg+xml">
+  <link rel="preload" href="${url("assets/fonts/manrope-variable.ttf")}" as="font" type="font/ttf" crossorigin>
   <link rel="stylesheet" href="${url("assets/styles.css")}">
   <script type="importmap">${JSON.stringify({ imports: { mermaid: url("assets/mermaid/mermaid.esm.min.mjs") } }).replace(/</g, "\\u003c")}</script>
   <script type="module" src="${url("assets/site.js")}"></script>
@@ -81,11 +100,14 @@ export function layout({
 <body data-product="${library ? "library" : "app"}" data-version="${escape(version)}">
   <a class="skip" href="#main">Skip to content</a>
   <header class="site-header">
-    <a class="brand" href="${url("index.html")}" aria-label="${brand} home"><img class="brand-mark" src="${url("assets/logo.svg")}" alt="" width="34" height="34">${brand}</a>
-    <nav aria-label="${library ? "Library" : "App"} navigation">${navigation.map(([target, label]) => `<a ${root + target === file ? 'aria-current="page"' : ""} href="${url(target)}">${label}</a>`).join("")}</nav>
-    <button class="theme-toggle" type="button" aria-label="Switch color theme">◐</button>
+    <div class="site-identity">
+      <a class="brand" href="${url("index.html")}" aria-label="${brand} home"><img class="brand-mark" src="${url("assets/logo.svg")}" alt="" width="34" height="34">KetraTerm</a>
+      <nav class="product-navigation" aria-label="KetraTerm products"><a href="${escape(library ? crossLink : url("index.html"))}"${library ? "" : ' aria-current="true"'}>App</a><a href="${escape(library ? url("index.html") : crossLink)}"${library ? ' aria-current="true"' : ""}>Library</a></nav>
+    </div>
+    <details class="site-navigation" open><summary>Menu</summary><nav aria-label="${library ? "Library" : "App"} navigation">${navigation.map(([target, label], index) => `<a ${root + target === current ? `aria-current="${file === current ? "page" : "true"}"` : ""} ${index === navigation.length - 1 ? 'class="nav-primary"' : ""} href="${url(target)}">${label}</a>`).join("")}</nav></details>
+    <button class="theme-toggle" type="button" aria-label="Switch to light theme">Light</button>
   </header>
-  ${sidebar ? `<div class="docs-shell"><aside class="sidebar" aria-label="Documentation navigation"><details class="nav-disclosure" open><summary class="mobile-nav-toggle">Browse ${library ? "library" : "app"} guides</summary><div>${sidebar}</div></details></aside><main id="main" class="article"><div class="article-top"><span class="eyebrow">${library ? "Library" : "Desktop app"}${version ? ` · ${escape(version)}` : ""}</span>${library ? `<a href="${url("versions.html")}">All versions ↗</a>` : ""}</div>${body}</main><aside class="toc" aria-label="On this page">${toc}</aside></div>` : `<main id="main">${body}</main>`}
+  ${sidebar ? `<div class="docs-shell"><aside class="sidebar" aria-label="Documentation navigation"><details class="nav-disclosure" open><summary class="mobile-nav-toggle">Browse ${library ? "library" : "app"} guides</summary><div>${sidebar}</div></details></aside><main id="main" tabindex="-1" class="article${toc ? " article-with-outline" : ""}"><div class="article-top">${breadcrumb}${version ? `<div class="doc-version"><span>${escape(version)}</span>${library ? `<a href="${url("versions.html")}">All versions</a>` : ""}</div>` : ""}</div>${toc ? `<details class="page-outline" open><summary>On this page</summary><nav aria-label="On this page">${toc}</nav></details>` : ""}<div class="article-content">${body}</div></main></div>` : `<main id="main" tabindex="-1">${body}</main>`}
   <footer>
     <a class="brand" href="${url("index.html")}"><img class="brand-mark" src="${url("assets/logo.svg")}" alt="" width="34" height="34">${brand}</a>
     <p>Open source · Apache 2.0</p>
@@ -93,8 +115,4 @@ export function layout({
   </footer>
 </body>
 </html>`;
-}
-
-export function cards(items, className = "") {
-  return `<div class="cards ${className}">${items.map(([number, title, text, href]) => `<a class="card" href="${href}"><span class="card-number">${number}</span><h3>${title}<span aria-hidden="true">↗</span></h3><p>${text}</p></a>`).join("")}</div>`;
 }
