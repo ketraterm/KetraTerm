@@ -29,7 +29,7 @@ plugins {
 // Keep shared libraries compatible with IntelliJ 2026.2's bundled 1.10.2-intellij-1 runtime.
 // The IDE plugin excludes our coroutines dependency; newer compiled calls can fail at runtime.
 // Raise this version only when the minimum supported IDE provides a compatible runtime.
-extra["kotlinxCoroutinesVersion"] = "1.10.2"
+extra["kotlinxCoroutinesVersion"] = "1.11.0"
 
 // One boundary for Maven publication, public ABI checks and aggregated API documentation.
 val publishedLibraryNames =
