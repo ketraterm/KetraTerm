@@ -1,99 +1,60 @@
 # Terminal Core Agent Guide
 
-`ketraterm-core` is the headless terminal state engine. It owns grid mutation,
-cursor physics, scrollback, modes, tab stops, pen attributes, width policy, and
-cluster storage.
-
-It must not parse escape sequences, decode UTF-8, segment graphemes, encode
-input events, or render UI.
+`ketraterm-core` owns headless grid mutation, cursor physics, margins, scrollback,
+tab stops, pen attributes, durable modes, width policy, and cluster storage. Read
+[the root guide](../AGENTS.md) first and use the
+[core contract](docs/terminal-core-contract.md) for integration semantics.
 
 ## Core Boundary
 
-Core receives semantic operations from parser/host-facing APIs such as
-`writeCodepoint`, `writeCluster`, cursor movement, erase/edit commands, mode
-setters, and pen setters.
+Accept semantic writer, cursor, and mode operations. Parsing, UTF-8 decoding,
+grapheme segmentation, charset translation, input encoding, and UI policy belong
+to their owning modules. Width calculation belongs here; parser-generated
+clusters must not arrive with a parser-assigned cell width.
 
-Core owns:
-
-- cursor bounds and clamping
-- origin mode and margin-relative movement
-- wrapping and pending-wrap behavior
-- scroll regions and scrollback
-- tab-stop state
-- primary and alternate buffers
-- cell width decisions
-- durable terminal modes
-- packed cell attributes and cluster handles
-
-Parser owns what text/protocol was received. Core owns where that text lands and
-how many cells it occupies.
+The standard buffer has no synchronization boundary. Preserve caller-serialized
+mutation and borrowed reads, callback-scoped non-reentrant render frames, and
+the documented atomic mode snapshots. Do not expose mutable storage through
+public interfaces.
 
 ## Data-Oriented Rules
 
-- Keep grid storage flat and primitive.
-- Preserve cache-friendly layouts: `IntArray` cells, packed attributes, bounded
-  cluster stores, and explicit sentinel values.
-- Do not introduce object-per-cell storage.
-- Do not allocate in mutation hot paths unless the operation inherently stores a
-  grapheme cluster or resizes/reflows.
-- Keep complex cluster data tied to bounded screen/history lifecycles.
+- Keep primitive cell storage and allocation-light scalar/ASCII writes; avoid
+  object-per-cell models and new allocations in steady-state mutation paths.
+- Preserve lazy extended-attribute storage and batched history-row allocation.
+- A screen's ring and cluster store are co-owned. Transfer cluster handles only
+  within that arena; deep-copy payloads when moving to a new store.
+- Release cluster handles before dropping or recycling live rows. Preserve row
+  identities, wrap provenance, and generation invalidation when content moves.
 
 ## Cell Invariants
 
-Every grid mutation must preserve cell invariants:
+Follow the [cell storage invariants](docs/grid-storage-layout.md#invariants)
+when changing row or cluster operations.
 
-- `0` means empty.
-- Positive values represent direct scalar codepoints when locally encoded that
-  way by the current storage model.
-- Wide spacers and cluster handles must never be orphaned.
-- Overwriting any cell in a wide or clustered span must clear the full previous
-  span before writing the new content.
+Every write, erase, shift, scroll, and reflow must preserve complete occupied
+spans. Touching a wide spacer must not leave its leader or a stale cluster
+reference behind. Partial-width operations must preserve cells outside the
+margins except occupants crossing a boundary.
 
-If a mutation touches wrapping, insert/delete, erase, scroll, resize, margins, or
-wide clusters, add tests that prove no corrupted leaders, spacers, or stale
-cluster references remain.
+## Width and attribute ownership
 
-## Width Ownership
+Use generated, pinned Unicode tables. Do not derive width from JDK assignment,
+locale, fonts, regex, ICU, or `BreakIterator`. Keep scalar validation before
+mutation and keep segmentation in the parser.
 
-Width calculation belongs here, not in `ketraterm-parser`.
-
-Core width policy must account for:
-
-- East Asian wide/full-width codepoints.
-- combining and zero-width codepoints.
-- emoji presentation and ZWJ clusters.
-- variation selectors.
-- ambiguous-width policy from terminal mode/configuration.
-
-Width data is generated from Unicode data files. Keep width APIs table-shaped so
-future Unicode upgrades remain mechanical and do not move width policy out of
-core.
-
-## Attribute Ownership
-
-Core must represent pen attributes truthfully; host must never fake or degrade
-unsupported values. Do not maintain an attribute-support inventory here. Use
-the core contract plus the canonical feature and gap maps for current status.
-
-## Response Channel Security
-
-`TerminalResponseChannel` owns capability-allowlist enforcement. Any change to
-queryable core state must update that policy boundary; global response-security
-requirements remain defined by the root guide.
+Represent pen and stored attributes without degrading values in the host
+adapter. The response channel owns capability allowlisting; host security
+permission and global response rules remain defined by the root guide.
 
 ## Testing
 
-Core tests should focus on invariants and terminal physics:
+For changed behavior, add focused tests for exact grid/cursor results and storage
+invariants. Cover margins, pending wrap, wide and clustered spans, protection,
+history, alternate-buffer lifecycle, reset, and resize where affected. Include
+invalid inputs and overflow boundaries relevant to the operation.
 
-- cursor movement with margins, origin mode, and bounds
-- wrap and pending-wrap behavior
-- insert/delete/erase with wide and clustered cells
-- scroll regions and scrollback retention
-- alternate buffer behavior
-- resize/reflow with cluster preservation
-- tab stops
-- mode snapshots
-- pen attribute storage and reset behavior
-
-Prefer small unit tests for exact mechanics and broader invariant tests around
-mutation engines.
+Run `./gradlew spotlessApply`, then `./gradlew :ketraterm-core:test`. Changes to
+parser-to-core mapping also require the appropriate host byte-stream tests.
+Feature scope and deferred work belong only in the canonical feature and gap
+maps linked by the root guide.

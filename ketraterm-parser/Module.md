@@ -1,100 +1,47 @@
 # Module ketraterm-parser
 
-## KetraTerm Parser (`:ketraterm-parser`)
-
-The `ketraterm-parser` module is a high-performance, strictly bounded, and allocation-conscious parser that transforms raw terminal host byte streams (from a PTY, SSH, or network socket) into semantic terminal command invocations.
-
-It is designed with strict **Single Responsibility Principles (SRP)**: it owns byte parsing, UTF-8 streaming, ANSI finite-state transitions, string-command extraction, and Unicode grapheme cluster segmentation. It has no knowledge of grid physics, cursor clamping, terminal widths, viewport scrollbacks, or rendering fonts.
-
----
-
-## Upstream Dependencies
-* **`:ketraterm-protocol`** (for shared control codes, modes, and primitive constants).
-
----
+Converts ordered terminal host bytes into semantic commands. The public entry
+points are [io.github.ketraterm.parser.api.TerminalParsers] and
+[io.github.ketraterm.parser.api.TerminalOutputParser]; the destination is
+[io.github.ketraterm.parser.spi.TerminalCommandSink]. This module depends only on
+`ketraterm-protocol`.
 
 ## Architectural Role & Pipeline Flow
 
-The parser operates as an asynchronous, chunk-safe pipeline. Raw packets of bytes of arbitrary size can be fed into the parser. The parser handles fragmented UTF-8 scalars, split control sequences, and multi-byte graphemes gracefully across boundary edges.
+The parser is synchronous and stateful. Its owner serializes input, reset, and
+end-of-input calls; sink callbacks run in order on that same thread. Transport I/O
+and session synchronization belong outside this module.
 
-```mermaid
-graph TD
-    PTY([Raw Byte Stream])
-    Parser[TerminalParser]
-    UTF8[Utf8Decoder]
-    ByteClass[ByteClass.classify]
-    FSM[AnsiStateMachine]
-    Engine[ActionEngine]
-    Dispatcher[CommandDispatcher]
-    PrintProc[PrintableProcessor]
-    GAssembler[GraphemeAssembler]
-    Sink[TerminalCommandSink]
+| Component | Responsibility |
+|---|---|
+| `TerminalParser` | Validates input ranges, coordinates UTF-8/FSM routing, and publishes printable prefixes at call boundaries. |
+| `ByteClass` / `AnsiStateMachine` | Classify bytes and select an action plus next state. |
+| `ActionEngine` | Collects bounded sequence state, applies parser actions, and flushes text before structural commands. |
+| ESC/CSI, SGR, OSC, and DCS dispatchers | Translate completed sequences into semantic sink calls. |
+| `PrintableProcessor` / `GraphemeAssembler` | Apply charset mapping, retain grapheme text, and publish initial writes or complete-prefix updates. |
+| `ParserState` | Stores reusable parameters, payloads, graphemes, and parser-owned charset context. |
 
-    PTY -->|ByteArray| Parser
-    Parser -->|Byte| UTF8
-    UTF8 -->|Codepoint| PrintProc
-    UTF8 -.->|Reprocess Byte| ByteClass
-    Parser -->|Normal Byte| ByteClass
-    ByteClass -->|ByteClass ID| FSM
-    FSM -->|Transition Matrix| Engine
-    Engine -->|ESC / CSI| Dispatcher
-    Dispatcher -->|Grid Commands| Sink
-    Engine -->|Print Byte| PrintProc
-    PrintProc -->|Write Character| GAssembler
-    GAssembler -->|Write Cell / Cluster| Sink
-```
+UTF-8 decoding takes priority while a printable scalar is incomplete. Otherwise,
+the FSM routes ASCII/control bytes, printable UTF-8 ingress, and opaque string
+payloads. Invalid continuation handling can replay the current byte through the
+normal route once, preserving a following control sequence.
 
----
+## Ownership and Resource Contracts
 
-## Sub-Documentation
+The parser never calculates cell width, clamps coordinates, mutates a grid
+directly, or chooses response/clipboard permissions. These decisions remain with
+the sink and its owning layers. Effective screen selection is observed through
+the sink to keep parser-owned charset save slots aligned with actual screen
+transitions.
 
-For deep-dive specifications on FSM state tables and Unicode grapheme handling:
-* [ansi-fsm-specification.md](docs/ansi-fsm-specification.md) - Finite-state machine transition matrices, 64-bit CSI signature packing, and dispatch table binary searches.
-* [grapheme-segmentation.md](docs/grapheme-segmentation.md) - Streaming UTF-8 decoding, character shift states, and Unicode UAX #29 grapheme boundaries.
+Primitive fields and reusable arrays support the byte and printable hot paths.
+Metadata decoding and permitted large OSC collection can allocate. Array callbacks
+borrow storage only for their synchronous duration.
 
----
+<a id="maintenance"></a>
 
-## How to Use
+## Further reading
 
-The following example shows how to create a parser through `TerminalParsers` and feed raw bytes to it:
-
-```kotlin
-import io.github.ketraterm.parser.api.TerminalParsers
-import io.github.ketraterm.parser.spi.TerminalCommandSink
-
-class ParserConsumer(sink: TerminalCommandSink) {
-    // 1. Instantiate the parser with a command sink
-    private val parser = TerminalParsers.create(sink)
-
-    // 2. Feed raw byte buffers (from PTY or network sockets) as they arrive
-    fun onDataReceived(buffer: ByteArray, bytesRead: Int) {
-        // The parser maintains state across chunk boundaries
-        parser.accept(buffer, 0, bytesRead)
-    }
-}
-```
-
----
-
-## How to Implement: Custom Command Sink
-
-To handle the semantic commands generated by the parser (such as writing text, moving the cursor, or resetting the screen), implement the [TerminalCommandSink](src/main/kotlin/io/github/ketraterm/parser/spi/TerminalCommandSink.kt) interface:
-
-```kotlin
-import io.github.ketraterm.parser.spi.TerminalCommandSink
-
-// Printable callbacks only; concrete sinks also implement the remaining commands.
-abstract class PrintCommandSink : TerminalCommandSink {
-    override fun writeCodepoint(codepoint: Int) {
-        println("Print codepoint: $codepoint")
-    }
-
-    override fun writeCluster(codepoints: IntArray, length: Int) {
-        println("Print grapheme: ${String(codepoints, 0, length)}")
-    }
-
-    override fun updatePreviousCluster(codepoints: IntArray, length: Int) {
-        println("Update previous grapheme: ${String(codepoints, 0, length)}")
-    }
-}
-```
+- [README](README.md): consumer use.
+- [ANSI state machine](docs/ansi-fsm-specification.md): byte classification and dispatch.
+- [Grapheme segmentation](docs/grapheme-segmentation.md): incremental text assembly.

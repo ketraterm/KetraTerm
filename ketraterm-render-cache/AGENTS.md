@@ -1,31 +1,36 @@
 # Terminal Render Cache Agent Guide
 
-`ketraterm-render-cache` owns renderer-side copies of primitive render frames. It
-lets UI consumers work from stable cached row, cluster, attribute, hyperlink,
-wrap, cursor, and generation data without reaching back into core storage.
+`ketraterm-render-cache` owns renderer-side copies of primitive render frames,
+bounded retained-range copying, and leased publication between writers and
+readers. Its only production dependency is `ketraterm-render-api`.
 
 ## Boundary
 
-Render cache owns:
+Keep parser, core, host, session, transport, PTY, and UI dependencies out of this
+module. Source readers own terminal synchronization. Font selection, glyph runs,
+selection state, painting, and repaint scheduling belong to renderers.
 
-- copying `TerminalRenderFrameReader` data from `ketraterm-render-api`.
-- retaining copied structure and line generations for renderer-side comparison.
-- retaining copied cluster text and flattened primitive cell planes.
-- publishing cache snapshots with clear ownership between render workers and UI
-  readers.
+## Invariants
 
-Render cache must not:
-
-- parse terminal output protocols.
-- mutate core, session, transport, or UI state.
-- choose fonts, colors, glyph runs, paint strategy, or Swing repaint policy.
-- depend on parser, core, host, session, PTY, Swing, or host modules.
-
-Keep cache updates allocation-conscious. Reuse primitive cell-plane storage and
-clear cluster row ranges deliberately when copied frame data changes.
+- `TerminalRenderCache` is mutable and requires confinement or external
+  serialization. Published caches and their arrays are borrowed read-only until
+  the corresponding reader lease ends.
+- Source reader identity qualifies generation comparisons. Reset ends a source
+  lifetime; direct frame consumers must reset before replacing their source.
+- `hasFrame` becomes true only after a complete copy. Failed copies must not
+  leave usable partial frames or skip required rows on retry.
+- Logical dimensions define the active array prefix. Preserve capacity reuse
+  without treating spare rows or stale cluster payloads as visible content.
+- Keep cell and cluster copying primitive. Growth may allocate; avoid per-cell
+  objects or string assembly in frame-copy loops.
+- Lease bookkeeping must prevent reuse of pinned or writer-owned buffers.
+  Release leases on callback failure and non-local returns.
 
 ## Testing
 
-Tests should assert copy semantics, resize behavior, cluster clearing, cursor
-updates, and publisher ownership rules. Use fake
-`TerminalRenderFrameReader` instances rather than a live terminal session.
+Use fake `TerminalRenderFrameReader` instances rather than live sessions. Assert
+source replacement, generation-based row copies, resize and reserve reuse,
+cluster clearing, cursor changes, range bounds, copy failures, and pinned-buffer
+stability. Coordinate concurrent tests with explicit handshakes and bounded waits.
+
+Run `./gradlew :ketraterm-render-cache:test` for implementation changes.

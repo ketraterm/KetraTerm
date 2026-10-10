@@ -1,89 +1,102 @@
 # KetraTerm Host (`:ketraterm-host`)
 
-The `ketraterm-host` module serves as the production bridge and adapter layer between the byte-stream parser (`ketraterm-parser`) and the headless state machine/grid engine (`ketraterm-core`).
+`HostCommandAdapter` maps parser commands to the public core API and delivers
+host metadata and requests through `HostEventSink`. It does not own a transport,
+perform platform actions, or create worker threads.
 
-It acts as the single, thin, and explicit translation point where abstract semantic ANSI/DEC protocols become concrete terminal grid mutations, mode changes, and host-facing events.
-
----
-
-## Upstream Dependencies
-- **`:ketraterm-protocol`** (vocabulary, mode IDs, enums)
-- **`:ketraterm-parser`** (FSM, UTF-8, semantic command sinks)
-- **`:ketraterm-core`** (grid representation, text buffer, cell attributes, modes)
-
----
-
-## Architectural Role & Pipeline Flow
-
-The terminal pipeline operates in strict, unidirectional layers to preserve a Strong Single Responsibility Principle (SRP). `ketraterm-host` sits at the center of this pipeline:
-
-```mermaid
-graph TD
-    HostBytes[Raw Byte Stream] -->|UTF-8 / Escape Sequences| Parser[ketraterm-parser]
-    Parser -->|TerminalCommandSink semantic calls| Integration[ketraterm-host: HostCommandAdapter]
-    Integration -->|TerminalBuffer mutations| Core[ketraterm-core]
-    Integration -->|HostEventSink callbacks| HostApp[Host UI Application]
-```
-
-### What the Host Adapter Owns:
-1. **Semantic Translation**: Mapping high-level `TerminalCommandSink` callbacks into atomic `TerminalBuffer` calls.
-2. **Coordinate Normalization**: Converting zero-based parser indices into DEC-compatible, one-based inclusive coordinates expected by core APIs.
-3. **Safety Policies**: Intercepting and clamping unbound protocol payloads (like OSC 8 hyperlink URLs) to prevent memory exhaustion.
-4. **Host Metadata Event Forwarding**: Dispatching non-grid events (like the terminal bell or window/icon title changes) to the host environment.
-
----
-
-## Sub-Documentation
-
-For details on the hyperlink registry and mapping rules:
-* [hyperlink-registry.md](docs/hyperlink-registry.md) - OSC 8 URI mapping, numeric cell keys, and LRU eviction thresholds.
-* [command-adapter-mapping.md](docs/command-adapter-mapping.md) - Coordinate systems, screen buffer swapping logic, and soft/hard resets.
-
----
+The artifact is `io.github.ketraterm:ketraterm-host`. For a complete synchronized
+pipeline, start with [`ketraterm-session`](../ketraterm-session/README.md); use the
+adapter directly when your application owns parsing and core synchronization.
+See the [root README](../README.md) for dependency setup.
 
 ## How to Use
 
-The following example shows how to instantiate the adapter and wire the parser to the core buffer:
+Create a single-threaded pipeline with a title callback:
 
 ```kotlin
 import io.github.ketraterm.core.TerminalBuffers
-import io.github.ketraterm.core.api.TerminalBuffer
-import io.github.ketraterm.parser.TerminalParser
 import io.github.ketraterm.host.HostCommandAdapter
+import io.github.ketraterm.host.HostControlPolicy
 import io.github.ketraterm.host.HostEventSink
 import io.github.ketraterm.host.HostPolicy
+import io.github.ketraterm.parser.api.TerminalParsers
 
 fun main() {
-    // 1. Create the backend core buffer
-    val buffer: TerminalBuffer = TerminalBuffers.create(width = 80, height = 24)
-
-    // 2. Create a host event sink to handle non-grid metadata events (e.g. system bell)
-    val eventSink = object : HostEventSink {
-        override fun bell() {
-            println("[Visual Bell Triggered]")
+    val terminal = TerminalBuffers.create(width = 80, height = 24)
+    var windowTitle = ""
+    val events = object : HostEventSink by HostEventSink.NONE {
+        override fun windowTitleChanged(title: String) {
+            windowTitle = title
         }
-        override fun iconTitleChanged(title: String) {}
-        override fun windowTitleChanged(title: String) {}
     }
-
-    // 3. Instantiate the adapter, wiring it to the buffer and event sink
     val adapter = HostCommandAdapter(
-        terminal = buffer,
-        hostEvents = eventSink,
-        hostPolicy = HostPolicy()
+        terminal = terminal,
+        hostEvents = events,
+        hostPolicy = HostPolicy(
+            notificationPolicy = HostControlPolicy.DENY,
+            windowManipulationPolicy = HostControlPolicy.DENY,
+        ),
+    )
+    val parser = TerminalParsers.create(
+        sink = adapter,
+        clipboardWriteLimitBytes = adapter::clipboardWriteLimitBytes,
     )
 
-    // 4. Wire the parser to use this adapter as its Command Sink
-    val parser = TerminalParser(sink = adapter)
+    parser.accept("Hello\u001B]2;Example\u0007".toByteArray(Charsets.UTF_8))
+    parser.endOfInput()
 
-    // 5. Feed raw bytes (e.g., cursor up sequence "CSI A")
-    val data = "\u001B[A".toByteArray(Charsets.US_ASCII)
-    parser.accept(data, 0, data.size)
+    check(terminal.getLineAsString(0) == "Hello")
+    check(windowTitle == "Example")
 }
 ```
 
----
+Keep one parser and adapter for each stream. Serialize parser calls, adapter
+commands, and core/grid metadata access under the same owner. Input chunks may
+be reused after `accept` returns. Call `endOfInput` at EOF; parser `reset` only
+discards pending parsing state and is distinct from terminal reset commands.
+The adapter has no `close` operation or transport resources to release.
+
+If a direct callback throws, its exception propagates through parsing. Stop
+processing that stream rather than assuming parser and terminal state remain
+aligned.
 
 ## How to Extend: Custom Event Sinks
 
-To react to non-grid events in a custom application UI (for example, to display window titles in an OS frame header), implement the [HostEventSink](src/main/kotlin/io/github/ketraterm/host/HostEventSink.kt) interface and pass it to the `HostCommandAdapter` constructor during startup.
+Implement [`HostEventSink`](src/main/kotlin/io/github/ketraterm/host/HostEventSink.kt)
+or delegate unneeded operations to `HostEventSink.NONE`, as above. Callbacks
+deliver accepted metadata or requests; the host decides how to display titles,
+open links, resize windows, show notifications, or access a clipboard.
+
+Parser callbacks are synchronous and ordered on the mutation caller's thread.
+With `TerminalSession`, its mutation lock is held during delivery. Return
+promptly, schedule UI work through the host's lifecycle, and do not reenter
+session mutation or wait for a UI thread. There is no initial-state replay.
+Clipboard-read execution audits can arrive on session workers and require a
+thread-safe sink.
+
+## Host policy
+
+[`HostPolicy`](src/main/kotlin/io/github/ketraterm/host/HostPolicy.kt) permits
+title, hyperlink, working-directory, notification, window, palette, and terminal
+response controls by default; clipboard reads and writes are denied by default.
+Select permissions for the whole stream before feeding it. Shell metadata and
+process names do not authenticate the source of nested SSH or multiplexer output.
+
+`setHostPolicy` safely publishes an immutable replacement across threads. It
+does not revoke retained metadata or execute platform work. A lowered hyperlink
+entry limit is applied on the next accepted open, as described in the
+[registry contract](docs/hyperlink-registry.md#3-eviction--safety-limits-hostpolicy).
+
+The adapter validates clipboard payloads and separates content-free audits from
+write/prompt payloads. It never reads or writes a platform clipboard itself.
+Session execution owns clipboard-read deadlines, policy revalidation, and
+ordered replies. A direct embedder must provide that execution and response
+path when enabling reads.
+
+## Sub-Documentation
+
+- [Command mapping](docs/command-adapter-mapping.md): coordinate conventions,
+  screen transitions, reset boundaries, and response policy.
+- [Hyperlink registry](docs/hyperlink-registry.md): numeric identities,
+  retention limits, invalidation, and host activation responsibilities.
+- [Module context](Module.md): maintainer ownership and test entry points.

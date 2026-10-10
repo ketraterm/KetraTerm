@@ -1,125 +1,53 @@
 # Module ketraterm-testkit
 
-## KetraTerm Testkit (`:ketraterm-testkit`)
-
-The `ketraterm-testkit` module is the dedicated test double and mock harness module for KetraTerm Terminal. It provides in-memory connectors and lifecycle simulation tools for testing terminal runtimes, transport layers, and host-bound input/output loops without spinning up physical shells, PTYs, or socket connections.
-
-By decoupling testing from physical operating system interfaces (like OS-level pseudo-terminals or SSH processes), `ketraterm-testkit` enables ultra-fast, deterministic, and platform-agnostic testing of terminal components. It also owns the headless conformance replay harness that drives the production parser-to-core pipeline and captures canonical observable snapshots.
-
----
+Repository-only helpers for deterministic tests of transport and terminal
+semantics. This module is excluded from the supported Maven, ABI, and aggregated
+public API documentation boundary.
 
 ## Upstream Dependencies
-* **`:ketraterm-core`** (for public terminal state and render-frame contracts).
-* **`:ketraterm-host`** (for production parser-to-core mapping).
-* **`:ketraterm-parser`** (for production byte-stream parsing).
-* **`:ketraterm-transport-api`** (for standard connector and listener contracts).
 
----
-
-## Architectural Role
-
-The `MockConnector` serves as a bidirectional bridge in unit and integration tests. It allows tests to feed simulated host responses down to any connector listener while capturing and asserting on the exact bytes written back:
-
-```mermaid
-graph TD
-    Test["Unit / Integration Test"] -- "1. Feeds bytes / triggers lifecycle" --> MockConnector["MockConnector"]
-    MockConnector -- "2. Triggers listener callback" --> Listener["TerminalConnectorListener"]
-    Listener -- "3. Writes host-bound bytes" --> MockConnector
-    MockConnector -- "4. Captures bytes in memory" --> OutboundBytes["writtenBytes (ByteArray)"]
-    Test -- "5. Asserts exact byte sequences" --> OutboundBytes
-```
-
----
+Production composition uses public contracts from core, host, parser, and
+transport API. Jackson encodes and decodes the independent oracle's JSON process
+protocol. These are implementation dependencies. Consumers are test source sets,
+not production modules.
 
 ## Public API Surface
 
-The module's public surface contains transport doubles and deterministic conformance replay APIs.
+| Helper | Responsibility |
+| --- | --- |
+| `MockConnector` | Synchronous host-byte delivery, copied outbound capture, and explicit lifecycle simulation. |
+| `TerminalReplayEvent` / `TerminalReplayTranscript` | Detached input chunks and ordered input, resize, and end-of-input events. |
+| `TerminalConformanceHarness` | Stateful replay through the production parser-to-core pipeline and response collection. |
+| `TerminalConformanceSnapshot` | Detached observable grid, cursor, modes, metadata, and response values. |
+| `TerminalReplayChunkings` | Deterministic partitions for bounded chunk-invariance fixtures. |
+| `TerminalConformanceDiffer` | Bounded structural snapshot diagnostics. |
+| `TerminalDifferentialOracle` / `TerminalDifferentialComparator` | Independent emulator execution and comparison of explicitly shared observations. |
 
-### [`MockConnector`](src/main/kotlin/io/github/ketraterm/testkit/MockConnector.kt)
+## Architectural Role
 
-#### Lifecycle Tracking Properties
-* `startCount: Int`: The number of times `start` was called. Tests can assert this is exactly `1` to verify the connector is not restarted incorrectly.
-* `closeCount: Int`: The number of times `close()` was called locally. Excellent for verifying that the local terminal cleanly initiates teardown.
-* `isClosed: Boolean`: Indicates whether local close has been requested. Any subsequent calls to `write` or `resize` are ignored after `isClosed` becomes `true`.
-* `resizeCalls: List<Pair<Int, Int>>`: An ordered log of columns-to-rows pairs sent via the `resize` function.
-* `writtenBytes: ByteArray`: A representation of all bytes written by the system under test to the connector during the test run.
+The conformance harness owns its parser, adapter, core buffer, and copied snapshot
+values. It is stateful and must be recreated for independent runs. The connector
+fake forwards a borrowed host slice synchronously; it retains copies of writes.
+Neither helper adds a synchronization boundary.
 
-#### Remote Event Simulation APIs
-* `feedFromHost(bytes: ByteArray, offset: Int, length: Int)`: Feeds incoming host bytes to the session (triggers `onBytes` on the registered `TerminalConnectorListener`). This mimics raw stdout output from a shell or TUI application.
-* `simulateClosed(exitCode: Int? = null)`: Signals to the session listener that the remote process exited with the given exit code.
-* `simulateCrash(error: Throwable)`: Signals to the session listener that the transport crashed or failed with an exception.
+`TerminalProcessOracle` launches one bounded process per replay.
+`TerminalPersistentProcessOracle` keeps a JSON-lines worker for repeated requests;
+its owner must close it. The repository's xterm adapter creates fresh emulator
+state per request. Oracle output describes a comparison scope, not an alternative
+source of truth for KetraTerm's semantics.
 
-### Headless conformance replay
+<a id="how-to-use-in-tests"></a>
 
-`TerminalConformanceHarness` replays `TerminalReplayTranscript` events through the production parser, host adapter, core buffer, response channel, and render-frame ABI. Its `TerminalConformanceSnapshot` result captures complete retained rows, live-grid boundaries, soft wraps, cell render values, grapheme clusters, attributes, hyperlinks, cursor, modes, titles, active hyperlink metadata, and ordered response bytes. Snapshots exclude internal storage handles and generation counters so they describe observable terminal semantics rather than implementation details.
+## Source sets
 
-`TerminalReplayChunkings` produces named bounded chunk partitions for parser invariance checks, including every two-way split and bytewise delivery. `TerminalConformanceDiffer` reports deterministic field-level mismatch paths with bounded row and response context, allowing corpus failures to identify the first semantic divergence without dumping entire grids.
-
-Independent implementations attach through the versioned, process-isolated `TerminalDifferentialOracle` contract. `TerminalDifferentialComparator` compares only the supported semantic intersection without treating an external implementation as authoritative. The repository's first adapter is a version-pinned headless xterm.js tool under `tools/xterm-oracle`.
-
----
-
-## How to Use in Tests
-
-The following example shows how to write a unit test using `MockConnector` to assert on bidirectional byte flows:
-
-```kotlin
-import io.github.ketraterm.transport.TerminalConnectorListener
-import io.github.ketraterm.testkit.MockConnector
-import org.junit.jupiter.api.Assertions.assertEquals
-import org.junit.jupiter.api.Test
-
-class ConnectorTest {
-
-    @Test
-    fun `test raw write and feed simulation`() {
-        // 1. Create the MockConnector
-        val connector = MockConnector()
-
-        // 2. Wire up a simple listener callback to track incoming bytes
-        var receivedString = ""
-        connector.start(object : TerminalConnectorListener {
-            override fun onBytes(bytes: ByteArray, offset: Int, length: Int) {
-                receivedString = String(bytes, offset, length, Charsets.UTF_8)
-            }
-            override fun onClosed(exitCode: Int?) {}
-            override fun onError(error: Throwable) {}
-        })
-
-        // 3. Simulate host emitting data (stdin/stdout write)
-        val hostData = "Hello from Host".toByteArray(Charsets.UTF_8)
-        connector.feedFromHost(hostData, 0, hostData.size)
-
-        // 4. Assert the listener received the fed bytes
-        assertEquals("Hello from Host", receivedString)
-
-        // 5. Test client write to the connector
-        val clientData = "Client Request".toByteArray(Charsets.UTF_8)
-        connector.write(clientData, 0, clientData.size)
-
-        // 6. Assert the mock connector captured the client's output
-        val captured = String(connector.writtenBytes, Charsets.UTF_8)
-        assertEquals("Client Request", captured)
-    }
-}
-```
-
----
-
-## Testing best practices
-
-1. **Assert Real Semantics**: In-memory mocks do not fake intermediate or half-finished behaviors. They provide raw, byte-level capture so that tests assert *real* wire protocols rather than mock method signals.
-2. **Explicit Captured Bytes**: The mock connector does not convert or interpret bytes itself. It acts as a passive sink and leaves the interpretation of bytes to assertions, ensuring tests remain explicit and readable.
-3. **Remote Events Must Be Explicit**: Local `close()` only records that the local application requested a shutdown. Remote exit/crashes must always be triggered via explicit simulation functions (`simulateClosed` / `simulateCrash`) rather than assuming remote side-effects.
-
----
+See the [README](README.md) for dependency setup and complete usage examples.
+Reusable helpers belong in `src/main`; test corpora, generated campaigns, and
+publication verification belong in `src/test`. Isolated external-consumer sources
+and retained binaries live in [src/consumerTest](src/consumerTest/README.md).
 
 ## Running Testkit Tests
 
-To run the checks for this module:
-```bash
-./gradlew :ketraterm-testkit:test
-
-# Install, unit-test, and compare against the pinned xterm.js oracle
-./gradlew :ketraterm-testkit:xtermDifferentialTest
-```
+The [README task reference](README.md#running-testkit-tests) separates ordinary
+tests, optional campaigns, and publication checks. The
+[consumer guide](src/consumerTest/README.md) describes the staged Maven and
+compiled-client workflows.

@@ -1,54 +1,76 @@
 # OSC 8 Hyperlink Registry & Cache Invalidation
 
-The `ketraterm-host` module manages the association of terminal cells with interactive hyperlinks (gated via `OSC 8` sequences) using an efficient, double-indexed LRU cache.
-
----
+`HostCommandAdapter` retains bounded OSC 8 metadata while core cells and render
+frames carry numeric hyperlink IDs. Registry access must be serialized with
+adapter commands and core mutation. A session provides that boundary for its
+consumers.
 
 ## 1. Cell Hyperlink Representation
 
-To maintain flat cell arrays and prevent heap-allocated objects per cell, the rendering layers represent hyperlink links as primitive 32-bit `Int` identifiers:
+A cell's `hyperlinkId` is an `Int`: zero means no hyperlink; positive values
+identify registry entries. Closing OSC 8 clears the active writing hyperlink
+without removing entries used by already written cells.
 
-* **In the cell attribute word**: The link's numeric identifier is packed inside the cell's extended attribute plane (`extraAttrWords`/`hyperlinkIds`).
-* **Zero mapping**: A hyperlink ID value of `0` represents a normal text cell containing no hyperlink.
-
----
+`hyperlinkUri(id)` returns the retained URI or `null`. A cell can remain visible
+after its entry is evicted, reset, or otherwise unavailable, so consumers must
+handle a failed lookup. The adapter checks OSC 8 permission and URI/ID length
+limits; it does not enforce a browser scheme allowlist or open a destination.
+The embedding host owns validation and explicit activation of a resolved URI.
 
 ## 2. Double-Indexed LRU Registry (`HostCommandAdapter`)
 
-The translation of string-based hyperlink keys (combining a unique ID and a destination URI) to the cell's numeric identifier is managed inside `HostCommandAdapter` using two lookup structures:
+An access-ordered key-to-ID index controls retention; an ID-to-key index serves
+URI lookup. Both indexes change together under the serialized command owner.
 
-```
-    [HyperlinkKey(id, uri)] ◄──► [Numeric ID (Int)]
-               ▲
-               │
-    (LinkedHashMap: LRU Cache)
-```
+An explicit application `(id, URI)` pair reuses its numeric ID while retained
+and refreshes its recency. An anonymous link creates a distinct occurrence even
+when its URI matches a previous one. URI lookup itself does not refresh recency.
 
-1. **`hyperlinkIds` (`LinkedHashMap<HyperlinkKey, Int>`)**:
-   * Maps a [HyperlinkKey](../src/main/kotlin/io/github/ketraterm/host/HostCommandAdapter.kt) to its allocated numeric ID.
-   * Configured in access-order mode to act as a Least Recently Used (LRU) cache.
-2. **`hyperlinkKeysByNumericId` (`HashMap<Int, HyperlinkKey>`)**:
-   * Maps the numeric ID back to the hyperlink key. Used by renderers to resolve clicked cell IDs back to actual clickable URIs via `hyperlinkUri(numericId)`.
-
----
+`hyperlinkRegistered` is emitted only for a new entry. `hyperlinkRemoved` follows
+an eviction, after the removed ID is unresolvable. Hard reset emits one
+`hyperlinksCleared` event for a nonempty registry instead of per-ID removals.
+These callbacks do not activate links.
 
 ## 3. Eviction & Safety Limits (`HostPolicy`)
 
-To protect terminal memory against unbounded memory growth (e.g. applications writing millions of unique URLs in scrollback logs), the registry is governed by safety constraints in [HostPolicy](../src/main/kotlin/io/github/ketraterm/host/HostPolicy.kt):
+[`HostPolicy`](../src/main/kotlin/io/github/ketraterm/host/HostPolicy.kt) bounds
+retention and accepted payload sizes:
 
-* **`maxHyperlinkEntries`**: The maximum number of active hyperlinks retained in the registry (default `4096`).
-* **Eviction rule**: An accepted open removes enough least-recently-used entries from both collections to satisfy the captured limit, reserving one slot for a new key. Explicit-key reuse refreshes recency before trimming and preserves that entry. Cells carrying evicted IDs still display text but no longer resolve to URIs.
+| Setting | Default | Meaning |
+| --- | --- | --- |
+| `maxHyperlinkEntries` | `4096` | Maximum retained entries after an accepted open; must be positive |
+| `maxHyperlinkUriLength` | `4096` | Maximum URI length in UTF-16 code units; must be nonnegative |
+| `maxHyperlinkIdLength` | `256` | Maximum application ID length in UTF-16 code units; must be nonnegative |
 
-Policy replacement only publishes a volatile value; it never mutates either registry or emits callbacks. A lowered limit takes effect on the next accepted open under the serialized command owner. Denied, invalid and exhausted new opens do not trigger eviction. Work is bounded by the retained entry count, independently of the configured limit's magnitude.
+Denied or oversized opens clear the active hyperlink instead of truncating a
+destination or attaching the previous link to subsequent text.
 
-Each removal callback observes its ID as unresolved, and all removals precede replacement registration. Callback failures propagate and stop the admission; completed removals remain coherent in both indexes, and a later accepted open resumes enforcing the limit. Callbacks must not reenter mutation.
+Policy replacement only publishes a volatile value; it does not mutate the
+registry or emit callbacks. The next accepted open captures the entry limit and
+evicts enough least-recently-used entries from both indexes to satisfy it,
+reserving a slot for a new entry. Explicit-key reuse refreshes recency before
+trimming and preserves that entry. Denied, invalid, and exhausted new opens do
+not trigger eviction. Work depends on the retained entry count, independently
+of the configured limit's magnitude.
+
+All removal callbacks precede replacement registration. Callback failures
+propagate and stop admission; completed removals remain coherent in both
+indexes. A later accepted open resumes enforcing the limit. Callbacks must not
+reenter mutation.
 
 ## 4. Identity Lifetime and Reset
 
-An issued numeric ID may resolve to its original URI or become unresolved. It must never resolve to a different URI during the lifetime of its `HostCommandAdapter`. Retained alternate-screen cells, render snapshots, and pending UI actions can outlive the registry entry they reference.
+An issued numeric ID resolves to its original URI or becomes unresolved. It
+never resolves to a different URI during that adapter's lifetime. Cells,
+copied render data, and pending host actions may outlive a registry entry.
 
-Hard reset clears the registry and active hyperlink metadata without restarting numeric ID allocation. Eviction also leaves the allocation sequence intact. Both operations invalidate old links without allowing later output to retarget them. Soft reset clears only the active hyperlink; retained registry entries remain resolvable.
+Soft reset clears only the active hyperlink; retained entries remain
+resolvable. Hard reset clears active metadata and the registry without
+restarting allocation. Eviction likewise does not recycle IDs. Reopening an
+evicted explicit key therefore receives a new ID.
 
-Numeric IDs increase from `1` through `Int.MAX_VALUE`. Anonymous OSC 8 links use their numeric ID to distinguish separate occurrences; explicit `(id, URI)` pairs reuse their existing entry while it is retained. Neither reset nor eviction recycles an issued numeric ID.
-
-After the last positive ID is allocated, new entries are refused without evicting retained entries. Their text is still printed with hyperlink ID `0`, and active hyperlink metadata is cleared. Existing explicit pairs can still reuse retained entries. Hard reset does not undo exhaustion; a new adapter starts a new identity lifetime. This policy preserves the primitive cell representation and bounded registry without wraparound aliases or per-frame work.
+IDs increase from `1` through `Int.MAX_VALUE`. Once exhausted, new entries are
+refused without evicting retained entries; subsequent text receives ID zero.
+Retained explicit pairs can still be reused. Hard reset does not undo
+exhaustion. A new adapter begins a new identity lifetime, so numeric IDs from
+different adapters must never be mixed.

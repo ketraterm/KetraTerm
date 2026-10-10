@@ -1,88 +1,123 @@
 # Stable Public Render Attribute Packing
 
-To minimize allocation overhead and maintain a JIT-friendly performance profile, cell attributes in the **KetraTerm Terminal** are packed into 64-bit primitive `Long` values.
-
----
+Render attributes use primitive `Long` words. This public encoding is independent
+of core's private storage layout. Consumers should use `TerminalRenderAttrs` and
+`TerminalRenderExtraAttrs` helpers rather than copy bit arithmetic into renderers.
 
 ## 1. Primary Attribute Word (`TerminalRenderAttrs`)
 
-The primary `Long` attribute word stores the foreground/background color kinds and values, along with standard text decorations and intensity styles.
-
 ### Bit Layout Mapping
 
-```
-+-------------------------------------------------------+
-| Bit Range   | Usage                                   |
-+-------------+-----------------------------------------+
-| bits 0..1   | Foreground Color Kind                   |
-| bits 2..25  | Foreground Color Value                  |
-| bits 26..27 | Background Color Kind                   |
-| bits 28..51 | Background Color Value                  |
-| bit 52      | Bold intensity flag                     |
-| bit 53      | Faint intensity flag                    |
-| bit 54      | Italic style flag                       |
-| bits 55..57 | Underline style enum                    |
-| bit 58      | Blink text flag                         |
-| bit 59      | Inverse video flag                      |
-| bit 60      | Invisible text flag                     |
-| bit 61      | Strikethrough decoration flag           |
-| bits 62..63 | Reserved (currently zero)               |
-+-------------------------------------------------------+
-```
+| Bits | Meaning |
+| --- | --- |
+| 0..1 | Foreground color kind |
+| 2..25 | Foreground color value |
+| 26..27 | Background color kind |
+| 28..51 | Background color value |
+| 52 | Bold |
+| 53 | Faint |
+| 54 | Italic |
+| 55..57 | Underline style |
+| 58 | Blink |
+| 59 | Inverse video |
+| 60 | Invisible text |
+| 61 | Strikethrough |
+| 62..63 | Reserved; currently zero |
+
+`TerminalRenderAttrs.DEFAULT` is zero: default colors and no styles.
 
 ### Color Encoding Rules
-* **Color Kind (2 bits)**:
-  * `0`: Default color (underlying theme default).
-  * `1`: 8-bit indexed color (`0..255`).
-  * `2`: 24-bit TrueColor RGB.
-* **Color Value (24 bits)**:
-  * For Default color: set to `0`.
-  * For Indexed color: values `0..255` are mapped into the lower 8 bits.
-  * For RGB color: packed as `0xRRGGBB`.
+
+| `TerminalRenderColorKind` | Kind value | Valid color value |
+| --- | --- | --- |
+| `DEFAULT` | 0 | Exactly 0 |
+| `INDEXED` | 1 | `0..255` |
+| `RGB` | 2 | `0..0xFFFFFF`, encoded as `0xRRGGBB` |
+
+Kind 3 is not defined. Pack helpers reject unsupported kinds and out-of-range
+values with `IllegalArgumentException`. Decoder helpers extract fields without
+validating an arbitrary input word; use pack helpers when constructing words.
 
 ### Underline Styles (3 bits)
-Underline styles map to the following integer values defined in `TerminalRenderUnderline`:
-* `0`: `NONE`
-* `1`: `SINGLE`
-* `2`: `DOUBLE`
-* `3`: `CURLY`
-* `4`: `DOTTED`
-* `5`: `DASHED`
 
----
+| `TerminalRenderUnderline` | Value |
+| --- | --- |
+| `NONE` | 0 |
+| `SINGLE` | 1 |
+| `DOUBLE` | 2 |
+| `CURLY` | 3 |
+| `DOTTED` | 4 |
+| `DASHED` | 5 |
+
+`TerminalRenderAttrs.pack` rejects other underline-style values.
 
 ## 2. Extra Attribute Word (`TerminalRenderExtraAttrs`)
 
-For less common attributes, an optional `Long` extra-attribute word is used. Renderers that do not require these decorations can pass `null` or omit the extra array allocations.
-
 ### Bit Layout Mapping
 
-```
-+-------------------------------------------------------+
-| Bit Range   | Usage                                   |
-+-------------+-----------------------------------------+
-| bits 0..1   | Underline Color Kind                    |
-| bits 2..25  | Underline Color Value                   |
-| bit 26      | Overline decoration flag                |
-| bits 27..63 | Reserved (currently zero)               |
-+-------------------------------------------------------+
-```
+| Bits | Meaning |
+| --- | --- |
+| 0..1 | Underline color kind |
+| 2..25 | Underline color value |
+| 26 | Overline |
+| 27..63 | Reserved; currently zero |
 
----
+`TerminalRenderExtraAttrs.DEFAULT` is zero. Underline colors use the same kinds
+and validation as primary colors. Consumers that do not need this channel can
+omit `extraAttrWords` in `copyLine`.
 
 ## 3. Usage & Access
 
-Instead of writing manual bit shifts, consumers should always use the decoder helpers:
+Construct an attribute word and resolve its foreground color:
 
 ```kotlin
+import io.github.ketraterm.render.api.TerminalColorPalette
 import io.github.ketraterm.render.api.TerminalRenderAttrs
+import io.github.ketraterm.render.api.TerminalRenderColorKind
+import io.github.ketraterm.render.api.TerminalRenderUnderline
 
-fun drawCell(x: Int, y: Int, attrWord: Long) {
-    val fgKind = TerminalRenderAttrs.foregroundKind(attrWord)
-    val fgVal = TerminalRenderAttrs.foregroundValue(attrWord)
-    
-    val isBold = TerminalRenderAttrs.isBold(attrWord)
-    val underline = TerminalRenderAttrs.underlineStyle(attrWord)
-    // Render using properties...
+fun main() {
+    val word = TerminalRenderAttrs.pack(
+        foregroundKind = TerminalRenderColorKind.INDEXED,
+        foregroundValue = 2,
+        bold = true,
+        underlineStyle = TerminalRenderUnderline.SINGLE,
+    )
+    val palette = TerminalColorPalette()
+    check(TerminalRenderAttrs.isBold(word))
+    check(palette.foreground(word) == palette.indexedColor(10))
 }
 ```
+
+`TerminalColorPalette.foreground` and `background` resolve default, indexed, and
+RGB colors to ARGB. They apply inverse and invisible attributes. With
+`boldAsBright`, bold indexed foregrounds `0..7` resolve through entries `8..15`.
+Faint does not change the resolved palette color; renderers decide how to present
+that style. Underline, overline, and blink presentation also belong to renderers.
+
+A palette requires exactly 256 indexed colors, defensively copies the supplied
+array, and offers caller-owned copies through `copyIndexedColorsInto` or
+`toIndexedColorsArray`. Its `isDark` preference is host-declared, independent of
+individual color values.
+
+## Cell flags
+
+`TerminalRenderCellFlags` is a separate `Int` bit set. The valid combinations are:
+
+| Combination | Interpretation |
+| --- | --- |
+| `EMPTY` | No glyph; still has cell attributes. |
+| `EMPTY or WRAP_PADDING` | Artificial final-column blank before a wide glyph wraps. |
+| `CODEPOINT` | `codeWords` holds a Unicode scalar value. |
+| `CODEPOINT or WIDE_LEADING` | Scalar glyph occupies this and the next column. |
+| `CLUSTER` | Grapheme delivered through a cluster sink. |
+| `CLUSTER or WIDE_LEADING` | Cluster occupies this and the next column. |
+| `WIDE_TRAILING` | Continuation column; do not draw another glyph. |
+
+`isValidCombination` validates the bit combination, not its position in a row.
+`WRAP_PADDING` is valid only at the last column of a row whose `lineWrapped` is
+true. Logical text extraction omits that padding when joining wrapped rows;
+painting and rectangular selection preserve its physical geometry.
+
+The bit values are `EMPTY=1`, `CODEPOINT=2`, `CLUSTER=4`, `WIDE_LEADING=8`,
+`WIDE_TRAILING=16`, and `WRAP_PADDING=32`. Prefer the named constants.

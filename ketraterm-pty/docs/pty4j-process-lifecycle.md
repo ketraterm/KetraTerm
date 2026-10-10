@@ -1,49 +1,91 @@
 # Pty4j Local Process Lifecycle & Watcher Threads
 
-The `ketraterm-pty` module exposes local pseudo-terminal (PTY) processes through the `TerminalConnector` contract, using the JetBrains `pty4j` library as the underlying native engine.
-
----
+The local PTY connector adapts a Pty4J process to the ordered raw-byte
+`TerminalConnector` contract. Session construction and consumer examples are in
+the [README](../README.md). This guide describes connector lifecycle and the
+native integration seam.
 
 ## 1. Threading Architecture
 
-To prevent blocking client threads during blocking Native I/O reads or process waiting, [PtyConnector](../src/main/kotlin/io/github/ketraterm/pty/PtyConnector.kt) spawns two background daemon threads upon startup:
+Creating the connector launches its child process. Calling `start(listener)`
+starts two daemon threads; it permits one start and rejects a closed connector.
 
-```
-                  +──────────────────────────+
-                  |       PtyConnector       |
-                  +────────────┬─────────────+
-                               |
-         ┌─────────────────────┴─────────────────────┐
-         ▼                                           ▼
-  [Reader Thread]                            [Watcher Thread]
-  ("terminal-pty-reader")                    ("terminal-pty-watcher")
-         │                                           │
-  - Loops on process.inputStream.read()      - Blocks on process.waitFor()
-  - Dispatches onBytes(...) serially         - Captures exitCode
-  - Reuses flat byte read buffers            - Dispatches onClosed(...)
-```
+| Worker | Default name | Work |
+|---|---|---|
+| Reader | `terminal-pty-reader` | Read stdout and synchronously invoke `onBytes` in stream order. |
+| Watcher | `terminal-pty-watcher` | Wait for process exit, then wait for stdout delivery to finish before reporting normal closure. |
 
-* **Reader Thread (`terminal-pty-reader`)**:
-  * Continually blocks on process `inputStream.read(buffer)`.
-  * **Memory optimization**: Reuses a pre-allocated byte buffer (default `8192` bytes) to prevent GC allocation overhead.
-  * **Synchronous dispatch**: Immediately forwards read chunks to `TerminalConnectorListener.onBytes(...)`.
-* **Watcher Thread (`terminal-pty-watcher`)**:
-  * Blocks on `process.waitFor()` to detect process termination.
-  * Captures the integer exit code and safely dispatches `onClosed(exitCode)` to cleanup resources.
-* **Daemon Property**: Both threads are explicitly marked as daemon threads (`isDaemon = true`) so that when the main application shuts down, the PTY reader threads do not keep the JVM process alive.
+The reader allocates one byte buffer at startup, by default 8,192 bytes, and
+reuses it. The listener borrows only the supplied range for the duration of
+`onBytes`; copy data that must outlive the callback. Chunks need not align with
+UTF-8 scalars, escape sequences, or terminal frames. The session processes them
+synchronously and owns parsing.
 
-Normal closure waits for stdout delivery through EOF before `onClosed(exitCode)`.
-An exception from reading or `onBytes` instead retains the original exception in
-`PtyConnector.failure: Throwable?`, reports it through `onError`, disposes the
-process and both streams once, then reports `onClosed(null)`. Failed chunks are
-not retried. Callbacks may close reentrantly; exceptions after local close are
-treated as teardown and do not replace it with a remote failure.
+The watcher can observe process exit before the final read. It waits for EOF and
+completed byte callbacks before `onClosed(exitCode)`. Reader EOF alone does not
+report closure while the process is still running. `PtyConnector.waitFor()`
+waits only for process exit; it is not an output-drain boundary.
 
----
+Daemon workers do not keep the JVM alive. Hosts must still close their sessions
+to release native resources.
+
+## Failure and local close
+
+A reader or byte-listener exception is retained in `PtyConnector.failure` and
+reported through `onError`. The connector closes the process and both streams,
+then invokes `onClosed(null)`. It does not retry the failed chunk or replace the
+original failure with a later process exit. Connector callbacks may close
+reentrantly.
+
+Local close cancels pending delivery rather than draining it. It does not emit a
+remote `onClosed` callback; the session records its own local termination.
+Exceptions arriving after local close are teardown and do not become remote
+failures.
+
+Cleanup requests process destruction and closes both streams. A call outside
+the connector workers makes bounded joins of the reader and watcher. A worker
+does not join itself or its peer, which may be waiting for the current callback.
+Close is idempotent, but native destruction and stream cleanup can block. Keep
+it off a UI thread.
+
+## Writes and resize
+
+Direct connector writes validate the byte range, serialize access to stdin, and
+flush the supplied range before returning. Closed connectors ignore valid
+writes. The session's outbound writer orders user input and terminal replies;
+do not write through a retained connector after transferring it to a session.
+
+Resize requires positive dimensions and synchronously delegates to
+`WinSize(columns, rows)` while the connector is open. Use session resize APIs
+for a session-owned connector so grid reflow, transport dimensions, and viewport
+metadata are coordinated.
 
 ## 2. Windows ConPTY Considerations
 
-On Windows systems, `pty4j` abstracts Microsoft's native **Windows Pseudo Console (ConPTY)** APIs:
+The factory enables Pty4J's ConPTY option. Platform process creation and native
+library loading are owned by Pty4J; startup may fail when the local native
+environment or requested executable is unavailable. Initial dimensions are
+supplied during process creation and propagated again before session delivery
+starts.
 
-* **Size updates**: Applications (like `cmd.exe` or `powershell.exe`) require size propagation to compute terminal wrap columns correctly.
-* **Synchronous Resize**: The adapter's `resize(cols, rows)` method delegates to `PtyProcess.setWinSize(WinSize(cols, rows))` to ensure the native console host fits the current terminal display width.
+Foreground-process lookup uses the Unix terminal's foreground process group
+when available. Windows selects the newest live descendant, which can be a
+background child. Missing permissions, unavailable metadata, closure, or an
+oversized descendant tree can yield no name. Applications inside SSH or WSL are
+not inspected. Treat this information as presentation metadata rather than a
+process-control guarantee.
+
+## Native validation
+
+Ordinary module tests use fake process streams and do not require a native shell.
+`PtyRealProcessTest` is skipped unless `terminal.pty.host=true`:
+
+```text
+./gradlew :ketraterm-pty:test --tests "io.github.ketraterm.pty.PtyRealProcessTest" "-Dterminal.pty.host=true"
+```
+
+The native suite requires working Pty4J support and a local shell: `/bin/sh` on
+Unix, or `cmd.exe` and `powershell.exe` on Windows. Its OSC 52 byte harness also
+requires `node` on PATH and the repository's `tools/osc52/osc52.mjs`.
+Tests use explicit output/readiness signals and deadlines; skipped native tests
+do not establish platform support for the current environment.

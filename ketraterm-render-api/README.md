@@ -1,125 +1,86 @@
-# KetraTerm Render API (`:ketraterm-render-api`)
+# KetraTerm Render API
 
-The `ketraterm-render-api` module defines the strictly bounded, dependency-free public render contract and vocabulary shared across the terminal pipeline. It acts as the immutable, allocation-conscious bridge between stateful terminal state providers, frame caches, and UI rendering modules.
-
-This module is designed under a rigid **Single Responsibility Principle (SRP)**: it owns the stable representation of viewport frames, cursor states, cell flags, underline styles, color palettes, and attribute packing/decoding logic. It has no knowledge of grid physics, text input encoding, font selections, or specific platform painting lifecycles.
-
----
-
-## Upstream Dependencies
-* **None**. This is a standalone, zero-dependency module compiling against the bare-metal Kotlin Standard Library.
-
----
+`ketraterm-render-api` defines the primitive render contracts used by core,
+sessions, render caches, and UI implementations. It has no dependency on another
+KetraTerm module or UI toolkit. All public types are in
+`io.github.ketraterm.render.api`.
 
 ## Architectural Role
 
-```mermaid
-classDiagram
-    direction TB
-    class TerminalRenderFrameReader {
-        <<interface>>
-        +readRenderFrame(consumer: TerminalRenderFrameConsumer)
-    }
-    class TerminalRenderFrame {
-        <<interface>>
-        +columns: Int
-        +rows: Int
-        +cursor: TerminalRenderCursor
-        +frameGeneration: Long
-        +copyLine(...)
-    }
-    class TerminalColorPalette {
-        +foreground(attr: Long): Int
-        +background(attr: Long): Int
-    }
-    class TerminalRenderAttrs {
-        <<utility>>
-        +pack(...)
-    }
+A `TerminalRenderFrameReader` supplies a borrowed `TerminalRenderFrame` inside a
+synchronous callback. Consumers copy the data they need before returning. The
+reader implementation owns synchronization; the interfaces do not provide a lock
+or a thread scheduler.
 
-    TerminalRenderFrameReader --> TerminalRenderFrame : delivers
-    TerminalRenderFrame --> TerminalColorPalette : resolved via
-    TerminalRenderFrame --> TerminalRenderAttrs : attributes decoded via
-```
-
-### What the Module Owns
-- **Stable Primitives & Encodings**: Value objects and interfaces representing frames, cursors, buffer kinds, and cursor shapes.
-- **Bitwise Layout Specifications**: High-performance, 64-bit packed attribute formats ([TerminalRenderAttrs](src/main/kotlin/io/github/ketraterm/render/api/TerminalRenderAttrs.kt) and [TerminalRenderExtraAttrs](src/main/kotlin/io/github/ketraterm/render/api/TerminalRenderExtraAttrs.kt)) and cell-level flags ([TerminalRenderCellFlags](src/main/kotlin/io/github/ketraterm/render/api/TerminalRenderCellFlags.kt)).
-- **Color Palettes**: An immutable palette model ([TerminalColorPalette](src/main/kotlin/io/github/ketraterm/render/api/TerminalColorPalette.kt)) that converts abstract ANSI/direct colors into packed ARGB integers for fast paint loops.
-
-### What the Module Does NOT Own
-- **Core Internal Storage**: It never exposes or holds references to mutable ring buffers, cell objects, cursor coordinates, or grid physics.
-- **UI Platform Classes**: It does not depend on AWT, Swing, Compose, Skia, JavaFX, or any host windowing module.
-
----
-
-## Sub-Documentation
-
-For deep-dive technical details on attribute packing and thread synchronization:
-* [attribute-packing.md](docs/attribute-packing.md) - Exact bit mapping layouts for 64-bit attributes.
-* [render-frame-lifecycle.md](docs/render-frame-lifecycle.md) - Lifespans, monotonic generations, and synchronization boundaries.
-
----
+The contract includes viewport dimensions, row identities and generations, cursor
+state, packed cell attributes, color palettes, and grapheme cluster callbacks.
+Font selection, glyph shaping, painting, and blink timing belong to renderers.
+For a ready-made copied frame, use
+[`ketraterm-render-cache`](../ketraterm-render-cache/README.md).
 
 ## How to Use
 
-The following example shows how a custom drawing canvas consumes a `TerminalRenderFrame` to copy cell data and draw to a screen:
+This example copies the base channels of one row into reusable caller-owned
+arrays. The resulting arrays remain usable after the frame callback returns;
+calling `update` again replaces their contents. Use the instance on one thread or
+serialize access to it.
 
 ```kotlin
-import io.github.ketraterm.render.api.TerminalRenderFrame
-import io.github.ketraterm.render.api.TerminalRenderFrameConsumer
 import io.github.ketraterm.render.api.TerminalRenderFrameReader
-import io.github.ketraterm.render.api.TerminalColorPalette
 
-class CanvasPainter(
-    private val reader: TerminalRenderFrameReader,
-    private val palette: TerminalColorPalette
-) {
-    fun repaint() {
-        reader.readRenderFrame(object : TerminalRenderFrameConsumer {
-            override fun accept(frame: TerminalRenderFrame) {
-                val cols = frame.columns
-                val rows = frame.rows
-                
-                // Reusable buffers to avoid dynamic allocation per-frame
-                val codeWords = IntArray(cols)
-                val attrWords = LongArray(cols)
-                val flags = IntArray(cols)
-                
-                for (r in 0 until rows) {
-                    frame.copyLine(r, codeWords, 0, attrWords, 0, flags, 0)
-                    for (c in 0 until cols) {
-                        val flag = flags[c]
-                        val attr = attrWords[c]
-                        
-                        val fgColor = palette.foreground(attr)
-                        val bgColor = palette.background(attr)
-                        
-                        // Render cell 'c' with resolved ARGB colors
-                    }
-                }
+class RenderRowCopy {
+    var codeWords = IntArray(0)
+        private set
+    var attributes = LongArray(0)
+        private set
+    var flags = IntArray(0)
+        private set
+
+    fun update(reader: TerminalRenderFrameReader, row: Int) {
+        reader.readRenderFrame { frame ->
+            require(row in 0 until frame.rows)
+            if (codeWords.size != frame.columns) {
+                codeWords = IntArray(frame.columns)
+                attributes = LongArray(frame.columns)
+                flags = IntArray(frame.columns)
             }
-        })
-    }
-}
-```
-
----
-
-## How to Extend: Custom State Provider
-
-To expose a custom data structure (such as a remote SSH buffer or custom grid implementation) for rendering, implement the `TerminalRenderFrame` and `TerminalRenderFrameReader` interfaces:
-
-```kotlin
-import io.github.ketraterm.render.api.*
-
-class CustomFrameReader : TerminalRenderFrameReader {
-    private val frame = CustomFrame()
-
-    override fun readRenderFrame(consumer: TerminalRenderFrameConsumer) {
-        synchronized(this) {
-            consumer.accept(frame)
+            frame.copyLine(
+                row = row,
+                codeWords = codeWords,
+                attrWords = attributes,
+                flags = flags,
+            )
         }
     }
 }
 ```
+
+`codeWords` contains Unicode scalar values only for `CODEPOINT` cells. A complete
+text renderer must also handle `CLUSTER` callbacks and wide-cell flags; a zero
+code word alone does not identify a blank. Request `extraAttrWords` and
+`hyperlinkIds` when those channels are needed. The
+[frame lifecycle guide](docs/render-frame-lifecycle.md) describes those handoffs.
+
+Use the frame's `palette.foreground(word)` and `palette.background(word)` to
+resolve primary attributes to packed ARGB colors. A host can supply its own
+immutable `TerminalColorPalette`, including all 256 indexed colors, selection and
+cursor colors, bold-as-bright behavior, and an explicit dark/light preference.
+
+## How to Extend: Custom State Provider
+
+Implement `TerminalRenderFrameReader` and `TerminalRenderFrame` to expose another
+state source. Deliver a consistent frame during the callback, implement the
+required row/cursor methods, and provide public attribute words rather than a
+private storage encoding. Optional metadata and viewport overloads have
+conservative defaults; document which ones your reader implements.
+
+Keep a reader associated with one content source. Replacing it with unrelated
+content requires a new reader or an explicit consumer-cache reset. A reader may
+reject nested reads with `IllegalStateException`, but must leave the enclosing
+frame valid. For full lifetime, generation, and range rules, see the guide below.
+
+## Sub-Documentation
+
+- [Render frame lifecycle and concurrency](docs/render-frame-lifecycle.md)
+- [Stable attribute and cell encodings](docs/attribute-packing.md)
+- [Module ownership](Module.md)

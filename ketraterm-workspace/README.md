@@ -1,140 +1,150 @@
-# KetraTerm Workspace (`:ketraterm-workspace`)
+# KetraTerm Workspace
 
-The `ketraterm-workspace` module provides shared product implementation for host-neutral session and tab management. It coordinates local sessions under a workspace lifecycle and launches host-supplied profiles and immutable options. Products own preference schemas and persistence. See the [supported library boundary](../docs/library-compatibility.md#supported-boundary) for external embedding contracts.
+`ketraterm-workspace` is shared product infrastructure for local terminal
+profiles, tabs, and session ownership. It has no UI toolkit dependency. The
+standalone application and IntelliJ plugin adapt its events to their own views
+and settings.
 
-This module is designed to be completely decoupled from any specific UI toolkit, serving as the headless state controller for tabbed desktop terminal interfaces or IDE tool windows.
-
----
-
-## Upstream Dependencies
-- **`:ketraterm-protocol`** (vocabulary, mode IDs, enums)
-- **`:ketraterm-render-api`** (render frame primitives and color palettes)
-- **`:ketraterm-transport-api`** (duplex connector contracts)
-- **`:ketraterm-session`** (session orchestration, lifecycle state, and render publication)
-- **`:ketraterm-shell-integration`** (explicit OSC producer selection for local workspace sessions)
-- **`:ketraterm-pty`** (local PTY process management and options)
-
----
-
-## Architectural Role
-
-`TerminalWorkspace` manages a collection of tabs. Each tab wraps an active, running `TerminalSession` tied to a specific `TerminalProfile` launch configuration.
-
-The workspace owns a supervisor scope and one lifecycle job per tab. Optional process-title and startup notifications are supervised separately: a failed observer is reported without stopping session-close observation. Removing a tab cancels its jobs; closing the workspace cancels the scope. Local tab closure remains distinct from unexpected remote closure, and host callbacks run outside the workspace state lock. Reentrant selection or closure supersedes an older pending selection notification.
-
-```mermaid
-graph TD
-    Workspace["TerminalWorkspace"] -->|manages| Tab1["TerminalWorkspaceTab 1"]
-    Workspace -->|manages| Tab2["TerminalWorkspaceTab 2"]
-    
-    Tab1 -->|owns| Session1["TerminalSession"]
-    Tab1 -->|describes| Profile1["TerminalProfile"]
-    
-    Tab2 -->|owns| Session2["TerminalSession"]
-    Tab2 -->|describes| Profile2["TerminalProfile"]
-
-    Host["Product host"] -->|supplies launch options| Workspace
-```
-
-### Clipboard read routing
-
-`TerminalWorkspaceListener.readClipboard(tab, request)` runs asynchronously for the owning tab, independently of selection. The workspace publishes the tab and returns from `tabOpened` before starting session output delivery, so startup clipboard writes cannot be lost before a following read. Failed publication or startup closes the prepared session and removes the tab; removed tabs cannot receive reads. Product providers must still await asynchronously posted pane creation and earlier clipboard writes before native access. No clipboard implementation means an explicit unavailable result.
-
-### Key Components
-* [TerminalWorkspace](src/main/kotlin/io/github/ketraterm/workspace/TerminalWorkspace.kt): The main lifecycle manager. Handles opening, selecting, closing, and applying settings updates to all open terminal tabs.
-* [TerminalProfile](src/main/kotlin/io/github/ketraterm/workspace/TerminalProfile.kt): Describes a launch configuration (command, display name, working directory, environment variables).
-* `TerminalWorkspaceOpenOptions`: Validated immutable launch options, built and updated through named configuration callbacks or Java builders.
-
----
-
-## Sub-Documentation
-
-See [configuration ownership and construction](../docs/library-configuration.md). Standalone persistence is documented in the [application TOML guide](../ketraterm-app/docs/profile-config-toml.md).
-
----
-
-## Shell metadata ownership
-
-The local workspace selects `OscShellIntegration` and prepares supported shell
-hooks according to launch options. Session and PTY APIs remain independent of
-that implementation. Synchronous selected-model notifications update workspace
-directories/titles before transport closure, and
-`TerminalWorkspaceListener.commandFinished(tab, metadata)` reports
-each completed command without looking up whichever record is latest later.
-Listener registrations end when the tab is removed; the metadata producer owns
-its model.
+This is product infrastructure. External embedders should use the
+[library entry points](../README.md#using-the-libraries) and [PTY API](../ketraterm-pty/README.md).
 
 ## How to Use
 
-Hosts own persisted preferences. Workspace accepts immutable launch options and does not choose a configuration path or schema. The following example registers a workspace listener and opens a terminal tab:
+Create a workspace for the host's lifetime. Here, `runHost` owns the UI and event loop:
 
 ```kotlin
+import io.github.ketraterm.workspace.TerminalProfileRegistry
 import io.github.ketraterm.workspace.TerminalWorkspace
 import io.github.ketraterm.workspace.TerminalWorkspaceListener
-import io.github.ketraterm.workspace.TerminalWorkspaceTab
 import io.github.ketraterm.workspace.TerminalWorkspaceOpenOptions
-import io.github.ketraterm.workspace.TerminalProfile
-import java.nio.file.Path
+import io.github.ketraterm.workspace.TerminalWorkspaceTab
 
-fun main() {
-    // 2. Define a workspace listener to respond to tab lifecycle events
-    val listener = object : TerminalWorkspaceListener {
-        override fun tabOpened(tab: TerminalWorkspaceTab) {
-            println("Tab opened: ${tab.id} - ${tab.title}")
+fun runLocalWorkspace(
+    listener: TerminalWorkspaceListener,
+    runHost: (TerminalWorkspace, TerminalWorkspaceTab) -> Unit,
+) {
+    TerminalWorkspace(listener).use { workspace ->
+        val profile = TerminalProfileRegistry().initialProfile(emptyList())
+        val options = TerminalWorkspaceOpenOptions.create { draft ->
+            draft.columns = 100
+            draft.rows = 30
+            draft.maxHistory = 2_000
         }
-        override fun tabClosed(tabId: String) {
-            println("Tab closed: $tabId")
-        }
-        override fun tabSelected(tabId: String) {
-            println("Active tab switched to: $tabId")
-        }
-        override fun titleChanged(tab: TerminalWorkspaceTab, title: String) {}
-        override fun colorChanged(tab: TerminalWorkspaceTab, color: String?) {}
-        override fun bell(tab: TerminalWorkspaceTab) {}
+        val tab = workspace.openTab(profile, options)
+        runHost(workspace, tab)
     }
-
-    // 3. Create the workspace manager
-    val workspace = TerminalWorkspace(listener)
-
-    // 4. Declare a launch profile (e.g. Git Shell)
-    val gitProfile = TerminalProfile(
-        id = "git-shell",
-        displayName = "Git Repo Shell",
-        command = listOf("bash"),
-        environment = mapOf("GIT_PS1" to "true"),
-        workingDirectory = Path.of("/my/repo")
-    )
-
-    // 5. Open a tab using the profile
-    val openOptions = TerminalWorkspaceOpenOptions.create {
-        it.columns = 80
-        it.rows = 24
-        it.maxHistory = 1000
-        it.treatAmbiguousAsWide = false
-    }
-    val tab = workspace.openTab(gitProfile, openOptions)
 }
 ```
 
----
+When `runHost` returns or throws, `use` closes the workspace and its sessions.
+`openTab` includes shell preparation and local process creation; hosts should
+perform it away from a UI thread. `tabOpened` is the place to bind a renderer or
+establish host routing before terminal output starts.
+
+## Architectural Role
+
+`TerminalWorkspace` owns the tab registry, selection, and session-observation
+jobs. PTY process and stream mechanics remain in `ketraterm-pty`; terminal
+synchronization and input admission remain in `ketraterm-session`.
+
+Opening a tab registers and selects it, calls `tabOpened`, and then starts its
+session. Consequently, `tabSelected` may arrive before `tabOpened`. A listener
+or startup failure removes the prepared tab, closes its session, and propagates
+the failure with any cleanup failures suppressed.
+
+- `tabSnapshot()` copies the open-tab list; the tab objects remain live.
+- `selectTab(id)` rejects an unknown identity.
+- `closeTab(id)` removes the tab and closes its session; an unknown identity is
+  ignored. Remaining selection is reported after cleanup.
+- `sessionClosed` reports process exit or transport failure. The stopped tab
+  remains registered until the host chooses to remove or restart it.
+- `close()` rejects new tabs, attempts cleanup for every tab, and cancels workspace
+  jobs. It propagates the first failure with later failures suppressed. Repeated
+  or reentrant calls return without waiting for an active close to finish.
+
+Optional process-title and startup-notification observers are supervised
+separately, so their failures do not stop session-close observation.
+
+## Profiles and launch options
+
+[`TerminalProfile`](src/main/kotlin/io/github/ketraterm/workspace/TerminalProfile.kt)
+contains the process command, environment, initial directory, display category,
+and optional shell environment or startup command. Command arguments are passed
+as a list, rather than split from a command string. Keep the supplied collections
+unchanged while the profile is in use.
+
+`TerminalProfileRegistry` discovers built-in profiles in preference order.
+`configuredProfile` preserves the requested executable and uses recognized
+built-in arguments and display names. `initialProfile(args)` preserves explicit
+arguments as a one-off profile; without arguments it selects the first discovered
+profile. Discovery and path validation are launch-time work.
+
+`TerminalWorkspaceOpenOptions` configures dimensions, history, shell hooks,
+input policy, and host capabilities for new sessions. Use `create`, `copy`, or
+`builder` to obtain an immutable snapshot.
+
+`applySettings(palette, treatAmbiguousAsWide)` changes the palette and width policy
+for future writes in open sessions. Other launch options describe new sessions.
+Products own preference schemas, persistence, and the host actions permitted by
+`HostPolicy`; advertise only mode capabilities the host implements.
+
+## Shell metadata ownership
+
+The local session factory selects `OscShellIntegration` and, when enabled,
+prepares interactive PowerShell, Bash, zsh, or fish hooks. Explicit script or
+command entry points are preserved rather than converted into interactive
+launches. Explicit WSL shell launches can receive hooks; startup commands require
+a directly configured interactive shell with hooks enabled. Invalid startup
+combinations fail before process creation.
+
+`TerminalShellEnvironment` overrides launch environment values and can prepend
+one directory to PATH. With working hooks, these selections are reapplied after
+shell startup files. Otherwise they affect only the initial process environment.
+Startup commands are submitted through the session after shell readiness;
+`startupCommandCancelled` reports cancellation caused by earlier user input.
+
+Directory and command-finished notifications come from the session's selected
+shell model. `commandFinished` carries each completion's captured metadata,
+without replay or conflation. The tab retains its last observed directory after
+session closure. Registrations end on removal or session closure; an already
+dispatched callback may finish.
 
 ## How to Extend: Custom Tab Listeners
 
-UI components (such as Swing tabbed panels or custom IDE interfaces) implement `TerminalWorkspaceListener` to map workspace actions directly onto window views:
+Implement only the `TerminalWorkspaceListener` callbacks your host needs; all
+have defaults. Callback threads depend on the source: workspace method callers,
+session event producers, or workspace coroutines. The workspace does not dispatch
+to Swing's EDT or an IDE UI thread. Schedule UI work on the host's dispatcher.
 
-```kotlin
-import io.github.ketraterm.workspace.TerminalWorkspaceListener
-import io.github.ketraterm.workspace.TerminalWorkspaceTab
-import javax.swing.JTabbedPane
+Terminal metadata callbacks can run under the session mutation lock. Return
+promptly, avoid blocking, and schedule work without waiting for UI dispatch or
+reentering terminal mutation. Workspace lifecycle notifications run outside the
+workspace state lock. Observe the originating `tab` rather than whichever tab is
+currently selected.
 
-class SwingTabAdapter(private val tabbedPane: JTabbedPane) : TerminalWorkspaceListener {
-    override fun tabOpened(tab: TerminalWorkspaceTab) {
-        // Create Swing component and add tab
-    }
-    override fun tabClosed(tabId: String) {}
-    override fun tabSelected(tabId: String) {}
-    override fun titleChanged(tab: TerminalWorkspaceTab, title: String) {}
-    override fun colorChanged(tab: TerminalWorkspaceTab, color: String?) {}
-    override fun bell(tab: TerminalWorkspaceTab) {}
-}
-```
+For title updates queued to a UI thread, read `tab.title` when the queued work
+runs and check that the tab still exists. Its precedence is custom title,
+application title, foreground process, directory, then profile name. Set
+`customTitle`, `color`, or `showForegroundProcessName` for per-tab presentation;
+color strings are interpreted by the host.
+
+### Clipboard read routing
+
+`readClipboard(tab, request)` is suspending and resolves the requesting tab
+independently of selection. It runs after `tabOpened` returns, on the session I/O
+dispatcher without workspace or parser/input locks. If view creation or clipboard
+writes were posted asynchronously, await their completion before native access.
+Session cancellation and the original read deadline bound the operation. The
+default returns `TerminalClipboardReadResult.Unavailable`.
+
+The host also handles allowed clipboard writes and approval prompts. Provider
+read failures are audited by the session without clipboard details; they are not
+sent to `listenerFailed`. See the [session clipboard contract](../ketraterm-session/README.md)
+for reply and cancellation behavior.
+
+## Sub-Documentation
+
+- [Module structure and maintenance](Module.md)
+- [Configuration construction and ownership](../docs/library/configuration.md)
+- [Standalone profile persistence](../ketraterm-app/docs/profile-config-toml.md)
+- [Shell metadata API](../ketraterm-shell-integration/README.md)

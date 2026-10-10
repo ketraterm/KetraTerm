@@ -1,206 +1,97 @@
-# KetraTerm Terminal
+# KetraTerm
 
-**KetraTerm** is a next-generation, high-performance, strictly modular terminal emulator library written in **Kotlin/JVM 25**.
+KetraTerm is a Terminal Emulator application as well as a set of Kotlin/JVM terminal-emulation libraries for desktop and
+headless hosts. It provides streaming terminal parsing, grid and scrollback
+storage, input encoding, session management, and a reusable Swing component.
+Local PTY hosting, shell integration, and command completion are optional.
 
-Designed for embedding into IDEs, developer tools, and standalone desktop applications, KetraTerm provides a clean, fast, and modern terminal architecture. It rejects the bloated legacy compatibility of the 1980s (like printer passthroughs or Tektronix vector graphics) to focus on contemporary shells and text-user interfaces (TUIs).
-
-
----
+The libraries target Java 25. Kotlin consumers need Kotlin 2.4 or newer; Java
+consumers can use the same public APIs. See [library compatibility](docs/library/compatibility.md)
+for the supported compiler, runtime, and publication contracts.
 
 ## Features
 
-* **Native Pseudo-Terminal (PTY) Integration**: Seamless cross-platform native execution using JetBrains [Pty4J](https://github.com/traff/pty4j) with full Windows ConPTY support, built to handle modern shells (Zsh, Fish, PowerShell) and prompt size propagation.
-* **Modern Shell & TUI Support**: Implements the protocols documented in the feature map, with deterministic byte-stream, differential, and grid-model tests. Known compatibility and correctness limitations are recorded in the gap map.
-* **Richer Styling & 24-Bit TrueColor**: Bypasses the limits of standard 256-color palettes with full 24-bit TrueColor RGB mapping. Renders overline decorations and modern underline styles (Single, Double, Curly, Dotted, Dashed) with custom underline colors.
-* **Advanced Keyboard Shortcuts**: Supports DEC Backarrow mode, conventional Ctrl-number controls, xterm modified and extended function keys, `modifyOtherKeys`, compact CSI-u, and Kitty keyboard progressive flags `1` (escape-code disambiguation) and `8` (report all keys as CSI-u). Swing preserves press/repeat/release for AWT-visible non-text physical keys without per-event allocation. Rich native layout, IME, alternate-key, and associated-text reporting (`2`, `4`, `16`) is explicitly deferred and never advertised by portable hosts.
-* **Unbounded Mouse Tracking**: Supports legacy mouse tracking alongside modern Standard SGR Mouse (`1006`), SGR-Pixels (`1016`), and URXVT (`1015`) decimal-packed coordinates, allowing precise clicks, drags, and scroll-wheel interactions beyond the legacy 223-cell limit.
-* **Triple-Buffered Rendering**: Decouples parsing from Swing painting through a background frame-publication worker and leased copied frames. Java2D painting runs on the EDT; frame rate and allocation depend on workload, runtime, and platform.
-* **Bounded Protocol Handling**: Uses a bounded, double-indexed LRU cache for OSC 8 hyperlinks, title stack limits, and bounded OSC/DCS payload collection. Host policies gate terminal-initiated actions; open security corrections are tracked in the release review and gap map.
-* **Pixel-Perfect Typography & Color Emojis**: Integrates UAX #29 grapheme cluster segmentation, East Asian width policies, custom fallback font chains, and prioritized OS color emojis (Apple, Segoe, Noto). Programmatically paints box-drawing and block characters to eliminate anti-aliased line gaps.
-* **Allocation-Conscious Storage**: Core grid storage uses flat parallel primitive arrays and a `ClusterStore` arena, avoiding object-per-cell storage. Reusable hot-path buffers reduce allocation; this does not imply zero allocation across complete Swing frames or changing workloads.
-* **Independent Buffer & Margin Physics**: Employs vertical and horizontal scroll margins (`DECSLRM`/`DECSTBM`) with instant switching between primary and alt buffers (`?1049`) carrying independent margins and cursor state save slots.
-* **VT420 Rectangular Operations**: Supports protected, wide-glyph-safe rectangular erase, fill, copy, attribute updates, column edits, and active-page checksum responses for demanding text TUIs.
-* **Native Desktop Notifications**: Fully supports native desktop notifications triggered directly via iTerm2-style `OSC 9` and urxvt-style `OSC 777` sequences, featuring a KetraTerm-specific severity extension (`info`, `warning`, `error`, `none`), ConEmu subcommand conflict filtering, and self-cleaning tray icon management.
-* **Exceptional Utf-8 Support**: Supports UTF-8 input and output, with Unicode 17.0.0 data-backed grapheme segmentation, emoji properties, and East Asian width policies for modern emojis, symbols, and scripts.
-* **Replaceable Shell Integration**: Hosts can supply their existing shell model for prompts, commands, directories, editing, and readiness. KetraTerm's OSC 133/7 producer is an optional module selected by the standard workspace.
-
-> For a complete specification of all supported capabilities, see the [Terminal Feature Map](docs/terminal-feature-map.md). A detailed list of current backlog items and compatibility decisions is maintained in the [Terminal Feature Gap Map](docs/terminal-feature-gap-map.md)
-
-> Deterministic differential, resize/reflow, and independent grid-model verification are documented in [Terminal Conformance Testing](docs/terminal-conformance-testing.md).
-
-> The [terminal quality audit](docs/reviews/terminal-quality-audit-2026-09-27.md) records correctness, performance and API findings, reproduction evidence, and verification requirements.
-
-> Published APIs, supported compiler/runtime versions, compatibility rules and baseline checks are documented in [Library Compatibility](docs/library-compatibility.md).
-
----
-
-
-## Seamless Integration Guide
-
-The example below launches a plain PTY session. `TerminalSession.create` and
-`PtyOptions` install no shell integration unless one is selected. The standard
-workspace selects KetraTerm's optional producer; IDE hosts can supply their own
-model through the [session integration API](ketraterm-session/README.md#host-owned-shell-integration).
-
-```kotlin
-import io.github.ketraterm.pty.TerminalSessions
-import io.github.ketraterm.pty.PtyOptions
-import io.github.ketraterm.ui.swing.api.SwingTerminal
-import io.github.ketraterm.ui.swing.settings.SwingSettings
-import io.github.ketraterm.ui.swing.settings.TerminalTheme
-import java.awt.BorderLayout
-import javax.swing.JFrame
-
-fun spawnTerminalWindow() {
-    // 1. Configure the local PTY process (automatically resolves default platform shell)
-    val options = PtyOptions(
-        command = emptyList(), // e.g. resolves to bash/zsh/cmd.exe
-        columns = 100,
-        rows = 30,
-        maxHistory = 2000
-    )
-
-    // 2. Start PTY process and reader daemon threads
-    val session = TerminalSessions.localPty(options)
-
-    // 3. Create the Swing JComponent with visual settings
-    val settings = SwingSettings(
-        palette = TerminalTheme.ONE_DARK.createPalette(),
-        fontSize = 14,
-        fontFamily = "JetBrains Mono"
-    )
-    val terminalComponent = SwingTerminal(
-        settingsProvider = { settings }
-    )
-
-    // 4. Bind the Swing component to the active session
-    terminalComponent.bind(session)
-
-    // 5. Host it in a standard JFrame layout
-    val frame = JFrame("KetraTerm Terminal")
-    frame.defaultCloseOperation = JFrame.EXIT_ON_CLOSE
-    frame.layout = BorderLayout()
-    frame.add(terminalComponent, BorderLayout.CENTER)
-    frame.pack()
-    frame.isVisible = true
-}
-```
-
----
-
-## Project Structure
-
-KetraTerm is composed of strict, decoupled Gradle modules:
-
-* **`:ketraterm-protocol`**: Zero-dependency ANSI/DEC constants and vocabulary enums.
-* **`:ketraterm-parser`**: Streaming UTF-8 decoder and table-driven escape sequence FSM.
-* **`:ketraterm-core`**: Headless text grid storage, circular scrollback buffers, and resizing reflow.
-* **`:ketraterm-host`**: Semantic translation adapter connecting the parser to core state.
-* **`:ketraterm-input`**: Keyboard/mouse event models and host-bound ANSI encoders.
-* **`:ketraterm-completion`**: Command completion models, parsing, ranking, and learning indexes.
-* **`:ketraterm-completion-host`**: Direct suspending local path-provider and bounded scanning infrastructure.
-* **`:ketraterm-completion-persistence`**: Shared product implementation of sanitized local-file storage for completion learning.
-* **`:ketraterm-render-api`**: Dependency-free visual frame contracts.
-* **`:ketraterm-render-cache`**: Double/triple-buffered publication cache.
-* **`:ketraterm-transport-api`**: Duplex I/O connector interfaces.
-* **`:ketraterm-session`**: Runtime synchronization, ordered writes, and neutral shell metadata contracts.
-* **`:ketraterm-shell-integration`**: Optional OSC shell metadata and bounded command extraction.
-* **`:ketraterm-pty`**: Local native process Pty4J launcher and stream pump.
-* **`:ketraterm-ui-swing`**: Reusable desktop `JComponent` painter and mouse interaction adapters.
-* **`:ketraterm-ui-swing-host`**: Optional host chrome, actions, and completion-to-Swing adapters.
-* **`:ketraterm-workspace`**: Shared product implementation of local tabs, profiles, and workspace lifecycle.
-* **`:ketraterm-app`**: Standalone desktop application host.
-* **`:ketraterm-testkit`**: In-memory connector mocks and simulation tools.
-* **`:ketraterm-benchmarks`**: JMH benchmarks for parser, core, render, and session hot paths.
-
-The [supported library boundary](docs/library-compatibility.md#supported-boundary)
-defines Maven publications and public API documentation. Shared product modules
-remain separate from that boundary.
-
-> [TIP]
-> For a detailed walkthrough of the unidirectional pipeline flow, concurrency locks, in-memory cell storage, and caches, refer to our [Architecture Guide](ARCHITECTURE.md).
-
----
+- Unicode grapheme clusters, combining marks, wide characters, and emoji sequences
+- Scrollback with resize reflow and wrap-aware text selection
+- 256-color and 24-bit true color rendering
+- Synchronized output for coordinated screen updates
+- Kitty keyboard encoding, bracketed paste, and pixel-coordinate mouse reporting
+- OSC 8 hyperlinks and asynchronous scrollback search
+- Shell integration with command navigation, exit status, and output extraction
+- Extensible command completion with contextual ranking and bounded learning
+- Host-controlled permissions for clipboard access and terminal actions
+- Customizable Swing rendering, font fallback, themes, and key bindings
+- Headless sessions, custom transports, and optional local PTY hosting
+- Allocation-conscious primitive storage and reusable render buffers
 
 ## Using the libraries
 
-Select the entry point you need; Maven and Gradle include its required dependencies
-transitively. You do not need to declare the pipeline modules individually.
+Choose an entry point and add optional integrations as needed:
 
-| Use | Direct dependency |
+| Dependency | Use |
 | --- | --- |
-| Headless terminal pipeline and session with a host-owned transport | `ketraterm-headless` |
-| Embedded Swing terminal, including its session and headless pipeline | `ketraterm-swing` |
-| Optional local PTY process hosting | `ketraterm-pty` |
-| Optional built-in OSC shell integration | `ketraterm-shell-integration` |
-| Optional completion and Swing host adapters | `ketraterm-ui-swing-host` |
+| [ketraterm-headless](ketraterm-headless/README.md) | Terminal pipeline and session with a host-owned transport. |
+| [ketraterm-swing](ketraterm-swing/README.md) | Swing terminal component and its headless dependencies. |
+| [ketraterm-pty](ketraterm-pty/README.md) | Local processes through Pty4J. |
+| [ketraterm-shell-integration](ketraterm-shell-integration/README.md) | Built-in OSC shell metadata producer. |
+| [ketraterm-ui-swing-host](ketraterm-ui-swing-host/README.md) | Host actions and completion-to-Swing adapters. |
 
-`ketraterm-headless` and `ketraterm-swing` are dependency-only entry points; they
-introduce no extra runtime code. Individual modules remain available for custom
-pipelines and advanced use.
+The headless and Swing entry points contain dependency metadata rather than
+runtime code. Individual modules are also available for custom assembly.
+The [BOM](ketraterm-bom/README.md) aligns versions without adding runtime dependencies.
 
-Use `ketraterm-bom` to align whichever libraries you select. The BOM contains
-version constraints, not runtime dependencies. It does not install every library.
-Development snapshots use Sonatype's snapshot repository:
+Replace `{version}` with the KetraTerm version you want to use.
 
 ```kotlin
 repositories {
     mavenCentral()
-    maven("https://central.sonatype.com/repository/maven-snapshots/") {
-        content { includeGroup("io.github.ketraterm") }
-        mavenContent { snapshotsOnly() }
-    }
 }
+
 dependencies {
-    implementation(platform("io.github.ketraterm:ketraterm-bom:0.4.0-SNAPSHOT"))
+    implementation(platform("io.github.ketraterm:ketraterm-bom:{version}"))
     implementation("io.github.ketraterm:ketraterm-swing")
-    // Add only the optional integrations your host needs.
     implementation("io.github.ketraterm:ketraterm-pty")
 }
 ```
 
-For headless use, replace the Swing and PTY dependencies with
-`io.github.ketraterm:ketraterm-headless`. Hosts supplying their own transport,
-shell metadata or completion can omit our corresponding optional libraries.
-See [supported boundaries and Maven BOM usage](docs/library-compatibility.md#supported-boundary).
+For snapshot builds, also configure the
+[Sonatype snapshot repository](https://central.sonatype.com/repository/maven-snapshots/).
 
-## Development & Verification
+For a headless host, use `ketraterm-headless` and implement
+[`TerminalConnector`](ketraterm-transport-api/README.md).
 
-### Prerequisites
-* **JDK 25 or higher**
-* **Gradle**: use the included wrapper (`gradlew` / `gradlew.bat`).
+<a id="local-pty-example"></a>
 
-### Command Reference
-* **Verify Library Publication** (build-local artifacts; no upload):
-  ```bash
-  ./gradlew publicationChecks
-  ```
-* **Run All Tests**:
-  ```bash
-  ./gradlew test
-  ```
-* **Run Component Checks**:
-  ```bash
-  ./gradlew :ketraterm-parser:test
-  ./gradlew :ketraterm-core:test
-  ./gradlew :ketraterm-ui-swing:test
-  ```
-* **Run Generated Terminal Campaigns**:
-  ```bash
-  ./gradlew :ketraterm-testkit:xtermDifferentialSmokeTest
-  ./gradlew :ketraterm-testkit:resizeReflowInvariantSmokeTest
-  ./gradlew :ketraterm-testkit:cursorWrapModelSmokeTest
-  ```
-* **Launch Standalone Swing App**:
-  ```bash
-  ./gradlew :ketraterm-app:run
-  ```
-* **Launch with Custom Shell Command**:
-  ```bash
-  ./gradlew :ketraterm-app:run --args="powershell.exe"
-  ```
+## Local processes
 
----
+For a local process, create a session with `TerminalSessions.createLocalPty`,
+bind a `SwingTerminal` on the Swing event dispatch thread, then start the session.
+The host owns the session and must close it when it is no longer needed.
+
+See the [PTY guide](ketraterm-pty/README.md#how-to-use) for process startup and
+the [Swing example](ketraterm-ui-swing/README.md#how-to-use) for view setup.
+
+## Documentation
+
+Browse the [documentation](docs/README.md) for feature catalogs, embedding guides,
+protocol references, and contributor resources. The [feature map](docs/terminal-feature-map.md)
+describes supported capabilities; the [gap map](docs/terminal-feature-gap-map.md)
+tracks remaining work. Consumer-visible changes are in the [library changelog](CHANGELOG.md).
+
+## Development
+
+Use JDK 25 and the included Gradle wrapper (`gradlew` / `gradlew.bat`).
+
+```bash
+./gradlew :ketraterm-app:run
+./gradlew test
+./gradlew publicationChecks
+```
+
+`publicationChecks` validates build-local Maven artifacts, public ABI, formatting,
+tests, and isolated consumers; it does not upload artifacts. The IntelliJ plugin
+has a separate Gradle build. See [Contributing](CONTRIBUTING.md) for focused
+checks and product development commands.
 
 ## Authors
 
@@ -221,6 +112,5 @@ See [supported boundaries and Maven BOM usage](docs/library-compatibility.md#sup
 
 ## License
 
-Copyright 2026 Gagik Sargsyan
-
-Licensed under the Apache License, Version 2.0. See [LICENSE](LICENSE) for details.
+Copyright 2026 Gagik Sargsyan. Licensed under the
+[Apache License, Version 2.0](LICENSE).

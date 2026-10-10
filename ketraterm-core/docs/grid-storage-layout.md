@@ -1,56 +1,93 @@
 # Grid Storage Layout & Memory Architecture
 
-The `ketraterm-core` module implements a highly optimized, flat memory architecture designed to handle high-frequency terminal grid writes and viewport resizes with minimal garbage collector impact.
-
----
+This is an internal storage guide, not a public encoding contract. Consumers use
+`TerminalReader`, `TerminalLine`, and render-frame copies; raw arrays and cluster
+handles remain private to core.
 
 ## 1. Parallel Array Cell Storage (`Line`)
 
-Instead of representing grid cells as individual JVM heap objects, each physical line in the grid is modeled by a [Line](../src/main/kotlin/io/github/ketraterm/core/model/Line.kt) class backed by flat parallel primitive arrays:
+Each physical [Line](../src/main/kotlin/io/github/ketraterm/core/model/Line.kt)
+holds parallel primitive arrays:
 
-```
-                  Parallel Array Mapping in a Line
-+---------------+-----------------------------------------------+
-| Array Name    | Type      | Contents                          |
-+---------------+-----------+-----------------------------------+
-| codepoints    | IntArray  | Codepoint, EMPTY, SPACER, or      |
-|               |           | negative Cluster Handle (<= -2)  |
-| attrs         | LongArray | Primary styling attributes        |
-| extendedAttrs | LongArray | Extended styling attributes       |
-+---------------+-----------+-----------------------------------+
-```
+| Storage | Type | Contents |
+| --- | --- | --- |
+| `codepoints` | `IntArray` | Scalar, empty cell, wide spacer, or cluster handle |
+| `attrs` | `LongArray` | Primary packed attributes |
+| `extendedAttrs` | `LongArray?` | Extended attributes; absent storage reads as zero |
+
+`extendedAttrs` is allocated on the first nonzero extended write and retained
+through clears for reuse. A row-local cluster count lets erases skip handle
+scanning when no cluster cells are present.
 
 ### Invariants:
-* **`codepoints` values**:
-  * `>= 0`: Direct Unicode codepoint (ASCII or BMP).
-  * `0`: Empty cell (`TerminalConstants.EMPTY`).
-  * `-1`: Wide character spacer cell continuation (`TerminalConstants.WIDE_CHAR_SPACER`).
-  * `<= -2`: A negative handle pointer into the `ClusterStore` arena for multi-codepoint grapheme clusters.
-* **`attrs` & `extendedAttrs`**: Parallel arrays that match the `codepoints` array indices, allowing attributes to be retrieved at $O(1)$ without pointer chasing.
 
----
+- `0` denotes an empty cell.
+- Positive values hold direct Unicode scalars, including supplementary values.
+- `-1` is the trailing spacer of a two-cell occupant.
+- Values `<= -2` encode handles into the row's owning cluster store.
+- Attributes use the same column index as the cell value. Overwriting or erasing
+  a cluster releases its handle; moving cells must transfer ownership exactly
+  once.
+
+Rows also carry a soft-wrap flag, wide-wrap padding provenance, authored-output
+provenance, line identity, and render generation. These are distinct facts:
+erasing text can retain a row's identity and authored blank output, while
+replacing the row creates a new identity. Reflow excludes artificial wrap
+padding from logical text.
+
+A public `TerminalLine` decodes cluster handles to their base codepoint.
+`readCluster` copies the complete payload into caller-owned storage. Render
+copies translate internal packed attributes and cluster references into the
+stable encodings in `ketraterm-render-api`.
 
 ## 2. Off-Screen History Ring (`HistoryRing`)
 
-Scrollback and off-screen history are managed by [HistoryRing](../src/main/kotlin/io/github/ketraterm/core/buffer/HistoryRing.kt), which is a fixed-capacity ring buffer of physical `Line` objects.
+A screen's [HistoryRing](../src/main/kotlin/io/github/ketraterm/core/buffer/HistoryRing.kt)
+contains both retained history and live viewport rows, oldest first. Primary
+capacity is `maxHistory + height`; alternate capacity is `height`.
 
-* **Line Recycling**: When the history capacity is reached, new lines pushed into the ring reuse the oldest line's physical arrays (`push()` returns the recycled line). This avoids new object allocations during active shell scroll outputs.
-* **Logical-to-Physical Rotation**: Methods `rotateUp` and `rotateDown` rotate logical indices within the active scroll margins, shifting array pointers rather than copying line values element-by-element.
+The reference table is allocated at full capacity, while row objects are
+constructed for the initial viewport plus a batch of spare rows. Additional
+batches are allocated as output fills the ring. Once capacity is reached,
+`push()` reuses the oldest row and advances eviction accounting. The caller
+clears recycled contents and releases their clusters before reuse.
 
----
+Full-width region scrolling rotates row references rather than copying each
+cell. Partial-width scrolling copies only the selected cell slices and does not
+admit rows to history. History destruction releases discarded live contents
+before dropping their logical reachability, leaving row storage available for
+reuse.
+
+Height-only primary resize adjusts the reference table while retaining surviving
+row arrays and their store. A width change reconstructs logical lines into a new
+ring and store. See the [resize contract](terminal-core-contract.md#resize).
 
 ## 3. The Arena Allocator (`ClusterStore`)
 
-Multi-codepoint grapheme clusters (such as emojis with joiners) cannot fit in a single 32-bit cell integer. To avoid allocating standard string objects for these cells, `ketraterm-core` utilizes a buffer-scoped arena allocator called [ClusterStore](../src/main/kotlin/io/github/ketraterm/core/store/ClusterStore.kt).
+Each screen owns a separate
+[ClusterStore](../src/main/kotlin/io/github/ketraterm/core/store/ClusterStore.kt).
+Its primitive arrays contain:
 
-### Memory Mapping:
-* **`clusterData` (IntArray)**: A single flat array containing the raw codepoints of all allocated clusters.
-* **`slotStarts` & `slotLengths` (IntArray)**: Metadata tables mapping slot indices to their offsets and sizes inside `clusterData`.
-* **Allocation Handle**: The allocator returns a negative handle `slot = -(handle + 2)`. This handle is stored directly inside the `codepoints` array of the `Line`.
+- `clusterData`: the flat codepoint pool.
+- `slotStarts` and `slotLengths`: each slot's region and live payload length.
+- `slotCapacities`: the reusable capacity of that region.
+- `nextFree` and segregated free-list heads: reusable slot links.
 
-### Freelist Slot Reclamation:
-* When a cell containing a cluster handle is overwritten or erased, `free(handle)` returns the slot to a segregated freelist.
-* Each slot permanently owns its data region. Allocations reuse a sufficiently large free slot or create a new slot and region; they never relocate a smaller slot and abandon its old region.
-* Capacity classes are exact for 1–4 codepoints, then powers of two (8, 16, ...). Allocation searches matching and larger classes, while requests of 1–4 codepoints only search those small classes. This bounds free-list lookup work independently of scrollback size. Larger classes trade spare capacity for fast reuse.
-* Freeing retains storage for reuse; it does not shrink the arena. Reflow copies surviving clusters into a fresh store.
-* **Thread Safety**: Access to `ClusterStore` is confined strictly to the terminal core's state mutation thread.
+A cell stores `handle = -(slot + 2)`; decoding uses `slot = -(handle + 2)`.
+Allocation copies the caller's codepoint range synchronously. A freed slot
+retains its data region and may be reused; double-free is rejected. Freeing does
+not zero the payload or shrink the arena.
+
+Capacity classes are exact for lengths one through four, then powers of two.
+Allocation searches suitable classes instead of scanning all history. Small
+requests use only the small classes. A reused slot never abandons its original
+region in order to hold a larger payload.
+
+The store grows when reuse cannot satisfy a request. There is no fixed public
+cluster-length bound, so history capacity alone does not define a byte-size
+limit. Width reflow deep-copies surviving clusters into a fresh store; height
+resize preserves their existing handles. Rows and handles must never cross
+store boundaries without that copy.
+
+All row and store access requires serialization with terminal mutation. The
+assembled session supplies it; direct core callers provide their own boundary.

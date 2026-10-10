@@ -18,6 +18,9 @@ expose is omitted rather than fabricated.
 
 ## Verification
 
+Install Node.js and npm on `PATH`; CI uses Node.js 22. The dedicated Gradle tasks
+install the locked npm dependencies before running the oracle.
+
 From the repository root:
 
 ```shell

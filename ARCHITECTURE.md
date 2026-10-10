@@ -1,92 +1,152 @@
 # KetraTerm Terminal Pipeline Architecture
 
-This document describes the design principles, unidirectional data flow, concurrency architecture, and data structures of **KetraTerm**.
+KetraTerm separates terminal parsing, state mutation, input encoding, transport,
+and presentation into JVM modules. `TerminalSession` coordinates the running
+pipeline; applications choose the transport, host services, optional shell
+producer, and presentation.
 
----
+This guide describes the module boundaries and runtime ownership. Detailed
+terminal behavior and deferred scope belong to the [feature map](docs/terminal-feature-map.md)
+and [gap map](docs/terminal-feature-gap-map.md).
 
-## High-Level Architecture & Unidirectional Flow
+<a id="high-level-architecture--unidirectional-flow"></a>
 
-KetraTerm separates terminal operations into a strict, unidirectional data pipeline to ensure complete decoupling of SSH/PTY I/O, byte parsing, screen-state mutation, and visual painting.
+## Data flow
 
-```
-  Inbound Path (Host to Screen State):
-  ┌─────────────┐  Raw Bytes  ┌────────────────────┐  Commands  ┌───────────────────┐  Mutations  ┌───────────────┐
-  │ PTY / SSH   ├────────────►│ ketraterm-parser   ├───────────►│ ketraterm-host    ├────────────►│ ketraterm-core│
-  └─────────────┘             └────────────────────┘            └───────────────────┘             └───────┬───────┘
-                                                                                                 Snapshot │ 
-  Rendering Path (Triple-Buffered):                                                                       ▼
-  ┌────────────────┐  Repaint   ┌───────────────────┐  Lease  ┌───────────────────────┐  copyLine  ┌───────────────┐
-  │ Swing Component│ ◄──────────┤ ketraterm-ui-swing├────────►│ ketraterm-render-cache│◄───────────┤ Render API    │
-  └────────────────┘            └───────────────────┘         └───────────────────────┘            └───────────────┘
-  
-  Outbound Path (User to Host stdin):
-  ┌─────────────┐  Key/Paste  ┌─────────────────┐  ANSI Bytes┌──────────────────────┐  write()    ┌───────────────┐
-  │ User Event  ├────────────►│ ketraterm-input ├───────────►│ ketraterm-session    ├────────────►│ PTY / SSH     │
-  └─────────────┘             └─────────────────┘            └──────────────────────┘             └───────────────┘
+```mermaid
+flowchart LR
+    connector[TerminalConnector] -->|ordered output bytes| parser[Parser]
+    parser -->|semantic commands| host[HostCommandAdapter]
+    host -->|mutations| core[Core grid]
+    core -->|Render API reads| publication[Session frame publication]
+    publication -->|leased copied frame| cache[Renderer-owned cache]
+    cache -->|prepared cells| view[Swing painting]
 ```
 
-`TerminalSession` serializes parser/core mutation and outbound admission. A background worker publishes copied frames, while Swing paints its own cache on the EDT. These boundaries reduce shared-state exposure; workload-specific performance and remaining lifecycle defects are documented in the [terminal quality audit](docs/reviews/terminal-quality-audit-2026-09-27.md).
+The session serializes inbound parser/core work. The parser recognizes byte
+sequences and assembles text; the host adapter maps commands; core owns cell
+width, cursor movement, margins, buffer storage, and reflow. Transport implementations
+supply ordered bytes without interpreting terminal protocols.
 
----
+Outbound intent enters the session before encoding:
 
-## Module Responsibility Matrix
+```mermaid
+flowchart LR
+    intent[Key / mouse / paste intent] --> admission[Session admission]
+    admission --> encoder[Input encoder]
+    encoder --> queue[Ordered outbound writer]
+    replies[Permitted terminal replies] --> queue
+    queue --> connector[TerminalConnector.write]
+```
 
-The KetraTerm codebase is partitioned into highly specialized modules with strict boundaries:
+The input encoder reads stable mode state and produces host-bound bytes. The
+session admits input and terminal replies to the same ordered writer.
+`submitInput` and `submitBytes` report admission, not completed transport output.
+Transport failures are reflected in session lifecycle state.
 
-| Module | Purpose & Core Responsibility | What It Owns | What It Does NOT Own |
-| :--- | :--- | :--- | :--- |
-| [**ketraterm-protocol**](./ketraterm-protocol) | Shared Vocabulary | C0/C1 constants, `AnsiMode`, `DecPrivateMode`, mouse modes, `TerminalHostOutput` | Has no execution logic or sub-dependencies. |
-| [**ketraterm-parser**](./ketraterm-parser) | Stream Parsing | UTF-8 streaming decoder, table-driven `AnsiStateMachine`, DEC charset remapping, UAX #29 segmentation | Has no grid physics, cursor calculations, or UI state. |
-| [**ketraterm-core**](./ketraterm-core) | Headless Grid Engine | Circular scrollback history, parallel array cells (`Line`), wide-character erasure, margins, resizing reflow | Has no byte stream parsing, input encoding, or UI code. |
-| [**ketraterm-host**](./ketraterm-host) | Translation Adapter | `HostCommandAdapter`, SGR Pen state, OSC 8 Hyperlink LRU registry, DECSTR/RIS resets | Has no byte parsing or state duplication. |
-| [**ketraterm-input**](./ketraterm-input) | Event Encoding | Key arrow/numpad maps, xterm `modifyOtherKeys`, SGR/legacy mouse coordinate mapping, bracketed paste | Has no screen mutation or output parsing logic. |
-| [**ketraterm-render-api**](./ketraterm-render-api) | Rendering Contract | Viewport frame models, cursor shapes, cell state flags (`TerminalRenderCellFlags`), packed color ARGB resolution | Has no UI frame painting or glyph metrics. |
-| [**ketraterm-render-cache**](./ketraterm-render-cache) | Frame Snapshotting | `TerminalRenderCache` double-buffering, `TerminalRenderPublisher` triple-buffering | Agnostic to UI paint platforms (AWT/Swing/Compose). |
-| [**ketraterm-transport-api**](./ketraterm-transport-api) | Duplex Channel Contract | `TerminalConnector` interface, connection callbacks, size change signaling | Has no thread policies or payload inspection. |
-| [**ketraterm-session**](./ketraterm-session) | Runtime synchronization and neutral shell contracts | Serialized mutation, ordered input/replies, conflated frame publication, selected shell-model observation | No transport threads, painting, or dependency on the OSC producer. |
-| [**ketraterm-shell-integration**](./ketraterm-shell-integration) | Optional OSC shell producer | Bounded command extraction, prompt readiness, stable-line metadata | Uses session-owned frame access; no transport, UI, or coroutine scope. |
-| [**ketraterm-pty**](./ketraterm-pty) | Native Process Host | Cross-platform Pty4J management, daemon reader/watcher threads, system default shell detection | Has no input encoding or grid cell mutations. |
-| [**ketraterm-ui-swing**](./ketraterm-ui-swing) | Swing Component | `SwingTerminal` component, bifurcated text rendering, smart double-click path selection | Has no shell process awareness or protocol parsing. |
-| [**ketraterm-testkit**](./ketraterm-testkit) | Testing Fakes | In-memory `MockConnector`, outbound write capture, remote crash/exit simulators | Has no physical thread spawning or shell requirements. |
+<a id="module-responsibility-matrix"></a>
 
----
+## Modules
 
-## Concurrency & Locking Architecture
+### Published libraries
 
-Operating a multithreaded terminal on the JVM introduces concurrent events from the host PTY (background reads), the OS (resizing and focus shifts), and the UI (user keystrokes and paint ticks). The transport contract already guarantees ordered, serial byte delivery, so `TerminalSession` needs two locks and one coroutine publication worker:
+| Module | Responsibility |
+| --- | --- |
+| [protocol](ketraterm-protocol/README.md) | Dependency-free protocol constants and shared vocabulary. |
+| [parser](ketraterm-parser/README.md) | Streaming bytes, UTF-8, escape sequences, charsets, and grapheme assembly. |
+| [core](ketraterm-core/README.md) | Headless grid, scrollback, modes, width policy, and resize/reflow. |
+| [host](ketraterm-host/README.md) | Parser-command mapping, host effects, and hyperlink registration. |
+| [input](ketraterm-input/README.md) | Keyboard, paste, focus, mouse, and host-output encoding. |
+| [render-api](ketraterm-render-api/README.md) | Dependency-free primitive rendering contracts and attributes. |
+| [render-cache](ketraterm-render-cache/README.md) | Copied render storage and leased frame publication. |
+| [transport-api](ketraterm-transport-api/README.md) | Ordered raw-byte connector and lifecycle contracts. |
+| [session](ketraterm-session/README.md) | Runtime synchronization, outbound ordering, lifecycle, and neutral shell contracts. |
+| [shell-integration](ketraterm-shell-integration/README.md) | Optional OSC metadata interpretation and bounded command extraction. |
+| [pty](ketraterm-pty/README.md) | Local process/connector lifecycle and convenience session assembly. |
+| [ui-swing](ketraterm-ui-swing/README.md) | Reusable Java2D rendering and Swing interaction. |
+| [completion](ketraterm-completion/README.md) | Completion context, source evaluation, ranking, and bounded learning. |
+| [completion-host](ketraterm-completion-host/README.md) | Host-neutral directory/path access for completion. |
+| [ui-swing-host](ketraterm-ui-swing-host/README.md) | Host actions, popup presentation, and completion adapters. |
 
-1. **`mutationLock`**: The core-critical lock. It blocks parser execution, grid resizing, borrowed frame reads, and render-frame extraction. This ensures copied frames never contain half-written rows or mismatched widths.
-2. **`outboundWriteLock`**: A reentrant monitor protecting ordinary encoder scratch, policy state and bounded queue admission. One I/O coroutine writes admitted input and responses in order; native writes and bulk encoding run outside this monitor. Input return means acceptance, not completed transport output.
-3. **Render publication worker**: A conflated coroutine channel wakes one session worker. The worker extracts a frame under `mutationLock`, promotes it through `TerminalRenderPublisher`, and updates a `StateFlow` generation consumed by UI renderers.
+[ketraterm-headless](ketraterm-headless/README.md) exposes session dependencies;
+[ketraterm-swing](ketraterm-swing/README.md) exposes Swing
+dependencies. Both publish dependency metadata without adding runtime code.
+[ketraterm-bom](ketraterm-bom/README.md) supplies version constraints for the published dependency set.
+See [library compatibility](docs/library/compatibility.md#supported-boundary)
+for the publication boundary.
 
----
+### Products and development modules
 
-## Core Mechanics & Data Structures
+| Module | Responsibility |
+| --- | --- |
+| [completion-persistence](ketraterm-completion-persistence/README.md) | Product-owned sanitized, versioned learning persistence. |
+| [workspace](ketraterm-workspace/README.md) | Profiles, local sessions, tabs, and workspace lifecycle. |
+| [app](ketraterm-app/README.md) | Standalone desktop product, configuration, and window wiring. |
+| [intellij-plugin](ketraterm-intellij-plugin/README.md) | IntelliJ-specific product integration in a separate build. |
+| [testkit](ketraterm-testkit/README.md) | Reusable connector fakes, test fixtures, and verification campaigns. |
+| [benchmarks](ketraterm-benchmarks/README.md) | JMH measurements for terminal hot paths. |
 
-### 1. Flat In-Memory Cell Storage
-To eliminate object-per-cell memory overhead and ensure JVM cache-line locality, the terminal cell grid in `Line` uses parallel primitive arrays:
-* `codepoints` (`IntArray`): Stores cell characters (e.g. `0` for empty cells, `> 0` for Unicode scalars, `-1` for wide-character continuation spacers, and `<= -2` for grapheme cluster handles).
-* `attrs` (`LongArray`): Stores packed primary visual attributes (24-bit RGB or indexed colors, bold, italic, inverse, blink, faint, erase protection).
-* `extendedAttrs` (`LongArray`): Stores secondary attributes (underline styles, overline, conceal, and packed hyperlink IDs).
+<a id="concurrency--locking-architecture"></a>
 
-### 2. Monomorphized LRU Typography Caches
-To avoid object-boxing during high-speed rendering ticks, custom, primitive-keyed LRU caches are utilized in the rendering and font selection layers:
-* `IntFontLru`: Maps 32-bit Unicode codepoints directly to `java.awt.Font` fallbacks using flat primitive arrays and custom hash multipliers.
-* `LongTextLayoutLru`: Maps packed 64-bit styling/codepoint keys directly to pre-shaped Java2D `TextLayout` objects.
-* `ClusterTextLayoutLru`: Identifies multi-character grapheme clusters by taking direct slices of primitive `IntArray` segments from the render cache and comparing them using array-content hashing.
-* `AwtColorCache`: Maps packed 32-bit ARGB integers to `java.awt.Color` instances.
+## Concurrency
 
-### 3. High-Fidelity Resizing & Reflow
-During terminal resizes, KetraTerm uses a 3-phase reflow strategy in `TerminalResizer`:
-1. **Logical Row Rebuilding**: Re-assembles full logical lines by joining physical rows that carry the soft-wrap flag.
-2. **Re-wrapping**: Re-calculates wrap boundaries and folds character arrays according to new column dimensions.
-3. **Cluster Deep-Copying**: Moves survived cluster indices into a pristine `ClusterStore` arena to prevent references from leaking or fragmentation.
+Core, parser, and standalone encoders require caller serialization. A session
+provides the synchronization boundary for its assembled pipeline:
 
----
+- Parser execution, core mutation, resizing, and borrowed render reads are
+  serialized so readers cannot observe partially mutated state.
+- Outbound admission protects mode/policy capture, encoder scratch, and the
+  bounded writer queue. One I/O worker writes admitted input and replies in order.
+  Native writes and bulk encoding do not hold the admission monitor.
+- A conflated render worker extracts copied frames under the mutation boundary
+  and publishes them through `TerminalRenderPublisher`. Generation notifications
+  signal available work; they are not a log of every intermediate frame.
+- Swing owns its presentation state on the EDT. It consumes published frames
+  into reusable local storage, prepares rendering data, and paints that storage.
 
-## Testing Doctrine & Hermetic Architecture
+Direct render frames and their backing arrays are borrowed. Keep them inside
+their documented callback or lease; copy data that must outlive that scope.
+No UI code should retain live core lines or mutate session-owned core state
+outside the session boundary.
 
-We treat terminal testing as a critical engineering discipline:
-1. **Assert Real Semantics**: Tests assert standard-aligned ANSI/DEC protocol states and real screen results, rather than current parser implementation quirks.
-2. **Deterministic Concurrency Tests**: Host and session suites use controlled schedulers and explicit event handshakes to test resize, write, render and shutdown ordering. Passing cases establish those tested contracts, not the absence of all races.
-3. **In-Memory Fakes**: By leveraging `:ketraterm-testkit`'s `MockConnector`, developers can run complete, bidirectional I/O host tests with exact byte assertions, completely independent of local OS PTY subsystems.
+See [session concurrency](ketraterm-session/docs/session-concurrency-locks.md),
+[render-frame lifecycle](ketraterm-render-api/docs/render-frame-lifecycle.md), and
+[publication buffering](ketraterm-render-cache/docs/triple-buffering-concurrency.md).
+
+<a id="core-mechanics--data-structures"></a>
+
+## Storage and rendering
+
+Cells use parallel primitive arrays and a shared cluster arena. Scrollback rows
+are allocated incrementally and recycled at capacity. Core owns width, wrapping,
+and resize/reflow; renderers consume its public frame projection.
+
+The Swing renderer reuses copied cell planes and layout caches. Font selection
+and Java2D painting stay in the UI layer. See the
+[storage layout](ketraterm-core/docs/grid-storage-layout.md) and
+[Swing rendering guide](ketraterm-ui-swing/docs/bifurcated-text-rendering.md).
+
+## Lifecycle and Host Ownership
+
+The caller owns a created session and must close it even if startup fails or it
+is never started. Register host state before starting output delivery when
+callbacks can observe that state. Disposing a Swing view releases the view's
+resources and binding; it does not close the shared session.
+
+Hosts own clipboard access, terminal-initiated action policy, settings and theme
+resolution, completion I/O, and shell-hook installation. Session shell contracts
+allow host-owned metadata producers; the optional OSC producer is one implementation.
+PTY assembly does not automatically install a shell integration producer.
+
+<a id="testing-doctrine--hermetic-architecture"></a>
+
+## Testing
+
+Tests assert terminal state and exact outbound bytes. Controlled schedulers and
+explicit handshakes cover concurrency and lifecycle; connector fakes exercise
+complete sessions without a local shell. Native PTY tests and external differential
+campaigns have their own opt-in requirements.
+
+See [testkit](ketraterm-testkit/README.md),
+[conformance testing](docs/development/conformance-testing.md), and
+[Contributing](CONTRIBUTING.md) for the relevant commands and validation boundaries.

@@ -1,586 +1,308 @@
 # Completion Module Architecture
 
-`ketraterm-completion` is a suspending completion engine module. It owns
-request/candidate contracts, static command specs, command-line parsing,
-structured parallel source evaluation, ranking, and bounded in-memory learning indexes. It does not own UI popup
-behavior, persistence, shell processes, PTY/session lifecycle, or IntelliJ APIs.
+`ketraterm-completion` turns an immutable command-line request into progressive
+ranked suggestions. It owns semantic parsing, source coordination, ranking, and
+bounded in-memory learning. Hosts own environment access and interaction. Start
+with the [README](../README.md) for construction and a runnable example.
 
 ## Public Surface
 
-`TerminalCompletionMessages` is the host-owned message lookup boundary for generated
-candidate descriptions. Its default facade reads UTF-8 resource bundles for a
-captured display locale and uses English for missing custom keys. Source and engine
-construction resolve static descriptions once; ranking and matching perform no
-message lookup. `TerminalCommandSpecs.defaults(locale)` and its bundle/callback
-overloads prepare localized descriptions and argument labels once while preserving
-canonical tokens and semantic metadata. Hosts keep provider-supplied documentation
-and choose their localization framework. See the [message configuration contract](../../docs/library-configuration.md#optional-host-chrome-and-labels).
+Consumers use `io.github.ketraterm.completion.api` and
+`io.github.ketraterm.completion.model`.
 
-External modules should import only:
+| Contract | Purpose |
+|----------|---------|
+| `TerminalCompletionRequest` | Captured command text, UTF-16 cursor, working-directory URI, profile, and shell capabilities. |
+| `TerminalCompletionContext.resolve` | Public request resolution for custom engines and direct source evaluation. |
+| `TerminalCompletionEngine` | Cold `Flow` of best-first candidate snapshots. |
+| `TerminalCompletionSource` | One suspending provider evaluated against the shared semantic context. |
+| `TerminalCompletionEngines` / `TerminalCompletionSources` | Engine composition and adapters for paths, Gradle tasks, and dynamic values. |
+| `TerminalCommandSpec`, `TerminalOptionSpec`, `TerminalArgumentSpec` | Declarative command grammar and value metadata. |
+| `TerminalCompletionLearningStore` | Bounded learning, immutable snapshots, and host-recorded outcomes. |
 
-- `io.github.ketraterm.completion.api`
-- `io.github.ketraterm.completion.model`
+Candidate replacement offsets address the original request's command line.
+They are inclusive at the start, exclusive at the end, and must preserve UTF-16
+scalar boundaries. The engine filters edits outside the request or not spanning
+its cursor before ranking. `displayText`, `detail`, and `matchedRanges` describe
+presentation; `replacementText` supplies insertion. `TerminalCompletionMatchRanges`
+defensively copies its primitive storage and validates display boundaries.
 
-The `api` package exposes host-facing engines, source factories, request and
-candidate contracts, and one concrete bounded learning store. Product registries
-compose their path and dynamic providers directly and pass the shared learning
-store to the engine. The engine automatically evaluates its
-command specs as one static source, so hosts cannot wire parsing specs and
-static candidates inconsistently. One bounded aggregate owns learning. It
-publishes opaque ranking evidence plus an optional, positive, policy-approved plaintext
-replay projection; learning never becomes a second independent provider vote.
+`feedbackToken` is optional provider-owned runtime context. Fusion preserves the
+chosen presentation candidate's token without interpreting it. Source labels
+and row indices are not provider identities; feedback is not broadcast to
+contributors hidden by deduplication.
 
-`TerminalCompletionMatchRanges` is the immutable primitive-backed display-range
-contract carried by completion candidates. Construction validates ordered,
-non-overlapping UTF-16 scalar boundaries and takes ownership through defensive
-copying at public boundaries; hosts use indexed access when adapting or painting
-to avoid exposing mutable array state.
-
-`TerminalCompletionCandidate.feedbackToken` is optional opaque provider-owned
-feedback context. The engine never interprets it for matching, ranking, or outcome
-grouping. Fusion preserves the chosen presentation representative's complete
-candidate, including its token, while replacing only the fused score. Hosts may
-route interaction feedback using that token; source labels and row indices are
-not provider identities. The engine does not broadcast feedback to contributors
-hidden by outcome deduplication.
-
-`TerminalCompletionSourcePrior` is the single reviewed cold-start policy for
-built-in source families. Standalone and IntelliJ composition use these named
-values instead of maintaining duplicated numeric constants. They remain small
-inputs to evidence fusion and never become a priority-first sorting layer.
-
-The `model` package contains durable public data models that hosts may persist
-or construct:
-
-- `TerminalCommandSpec` and `TerminalOptionSpec`
-- `TerminalPathArgumentKind`
-- `TerminalCompletionValueDomain`
-- `TerminalCommandSpecs`
-- `TerminalCompletionFeedbackKind`
-- `TerminalCompletionRankingStats`
-- `TerminalCommandReplay`
-- `TerminalCompletionLearningSnapshot`
-
-`TerminalCompletionReplayPolicy` is a best-effort conservative plaintext
-eligibility filter, not proof that a command contains no secret. Malformed
-UTF-16 is rejected before any evidence is recorded. For otherwise recordable
-commands, the policy rejects multiline text, ISO controls other than internal
-tabs, more than 4,096 UTF-16 code units, or more than 8,192 UTF-8 bytes. It then
-applies leading-whitespace privacy and a small credential classifier. Those
-well-formed commands may still update ranking through a stable, case-sensitive
-SHA-256 identity, but only successful commands approved by the
-filter can enter retained replay history or the observed-token compiler. Persistence
-rechecks the same eligibility at its storage boundary. The digest is not
-directly decodable, but common command strings can still be guessed and hashed
-for comparison. At request time, plaintext history and observed tokens require
-the recorded profile and canonical working-directory context to equal the
-request context exactly, including null. Unknown replay context is not a
-wildcard. Opaque ranking evidence keeps its existing context fallback.
-
-Model constructors expose durable host-owned fields only. Derived matching
-values, such as lowercase command text, are computed by completion internals
-instead of being caller-owned constructor state. Exact command identity
-preserves the full single-line command, including case, leading whitespace, and
-syntactically meaningful trailing whitespace;
-lowercase values are only for case-insensitive prefix search.
-
-Types used only to tokenize, classify, rank, merge, or index suggestions belong
-in implementation packages and must stay `internal`.
-
-`TerminalCompletionSources.valueDomain(...)` adapts a suspending host loader for one declared
-`TerminalCompletionValueDomain`. It resolves the active spec context through the shared tokenizer, applies the request's
-shell quoting policy, and emits domain-tagged argument candidates. A provider may perform bounded host I/O and must
-cooperate with cancellation. The loader receives the immutable request and resolved context, and owns an independent
-input, visit, or time budget. It returns that complete host-bounded snapshot; matching and the final candidate limit remain
-inside the shared source. A provider may additionally restrict itself to canonical command/subcommand names when a value
-domain has command-specific validity.
-Aggregate host sources that load several provider groups in one operation use
-`TerminalCompletionSources.valueDomainCandidates(...)` to project each already-loaded group through the identical
-matching, quoting, replacement, and scoring policy without constructing nested source adapters per request.
-
-`TerminalCompletionSources.fuzzyPath(...)` accepts one query-aware `TerminalFuzzyPathProvider`. The host receives the
-immutable request and resolved context and returns already matched, relevance-ordered entries within its own query,
-input, visit, or time budget. It never receives the engine's final candidate limit. The shared source applies path-kind,
-hidden-path, replacement, and shell-quoting rules before enforcing that limit, so ineligible early matches cannot hide
-eligible later matches. Providers use the request's captured working-directory URI instead of resampling mutable session
-state. Fuzzy path completion requires typed path text by default; a small, context-specific provider such as Git status
-paths may opt in to empty-prefix suggestions.
-
-`TerminalCompletionSources.gradleTask(...)` follows the snapshot contract as well. The host loader receives the request
-and resolved Gradle context, traverses an imported model under its own visit budget, and returns the complete bounded task
-snapshot. Canonical Gradle matching and the final candidate limit are shared-engine responsibilities.
-
-`TerminalCompletionContext.resolve(request, commandSpecs)` is the public synchronous
-entry point for command-line context resolution. It delegates to the shared internal
-`TerminalCompletionContextResolver`; both the merged engine and custom engines use
-the same tokenizer and semantic analysis. The merged engine resolves once from its
-one command-spec set, then passes
-that same immutable context to every source and the global ranker instead of independently
-guessing command position, subcommand position, option-name position,
-option-value position, positional-argument position, active option metadata,
-expected path kind, expected dynamic value domain, repeatable subcommand source,
-static value candidates, replacement offsets,
-or active quote state from raw command text.
-
-Custom engines resolve once and pass the returned context and the same request to
-stock sources or candidate projectors, without constructing a merged engine. The
-catalog defaults to bundled specs; an explicit empty catalog provides lexical
-context without inferred spec metadata. Partial input produces a partial context,
-and `OPERATOR` signals callers to skip source evaluation. Resolution performs no
-host I/O and owns no scheduling, ranking, source limits, or lifecycle. Context-owned
-command paths, option conflict groups, static candidates, and preceding argument
-collections reject mutation and may be retained across suspension or overlapping
-requests. Spec models remain catalog-owned references; callers keep their nested
-collections unchanged during resolution and while contexts are in use. Internal
-tokenizer/semantic types and the derived-field constructor remain unpublished.
-
-`TerminalCompletionContext.precedingArguments` exposes immutable decoded words
-after the executable and before the active word in the cursor's command segment,
-including subcommands, options and their values. `precedingPositionalArguments`
-and `precedingOptionValues(name)` use the same semantic pass as active-position
-resolution; providers can use preceding repository or cluster selections without
-another parser. Option queries accept declared aliases and retain every occurrence
-in input order, including separate, attached and empty values. Unknown commands
-still expose lexical words, but have no inferred option or positional ownership.
-The active word and later words are excluded even when the cursor is at the active
-word's end. Quotes/escapes follow the request's syntax; no shell expansion occurs.
-After the first `--`, further words (including another `--`) are positional.
-These request-owned collections reject mutation and may survive suspension or
-overlapping requests. Positional count is derived from retained positional values;
-there is no second count or provider-owned AST to keep synchronized.
-
-`SwingTerminal` owns automatic suggestion scheduling under its current binding. Its debounced,
-text-only predicate is deliberately a cheap UX gate: it never tokenizes,
-resolves command specs, or duplicates source eligibility. Context resolution is
-the semantic authority; the merged engine returns an empty result when completion
-is not valid. The scheduler retains the last immutable command snapshot so unchanged
-command state does not repeat provider work. Provider replacement and explicit
-host-context refresh invalidate that deduplication.
-
-`TerminalShellCapabilities` is the single host-to-engine dialect contract. It
-contains `TerminalShellSyntax` for segment lexing and
-`TerminalShellQuotingPolicy` for replacement text. The shared engine never
-infers either capability from command text or a profile id: hosts select the
-tested `POSIX` or `POWERSHELL` capability set from authoritative profile
-metadata, and use `PLAIN` for every shell without an implemented contract.
+`TerminalCompletionMessages` localizes generated descriptions.
+`TerminalCommandSpecs.defaults(locale)` and its bundle/callback overloads
+localize catalog descriptions and argument labels while preserving canonical
+tokens and metadata. Engine and path-source construction resolve static labels;
+parameterized descriptions, such as Gradle task fallback text, may be formatted
+during evaluation. Message providers must be thread-safe. See the shared
+[configuration contract](../../docs/library/configuration.md#optional-host-chrome-and-labels).
 
 ## Internal Implementation
 
-These packages are implementation detail and must not be imported by app,
-workspace, Swing UI, or future plugin code:
+Implementation packages (`commandline`, `engine`, `internal`, `matching`,
+`ranking`, `source`, `spec`, and `stats`) contain internal declarations.
+External modules do not import them.
 
-- `commandline`
-- `engine`
-- `history`
-- `internal`
-- `ranking`
-- `source`
-- `spec`
-- `stats`
+One token pass selects the active command segment, and one context resolver
+uses the engine's command catalog to classify the cursor. The engine shares the
+result with static and host sources and the global ranker. The same catalog
+supplies the static source automatically.
 
-Top-level declarations in those packages should be `internal` unless a product
-decision explicitly promotes a type into `api` or `model`.
+Each request captures one compiled learning-index set before source evaluation.
+The set contains opaque ranking lookup, eligible replay history, and derived
+observed tokens. A snapshot-identity and shell-syntax cache reuses compiled
+indexes across requests. Learning mutations during evaluation affect the next
+request, keeping one request internally consistent.
 
-Implementation files follow the completion request directly. One semantic
-token pass resolves command paths, inherited options, repeatable subcommands,
-option values, and positional arguments for live completion. The merged engine
-captures one compiled learning-index set per request and uses it for positive
-history candidates, observed tokens for unknown commands, and exact ranking
-evidence. All three views therefore observe the same immutable mutation state
-and contribute as one learned source. Ranking compiles directly from opaque
-rows. Replay rows are joined to their matching evidence and tokenized once for
-both history and observed-token indexes. The shared learning store publishes
-immutable split snapshots and owns the identity-aware compiled-index cache.
-Snapshot models remain pure persistence data. One scoring
-policy owns bounded counter math. Global fusion owns
-outcome grouping, explicit score components, semantic relevance,
-representative selection, and deterministic final ordering.
-Public directory path resolution, scan contracts, and bounded scan
-implementations each live in their matching file in `ketraterm-completion-host`.
+### Custom engines and direct source evaluation
+
+`TerminalCompletionContext.resolve(request, commandSpecs)` uses the same parsing
+and spec resolution as the stock engine. A custom engine resolves once and
+passes that context with the original request to `TerminalCompletionSource.complete`
+or `TerminalCompletionSources.valueDomainCandidates`. The default catalog is
+bundled; an empty catalog provides lexical context without inferred command,
+option, or positional metadata.
+
+Resolution performs no host I/O, scheduling, ranking, or caching. Empty, unknown,
+and incomplete lines produce partial contexts. At an `OPERATOR` position,
+callers should skip source evaluation. Custom engines own candidate limits,
+replacement validation, ranking, source concurrency, failure handling, and
+cancellation.
+
+Context-owned collections are immutable and can be retained across suspension
+or overlapping requests. Command specs are referenced rather than deep-copied:
+keep their nested collections unchanged while any context uses them. A new
+catalog for later requests does not invalidate an earlier context.
+
+### Context argument history
+
+Sources can query decoded arguments before the active word without tokenizing
+again. These request-owned immutable values include only the cursor's command
+segment; the active word is excluded even at its end, as are all later words.
+Quotes and escapes follow the captured shell syntax, empty quoted words remain
+empty strings, and no variable, glob, or command expansion occurs.
+
+- `precedingArguments` includes subcommands, option names, values, and `--` in
+  input order. It excludes leading environment assignments and the executable,
+  works for unknown commands, and is empty at command or operator positions.
+- `precedingPositionalArguments` uses the matched spec to exclude resolved
+  subcommands, options, option values, and the terminator. After `--`, words are
+  positional. It is empty for unknown commands; unknown options do not acquire
+  inferred value ownership.
+- `precedingOptionValues(optionName)` returns all completed values for a known
+  option, including repeats, inherited options, and empty values. Any declared
+  alias is accepted using trimmed, case-insensitive spec lookup. Separate and
+  `--name=value` forms share decoded value semantics. Unknown options, valueless
+  flags, pending values, and the active word are excluded. The caller chooses
+  first, last, or all values; no last-value-wins policy is imposed.
+
+### Evaluation and failure behavior
+
+Collection starts a cold structured coroutine flow. The engine evaluates specs
+and retained learning first, then launches one child per host source. Completed
+sources are incorporated serially, and a changed global ranking is emitted
+without waiting for slower sources. Each emission replaces the preceding
+snapshot; unchanged rankings are not emitted again. Normal completion leaves
+the final result available to the caller.
+
+Every source receives an output limit of 256. The engine also bounds each source
+result and returns at most 256 globally ranked candidates per snapshot. These
+are safety limits independent of the number of rows a UI presents. Source
+implementations match, filter, and encode before applying their output limit.
+Their host loaders need separate enumeration or time budgets; the candidate
+limit is not an I/O budget or a request deadline.
+
+Ordinary source exceptions reach `TerminalCompletionSourceFailureHandler` and
+contribute an empty result. Unexpected errors are reported, fail collection,
+and cancel sibling sources. Independent source cancellation contributes an
+empty result; cancelling the request collection cancels all source work.
+Failure handlers may run concurrently and must return promptly without
+throwing. Sources must cooperate with cancellation and must not launch their
+own jobs. A shared engine can evaluate concurrent requests, so host providers
+must safely support that use.
 
 ## Host Ownership
 
-Hosts are responsible for choosing whether and where persistence is enabled. `TerminalCompletionLearningStore` applies
-`TerminalCompletionReplayPolicy` before plaintext enters retained memory and merges its one
-persisted hydration snapshot and accepts live feedback events, but it is not a completion source and never contributes a second visible candidate. Completion components never
-read files, scan raw shell history, spawn shells, or talk to UI frameworks.
+Hosts capture command text and context together, select authoritative shell
+capabilities, and retain the original request while candidates are displayed.
+They cancel obsolete collections and admit edits only against the matching
+editing state. Applying an edit, sending terminal input, and executing a command
+are separate host responsibilities.
 
-Embedding hosts own optional disk I/O. KetraTerm's products use the separate,
-product-only `ketraterm-completion-persistence` module. Its
-`TerminalCompletionLearningCoordinator` owns the product's fixed-path lifecycle. Learning mutates its bounded in-memory
-store synchronously; one conflated worker hydrates once, observes last-value enablement, and checkpoints the latest dirty
-snapshot every 30 seconds. The file store persists opaque evidence and only
-positive, policy-approved replay rows, rechecking replay eligibility before encoding. It
-talks directly to one bounded file store and forces the final dirty write during shutdown. A user-requested reset clears
-the shared in-memory store synchronously, supersedes any in-flight hydration, and sends an immediate empty replacement
-through that same worker even when routine persistence is disabled.
-There is no runtime path switching, repository lifecycle, separate writer, control actor, or arbitrary flush barrier.
-Product hosts own the fixed destination, enablement policy, one load-failure diagnostic callback, and a bounded
-shutdown durability budget. If final Java NIO does not finish within that budget, the host cancels its persistence
-scope and stops waiting; the timeout is not presented as an interrupt guarantee for the filesystem operation.
-Completion persistence is not a workspace responsibility.
+Environment-specific providers may perform bounded suspending I/O. They use the
+request's captured working directory rather than resampling mutable session
+state. Blocking APIs need an appropriate dispatcher; normal absence or
+unsupported context may return no matches, while operational failures propagate
+to the engine's diagnostic boundary.
 
-The standalone app and IntelliJ plugin should compose completion sources through
-`TerminalCompletionSources` and `TerminalCompletionEngines`, then adapt returned
-candidates to their own UI presentation.
+See the [module guide](../Module.md#integration-boundaries) for host adapters.
 
-The pure engine is also usable directly by any other UI or headless caller.
-Swing request interaction and terminal edit admission remain in their owning
-modules; they are not requirements for source evaluation or learning.
+### Learning and privacy
 
-The public API should not grow by convenience. New public functions must be
-durable host contracts, used by standalone/plugin integration, or explicitly
-documented persistence/model contracts.
-Kotlin `internal` visibility and Gradle module dependencies enforce the
-implementation boundary. Do not recreate source-scanning architecture tests or
-mirror permitted declarations in a second manual allowlist. Public constructors
-and methods must document parameters/properties, return values, observable
-failure behavior, ownership, threading, and I/O expectations where those
-concepts apply.
+`TerminalCompletionLearningStore` serializes mutations around one bounded exact
+aggregate; its default capacity is 2,048 rows. Published snapshots are immutable
+and retain identity while their contents are unchanged. `mergeSnapshot` adds
+aggregate events with saturating counters; merging the same event set twice
+would count it twice. Hosts control hydration and persistence.
+
+Learning has two representations:
+
+- Opaque ranking evidence uses a case-sensitive SHA-256 command identity and
+  retains execution and explicit accepted/dismissed feedback statistics.
+- Plaintext replay supplies history and observed-token candidates only for
+  successful commands approved by `TerminalCompletionReplayPolicy` and the
+  store's optional host `replayFilter`.
+
+`TerminalCompletionLearningStore()` and its capacity overload use the built-in
+policy alone. The constructor accepting `replayFilter: Predicate<String>` adds
+a restriction for execution admission and imported replay rows. Returning
+`false` for every command disables plaintext replay while preserving opaque
+evidence; returning `true` cannot bypass the built-in policy.
+
+The filter runs synchronously outside the store lock, only after built-in
+approval. It may run concurrently and must be thread-safe and consistent for
+the store's lifetime. Exceptions propagate before the recording or merge
+operation mutates evidence. Admission filtering does not retroactively remove
+retained rows. `clear()` removes all retained evidence and replay while
+preserving the configured filter and capacity.
+
+Blank, multiline, or malformed UTF-16 command events are ignored. Plaintext
+eligibility additionally limits text to 4,096 UTF-16 code units and 8,192 UTF-8
+bytes, rejects ISO controls other than internal tabs, respects leading-space or
+tab privacy, and applies a conservative credential classifier. Approval cannot
+prove that text contains no secret. Opaque identities also allow guessed common
+commands to be checked by hashing; they are not an anonymity guarantee.
+
+Replay history and observed tokens require the recorded profile and canonical
+working directory to equal the request context, including null. Unknown context
+is not a wildcard. Directory canonicalization trims surrounding whitespace and
+normalizes a trailing slash; it does not resolve filesystem aliases. Opaque
+ranking evidence may fall back from exact context to directory-only,
+profile-only, and global evidence.
+
+Suggestion feedback never creates replay rows. Explicit dismissal supplies
+negative evidence; passive closure and rejected editing attempts should not be
+recorded as dismissal. Successful command executions are the authority for
+replay. Hosts choose whether to collect data and where to persist it.
 
 ## Command-Line Context Policy
 
-Completion treats trailing space as a semantic boundary. With the cursor inside
-`cd`, sources complete the command token. With the cursor after `cd `, sources
-complete a new empty argument at the cursor. Matching learned commands are
-projected to that argument, so `cd IdeaProjects/KetraTerm/` is presented and
-inserted as `IdeaProjects/KetraTerm/`; the executable is not repeated in the
-popup. A full command is retained only when the executable itself is active;
-history rows that cannot be projected safely into the active context are not
-offered.
+Hosts choose `TerminalShellCapabilities.POSIX`, `POWERSHELL`, or `PLAIN`; the
+engine does not infer syntax from command text or profile ids. These are
+completion lexical and replacement contracts, rather than full shell parsers.
 
-The learning compiler derives a bounded observed-token index from successful,
-policy-approved replay rows for executables that have no static `TerminalCommandSpec`. Commands
-such as `abc de -g`, `abc de -f`, and `abc as` can therefore offer `de` and
-`as` after `abc `, and `-g`/`-f` after `abc de `. These are `ARGUMENT`
-candidates labeled as learned observations, not inferred subcommands or a
-claimed command grammar. The index learns only the first non-option token after
-an unknown executable and option names; it never learns later positional values
-or option values. It is a derived view of replay rows joined to opaque evidence,
-not a second mutable or
-persisted learning family.
+| Capability | POSIX | PowerShell | Plain fallback |
+|------------|-------|------------|----------------|
+| Command separators | `;`, `&`, `&&`, `\|`, `\|\|` | `;`, `&&`, `\|`, `\|\|` | None inferred |
+| Escape outside single quotes | Backslash | Backtick | Backslash tokenization |
+| Quote recovery | Single and double quotes | Single and double quotes, including doubled quotes | Conservative tokenization |
+| Unsafe unquoted replacements | POSIX escaping | Single-quoted literals | Omitted |
 
-For supported POSIX and PowerShell syntax, the tokenizer uses one bounded
-single-pass lexical scan per merged-engine request to select the cursor's
-command segment. Operators inside quotes or escaped by the dialect do not split
-segments. A cursor at the start of an operator belongs to the left segment; a
-cursor inside a multi-character operator is an `OPERATOR` region and returns no
-candidates; a cursor after the operator belongs to a new right segment.
-Unclosed quotes and incomplete command lines remain tokenizable and resolve to
-their closest logical segment. Learned-history candidates are suppressed in
-segments following an operator until segment-local history ownership is
-implemented; replacing across an operator boundary is never inferred.
+Operators inside quotes or escaped by the selected dialect do not split
+segments. The start of an operator belongs to the left segment; the interior of
+a multi-character operator is an `OPERATOR` region with no candidates; after
+the operator, completion starts a right segment. Incomplete quotes remain
+tokenizable. Learned candidates are suppressed in segments following an
+operator.
 
-The exact shell option terminator `--` is a command-context boundary once the
-cursor has moved beyond the token, such as after a following space. While the
-cursor remains attached to `--`, it is a long-option prefix and may suggest
-options such as `--help`. Tokens after a passed terminator remain positional: they do
-not resolve as options, option values, or subcommands, and static spec option
-completion stops. An incomplete prefix such as `--v` remains an option prefix
-until the terminator token has been passed.
+Trailing whitespace starts a new argument. Completing `cd` targets the command;
+completing `cd ` targets an empty argument. A learned `cd project/` is projected
+as `project/` in that argument context. History entries that cannot be projected
+safely are omitted.
 
-Path completion is intentionally conservative. In command position it only
-returns candidates for explicitly path-like prefixes. In argument position it
-returns bare current-directory entries only when the resolved
-`TerminalCommandSpec` or `TerminalOptionSpec` declares path metadata through
-`TerminalPathArgumentKind`. Directory-changing commands such as `cd`, `chdir`,
-`pushd`, and PowerShell `Set-Location` aliases receive directory-only
-candidates, while commands such as `git add` and `kubectl apply` may request
-file-or-directory candidates. Dot-prefixed entries are hidden for an empty path
-prefix and appear once the user types `.` by default. Command positional and
-option path metadata may instead set `TerminalHiddenPathPolicy.INCLUDE` to
-always expose hidden entries, or `EXCLUDE` to keep them hidden even after a dot
-prefix. When the active path token begins
-with a quote, path candidates replace the whole token with a matching quoted
-replacement instead of dropping the quote. Unquoted path replacements are
-escaped according to `TerminalCompletionRequest.shellCapabilities.quoting`.
-POSIX uses backslash escaping, PowerShell uses single-quoted literals where
-escaping is necessary, and `PLAIN` omits replacements that would require
-dialect-specific escaping. Existing single- and double-quote styles are
-preserved when that style can safely represent the candidate.
+The exact `--` token ends option and subcommand resolution after the cursor has
+passed it. While the cursor remains attached to `--`, it is still an option
+prefix. Later tokens are positional. Attached option values such as
+`--output=text` replace only the value after `=` and share the separate-value
+context used by `--output text`.
 
-In command position, an existing path candidate whose replacement resolves to
-a declared top-level command alias is presented with that specification's
-command kind and description. The path source remains the existence authority
-and retains its ranking contribution; the specification supplies semantic
-presentation only. Raw and shell-encoded alias spellings are indexed when the
-engine is created, so this enrichment does not re-tokenize candidates or probe
-the filesystem.
+Specifications describe static values through `valueCandidates`, host-loaded
+values through `TerminalCompletionValueDomain`, and paths through
+`TerminalPathArgumentKind`. An active option's value metadata is authoritative,
+including `NONE`; it does not fall back to positional metadata.
+`positionalArguments` takes precedence over scalar positional fields and can
+declare an optional argument or a variadic final argument.
+`exclusiveGroupIds` suppresses conflicting completed options before the cursor.
+`repeatableSubcommands` models sibling task values such as `gradle clean build`.
 
-Path interpretation is host-owned. The pure source emits a
-`TerminalDirectoryListingRequest` containing the authoritative working-directory
-URI, a transport-neutral lexical directory prefix, and the active entry-name
-prefix. It does not discard URI authorities, expand `~`, or interpret drive and
-UNC roots. Hosts must reject remote authorities they cannot map safely and
-return bounded results from a suspending provider that cooperates with request
-cancellation.
+Path sources activate for explicit path-like command prefixes or declared path
+arguments. The expected path kind filters entries; `TerminalHiddenPathPolicy`
+controls dot-prefixed entries. Its default hides them for an empty prefix and
+reveals them after a leading dot. Shell quoting preserves an existing quote
+style when safe and uses the request's replacement policy otherwise.
 
-Live trigger policy is a cheap presentation check, not a second completion
-parser. A small non-whitespace threshold plus common trigger characters keeps
-typing responsive, while the merged engine parses once and suppresses invalid
-operator, command, option, path, and value-domain requests authoritatively.
-
-`SwingTerminal` debounces automatic refreshes on the EDT and owns their observation
-under the current session binding. Hosts configure a provider with
-`setShellSuggestionProvider` before or after binding; it survives rebinding, while
-active requests and observation follow the bound session, settings, and disposal.
-No separate completion binding or observer attachment is required. Automatic targets
-installed with `setShellSuggestionTarget` receive one captured
-`SwingShellSuggestionInteraction`; they do not recapture the editing context at
-acceptance. The interaction owns the original command request, captured edit
-handler, complete immutable `SwingShellSuggestionSnapshot`, selection, admission,
-feedback, and closure. Selection updates share the publication's candidate
-storage. UI gestures retain their publication so stale row indices cannot act on
-a newer ranking.
-
-`SwingShellSuggestionEditTarget.capture(request)` and
-`SwingShellSuggestionProvider.open(request)` run cheaply on the EDT before
-provider work starts. Opening returns a `SwingShellSuggestionSource` pairing its
-cold progressive flow with its request-specific observer. The default `open`
-defers invocation of `suggestions(request)` until collection off the EDT. The
-terminal collects in an interaction-owned child scope, conflates progressive
-snapshots, and publishes on the EDT. Each interaction accepts one provider
-collection. Supersession, input, invalidation, rebinding, and disposal close
-obsolete interactions and cancel collection; late publications are declined.
-Normal stream completion preserves a usable final publication.
-
-Presentation is platform-owned and independent of collection.
-`SwingTerminal.presentShellSuggestions` mounts the optional embedded view;
-`requestShellSuggestions(interaction, provider)` only opens and collects the
-source. Hosts can publish their own candidates or use the existing provider with
-a detached window, popup, or panel consuming the same full interaction snapshot.
-The default Swing view uses a `JList`; the IntelliJ plugin owns a separate native
-`JBList`. Their embedded adapters consume bounded
-`SwingShellSuggestionViewSnapshot` windows with authoritative display text,
-detail, source label, accent role, match ranges, and overflow metadata. Detached
-presentation owns its viewport and placement directly. The Swing adapter maps
-stable source identities through one private exact display-label table; unknown
-identities use a bounded human-readable fallback. Renderers do not reparse
-engine kinds or provider identifiers.
-
-Acceptance returns an explicit `SwingShellSuggestionAcceptanceResult` from the
-configured editing authority. The session-backed target captures its versioned
-editing capability before source work and uses final atomic conditional
-admission. `ACCEPTED` describes admission, not transport completion or shell
-execution. Request feedback distinguishes admitted acceptance, rejected
-attempts, and explicit dismissal. Rejection and passive closure do not change
-learning. `SwingShellSuggestionProvider.open` captures the source and paired host
-observer together, so replacement cannot reroute feedback to another provider runtime.
-Normal terminal requests capture editing from the actual bound session; custom
-editors pass an explicit request-scoped edit target. The optional feedback observer
-on `SwingCompletionSuggestionProvider` is captured with the source, along with an
-immutable host-context snapshot taken synchronously on the EDT. Engine work starts
-only on collection. Direct `suggestions` callers capture metadata in their own
-calling thread. The adapter preserves candidate feedback tokens independently of
-that metadata. Feedback routing and privacy remain
-host-owned; completion sources never own UI callbacks or terminal state.
-
-Static bounded option domains belong in `TerminalOptionSpec.valueCandidates`.
-Examples are output formats, log levels, or other values that are stable and do
-not require host I/O. Dynamic domains are declared with
-`TerminalCompletionValueDomain` through `TerminalOptionSpec.valueDomain`,
-`TerminalCommandSpec.positionalArgumentValueDomain`, and
-`TerminalCompletionCandidate.valueDomain`. Git branches, Docker contexts,
-Kubernetes namespaces, IDE run configurations, project files, or indexed symbols
-must still come from host-owned providers; the shared module only models and
-ranks those values.
-
-Options that require a value support both separate and attached forms. For
-example, `aws --output text` and `aws --output=text` resolve to the same option
-value context. Attached completion replaces only the text after `=`, preserving
-the option name and separator. This applies to static values, path values, and
-host-provided dynamic domains; a quoted attached path value preserves its quote
-style through the normal path replacement policy.
-
-Task-style CLIs that accept several sibling command values on one line should
-set `TerminalCommandSpec.repeatableSubcommands`. Gradle is the built-in example:
-after `./gradlew clean bu`, the context remains attached to the root Gradle
-task set and the spec source can suggest `build` while omitting already-used tasks such as `clean`. A host may add a
-suspending Gradle-task source for the same context. It completes imported root tasks, canonical module tasks such as
-`:app:run`, and short names after `-p app` or `--project-dir app`; `-p`
-uses a project directory, not a Gradle colon path.
-
-`TerminalOptionSpec.exclusiveGroupIds` models mutually exclusive option sets
-without coupling one option to another option name. Once a completed option
-before the cursor claims a group, spec completion suppresses every option that
-claims that group. Aliases resolve to the same option and therefore claim the
-same groups.
-
-`TerminalArgumentSpec` models ordered positional arguments. It supports static
-value candidates, path and dynamic-domain metadata, optional arguments, and a
-variadic final argument that applies to every remaining positional token.
-`TerminalCommandSpec.positionalArguments` takes precedence when present; the
-scalar positional fields remain the fallback for compact specs.
+For an unknown executable, approved replay can derive the first non-option
+argument and option names as observed `ARGUMENT` candidates. It does not infer a
+command grammar, later positional values, or option values. Those tokens are
+compiled from replay and are not a separate persisted learning family.
 
 ## Host Dynamic Providers
 
-Reusable local-path resolution and bounded directory-scanning machinery belongs to `ketraterm-completion-host`; it
-may perform bounded host work but does not parse, rank, prioritize, or schedule completion candidates. Standalone
-and IntelliJ retain only environment-specific suspending loaders and scanners. There is no snapshot service, TTL,
-publication callback, refresh-after-publication pass, semaphore, or provider-owned job. Blocking local filesystem access
-moves to an injected IO dispatcher.
-Enumeration has visit, result, and elapsed-time caps. The defaults (8,192 visited entries, 256 matches, and a 50 ms scan
-budget) are an explicit desktop baseline covered by JMH directory-scan benchmarks; change them only with representative
-local and remote-filesystem measurements.
-The direct local NIO scanner performs one bounded scan per request and retains no
-directory cache. IntelliJ's project-VFS scanner alone may retain one replace-only
-raw snapshot when its directory URL, VFS modification stamp, and project-roots
-modification count still match. That VFS snapshot is capped at 8,192 sorted
-entries and filtered per prefix to at most 256 source candidates. Incomplete,
-cancelled, failed, or version-changing VFS scans are never cached. There is no
-TTL, refresh callback, worker, or merged-candidate cache.
-`runInterruptible` makes local directory scans cooperatively interruptible. The app resolves
-local and `localhost` file URIs, explicit home paths,
-Windows drive roots, and Windows UNC roots while rejecting non-local OSC 7 authorities. The IntelliJ plugin uses
-write-allowing suspending read actions for project-aware VFS queries and bounded local scanning elsewhere. One Git
-source selects the repository for the terminal working directory and reads local branches, remote branches, and tags in
-one IntelliJ read action. Local branches apply to `git switch`, `checkout`, `merge`, and `rebase`; remote branches and
-tags apply to `checkout`, `merge`, and `rebase`, so `git switch` remains local-branch-only.
-Whole-project fuzzy paths use a prefix-keyed suspending query through IntelliJ's Go to File model and item provider.
-IntelliJ owns indexed discovery, fuzzy matching, path qualification, and result ordering; the plugin only converts PSI
-items into shell-facing paths, while the shared source applies terminal path semantics. These queries use IntelliJ's
-suspending `readAction`, so pending write actions restart the read without a blocking-context bridge. Fuzzy paths activate only in declared or
-explicitly path-like terminal positions, while direct directory completion remains higher priority for immediate
-children. Changelists, SDKs, and run configurations remain follow-up work. IntelliJ also reads its already-imported Gradle external-system
-model into a bounded task result; it never starts Gradle from a completion request. Every IntelliJ loader uses the
-working-directory URI captured in that immutable request. A separate Git status loader
-supplies changed and
-untracked paths for `git add`, `restore`, `rm`, and `diff` without starting a Git process.
+`TerminalCompletionSources` supplies adapters with distinct loader contracts:
 
-IntelliJ dynamic completion is composed from ordinary source-producing functions and explicit prioritized source
-entries. There is no provider-factory or registration framework. Each product completion registry composes its
-providers with the shared learning store, maps host events into the learning coordinator, and
-owns the persistence shutdown boundary, so completion files are never loaded on the Swing event-dispatch thread.
+| Factory | Host supplies | Shared source supplies |
+|---------|---------------|------------------------|
+| `path` | Bounded matching directory children for a lexical request. | Path eligibility, quoting, replacement, and local ranking. |
+| `fuzzyPath` | Already-matched, relevance-ordered entries from a bounded query. | Terminal path rules and final output limit. |
+| `gradleTask` | Complete host-bounded task snapshot. | Gradle matching, project scoping, replacement, and limit. |
+| `valueDomain` | Complete host-bounded values for the declared domain. | Matching, quoting, replacement, and limit. |
 
-The engine-to-Swing request/candidate bridge and Swing-feedback-to-statistics mapping live in `ketraterm-ui-swing-host`.
-Product hosts inject context, privacy, and persistence policy instead of copying the vocabulary conversion
-logic. Automatic Swing scheduling belongs to the terminal component.
+Fuzzy providers own fuzzy matching; Gradle and value-domain providers leave
+matching to the shared source. These loaders receive the immutable request and
+resolved context, not the engine's output limit. They require an independent
+visit, input, result, or time budget. A Gradle loader reads its available model;
+completion must not start Gradle to discover tasks.
 
-Standalone owns one stateless completion engine and local-filesystem provider per application registry. Each pane
-adds only its request-context supplier and source feedback observer.
+`valueDomainCandidates` projects already-loaded groups for aggregate providers
+without constructing a nested adapter per request. Optional canonical command
+restrictions narrow a provider's validity. Fuzzy paths require typed path text
+by default; a context-specific provider can permit an empty prefix.
 
-Both hosts should map their data into the shared request/candidate/source
-contracts and let the shared engine resolve outcomes, fuse provider evidence,
-deduplicate, and rank candidates.
-`ketraterm-completion` must stay pure: it should not shell out to Git, read IDE
-indexes, watch files, or block on host I/O.
-
-Learned events mutate one bounded exact aggregate and publish its immutable split snapshot lazily on the next completion,
-persistence, or explicit snapshot read. Multiple events before that read therefore avoid rebuilding the full row
-list. No-op or rejected events retain the current snapshot identity. There is no
-second row-snapshot cache inside the mutable index.
-
-On first use of a snapshot identity and shell syntax, one compiler tokenizes
-each replay row once and feeds that parsed context to the positive-history
-prefix index and observed-token index. The direct ranking lookup consumes only
-opaque evidence and never requires plaintext. A completion request
-captures that index set once before source evaluation and uses it throughout the
-request even if learning mutates while sources run. One flat syntax-indexed cache
-reuses the result for subsequent requests. History lookup groups rows
-by exact canonical host context and normalized tokens before the active position,
-then binary-searches the active token prefix. Observed-token success counts are
-retained per exact host context, so neither visibility nor score can borrow
-evidence from another profile or directory. A hot request does not rescan the
-bounded 2,048-row snapshot.
-
-The standalone host currently maps PowerShell to `POWERSHELL`, its tested
-POSIX-profile categories to `POSIX`, and Command Prompt, Fish, Nushell, and
-unknown profiles to `PLAIN`. Native shell completion callbacks and dialect
-adapters remain host-owned future work; they must supply authoritative
-replacement ranges and never be called from the shared completion hot path.
-
-The compatibility contract is deliberately explicit:
-
-| Capability                   | POSIX                                 | PowerShell                                  | Plain fallback                        |
-|------------------------------|---------------------------------------|---------------------------------------------|---------------------------------------|
-| Command separators           | `;`, `&`, `&&`, `\|`, `\|\|`          | `;`, `&&`, `\|`, `\|\|`                     | none inferred                         |
-| Escape outside single quotes | backslash                             | backtick                                    | backslash tokenization only           |
-| Quote recovery               | single and double                     | single and double, including doubled quotes | conservative tokenization             |
-| Safe unquoted path escaping  | backslash                             | single-quoted literal                       | only values needing no dialect escape |
-| Native shell callbacks       | host-owned, not invoked synchronously | host-owned, not invoked synchronously       | unavailable                           |
-
-Command Prompt, Fish, Nushell, and unknown dialects remain on the plain
-fallback until each has a tested lexical and quoting contract. This avoids
-silently applying POSIX rules to incompatible shells.
+Direct path requests preserve a lexical directory prefix and the authoritative
+working-directory URI. Hosts interpret home, drive, UNC, and authority semantics
+and reject locations they cannot safely map. The completion engine does not
+probe filesystems or turn remote authorities into local paths.
 
 ## Ranking Policy
 
-The merged engine ranks each provider locally, projects every candidate onto the
-command it would produce, and groups source-independent outcomes. Shell quoting
-is tokenized away for comparison. Declared path values additionally ignore only
-a redundant trailing separator, allowing `cd build`, `cd build/`, and a safely
-quoted equivalent to share evidence without resolving `..`, symlinks,
+Sources rank locally before global fusion. Source-local numeric scores are not
+compared across providers. The global ranker projects candidates onto the command
+they produce, groups equivalent outcomes, and combines each distinct source's
+best local rank using reciprocal-rank fusion. Duplicate rows from one source do
+not multiply support. `TerminalCompletionSourceEntry.priority` contributes a
+small prior clamped to `[-20, 20]`; named `TerminalCompletionSourcePrior` values
+provide the shared baseline for built-in source families.
+
+Outcome comparison accounts for shell quoting. Declared path values also ignore
+a redundant trailing separator; it does not resolve `..`, symlinks, URI
 authorities, environment variables, or filesystem case.
 
-Provider support uses reciprocal-rank fusion. Candidate scores are meaningful
-only within their producing source; a learned score is never compared numerically
-with a path or specification score. Each distinct semantic or learned source
-entry contributes its best local rank for an outcome and a source prior clamped to
-`[-20, 20]`. Exact learning evidence does not constitute another source entry,
-so one learned command cannot gain a second provider vote from its ranking row.
-Duplicate candidates from the same source do not multiply support.
+Semantic context and bounded exact learning evidence adjust the fused result.
+Failed executions do not penalize ordering. Ranking evidence never becomes an
+extra provider vote. Learned candidates act as a fallback, allowing live semantic
+providers to supply presentation while matching learned evidence strengthens
+the same outcome.
 
-The global ranker applies the strongest semantic adjustment among contributors.
-Exact outcome statistics then add bounded execution usage, accepted/dismissed
-feedback, recency, profile, and working-directory evidence. Nonzero command
-exits never penalize ordering. Only explicit dismissal is negative; passive
-popup closure is neutral. Popup feedback never creates replay history.
-
-The edit representative favors semantic fit, a narrow replacement range, the
-bounded prior, local rank, and stable declaration order. Presentation selection
-cannot change that edit. The engine marks its derived learned batch as an
-internal fallback and applies a small bounded penalty, increased for path edits
-where live filesystem results are authoritative. Among contributors with an
-identical edit, non-learned metadata wins after semantic fit and before the
-ordinary prior and stable tie-breakers. The selected contributor supplies the
-complete candidate atomically; the engine never mixes display text, match
-ranges, detail, kind, or source labels from different candidates. Learned
-evidence still strengthens matching specification or provider outcomes, and
-unique learned outcomes remain visible. This fallback policy is not a public
-source role or host configuration surface.
-
-Returned candidate scores are the fused global score. Final ordering continues to
-use the edit representative, so presentation ownership cannot change ranking.
-Ordering and all tie-breakers are deterministic.
-
-Source safety and presentation are independent. Every source receives a fixed
-256-candidate output budget. Sources apply it only after their owned matching, eligibility, and encoding rules.
-Fuzzy-path, Gradle-task, and value-domain host loaders do not receive that count; they use explicit independent query,
-input, visit, history, or time budgets. Fuzzy-path providers return ready ordered matches, while Gradle-task and
-value-domain providers return complete host-bounded snapshots for shared matching. There is no universal deadline or
-provider-budget protocol. The engine globally fuses the complete bounded
-union and has no popup-size parameter; the Swing controller alone presents an
-eight-row sliding viewport across the ranked snapshot. The snapshot also carries
-absolute overflow metadata so each physical renderer can expose range and scroll
-position without gaining access to ranking state.
-
-Source collection uses one cold structured `channelFlow`. The engine parses
-once, resolves one context, evaluates its internal spec source directly, launches
-one child per host source in a regular coroutine scope, and serially incorporates
-completed-source events in the parent. Each changed
-global ranking is emitted immediately, so a slow Git or index source cannot
-block a fast spec, learned, or direct-path result. Individual sources remain
-ordinary suspending functions and never own scopes or child jobs. Non-cancellation source failures are reported through
-`TerminalCompletionSourceFailureHandler`: ordinary exceptions contribute an empty result, while unexpected errors
-fail collection and cancel siblings. Independent source cancellation contributes an empty result even if the child
-has cancelled its own job; the channel reserves one result slot per source so accounting never needs to suspend.
-Request cancellation reaches every child. Source declaration order remains the deterministic final-fusion tie-breaker.
-Host adapters therefore propagate operational failures, including abnormal filesystem access, through their source.
-Only normal absence or unsupported host context becomes an empty provider result; adapters do not duplicate diagnostic
-callbacks or silently convert failures into "no matches."
+The edit representative favors semantic fit, narrower replacement ranges, the
+source prior, local rank, and stable tie-breakers. Presentation selection can
+choose only a contributor with the same edit. Its complete candidate metadata,
+including `feedbackToken`, is preserved together; the engine replaces only its
+score with the fused global score. Presentation selection does not change the
+admitted edit or final ordering. Ordering is deterministic for the same request,
+source results, learning snapshot, and evaluation time.
 
 ## Ranking Calibration
 
-Ranking constants are policy, not universal truth. Changes to priors, smoothing,
-recency buckets, or evidence clamps must pass the deterministic representative
-replay in `CompletionRankingReplayTest`. The replay reports top-one rate,
-top-three rate, and mean reciprocal rank for accepted outcomes covering paths,
-Git branches, and imported Gradle tasks. New anonymized failure cases should be
-added before tuning a weight so calibration cannot optimize only one provider.
+Use `CompletionRankingReplayTest` as the deterministic gate for changes to
+priors, recency, smoothing, and evidence clamps. Its representative path, Git,
+and Gradle cases check top-one rate, top-three rate, and mean reciprocal rank.
+Add anonymized failure cases before changing weights.
 
-Performance changes must also run `TerminalCompletionBenchmark`. The benchmark
-includes eight-provider fusion, 2,048 learned rows, duplicate-heavy evidence,
-hostile collection-cap input, and a real learned-history lookup backed by the
-full snapshot. The learned-history case is prewarmed deliberately: it
-measures the normal learning-store-owned compiled-index cache hit, while index
-construction stays bounded to first use of a new snapshot or shell syntax.
+Performance changes should compare `TerminalCompletionBenchmark` workloads in
+`ketraterm-benchmarks`. They include multi-provider fusion, duplicate-heavy
+evidence, hostile output bounds, and learned history backed by a full snapshot.
+The prewarmed history case measures the compiled-index cache hit; first-use
+compilation is separate work.

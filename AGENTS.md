@@ -8,6 +8,8 @@ cross-project boundaries; module guides own local implementation detail.
 
 ## Layer ownership
 
+- `ketraterm-bom`: version alignment for published libraries and entry points.
+- `ketraterm-headless` and `ketraterm-swing`: dependency-only library entry points.
 - `ketraterm-protocol`: dependency-free shared protocol vocabulary.
 - `ketraterm-parser`: bytes to semantic commands, including UTF-8, ANSI state
   machines, CSI/OSC/DCS, charsets, and grapheme assembly.
@@ -89,7 +91,7 @@ Prefer the smallest design that satisfies current behavior:
 - Public APIs need useful KDoc. Remove stale compatibility surfaces and comments;
   do not add comments that merely restate code.
 
-Supported behavior lives in `docs/terminal-feature-map.md`; deferred and
+Supported behavior lives in the catalogs indexed by `docs/terminal-feature-map.md`; deferred and
 policy-gated behavior lives in `docs/terminal-feature-gap-map.md`.
 `AGENTS.md` files define stable ownership, invariants, and local workflow only.
 
@@ -108,7 +110,31 @@ Tests assert terminal semantics, not implementation quirks. For behavior changes
 - Leave no silent no-ops, unrelated formatting churn, or architecture drift.
 
 Useful entry points: `ketraterm-core/docs/terminal-core-contract.md`,
-`docs/agent-skills.md`, and the touched module's `AGENTS.md`.
+`.agents/skills/`, and the touched module's `AGENTS.md`.
+
+## Documentation
+
+Use `docs/README.md` as the documentation index. Root `docs/features/` contains
+capability catalogs, `docs/library/` cross-module embedding guides,
+`docs/reference/` protocol and storage references, and `docs/development/`
+contributor guides. Keep module-specific contracts beside their owning module.
+
+Keep these document roles distinct:
+
+- `AGENTS.md`: instructions for AI agents working in this directory—orientation,
+  editing boundaries, invariants, and required checks.
+- `Module.md`: technical module reference—dependencies, packages, components,
+  and their relationships.
+- `README.md`: module overview—purpose, when to use it, setup, typical usage,
+  and relevant customization.
+- Module `docs/`: detailed contracts and guides that need more depth.
+
+Verify Markdown examples against current APIs, source, and tests. Use `{version}`
+in dependency examples. Link shared contracts rather than repeating them, and
+preserve useful incoming links and released changelog history.
+
+Documentation-only changes need link checks and appropriate example compilation;
+they do not require new behavior tests or a graph rebuild.
 
 ## Graphify
 
