@@ -1,0 +1,33 @@
+name: Check website
+
+on:
+  pull_request:
+    paths:
+      - 'website/**'
+      - 'ketraterm-app/src/main/resources/io/github/ketraterm/app/icons/logo.svg'
+      - '**/*.md'
+      - '.github/workflows/*website*'
+      - '.github/workflows/deploy-docs.yml'
+      - '.github/workflows/publish-binaries.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: website/package-lock.json
+      - run: npm ci --ignore-scripts
+        working-directory: website
+      - run: npm test && npm run format:check && npm run build && npm run check:links
+        working-directory: website
+        env:
+          GITHUB_TOKEN: ${{ github.token }}

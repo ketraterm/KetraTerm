@@ -1,0 +1,131 @@
+/*
+ * Copyright 2026 Gagik Sargsyan
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+#navigation-wrapper .library-name--link::before {
+  background-image: url("./logo.svg");
+}
+.ketraterm-api-navigation {
+  display: flex;
+  flex: none;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 16px;
+  padding: 8px 24px;
+  border-bottom: 1px solid #34424d;
+  background: #10161b;
+  color: #eef3f6;
+  font:
+    500 14px/1.4 system-ui,
+    sans-serif;
+}
+.ketraterm-api-navigation a {
+  display: inline-flex;
+  align-items: center;
+  box-sizing: border-box;
+  min-height: 40px;
+  border-radius: 5px;
+  color: #eef3f6;
+  text-decoration: none;
+}
+.ketraterm-api-navigation a:hover {
+  background: #1a232b;
+}
+.ketraterm-api-navigation a:focus-visible {
+  outline: 2px solid #58df86;
+  outline-offset: 2px;
+}
+.ketraterm-api-navigation .ketraterm-api-brand {
+  gap: 8px;
+  padding: 0 4px;
+  font-weight: 750;
+  font-size: 16px;
+  white-space: nowrap;
+}
+.ketraterm-api-brand img {
+  flex-shrink: 0;
+  width: 28px;
+  height: 28px;
+}
+.ketraterm-api-products {
+  display: flex;
+  gap: 2px;
+  padding: 2px;
+  border: 1px solid #34424d;
+  border-radius: 8px;
+}
+.ketraterm-api-products a {
+  padding: 0 12px;
+}
+.ketraterm-api-products [aria-current] {
+  color: #58df86;
+  background: #58df861a;
+}
+.ketraterm-api-reference {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  min-width: 0;
+  margin-left: auto;
+}
+.ketraterm-api-reference span {
+  color: #aab7c1;
+  overflow-wrap: anywhere;
+}
+.ketraterm-api-reference a {
+  flex-shrink: 0;
+  padding: 0 8px;
+}
+#navigation-wrapper .library-version:empty {
+  display: none;
+}
+#main p {
+  overflow-wrap: anywhere;
+}
+@media (max-width: 899px) {
+  #navigation-wrapper {
+    flex-wrap: nowrap;
+  }
+  #navigation-wrapper .navigation-controls--break {
+    display: none;
+  }
+  #navigation-wrapper .library-name--link {
+    margin-right: 0;
+    font-size: 14px;
+  }
+  #navigation-wrapper .library-name--link::before {
+    display: none;
+  }
+  #navigation-wrapper .navigation-controls {
+    flex-grow: 0;
+    margin-left: 0;
+    background: transparent;
+  }
+}
+@media (max-width: 600px) {
+  .ketraterm-api-navigation {
+    gap: 4px 12px;
+    padding: 8px 12px;
+  }
+  .ketraterm-api-reference {
+    flex-basis: 100%;
+    justify-content: space-between;
+  }
+}
+@media print {
+  .ketraterm-api-navigation {
+    display: none;
+  }
+}

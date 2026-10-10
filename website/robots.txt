@@ -1,4 +1,0 @@
-User-agent: *
-Allow: /
-
-Sitemap: https://ketraterm.github.io/ketraterm/sitemap.xml

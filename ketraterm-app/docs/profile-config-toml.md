@@ -1,4 +1,4 @@
-# Profile Configuration Syntax & Path Resolution
+# App settings
 
 The standalone application stores one preferences snapshot in `config.toml`.
 Use the settings dialog for live updates. Direct file edits take effect on the
