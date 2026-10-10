@@ -16,9 +16,9 @@
 
 import fs from "node:fs";
 import path from "node:path";
-import {layout, relative} from "./layout.mjs";
-import {renderMarkdown} from "./markdown.mjs";
-import {stableVersion} from "../assets/releases.js";
+import { layout, relative } from "./layout.mjs";
+import { renderMarkdown } from "./markdown.mjs";
+import { stableVersion } from "../assets/releases.js";
 
 export const appDocuments = [
   ["guide.html", "App guide", "ketraterm-app/docs/user-guide.md"],

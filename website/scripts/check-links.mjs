@@ -16,9 +16,9 @@
 
 import fs from "node:fs";
 import path from "node:path";
-import {fileURLToPath} from "node:url";
-import {parseHTML} from "linkedom";
-import {decodeHTMLAttribute} from "entities";
+import { fileURLToPath } from "node:url";
+import { parseHTML } from "linkedom";
+import { decodeHTMLAttribute } from "entities";
 
 export function checkLinks(root) {
   root = path.resolve(root) + path.sep;

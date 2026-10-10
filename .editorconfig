@@ -2,3 +2,6 @@ root = true
 
 [*.{kt,kts}]
 ktlint_standard_no-wildcard-imports = disabled
+
+[website/**.{js,mjs}]
+ij_javascript_spaces_within_imports = true

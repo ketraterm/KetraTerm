@@ -17,7 +17,12 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import fs from "node:fs";
-import {detectOS, releaseAssets, selectAssets, validAsset,} from "../assets/downloads.js";
+import {
+  detectOS,
+  releaseAssets,
+  selectAssets,
+  validAsset,
+} from "../assets/downloads.js";
 
 const asset = (name) => ({
   name,

@@ -19,8 +19,8 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
-import {parseHTML} from "linkedom";
-import {addApiNavigation} from "../src/api-navigation.mjs";
+import { parseHTML } from "linkedom";
+import { addApiNavigation } from "../src/api-navigation.mjs";
 
 const dokkaPage = `<!DOCTYPE html>\r\n<html lang="en">\r\n<head>\r\n<title>TerminalSession</title>\r\n<link rel="stylesheet" href="styles/style.css">\r\n<script>var pathToRoot = "../../"; const exact = "<div>API source</div>";</script>\r\n</head>\r\n<body>\r\n<div class='root'>\r\n<header id="navigation-wrapper" class="navigation theme-dark"><a href="index.html">KetraTerm</a></header>\r\n<div id="container"><nav id="leftColumn">Types</nav><main id="main"><h1 id="session">TerminalSession</h1><p>Original API text &amp; contracts.</p><a href="../index.html#type">Type</a></main></div>\r\n</div>\r\n<script src="scripts/main.js"></script>\r\n</body>\r\n</html>`;
 

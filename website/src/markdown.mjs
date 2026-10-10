@@ -16,10 +16,10 @@
 
 import fs from "node:fs";
 import path from "node:path";
-import {Marked} from "marked";
+import { Marked } from "marked";
 import GithubSlugger from "github-slugger";
-import {decodeHTML} from "entities";
-import {escape, relative, repository} from "./layout.mjs";
+import { decodeHTML } from "entities";
+import { escape, relative, repository } from "./layout.mjs";
 
 // Both sites render the owning Markdown source. Only published routes differ.
 export function renderMarkdown({

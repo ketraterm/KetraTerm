@@ -16,8 +16,8 @@
 
 import assert from "node:assert/strict";
 import test from "node:test";
-import {parseHTML} from "linkedom";
-import {pages} from "../src/pages.mjs";
+import { parseHTML } from "linkedom";
+import { pages } from "../src/pages.mjs";
 
 let siteImport = 0;
 

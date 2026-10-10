@@ -16,9 +16,9 @@
 
 import fs from "node:fs";
 import path from "node:path";
-import {defaultSiteUrl, escape, layout, relative} from "./layout.mjs";
-import {renderMarkdown} from "./markdown.mjs";
-import {appDocuments} from "./app-docs.mjs";
+import { defaultSiteUrl, escape, layout, relative } from "./layout.mjs";
+import { renderMarkdown } from "./markdown.mjs";
+import { appDocuments } from "./app-docs.mjs";
 
 export function documentationFiles(root) {
   const files = [

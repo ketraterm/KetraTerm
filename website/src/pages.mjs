@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-import {escape, layout, repository} from "./layout.mjs";
+import { escape, layout, repository } from "./layout.mjs";
 
 const screenshots = [
   [13, "Workspace", "Lazygit and a build running in split panes"],

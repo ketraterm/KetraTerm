@@ -19,7 +19,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
-import {checkLinks} from "../scripts/check-links.mjs";
+import { checkLinks } from "../scripts/check-links.mjs";
 
 function fixture(t, files) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "ketraterm-link-check-"));

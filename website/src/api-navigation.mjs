@@ -16,7 +16,7 @@
 
 import fs from "node:fs";
 import path from "node:path";
-import {defaultSiteUrl, escape, relative} from "./layout.mjs";
+import { defaultSiteUrl, escape, relative } from "./layout.mjs";
 
 const navigationBlock =
   /<!-- ketraterm-api-navigation:start -->[\s\S]*?<!-- ketraterm-api-navigation:end -->/g;

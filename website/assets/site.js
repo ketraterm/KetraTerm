@@ -14,8 +14,13 @@
  * limitations under the License.
  */
 
-import {detectOS, releaseAssets, releasesUrl, selectAssets,} from "./downloads.js";
-import {latestReleaseApi} from "./releases.js";
+import {
+  detectOS,
+  releaseAssets,
+  releasesUrl,
+  selectAssets,
+} from "./downloads.js";
+import { latestReleaseApi } from "./releases.js";
 
 const themeButton = document.querySelector(".theme-toggle");
 const navigation = document.querySelectorAll(

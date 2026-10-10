@@ -16,9 +16,9 @@
 
 import fs from "node:fs";
 import path from "node:path";
-import {execFileSync} from "node:child_process";
-import {releaseId, sortVersions} from "./archive.mjs";
-import {latestReleaseApi, stableVersion} from "../assets/releases.js";
+import { execFileSync } from "node:child_process";
+import { releaseId, sortVersions } from "./archive.mjs";
+import { latestReleaseApi, stableVersion } from "../assets/releases.js";
 
 export async function latestAppRelease() {
   const response = await fetch(latestReleaseApi, {

@@ -19,8 +19,8 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
-import {parseHTML} from "linkedom";
-import {repairApiLinks} from "../src/api-links.mjs";
+import { parseHTML } from "linkedom";
+import { repairApiLinks } from "../src/api-links.mjs";
 
 function fixture(t, files) {
   const output = fs.mkdtempSync(path.join(os.tmpdir(), "ketraterm-api-links-"));

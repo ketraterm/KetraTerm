@@ -18,12 +18,12 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import {execFileSync} from "node:child_process";
+import { execFileSync } from "node:child_process";
 import test from "node:test";
-import {backfillApi} from "../scripts/backfill-api.mjs";
-import {latestAppRelease} from "../src/release-sources.mjs";
-import {renderAppDocumentation} from "../src/app-docs.mjs";
-import {inventory} from "../src/archive.mjs";
+import { backfillApi } from "../scripts/backfill-api.mjs";
+import { latestAppRelease } from "../src/release-sources.mjs";
+import { renderAppDocumentation } from "../src/app-docs.mjs";
+import { inventory } from "../src/archive.mjs";
 
 test("stable app selection follows published GitHub metadata and fails closed", async (t) => {
   const release = { tag_name: "v2.0.0", prerelease: false, draft: false };

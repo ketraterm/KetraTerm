@@ -16,10 +16,10 @@
 
 import fs from "node:fs";
 import path from "node:path";
-import {fileURLToPath} from "node:url";
-import {spawnSync} from "node:child_process";
-import {copyArchives} from "../src/archive.mjs";
-import {exportRelease, releaseTags} from "../src/release-sources.mjs";
+import { fileURLToPath } from "node:url";
+import { spawnSync } from "node:child_process";
+import { copyArchives } from "../src/archive.mjs";
+import { exportRelease, releaseTags } from "../src/release-sources.mjs";
 
 export function backfillApi({ root, previous, archive, build = buildDokka }) {
   // Preserve the original archive until every missing release builds successfully.

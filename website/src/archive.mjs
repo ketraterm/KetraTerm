@@ -16,7 +16,7 @@
 
 import fs from "node:fs";
 import path from "node:path";
-import {stableVersion} from "../assets/releases.js";
+import { stableVersion } from "../assets/releases.js";
 
 export const releaseId = (version) => {
   if (!/^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/.test(version))

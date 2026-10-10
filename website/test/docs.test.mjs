@@ -19,9 +19,9 @@ import test from "node:test";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import {parseHTML} from "linkedom";
-import {documentationFiles, renderDocumentation} from "../src/docs.mjs";
-import {renderAppDocumentation} from "../src/app-docs.mjs";
+import { parseHTML } from "linkedom";
+import { documentationFiles, renderDocumentation } from "../src/docs.mjs";
+import { renderAppDocumentation } from "../src/app-docs.mjs";
 
 test("publishes module docs once, preserves heading anchors, and rewrites links inside tables", (t) => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "ketraterm-guides-"));

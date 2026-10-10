@@ -19,8 +19,13 @@ import test from "node:test";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import {buildSite} from "../scripts/build.mjs";
-import {copyArchives, inventory, releaseId, sortVersions,} from "../src/archive.mjs";
+import { buildSite } from "../scripts/build.mjs";
+import {
+  copyArchives,
+  inventory,
+  releaseId,
+  sortVersions,
+} from "../src/archive.mjs";
 
 test("the version picker orders a stable release before its prereleases", () => {
   const ids = ["v1.9.0", "v1.10.0-rc.1", "v1.10.0", "v1.10.0-rc.2", "dev"];

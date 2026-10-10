@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-import {stableVersion} from "./releases.js";
+import { stableVersion } from "./releases.js";
 
 export const releasesUrl = "https://github.com/ketraterm/KetraTerm/releases";
 

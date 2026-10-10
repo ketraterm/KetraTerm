@@ -16,16 +16,16 @@
 
 import fs from "node:fs";
 import path from "node:path";
-import {fileURLToPath} from "node:url";
-import {execFileSync} from "node:child_process";
-import {renderDocumentation} from "../src/docs.mjs";
-import {appDocuments, renderAppDocumentation} from "../src/app-docs.mjs";
-import {copyArchives, inventory, releaseId} from "../src/archive.mjs";
-import {pages} from "../src/pages.mjs";
-import {addApiNavigation} from "../src/api-navigation.mjs";
-import {repairApiLinks} from "../src/api-links.mjs";
-import {escape, relative} from "../src/layout.mjs";
-import {exportRelease, latestAppRelease} from "../src/release-sources.mjs";
+import { fileURLToPath } from "node:url";
+import { execFileSync } from "node:child_process";
+import { renderDocumentation } from "../src/docs.mjs";
+import { appDocuments, renderAppDocumentation } from "../src/app-docs.mjs";
+import { copyArchives, inventory, releaseId } from "../src/archive.mjs";
+import { pages } from "../src/pages.mjs";
+import { addApiNavigation } from "../src/api-navigation.mjs";
+import { repairApiLinks } from "../src/api-links.mjs";
+import { escape, relative } from "../src/layout.mjs";
+import { exportRelease, latestAppRelease } from "../src/release-sources.mjs";
 
 export function buildSite({
   root,

@@ -17,7 +17,7 @@
 import http from "node:http";
 import fs from "node:fs";
 import path from "node:path";
-import {fileURLToPath} from "node:url";
+import { fileURLToPath } from "node:url";
 
 const root = path.resolve(
   fileURLToPath(new URL("../../build/website/", import.meta.url)),

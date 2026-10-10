@@ -16,9 +16,9 @@
 
 import assert from "node:assert/strict";
 import test from "node:test";
-import {parseHTML} from "linkedom";
-import {layout} from "../src/layout.mjs";
-import {pages} from "../src/pages.mjs";
+import { parseHTML } from "linkedom";
+import { layout } from "../src/layout.mjs";
+import { pages } from "../src/pages.mjs";
 
 test("the app owns the root and the library can be hosted independently", () => {
   const output = new Map(

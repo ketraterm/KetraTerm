@@ -16,9 +16,9 @@
 
 import fs from "node:fs";
 import path from "node:path";
-import {decodeHTML} from "entities";
-import {parseHTML} from "linkedom";
-import {escape} from "./layout.mjs";
+import { decodeHTML } from "entities";
+import { parseHTML } from "linkedom";
+import { escape } from "./layout.mjs";
 
 const anchors =
   /<!--[\s\S]*?-->|<(script|style)\b[^>]*>[\s\S]*?<\/\1\s*>|<a\b[^>]*\shref\s*=\s*(["'])([^"']*)\2[^>]*>([\s\S]*?)<\/a\s*>/gi;
