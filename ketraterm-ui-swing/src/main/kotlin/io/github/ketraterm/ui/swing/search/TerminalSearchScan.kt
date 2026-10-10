@@ -17,14 +17,14 @@ package io.github.ketraterm.ui.swing.search
 
 import io.github.ketraterm.render.api.TerminalRenderBufferKind
 import io.github.ketraterm.render.api.TerminalRenderFrameReader
-import io.github.ketraterm.render.cache.TerminalRenderRangeCopy
+import io.github.ketraterm.render.cache.TerminalTextRangeCopy
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.yield
 
 /** Worker-owned bounded cell copy. Results and longest logical-line scratch grow with retained text. */
 internal class TerminalSearchScan {
-    private val copy = TerminalRenderRangeCopy()
+    private val copy = TerminalTextRangeCopy()
 
     suspend fun scan(
         reader: TerminalRenderFrameReader,
@@ -55,16 +55,15 @@ internal class TerminalSearchScan {
             val copied = copy.read(reader, next, last) { context.ensureActive() }
             val copiedFirst = copy.firstAbsoluteRow
             val copiedLast = copy.lastAbsoluteRow
-            val cache = copy.cache
             if (copied &&
-                (cache.columns != columns || cache.activeBuffer != buffer || cache.historyContentGeneration != historyContentGeneration)
+                (copy.columns != columns || copy.activeBuffer != buffer || copy.historyContentGeneration != historyContentGeneration)
             ) {
                 return null
             }
-            if (copied) lastGeneration = cache.contentGeneration
+            if (copied) lastGeneration = copy.contentGeneration
             if (copiedFirst > next) model.discardPendingLine()
             if (copiedFirst > last) break
-            if (copiedLast >= copiedFirst) model.append(cache, copiedFirst) else model.discardPendingLine()
+            if (copied) model.append(copy) else model.discardPendingLine()
             if (!copied || copiedLast == last) break
             next = copiedLast + 1L
             yield()

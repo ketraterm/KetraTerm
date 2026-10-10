@@ -234,6 +234,21 @@ internal class CoreTerminalRenderFrame(
         )
     }
 
+    override fun copyTextLine(
+        row: Int,
+        codeWords: IntArray,
+        codeOffset: Int,
+        flags: IntArray,
+        flagOffset: Int,
+        clusterDataSink: io.github.ketraterm.render.api.TerminalRenderClusterDataSink?,
+    ) {
+        checkValid()
+        checkRow(row)
+        checkCapacity(codeWords, codeOffset, columns, "codeWords")
+        checkCapacity(flags, flagOffset, columns, "flags")
+        visibleLineAt(row).copyTextToRenderAbi(columns, codeWords, codeOffset, flags, flagOffset, clusterDataSink, clusterScratch)
+    }
+
     private fun visibleLineAt(row: Int) = state.ring[state.resolveScrollbackRingIndex(row, resolvedScrollbackOffset)]
 
     private fun checkRow(row: Int) {

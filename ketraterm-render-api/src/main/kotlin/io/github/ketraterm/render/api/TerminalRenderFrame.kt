@@ -217,6 +217,36 @@ public interface TerminalRenderFrame {
     )
 
     /**
+     * Copies only text and cell geometry for one visible [row], in logical column order.
+     *
+     * Overwrites [columns] entries in [codeWords] and [flags] starting at their respective
+     * offsets. Encodings and cluster callback lifetimes are identical to [copyLine].
+     * No attributes, hyperlinks, palette or cursor data are requested.
+     *
+     * The compatibility implementation delegates to [copyLine] with temporary attribute
+     * storage. Allocation-sensitive frame implementations should override this method
+     * to skip attribute translation and copying entirely.
+     */
+    public fun copyTextLine(
+        row: Int,
+        codeWords: IntArray,
+        codeOffset: Int = 0,
+        flags: IntArray,
+        flagOffset: Int = 0,
+        clusterDataSink: TerminalRenderClusterDataSink? = null,
+    ) {
+        copyLine(
+            row = row,
+            codeWords = codeWords,
+            codeOffset = codeOffset,
+            attrWords = LongArray(columns),
+            flags = flags,
+            flagOffset = flagOffset,
+            clusterDataSink = clusterDataSink,
+        )
+    }
+
+    /**
      * Copies the current cursor overlay state into [sink].
      *
      * The default implementation adapts [cursor] for simple frame

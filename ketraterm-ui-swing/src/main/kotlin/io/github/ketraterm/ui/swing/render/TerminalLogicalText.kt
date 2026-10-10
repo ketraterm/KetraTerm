@@ -25,26 +25,48 @@ internal inline fun forEachLogicalTextCell(
     checkCancelled: () -> Unit = {},
     append: (codePoint: Int, startColumn: Int, endColumn: Int) -> Unit,
 ) {
+    forEachLogicalTextCell(
+        cache.columns,
+        cache.codeWords,
+        cache.flags,
+        cache.clusterRefs,
+        cache.clusterCodepoints,
+        row,
+        checkCancelled,
+        append,
+    )
+}
+
+internal inline fun forEachLogicalTextCell(
+    columns: Int,
+    codeWords: IntArray,
+    cellFlags: IntArray,
+    clusterRefs: LongArray,
+    clusterCodepoints: IntArray,
+    row: Int,
+    checkCancelled: () -> Unit,
+    append: (codePoint: Int, startColumn: Int, endColumn: Int) -> Unit,
+) {
     var column = 0
-    while (column < cache.columns) {
+    while (column < columns) {
         checkCancelled()
-        val index = cache.rowOffset(row) + column
-        val flags = cache.flags[index]
+        val index = row * columns + column
+        val flags = cellFlags[index]
         if (flags and (TerminalRenderCellFlags.WIDE_TRAILING or TerminalRenderCellFlags.WRAP_PADDING) != 0) {
             column++
             continue
         }
-        val endColumn = minOf(cache.columns, column + if (flags and TerminalRenderCellFlags.WIDE_LEADING != 0) 2 else 1)
-        val ref = cache.clusterRefs[index]
+        val endColumn = minOf(columns, column + if (flags and TerminalRenderCellFlags.WIDE_LEADING != 0) 2 else 1)
+        val ref = clusterRefs[index]
         if (flags and TerminalRenderCellFlags.CLUSTER != 0 && ref != 0L) {
-            val start = cache.clusterOffset(ref)
-            val end = start + cache.clusterLength(ref)
+            val start = (ref ushr 32).toInt()
+            val end = start + ref.toInt()
             for (offset in start until end) {
                 checkCancelled()
-                append(cache.clusterCodepoints[offset], column, endColumn)
+                append(clusterCodepoints[offset], column, endColumn)
             }
         } else {
-            val codePoint = if (flags and TerminalRenderCellFlags.CODEPOINT != 0) cache.codeWords[index] else ' '.code
+            val codePoint = if (flags and TerminalRenderCellFlags.CODEPOINT != 0) codeWords[index] else ' '.code
             append(codePoint, column, endColumn)
         }
         column = endColumn

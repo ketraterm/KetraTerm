@@ -72,6 +72,12 @@ from its corresponding nonnegative offset. The row is in `0 until rows`.
 Core's frame implementation rejects invalid rows or capacities with
 `IllegalArgumentException`.
 
+`copyTextLine` copies the same code words, cell flags and primitive cluster
+payloads without presentation channels. Core overrides it to avoid reading or
+translating attributes. Existing frame providers inherit a compatibility
+implementation using `copyLine` and a temporary attribute array; providers used
+for frequent text scans should override it to avoid that allocation.
+
 Use [public cell flags](attribute-packing.md#cell-flags) to distinguish scalar,
 cluster, empty, wide-leading, and wide-trailing cells. `codeWords` is zero for
 clusters, empty cells, and wide trailing cells. Attribute words remain available

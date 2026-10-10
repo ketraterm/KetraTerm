@@ -92,6 +92,31 @@ internal fun Line.copyToRenderAbi(
     }
 }
 
+internal fun Line.copyTextToRenderAbi(
+    width: Int,
+    codeWords: IntArray,
+    codeOffset: Int,
+    flags: IntArray,
+    flagOffset: Int,
+    clusterDataSink: io.github.ketraterm.render.api.TerminalRenderClusterDataSink?,
+    clusterScratch: RenderClusterScratch,
+) {
+    var col = 0
+    while (col < width) {
+        val raw = rawCodepoint(col)
+        codeWords[codeOffset + col] = if (raw > 0) raw else 0
+        flags[flagOffset + col] = cellFlags(col, raw)
+        if (raw <= TerminalConstants.CLUSTER_HANDLE_MAX && clusterDataSink != null) {
+            val length = clusterScratch.readCluster(this, col)
+            clusterDataSink.onCluster(col, clusterScratch.codepoints, 0, length)
+        }
+        col++
+    }
+    if (endsWithWrapPadding && wrapped && width == this.width) {
+        flags[flagOffset + width - 1] = TerminalRenderCellFlags.EMPTY or TerminalRenderCellFlags.WRAP_PADDING
+    }
+}
+
 private fun Line.cellFlags(
     col: Int,
     raw: Int,

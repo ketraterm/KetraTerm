@@ -16,6 +16,7 @@
 package io.github.ketraterm.ui.swing.search
 
 import io.github.ketraterm.render.cache.TerminalRenderCache
+import io.github.ketraterm.render.cache.TerminalTextRangeCopy
 import io.github.ketraterm.ui.swing.render.forEachLogicalTextCell
 
 /**
@@ -74,7 +75,34 @@ internal class TerminalSearchModel {
         cache: TerminalRenderCache,
         firstRow: Long,
     ) {
-        for (row in 0 until cache.rows) {
+        appendRows(cache.rows, firstRow, cache.lineIds, cache.lineGenerations, cache.lineWrapped) { row -> appendRow(cache, row) }
+    }
+
+    fun append(copy: TerminalTextRangeCopy) {
+        appendRows(copy.rows, copy.firstAbsoluteRow, copy.lineIds, copy.lineGenerations, copy.lineWrapped) { row ->
+            forEachLogicalTextCell(
+                copy.columns,
+                copy.codeWords,
+                copy.flags,
+                copy.clusterRefs,
+                copy.clusterCodepoints,
+                row,
+                checkCancelled,
+            ) { codePoint, startColumn, endColumn ->
+                appendMappedCodePoint(codePoint, startColumn, endColumn)
+            }
+        }
+    }
+
+    private inline fun appendRows(
+        rows: Int,
+        firstRow: Long,
+        ids: LongArray,
+        generations: LongArray,
+        wrapped: BooleanArray,
+        appendRow: (Int) -> Unit,
+    ) {
+        for (row in 0 until rows) {
             checkCancelled()
             currentRow = (firstRow + row - firstAbsoluteRow).toInt()
             if (currentRow >= rowIds.size) {
@@ -82,10 +110,10 @@ internal class TerminalSearchModel {
                 rowIds = rowIds.copyOf(capacity)
                 rowGenerations = rowGenerations.copyOf(capacity)
             }
-            rowIds[currentRow] = cache.lineIds[row]
-            rowGenerations[currentRow] = cache.lineGenerations[row]
-            appendRow(cache, row)
-            if (!cache.lineWrapped[row]) finishLine()
+            rowIds[currentRow] = ids[row]
+            rowGenerations[currentRow] = generations[row]
+            appendRow(row)
+            if (!wrapped[row]) finishLine()
         }
     }
 

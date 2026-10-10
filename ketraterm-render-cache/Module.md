@@ -13,6 +13,8 @@ The public types in `io.github.ketraterm.render.cache` have distinct roles:
   copied frame; readers borrow the latest cache through `readCurrent`.
 - `TerminalRenderRangeCopy` makes bounded retained-range copies for worker-side
   analysis, with explicit absolute bounds for the sliced origin.
+- `TerminalTextRangeCopy` copies bounded text and row metadata for search without
+  rendering attributes, cursor state, or clearing spare array capacity.
 
 Backend-specific layout, glyph runs, selection, and painting belong to renderer
 modules. Arrays expose cache-owned storage for reading; capacity may exceed the

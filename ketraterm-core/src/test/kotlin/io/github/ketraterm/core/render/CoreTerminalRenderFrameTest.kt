@@ -31,6 +31,55 @@ import org.junit.jupiter.params.ParameterizedTest
 import org.junit.jupiter.params.provider.ValueSource
 
 class CoreTerminalRenderFrameTest {
+    @Test
+    fun `text copy preserves geometry clusters and offsets without presentation data`() {
+        val state = TerminalState(initialWidth = 8, initialHeight = 1, maxHistory = 0)
+        val line = state.ring[0]
+        line.setCell(0, 'A'.code, 0, 0)
+        line.setCell(1, 0x1F600, 0, 0)
+        line.setCell(2, TerminalConstants.WIDE_CHAR_SPACER, 0, 0)
+        line.setCluster(3, intArrayOf('e'.code, 0x0301), 2, 0, 0)
+        line.setCluster(4, intArrayOf(0x1F469, 0x200D, 0x1F4BB), 3, 0, 0)
+        line.setCell(5, TerminalConstants.WIDE_CHAR_SPACER, 0, 0)
+        line.wrapped = true
+        line.endsWithWrapPadding = true
+        val frame = CoreTerminalRenderFrame(state)
+        val codes = IntArray(10) { -99 }
+        val flags = IntArray(12) { -99 }
+        val clusters = mutableMapOf<Int, List<Int>>()
+        frame.use(0) {
+            frame.copyTextLine(0, codes, 1, flags, 2) { col, data, offset, length ->
+                clusters[col] = data.slice(offset until offset + length)
+            }
+        }
+        assertArrayEquals(intArrayOf(-99, 'A'.code, 0x1F600, 0, 0, 0, 0, 0, 0, -99), codes)
+        assertArrayEquals(
+            intArrayOf(
+                -99,
+                -99,
+                TerminalRenderCellFlags.CODEPOINT,
+                TerminalRenderCellFlags.CODEPOINT or TerminalRenderCellFlags.WIDE_LEADING,
+                TerminalRenderCellFlags.WIDE_TRAILING,
+                TerminalRenderCellFlags.CLUSTER,
+                TerminalRenderCellFlags.CLUSTER or TerminalRenderCellFlags.WIDE_LEADING,
+                TerminalRenderCellFlags.WIDE_TRAILING,
+                TerminalRenderCellFlags.EMPTY,
+                TerminalRenderCellFlags.EMPTY or TerminalRenderCellFlags.WRAP_PADDING,
+                -99,
+                -99,
+            ),
+            flags,
+        )
+        assertEquals(mapOf(3 to listOf('e'.code, 0x0301), 4 to listOf(0x1F469, 0x200D, 0x1F4BB)), clusters)
+        assertThrows(IllegalStateException::class.java) { frame.copyTextLine(0, codes, 0, flags, 0, null) }
+        frame.use(0) {
+            assertThrows(IllegalArgumentException::class.java) { frame.copyTextLine(1, codes, 0, flags, 0, null) }
+            assertThrows(IllegalArgumentException::class.java) { frame.copyTextLine(0, codes, -1, flags, 0, null) }
+            assertThrows(IllegalArgumentException::class.java) { frame.copyTextLine(0, codes, 3, flags, 0, null) }
+            assertThrows(IllegalArgumentException::class.java) { frame.copyTextLine(0, codes, 0, flags, 5, null) }
+        }
+    }
+
     @ParameterizedTest
     @ValueSource(ints = [0, 1, 2, 3])
     fun `adjacent attribute runs preserve all outputs and refresh for each copy`(optionalOutputs: Int) {

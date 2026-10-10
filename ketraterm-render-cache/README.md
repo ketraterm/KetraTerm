@@ -81,6 +81,15 @@ row remains and `cache.hasFrame` is false. Assemble strings and perform analysis
 after `read` returns. The optional cancellation check runs during source copying
 and must be cheap and non-suspending.
 
+`TerminalTextRangeCopy` uses the same range and batch limits for text analysis.
+It requests `copyTextLine` and retains only code words, cell flags, cluster data,
+row identities/generations, wrapping and source generations. Every batch replaces
+its active prefix; unused capacity is not cleared. Read only `rows * columns`
+cells and `rows` row entries after a successful read. Failed or empty reads leave
+`rows` zero. Cluster references use the same packed offset/length layout as the
+render cache, and both copies retain at most 256 code points per cluster.
+The buffer belongs to one worker and remains valid only until its next read.
+
 ## Allocation behavior
 
 Primitive planes and cluster buffers are reused, and unchanged rows skip source

@@ -16,13 +16,47 @@
 package io.github.ketraterm.ui.swing.search
 
 import io.github.ketraterm.core.TerminalBuffers
-import io.github.ketraterm.render.api.*
+import io.github.ketraterm.render.api.TerminalRenderClusterDataSink
+import io.github.ketraterm.render.api.TerminalRenderFrame
+import io.github.ketraterm.render.api.TerminalRenderFrameConsumer
+import io.github.ketraterm.render.api.TerminalRenderFrameReader
 import io.github.ketraterm.render.cache.TerminalRenderCache
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.Test
 
 class TerminalSearchScanTest {
+    @Test
+    fun `repeated text scans preserve cluster payloads and discard erased matches`() =
+        runTest {
+            val terminal = TerminalBuffers.create(4, 1, maxHistory = 100)
+            repeat(64) {
+                terminal.writeText("old")
+                terminal.carriageReturn()
+                terminal.newLine()
+            }
+            terminal.writeText("abc")
+            terminal.writeCluster(intArrayOf(0x1F469, 0x200D, 0x1F4BB))
+            terminal.writeText("x")
+            val scanner = TerminalSearchScan()
+            val model = TerminalSearchModel()
+            val reader = terminal as TerminalRenderFrameReader
+            val query = "bc\uD83D\uDC69\u200D\uD83D\uDCBBx"
+            repeat(2) {
+                val result = requireNotNull(scanner.scan(reader, model, query, false))
+                assertEquals(1, result.highlights.resultCount)
+                assertEquals(64L, result.highlights.activeStartAbsoluteRow())
+                assertEquals(1, result.highlights.activeStartColumn())
+            }
+            terminal.eraseEntireScreen()
+            terminal.eraseScreenAndHistory()
+            assertEquals(0, requireNotNull(scanner.scan(reader, model, query, false)).highlights.resultCount)
+            terminal.positionCursor(0, 0)
+            terminal.writeCluster(intArrayOf('e'.code, 0x301))
+            assertEquals(1, requireNotNull(scanner.scan(reader, model, "e\u0301", false)).highlights.resultCount)
+            assertEquals(0, requireNotNull(scanner.scan(reader, model, query, false)).highlights.resultCount)
+        }
+
     @Test
     fun `clear during a scan rejects all results from the old history`() =
         runTest {
@@ -110,35 +144,21 @@ class TerminalSearchScanTest {
                         source.readRenderFrameForAbsoluteRange(startAbsoluteRow, endAbsoluteRow) { frame ->
                             consumer.accept(
                                 object : TerminalRenderFrame by frame {
-                                    override fun copyLine(
+                                    override fun copyTextLine(
                                         row: Int,
                                         codeWords: IntArray,
                                         codeOffset: Int,
-                                        attrWords: LongArray,
-                                        attrOffset: Int,
                                         flags: IntArray,
                                         flagOffset: Int,
-                                        extraAttrWords: LongArray?,
-                                        extraAttrOffset: Int,
-                                        hyperlinkIds: IntArray?,
-                                        hyperlinkOffset: Int,
-                                        clusterSink: TerminalRenderClusterSink?,
                                         clusterDataSink: TerminalRenderClusterDataSink?,
                                     ) {
                                         copied++
-                                        frame.copyLine(
+                                        frame.copyTextLine(
                                             row,
                                             codeWords,
                                             codeOffset,
-                                            attrWords,
-                                            attrOffset,
                                             flags,
                                             flagOffset,
-                                            extraAttrWords,
-                                            extraAttrOffset,
-                                            hyperlinkIds,
-                                            hyperlinkOffset,
-                                            clusterSink,
                                             clusterDataSink,
                                         )
                                     }
@@ -151,8 +171,8 @@ class TerminalSearchScanTest {
                 }
             val result = requireNotNull(TerminalSearchScan().scan(reader, TerminalSearchModel(), "needle", false))
             assertEquals(200, result.highlights.resultCount)
-            assertTrue(calls > 1)
-            assertTrue(maximum * 160 <= 4096, "No lock acquisition may copy the entire tall grid")
+            assertEquals(8, calls)
+            assertEquals(25, maximum, "Each batch must copy text through the bounded text-only path")
         }
 
     @Test
