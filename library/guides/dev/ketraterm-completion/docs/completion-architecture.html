@@ -1,0 +1,364 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="description" content="A modular Kotlin/JVM terminal emulator library for Swing and headless applications.">
+  <meta name="color-scheme" content="light dark">
+  <title>Completion Module Architecture · KetraTerm Library</title>
+  <link rel="icon" href="../../../../assets/logo.svg" type="image/svg+xml">
+  <link rel="preload" href="../../../../assets/fonts/manrope-variable.ttf" as="font" type="font/ttf" crossorigin>
+  <link rel="stylesheet" href="../../../../assets/styles.css">
+  <script type="importmap">{"imports":{"mermaid":"../../../../assets/mermaid/mermaid.esm.min.mjs"}}</script>
+  <script type="module" src="../../../../assets/site.js"></script>
+</head>
+<body data-product="library" data-version="Development">
+  <a class="skip" href="#main">Skip to content</a>
+  <header class="site-header">
+    <div class="site-identity">
+      <a class="brand" href="../../../../index.html" aria-label="KetraTerm Library home"><img class="brand-mark" src="../../../../assets/logo.svg" alt="" width="34" height="34">KetraTerm</a>
+      <nav class="product-navigation" aria-label="KetraTerm products"><a href="https://ketraterm.github.io/KetraTerm/">App</a><a href="../../../../index.html" aria-current="true">Library</a></nav>
+    </div>
+    <details class="site-navigation" open><summary>Menu</summary><nav aria-label="Library navigation"><a   href="../../docs/README.html">Guides</a><a aria-current="true"  href="../../modules.html">Modules</a><a   href="../../../../versions.html">API & versions</a><a   href="../../CHANGELOG.html">Changelog</a><a  class="nav-primary" href="../../README.html">Get started</a></nav></details>
+    <button class="theme-toggle" type="button" aria-label="Switch to light theme">Light</button>
+  </header>
+  <div class="docs-shell"><aside class="sidebar" aria-label="Documentation navigation"><details class="nav-disclosure" open><summary class="mobile-nav-toggle">Browse library guides</summary><div><label class="search-label">Find a library guide<input type="search" data-doc-search placeholder="Search library docs" autocomplete="off" data-index="../../search.json"></label><div class="search-results" aria-live="polite"></div><details open><summary>Start here</summary><a  href="../../docs/README.html">Documentation</a><a  href="../../README.html">Installation</a><a  href="../../modules.html">Module guides</a><a  href="../../CHANGELOG.html">Changelog</a></details><details open><summary>Capabilities</summary><a  href="../../docs/terminal-feature-map.html">Feature map</a><a  href="../../docs/features/terminal.html">Terminal</a><a  href="../../docs/features/shells.html">Shell integration</a><a  href="../../docs/features/desktop.html">Swing view & hosts</a><a  href="../../docs/features/completion.html">Completion</a><a  href="../../docs/features/embedding.html">Embedding</a><a  href="../../docs/terminal-feature-gap-map.html">Known limits</a></details><details open><summary>Embedding guides</summary><a  href="../../docs/library/configuration.html">Configuration</a><a  href="../../docs/library/compatibility.html">Compatibility</a><a  href="../../docs/library/render-ownership.html">Render ownership</a></details><details open><summary>Reference</summary><a  href="../../docs/reference/protocol.html">Protocols</a><a  href="../../docs/reference/notifications.html">Notifications</a><a  href="../../docs/reference/storage.html">Storage & privacy</a></details><details open><summary>Development</summary><a  href="../../ARCHITECTURE.html">Architecture</a><a  href="../../CONTRIBUTING.html">Contributing</a><a  href="../../docs/development/conformance-testing.html">Conformance testing</a></details></div></details></aside><main id="main" tabindex="-1" class="article article-with-outline"><div class="article-top"><nav class="breadcrumb" aria-label="Breadcrumb"><ol><li><a href="../../../../index.html">Library</a></li><li><a href="../../modules.html">Modules</a></li><li><a href="../README.html">ketraterm-completion</a></li><li><span aria-current="page">Completion Module Architecture</span></li></ol></nav><div class="doc-version"><span>Development</span><a href="../../../../versions.html">All versions</a></div></div><details class="page-outline" open><summary>On this page</summary><nav aria-label="On this page"><a class="depth-2" href="#public-surface">Public Surface</a><a class="depth-2" href="#internal-implementation">Internal Implementation</a><a class="depth-3" href="#custom-engines-and-direct-source-evaluation">Custom engines and direct source evaluation</a><a class="depth-3" href="#context-argument-history">Context argument history</a><a class="depth-3" href="#evaluation-and-failure-behavior">Evaluation and failure behavior</a><a class="depth-2" href="#host-ownership">Host Ownership</a><a class="depth-3" href="#learning-and-privacy">Learning and privacy</a><a class="depth-2" href="#command-line-context-policy">Command-Line Context Policy</a><a class="depth-2" href="#host-dynamic-providers">Host Dynamic Providers</a><a class="depth-2" href="#ranking-policy">Ranking Policy</a><a class="depth-2" href="#ranking-calibration">Ranking Calibration</a></nav></details><div class="article-content"><div class="prose"><h1 id="completion-module-architecture">Completion Module Architecture</h1>
+<p><code>ketraterm-completion</code> turns an immutable command-line request into progressive
+ranked suggestions. It owns semantic parsing, source coordination, ranking, and
+bounded in-memory learning. Hosts own environment access and interaction. Start
+with the <a href="../README.html">README</a> for construction and a runnable example.</p>
+<h2 id="public-surface">Public Surface</h2>
+<p>Consumers use <code>io.github.ketraterm.completion.api</code> and
+<code>io.github.ketraterm.completion.model</code>.</p>
+<div class="table-scroll"><table>
+<thead>
+<tr>
+<th>Contract</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>TerminalCompletionRequest</code></td>
+<td>Captured command text, UTF-16 cursor, working-directory URI, profile, and shell capabilities.</td>
+</tr>
+<tr>
+<td><code>TerminalCompletionContext.resolve</code></td>
+<td>Public request resolution for custom engines and direct source evaluation.</td>
+</tr>
+<tr>
+<td><code>TerminalCompletionEngine</code></td>
+<td>Cold <code>Flow</code> of best-first candidate snapshots.</td>
+</tr>
+<tr>
+<td><code>TerminalCompletionSource</code></td>
+<td>One suspending provider evaluated against the shared semantic context.</td>
+</tr>
+<tr>
+<td><code>TerminalCompletionEngines</code> / <code>TerminalCompletionSources</code></td>
+<td>Engine composition and adapters for paths, Gradle tasks, and dynamic values.</td>
+</tr>
+<tr>
+<td><code>TerminalCommandSpec</code>, <code>TerminalOptionSpec</code>, <code>TerminalArgumentSpec</code></td>
+<td>Declarative command grammar and value metadata.</td>
+</tr>
+<tr>
+<td><code>TerminalCompletionLearningStore</code></td>
+<td>Bounded learning, immutable snapshots, and host-recorded outcomes.</td>
+</tr>
+</tbody></table></div>
+<p>Candidate replacement offsets address the original request&#39;s command line.
+They are inclusive at the start, exclusive at the end, and must preserve UTF-16
+scalar boundaries. The engine filters edits outside the request or not spanning
+its cursor before ranking. <code>displayText</code>, <code>detail</code>, and <code>matchedRanges</code> describe
+presentation; <code>replacementText</code> supplies insertion. <code>TerminalCompletionMatchRanges</code>
+defensively copies its primitive storage and validates display boundaries.</p>
+<p><code>feedbackToken</code> is optional provider-owned runtime context. Fusion preserves the
+chosen presentation candidate&#39;s token without interpreting it. Source labels
+and row indices are not provider identities; feedback is not broadcast to
+contributors hidden by deduplication.</p>
+<p><code>TerminalCompletionMessages</code> localizes generated descriptions.
+<code>TerminalCommandSpecs.defaults(locale)</code> and its bundle/callback overloads
+localize catalog descriptions and argument labels while preserving canonical
+tokens and metadata. Engine and path-source construction resolve static labels;
+parameterized descriptions, such as Gradle task fallback text, may be formatted
+during evaluation. Message providers must be thread-safe. See the shared
+<a href="../../docs/library/configuration.html#optional-host-chrome-and-labels">configuration contract</a>.</p>
+<h2 id="internal-implementation">Internal Implementation</h2>
+<p>Implementation packages (<code>commandline</code>, <code>engine</code>, <code>internal</code>, <code>matching</code>,
+<code>ranking</code>, <code>source</code>, <code>spec</code>, and <code>stats</code>) contain internal declarations.
+External modules do not import them.</p>
+<p>One token pass selects the active command segment, and one context resolver
+uses the engine&#39;s command catalog to classify the cursor. The engine shares the
+result with static and host sources and the global ranker. The same catalog
+supplies the static source automatically.</p>
+<p>Each request captures one compiled learning-index set before source evaluation.
+The set contains opaque ranking lookup, eligible replay history, and derived
+observed tokens. A snapshot-identity and shell-syntax cache reuses compiled
+indexes across requests. Learning mutations during evaluation affect the next
+request, keeping one request internally consistent.</p>
+<h3 id="custom-engines-and-direct-source-evaluation">Custom engines and direct source evaluation</h3>
+<p><code>TerminalCompletionContext.resolve(request, commandSpecs)</code> uses the same parsing
+and spec resolution as the stock engine. A custom engine resolves once and
+passes that context with the original request to <code>TerminalCompletionSource.complete</code>
+or <code>TerminalCompletionSources.valueDomainCandidates</code>. The default catalog is
+bundled; an empty catalog provides lexical context without inferred command,
+option, or positional metadata.</p>
+<p>Resolution performs no host I/O, scheduling, ranking, or caching. Empty, unknown,
+and incomplete lines produce partial contexts. At an <code>OPERATOR</code> position,
+callers should skip source evaluation. Custom engines own candidate limits,
+replacement validation, ranking, source concurrency, failure handling, and
+cancellation.</p>
+<p>Context-owned collections are immutable and can be retained across suspension
+or overlapping requests. Command specs are referenced rather than deep-copied:
+keep their nested collections unchanged while any context uses them. A new
+catalog for later requests does not invalidate an earlier context.</p>
+<h3 id="context-argument-history">Context argument history</h3>
+<p>Sources can query decoded arguments before the active word without tokenizing
+again. These request-owned immutable values include only the cursor&#39;s command
+segment; the active word is excluded even at its end, as are all later words.
+Quotes and escapes follow the captured shell syntax, empty quoted words remain
+empty strings, and no variable, glob, or command expansion occurs.</p>
+<ul>
+<li><code>precedingArguments</code> includes subcommands, option names, values, and <code>--</code> in
+input order. It excludes leading environment assignments and the executable,
+works for unknown commands, and is empty at command or operator positions.</li>
+<li><code>precedingPositionalArguments</code> uses the matched spec to exclude resolved
+subcommands, options, option values, and the terminator. After <code>--</code>, words are
+positional. It is empty for unknown commands; unknown options do not acquire
+inferred value ownership.</li>
+<li><code>precedingOptionValues(optionName)</code> returns all completed values for a known
+option, including repeats, inherited options, and empty values. Any declared
+alias is accepted using trimmed, case-insensitive spec lookup. Separate and
+<code>--name=value</code> forms share decoded value semantics. Unknown options, valueless
+flags, pending values, and the active word are excluded. The caller chooses
+first, last, or all values; no last-value-wins policy is imposed.</li>
+</ul>
+<h3 id="evaluation-and-failure-behavior">Evaluation and failure behavior</h3>
+<p>Collection starts a cold structured coroutine flow. The engine evaluates specs
+and retained learning first, then launches one child per host source. Completed
+sources are incorporated serially, and a changed global ranking is emitted
+without waiting for slower sources. Each emission replaces the preceding
+snapshot; unchanged rankings are not emitted again. Normal completion leaves
+the final result available to the caller.</p>
+<p>Every source receives an output limit of 256. The engine also bounds each source
+result and returns at most 256 globally ranked candidates per snapshot. These
+are safety limits independent of the number of rows a UI presents. Source
+implementations match, filter, and encode before applying their output limit.
+Their host loaders need separate enumeration or time budgets; the candidate
+limit is not an I/O budget or a request deadline.</p>
+<p>Ordinary source exceptions reach <code>TerminalCompletionSourceFailureHandler</code> and
+contribute an empty result. Unexpected errors are reported, fail collection,
+and cancel sibling sources. Independent source cancellation contributes an
+empty result; cancelling the request collection cancels all source work.
+Failure handlers may run concurrently and must return promptly without
+throwing. Sources must cooperate with cancellation and must not launch their
+own jobs. A shared engine can evaluate concurrent requests, so host providers
+must safely support that use.</p>
+<h2 id="host-ownership">Host Ownership</h2>
+<p>Hosts capture command text and context together, select authoritative shell
+capabilities, and retain the original request while candidates are displayed.
+They cancel obsolete collections and admit edits only against the matching
+editing state. Applying an edit, sending terminal input, and executing a command
+are separate host responsibilities.</p>
+<p>Environment-specific providers may perform bounded suspending I/O. They use the
+request&#39;s captured working directory rather than resampling mutable session
+state. Blocking APIs need an appropriate dispatcher; normal absence or
+unsupported context may return no matches, while operational failures propagate
+to the engine&#39;s diagnostic boundary.</p>
+<p>See the <a href="../Module.html#integration-boundaries">module guide</a> for host adapters.</p>
+<h3 id="learning-and-privacy">Learning and privacy</h3>
+<p><code>TerminalCompletionLearningStore</code> serializes mutations around one bounded exact
+aggregate; its default capacity is 2,048 rows. Published snapshots are immutable
+and retain identity while their contents are unchanged. <code>mergeSnapshot</code> adds
+aggregate events with saturating counters; merging the same event set twice
+would count it twice. Hosts control hydration and persistence.</p>
+<p>Learning has two representations:</p>
+<ul>
+<li>Opaque ranking evidence uses a case-sensitive SHA-256 command identity and
+retains execution and explicit accepted/dismissed feedback statistics.</li>
+<li>Plaintext replay supplies history and observed-token candidates only for
+successful commands approved by <code>TerminalCompletionReplayPolicy</code> and the
+store&#39;s optional host <code>replayFilter</code>.</li>
+</ul>
+<p><code>TerminalCompletionLearningStore()</code> and its capacity overload use the built-in
+policy alone. The constructor accepting <code>replayFilter: Predicate&lt;String&gt;</code> adds
+a restriction for execution admission and imported replay rows. Returning
+<code>false</code> for every command disables plaintext replay while preserving opaque
+evidence; returning <code>true</code> cannot bypass the built-in policy.</p>
+<p>The filter runs synchronously outside the store lock, only after built-in
+approval. It may run concurrently and must be thread-safe and consistent for
+the store&#39;s lifetime. Exceptions propagate before the recording or merge
+operation mutates evidence. Admission filtering does not retroactively remove
+retained rows. <code>clear()</code> removes all retained evidence and replay while
+preserving the configured filter and capacity.</p>
+<p>Blank, multiline, or malformed UTF-16 command events are ignored. Plaintext
+eligibility additionally limits text to 4,096 UTF-16 code units and 8,192 UTF-8
+bytes, rejects ISO controls other than internal tabs, respects leading-space or
+tab privacy, and applies a conservative credential classifier. Approval cannot
+prove that text contains no secret. Opaque identities also allow guessed common
+commands to be checked by hashing; they are not an anonymity guarantee.</p>
+<p>Replay history and observed tokens require the recorded profile and canonical
+working directory to equal the request context, including null. Unknown context
+is not a wildcard. Directory canonicalization trims surrounding whitespace and
+normalizes a trailing slash; it does not resolve filesystem aliases. Opaque
+ranking evidence may fall back from exact context to directory-only,
+profile-only, and global evidence.</p>
+<p>Suggestion feedback never creates replay rows. Explicit dismissal supplies
+negative evidence; passive closure and rejected editing attempts should not be
+recorded as dismissal. Successful command executions are the authority for
+replay. Hosts choose whether to collect data and where to persist it.</p>
+<h2 id="command-line-context-policy">Command-Line Context Policy</h2>
+<p>Hosts choose <code>TerminalShellCapabilities.POSIX</code>, <code>POWERSHELL</code>, or <code>PLAIN</code>; the
+engine does not infer syntax from command text or profile ids. These are
+completion lexical and replacement contracts, rather than full shell parsers.</p>
+<div class="table-scroll"><table>
+<thead>
+<tr>
+<th>Capability</th>
+<th>POSIX</th>
+<th>PowerShell</th>
+<th>Plain fallback</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Command separators</td>
+<td><code>;</code>, <code>&amp;</code>, <code>&amp;&amp;</code>, <code>|</code>, <code>||</code></td>
+<td><code>;</code>, <code>&amp;&amp;</code>, <code>|</code>, <code>||</code></td>
+<td>None inferred</td>
+</tr>
+<tr>
+<td>Escape outside single quotes</td>
+<td>Backslash</td>
+<td>Backtick</td>
+<td>Backslash tokenization</td>
+</tr>
+<tr>
+<td>Quote recovery</td>
+<td>Single and double quotes</td>
+<td>Single and double quotes, including doubled quotes</td>
+<td>Conservative tokenization</td>
+</tr>
+<tr>
+<td>Unsafe unquoted replacements</td>
+<td>POSIX escaping</td>
+<td>Single-quoted literals</td>
+<td>Omitted</td>
+</tr>
+</tbody></table></div>
+<p>Operators inside quotes or escaped by the selected dialect do not split
+segments. The start of an operator belongs to the left segment; the interior of
+a multi-character operator is an <code>OPERATOR</code> region with no candidates; after
+the operator, completion starts a right segment. Incomplete quotes remain
+tokenizable. Learned candidates are suppressed in segments following an
+operator.</p>
+<p>Trailing whitespace starts a new argument. Completing <code>cd</code> targets the command;
+completing <code>cd </code> targets an empty argument. A learned <code>cd project/</code> is projected
+as <code>project/</code> in that argument context. History entries that cannot be projected
+safely are omitted.</p>
+<p>The exact <code>--</code> token ends option and subcommand resolution after the cursor has
+passed it. While the cursor remains attached to <code>--</code>, it is still an option
+prefix. Later tokens are positional. Attached option values such as
+<code>--output=text</code> replace only the value after <code>=</code> and share the separate-value
+context used by <code>--output text</code>.</p>
+<p>Specifications describe static values through <code>valueCandidates</code>, host-loaded
+values through <code>TerminalCompletionValueDomain</code>, and paths through
+<code>TerminalPathArgumentKind</code>. An active option&#39;s value metadata is authoritative,
+including <code>NONE</code>; it does not fall back to positional metadata.
+<code>positionalArguments</code> takes precedence over scalar positional fields and can
+declare an optional argument or a variadic final argument.
+<code>exclusiveGroupIds</code> suppresses conflicting completed options before the cursor.
+<code>repeatableSubcommands</code> models sibling task values such as <code>gradle clean build</code>.</p>
+<p>Path sources activate for explicit path-like command prefixes or declared path
+arguments. The expected path kind filters entries; <code>TerminalHiddenPathPolicy</code>
+controls dot-prefixed entries. Its default hides them for an empty prefix and
+reveals them after a leading dot. Shell quoting preserves an existing quote
+style when safe and uses the request&#39;s replacement policy otherwise.</p>
+<p>For an unknown executable, approved replay can derive the first non-option
+argument and option names as observed <code>ARGUMENT</code> candidates. It does not infer a
+command grammar, later positional values, or option values. Those tokens are
+compiled from replay and are not a separate persisted learning family.</p>
+<h2 id="host-dynamic-providers">Host Dynamic Providers</h2>
+<p><code>TerminalCompletionSources</code> supplies adapters with distinct loader contracts:</p>
+<div class="table-scroll"><table>
+<thead>
+<tr>
+<th>Factory</th>
+<th>Host supplies</th>
+<th>Shared source supplies</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>path</code></td>
+<td>Bounded matching directory children for a lexical request.</td>
+<td>Path eligibility, quoting, replacement, and local ranking.</td>
+</tr>
+<tr>
+<td><code>fuzzyPath</code></td>
+<td>Already-matched, relevance-ordered entries from a bounded query.</td>
+<td>Terminal path rules and final output limit.</td>
+</tr>
+<tr>
+<td><code>gradleTask</code></td>
+<td>Complete host-bounded task snapshot.</td>
+<td>Gradle matching, project scoping, replacement, and limit.</td>
+</tr>
+<tr>
+<td><code>valueDomain</code></td>
+<td>Complete host-bounded values for the declared domain.</td>
+<td>Matching, quoting, replacement, and limit.</td>
+</tr>
+</tbody></table></div>
+<p>Fuzzy providers own fuzzy matching; Gradle and value-domain providers leave
+matching to the shared source. These loaders receive the immutable request and
+resolved context, not the engine&#39;s output limit. They require an independent
+visit, input, result, or time budget. A Gradle loader reads its available model;
+completion must not start Gradle to discover tasks.</p>
+<p><code>valueDomainCandidates</code> projects already-loaded groups for aggregate providers
+without constructing a nested adapter per request. Optional canonical command
+restrictions narrow a provider&#39;s validity. Fuzzy paths require typed path text
+by default; a context-specific provider can permit an empty prefix.</p>
+<p>Direct path requests preserve a lexical directory prefix and the authoritative
+working-directory URI. Hosts interpret home, drive, UNC, and authority semantics
+and reject locations they cannot safely map. The completion engine does not
+probe filesystems or turn remote authorities into local paths.</p>
+<h2 id="ranking-policy">Ranking Policy</h2>
+<p>Sources rank locally before global fusion. Source-local numeric scores are not
+compared across providers. The global ranker projects candidates onto the command
+they produce, groups equivalent outcomes, and combines each distinct source&#39;s
+best local rank using reciprocal-rank fusion. Duplicate rows from one source do
+not multiply support. <code>TerminalCompletionSourceEntry.priority</code> contributes a
+small prior clamped to <code>[-20, 20]</code>; named <code>TerminalCompletionSourcePrior</code> values
+provide the shared baseline for built-in source families.</p>
+<p>Outcome comparison accounts for shell quoting. Declared path values also ignore
+a redundant trailing separator; it does not resolve <code>..</code>, symlinks, URI
+authorities, environment variables, or filesystem case.</p>
+<p>Semantic context and bounded exact learning evidence adjust the fused result.
+Failed executions do not penalize ordering. Ranking evidence never becomes an
+extra provider vote. Learned candidates act as a fallback, allowing live semantic
+providers to supply presentation while matching learned evidence strengthens
+the same outcome.</p>
+<p>The edit representative favors semantic fit, narrower replacement ranges, the
+source prior, local rank, and stable tie-breakers. Presentation selection can
+choose only a contributor with the same edit. Its complete candidate metadata,
+including <code>feedbackToken</code>, is preserved together; the engine replaces only its
+score with the fused global score. Presentation selection does not change the
+admitted edit or final ordering. Ordering is deterministic for the same request,
+source results, learning snapshot, and evaluation time.</p>
+<h2 id="ranking-calibration">Ranking Calibration</h2>
+<p>Use <code>CompletionRankingReplayTest</code> as the deterministic gate for changes to
+priors, recency, smoothing, and evidence clamps. Its representative path, Git,
+and Gradle cases check top-one rate, top-three rate, and mean reciprocal rank.
+Add anonymized failure cases before changing weights.</p>
+<p>Performance changes should compare <code>TerminalCompletionBenchmark</code> workloads in
+<code>ketraterm-benchmarks</code>. They include multi-provider fusion, duplicate-heavy
+evidence, hostile output bounds, and learned history backed by a full snapshot.
+The prewarmed history case measures the compiled-index cache hit; first-use
+compilation is separate work.</p>
+</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/e3c7f9c626934093d35a67ca97afbbf1b343f28d/ketraterm-completion/docs/completion-architecture.md">View source on GitHub ↗</a></div></div></main></div>
+  <footer>
+    <a class="brand" href="../../../../index.html"><img class="brand-mark" src="../../../../assets/logo.svg" alt="" width="34" height="34">KetraTerm Library</a>
+    <p>Open source · Apache 2.0</p>
+    <div><a href="https://github.com/ketraterm/KetraTerm">GitHub ↗</a><a href="https://github.com/ketraterm/KetraTerm/issues">Issues ↗</a><a class="product-switch" href="https://ketraterm.github.io/KetraTerm/">Desktop app ↗</a></div>
+  </footer>
+</body>
+</html>

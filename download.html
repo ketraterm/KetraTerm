@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="description" content="KetraTerm is a desktop terminal for Windows, macOS, and Linux.">
+  <meta name="color-scheme" content="light dark">
+  <title>Download · KetraTerm</title>
+  <link rel="icon" href="assets/logo.svg" type="image/svg+xml">
+  <link rel="preload" href="assets/fonts/manrope-variable.ttf" as="font" type="font/ttf" crossorigin>
+  <link rel="stylesheet" href="assets/styles.css">
+  <script type="importmap">{"imports":{"mermaid":"assets/mermaid/mermaid.esm.min.mjs"}}</script>
+  <script type="module" src="assets/site.js"></script>
+</head>
+<body data-product="app" data-version="">
+  <a class="skip" href="#main">Skip to content</a>
+  <header class="site-header">
+    <div class="site-identity">
+      <a class="brand" href="index.html" aria-label="KetraTerm home"><img class="brand-mark" src="assets/logo.svg" alt="" width="34" height="34">KetraTerm</a>
+      <nav class="product-navigation" aria-label="KetraTerm products"><a href="index.html" aria-current="true">App</a><a href="library/index.html">Library</a></nav>
+    </div>
+    <details class="site-navigation" open><summary>Menu</summary><nav aria-label="App navigation"><a   href="gallery.html">Screenshots</a><a   href="guide.html">Guide</a><a   href="settings.html">Settings</a><a   href="changelog.html">Changelog</a><a aria-current="page" class="nav-primary" href="download.html">Download</a></nav></details>
+    <button class="theme-toggle" type="button" aria-label="Switch to light theme">Light</button>
+  </header>
+  <main id="main" tabindex="-1"><section class="wrap download-heading"><div><p class="product-label">KetraTerm desktop</p><h1>Download KetraTerm.</h1><p class="lead">Install it. Open your shell. Make yourself at home.</p></div><img class="download-logo" src="assets/logo.svg" alt="" width="120" height="120"></section>
+  <section class="wrap download-section">
+    <div class="installer-window">
+      <div class="installer-body"><div class="download-card" data-download="full">
+    <div class="download-controls">
+      <label>Download for<select id="download-os" aria-label="Operating system">
+        <option value="" disabled>Choose an OS</option>
+        <option value="windows">Windows</option><option value="macos">macOS</option>
+        <option value="linux">Linux</option><option value="java">Any OS · bring Java</option>
+      </select></label>
+      <label id="arch-field" hidden>Architecture<select id="download-arch" aria-label="Architecture">
+        <option value="">Choose your Mac</option><option value="arm64">Apple silicon</option><option value="x64">Intel</option>
+      </select></label>
+    </div><div id="download-options"></div>
+    <p class="small" id="detection-note">Choose an operating system to see packages.</p>
+    <p id="release-status" role="status">Checking release availability…</p>
+    <noscript><p><a href="https://github.com/ketraterm/KetraTerm/releases/latest">Download from GitHub Releases</a>.</p></noscript>
+    <div class="download-links"><a href="https://github.com/ketraterm/KetraTerm/releases">All releases</a><a href="changelog.html">What’s new</a></div>
+  </div><aside class="install-steps"><h2>From download to prompt.</h2><ol><li><strong>Install or unpack.</strong><p>Platform packages include the Java runtime. Portable packages run without an installer.</p></li><li><strong>Open KetraTerm.</strong><p>Choose an installed shell from the profile menu.</p></li><li><strong>Make it yours.</strong><p>Pick a theme and font, then open tabs or split panes.</p></li></ol><a href="guide.html">Open the app guide ↗</a></aside></div>
+      <div class="workspace-status"><span>Windows x64 · macOS Apple silicon / Intel · Linux x64</span><a href="https://github.com/ketraterm/KetraTerm/issues">Need help? ↗</a></div>
+    </div>
+    <div class="download-help"><p>Bringing your own runtime? Choose <strong>Any OS · bring Java</strong>. That archive requires Java 25.</p><a href="guide.html#shells-and-sessions">Check shell support ↗</a></div>
+  </section></main>
+  <footer>
+    <a class="brand" href="index.html"><img class="brand-mark" src="assets/logo.svg" alt="" width="34" height="34">KetraTerm</a>
+    <p>Open source · Apache 2.0</p>
+    <div><a href="https://github.com/ketraterm/KetraTerm">GitHub ↗</a><a href="https://github.com/ketraterm/KetraTerm/issues">Issues ↗</a><a class="product-switch" href="library/index.html">For developers ↗</a></div>
+  </footer>
+</body>
+</html>

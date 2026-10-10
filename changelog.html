@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="description" content="KetraTerm is a desktop terminal for Windows, macOS, and Linux.">
+  <meta name="color-scheme" content="light dark">
+  <title>App changelog · KetraTerm</title>
+  <link rel="icon" href="assets/logo.svg" type="image/svg+xml">
+  <link rel="preload" href="assets/fonts/manrope-variable.ttf" as="font" type="font/ttf" crossorigin>
+  <link rel="stylesheet" href="assets/styles.css">
+  <script type="importmap">{"imports":{"mermaid":"assets/mermaid/mermaid.esm.min.mjs"}}</script>
+  <script type="module" src="assets/site.js"></script>
+</head>
+<body data-product="app" data-version="v0.3.0 · Stable release">
+  <a class="skip" href="#main">Skip to content</a>
+  <header class="site-header">
+    <div class="site-identity">
+      <a class="brand" href="index.html" aria-label="KetraTerm home"><img class="brand-mark" src="assets/logo.svg" alt="" width="34" height="34">KetraTerm</a>
+      <nav class="product-navigation" aria-label="KetraTerm products"><a href="index.html" aria-current="true">App</a><a href="library/index.html">Library</a></nav>
+    </div>
+    <details class="site-navigation" open><summary>Menu</summary><nav aria-label="App navigation"><a   href="gallery.html">Screenshots</a><a   href="guide.html">Guide</a><a   href="settings.html">Settings</a><a aria-current="page"  href="changelog.html">Changelog</a><a  class="nav-primary" href="download.html">Download</a></nav></details>
+    <button class="theme-toggle" type="button" aria-label="Switch to light theme">Light</button>
+  </header>
+  <div class="docs-shell"><aside class="sidebar" aria-label="Documentation navigation"><details class="nav-disclosure" open><summary class="mobile-nav-toggle">Browse app guides</summary><div><label class="search-label">Find app help<input type="search" data-doc-search placeholder="Search app guides" autocomplete="off" data-index="search.json"></label><div class="search-results" aria-live="polite"></div><details open><summary>Using KetraTerm</summary><a  href="guide.html">App guide</a><a  href="settings.html">Settings reference</a><a aria-current="page" href="changelog.html">App changelog</a></details></div></details></aside><main id="main" tabindex="-1" class="article article-with-outline"><div class="article-top"><nav class="breadcrumb" aria-label="Breadcrumb"><ol><li><a href="index.html">KetraTerm</a></li><li><span aria-current="page">App changelog</span></li></ol></nav><div class="doc-version"><span>v0.3.0 · Stable release</span></div></div><details class="page-outline" open><summary>On this page</summary><nav aria-label="On this page"><a class="depth-2" href="#030---2026-09-23">[0.3.0] - 2026-09-23</a><a class="depth-2" href="#022---2026-09-11">[0.2.2] - 2026-09-11</a><a class="depth-2" href="#021---2026-07-14">[0.2.1] - 2026-07-14</a><a class="depth-2" href="#020---2026-07-13">[0.2.0] - 2026-07-13</a><a class="depth-2" href="#013---2026-07-08">[0.1.3] - 2026-07-08</a><a class="depth-2" href="#012---2026-07-03">[0.1.2] - 2026-07-03</a><a class="depth-2" href="#011---2026-07-02">[0.1.1] - 2026-07-02</a><a class="depth-2" href="#010---2026-06-30">[0.1.0] - 2026-06-30</a></nav></details><div class="article-content"><div class="prose"><h1 id="ketraterm-standalone-changelog">KetraTerm Standalone Changelog</h1>
+<h2 id="030---2026-09-23">[0.3.0] - 2026-09-23</h2>
+<ul>
+<li>Fixed scrolling in split terminal layouts disturbing neighboring content.</li>
+<li>Fixed slow trackpad movements being ignored in full-screen terminal apps when mouse mode is off.</li>
+<li>Terminal apps can now copy larger selections to the clipboard, up to 1 MiB, while respecting clipboard permissions.</li>
+<li>Fixed cursor shape and blinking not returning after leaving full-screen terminal apps such as Neovim.</li>
+<li>Tabs can now show the running application&#39;s name when it does not supply a title. Custom names keep priority, and automatic process titles can be turned off in settings.</li>
+<li>Improved cursor positioning compatibility with terminal apps that save and restore the cursor.</li>
+<li>Improved compatibility with apps that switch terminal width, while respecting resize settings and protecting split layouts.</li>
+<li>Fixed cursor and scroll-position jumps when resizing terminals with a full history.</li>
+<li>Fixed terminal links opening the wrong destination after a reset.</li>
+<li>Compatible terminal apps can now match the terminal&#39;s light or dark theme.</li>
+<li>Added a startup command setting for new terminal tabs and splits.</li>
+<li>Fixed missing spaces and line breaks when copying or exporting terminal text, including after resizing.</li>
+<li>Improved compatibility with custom shell startup files and commands.</li>
+<li>Improved link underlines and kept hover highlights consistent across wrapped lines and output updates.</li>
+</ul>
+<h2 id="022---2026-09-11">[0.2.2] - 2026-09-11</h2>
+<ul>
+<li>Fixed alignment of Hebrew, Arabic, and mixed-direction text with cell backgrounds, the cursor, selection and search highlights, and mouse targets.</li>
+<li>Fixed Arabic letter forms changing under the block cursor and missing text in very long lines that require contextual shaping.</li>
+<li>Fixed Arabic text containing joiners unexpectedly switching fonts, particularly on macOS.</li>
+<li>Preserved native emoji rendering and solid block graphics on lines containing right-to-left text.</li>
+<li>Fixed concealed text and emoji becoming visible under the block cursor or when hovering over links. Prevented neighboring characters from spilling into concealed cells.</li>
+<li>Fixed rectangular selections widening across mixed-direction lines or when part of the selection scrolls out of view.</li>
+<li>Fixed a terminal view retaining the previous session&#39;s text or search results when switching to a new session.</li>
+<li>Fixed blinking text and the cursor remaining hidden after unrelated output updates.</li>
+<li>Fixed inverted colors in scrollback failing to update when reverse-video mode changes or resets.</li>
+<li>Fixed gaps during smooth scrolling while new content is loading, scroll-position jumps during resizing, and stale scroll animations after screen switches.</li>
+</ul>
+<h2 id="021---2026-07-14">[0.2.1] - 2026-07-14</h2>
+<ul>
+<li>Fixed holding Backspace or Delete deleting only one character.</li>
+<li>Improved compatibility for Ctrl-number shortcuts, modified keys, extended function keys, and applications that configure Backspace behavior.</li>
+<li>Reported terminal capabilities more accurately to shells and terminal applications.</li>
+<li>Improved compatibility with full-screen terminal applications that verify rectangular screen regions.</li>
+</ul>
+<h2 id="020---2026-07-13">[0.2.0] - 2026-07-13</h2>
+<ul>
+<li>Fixed multiline paste.</li>
+<li>Fixed terminal selection copying that could intermittently copy the wrong text or leave the previous clipboard contents unchanged.</li>
+<li>Improved copying of scrollback selections, wrapped lines, and trailing empty cells.</li>
+<li>Fixed scrollback behavior in terminal apps (including TUIs like codex logs) so historical output is scrollable again.</li>
+<li>Fixed prompt gutter clicks selecting the wrong text under certain circumstances.</li>
+</ul>
+<h2 id="013---2026-07-08">[0.1.3] - 2026-07-08</h2>
+<ul>
+<li>Improved focused-terminal shortcuts for copy, paste, search, and page scrolling.</li>
+<li>Added a compact floating search bar with result navigation and match-case control.</li>
+<li>Added a terminal context menu that respects TUI mouse tracking.</li>
+<li>Improved macOS shortcut behavior with standard Cmd+C, Cmd+V, and Cmd+F bindings.</li>
+</ul>
+<h2 id="012---2026-07-03">[0.1.2] - 2026-07-03</h2>
+<ul>
+<li>Added terminal process close confirmation.</li>
+<li>Added a &quot;Scroll on output&quot; setting to keep the viewport in place or follow new output.</li>
+<li>Fixed selection copying to support text spanning the entire terminal scrollback history.</li>
+<li>Fixed first-run TUI wrapping corruption.</li>
+</ul>
+<h2 id="011---2026-07-02">[0.1.1] - 2026-07-02</h2>
+<ul>
+<li>Fixed AltGr character input and terminal grid corruption on AZERTY keyboards for Windows/Linux.</li>
+</ul>
+<h2 id="010---2026-06-30">[0.1.0] - 2026-06-30</h2>
+<ul>
+<li>First public KetraTerm standalone desktop application release.</li>
+<li>Added a native desktop window with multiple terminal tabs, custom titles, and tab-management shortcuts.</li>
+<li>Added local terminal sessions for zsh, bash, sh, PowerShell, and cmd.exe.</li>
+<li>Added configurable typography, default colors, palettes, and scrollback capacity.</li>
+</ul>
+</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/53b548442ec75b6d28f8c061a9b36c04e8cf560c/ketraterm-app/CHANGELOG.md">View source on GitHub ↗</a></div></div></main></div>
+  <footer>
+    <a class="brand" href="index.html"><img class="brand-mark" src="assets/logo.svg" alt="" width="34" height="34">KetraTerm</a>
+    <p>Open source · Apache 2.0</p>
+    <div><a href="https://github.com/ketraterm/KetraTerm">GitHub ↗</a><a href="https://github.com/ketraterm/KetraTerm/issues">Issues ↗</a><a class="product-switch" href="library/index.html">For developers ↗</a></div>
+  </footer>
+</body>
+</html>

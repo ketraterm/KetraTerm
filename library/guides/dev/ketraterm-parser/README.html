@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="description" content="A modular Kotlin/JVM terminal emulator library for Swing and headless applications.">
+  <meta name="color-scheme" content="light dark">
+  <title>KetraTerm Parser (:ketraterm-parser) · KetraTerm Library</title>
+  <link rel="icon" href="../../../assets/logo.svg" type="image/svg+xml">
+  <link rel="preload" href="../../../assets/fonts/manrope-variable.ttf" as="font" type="font/ttf" crossorigin>
+  <link rel="stylesheet" href="../../../assets/styles.css">
+  <script type="importmap">{"imports":{"mermaid":"../../../assets/mermaid/mermaid.esm.min.mjs"}}</script>
+  <script type="module" src="../../../assets/site.js"></script>
+</head>
+<body data-product="library" data-version="Development">
+  <a class="skip" href="#main">Skip to content</a>
+  <header class="site-header">
+    <div class="site-identity">
+      <a class="brand" href="../../../index.html" aria-label="KetraTerm Library home"><img class="brand-mark" src="../../../assets/logo.svg" alt="" width="34" height="34">KetraTerm</a>
+      <nav class="product-navigation" aria-label="KetraTerm products"><a href="https://ketraterm.github.io/KetraTerm/">App</a><a href="../../../index.html" aria-current="true">Library</a></nav>
+    </div>
+    <details class="site-navigation" open><summary>Menu</summary><nav aria-label="Library navigation"><a   href="../docs/README.html">Guides</a><a aria-current="true"  href="../modules.html">Modules</a><a   href="../../../versions.html">API & versions</a><a   href="../CHANGELOG.html">Changelog</a><a  class="nav-primary" href="../README.html">Get started</a></nav></details>
+    <button class="theme-toggle" type="button" aria-label="Switch to light theme">Light</button>
+  </header>
+  <div class="docs-shell"><aside class="sidebar" aria-label="Documentation navigation"><details class="nav-disclosure" open><summary class="mobile-nav-toggle">Browse library guides</summary><div><label class="search-label">Find a library guide<input type="search" data-doc-search placeholder="Search library docs" autocomplete="off" data-index="../search.json"></label><div class="search-results" aria-live="polite"></div><details open><summary>Start here</summary><a  href="../docs/README.html">Documentation</a><a  href="../README.html">Installation</a><a  href="../modules.html">Module guides</a><a  href="../CHANGELOG.html">Changelog</a></details><details open><summary>Capabilities</summary><a  href="../docs/terminal-feature-map.html">Feature map</a><a  href="../docs/features/terminal.html">Terminal</a><a  href="../docs/features/shells.html">Shell integration</a><a  href="../docs/features/desktop.html">Swing view & hosts</a><a  href="../docs/features/completion.html">Completion</a><a  href="../docs/features/embedding.html">Embedding</a><a  href="../docs/terminal-feature-gap-map.html">Known limits</a></details><details open><summary>Embedding guides</summary><a  href="../docs/library/configuration.html">Configuration</a><a  href="../docs/library/compatibility.html">Compatibility</a><a  href="../docs/library/render-ownership.html">Render ownership</a></details><details open><summary>Reference</summary><a  href="../docs/reference/protocol.html">Protocols</a><a  href="../docs/reference/notifications.html">Notifications</a><a  href="../docs/reference/storage.html">Storage & privacy</a></details><details open><summary>Development</summary><a  href="../ARCHITECTURE.html">Architecture</a><a  href="../CONTRIBUTING.html">Contributing</a><a  href="../docs/development/conformance-testing.html">Conformance testing</a></details></div></details></aside><main id="main" tabindex="-1" class="article article-with-outline"><div class="article-top"><nav class="breadcrumb" aria-label="Breadcrumb"><ol><li><a href="../../../index.html">Library</a></li><li><a href="../modules.html">Modules</a></li><li><span aria-current="page">KetraTerm Parser (:ketraterm-parser)</span></li></ol></nav><div class="doc-version"><span>Development</span><a href="../../../versions.html">All versions</a></div></div><details class="page-outline" open><summary>On this page</summary><nav aria-label="On this page"><a class="depth-2" href="#how-to-use">How to Use</a><a class="depth-2" href="#how-to-implement-custom-command-sink">How to Implement: Custom Command Sink</a><a class="depth-2" href="#custom-osc-commands">Custom OSC Commands</a><a class="depth-2" href="#sub-documentation">Sub-Documentation</a></nav></details><div class="article-content"><div class="prose"><h1 id="ketraterm-parser-ketraterm-parser">KetraTerm Parser (<code>:ketraterm-parser</code>)</h1>
+<p>Parses terminal host output into synchronous <code>TerminalCommandSink</code> callbacks.
+The parser owns UTF-8 decoding, ANSI sequence recognition, charset mapping, and
+grapheme assembly. The sink owns terminal state, cell width, and grid behavior.
+The only library dependency is <code>ketraterm-protocol</code>.</p>
+<p>See the <a href="../README.html">repository README</a> for installation and JVM requirements.</p>
+<p>Use this module when supplying a command sink or replacing the parsing layer.
+For a complete terminal pipeline, use <a href="../ketraterm-session/README.html">ketraterm-session</a>;
+<a href="../ketraterm-host/README.html">ketraterm-host</a> supplies the parser-to-core adapter.</p>
+<h2 id="how-to-use">How to Use</h2>
+<p>Create one parser per stream and feed bytes in their original order:</p>
+<pre><code class="language-kotlin">import io.github.ketraterm.parser.api.TerminalParsers
+import io.github.ketraterm.parser.spi.TerminalCommandSink
+
+class ParserConsumer(sink: TerminalCommandSink) {
+    private val parser = TerminalParsers.create(sink)
+
+    fun onDataReceived(buffer: ByteArray, bytesRead: Int) {
+        parser.accept(buffer, 0, bytesRead)
+    }
+
+    fun onEndOfStream() {
+        parser.endOfInput()
+    }
+}
+</code></pre>
+<p><code>accept</code> consumes the specified range before returning; the caller can then reuse
+the byte array. Chunks may split UTF-8 scalars, escape sequences, control strings,
+or graphemes. Calls, including <code>reset</code> and <code>endOfInput</code>, must be serialized and
+non-reentrant. The parser starts no threads or coroutines. Callbacks execute on
+the calling thread, so they should return promptly.</p>
+<p><code>endOfInput</code> publishes pending printable text, replaces incomplete printable
+UTF-8, and discards unfinished OSC/DCS commands. <code>reset</code> discards parser-owned
+state without emitting a terminal reset. If a callback throws, the exception
+propagates; stop processing that stream because parser and sink state may no
+longer agree.</p>
+<h2 id="how-to-implement-custom-command-sink">How to Implement: Custom Command Sink</h2>
+<p>Implement <a href="https://github.com/ketraterm/KetraTerm/blob/e3c7f9c626934093d35a67ca97afbbf1b343f28d/ketraterm-parser/src/main/kotlin/io/github/ketraterm/parser/spi/TerminalCommandSink.kt">TerminalCommandSink</a>
+to receive semantic operations. Its contracts matter beyond individual commands:</p>
+<ul>
+<li><code>writeCluster</code> and <code>updatePreviousCluster</code> borrow an <code>IntArray</code> for the callback
+only. Consume or copy the used prefix before returning.</li>
+<li><code>updatePreviousCluster</code> supplies the complete retained grapheme, including its
+previously published prefix. The sink updates the same text target and owns
+attributes, width, cursor movement, and wrapping.</li>
+<li><code>isAlternateScreenActive</code> must reflect the effective screen synchronously,
+including rejected or repeated mode requests. Parser-owned charset saves use
+this observation.</li>
+<li><a href="https://github.com/ketraterm/KetraTerm/blob/e3c7f9c626934093d35a67ca97afbbf1b343f28d/ketraterm-parser/src/main/kotlin/io/github/ketraterm/parser/spi/TerminalAsciiCommandSink.kt">TerminalAsciiCommandSink</a>
+is an optional batching capability. Its ASCII slices are also borrowed;
+ordinary sinks continue to receive scalar callbacks.</li>
+</ul>
+<p>The factory retains at most 32 codepoints per grapheme. Additional continuations
+advance segmentation context without being emitted. Read boundaries publish
+printable prefixes while allowing later continuations to update them; publication
+does not promise identical grid placement for every chunking of a width-changing
+grapheme. See <a href="docs/grapheme-segmentation.html">grapheme publication and retention</a>.</p>
+<h2 id="custom-osc-commands">Custom OSC Commands</h2>
+<p><code>TerminalParsers.create</code> overloads accept a <code>TerminalCustomOscHandler</code> for complete
+OSC commands the built-in parser does not support. The handler receives the
+command number and a borrowed byte range containing the undecoded body. It owns
+validation, decoding, permissions, and any retained copy.</p>
+<p>The handler receives only complete, valid, bounded envelopes. Built-in commands
+never fall through. Configure the custom OSC size limit through the factory.</p>
+<p>For session integration, use <code>TerminalOutputParserFactory</code> to preserve the
+session&#39;s assembled sink and live clipboard collection budget. That budget bounds
+OSC 52 collection; it does not grant permission to modify the clipboard. Custom
+handlers running under a session must not wait for UI work or call mutating
+session APIs.</p>
+<h2 id="sub-documentation">Sub-Documentation</h2>
+<ul>
+<li><a href="Module.html">Module overview</a>: implementation boundaries and maintenance entry points.</li>
+<li><a href="docs/ansi-fsm-specification.html">ANSI FSM specification</a>: routing, dispatch keys, and recovery.</li>
+<li><a href="docs/grapheme-segmentation.html">Grapheme segmentation</a>: UTF-8, publication, retention, and charset state.</li>
+<li><a href="../docs/terminal-feature-map.html">Feature map</a> and <a href="../docs/terminal-feature-gap-map.html">gap map</a>: supported behavior and deferred scope.</li>
+</ul>
+</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/e3c7f9c626934093d35a67ca97afbbf1b343f28d/ketraterm-parser/README.md">View source on GitHub ↗</a></div></div></main></div>
+  <footer>
+    <a class="brand" href="../../../index.html"><img class="brand-mark" src="../../../assets/logo.svg" alt="" width="34" height="34">KetraTerm Library</a>
+    <p>Open source · Apache 2.0</p>
+    <div><a href="https://github.com/ketraterm/KetraTerm">GitHub ↗</a><a href="https://github.com/ketraterm/KetraTerm/issues">Issues ↗</a><a class="product-switch" href="https://ketraterm.github.io/KetraTerm/">Desktop app ↗</a></div>
+  </footer>
+</body>
+</html>

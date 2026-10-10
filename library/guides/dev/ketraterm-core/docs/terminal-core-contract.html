@@ -1,0 +1,423 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="description" content="A modular Kotlin/JVM terminal emulator library for Swing and headless applications.">
+  <meta name="color-scheme" content="light dark">
+  <title>Terminal Core Contract · KetraTerm Library</title>
+  <link rel="icon" href="../../../../assets/logo.svg" type="image/svg+xml">
+  <link rel="preload" href="../../../../assets/fonts/manrope-variable.ttf" as="font" type="font/ttf" crossorigin>
+  <link rel="stylesheet" href="../../../../assets/styles.css">
+  <script type="importmap">{"imports":{"mermaid":"../../../../assets/mermaid/mermaid.esm.min.mjs"}}</script>
+  <script type="module" src="../../../../assets/site.js"></script>
+</head>
+<body data-product="library" data-version="Development">
+  <a class="skip" href="#main">Skip to content</a>
+  <header class="site-header">
+    <div class="site-identity">
+      <a class="brand" href="../../../../index.html" aria-label="KetraTerm Library home"><img class="brand-mark" src="../../../../assets/logo.svg" alt="" width="34" height="34">KetraTerm</a>
+      <nav class="product-navigation" aria-label="KetraTerm products"><a href="https://ketraterm.github.io/KetraTerm/">App</a><a href="../../../../index.html" aria-current="true">Library</a></nav>
+    </div>
+    <details class="site-navigation" open><summary>Menu</summary><nav aria-label="Library navigation"><a   href="../../docs/README.html">Guides</a><a aria-current="true"  href="../../modules.html">Modules</a><a   href="../../../../versions.html">API & versions</a><a   href="../../CHANGELOG.html">Changelog</a><a  class="nav-primary" href="../../README.html">Get started</a></nav></details>
+    <button class="theme-toggle" type="button" aria-label="Switch to light theme">Light</button>
+  </header>
+  <div class="docs-shell"><aside class="sidebar" aria-label="Documentation navigation"><details class="nav-disclosure" open><summary class="mobile-nav-toggle">Browse library guides</summary><div><label class="search-label">Find a library guide<input type="search" data-doc-search placeholder="Search library docs" autocomplete="off" data-index="../../search.json"></label><div class="search-results" aria-live="polite"></div><details open><summary>Start here</summary><a  href="../../docs/README.html">Documentation</a><a  href="../../README.html">Installation</a><a  href="../../modules.html">Module guides</a><a  href="../../CHANGELOG.html">Changelog</a></details><details open><summary>Capabilities</summary><a  href="../../docs/terminal-feature-map.html">Feature map</a><a  href="../../docs/features/terminal.html">Terminal</a><a  href="../../docs/features/shells.html">Shell integration</a><a  href="../../docs/features/desktop.html">Swing view & hosts</a><a  href="../../docs/features/completion.html">Completion</a><a  href="../../docs/features/embedding.html">Embedding</a><a  href="../../docs/terminal-feature-gap-map.html">Known limits</a></details><details open><summary>Embedding guides</summary><a  href="../../docs/library/configuration.html">Configuration</a><a  href="../../docs/library/compatibility.html">Compatibility</a><a  href="../../docs/library/render-ownership.html">Render ownership</a></details><details open><summary>Reference</summary><a  href="../../docs/reference/protocol.html">Protocols</a><a  href="../../docs/reference/notifications.html">Notifications</a><a  href="../../docs/reference/storage.html">Storage & privacy</a></details><details open><summary>Development</summary><a  href="../../ARCHITECTURE.html">Architecture</a><a  href="../../CONTRIBUTING.html">Contributing</a><a  href="../../docs/development/conformance-testing.html">Conformance testing</a></details></div></details></aside><main id="main" tabindex="-1" class="article article-with-outline"><div class="article-top"><nav class="breadcrumb" aria-label="Breadcrumb"><ol><li><a href="../../../../index.html">Library</a></li><li><a href="../../modules.html">Modules</a></li><li><a href="../README.html">ketraterm-core</a></li><li><span aria-current="page">Terminal Core Contract</span></li></ol></nav><div class="doc-version"><span>Development</span><a href="../../../../versions.html">All versions</a></div></div><details class="page-outline" open><summary>On this page</summary><nav aria-label="On this page"><a class="depth-2" href="#public-api-surfaces">Public API surfaces</a><a class="depth-3" href="#render-frame-generations">Render frame generations</a><a class="depth-2" href="#writer-contract">Writer contract</a><a class="depth-3" href="#printable-ingress">Printable ingress</a><a class="depth-3" href="#erase-and-edit-commands">Erase and edit commands</a><a class="depth-2" href="#cursor-contract">Cursor contract</a><a class="depth-3" href="#decsc--decrc">DECSC / DECRC</a><a class="depth-3" href="#tabs">Tabs</a><a class="depth-2" href="#mode-state-contract">Mode-state contract</a><a class="depth-2" href="#unicode-scalar-and-width-policy">Unicode scalar and width policy</a><a class="depth-2" href="#reader-contract">Reader contract</a><a class="depth-2" href="#buffer-lifecycle-contract">Buffer lifecycle contract</a><a class="depth-3" href="#primary-and-alternate-screens">Primary and alternate screens</a><a class="depth-3" href="#resize">Resize</a><a class="depth-3" href="#soft-reset">Soft reset</a><a class="depth-3" href="#hard-reset">Hard reset</a><a class="depth-3" href="#deccolm">DECCOLM</a><a class="depth-2" href="#protection-contract">Protection contract</a><a class="depth-2" href="#terminal-responses">Terminal responses</a><a class="depth-2" href="#invariants">Invariants</a></nav></details><div class="article-content"><div class="prose"><h1 id="terminal-core-contract">Terminal Core Contract</h1>
+<p>Behavioral contract of the standard buffer returned by <code>TerminalBuffers.create</code>.
+Method KDoc defines individual parameters and validation. The
+<a href="../../docs/terminal-feature-map.html">feature map</a> and
+<a href="../../docs/terminal-feature-gap-map.html">gap map</a> own capability status and
+protocol scope.</p>
+<h2 id="public-api-surfaces">Public API surfaces</h2>
+<p><code>TerminalBuffers.create(width, height, maxHistory)</code> returns <code>TerminalRenderBuffer</code>,
+which combines <code>TerminalBuffer</code> with <code>TerminalRenderFrameReader</code> over the same
+state. Headless implementations may implement <code>TerminalBuffer</code> alone.</p>
+<p><code>TerminalBuffer</code> composes these roles:</p>
+<div class="table-scroll"><table>
+<thead>
+<tr>
+<th>Role</th>
+<th>Responsibility</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>TerminalWriter</code></td>
+<td>Text, erase/edit operations, pen, titles, and protection</td>
+</tr>
+<tr>
+<td><code>TerminalCursor</code></td>
+<td>Positioning, movement, saved cursor, and tab stops</td>
+</tr>
+<tr>
+<td><code>TerminalModeController</code></td>
+<td>Durable modes, palette, and screen switching</td>
+</tr>
+<tr>
+<td><code>TerminalModeReader</code> / <code>TerminalInputState</code></td>
+<td>Typed or packed mode snapshots</td>
+</tr>
+<tr>
+<td><code>TerminalResponseChannel</code></td>
+<td>State-dependent query replies and queued bytes</td>
+</tr>
+<tr>
+<td><code>TerminalReader</code></td>
+<td>Borrowed lines, palette, grid/cursor dimensions, and metadata</td>
+</tr>
+<tr>
+<td><code>TerminalInspector</code></td>
+<td>Allocating text and attribute inspection</td>
+</tr>
+</tbody></table></div>
+<p>Depend on the narrowest role needed. The factory requires positive visible
+dimensions and nonnegative history capacity; <code>maxHistory + height</code> must fit in
+<code>Int</code>. Zero history capacity disables primary scrollback. Creation installs no
+lock: mutations, response access, cursor/grid/history reads, and borrowed frames
+require external serialization. Factory mode snapshots are atomic, but cannot
+make separately read grid state coherent.</p>
+<p>Cursor positioning and cell reads use zero-based coordinates. With origin mode,
+positioning is relative to the top margin; with both origin and left/right margin
+modes, columns are relative to the left margin. Margin methods and rectangular
+commands retain their documented DEC one-based conventions; zero rectangle
+parameters mean omitted values. The host adapter performs parser-to-core
+coordinate conversion.</p>
+<h3 id="render-frame-generations">Render frame generations</h3>
+<p>Frames are valid only within their callback and must not escape it. Nested frame
+reads on the same buffer throw <code>IllegalStateException</code> before disturbing the
+outer frame. Callback failure releases the lease. Copy rows and cluster data
+into caller-owned arrays before returning.</p>
+<p>Generation values belong to one source. Compare them for equality, including
+across overflow; include source and active-buffer identity in retained cache keys.</p>
+<div class="table-scroll"><table>
+<thead>
+<tr>
+<th>Value</th>
+<th>Invalidation meaning</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>frameGeneration</code></td>
+<td>Any visually relevant change</td>
+</tr>
+<tr>
+<td><code>contentGeneration</code></td>
+<td>Retained cell, authored-output provenance, or terminal-owned row-mapping changes</td>
+</tr>
+<tr>
+<td><code>structureGeneration</code></td>
+<td>Terminal shape or row mapping changes</td>
+</tr>
+<tr>
+<td><code>lineGeneration(row)</code></td>
+<td>That rendered row, including global reverse-video interpretation</td>
+</tr>
+<tr>
+<td><code>historyContentGeneration</code></td>
+<td>Per-buffer retained-history replacement, clear, or resize/reflow</td>
+</tr>
+</tbody></table></div>
+<p>Ordinary history admission and eviction preserve <code>historyContentGeneration</code>;
+track row identities and <code>discardedCount</code> for those changes. Caller-requested
+scrollback offsets do not mutate terminal state and must be included separately
+in viewport cache keys. Reverse video preserves stored content, row identities,
+and structure generation while invalidating rendered attributes for every row,
+including history and the inactive screen. Global invalidation uses a counter
+rather than walking retained rows.</p>
+<p><code>outputEndAbsoluteRow</code> is the exclusive absolute end of authored output in the
+active buffer, independent of the viewport. It includes retained history,
+written cells, and explicit blank linefeed sources, and excludes untouched live
+capacity. Cursor motion alone does not extend it. Same-row erasure preserves
+authored blanks; row replacement resets provenance. Reflow carries authored
+output without treating cursor-placement or wide-wrap padding as new text.
+Changes advance content and frame generations. The boundary can retreat and
+does not imply that the final logical line is immutable or terminated.</p>
+<p><code>TerminalReader.palette</code> returns the current immutable effective palette without
+acquiring a frame or allocating. Serialize the read; a retained palette remains
+safe afterward. Unchanged indexed/dynamic color writes and unsupported targets
+preserve palette identity and row generations. Host theme updates replace the
+reset baseline even when effective values are equal; only an effective change
+invalidates visible rows. Palette equality includes colors and presentation
+preferences, including dark/light classification.</p>
+<h2 id="writer-contract">Writer contract</h2>
+<h3 id="printable-ingress">Printable ingress</h3>
+<ul>
+<li><code>writeCodepoint</code> accepts one Unicode scalar. It performs placement and width
+handling without grapheme segmentation.</li>
+<li><code>writeAscii</code> accepts a borrowed printable ASCII range (<code>0x20..0x7E</code>) and has the
+same cell/cursor semantics as successive scalar writes. It validates the
+entire range before mutation, does not retain the array, and leaves state
+unchanged for an empty range.</li>
+<li><code>writeText</code> decodes UTF-16 as literal scalars. It does not interpret control
+characters or escape sequences. Use explicit control operations or a parser.</li>
+<li><code>writeCluster</code> accepts one pre-segmented sequence; core computes its width.
+<code>length</code> must be in <code>1..codepoints.size</code>.</li>
+<li><code>updatePreviousCluster</code> replaces the complete retained sequence of the most
+recently written printable cell. The caller includes the previously published
+prefix; core neither compares prefixes nor validates grapheme boundaries.</li>
+</ul>
+<p>Both cluster operations validate and synchronously copy the used prefix, so the
+caller may immediately reuse its array. No parser retention limit applies to
+direct core callers. Invalid scalar input is rejected before mutation; see
+<a href="#unicode-scalar-and-width-policy">Unicode scalar and width policy</a>.</p>
+<p>Cluster continuation preserves the target&#39;s attributes. Same-width updates
+preserve cursor position; in-row width changes adjust the following cursor and
+pending wrap against the active right margin. Narrowing clears the released
+spacer. Widening overwrites the next cell only when the span fits inside the
+margin; otherwise the cluster remains one cell. Updates do not insert or shift
+cells, including in insert mode, and do not undo completed wraps, scrolling,
+overwrites, or insert shifts. A printable write rejected by geometry or disabled
+autowrap clears the target; validation failure preserves it. A valid update with
+no remembered target is ignored.</p>
+<p>All write paths preserve complete wide/cluster spans. Overwriting a spacer
+clears its previous occupant rather than leaving an orphaned leader or handle.</p>
+<h3 id="erase-and-edit-commands">Erase and edit commands</h3>
+<p>Structural edits cancel pending wrap. <code>newLine</code> advances vertically without a
+carriage return; <code>carriageReturn</code> moves to the active left boundary. The host
+adapter applies newline mode when mapping linefeed controls.</p>
+<p><code>scrollUp(count)</code> and <code>scrollDown(count)</code> ignore nonpositive counts and cap work
+at the region height. They preserve cursor position. Full-width upward scrolling
+from the top of the viewport may admit rows to primary history; partial-width
+scrolling never does. Downward scrolling does not consume history.</p>
+<p><code>ICH</code> / <code>DCH</code> operate within horizontal margins; <code>IL</code> / <code>DL</code> operate within the
+vertical region and do nothing when the cursor is outside it. Vertical scrolling
+and line edits preserve cells outside horizontal margins, except complete
+occupants crossing a slice boundary. <code>ECH</code> erases without shifting; zero means
+one cell and negative values are ignored. Rectangle operations use their
+method-level DEC coordinates and extent rules.</p>
+<p>Normal erasure ignores protection; selective erasure respects it. Clears ignore
+protection. Clearing operations have different state effects:</p>
+<div class="table-scroll"><table>
+<thead>
+<tr>
+<th>Operation</th>
+<th>Effect</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>eraseEntireScreen</code></td>
+<td>Erases visible cells, preserving cursor and history</td>
+</tr>
+<tr>
+<td><code>eraseScreenAndHistory</code></td>
+<td>Erases history, preserving visible cells</td>
+</tr>
+<tr>
+<td><code>eraseBuffer</code></td>
+<td>Erases active screen and history with current erase attributes; preserves cursor, pen, modes, margins, tabs, saved cursor, and inactive screen</td>
+</tr>
+<tr>
+<td><code>clearScreen</code></td>
+<td>Clears visible cells and homes the cursor; preserves history</td>
+</tr>
+<tr>
+<td><code>clearAll</code></td>
+<td>Clears active screen and history, resets pen, homes cursor, clears its save slot, and resets tabs; retains margins</td>
+</tr>
+<tr>
+<td><code>reset</code></td>
+<td>Performs RIS; see buffer lifecycle below</td>
+</tr>
+</tbody></table></div>
+<p><code>updatePenColors</code> changes only non-null SGR fields. Null means unchanged,
+<code>CellColor.DEFAULT</code> selects default color, and false clears a flag. Hyperlink IDs
+and selective-erase protection survive. It does not change existing cells.</p>
+<h2 id="cursor-contract">Cursor contract</h2>
+<p>Cursor movement clamps to applicable viewport or margin boundaries without
+integer overflow. Tab traversal is bounded by viewport width, not the supplied
+count. Cursor-affecting commands cancel pending wrap; saving or restoring the
+cursor follows the explicit saved-state rules below.</p>
+<h3 id="decsc--decrc"><code>DECSC</code> / <code>DECRC</code></h3>
+<p>Each screen has a save slot containing column, row, both pen words, pending wrap,
+and origin mode. Charset designation and locking shifts remain parser-owned.
+The parser selects its charset save slot using the core&#39;s actual active screen
+through the command sink.</p>
+<p><code>restoreCursor</code> clamps saved coordinates to current bounds. Pending wrap is
+restored only if the resulting column is the active right margin. Without a
+save, it homes to absolute <code>(0, 0)</code>, clears pending wrap and origin mode, and
+resets the pen.</p>
+<h3 id="tabs">Tabs</h3>
+<p><code>HT</code>, <code>CHT</code>, and <code>CBT</code> never wrap and stop at applicable horizontal boundaries.
+<code>HTS</code>, <code>TBC 0</code>, and <code>TBC 3</code> cancel pending wrap. Resize preserves surviving custom
+stops, drops truncated stops, and seeds newly exposed columns with the default
+8-column rhythm. RIS, <code>clearAll</code>, and DECCOLM restore default stops.</p>
+<h2 id="mode-state-contract">Mode-state contract</h2>
+<p><code>TerminalModeController</code> changes durable modes. <code>getModeSnapshot</code> returns an
+immutable atomic snapshot of the typed fields declared by
+<code>TerminalModeSnapshot</code>, not an inventory of every mode. The packed snapshot
+exposes <code>TerminalModeBits</code> plus the xterm resource helpers on
+<code>TerminalInputState</code>; it includes DECCOLM and resources absent from the typed
+snapshot. Capture one word when decoding several fields for one decision.</p>
+<p>Existing bit positions, widths, sentinels, and mouse ordinal meanings are stable.
+Bits 37..62 hold xterm resources; bits 19 and 63 are unassigned and must be
+ignored. Neither snapshot promises space for every future mode.
+<code>keyModifierOption</code> and <code>keyFormatOption</code> decode the same packed word. Resource
+setters reject invalid identifiers/values before mutation; family resets restore
+defaults atomically while preserving unrelated bits.</p>
+<p>Independent <code>TerminalInputState</code> implementations can construct resource values
+with <code>withKeyModifierOption</code> and <code>withKeyFormatOption</code>. These pure helpers return
+a new packed word, validate supported resources and values, and preserve all
+unrelated bits. The producer owns coherent publication; the helpers do not
+update a terminal or input state.</p>
+<p>Mode setters that home the cursor or affect wrap/margin physics cancel pending
+wrap. Input reporting and presentation setters preserve it. <code>resetCursorStyle</code>
+restores the configured default shape and enables the blink flag without
+changing visibility, position, or pending wrap; the host owns blink animation.</p>
+<p>Kitty keyboard flags and stacks are screen-local. Each stack retains at most 32
+saved entries, evicting the oldest on overflow. A positive counted pop resets
+flags when the retained stack is exhausted, including exact exhaustion; a
+partial pop restores the last popped flags. Nonpositive counts do nothing, and
+work is constant regardless of the requested count. Soft and hard reset clear
+both stacks. Serialize these operations with other core mutation.</p>
+<h2 id="unicode-scalar-and-width-policy">Unicode scalar and width policy</h2>
+<p><code>writeCodepoint</code>, <code>writeCluster</code>, and <code>updatePreviousCluster</code> accept scalars in
+<code>0..0x10FFFF</code>, excluding <code>0xD800..0xDFFF</code>. Invalid input throws
+<code>IllegalArgumentException</code> before grid, cursor, or pending-wrap mutation, even
+without a continuation target. Cluster APIs validate the entire used prefix;
+unused array entries are ignored. <code>writeText</code> replaces each unpaired UTF-16
+surrogate with U+FFFD and preserves valid pairs. Parser UTF-8 recovery remains
+outside core.</p>
+<p>Width uses generated Unicode 17.0.0 tables, independently of JDK assignment,
+locale, and available fonts:</p>
+<ul>
+<li>Unlisted valid scalars default to one cell, including ordinary unassigned values.</li>
+<li>Reserved wide ranges retain East Asian Width defaults, including unassigned
+CJK values and planes 2 and 3 through <code>xFFFD</code>.</li>
+<li>Noncharacters are valid and narrow.</li>
+<li>Private-use scalars and U+FFFD follow ambiguous-width mode.</li>
+<li>Zero-width classification, terminal cell-graphics overrides, and cluster
+variation-selector presentation rules retain precedence.</li>
+</ul>
+<p>Reserved defaults follow the pinned
+<a href="https://www.unicode.org/Public/17.0.0/ucd/EastAsianWidth.txt">Unicode East Asian Width data</a>.
+These are cell-width rules, not host security permissions. They do not add
+segmentation to scalar ingress. DECFRA remains a single-cell fill operation and
+ignores invalid fill values.</p>
+<h2 id="reader-contract">Reader contract</h2>
+<p><code>TerminalReader.getLine</code> returns a void line for an invalid row;
+<code>getCodepointAt</code> returns <code>0</code> for an invalid coordinate. On a real borrowed
+<code>TerminalLine</code>, callers must use valid columns within its <code>width</code>; these indexed
+methods are not out-of-bounds probes.</p>
+<p>Blank cells read as <code>0</code>, wide spacers as <code>-1</code>, and cluster cells as their base
+codepoint. <code>isCluster</code> identifies cells whose full payload requires
+<code>readCluster</code>. Its destination must hold the complete sequence; insufficient
+capacity throws <code>IndexOutOfBoundsException</code>. Directly written clusters have no
+fixed public length bound.</p>
+<p>Use <code>getClusterLength(col)</code> to size a reusable destination before <code>readCluster</code>.
+It returns the exact codepoint count, or zero for a scalar, blank, or wide spacer.
+Keep the borrowed line, sizing, and copying inside one uninterrupted
+serialization boundary. Clustered custom line implementations must override
+the sizing operation; its scalar-only default rejects an unsupported cluster.</p>
+<p>Alternatively, use
+<code>TerminalRenderFrame.copyLine</code> and its primitive cluster-data sink. The callback
+supplies the full length and a borrowed range to copy before returning. Keep
+serialization held for either read path. Render frames expose primitive public
+attributes and cell flags; <code>getAttrAt</code> offers allocating unpacked inspection.
+Raw storage handles and internal arrays are not public APIs.</p>
+<h2 id="buffer-lifecycle-contract">Buffer lifecycle contract</h2>
+<h3 id="primary-and-alternate-screens">Primary and alternate screens</h3>
+<p>Each screen has its own cursor, margins, save slot, ring, and cluster store.
+Alternate content has no scrollback.</p>
+<div class="table-scroll"><table>
+<thead>
+<tr>
+<th>DEC mode</th>
+<th>Core operation</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>47</code></td>
+<td>Non-clearing alternate switch, without cursor save/restore</td>
+</tr>
+<tr>
+<td><code>1047</code></td>
+<td>Clearing alternate entry that homes cursor and resets margins; exit does not restore a save slot</td>
+</tr>
+<tr>
+<td><code>1048</code></td>
+<td>Save/restore cursor without switching screens</td>
+</tr>
+<tr>
+<td><code>1049</code></td>
+<td>Save primary cursor, enter a cleared alternate screen, then restore on exit</td>
+</tr>
+</tbody></table></div>
+<p>Actual alternate entry also saves primary cursor shape and blink flag separately
+from the DECSC slot; exit restores them. Repeated entry/exit requests are no-ops
+and preserve this presentation snapshot. Alternate content survives non-clearing
+switches until a clearing entry or effective resize discards it. Resize and soft
+reset while alternate is active preserve the primary presentation snapshot; RIS
+restores configured default presentation.</p>
+<h3 id="resize">Resize</h3>
+<p><code>resize(newWidth, newHeight, oldScrollbackOffset)</code> validates positive dimensions
+and retained capacity before allocation or mutation. Identical dimensions are a
+no-op and return a clamped offset plus current history size.</p>
+<p>An effective resize:</p>
+<ul>
+<li>Reconstructs and rewraps primary logical lines when width changes, relocating
+the cursor and deep-copying surviving clusters into a new store.</li>
+<li>Preserves retained primary physical rows, attributes, wrap flags, identities,
+and cluster handles for height-only changes. Untouched trailing rows serve as
+layout capacity; cursor and viewport positions adjust to the new boundary.</li>
+<li>Retains newest rows within configured capacity. A scrolled viewport keeps its
+retained anchor or clamps to the oldest surviving row if it is evicted.</li>
+<li>Wipes and recreates the alternate grid at the new dimensions.</li>
+<li>Resets vertical and horizontal margins on both screens, resizes tab stops,
+clamps saved cursors, and clears active pending wrap.</li>
+</ul>
+<p>The returned pair is <code>(newScrollbackOffset, newHistorySize)</code> for the active
+screen. Alternate returns <code>(0, 0)</code> while primary is resized in the background.</p>
+<h3 id="soft-reset">Soft reset</h3>
+<p><code>softReset</code> implements DECSTR (<code>CSI ! p</code>). It preserves visible content,
+history, dimensions, tabs, active screen, and cursor position. It resets pen,
+protection, margins on both screens, saved cursors to home/default state, and
+pending wrap.</p>
+<p>Mode defaults restore autowrap, cursor visibility/blinking, normal video, and
+normal cursor/keypad/input behavior. Bracketed paste, focus reporting, mouse
+tracking, synchronized output, and Kitty keyboard state reset; both xterm
+resource families return to defaults. Ambiguous-width policy, mouse encoding,
+and the DECCOLM selection survive. Palette and content are preserved.</p>
+<h3 id="hard-reset">Hard reset</h3>
+<p><code>reset</code> implements RIS (<code>ESC c</code>). It returns to primary, clears primary content
+and history, homes the cursor, resets pen and terminal modes, restores full
+primary scrolling margins and default tabs, clears both Kitty stacks, restores
+default cursor presentation, and restores the host theme palette.</p>
+<p>Retained alternate cells are not cleared by RIS. A later non-clearing mode <code>47</code>
+entry can revisit them; clearing alternate entry or an effective resize discards
+that content.</p>
+<h3 id="deccolm"><code>DECCOLM</code></h3>
+<p><code>executeDeccolm</code> accepts only widths <code>80</code> or <code>132</code>; other values are ignored.
+It resizes both screens, clears the active screen and history, homes to absolute
+<code>(0, 0)</code>, resets active margins and tabs, cancels pending wrap, and preserves both
+saved-cursor slots. With alternate active, primary is reflowed in the background.</p>
+<p>The accepted column-mode selection is independent of geometry: it survives
+ordinary resize, screen changes, and DECSTR, and resets on RIS. Status queries
+observe it without modifying state or render generations.</p>
+<h2 id="protection-contract">Protection contract</h2>
+<p>Protection applies to selective erasure. <code>DECSCA</code> stamps future cells; normal
+writes and normal erasure ignore protection. Wide spacers inherit the leader&#39;s
+protection, and reflow preserves it. Hard clears ignore it.</p>
+<h2 id="terminal-responses">Terminal responses</h2>
+<p>Query methods enqueue replies in <code>TerminalResponseChannel</code>.
+<code>readResponseBytes</code> synchronously copies queued bytes into a caller-owned range;
+invalid ranges are rejected without draining the queue or changing the array.
+Sessions drain replies after core mutation and send them through the same
+serialized outbound path as input. Direct hosts must do that themselves.</p>
+<p>The host adapter must enforce terminal-response permission before calling query
+methods. Core&#39;s explicit capability allowlists govern reply contents and
+protocol-specific failure behavior. Denying the response family suppresses
+failure replies as well as success replies; supported queries and identities
+remain defined by the canonical feature map and protocol module.</p>
+<h2 id="invariants">Invariants</h2>
+<p>Public mutation paths preserve complete wide spans, live cluster ownership,
+per-screen arena isolation, tab-stop width, and accurate render invalidation.
+Horizontal slices never copy incomplete wide source spans and clear destination
+occupants crossing their boundaries. Pending wrap is cleared by cursor/structural
+operations that cancel it, and preserved by non-cursor mode changes.</p>
+</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/e3c7f9c626934093d35a67ca97afbbf1b343f28d/ketraterm-core/docs/terminal-core-contract.md">View source on GitHub ↗</a></div></div></main></div>
+  <footer>
+    <a class="brand" href="../../../../index.html"><img class="brand-mark" src="../../../../assets/logo.svg" alt="" width="34" height="34">KetraTerm Library</a>
+    <p>Open source · Apache 2.0</p>
+    <div><a href="https://github.com/ketraterm/KetraTerm">GitHub ↗</a><a href="https://github.com/ketraterm/KetraTerm/issues">Issues ↗</a><a class="product-switch" href="https://ketraterm.github.io/KetraTerm/">Desktop app ↗</a></div>
+  </footer>
+</body>
+</html>

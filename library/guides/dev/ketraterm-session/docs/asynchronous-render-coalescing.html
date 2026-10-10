@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="description" content="A modular Kotlin/JVM terminal emulator library for Swing and headless applications.">
+  <meta name="color-scheme" content="light dark">
+  <title>Coroutine render publication · KetraTerm Library</title>
+  <link rel="icon" href="../../../../assets/logo.svg" type="image/svg+xml">
+  <link rel="preload" href="../../../../assets/fonts/manrope-variable.ttf" as="font" type="font/ttf" crossorigin>
+  <link rel="stylesheet" href="../../../../assets/styles.css">
+  <script type="importmap">{"imports":{"mermaid":"../../../../assets/mermaid/mermaid.esm.min.mjs"}}</script>
+  <script type="module" src="../../../../assets/site.js"></script>
+</head>
+<body data-product="library" data-version="Development">
+  <a class="skip" href="#main">Skip to content</a>
+  <header class="site-header">
+    <div class="site-identity">
+      <a class="brand" href="../../../../index.html" aria-label="KetraTerm Library home"><img class="brand-mark" src="../../../../assets/logo.svg" alt="" width="34" height="34">KetraTerm</a>
+      <nav class="product-navigation" aria-label="KetraTerm products"><a href="https://ketraterm.github.io/KetraTerm/">App</a><a href="../../../../index.html" aria-current="true">Library</a></nav>
+    </div>
+    <details class="site-navigation" open><summary>Menu</summary><nav aria-label="Library navigation"><a   href="../../docs/README.html">Guides</a><a aria-current="true"  href="../../modules.html">Modules</a><a   href="../../../../versions.html">API & versions</a><a   href="../../CHANGELOG.html">Changelog</a><a  class="nav-primary" href="../../README.html">Get started</a></nav></details>
+    <button class="theme-toggle" type="button" aria-label="Switch to light theme">Light</button>
+  </header>
+  <div class="docs-shell"><aside class="sidebar" aria-label="Documentation navigation"><details class="nav-disclosure" open><summary class="mobile-nav-toggle">Browse library guides</summary><div><label class="search-label">Find a library guide<input type="search" data-doc-search placeholder="Search library docs" autocomplete="off" data-index="../../search.json"></label><div class="search-results" aria-live="polite"></div><details open><summary>Start here</summary><a  href="../../docs/README.html">Documentation</a><a  href="../../README.html">Installation</a><a  href="../../modules.html">Module guides</a><a  href="../../CHANGELOG.html">Changelog</a></details><details open><summary>Capabilities</summary><a  href="../../docs/terminal-feature-map.html">Feature map</a><a  href="../../docs/features/terminal.html">Terminal</a><a  href="../../docs/features/shells.html">Shell integration</a><a  href="../../docs/features/desktop.html">Swing view & hosts</a><a  href="../../docs/features/completion.html">Completion</a><a  href="../../docs/features/embedding.html">Embedding</a><a  href="../../docs/terminal-feature-gap-map.html">Known limits</a></details><details open><summary>Embedding guides</summary><a  href="../../docs/library/configuration.html">Configuration</a><a  href="../../docs/library/compatibility.html">Compatibility</a><a  href="../../docs/library/render-ownership.html">Render ownership</a></details><details open><summary>Reference</summary><a  href="../../docs/reference/protocol.html">Protocols</a><a  href="../../docs/reference/notifications.html">Notifications</a><a  href="../../docs/reference/storage.html">Storage & privacy</a></details><details open><summary>Development</summary><a  href="../../ARCHITECTURE.html">Architecture</a><a  href="../../CONTRIBUTING.html">Contributing</a><a  href="../../docs/development/conformance-testing.html">Conformance testing</a></details></div></details></aside><main id="main" tabindex="-1" class="article article-with-outline"><div class="article-top"><nav class="breadcrumb" aria-label="Breadcrumb"><ol><li><a href="../../../../index.html">Library</a></li><li><a href="../../modules.html">Modules</a></li><li><a href="../README.html">ketraterm-session</a></li><li><span aria-current="page">Coroutine render publication</span></li></ol></nav><div class="doc-version"><span>Development</span><a href="../../../../versions.html">All versions</a></div></div><details class="page-outline" open><summary>On this page</summary><nav aria-label="On this page"><a class="depth-2" href="#invalidation-and-conflation">Invalidation and conflation</a><a class="depth-2" href="#failure-and-synchronized-output">Failure and synchronized output</a><a class="depth-2" href="#ownership-and-allocation-boundary">Ownership and allocation boundary</a></nav></details><div class="article-content"><div class="prose"><h1 id="coroutine-render-publication">Coroutine render publication</h1>
+<p><code>TerminalSession</code> publishes copied render data for consumers that do not need
+synchronous access to the live grid. Read a publication with <code>readPublishedFrame</code>
+and observe <code>renderGeneration</code> for invalidation. Both are described in the
+<a href="../README.html#rendering-and-local-operations">session README</a>.</p>
+<h2 id="invalidation-and-conflation">Invalidation and conflation</h2>
+<p>One session worker uses a conflated channel to process render invalidations.
+The latest scrollback offset and requested row count share an atomic packed
+request; a generation counter identifies newer invalidations. No request object
+or queue entry is created for each viewport change.</p>
+<p>The worker extracts the requested viewport under mutation serialization and
+copies it into <code>TerminalRenderPublisher</code>. It advances <code>renderGeneration</code> only
+after successful promotion. Generations are opaque invalidation tokens:
+intermediate generations may be skipped, and the flow is not a log of output.</p>
+<p>The first publication after an idle period is immediate. During continuous host
+output, the worker waits up to a 16 ms display interval before sampling the newest
+request again, including a trailing frame for the final invalidation. Explicit
+viewport, resize, palette, and cursor invalidations interrupt that wait. These
+are scheduling rules, not a frame-latency guarantee; copying, dispatcher load,
+and reader leases can delay publication.</p>
+<p>Incoming output preserves the current requested scrollback offset. A new
+<code>requestRender</code> replaces it. One session has one published viewport; unrelated
+scroll positions must not compete for it. Direct <code>readRenderFrame</code> calls can
+read a requested range without changing the publication request.</p>
+<h2 id="failure-and-synchronized-output">Failure and synchronized output</h2>
+<p>A failed cache copy leaves the previous successful publication readable.
+The worker returns rather than retrying in a loop; a later invalidation can
+trigger another attempt. Cancellation propagates.</p>
+<p>Synchronized-output mode defers normal publication. A worker-dispatcher timer
+turns that mode off after the 100 ms safety timeout and invalidates rendering.
+Normal mode disable cancels the timer. Timer dispatch can be delayed by scheduler
+load, so this is not a real-time deadline.</p>
+<p>Closure cancels render work, finalizes parser EOF under mutation serialization,
+and attempts synchronous publication of the final requested viewport even when
+synchronized output was active. <code>Closed</code> is retained after those attempts.
+Consumers may continue reading a successful final cache but cannot request new
+session publications. See <a href="session-concurrency-locks.html#closed-session-presentation">closed-session presentation</a>.</p>
+<h2 id="ownership-and-allocation-boundary">Ownership and allocation boundary</h2>
+<p>The worker dispatcher belongs to the caller. Closing the session cancels its
+jobs without disposing that dispatcher or consumer scopes. <code>renderGeneration</code>
+is a retained state flow and does not complete on closure.</p>
+<p>Published caches and arrays are borrowed only inside <code>readPublishedFrame</code>.
+A reader lease prevents recycling of its cache while another frame is promoted.
+Copy promptly and do not mutate or retain borrowed storage, close the session,
+or reenter session mutation/publication from the callback. Long-lived leases
+can delay further copying and closure.</p>
+<p>Invalidation avoids per-request objects. Parser/core mutation and cell copying
+do not dispatch a coroutine per cell. Coroutine/channel scheduling, cache growth,
+and consumer work have separate allocation costs; this is not an allocation-free
+claim for an entire frame or session. Input output uses the independent writer,
+not the render worker.</p>
+</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/e3c7f9c626934093d35a67ca97afbbf1b343f28d/ketraterm-session/docs/asynchronous-render-coalescing.md">View source on GitHub ↗</a></div></div></main></div>
+  <footer>
+    <a class="brand" href="../../../../index.html"><img class="brand-mark" src="../../../../assets/logo.svg" alt="" width="34" height="34">KetraTerm Library</a>
+    <p>Open source · Apache 2.0</p>
+    <div><a href="https://github.com/ketraterm/KetraTerm">GitHub ↗</a><a href="https://github.com/ketraterm/KetraTerm/issues">Issues ↗</a><a class="product-switch" href="https://ketraterm.github.io/KetraTerm/">Desktop app ↗</a></div>
+  </footer>
+</body>
+</html>

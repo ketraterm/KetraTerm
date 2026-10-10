@@ -1,0 +1,115 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="description" content="A modular Kotlin/JVM terminal emulator library for Swing and headless applications.">
+  <meta name="color-scheme" content="light dark">
+  <title>Library configuration · KetraTerm Library</title>
+  <link rel="icon" href="../../../../assets/logo.svg" type="image/svg+xml">
+  <link rel="preload" href="../../../../assets/fonts/manrope-variable.ttf" as="font" type="font/ttf" crossorigin>
+  <link rel="stylesheet" href="../../../../assets/styles.css">
+  <script type="importmap">{"imports":{"mermaid":"../../../../assets/mermaid/mermaid.esm.min.mjs"}}</script>
+  <script type="module" src="../../../../assets/site.js"></script>
+</head>
+<body data-product="library" data-version="Development">
+  <a class="skip" href="#main">Skip to content</a>
+  <header class="site-header">
+    <div class="site-identity">
+      <a class="brand" href="../../../../index.html" aria-label="KetraTerm Library home"><img class="brand-mark" src="../../../../assets/logo.svg" alt="" width="34" height="34">KetraTerm</a>
+      <nav class="product-navigation" aria-label="KetraTerm products"><a href="https://ketraterm.github.io/KetraTerm/">App</a><a href="../../../../index.html" aria-current="true">Library</a></nav>
+    </div>
+    <details class="site-navigation" open><summary>Menu</summary><nav aria-label="Library navigation"><a aria-current="true"  href="../README.html">Guides</a><a   href="../../modules.html">Modules</a><a   href="../../../../versions.html">API & versions</a><a   href="../../CHANGELOG.html">Changelog</a><a  class="nav-primary" href="../../README.html">Get started</a></nav></details>
+    <button class="theme-toggle" type="button" aria-label="Switch to light theme">Light</button>
+  </header>
+  <div class="docs-shell"><aside class="sidebar" aria-label="Documentation navigation"><details class="nav-disclosure" open><summary class="mobile-nav-toggle">Browse library guides</summary><div><label class="search-label">Find a library guide<input type="search" data-doc-search placeholder="Search library docs" autocomplete="off" data-index="../../search.json"></label><div class="search-results" aria-live="polite"></div><details open><summary>Start here</summary><a  href="../README.html">Documentation</a><a  href="../../README.html">Installation</a><a  href="../../modules.html">Module guides</a><a  href="../../CHANGELOG.html">Changelog</a></details><details open><summary>Capabilities</summary><a  href="../terminal-feature-map.html">Feature map</a><a  href="../features/terminal.html">Terminal</a><a  href="../features/shells.html">Shell integration</a><a  href="../features/desktop.html">Swing view & hosts</a><a  href="../features/completion.html">Completion</a><a  href="../features/embedding.html">Embedding</a><a  href="../terminal-feature-gap-map.html">Known limits</a></details><details open><summary>Embedding guides</summary><a aria-current="page" href="configuration.html">Configuration</a><a  href="compatibility.html">Compatibility</a><a  href="render-ownership.html">Render ownership</a></details><details open><summary>Reference</summary><a  href="../reference/protocol.html">Protocols</a><a  href="../reference/notifications.html">Notifications</a><a  href="../reference/storage.html">Storage & privacy</a></details><details open><summary>Development</summary><a  href="../../ARCHITECTURE.html">Architecture</a><a  href="../../CONTRIBUTING.html">Contributing</a><a  href="../development/conformance-testing.html">Conformance testing</a></details></div></details></aside><main id="main" tabindex="-1" class="article article-with-outline"><div class="article-top"><nav class="breadcrumb" aria-label="Breadcrumb"><ol><li><a href="../../../../index.html">Library</a></li><li><span>Embedding guides</span></li><li><span aria-current="page">Library configuration</span></li></ol></nav><div class="doc-version"><span>Development</span><a href="../../../../versions.html">All versions</a></div></div><details class="page-outline" open><summary>On this page</summary><nav aria-label="On this page"><a class="depth-2" href="#ownership">Ownership</a><a class="depth-2" href="#immutable-settings">Immutable settings</a><a class="depth-2" href="#session-independent-completion-construction">Session-independent completion construction</a><a class="depth-2" href="#optional-host-chrome-and-labels">Optional host chrome and labels</a></nav></details><div class="article-content"><div class="prose"><h1 id="library-configuration">Library configuration</h1>
+<p>Configuration follows the object that owns the behavior. Product preferences
+and persistence belong to the embedding application.</p>
+<h2 id="ownership">Ownership</h2>
+<div class="table-scroll"><table>
+<thead>
+<tr>
+<th>Configuration</th>
+<th>Owner</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Fonts, palette, padding, spacing, cursor, and interaction</td>
+<td><code>SwingSettings</code>.</td>
+</tr>
+<tr>
+<td>Clipboard, deferred paste, font resolution, and hyperlink services</td>
+<td><code>SwingHostServices</code>; supplied services remain host-owned.</td>
+</tr>
+<tr>
+<td>Suggestion provider and presentation target</td>
+<td>EDT <code>SwingTerminal</code> setters.</td>
+</tr>
+<tr>
+<td>History capacity and initial terminal dimensions</td>
+<td>Core creation or local-session <code>PtyOptions</code>.</td>
+</tr>
+<tr>
+<td>Terminal-originated actions and replies</td>
+<td>Session <code>HostPolicy</code>.</td>
+</tr>
+<tr>
+<td>Shell process and environment</td>
+<td>PTY options or the host&#39;s connector.</td>
+</tr>
+<tr>
+<td>Shell metadata</td>
+<td>A selected built-in or host-owned producer.</td>
+</tr>
+<tr>
+<td>Settings files and application defaults</td>
+<td>The standalone or IDE product.</td>
+</tr>
+</tbody></table></div>
+<p>Binding/reloading a Swing view also applies its palette, width, cursor, and paste
+settings to the session. Launch settings affect new sessions. See
+<a href="../../ketraterm-ui-swing/README.html#binding-and-configuration-ownership">binding ownership</a>.</p>
+<h2 id="immutable-settings">Immutable settings</h2>
+<p><code>SwingSettings</code>, <code>SwingHostServices</code>, and <code>PtyOptions</code> support
+<code>create(Consumer)</code>, <code>copy(Consumer)</code>, <code>builder()</code>, and <code>toBuilder()</code>.
+Callbacks run synchronously. Builders are caller-confined drafts; validation
+occurs at build, and failed updates leave the original snapshot unchanged.
+Collection values are detached; supplied services keep their own lifetimes.
+Nullable services can be cleared explicitly.</p>
+<p>Default alternate-screen padding derives from primary padding and the gutter.
+A copied builder retains resolved padding; assigning null requests recalculation.</p>
+<p>Use the current examples in the <a href="../../ketraterm-ui-swing/README.html">Swing README</a>
+and <a href="../../ketraterm-pty/README.html">PTY README</a>.</p>
+<h2 id="session-independent-completion-construction">Session-independent completion construction</h2>
+<p>Install a provider with <code>setShellSuggestionProvider</code> on the EDT, before or after
+binding. Provider configuration survives rebinding; active requests and editing
+authority follow the current binding. Null removes the configured provider.
+<code>refreshShellSuggestions()</code> re-evaluates external context changes.</p>
+<p><code>setShellSuggestionTarget</code> routes automatic requests to a host-owned surface.
+Explicit interactions can instead supply a custom editing target. The default
+bound-session target validates request-time context before accepting an edit.
+See <a href="../../ketraterm-ui-swing-host/README.html#completion-bridge">completion composition</a>
+for the provider adapter and <a href="../../ketraterm-ui-swing/README.html">Swing integration</a>
+for interaction/presentation APIs.</p>
+<h2 id="optional-host-chrome-and-labels">Optional host chrome and labels</h2>
+<p>The shipped message catalogs are English. <code>SwingHostMessages</code>,
+<code>SwingTerminalMessages</code>, and <code>TerminalCompletionMessages</code> accept a locale,
+partial resource overrides, or host message lookup. Missing keys fall back to
+English. IntelliJ uses its platform message system.</p>
+<p>Message patterns use JDK <code>MessageFormat</code>; formatted literal apostrophes must
+be doubled. Components capture their message provider at construction, so
+recreate chrome to change that captured language.</p>
+<p>Search chrome accepts immutable <code>SwingTerminalSearchColors</code> snapshots.
+Completion adapters accept source-ID-to-display-label maps. Neither changes
+terminal data, source identity, ranking, or feedback routing. Localized command
+catalogs change descriptions while preserving command and option tokens.</p>
+<p>See <a href="../../ketraterm-ui-swing-host/README.html#localization-and-host-settings">host localization and settings</a>
+and <a href="../../ketraterm-completion/README.html#customize-the-engine">completion customization</a>.</p>
+</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/e3c7f9c626934093d35a67ca97afbbf1b343f28d/docs/library/configuration.md">View source on GitHub ↗</a></div></div></main></div>
+  <footer>
+    <a class="brand" href="../../../../index.html"><img class="brand-mark" src="../../../../assets/logo.svg" alt="" width="34" height="34">KetraTerm Library</a>
+    <p>Open source · Apache 2.0</p>
+    <div><a href="https://github.com/ketraterm/KetraTerm">GitHub ↗</a><a href="https://github.com/ketraterm/KetraTerm/issues">Issues ↗</a><a class="product-switch" href="https://ketraterm.github.io/KetraTerm/">Desktop app ↗</a></div>
+  </footer>
+</body>
+</html>

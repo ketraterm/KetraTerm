@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="description" content="A modular Kotlin/JVM terminal emulator library for Swing and headless applications.">
+  <meta name="color-scheme" content="light dark">
+  <title>KetraTerm Input · KetraTerm Library</title>
+  <link rel="icon" href="../../../assets/logo.svg" type="image/svg+xml">
+  <link rel="preload" href="../../../assets/fonts/manrope-variable.ttf" as="font" type="font/ttf" crossorigin>
+  <link rel="stylesheet" href="../../../assets/styles.css">
+  <script type="importmap">{"imports":{"mermaid":"../../../assets/mermaid/mermaid.esm.min.mjs"}}</script>
+  <script type="module" src="../../../assets/site.js"></script>
+</head>
+<body data-product="library" data-version="Development">
+  <a class="skip" href="#main">Skip to content</a>
+  <header class="site-header">
+    <div class="site-identity">
+      <a class="brand" href="../../../index.html" aria-label="KetraTerm Library home"><img class="brand-mark" src="../../../assets/logo.svg" alt="" width="34" height="34">KetraTerm</a>
+      <nav class="product-navigation" aria-label="KetraTerm products"><a href="https://ketraterm.github.io/KetraTerm/">App</a><a href="../../../index.html" aria-current="true">Library</a></nav>
+    </div>
+    <details class="site-navigation" open><summary>Menu</summary><nav aria-label="Library navigation"><a   href="../docs/README.html">Guides</a><a aria-current="true"  href="../modules.html">Modules</a><a   href="../../../versions.html">API & versions</a><a   href="../CHANGELOG.html">Changelog</a><a  class="nav-primary" href="../README.html">Get started</a></nav></details>
+    <button class="theme-toggle" type="button" aria-label="Switch to light theme">Light</button>
+  </header>
+  <div class="docs-shell"><aside class="sidebar" aria-label="Documentation navigation"><details class="nav-disclosure" open><summary class="mobile-nav-toggle">Browse library guides</summary><div><label class="search-label">Find a library guide<input type="search" data-doc-search placeholder="Search library docs" autocomplete="off" data-index="../search.json"></label><div class="search-results" aria-live="polite"></div><details open><summary>Start here</summary><a  href="../docs/README.html">Documentation</a><a  href="../README.html">Installation</a><a  href="../modules.html">Module guides</a><a  href="../CHANGELOG.html">Changelog</a></details><details open><summary>Capabilities</summary><a  href="../docs/terminal-feature-map.html">Feature map</a><a  href="../docs/features/terminal.html">Terminal</a><a  href="../docs/features/shells.html">Shell integration</a><a  href="../docs/features/desktop.html">Swing view & hosts</a><a  href="../docs/features/completion.html">Completion</a><a  href="../docs/features/embedding.html">Embedding</a><a  href="../docs/terminal-feature-gap-map.html">Known limits</a></details><details open><summary>Embedding guides</summary><a  href="../docs/library/configuration.html">Configuration</a><a  href="../docs/library/compatibility.html">Compatibility</a><a  href="../docs/library/render-ownership.html">Render ownership</a></details><details open><summary>Reference</summary><a  href="../docs/reference/protocol.html">Protocols</a><a  href="../docs/reference/notifications.html">Notifications</a><a  href="../docs/reference/storage.html">Storage & privacy</a></details><details open><summary>Development</summary><a  href="../ARCHITECTURE.html">Architecture</a><a  href="../CONTRIBUTING.html">Contributing</a><a  href="../docs/development/conformance-testing.html">Conformance testing</a></details></div></details></aside><main id="main" tabindex="-1" class="article article-with-outline"><div class="article-top"><nav class="breadcrumb" aria-label="Breadcrumb"><ol><li><a href="../../../index.html">Library</a></li><li><a href="../modules.html">Modules</a></li><li><span aria-current="page">KetraTerm Input</span></li></ol></nav><div class="doc-version"><span>Development</span><a href="../../../versions.html">All versions</a></div></div><details class="page-outline" open><summary>On this page</summary><nav aria-label="On this page"><a class="depth-2" href="#direct-encoding">Direct encoding</a><a class="depth-2" href="#events-and-policy">Events and policy</a><a class="depth-2" href="#further-reading">Further reading</a></nav></details><div class="article-content"><div class="prose"><h1 id="ketraterm-input">KetraTerm Input</h1>
+<p><code>ketraterm-input</code> converts platform-neutral keyboard, mouse, paste, focus, and
+text-replacement events into bytes for a terminal host. Encoding uses the current
+core input modes and an explicit <code>TerminalInputPolicy</code>.</p>
+<p>The module depends on <code>ketraterm-core</code> and <code>ketraterm-protocol</code>. It has no UI,
+transport, or clipboard dependency. For an application with a connector, use
+<a href="../ketraterm-session/README.html">TerminalSession</a> to order input with terminal
+responses and transport writes.</p>
+<h2 id="direct-encoding">Direct encoding</h2>
+<p>Use <code>TerminalInputEncoders.create</code> when you provide the serialization and output
+sink yourself. The following function demonstrates mode-dependent encoding; the
+caller supplies a <code>TerminalHostOutput</code> that consumes or copies bytes before each
+write returns.</p>
+<pre><code class="language-kotlin">import io.github.ketraterm.core.TerminalBuffers
+import io.github.ketraterm.input.TerminalInputEncoders
+import io.github.ketraterm.input.event.TerminalKey
+import io.github.ketraterm.input.event.TerminalKeyEvent
+import io.github.ketraterm.input.event.TerminalPasteEvent
+import io.github.ketraterm.input.policy.TerminalInputPolicy
+import io.github.ketraterm.protocol.host.TerminalHostOutput
+
+fun encodeExample(output: TerminalHostOutput) {
+    val terminal = TerminalBuffers.create(width = 80, height = 24)
+    val encoder = TerminalInputEncoders.create(
+        inputState = terminal,
+        output = output,
+        policy = TerminalInputPolicy(),
+    )
+
+    encoder.encodeKey(TerminalKeyEvent.key(TerminalKey.UP)) // ESC [ A
+    terminal.setApplicationCursorKeys(true)
+    encoder.encodeKey(TerminalKeyEvent.key(TerminalKey.UP)) // ESC O A
+
+    encoder.encodeKey(TerminalKeyEvent.codepoint(&#39;é&#39;.code)) // UTF-8
+    encoder.encodeKey(TerminalKeyEvent.text(&quot;e\u0301&quot;)) // Committed text
+    terminal.setBracketedPasteEnabled(true)
+    encoder.encodePaste(TerminalPasteEvent(&quot;hello&quot;)) // ESC [ 200 ~ hello ESC [ 201 ~
+}
+</code></pre>
+<p>The encoder reads one coherent <code>TerminalInputState.getInputModeBits()</code> value per
+event. A custom mode source must implement that method; decode captured values
+with the <code>TerminalInputState</code> helpers rather than interpreting bit positions.
+Calls and <code>setInputPolicy</code> updates on the default encoder must be serialized.
+It reuses scratch arrays, so the sink must not retain borrowed byte ranges.
+Sink failures propagate and may leave a partially written operation. The encoder
+does not own or close the sink.</p>
+<h2 id="events-and-policy">Events and policy</h2>
+<ul>
+<li>Use <code>TerminalKeyEvent.key</code> for special keys and <code>codepoint</code> for a printable
+Unicode scalar. <code>text</code> represents committed text without physical-key identity;
+it does not receive paste framing or modifier transformations in text modes.</li>
+<li>Mouse cell coordinates are zero-based. Optional pixel coordinates are used
+only by SGR-Pixels encoding. Coordinate conversion and gesture routing belong
+to the UI adapter.</li>
+<li><code>TerminalTextReplacementEvent</code> emits Delete actions, Backspace actions, then
+replacement text through paste policy. Counts describe editor actions, not
+string indices.</li>
+<li><code>TerminalInputPolicy()</code> defaults to DEL Backspace, ESC-prefixed Meta/Alt,
+suppression of unsupported modified keys and out-of-range legacy mouse
+coordinates, and preserved paste controls and line endings. Bracketed paste
+always protects its delimiters.</li>
+</ul>
+<p>The key-event factories and encoder factory expose Java static methods with
+default-argument overloads. For custom session encoding, supply a
+<code>TerminalInputEncoderFactory</code> that creates independent instances bound to the
+session&#39;s mode source and sink.</p>
+<h2 id="further-reading">Further reading</h2>
+<ul>
+<li><a href="docs/terminal-input-contract.html">Input contract</a>: validation, policies,
+threading, and clipboard-reply ownership.</li>
+<li><a href="docs/keyboard-mouse-encoding.html">Wire encoding reference</a>: representative
+keyboard and mouse sequences.</li>
+<li><a href="Module.html">Module structure</a>: package responsibilities and verification.</li>
+<li><a href="../docs/features/terminal.html#keyboard-mouse-and-paste">Feature map</a>:
+supported protocols and host capability boundaries.</li>
+</ul>
+</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/e3c7f9c626934093d35a67ca97afbbf1b343f28d/ketraterm-input/README.md">View source on GitHub ↗</a></div></div></main></div>
+  <footer>
+    <a class="brand" href="../../../index.html"><img class="brand-mark" src="../../../assets/logo.svg" alt="" width="34" height="34">KetraTerm Library</a>
+    <p>Open source · Apache 2.0</p>
+    <div><a href="https://github.com/ketraterm/KetraTerm">GitHub ↗</a><a href="https://github.com/ketraterm/KetraTerm/issues">Issues ↗</a><a class="product-switch" href="https://ketraterm.github.io/KetraTerm/">Desktop app ↗</a></div>
+  </footer>
+</body>
+</html>

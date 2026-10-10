@@ -1,0 +1,304 @@
+<!doctype html>
+<html class="no-js" lang="en">
+<head>
+    <meta name="viewport" content="width=device-width, initial-scale=1" charset="UTF-8">
+    <title>TerminalCompletionCandidate</title>
+<link href="../../../images/logo-icon.svg" rel="icon" type="image/svg"><script>var pathToRoot = "../../../";</script>
+    <script>document.documentElement.classList.replace("no-js", "js");</script>
+    <script>const storage = localStorage.getItem("dokka-dark-mode")
+      if (storage == null) {
+        const osDarkSchemePreferred = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches
+        if (osDarkSchemePreferred === true) {
+          document.getElementsByTagName("html")[0].classList.add("theme-dark")
+        }
+      } else {
+        const savedDarkMode = JSON.parse(storage)
+        if (savedDarkMode === true) {
+          document.getElementsByTagName("html")[0].classList.add("theme-dark")
+        }
+      }
+    </script>
+<script type="text/javascript" src="../../../scripts/sourceset_dependencies.js" async></script>
+<link href="../../../styles/style.css" rel="Stylesheet">
+<link href="../../../styles/main.css" rel="Stylesheet">
+<link href="../../../styles/prism.css" rel="Stylesheet">
+<link href="../../../styles/logo-styles.css" rel="Stylesheet">
+<link href="../../../ui-kit/ui-kit.min.css" rel="Stylesheet">
+<script type="text/javascript" src="../../../scripts/safe-local-storage_blocking.js"></script>
+<script type="text/javascript" src="../../../scripts/navigation-loader.js" async></script>
+<script type="text/javascript" src="../../../scripts/platform-content-handler.js" async></script>
+<script type="text/javascript" src="../../../scripts/main.js" defer></script>
+<script type="text/javascript" src="../../../scripts/prism.js" async></script>
+<script type="text/javascript" src="../../../ui-kit/ui-kit.min.js" defer></script><!-- ketraterm-api-stylesheet:start -->
+<link rel="icon" href="../../../../../assets/logo.svg" type="image/svg+xml">
+<link rel="stylesheet" href="../../../../../assets/api-navigation.css">
+<!-- ketraterm-api-stylesheet:end --></head>
+<body>
+<div class="root"><!-- ketraterm-api-navigation:start -->
+<div class="ketraterm-api-navigation">
+  <a class="ketraterm-api-brand" href="../../../../../index.html" aria-label="KetraTerm Library home"><img src="../../../../../assets/logo.svg" alt="" width="28" height="28">KetraTerm</a>
+  <nav class="ketraterm-api-products" aria-label="KetraTerm products"><a href="https://ketraterm.github.io/KetraTerm/">App</a><a href="../../../../../index.html" aria-current="true">Library</a></nav>
+  <div class="ketraterm-api-reference"><span>API · v0.3.0</span><a href="../../../../../versions.html">All versions</a></div>
+</div>
+<!-- ketraterm-api-navigation:end -->
+    <header class="navigation theme-dark" id="navigation-wrapper" role="banner">
+<a class="library-name--link" href="../../../index.html">
+                    KetraTerm
+            </a>        <button class="navigation-controls--btn navigation-controls--btn_toc ui-kit_mobile-only" id="toc-toggle" type="button">Toggle table of contents
+        </button>
+        <div class="navigation-controls--break ui-kit_mobile-only"></div>
+        <div class="library-version" id="library-version">
+        </div>
+        <div class="navigation-controls">
+        <ul class="filter-section filter-section_loading" id="filter-section" aria-label="Target filter">
+                <button class="platform-tag platform-selector jvm-like" data-active="" aria-pressed="true" data-filter=":ketraterm-completion/main">jvm</button>
+            <div class="dropdown filter-section--dropdown" data-role="dropdown" id="filter-section-dropdown">
+                <button class="button button_dropdown filter-section--dropdown-toggle" role="combobox" data-role="dropdown-toggle" aria-controls="platform-tags-listbox" aria-haspopup="listbox" aria-expanded="false" aria-label="Toggle source sets"></button>
+                <ul role="listbox" id="platform-tags-listbox" class="dropdown--list" data-role="dropdown-listbox" aria-label="Target filter">
+                    <div class="dropdown--header"><span>Target filter</span>
+                        <button class="button" data-role="dropdown-toggle" aria-label="Close target filter">
+                            <i class="ui-kit-icon ui-kit-icon_cross"></i>
+                        </button>
+                    </div>
+                        <li role="option" class="dropdown--option platform-selector-option jvm-like" tabindex="0">
+                            <label class="checkbox">
+                                <input type="checkbox" class="checkbox--input" id=":ketraterm-completion/main" data-filter=":ketraterm-completion/main">
+                                <span class="checkbox--icon"></span>
+                                jvm
+                            </label>
+                        </li>
+                </ul>
+                <div class="dropdown--overlay"></div>
+            </div>
+        </ul>
+            <button class="navigation-controls--btn navigation-controls--btn_theme" id="theme-toggle-button" type="button">Switch theme
+            </button>
+            <div class="navigation-controls--btn navigation-controls--btn_search" id="searchBar" role="button">Search in
+                API
+            </div>
+        </div>
+    </header>
+    <div id="container">
+        <nav id="leftColumn" class="sidebar" data-item-type="SECTION" data-item-config="{&quot;defaultSize&quot;: 280, &quot;minSize&quot;: 200, &quot;maxSize&quot;: 400}">
+            <a class="toc--skip-link" href="#main">Skip to content</a>
+            <div class="dropdown theme-dark_mobile" data-role="dropdown" id="toc-dropdown">
+                <ul role="listbox" id="toc-listbox" class="dropdown--list dropdown--list_toc-list" data-role="dropdown-listbox" aria-label="Table of contents">
+                    <div class="dropdown--header">
+                            <span>
+                                    KetraTerm
+                            </span>
+                        <button class="button" data-role="dropdown-toggle" aria-label="Close table of contents">
+                            <i class="ui-kit-icon ui-kit-icon_cross"></i>
+                        </button>
+                    </div>
+                    <div class="sidebar--inner" id="sideMenu"></div>
+                </ul>
+                <div class="dropdown--overlay"></div>
+            </div>
+        </nav>
+        <div id="resizer" class="resizer" data-item-type="BAR"></div>
+        <div id="main" data-item-type="SECTION" role="main">
+<div class="main-content" data-page-type="classlike" id="content" pageids="ketraterm-completion::io.github.ketraterm.completion.api/TerminalCompletionCandidate///PointingToDeclaration//-293776716">
+  <div class="breadcrumbs"><a href="../../index.html">ketraterm-completion</a><span class="delimiter">/</span><a href="../index.html">io.github.ketraterm.completion.api</a><span class="delimiter">/</span><span class="current">TerminalCompletionCandidate</span></div>
+  <div class="cover ">
+    <h1 class="cover"><span>Terminal</span><wbr><span>Completion</span><wbr><span><span>Candidate</span></span></h1>
+    <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-completion/main"><div class="symbol monospace"><span class="token keyword">data </span><span class="token keyword">class </span><a href="index.html">TerminalCompletionCandidate</a>&nbsp;<span><span class="token annotation builtin">@</span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin.jvm/-jvm-overloads/index.html"><span class="token annotation builtin">JvmOverloads</span></a>&nbsp;</span><span class="token keyword">constructor</span><span class="token punctuation">(</span><span class="parameters "><span class="parameter "><span class="token keyword">val </span>replacementText<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-string/index.html">String</a><span class="token punctuation">, </span></span><span class="parameter "><span class="token keyword">val </span>replacementStartOffset<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a><span class="token punctuation">, </span></span><span class="parameter "><span class="token keyword">val </span>replacementEndOffset<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a><span class="token punctuation">, </span></span><span class="parameter "><span class="token keyword">val </span>source<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-string/index.html">String</a><span class="token punctuation">, </span></span><span class="parameter "><span class="token keyword">val </span>kind<span class="token operator">: </span><a href="../-terminal-completion-candidate-kind/index.html">TerminalCompletionCandidateKind</a><span class="token punctuation">, </span></span><span class="parameter "><span class="token keyword">val </span>displayText<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-string/index.html">String</a><span class="token operator"> = </span>replacementText<span class="token punctuation">, </span></span><span class="parameter "><span class="token keyword">val </span>detail<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-string/index.html">String</a><span class="token operator"> = </span><span class="token string">""</span><span class="token punctuation">, </span></span><span class="parameter "><span class="token keyword">val </span>score<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a><span class="token operator"> = </span><span class="token constant">0</span><span class="token punctuation">, </span></span><span class="parameter "><span class="token keyword">val </span>valueDomain<span class="token operator">: </span><a href="../../io.github.ketraterm.completion.model/-terminal-completion-value-domain/index.html">TerminalCompletionValueDomain</a><span class="token operator"> = </span>TerminalCompletionValueDomain.NONE<span class="token punctuation">, </span></span><span class="parameter "><span class="token keyword">val </span>matchedRanges<span class="token operator">: </span><a href="../-terminal-completion-match-ranges/index.html">TerminalCompletionMatchRanges</a><span class="token operator"> = </span>TerminalCompletionMatchRanges.EMPTY</span></span><span class="token punctuation">)</span></div><p class="paragraph">Immutable completion candidate returned by <a href="../-terminal-completion-engine/index.html">TerminalCompletionEngine</a>.</p><h4 class="tableheader">Throws</h4><div class="table"><div class="table-row table-row_content" data-filterable-current=":ketraterm-completion/main" data-filterable-set=":ketraterm-completion/main"><div class="main-subrow keyValue "><div class=""><span class="inline-flex"><div><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-illegal-argument-exception/index.html"><span>Illegal</span><wbr><span>Argument</span><wbr><span><span>Exception</span></span></a></div></span></div><div><div class="title"><p class="paragraph">if text/source fields are empty, replacement offsets do not form a nonnegative ordered range, or <a href="matched-ranges.html">matchedRanges</a> do not address <a href="display-text.html">displayText</a>.</p></div></div></div></div></div></div></div>
+  </div>
+  <div class="tabbedcontent">
+    <div class="tabs-section" tabs-section="tabs-section"><button class="section-tab" data-active="" data-togglable="CONSTRUCTOR,TYPE,PROPERTY,FUNCTION">Members</button></div>
+    <div class="tabs-section-body">
+      <div data-togglable="CONSTRUCTOR">
+        <h2 class="tableheader">Constructors</h2>
+        <div class="table"><a data-name="-1080279206%2FConstructors%2F-293776716" anchor-label="TerminalCompletionCandidate" id="-1080279206%2FConstructors%2F-293776716" data-filterable-set=":ketraterm-completion/main"></a>
+          <div class="table-row table-row_content" data-togglable="CONSTRUCTOR" data-filterable-current=":ketraterm-completion/main" data-filterable-set=":ketraterm-completion/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-terminal-completion-candidate.html"><span>Terminal</span><wbr><span>Completion</span><wbr><span><span>Candidate</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-1080279206%2FConstructors%2F-293776716"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-completion/main"><div class="symbol monospace"><div class="block"><div class="block"><span class="token annotation builtin">@</span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin.jvm/-jvm-overloads/index.html"><span class="token annotation builtin">JvmOverloads</span></a></div></div><span class="token keyword">constructor</span><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">replacementText<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-string/index.html">String</a><span class="token punctuation">, </span></span><span class="parameter ">replacementStartOffset<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a><span class="token punctuation">, </span></span><span class="parameter ">replacementEndOffset<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a><span class="token punctuation">, </span></span><span class="parameter ">source<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-string/index.html">String</a><span class="token punctuation">, </span></span><span class="parameter ">kind<span class="token operator">: </span><a href="../-terminal-completion-candidate-kind/index.html">TerminalCompletionCandidateKind</a><span class="token punctuation">, </span></span><span class="parameter ">displayText<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-string/index.html">String</a><span class="token operator"> = </span>replacementText<span class="token punctuation">, </span></span><span class="parameter ">detail<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-string/index.html">String</a><span class="token operator"> = </span><span class="token string">""</span><span class="token punctuation">, </span></span><span class="parameter ">score<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a><span class="token operator"> = </span><span class="token constant">0</span><span class="token punctuation">, </span></span><span class="parameter ">valueDomain<span class="token operator">: </span><a href="../../io.github.ketraterm.completion.model/-terminal-completion-value-domain/index.html">TerminalCompletionValueDomain</a><span class="token operator"> = </span>TerminalCompletionValueDomain.NONE<span class="token punctuation">, </span></span><span class="parameter ">matchedRanges<span class="token operator">: </span><a href="../-terminal-completion-match-ranges/index.html">TerminalCompletionMatchRanges</a><span class="token operator"> = </span>TerminalCompletionMatchRanges.EMPTY</span></span><span class="token punctuation">)</span></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div data-togglable="PROPERTY">
+        <h2 class="tableheader">Properties</h2>
+        <div class="table"><a data-name="665357501%2FProperties%2F-293776716" anchor-label="detail" id="665357501%2FProperties%2F-293776716" data-filterable-set=":ketraterm-completion/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-completion/main" data-filterable-set=":ketraterm-completion/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="detail.html"><span><span>detail</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="665357501%2FProperties%2F-293776716"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-completion/main"><div class="symbol monospace"><span class="token keyword">val </span><a href="detail.html">detail</a><span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-string/index.html">String</a></div><div class="brief "><p class="paragraph">optional secondary text explaining the candidate.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="1584219133%2FProperties%2F-293776716" anchor-label="displayText" id="1584219133%2FProperties%2F-293776716" data-filterable-set=":ketraterm-completion/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-completion/main" data-filterable-set=":ketraterm-completion/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="display-text.html"><span>display</span><wbr><span><span>Text</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="1584219133%2FProperties%2F-293776716"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-completion/main"><div class="symbol monospace"><span class="token keyword">val </span><a href="display-text.html">displayText</a><span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-string/index.html">String</a></div><div class="brief "><p class="paragraph">primary text shown in suggestion UI.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="309322522%2FProperties%2F-293776716" anchor-label="kind" id="309322522%2FProperties%2F-293776716" data-filterable-set=":ketraterm-completion/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-completion/main" data-filterable-set=":ketraterm-completion/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="kind.html"><span><span>kind</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="309322522%2FProperties%2F-293776716"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-completion/main"><div class="symbol monospace"><span class="token keyword">val </span><a href="kind.html">kind</a><span class="token operator">: </span><a href="../-terminal-completion-candidate-kind/index.html">TerminalCompletionCandidateKind</a></div><div class="brief "><p class="paragraph">semantic candidate category.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-575496558%2FProperties%2F-293776716" anchor-label="matchedRanges" id="-575496558%2FProperties%2F-293776716" data-filterable-set=":ketraterm-completion/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-completion/main" data-filterable-set=":ketraterm-completion/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="matched-ranges.html"><span>matched</span><wbr><span><span>Ranges</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-575496558%2FProperties%2F-293776716"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-completion/main"><div class="symbol monospace"><span class="token keyword">val </span><a href="matched-ranges.html">matchedRanges</a><span class="token operator">: </span><a href="../-terminal-completion-match-ranges/index.html">TerminalCompletionMatchRanges</a></div><div class="brief "><p class="paragraph">immutable ordered UTF-16 intervals relative to <a href="display-text.html">displayText</a> used by UI components to highlight matching fragments.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-964665774%2FProperties%2F-293776716" anchor-label="replacementEndOffset" id="-964665774%2FProperties%2F-293776716" data-filterable-set=":ketraterm-completion/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-completion/main" data-filterable-set=":ketraterm-completion/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="replacement-end-offset.html"><span>replacement</span><wbr><span>End</span><wbr><span><span>Offset</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-964665774%2FProperties%2F-293776716"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-completion/main"><div class="symbol monospace"><span class="token keyword">val </span><a href="replacement-end-offset.html">replacementEndOffset</a><span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a></div><div class="brief "><p class="paragraph">exclusive UTF-16 replacement end offset in the original request command line.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-1244793557%2FProperties%2F-293776716" anchor-label="replacementStartOffset" id="-1244793557%2FProperties%2F-293776716" data-filterable-set=":ketraterm-completion/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-completion/main" data-filterable-set=":ketraterm-completion/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="replacement-start-offset.html"><span>replacement</span><wbr><span>Start</span><wbr><span><span>Offset</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-1244793557%2FProperties%2F-293776716"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-completion/main"><div class="symbol monospace"><span class="token keyword">val </span><a href="replacement-start-offset.html">replacementStartOffset</a><span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a></div><div class="brief "><p class="paragraph">inclusive UTF-16 replacement start offset in the original request command line.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-775159507%2FProperties%2F-293776716" anchor-label="replacementText" id="-775159507%2FProperties%2F-293776716" data-filterable-set=":ketraterm-completion/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-completion/main" data-filterable-set=":ketraterm-completion/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="replacement-text.html"><span>replacement</span><wbr><span><span>Text</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-775159507%2FProperties%2F-293776716"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-completion/main"><div class="symbol monospace"><span class="token keyword">val </span><a href="replacement-text.html">replacementText</a><span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-string/index.html">String</a></div><div class="brief "><p class="paragraph">text to insert into <a href="replacement-start-offset.html">replacementStartOffset</a>, exclusive <a href="replacement-end-offset.html">replacementEndOffset</a>.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-1614082278%2FProperties%2F-293776716" anchor-label="score" id="-1614082278%2FProperties%2F-293776716" data-filterable-set=":ketraterm-completion/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-completion/main" data-filterable-set=":ketraterm-completion/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="score.html"><span><span>score</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-1614082278%2FProperties%2F-293776716"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-completion/main"><div class="symbol monospace"><span class="token keyword">val </span><a href="score.html">score</a><span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a></div><div class="brief "><p class="paragraph">source-local relevance before merging and the final fused ranking score after the merged engine returns the candidate; larger values are better in either scope.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="711242803%2FProperties%2F-293776716" anchor-label="source" id="711242803%2FProperties%2F-293776716" data-filterable-set=":ketraterm-completion/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-completion/main" data-filterable-set=":ketraterm-completion/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="source.html"><span><span>source</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="711242803%2FProperties%2F-293776716"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-completion/main"><div class="symbol monospace"><span class="token keyword">val </span><a href="source.html">source</a><span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-string/index.html">String</a></div><div class="brief "><p class="paragraph">compact source label, such as <code class="lang-kotlin">spec</code>, <code class="lang-kotlin">learned</code>, or <code class="lang-kotlin">path</code>.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-575427017%2FProperties%2F-293776716" anchor-label="valueDomain" id="-575427017%2FProperties%2F-293776716" data-filterable-set=":ketraterm-completion/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-completion/main" data-filterable-set=":ketraterm-completion/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="value-domain.html"><span>value</span><wbr><span><span>Domain</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-575427017%2FProperties%2F-293776716"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-completion/main"><div class="symbol monospace"><span class="token keyword">val </span><a href="value-domain.html">valueDomain</a><span class="token operator">: </span><a href="../../io.github.ketraterm.completion.model/-terminal-completion-value-domain/index.html">TerminalCompletionValueDomain</a></div><div class="brief "><p class="paragraph">dynamic value domain for argument candidates supplied by host-owned providers.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+    <div class="footer">
+        <div class="footer--container">
+            <a href="#content" id="go-to-top-link" class="footer--button footer--button_go-to-top"></a>
+            <div class="footer--content">
+                <div>
+                    <span>Generated by </span>
+                    <a class="footer--link footer--link_external" href="https://github.com/Kotlin/dokka">
+                        Dokka
+                    </a>
+                    <div>© 2026 Copyright</div>
+                </div>
+            </div>
+        </div>
+    </div>
+        </div>
+    </div>
+</div>
+</body>
+</html>

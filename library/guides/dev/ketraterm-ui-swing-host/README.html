@@ -1,0 +1,167 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="description" content="A modular Kotlin/JVM terminal emulator library for Swing and headless applications.">
+  <meta name="color-scheme" content="light dark">
+  <title>KetraTerm Swing Host · KetraTerm Library</title>
+  <link rel="icon" href="../../../assets/logo.svg" type="image/svg+xml">
+  <link rel="preload" href="../../../assets/fonts/manrope-variable.ttf" as="font" type="font/ttf" crossorigin>
+  <link rel="stylesheet" href="../../../assets/styles.css">
+  <script type="importmap">{"imports":{"mermaid":"../../../assets/mermaid/mermaid.esm.min.mjs"}}</script>
+  <script type="module" src="../../../assets/site.js"></script>
+</head>
+<body data-product="library" data-version="Development">
+  <a class="skip" href="#main">Skip to content</a>
+  <header class="site-header">
+    <div class="site-identity">
+      <a class="brand" href="../../../index.html" aria-label="KetraTerm Library home"><img class="brand-mark" src="../../../assets/logo.svg" alt="" width="34" height="34">KetraTerm</a>
+      <nav class="product-navigation" aria-label="KetraTerm products"><a href="https://ketraterm.github.io/KetraTerm/">App</a><a href="../../../index.html" aria-current="true">Library</a></nav>
+    </div>
+    <details class="site-navigation" open><summary>Menu</summary><nav aria-label="Library navigation"><a   href="../docs/README.html">Guides</a><a aria-current="true"  href="../modules.html">Modules</a><a   href="../../../versions.html">API & versions</a><a   href="../CHANGELOG.html">Changelog</a><a  class="nav-primary" href="../README.html">Get started</a></nav></details>
+    <button class="theme-toggle" type="button" aria-label="Switch to light theme">Light</button>
+  </header>
+  <div class="docs-shell"><aside class="sidebar" aria-label="Documentation navigation"><details class="nav-disclosure" open><summary class="mobile-nav-toggle">Browse library guides</summary><div><label class="search-label">Find a library guide<input type="search" data-doc-search placeholder="Search library docs" autocomplete="off" data-index="../search.json"></label><div class="search-results" aria-live="polite"></div><details open><summary>Start here</summary><a  href="../docs/README.html">Documentation</a><a  href="../README.html">Installation</a><a  href="../modules.html">Module guides</a><a  href="../CHANGELOG.html">Changelog</a></details><details open><summary>Capabilities</summary><a  href="../docs/terminal-feature-map.html">Feature map</a><a  href="../docs/features/terminal.html">Terminal</a><a  href="../docs/features/shells.html">Shell integration</a><a  href="../docs/features/desktop.html">Swing view & hosts</a><a  href="../docs/features/completion.html">Completion</a><a  href="../docs/features/embedding.html">Embedding</a><a  href="../docs/terminal-feature-gap-map.html">Known limits</a></details><details open><summary>Embedding guides</summary><a  href="../docs/library/configuration.html">Configuration</a><a  href="../docs/library/compatibility.html">Compatibility</a><a  href="../docs/library/render-ownership.html">Render ownership</a></details><details open><summary>Reference</summary><a  href="../docs/reference/protocol.html">Protocols</a><a  href="../docs/reference/notifications.html">Notifications</a><a  href="../docs/reference/storage.html">Storage & privacy</a></details><details open><summary>Development</summary><a  href="../ARCHITECTURE.html">Architecture</a><a  href="../CONTRIBUTING.html">Contributing</a><a  href="../docs/development/conformance-testing.html">Conformance testing</a></details></div></details></aside><main id="main" tabindex="-1" class="article article-with-outline"><div class="article-top"><nav class="breadcrumb" aria-label="Breadcrumb"><ol><li><a href="../../../index.html">Library</a></li><li><a href="../modules.html">Modules</a></li><li><span aria-current="page">KetraTerm Swing Host</span></li></ol></nav><div class="doc-version"><span>Development</span><a href="../../../versions.html">All versions</a></div></div><details class="page-outline" open><summary>On this page</summary><nav aria-label="On this page"><a class="depth-2" href="#dependency">Dependency</a><a class="depth-2" href="#search-chrome">Search chrome</a><a class="depth-2" href="#host-actions-and-context-menus">Host actions and context menus</a><a class="depth-2" href="#completion-bridge">Completion bridge</a><a class="depth-2" href="#clipboard-consent-and-dialogs">Clipboard consent and dialogs</a><a class="depth-2" href="#localization-and-host-settings">Localization and host settings</a></nav></details><div class="article-content"><div class="prose"><h1 id="ketraterm-swing-host">KetraTerm Swing Host</h1>
+<p>Optional host-side helpers for applications embedding <code>SwingTerminal</code>: search
+chrome, terminal action bindings, context menus, completion adapters, and
+clipboard consent. Hosts explicitly construct and install the helpers they need.
+The terminal view and session retain their own rendering and input responsibilities.</p>
+<h2 id="dependency">Dependency</h2>
+<p>Add <code>io.github.ketraterm:ketraterm-ui-swing-host</code> alongside your terminal entry
+point, using the <a href="../README.html#using-the-libraries">BOM and repository setup</a>. This module
+exposes the Swing UI, completion API, and coroutine dependencies. Filesystem
+completion and persistence are separate optional modules.</p>
+<h2 id="search-chrome">Search chrome</h2>
+<p><code>SwingTerminalSearchBar</code> delegates scanning, highlights, and result navigation
+to the terminal&#39;s search API. <code>SwingTerminalOverlayPane</code> places the bar over the
+terminal content, so opening it does not reduce the grid&#39;s available space.</p>
+<p>Construct Swing components on the event dispatch thread (EDT). This example
+wraps an existing terminal; its owner still binds and disposes the terminal.</p>
+<pre><code class="language-kotlin">import io.github.ketraterm.ui.swing.api.SwingTerminal
+import io.github.ketraterm.ui.swing.host.SwingTerminalOverlayPane
+import io.github.ketraterm.ui.swing.host.SwingTerminalSearchBar
+import javax.swing.JComponent
+import javax.swing.SwingUtilities
+
+class TerminalSearchPane(terminal: SwingTerminal) : AutoCloseable {
+    init {
+        check(SwingUtilities.isEventDispatchThread())
+    }
+
+    private val searchBar = SwingTerminalSearchBar(terminal)
+    val component: JComponent =
+        SwingTerminalOverlayPane(terminal, searchBar.component)
+
+    fun openSearch() = searchBar.open()
+
+    override fun close() = searchBar.close()
+}
+</code></pre>
+<p>Mount <code>component</code> in the host window and invoke <code>openSearch</code> from a host action.
+Call <code>close</code> when removing the pane; it cancels search observation and clears
+active highlights. Removing the bar from a displayable hierarchy also cancels
+its observation. <code>open</code>, <code>close</code>, and <code>refreshColors</code> enqueue work when called
+off the EDT; read <code>isOpen</code> and manipulate <code>component</code> on the EDT.</p>
+<p>Use <code>SwingTerminalSearchColors.create</code>, <code>copy</code>, or a builder to supply an immutable
+palette through <code>refreshColors(colors)</code>. Updating colors preserves the query and
+visibility. The palette is retained across close/open cycles.</p>
+<h2 id="host-actions-and-context-menus">Host actions and context menus</h2>
+<p><code>SwingTerminalHostShortcutMap.platformDefault()</code> supplies optional platform
+bindings. It does not register Swing actions. Install the entries with
+<code>forEachShortcut</code>, or resolve a key event with <code>actionFor(keyCode, modifiersEx)</code>
+inside your <code>SwingHostServices</code> key handler. Return whether the host consumed the
+event so unhandled keys continue to terminal input.</p>
+<p>Use <code>withShortcut</code> and <code>withoutShortcut</code> to customize bindings. Shortcuts must
+remain unique and use extended keyboard modifier masks.</p>
+<p><code>SwingTerminalContextMenuItems.addTerminalActions</code> appends selection, paste,
+search, screen-clear, and applicable hyperlink actions to a host-owned
+<code>JPopupMenu</code>. Pass the terminal&#39;s context-menu request and your search-opening
+callback, append product-specific items, and show the menu from the host callback
+on the EDT. See <a href="../ketraterm-ui-swing/README.html#how-to-extend-custom-host-services">Swing host services</a>
+for callback configuration.</p>
+<h2 id="completion-bridge">Completion bridge</h2>
+<p><code>SwingCompletionSuggestionProvider</code> adapts a
+<a href="../ketraterm-completion/README.html"><code>TerminalCompletionEngine</code></a> to the terminal&#39;s
+suggestion contract. It preserves replacement ranges, source identity,
+presentation fields, matched ranges, and opaque feedback tokens. The host selects
+the engine and sources and supplies current profile, directory, and shell metadata.</p>
+<pre><code class="language-kotlin">import io.github.ketraterm.completion.api.TerminalCompletionEngine
+import io.github.ketraterm.ui.swing.api.SwingTerminal
+import io.github.ketraterm.ui.swing.host.SwingCompletionContext
+import io.github.ketraterm.ui.swing.host.SwingCompletionSuggestionProvider
+import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionFeedbackHandler
+import javax.swing.SwingUtilities
+
+fun installCompletion(
+    terminal: SwingTerminal,
+    engine: TerminalCompletionEngine,
+    contextProvider: () -&gt; SwingCompletionContext,
+    feedbackHandler: SwingShellSuggestionFeedbackHandler =
+        SwingShellSuggestionFeedbackHandler.NONE,
+) {
+    check(SwingUtilities.isEventDispatchThread())
+    terminal.setShellSuggestionProvider(
+        SwingCompletionSuggestionProvider(
+            engine = engine,
+            contextProvider = contextProvider,
+            sourceLabels = mapOf(&quot;spec&quot; to &quot;Commands&quot;, &quot;path&quot; to &quot;Files&quot;),
+            feedbackHandler = feedbackHandler,
+        ),
+    )
+}
+</code></pre>
+<p>The terminal opens the provider on the EDT, capturing one immutable context and
+feedback handler before background collection. Keep <code>contextProvider</code> cheap.
+Direct calls to <code>suggestions(request)</code> capture context in the caller&#39;s thread;
+the returned flow is cold and runs engine work only when collected. This adapter
+does not choose a dispatcher, launch jobs, or close the engine. Collection
+cancellation and engine failures propagate to the caller.
+An invalid converted completion request produces one empty suggestion snapshot.</p>
+<p>Optional <code>sourceLabels</code> customize display labels, including localization.</p>
+<p><code>SwingCompletionFeedbackRecorder.createHandler()</code> maps accepted and explicitly
+dismissed suggestions to a host-owned learning sink. Admission rejection is
+ignored. The host owns learning-store synchronization.</p>
+<p>Configure completion on the EDT and keep engine resources alive for their owning
+host&#39;s lifetime. See <a href="../ketraterm-ui-swing/README.html#suggestion-request-ownership">suggestion request ownership</a>
+for editing authority, request invalidation, custom presentation, and diagnostics.
+Use <a href="../ketraterm-completion-host/README.html">completion-host</a> for filesystem sources
+and <a href="../ketraterm-completion-persistence/README.html">completion-persistence</a> for
+optional saved learning.</p>
+<h2 id="clipboard-consent-and-dialogs">Clipboard consent and dialogs</h2>
+<p><code>SwingClipboardReadPrompt</code> owns cancellable consent for one terminal pane.
+Construct it with a product dialog callback, or bridge
+<code>SwingMessageDialogs.showModeless</code>. Operations and decisions belong to the EDT;
+close the prompt there when disposing the pane. Denial, Escape, cancellation,
+and closure cannot approve a read. A block decision lasts for the pane&#39;s lifetime.</p>
+<p>Use one <code>SwingClipboardReader</code> per window. Call its suspending <code>read</code> on the EDT
+with the requesting pane&#39;s prompt, message, and clipboard handler, after earlier
+posted clipboard writes. It enforces admitted permission and reads native
+clipboard data on its I/O dispatcher. Busy prompts are denied; a busy native
+read is unavailable. Only one native read runs across reader instances, and a
+cancelled blocking call keeps that slot until it returns. The session owns the
+request deadline, permission revocation, and response serialization.</p>
+<p><code>SwingClipboardPrompts</code> builds consent text from terminal names and character
+counts without placing clipboard contents in the dialog. <code>SwingDialogRequest</code>
+holds plain text and copied choices; <code>SwingMessageDialogs</code> escapes message text
+for Swing display. Modal and modeless presenters return an option index or
+<code>null</code> for dismissal. Hosts still wire these helpers into their session&#39;s
+clipboard services and choose write-consent policy.</p>
+<h2 id="localization-and-host-settings">Localization and host settings</h2>
+<p>Supply <code>SwingHostMessages</code> to search, context-menu, dialog, and clipboard helpers
+to integrate a host message framework. <code>forLocale(locale, bundle)</code> uses JDK
+resource bundles and <code>MessageFormat</code>, with missing keys falling back to the
+bundled English catalog. The selected locale is captured; static component
+labels are resolved at construction. The <a href="https://github.com/ketraterm/KetraTerm/blob/e3c7f9c626934093d35a67ca97afbbf1b343f28d/ketraterm-ui-swing-host/src/main/resources/io/github/ketraterm/ui/swing/host/SwingHostMessages.properties">catalog</a>
+defines keys and arguments. Message arguments are plain text, not markup.</p>
+<p><code>SwingTerminalSettingsBounds</code> provides shared preference-control ranges for
+hosts. These limits do not define the core grid or renderer&#39;s valid configuration.</p>
+<p>For packages and dependencies, see <a href="Module.html">Module.md</a>.</p>
+</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/e3c7f9c626934093d35a67ca97afbbf1b343f28d/ketraterm-ui-swing-host/README.md">View source on GitHub ↗</a></div></div></main></div>
+  <footer>
+    <a class="brand" href="../../../index.html"><img class="brand-mark" src="../../../assets/logo.svg" alt="" width="34" height="34">KetraTerm Library</a>
+    <p>Open source · Apache 2.0</p>
+    <div><a href="https://github.com/ketraterm/KetraTerm">GitHub ↗</a><a href="https://github.com/ketraterm/KetraTerm/issues">Issues ↗</a><a class="product-switch" href="https://ketraterm.github.io/KetraTerm/">Desktop app ↗</a></div>
+  </footer>
+</body>
+</html>

@@ -1,0 +1,514 @@
+<!doctype html>
+<html class="no-js" lang="en">
+<head>
+    <meta name="viewport" content="width=device-width, initial-scale=1" charset="UTF-8">
+    <title>HostEventSink</title>
+<link href="../../../images/logo-icon.svg" rel="icon" type="image/svg"><script>var pathToRoot = "../../../";</script>
+    <script>document.documentElement.classList.replace("no-js", "js");</script>
+    <script>const storage = localStorage.getItem("dokka-dark-mode")
+      if (storage == null) {
+        const osDarkSchemePreferred = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches
+        if (osDarkSchemePreferred === true) {
+          document.getElementsByTagName("html")[0].classList.add("theme-dark")
+        }
+      } else {
+        const savedDarkMode = JSON.parse(storage)
+        if (savedDarkMode === true) {
+          document.getElementsByTagName("html")[0].classList.add("theme-dark")
+        }
+      }
+    </script>
+<script type="text/javascript" src="../../../scripts/sourceset_dependencies.js" async></script>
+<link href="../../../styles/style.css" rel="Stylesheet">
+<link href="../../../styles/main.css" rel="Stylesheet">
+<link href="../../../styles/prism.css" rel="Stylesheet">
+<link href="../../../styles/logo-styles.css" rel="Stylesheet">
+<link href="../../../ui-kit/ui-kit.min.css" rel="Stylesheet">
+<script type="text/javascript" src="../../../scripts/safe-local-storage_blocking.js"></script>
+<script type="text/javascript" src="../../../scripts/navigation-loader.js" async></script>
+<script type="text/javascript" src="../../../scripts/platform-content-handler.js" async></script>
+<script type="text/javascript" src="../../../scripts/main.js" defer></script>
+<script type="text/javascript" src="../../../scripts/prism.js" async></script>
+<script type="text/javascript" src="../../../ui-kit/ui-kit.min.js" defer></script><!-- ketraterm-api-stylesheet:start -->
+<link rel="icon" href="../../../../../assets/logo.svg" type="image/svg+xml">
+<link rel="stylesheet" href="../../../../../assets/api-navigation.css">
+<!-- ketraterm-api-stylesheet:end --></head>
+<body>
+<div class="root"><!-- ketraterm-api-navigation:start -->
+<div class="ketraterm-api-navigation">
+  <a class="ketraterm-api-brand" href="../../../../../index.html" aria-label="KetraTerm Library home"><img src="../../../../../assets/logo.svg" alt="" width="28" height="28">KetraTerm</a>
+  <nav class="ketraterm-api-products" aria-label="KetraTerm products"><a href="https://ketraterm.github.io/KetraTerm/">App</a><a href="../../../../../index.html" aria-current="true">Library</a></nav>
+  <div class="ketraterm-api-reference"><span>API · Development</span><a href="../../../../../versions.html">All versions</a></div>
+</div>
+<!-- ketraterm-api-navigation:end -->
+    <header class="navigation theme-dark" id="navigation-wrapper" role="banner">
+<a class="library-name--link" href="../../../index.html">
+                    KetraTerm
+            </a>        <button class="navigation-controls--btn navigation-controls--btn_toc ui-kit_mobile-only" id="toc-toggle" type="button">Toggle table of contents
+        </button>
+        <div class="navigation-controls--break ui-kit_mobile-only"></div>
+        <div class="library-version" id="library-version">
+        </div>
+        <div class="navigation-controls">
+        <ul class="filter-section filter-section_loading" id="filter-section" aria-label="Target filter">
+                <button class="platform-tag platform-selector jvm-like" data-active="" aria-pressed="true" data-filter=":ketraterm-host/main">jvm</button>
+            <div class="dropdown filter-section--dropdown" data-role="dropdown" id="filter-section-dropdown">
+                <button class="button button_dropdown filter-section--dropdown-toggle" role="combobox" data-role="dropdown-toggle" aria-controls="platform-tags-listbox" aria-haspopup="listbox" aria-expanded="false" aria-label="Toggle source sets"></button>
+                <ul role="listbox" id="platform-tags-listbox" class="dropdown--list" data-role="dropdown-listbox" aria-label="Target filter">
+                    <div class="dropdown--header"><span>Target filter</span>
+                        <button class="button" data-role="dropdown-toggle" aria-label="Close target filter">
+                            <i class="ui-kit-icon ui-kit-icon_cross"></i>
+                        </button>
+                    </div>
+                        <li role="option" class="dropdown--option platform-selector-option jvm-like" tabindex="0">
+                            <label class="checkbox">
+                                <input type="checkbox" class="checkbox--input" id=":ketraterm-host/main" data-filter=":ketraterm-host/main">
+                                <span class="checkbox--icon"></span>
+                                jvm
+                            </label>
+                        </li>
+                </ul>
+                <div class="dropdown--overlay"></div>
+            </div>
+        </ul>
+            <button class="navigation-controls--btn navigation-controls--btn_theme" id="theme-toggle-button" type="button">Switch theme
+            </button>
+            <div class="navigation-controls--btn navigation-controls--btn_search" id="searchBar" role="button">Search in
+                API
+            </div>
+        </div>
+    </header>
+    <div id="container">
+        <nav id="leftColumn" class="sidebar" data-item-type="SECTION" data-item-config="{&quot;defaultSize&quot;: 280, &quot;minSize&quot;: 200, &quot;maxSize&quot;: 400}">
+            <a class="toc--skip-link" href="#main">Skip to content</a>
+            <div class="dropdown theme-dark_mobile" data-role="dropdown" id="toc-dropdown">
+                <ul role="listbox" id="toc-listbox" class="dropdown--list dropdown--list_toc-list" data-role="dropdown-listbox" aria-label="Table of contents">
+                    <div class="dropdown--header">
+                            <span>
+                                    KetraTerm
+                            </span>
+                        <button class="button" data-role="dropdown-toggle" aria-label="Close table of contents">
+                            <i class="ui-kit-icon ui-kit-icon_cross"></i>
+                        </button>
+                    </div>
+                    <div class="sidebar--inner" id="sideMenu"></div>
+                </ul>
+                <div class="dropdown--overlay"></div>
+            </div>
+        </nav>
+        <div id="resizer" class="resizer" data-item-type="BAR"></div>
+        <div id="main" data-item-type="SECTION" role="main">
+<div class="main-content" data-page-type="classlike" id="content" pageids="ketraterm-host::io.github.ketraterm.host/HostEventSink///PointingToDeclaration//-1906139840">
+  <div class="breadcrumbs"><a href="../../index.html">ketraterm-host</a><span class="delimiter">/</span><a href="../index.html">io.github.ketraterm.host</a><span class="delimiter">/</span><span class="current">HostEventSink</span></div>
+  <div class="cover ">
+    <h1 class="cover"><span>Host</span><wbr><span>Event</span><wbr><span><span>Sink</span></span></h1>
+    <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-host/main"><div class="symbol monospace"><span class="token keyword">interface </span><a href="index.html">HostEventSink</a></div><p class="paragraph">Host-facing events emitted while parser commands are mapped to core state.</p><p class="paragraph">Hosts receive metadata and decide whether host-side actions can be honored. Grid mutation and terminal modes remain owned by core; session coordinates transport changes and terminal-to-host byte responses.</p><p class="paragraph">Parser metadata callbacks are synchronous and ordered on the mutation caller's thread. A TerminalSession holds its mutation lock during delivery. Return promptly; do not mutate the session or wait for a UI thread. Schedule UI work using the product's lifecycle. Direct sinks propagate exceptions to the caller; the PTY convenience bridge isolates and reports listener failures. Read-execution audits may arrive on session workers as documented below. No initial state replay or per-frame delivery is performed.</p></div></div>
+  </div>
+  <div class="tabbedcontent">
+    <div class="tabs-section" tabs-section="tabs-section"><button class="section-tab" data-active="" data-togglable="CONSTRUCTOR,TYPE,PROPERTY,FUNCTION">Members</button></div>
+    <div class="tabs-section-body">
+      <div data-togglable="TYPE">
+        <h2 class="tableheader">Types</h2>
+        <div class="table"><a data-name="-837737991%2FClasslikes%2F-1906139840" anchor-label="Companion" id="-837737991%2FClasslikes%2F-1906139840" data-filterable-set=":ketraterm-host/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-host/main" data-filterable-set=":ketraterm-host/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-companion/index.html"><span><span>Companion</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-837737991%2FClasslikes%2F-1906139840"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-host/main"><div class="symbol monospace"><span class="token keyword">object </span><a href="-companion/index.html">Companion</a></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div data-togglable="FUNCTION">
+        <h2 class="tableheader">Functions</h2>
+        <div class="table"><a data-name="-1980402171%2FFunctions%2F-1906139840" anchor-label="bell" id="-1980402171%2FFunctions%2F-1906139840" data-filterable-set=":ketraterm-host/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-host/main" data-filterable-set=":ketraterm-host/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="bell.html"><span><span>bell</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-1980402171%2FFunctions%2F-1906139840"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-host/main"><div class="symbol monospace"><span class="token keyword">abstract </span><span class="token keyword">fun </span><a href="bell.html"><span class="token function">bell</span></a><span class="token punctuation">(</span><span class="token punctuation">)</span></div><div class="brief "><p class="paragraph">Called when the parser emits BEL.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="751893416%2FFunctions%2F-1906139840" anchor-label="columnModeChanged" id="751893416%2FFunctions%2F-1906139840" data-filterable-set=":ketraterm-host/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-host/main" data-filterable-set=":ketraterm-host/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="column-mode-changed.html"><span>column</span><wbr><span>Mode</span><wbr><span><span>Changed</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="751893416%2FFunctions%2F-1906139840"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-host/main"><div class="symbol monospace"><span class="token keyword">open </span><span class="token keyword">fun </span><a href="column-mode-changed.html"><span class="token function">columnModeChanged</span></a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">rows<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a><span class="token punctuation">, </span></span><span class="parameter ">columns<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a></span></span><span class="token punctuation">)</span></div><div class="brief "><p class="paragraph">Reports a completed logical column switch with synchronized core/transport dimensions. Hosts may schedule a physical window resize according to their own permission and layout policy. Called during parsing; do not wait for the EDT or mutate the grid.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-309972997%2FFunctions%2F-1906139840" anchor-label="currentWorkingDirectoryChanged" id="-309972997%2FFunctions%2F-1906139840" data-filterable-set=":ketraterm-host/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-host/main" data-filterable-set=":ketraterm-host/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="current-working-directory-changed.html"><span>current</span><wbr><span>Working</span><wbr><span>Directory</span><wbr><span><span>Changed</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-309972997%2FFunctions%2F-1906139840"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-host/main"><div class="symbol monospace"><span class="token keyword">open </span><span class="token keyword">fun </span><a href="current-working-directory-changed.html"><span class="token function">currentWorkingDirectoryChanged</span></a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">uri<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-string/index.html">String</a></span></span><span class="token punctuation">)</span></div><div class="brief "><p class="paragraph">Called after a valid OSC 7 current-working-directory URI is accepted.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="792202521%2FFunctions%2F-1906139840" anchor-label="deminimizeWindow" id="792202521%2FFunctions%2F-1906139840" data-filterable-set=":ketraterm-host/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-host/main" data-filterable-set=":ketraterm-host/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="deminimize-window.html"><span>deminimize</span><wbr><span><span>Window</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="792202521%2FFunctions%2F-1906139840"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-host/main"><div class="symbol monospace"><span class="token keyword">open </span><span class="token keyword">fun </span><a href="deminimize-window.html"><span class="token function">deminimizeWindow</span></a><span class="token punctuation">(</span><span class="token punctuation">)</span></div><div class="brief "><p class="paragraph">Called when the shell requests deminimizing (restoring) the window.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="1288235793%2FFunctions%2F-1906139840" anchor-label="hyperlinkRegistered" id="1288235793%2FFunctions%2F-1906139840" data-filterable-set=":ketraterm-host/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-host/main" data-filterable-set=":ketraterm-host/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="hyperlink-registered.html"><span>hyperlink</span><wbr><span><span>Registered</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="1288235793%2FFunctions%2F-1906139840"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-host/main"><div class="symbol monospace"><span class="token keyword">open </span><span class="token keyword">fun </span><a href="hyperlink-registered.html"><span class="token function">hyperlinkRegistered</span></a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">hyperlinkId<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a><span class="token punctuation">, </span></span><span class="parameter ">uri<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-string/index.html">String</a><span class="token punctuation">, </span></span><span class="parameter ">id<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-string/index.html">String</a><span class="token operator">?</span></span></span><span class="token punctuation">)</span></div><div class="brief "><p class="paragraph">Called after a new OSC 8 registry entry is accepted. <a href="hyperlink-registered.html">hyperlinkId</a> is a positive session-local numeric identity; <a href="hyperlink-registered.html">id</a> is the optional application ID. Reusing an existing entry emits no registration. No browser action is implied.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="713257324%2FFunctions%2F-1906139840" anchor-label="hyperlinkRemoved" id="713257324%2FFunctions%2F-1906139840" data-filterable-set=":ketraterm-host/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-host/main" data-filterable-set=":ketraterm-host/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="hyperlink-removed.html"><span>hyperlink</span><wbr><span><span>Removed</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="713257324%2FFunctions%2F-1906139840"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-host/main"><div class="symbol monospace"><span class="token keyword">open </span><span class="token keyword">fun </span><a href="hyperlink-removed.html"><span class="token function">hyperlinkRemoved</span></a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">hyperlinkId<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a></span></span><span class="token punctuation">)</span></div><div class="brief "><p class="paragraph">Called after LRU eviction makes <a href="hyperlink-removed.html">hyperlinkId</a> unresolvable. Registration of a replacement follows all removals. Lowered limits can evict multiple entries, including when reusing an explicit key without registering a replacement. Numeric IDs are never reassigned. Closing OSC 8 or soft reset does not remove existing registry entries.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="385558131%2FFunctions%2F-1906139840" anchor-label="hyperlinksCleared" id="385558131%2FFunctions%2F-1906139840" data-filterable-set=":ketraterm-host/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-host/main" data-filterable-set=":ketraterm-host/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="hyperlinks-cleared.html"><span>hyperlinks</span><wbr><span><span>Cleared</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="385558131%2FFunctions%2F-1906139840"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-host/main"><div class="symbol monospace"><span class="token keyword">open </span><span class="token keyword">fun </span><a href="hyperlinks-cleared.html"><span class="token function">hyperlinksCleared</span></a><span class="token punctuation">(</span><span class="token punctuation">)</span></div><div class="brief "><p class="paragraph">Called after hard reset clears a nonempty registry, instead of per-ID removals.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="254183793%2FFunctions%2F-1906139840" anchor-label="iconTitleChanged" id="254183793%2FFunctions%2F-1906139840" data-filterable-set=":ketraterm-host/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-host/main" data-filterable-set=":ketraterm-host/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="icon-title-changed.html"><span>icon</span><wbr><span>Title</span><wbr><span><span>Changed</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="254183793%2FFunctions%2F-1906139840"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-host/main"><div class="symbol monospace"><span class="token keyword">abstract </span><span class="token keyword">fun </span><a href="icon-title-changed.html"><span class="token function">iconTitleChanged</span></a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">title<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-string/index.html">String</a></span></span><span class="token punctuation">)</span></div><div class="brief "><p class="paragraph">Called after the OSC icon title metadata changes.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-1959328191%2FFunctions%2F-1906139840" anchor-label="lowerWindow" id="-1959328191%2FFunctions%2F-1906139840" data-filterable-set=":ketraterm-host/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-host/main" data-filterable-set=":ketraterm-host/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="lower-window.html"><span>lower</span><wbr><span><span>Window</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-1959328191%2FFunctions%2F-1906139840"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-host/main"><div class="symbol monospace"><span class="token keyword">open </span><span class="token keyword">fun </span><a href="lower-window.html"><span class="token function">lowerWindow</span></a><span class="token punctuation">(</span><span class="token punctuation">)</span></div><div class="brief "><p class="paragraph">Called when the shell requests lowering the window.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-1311795334%2FFunctions%2F-1906139840" anchor-label="minimizeWindow" id="-1311795334%2FFunctions%2F-1906139840" data-filterable-set=":ketraterm-host/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-host/main" data-filterable-set=":ketraterm-host/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="minimize-window.html"><span>minimize</span><wbr><span><span>Window</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-1311795334%2FFunctions%2F-1906139840"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-host/main"><div class="symbol monospace"><span class="token keyword">open </span><span class="token keyword">fun </span><a href="minimize-window.html"><span class="token function">minimizeWindow</span></a><span class="token punctuation">(</span><span class="token punctuation">)</span></div><div class="brief "><p class="paragraph">Called when the shell requests minimizing the window.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="1980973560%2FFunctions%2F-1906139840" anchor-label="moveWindow" id="1980973560%2FFunctions%2F-1906139840" data-filterable-set=":ketraterm-host/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-host/main" data-filterable-set=":ketraterm-host/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="move-window.html"><span>move</span><wbr><span><span>Window</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="1980973560%2FFunctions%2F-1906139840"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-host/main"><div class="symbol monospace"><span class="token keyword">open </span><span class="token keyword">fun </span><a href="move-window.html"><span class="token function">moveWindow</span></a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">x<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a><span class="token punctuation">, </span></span><span class="parameter ">y<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a></span></span><span class="token punctuation">)</span></div><div class="brief "><p class="paragraph">Called when the shell requests moving the window.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="2115501583%2FFunctions%2F-1906139840" anchor-label="paletteChanged" id="2115501583%2FFunctions%2F-1906139840" data-filterable-set=":ketraterm-host/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-host/main" data-filterable-set=":ketraterm-host/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="palette-changed.html"><span>palette</span><wbr><span><span>Changed</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="2115501583%2FFunctions%2F-1906139840"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-host/main"><div class="symbol monospace"><span class="token keyword">open </span><span class="token keyword">fun </span><a href="palette-changed.html"><span class="token function">paletteChanged</span></a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">palette<span class="token operator">: </span><a href="../../../ketraterm-render-api/io.github.ketraterm.render.api/-terminal-color-palette/index.html">TerminalColorPalette</a></span></span><span class="token punctuation">)</span></div><div class="brief "><p class="paragraph">Called after the effective palette changes through OSC, host theme update, or hard reset. <a href="palette-changed.html">palette</a> is the immutable core-owned value and may be retained. Queries, denied/invalid operations, and equal values do not emit an event.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="1148464118%2FFunctions%2F-1906139840" anchor-label="raiseWindow" id="1148464118%2FFunctions%2F-1906139840" data-filterable-set=":ketraterm-host/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-host/main" data-filterable-set=":ketraterm-host/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="raise-window.html"><span>raise</span><wbr><span><span>Window</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="1148464118%2FFunctions%2F-1906139840"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-host/main"><div class="symbol monospace"><span class="token keyword">open </span><span class="token keyword">fun </span><a href="raise-window.html"><span class="token function">raiseWindow</span></a><span class="token punctuation">(</span><span class="token punctuation">)</span></div><div class="brief "><p class="paragraph">Called when the shell requests raising the window.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-1558135621%2FFunctions%2F-1906139840" anchor-label="resizeForColumnMode" id="-1558135621%2FFunctions%2F-1906139840" data-filterable-set=":ketraterm-host/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-host/main" data-filterable-set=":ketraterm-host/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="resize-for-column-mode.html"><span>resize</span><wbr><span>For</span><wbr><span>Column</span><wbr><span><span>Mode</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-1558135621%2FFunctions%2F-1906139840"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-host/main"><div class="symbol monospace"><span class="token keyword">open </span><span class="token keyword">fun </span><a href="resize-for-column-mode.html"><span class="token function">resizeForColumnMode</span></a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">rows<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a><span class="token punctuation">, </span></span><span class="parameter ">columns<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a></span></span><span class="token punctuation">)</span></div><div class="brief "><p class="paragraph">Prepares an 80/132-column switch before the destructive core reset.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="1699745307%2FFunctions%2F-1906139840" anchor-label="resizeWindow" id="1699745307%2FFunctions%2F-1906139840" data-filterable-set=":ketraterm-host/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-host/main" data-filterable-set=":ketraterm-host/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="resize-window.html"><span>resize</span><wbr><span><span>Window</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="1699745307%2FFunctions%2F-1906139840"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-host/main"><div class="symbol monospace"><span class="token keyword">abstract </span><span class="token keyword">fun </span><a href="resize-window.html"><span class="token function">resizeWindow</span></a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">rows<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a><span class="token punctuation">, </span></span><span class="parameter ">columns<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a></span></span><span class="token punctuation">)</span></div><div class="brief "><p class="paragraph">Called when the shell requests a window resize.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="118467159%2FFunctions%2F-1906139840" anchor-label="setMaximized" id="118467159%2FFunctions%2F-1906139840" data-filterable-set=":ketraterm-host/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-host/main" data-filterable-set=":ketraterm-host/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="set-maximized.html"><span>set</span><wbr><span><span>Maximized</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="118467159%2FFunctions%2F-1906139840"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-host/main"><div class="symbol monospace"><span class="token keyword">open </span><span class="token keyword">fun </span><a href="set-maximized.html"><span class="token function">setMaximized</span></a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">maximize<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-boolean/index.html">Boolean</a></span></span><span class="token punctuation">)</span></div><div class="brief "><p class="paragraph">Called when the shell requests maximizing or restoring the window.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-1100927090%2FFunctions%2F-1906139840" anchor-label="shellIntegrationMarker" id="-1100927090%2FFunctions%2F-1906139840" data-filterable-set=":ketraterm-host/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-host/main" data-filterable-set=":ketraterm-host/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="shell-integration-marker.html"><span>shell</span><wbr><span>Integration</span><wbr><span><span>Marker</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-1100927090%2FFunctions%2F-1906139840"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-host/main"><div class="symbol monospace"><span class="token keyword">open </span><span class="token keyword">fun </span><a href="shell-integration-marker.html"><span class="token function">shellIntegrationMarker</span></a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">event<span class="token operator">: </span><a href="../../../ketraterm-protocol/io.github.ketraterm.protocol/-shell-integration-event/index.html">ShellIntegrationEvent</a></span></span><span class="token punctuation">)</span></div><div class="brief "><p class="paragraph">Called when an OSC 133 shell integration marker is received.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="1230345559%2FFunctions%2F-1906139840" anchor-label="showNotification" id="1230345559%2FFunctions%2F-1906139840" data-filterable-set=":ketraterm-host/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-host/main" data-filterable-set=":ketraterm-host/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="show-notification.html"><span>show</span><wbr><span><span>Notification</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="1230345559%2FFunctions%2F-1906139840"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-host/main"><div class="symbol monospace"><span class="token keyword">open </span><span class="token keyword">fun </span><a href="show-notification.html"><span class="token function">showNotification</span></a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">title<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-string/index.html">String</a><span class="token punctuation">, </span></span><span class="parameter ">body<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-string/index.html">String</a><span class="token punctuation">, </span></span><span class="parameter ">level<span class="token operator">: </span><a href="../../../ketraterm-protocol/io.github.ketraterm.protocol/-notification-level/index.html">NotificationLevel</a></span></span><span class="token punctuation">)</span></div><div class="brief "><p class="paragraph">Called when the shell requests a desktop notification.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-1875745240%2FFunctions%2F-1906139840" anchor-label="terminalClipboardPrompt" id="-1875745240%2FFunctions%2F-1906139840" data-filterable-set=":ketraterm-host/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-host/main" data-filterable-set=":ketraterm-host/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="terminal-clipboard-prompt.html"><span>terminal</span><wbr><span>Clipboard</span><wbr><span><span>Prompt</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-1875745240%2FFunctions%2F-1906139840"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-host/main"><div class="symbol monospace"><span class="token keyword">open </span><span class="token keyword">fun </span><a href="terminal-clipboard-prompt.html"><span class="token function">terminalClipboardPrompt</span></a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">event<span class="token operator">: </span><a href="../-terminal-clipboard-prompt-event/index.html">TerminalClipboardPromptEvent</a></span></span><span class="token punctuation">)</span></div><div class="brief "><p class="paragraph">Called when an OSC 52 clipboard write request requires product-host user approval and has been decoded to text.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="1106292296%2FFunctions%2F-1906139840" anchor-label="terminalClipboardReadCompleted" id="1106292296%2FFunctions%2F-1906139840" data-filterable-set=":ketraterm-host/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-host/main" data-filterable-set=":ketraterm-host/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="terminal-clipboard-read-completed.html"><span>terminal</span><wbr><span>Clipboard</span><wbr><span>Read</span><wbr><span><span>Completed</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="1106292296%2FFunctions%2F-1906139840"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-host/main"><div class="symbol monospace"><span class="token keyword">open </span><span class="token keyword">fun </span><a href="terminal-clipboard-read-completed.html"><span class="token function">terminalClipboardReadCompleted</span></a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">event<span class="token operator">: </span><a href="../-terminal-clipboard-read-audit-event/index.html">TerminalClipboardReadAuditEvent</a></span></span><span class="token punctuation">)</span></div><div class="brief "><p class="paragraph">Content-free execution audit. Unlike parser metadata, this callback can arrive on a session worker; it must be thread-safe and return promptly. Do not reenter session mutation or wait for a UI thread from this callback. Never infer execution from the earlier admission decision alone.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="886099887%2FFunctions%2F-1906139840" anchor-label="terminalClipboardReadRequested" id="886099887%2FFunctions%2F-1906139840" data-filterable-set=":ketraterm-host/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-host/main" data-filterable-set=":ketraterm-host/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="terminal-clipboard-read-requested.html"><span>terminal</span><wbr><span>Clipboard</span><wbr><span>Read</span><wbr><span><span>Requested</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="886099887%2FFunctions%2F-1906139840"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-host/main"><div class="symbol monospace"><span class="token keyword">open </span><span class="token keyword">fun </span><a href="terminal-clipboard-read-requested.html"><span class="token function">terminalClipboardReadRequested</span></a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">request<span class="token operator">: </span><a href="../-terminal-clipboard-read-request/index.html">TerminalClipboardReadRequest</a></span></span><span class="token punctuation">)</span></div><div class="brief "><p class="paragraph">Admits a validated read for session execution, including read denial when terminal replies are permitted. Direct adapter embedders own the response. This synchronous callback must not access the clipboard or wait for consent.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-1600902140%2FFunctions%2F-1906139840" anchor-label="terminalClipboardRequest" id="-1600902140%2FFunctions%2F-1906139840" data-filterable-set=":ketraterm-host/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-host/main" data-filterable-set=":ketraterm-host/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="terminal-clipboard-request.html"><span>terminal</span><wbr><span>Clipboard</span><wbr><span><span>Request</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-1600902140%2FFunctions%2F-1906139840"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-host/main"><div class="symbol monospace"><span class="token keyword">open </span><span class="token keyword">fun </span><a href="terminal-clipboard-request.html"><span class="token function">terminalClipboardRequest</span></a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">event<span class="token operator">: </span><a href="../-terminal-clipboard-audit-event/index.html">TerminalClipboardAuditEvent</a></span></span><span class="token punctuation">)</span></div><div class="brief "><p class="paragraph">Called after an OSC 52 terminal clipboard request is evaluated by host policy.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="339612664%2FFunctions%2F-1906139840" anchor-label="terminalClipboardWrite" id="339612664%2FFunctions%2F-1906139840" data-filterable-set=":ketraterm-host/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-host/main" data-filterable-set=":ketraterm-host/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="terminal-clipboard-write.html"><span>terminal</span><wbr><span>Clipboard</span><wbr><span><span>Write</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="339612664%2FFunctions%2F-1906139840"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-host/main"><div class="symbol monospace"><span class="token keyword">open </span><span class="token keyword">fun </span><a href="terminal-clipboard-write.html"><span class="token function">terminalClipboardWrite</span></a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">event<span class="token operator">: </span><a href="../-terminal-clipboard-write-event/index.html">TerminalClipboardWriteEvent</a></span></span><span class="token punctuation">)</span></div><div class="brief "><p class="paragraph">Called when an OSC 52 clipboard write request has been allowed by host policy and decoded to text.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="79688680%2FFunctions%2F-1906139840" anchor-label="windowTitleChanged" id="79688680%2FFunctions%2F-1906139840" data-filterable-set=":ketraterm-host/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-host/main" data-filterable-set=":ketraterm-host/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="window-title-changed.html"><span>window</span><wbr><span>Title</span><wbr><span><span>Changed</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="79688680%2FFunctions%2F-1906139840"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-host/main"><div class="symbol monospace"><span class="token keyword">abstract </span><span class="token keyword">fun </span><a href="window-title-changed.html"><span class="token function">windowTitleChanged</span></a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">title<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-string/index.html">String</a></span></span><span class="token punctuation">)</span></div><div class="brief "><p class="paragraph">Called after the OSC window title metadata changes.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+    <div class="footer">
+        <div class="footer--container">
+            <a href="#content" id="go-to-top-link" class="footer--button footer--button_go-to-top"></a>
+            <div class="footer--content">
+                <div>
+                    <span>Generated by </span>
+                    <a class="footer--link footer--link_external" href="https://github.com/Kotlin/dokka">
+                        Dokka
+                    </a>
+                    <div>© 2026 Copyright</div>
+                </div>
+            </div>
+        </div>
+    </div>
+        </div>
+    </div>
+</div>
+</body>
+</html>

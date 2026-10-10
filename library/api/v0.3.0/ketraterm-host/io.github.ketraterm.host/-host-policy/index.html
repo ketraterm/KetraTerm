@@ -1,0 +1,364 @@
+<!doctype html>
+<html class="no-js" lang="en">
+<head>
+    <meta name="viewport" content="width=device-width, initial-scale=1" charset="UTF-8">
+    <title>HostPolicy</title>
+<link href="../../../images/logo-icon.svg" rel="icon" type="image/svg"><script>var pathToRoot = "../../../";</script>
+    <script>document.documentElement.classList.replace("no-js", "js");</script>
+    <script>const storage = localStorage.getItem("dokka-dark-mode")
+      if (storage == null) {
+        const osDarkSchemePreferred = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches
+        if (osDarkSchemePreferred === true) {
+          document.getElementsByTagName("html")[0].classList.add("theme-dark")
+        }
+      } else {
+        const savedDarkMode = JSON.parse(storage)
+        if (savedDarkMode === true) {
+          document.getElementsByTagName("html")[0].classList.add("theme-dark")
+        }
+      }
+    </script>
+<script type="text/javascript" src="../../../scripts/sourceset_dependencies.js" async></script>
+<link href="../../../styles/style.css" rel="Stylesheet">
+<link href="../../../styles/main.css" rel="Stylesheet">
+<link href="../../../styles/prism.css" rel="Stylesheet">
+<link href="../../../styles/logo-styles.css" rel="Stylesheet">
+<link href="../../../ui-kit/ui-kit.min.css" rel="Stylesheet">
+<script type="text/javascript" src="../../../scripts/safe-local-storage_blocking.js"></script>
+<script type="text/javascript" src="../../../scripts/navigation-loader.js" async></script>
+<script type="text/javascript" src="../../../scripts/platform-content-handler.js" async></script>
+<script type="text/javascript" src="../../../scripts/main.js" defer></script>
+<script type="text/javascript" src="../../../scripts/prism.js" async></script>
+<script type="text/javascript" src="../../../ui-kit/ui-kit.min.js" defer></script><!-- ketraterm-api-stylesheet:start -->
+<link rel="icon" href="../../../../../assets/logo.svg" type="image/svg+xml">
+<link rel="stylesheet" href="../../../../../assets/api-navigation.css">
+<!-- ketraterm-api-stylesheet:end --></head>
+<body>
+<div class="root"><!-- ketraterm-api-navigation:start -->
+<div class="ketraterm-api-navigation">
+  <a class="ketraterm-api-brand" href="../../../../../index.html" aria-label="KetraTerm Library home"><img src="../../../../../assets/logo.svg" alt="" width="28" height="28">KetraTerm</a>
+  <nav class="ketraterm-api-products" aria-label="KetraTerm products"><a href="https://ketraterm.github.io/KetraTerm/">App</a><a href="../../../../../index.html" aria-current="true">Library</a></nav>
+  <div class="ketraterm-api-reference"><span>API · v0.3.0</span><a href="../../../../../versions.html">All versions</a></div>
+</div>
+<!-- ketraterm-api-navigation:end -->
+    <header class="navigation theme-dark" id="navigation-wrapper" role="banner">
+<a class="library-name--link" href="../../../index.html">
+                    KetraTerm
+            </a>        <button class="navigation-controls--btn navigation-controls--btn_toc ui-kit_mobile-only" id="toc-toggle" type="button">Toggle table of contents
+        </button>
+        <div class="navigation-controls--break ui-kit_mobile-only"></div>
+        <div class="library-version" id="library-version">
+        </div>
+        <div class="navigation-controls">
+        <ul class="filter-section filter-section_loading" id="filter-section" aria-label="Target filter">
+                <button class="platform-tag platform-selector jvm-like" data-active="" aria-pressed="true" data-filter=":ketraterm-host/main">jvm</button>
+            <div class="dropdown filter-section--dropdown" data-role="dropdown" id="filter-section-dropdown">
+                <button class="button button_dropdown filter-section--dropdown-toggle" role="combobox" data-role="dropdown-toggle" aria-controls="platform-tags-listbox" aria-haspopup="listbox" aria-expanded="false" aria-label="Toggle source sets"></button>
+                <ul role="listbox" id="platform-tags-listbox" class="dropdown--list" data-role="dropdown-listbox" aria-label="Target filter">
+                    <div class="dropdown--header"><span>Target filter</span>
+                        <button class="button" data-role="dropdown-toggle" aria-label="Close target filter">
+                            <i class="ui-kit-icon ui-kit-icon_cross"></i>
+                        </button>
+                    </div>
+                        <li role="option" class="dropdown--option platform-selector-option jvm-like" tabindex="0">
+                            <label class="checkbox">
+                                <input type="checkbox" class="checkbox--input" id=":ketraterm-host/main" data-filter=":ketraterm-host/main">
+                                <span class="checkbox--icon"></span>
+                                jvm
+                            </label>
+                        </li>
+                </ul>
+                <div class="dropdown--overlay"></div>
+            </div>
+        </ul>
+            <button class="navigation-controls--btn navigation-controls--btn_theme" id="theme-toggle-button" type="button">Switch theme
+            </button>
+            <div class="navigation-controls--btn navigation-controls--btn_search" id="searchBar" role="button">Search in
+                API
+            </div>
+        </div>
+    </header>
+    <div id="container">
+        <nav id="leftColumn" class="sidebar" data-item-type="SECTION" data-item-config="{&quot;defaultSize&quot;: 280, &quot;minSize&quot;: 200, &quot;maxSize&quot;: 400}">
+            <a class="toc--skip-link" href="#main">Skip to content</a>
+            <div class="dropdown theme-dark_mobile" data-role="dropdown" id="toc-dropdown">
+                <ul role="listbox" id="toc-listbox" class="dropdown--list dropdown--list_toc-list" data-role="dropdown-listbox" aria-label="Table of contents">
+                    <div class="dropdown--header">
+                            <span>
+                                    KetraTerm
+                            </span>
+                        <button class="button" data-role="dropdown-toggle" aria-label="Close table of contents">
+                            <i class="ui-kit-icon ui-kit-icon_cross"></i>
+                        </button>
+                    </div>
+                    <div class="sidebar--inner" id="sideMenu"></div>
+                </ul>
+                <div class="dropdown--overlay"></div>
+            </div>
+        </nav>
+        <div id="resizer" class="resizer" data-item-type="BAR"></div>
+        <div id="main" data-item-type="SECTION" role="main">
+<div class="main-content" data-page-type="classlike" id="content" pageids="ketraterm-host::io.github.ketraterm.host/HostPolicy///PointingToDeclaration//-1906139840">
+  <div class="breadcrumbs"><a href="../../index.html">ketraterm-host</a><span class="delimiter">/</span><a href="../index.html">io.github.ketraterm.host</a><span class="delimiter">/</span><span class="current">HostPolicy</span></div>
+  <div class="cover ">
+    <h1 class="cover"><span>Host</span><wbr><span><span>Policy</span></span></h1>
+    <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-host/main"><div class="symbol monospace"><span class="token keyword">data </span><span class="token keyword">class </span><a href="index.html">HostPolicy</a><span class="token punctuation">(</span><span class="parameters "><span class="parameter "><span class="token keyword">val </span>titlePolicy<span class="token operator">: </span><a href="../-terminal-title-policy/index.html">TerminalTitlePolicy</a><span class="token operator"> = </span>TerminalTitlePolicy()<span class="token punctuation">, </span></span><span class="parameter "><span class="token keyword">val </span>hyperlinkPolicy<span class="token operator">: </span><a href="../-host-control-policy/index.html">HostControlPolicy</a><span class="token operator"> = </span>HostControlPolicy.ALLOW<span class="token punctuation">, </span></span><span class="parameter "><span class="token keyword">val </span>currentWorkingDirectoryPolicy<span class="token operator">: </span><a href="../-host-control-policy/index.html">HostControlPolicy</a><span class="token operator"> = </span>HostControlPolicy.ALLOW<span class="token punctuation">, </span></span><span class="parameter "><span class="token keyword">val </span>notificationPolicy<span class="token operator">: </span><a href="../-host-control-policy/index.html">HostControlPolicy</a><span class="token operator"> = </span>HostControlPolicy.ALLOW<span class="token punctuation">, </span></span><span class="parameter "><span class="token keyword">val </span>windowManipulationPolicy<span class="token operator">: </span><a href="../-host-control-policy/index.html">HostControlPolicy</a><span class="token operator"> = </span>HostControlPolicy.ALLOW<span class="token punctuation">, </span></span><span class="parameter "><span class="token keyword">val </span>palettePolicy<span class="token operator">: </span><a href="../-host-control-policy/index.html">HostControlPolicy</a><span class="token operator"> = </span>HostControlPolicy.ALLOW<span class="token punctuation">, </span></span><span class="parameter "><span class="token keyword">val </span>terminalResponsePolicy<span class="token operator">: </span><a href="../-host-control-policy/index.html">HostControlPolicy</a><span class="token operator"> = </span>HostControlPolicy.ALLOW<span class="token punctuation">, </span></span><span class="parameter "><span class="token keyword">val </span>clipboardPolicy<span class="token operator">: </span><a href="../-terminal-clipboard-policy/index.html">TerminalClipboardPolicy</a><span class="token operator"> = </span>TerminalClipboardPolicy()<span class="token punctuation">, </span></span><span class="parameter "><span class="token keyword">val </span>maxHyperlinkEntries<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a><span class="token operator"> = </span><span class="token constant">4096</span><span class="token punctuation">, </span></span><span class="parameter "><span class="token keyword">val </span>maxHyperlinkUriLength<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a><span class="token operator"> = </span><span class="token constant">4096</span><span class="token punctuation">, </span></span><span class="parameter "><span class="token keyword">val </span>maxHyperlinkIdLength<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a><span class="token operator"> = </span><span class="token constant">256</span><span class="token punctuation">, </span></span><span class="parameter "><span class="token keyword">val </span>maxNotificationTitleLength<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a><span class="token operator"> = </span><span class="token constant">256</span><span class="token punctuation">, </span></span><span class="parameter "><span class="token keyword">val </span>maxNotificationBodyLength<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a><span class="token operator"> = </span><span class="token constant">1024</span><span class="token punctuation">, </span></span><span class="parameter "><span class="token keyword">val </span>maxCurrentWorkingDirectoryUriLength<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a><span class="token operator"> = </span><span class="token constant">4096</span></span></span><span class="token punctuation">)</span></div><p class="paragraph">Host-facing security policy for terminal controls that can affect host state, retain host metadata, or write terminal-generated bytes back to the remote process.</p><p class="paragraph">The parser only recognizes protocols. This policy is evaluated in the host adapter before commands touch core state, host callbacks, metadata registries, or terminal-to-host response queues. Encoding validity is fixed by the OSC protocol contract before permission evaluation; permitting a command does not permit malformed structured data.</p></div></div>
+  </div>
+  <div class="tabbedcontent">
+    <div class="tabs-section" tabs-section="tabs-section"><button class="section-tab" data-active="" data-togglable="CONSTRUCTOR,TYPE,PROPERTY,FUNCTION">Members</button></div>
+    <div class="tabs-section-body">
+      <div data-togglable="CONSTRUCTOR">
+        <h2 class="tableheader">Constructors</h2>
+        <div class="table"><a data-name="-304736760%2FConstructors%2F-1906139840" anchor-label="HostPolicy" id="-304736760%2FConstructors%2F-1906139840" data-filterable-set=":ketraterm-host/main"></a>
+          <div class="table-row table-row_content" data-togglable="CONSTRUCTOR" data-filterable-current=":ketraterm-host/main" data-filterable-set=":ketraterm-host/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-host-policy.html"><span>Host</span><wbr><span><span>Policy</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-304736760%2FConstructors%2F-1906139840"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-host/main"><div class="symbol monospace"><span class="token keyword">constructor</span><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">titlePolicy<span class="token operator">: </span><a href="../-terminal-title-policy/index.html">TerminalTitlePolicy</a><span class="token operator"> = </span>TerminalTitlePolicy()<span class="token punctuation">, </span></span><span class="parameter ">hyperlinkPolicy<span class="token operator">: </span><a href="../-host-control-policy/index.html">HostControlPolicy</a><span class="token operator"> = </span>HostControlPolicy.ALLOW<span class="token punctuation">, </span></span><span class="parameter ">currentWorkingDirectoryPolicy<span class="token operator">: </span><a href="../-host-control-policy/index.html">HostControlPolicy</a><span class="token operator"> = </span>HostControlPolicy.ALLOW<span class="token punctuation">, </span></span><span class="parameter ">notificationPolicy<span class="token operator">: </span><a href="../-host-control-policy/index.html">HostControlPolicy</a><span class="token operator"> = </span>HostControlPolicy.ALLOW<span class="token punctuation">, </span></span><span class="parameter ">windowManipulationPolicy<span class="token operator">: </span><a href="../-host-control-policy/index.html">HostControlPolicy</a><span class="token operator"> = </span>HostControlPolicy.ALLOW<span class="token punctuation">, </span></span><span class="parameter ">palettePolicy<span class="token operator">: </span><a href="../-host-control-policy/index.html">HostControlPolicy</a><span class="token operator"> = </span>HostControlPolicy.ALLOW<span class="token punctuation">, </span></span><span class="parameter ">terminalResponsePolicy<span class="token operator">: </span><a href="../-host-control-policy/index.html">HostControlPolicy</a><span class="token operator"> = </span>HostControlPolicy.ALLOW<span class="token punctuation">, </span></span><span class="parameter ">clipboardPolicy<span class="token operator">: </span><a href="../-terminal-clipboard-policy/index.html">TerminalClipboardPolicy</a><span class="token operator"> = </span>TerminalClipboardPolicy()<span class="token punctuation">, </span></span><span class="parameter ">maxHyperlinkEntries<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a><span class="token operator"> = </span><span class="token constant">4096</span><span class="token punctuation">, </span></span><span class="parameter ">maxHyperlinkUriLength<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a><span class="token operator"> = </span><span class="token constant">4096</span><span class="token punctuation">, </span></span><span class="parameter ">maxHyperlinkIdLength<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a><span class="token operator"> = </span><span class="token constant">256</span><span class="token punctuation">, </span></span><span class="parameter ">maxNotificationTitleLength<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a><span class="token operator"> = </span><span class="token constant">256</span><span class="token punctuation">, </span></span><span class="parameter ">maxNotificationBodyLength<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a><span class="token operator"> = </span><span class="token constant">1024</span><span class="token punctuation">, </span></span><span class="parameter ">maxCurrentWorkingDirectoryUriLength<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a><span class="token operator"> = </span><span class="token constant">4096</span></span></span><span class="token punctuation">)</span></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div data-togglable="PROPERTY">
+        <h2 class="tableheader">Properties</h2>
+        <div class="table"><a data-name="209595839%2FProperties%2F-1906139840" anchor-label="clipboardPolicy" id="209595839%2FProperties%2F-1906139840" data-filterable-set=":ketraterm-host/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-host/main" data-filterable-set=":ketraterm-host/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="clipboard-policy.html"><span>clipboard</span><wbr><span><span>Policy</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="209595839%2FProperties%2F-1906139840"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-host/main"><div class="symbol monospace"><span class="token keyword">val </span><a href="clipboard-policy.html">clipboardPolicy</a><span class="token operator">: </span><a href="../-terminal-clipboard-policy/index.html">TerminalClipboardPolicy</a></div><div class="brief "><p class="paragraph">deny-by-default permission and audit policy for terminal-triggered clipboard protocols such as OSC 52.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="1786640416%2FProperties%2F-1906139840" anchor-label="currentWorkingDirectoryPolicy" id="1786640416%2FProperties%2F-1906139840" data-filterable-set=":ketraterm-host/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-host/main" data-filterable-set=":ketraterm-host/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="current-working-directory-policy.html"><span>current</span><wbr><span>Working</span><wbr><span>Directory</span><wbr><span><span>Policy</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="1786640416%2FProperties%2F-1906139840"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-host/main"><div class="symbol monospace"><span class="token keyword">val </span><a href="current-working-directory-policy.html">currentWorkingDirectoryPolicy</a><span class="token operator">: </span><a href="../-host-control-policy/index.html">HostControlPolicy</a></div><div class="brief "><p class="paragraph">whether OSC 7 current-working-directory reports may be retained and forwarded to the host.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-2138646289%2FProperties%2F-1906139840" anchor-label="hyperlinkPolicy" id="-2138646289%2FProperties%2F-1906139840" data-filterable-set=":ketraterm-host/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-host/main" data-filterable-set=":ketraterm-host/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="hyperlink-policy.html"><span>hyperlink</span><wbr><span><span>Policy</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-2138646289%2FProperties%2F-1906139840"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-host/main"><div class="symbol monospace"><span class="token keyword">val </span><a href="hyperlink-policy.html">hyperlinkPolicy</a><span class="token operator">: </span><a href="../-host-control-policy/index.html">HostControlPolicy</a></div><div class="brief "><p class="paragraph">whether OSC 8 hyperlinks may be retained and attached to written cells.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="1674191526%2FProperties%2F-1906139840" anchor-label="maxCurrentWorkingDirectoryUriLength" id="1674191526%2FProperties%2F-1906139840" data-filterable-set=":ketraterm-host/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-host/main" data-filterable-set=":ketraterm-host/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="max-current-working-directory-uri-length.html"><span>max</span><wbr><span>Current</span><wbr><span>Working</span><wbr><span>Directory</span><wbr><span>Uri</span><wbr><span><span>Length</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="1674191526%2FProperties%2F-1906139840"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-host/main"><div class="symbol monospace"><span class="token keyword">val </span><a href="max-current-working-directory-uri-length.html">maxCurrentWorkingDirectoryUriLength</a><span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a></div><div class="brief "><p class="paragraph">maximum accepted OSC 7 file URI length in UTF-16 code units. Longer or malformed URIs are ignored.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-2004474087%2FProperties%2F-1906139840" anchor-label="maxHyperlinkEntries" id="-2004474087%2FProperties%2F-1906139840" data-filterable-set=":ketraterm-host/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-host/main" data-filterable-set=":ketraterm-host/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="max-hyperlink-entries.html"><span>max</span><wbr><span>Hyperlink</span><wbr><span><span>Entries</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-2004474087%2FProperties%2F-1906139840"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-host/main"><div class="symbol monospace"><span class="token keyword">val </span><a href="max-hyperlink-entries.html">maxHyperlinkEntries</a><span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a></div><div class="brief "><p class="paragraph">maximum distinct OSC 8 hyperlink keys retained by the adapter before least-recently-used entries are evicted.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="320755344%2FProperties%2F-1906139840" anchor-label="maxHyperlinkIdLength" id="320755344%2FProperties%2F-1906139840" data-filterable-set=":ketraterm-host/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-host/main" data-filterable-set=":ketraterm-host/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="max-hyperlink-id-length.html"><span>max</span><wbr><span>Hyperlink</span><wbr><span>Id</span><wbr><span><span>Length</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="320755344%2FProperties%2F-1906139840"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-host/main"><div class="symbol monospace"><span class="token keyword">val </span><a href="max-hyperlink-id-length.html">maxHyperlinkIdLength</a><span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a></div><div class="brief "><p class="paragraph">maximum accepted OSC 8 <code class="lang-kotlin">id=</code> parameter length in UTF-16 code units. Longer IDs are ignored and mapped to no active hyperlink.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="1275254647%2FProperties%2F-1906139840" anchor-label="maxHyperlinkUriLength" id="1275254647%2FProperties%2F-1906139840" data-filterable-set=":ketraterm-host/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-host/main" data-filterable-set=":ketraterm-host/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="max-hyperlink-uri-length.html"><span>max</span><wbr><span>Hyperlink</span><wbr><span>Uri</span><wbr><span><span>Length</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="1275254647%2FProperties%2F-1906139840"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-host/main"><div class="symbol monospace"><span class="token keyword">val </span><a href="max-hyperlink-uri-length.html">maxHyperlinkUriLength</a><span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a></div><div class="brief "><p class="paragraph">maximum accepted OSC 8 URI length in UTF-16 code units. Longer URIs are ignored and mapped to no active hyperlink.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="1457159568%2FProperties%2F-1906139840" anchor-label="maxNotificationBodyLength" id="1457159568%2FProperties%2F-1906139840" data-filterable-set=":ketraterm-host/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-host/main" data-filterable-set=":ketraterm-host/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="max-notification-body-length.html"><span>max</span><wbr><span>Notification</span><wbr><span>Body</span><wbr><span><span>Length</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="1457159568%2FProperties%2F-1906139840"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-host/main"><div class="symbol monospace"><span class="token keyword">val </span><a href="max-notification-body-length.html">maxNotificationBodyLength</a><span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a></div><div class="brief "><p class="paragraph">maximum retained UTF-16 code units for desktop notification bodies, without splitting a valid surrogate pair.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-786020988%2FProperties%2F-1906139840" anchor-label="maxNotificationTitleLength" id="-786020988%2FProperties%2F-1906139840" data-filterable-set=":ketraterm-host/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-host/main" data-filterable-set=":ketraterm-host/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="max-notification-title-length.html"><span>max</span><wbr><span>Notification</span><wbr><span>Title</span><wbr><span><span>Length</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-786020988%2FProperties%2F-1906139840"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-host/main"><div class="symbol monospace"><span class="token keyword">val </span><a href="max-notification-title-length.html">maxNotificationTitleLength</a><span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a></div><div class="brief "><p class="paragraph">maximum retained UTF-16 code units for desktop notification titles, without splitting a valid surrogate pair.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="982569142%2FProperties%2F-1906139840" anchor-label="notificationPolicy" id="982569142%2FProperties%2F-1906139840" data-filterable-set=":ketraterm-host/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-host/main" data-filterable-set=":ketraterm-host/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="notification-policy.html"><span>notification</span><wbr><span><span>Policy</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="982569142%2FProperties%2F-1906139840"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-host/main"><div class="symbol monospace"><span class="token keyword">val </span><a href="notification-policy.html">notificationPolicy</a><span class="token operator">: </span><a href="../-host-control-policy/index.html">HostControlPolicy</a></div><div class="brief "><p class="paragraph">whether terminal-triggered desktop notification requests may be forwarded to the host.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="1015179962%2FProperties%2F-1906139840" anchor-label="palettePolicy" id="1015179962%2FProperties%2F-1906139840" data-filterable-set=":ketraterm-host/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-host/main" data-filterable-set=":ketraterm-host/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="palette-policy.html"><span>palette</span><wbr><span><span>Policy</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="1015179962%2FProperties%2F-1906139840"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-host/main"><div class="symbol monospace"><span class="token keyword">val </span><a href="palette-policy.html">palettePolicy</a><span class="token operator">: </span><a href="../-host-control-policy/index.html">HostControlPolicy</a></div><div class="brief "><p class="paragraph">whether OSC palette updates and palette query responses may affect core palette state or enqueue terminal-to-host bytes.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-1297337980%2FProperties%2F-1906139840" anchor-label="terminalResponsePolicy" id="-1297337980%2FProperties%2F-1906139840" data-filterable-set=":ketraterm-host/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-host/main" data-filterable-set=":ketraterm-host/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="terminal-response-policy.html"><span>terminal</span><wbr><span>Response</span><wbr><span><span>Policy</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-1297337980%2FProperties%2F-1906139840"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-host/main"><div class="symbol monospace"><span class="token keyword">val </span><a href="terminal-response-policy.html">terminalResponsePolicy</a><span class="token operator">: </span><a href="../-host-control-policy/index.html">HostControlPolicy</a></div><div class="brief "><p class="paragraph">whether DA, DSR/CPR (including light/dark scheme queries), window reports, DECRQCRA, DECRQSS, and XTGETTCAP requests may enqueue terminal-to-host response bytes.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="2089817533%2FProperties%2F-1906139840" anchor-label="titlePolicy" id="2089817533%2FProperties%2F-1906139840" data-filterable-set=":ketraterm-host/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-host/main" data-filterable-set=":ketraterm-host/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="title-policy.html"><span>title</span><wbr><span><span>Policy</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="2089817533%2FProperties%2F-1906139840"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-host/main"><div class="symbol monospace"><span class="token keyword">val </span><a href="title-policy.html">titlePolicy</a><span class="token operator">: </span><a href="../-terminal-title-policy/index.html">TerminalTitlePolicy</a></div><div class="brief "><p class="paragraph">origin-aware policy for OSC title updates and title-stack restore operations before adapter/core title metadata changes or host callbacks are emitted.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-48233164%2FProperties%2F-1906139840" anchor-label="windowManipulationPolicy" id="-48233164%2FProperties%2F-1906139840" data-filterable-set=":ketraterm-host/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-host/main" data-filterable-set=":ketraterm-host/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="window-manipulation-policy.html"><span>window</span><wbr><span>Manipulation</span><wbr><span><span>Policy</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-48233164%2FProperties%2F-1906139840"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-host/main"><div class="symbol monospace"><span class="token keyword">val </span><a href="window-manipulation-policy.html">windowManipulationPolicy</a><span class="token operator">: </span><a href="../-host-control-policy/index.html">HostControlPolicy</a></div><div class="brief "><p class="paragraph">whether terminal-triggered window movement, resize (including DECCOLM), minimize, raise, lower, and maximize requests may be forwarded. DECCOLM additionally requires explicit host acceptance.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+    <div class="footer">
+        <div class="footer--container">
+            <a href="#content" id="go-to-top-link" class="footer--button footer--button_go-to-top"></a>
+            <div class="footer--content">
+                <div>
+                    <span>Generated by </span>
+                    <a class="footer--link footer--link_external" href="https://github.com/Kotlin/dokka">
+                        Dokka
+                    </a>
+                    <div>© 2026 Copyright</div>
+                </div>
+            </div>
+        </div>
+    </div>
+        </div>
+    </div>
+</div>
+</body>
+</html>

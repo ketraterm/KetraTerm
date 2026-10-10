@@ -1,0 +1,1988 @@
+<!doctype html>
+<html class="no-js" lang="en">
+<head>
+    <meta name="viewport" content="width=device-width, initial-scale=1" charset="UTF-8">
+    <title>TerminalKey</title>
+<link href="../../../images/logo-icon.svg" rel="icon" type="image/svg"><script>var pathToRoot = "../../../";</script>
+    <script>document.documentElement.classList.replace("no-js", "js");</script>
+    <script>const storage = localStorage.getItem("dokka-dark-mode")
+      if (storage == null) {
+        const osDarkSchemePreferred = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches
+        if (osDarkSchemePreferred === true) {
+          document.getElementsByTagName("html")[0].classList.add("theme-dark")
+        }
+      } else {
+        const savedDarkMode = JSON.parse(storage)
+        if (savedDarkMode === true) {
+          document.getElementsByTagName("html")[0].classList.add("theme-dark")
+        }
+      }
+    </script>
+<script type="text/javascript" src="../../../scripts/sourceset_dependencies.js" async></script>
+<link href="../../../styles/style.css" rel="Stylesheet">
+<link href="../../../styles/main.css" rel="Stylesheet">
+<link href="../../../styles/prism.css" rel="Stylesheet">
+<link href="../../../styles/logo-styles.css" rel="Stylesheet">
+<link href="../../../ui-kit/ui-kit.min.css" rel="Stylesheet">
+<script type="text/javascript" src="../../../scripts/safe-local-storage_blocking.js"></script>
+<script type="text/javascript" src="../../../scripts/navigation-loader.js" async></script>
+<script type="text/javascript" src="../../../scripts/platform-content-handler.js" async></script>
+<script type="text/javascript" src="../../../scripts/main.js" defer></script>
+<script type="text/javascript" src="../../../scripts/prism.js" async></script>
+<script type="text/javascript" src="../../../ui-kit/ui-kit.min.js" defer></script><!-- ketraterm-api-stylesheet:start -->
+<link rel="icon" href="../../../../../assets/logo.svg" type="image/svg+xml">
+<link rel="stylesheet" href="../../../../../assets/api-navigation.css">
+<!-- ketraterm-api-stylesheet:end --></head>
+<body>
+<div class="root"><!-- ketraterm-api-navigation:start -->
+<div class="ketraterm-api-navigation">
+  <a class="ketraterm-api-brand" href="../../../../../index.html" aria-label="KetraTerm Library home"><img src="../../../../../assets/logo.svg" alt="" width="28" height="28">KetraTerm</a>
+  <nav class="ketraterm-api-products" aria-label="KetraTerm products"><a href="https://ketraterm.github.io/KetraTerm/">App</a><a href="../../../../../index.html" aria-current="true">Library</a></nav>
+  <div class="ketraterm-api-reference"><span>API · v0.2.1</span><a href="../../../../../versions.html">All versions</a></div>
+</div>
+<!-- ketraterm-api-navigation:end -->
+    <header class="navigation theme-dark" id="navigation-wrapper" role="banner">
+<a class="library-name--link" href="../../../index.html">
+                    KetraTerm
+            </a>        <button class="navigation-controls--btn navigation-controls--btn_toc ui-kit_mobile-only" id="toc-toggle" type="button">Toggle table of contents
+        </button>
+        <div class="navigation-controls--break ui-kit_mobile-only"></div>
+        <div class="library-version" id="library-version">
+        </div>
+        <div class="navigation-controls">
+        <ul class="filter-section filter-section_loading" id="filter-section" aria-label="Target filter">
+                <button class="platform-tag platform-selector jvm-like" data-active="" aria-pressed="true" data-filter=":ketraterm-input/main">jvm</button>
+            <div class="dropdown filter-section--dropdown" data-role="dropdown" id="filter-section-dropdown">
+                <button class="button button_dropdown filter-section--dropdown-toggle" role="combobox" data-role="dropdown-toggle" aria-controls="platform-tags-listbox" aria-haspopup="listbox" aria-expanded="false" aria-label="Toggle source sets"></button>
+                <ul role="listbox" id="platform-tags-listbox" class="dropdown--list" data-role="dropdown-listbox" aria-label="Target filter">
+                    <div class="dropdown--header"><span>Target filter</span>
+                        <button class="button" data-role="dropdown-toggle" aria-label="Close target filter">
+                            <i class="ui-kit-icon ui-kit-icon_cross"></i>
+                        </button>
+                    </div>
+                        <li role="option" class="dropdown--option platform-selector-option jvm-like" tabindex="0">
+                            <label class="checkbox">
+                                <input type="checkbox" class="checkbox--input" id=":ketraterm-input/main" data-filter=":ketraterm-input/main">
+                                <span class="checkbox--icon"></span>
+                                jvm
+                            </label>
+                        </li>
+                </ul>
+                <div class="dropdown--overlay"></div>
+            </div>
+        </ul>
+            <button class="navigation-controls--btn navigation-controls--btn_theme" id="theme-toggle-button" type="button">Switch theme
+            </button>
+            <div class="navigation-controls--btn navigation-controls--btn_search" id="searchBar" role="button">Search in
+                API
+            </div>
+        </div>
+    </header>
+    <div id="container">
+        <nav id="leftColumn" class="sidebar" data-item-type="SECTION" data-item-config="{&quot;defaultSize&quot;: 280, &quot;minSize&quot;: 200, &quot;maxSize&quot;: 400}">
+            <a class="toc--skip-link" href="#main">Skip to content</a>
+            <div class="dropdown theme-dark_mobile" data-role="dropdown" id="toc-dropdown">
+                <ul role="listbox" id="toc-listbox" class="dropdown--list dropdown--list_toc-list" data-role="dropdown-listbox" aria-label="Table of contents">
+                    <div class="dropdown--header">
+                            <span>
+                                    KetraTerm
+                            </span>
+                        <button class="button" data-role="dropdown-toggle" aria-label="Close table of contents">
+                            <i class="ui-kit-icon ui-kit-icon_cross"></i>
+                        </button>
+                    </div>
+                    <div class="sidebar--inner" id="sideMenu"></div>
+                </ul>
+                <div class="dropdown--overlay"></div>
+            </div>
+        </nav>
+        <div id="resizer" class="resizer" data-item-type="BAR"></div>
+        <div id="main" data-item-type="SECTION" role="main">
+<div class="main-content" data-page-type="classlike" id="content" pageids="ketraterm-input::io.github.ketraterm.input.event/TerminalKey///PointingToDeclaration//-1240825056">
+  <div class="breadcrumbs"><a href="../../index.html">ketraterm-input</a><span class="delimiter">/</span><a href="../index.html">io.github.ketraterm.input.event</a><span class="delimiter">/</span><span class="current">TerminalKey</span></div>
+  <div class="cover ">
+    <h1 class="cover"><span>Terminal</span><wbr><span><span>Key</span></span></h1>
+    <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-input/main"><div class="symbol monospace"><span class="token keyword">enum </span><a href="index.html">TerminalKey</a> : <a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-enum/index.html">Enum</a><span class="token operator">&lt;</span><a href="index.html">TerminalKey</a><span class="token operator">&gt; </span></div><p class="paragraph">Non-printable terminal keys accepted by the input encoder.</p><p class="paragraph">Printable text is represented as a Unicode scalar on <a href="../-terminal-key-event/index.html">io.github.ketraterm.input.event.TerminalKeyEvent</a>, never as a <code class="lang-kotlin">TerminalKey</code> enum value.</p></div></div>
+  </div>
+  <div class="tabbedcontent">
+    <div class="tabs-section" tabs-section="tabs-section"><button class="section-tab" data-active="" data-togglable="CONSTRUCTOR,TYPE,PROPERTY,FUNCTION">Members</button><button class="section-tab" data-togglable="ENTRY">Entries</button></div>
+    <div class="tabs-section-body">
+      <div data-togglable="ENTRY">
+        <h2 class="tableheader">Entries</h2>
+        <div class="table"><a data-name="1111844431%2FClasslikes%2F-1240825056" anchor-label="UP" id="1111844431%2FClasslikes%2F-1240825056" data-filterable-set=":ketraterm-input/main"></a>
+          <div class="table-row table-row_content" data-togglable="ENTRY" data-filterable-current=":ketraterm-input/main" data-filterable-set=":ketraterm-input/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-u-p/index.html">UP</a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="1111844431%2FClasslikes%2F-1240825056"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-input/main"><div class="symbol monospace"><div class="block"><a href="-u-p/index.html">UP</a></div></div><div class="brief "><p class="paragraph">Cursor-up key.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="1888093718%2FClasslikes%2F-1240825056" anchor-label="DOWN" id="1888093718%2FClasslikes%2F-1240825056" data-filterable-set=":ketraterm-input/main"></a>
+          <div class="table-row table-row_content" data-togglable="ENTRY" data-filterable-current=":ketraterm-input/main" data-filterable-set=":ketraterm-input/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-d-o-w-n/index.html">DOWN</a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="1888093718%2FClasslikes%2F-1240825056"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-input/main"><div class="symbol monospace"><div class="block"><a href="-d-o-w-n/index.html">DOWN</a></div></div><div class="brief "><p class="paragraph">Cursor-down key.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="111134395%2FClasslikes%2F-1240825056" anchor-label="LEFT" id="111134395%2FClasslikes%2F-1240825056" data-filterable-set=":ketraterm-input/main"></a>
+          <div class="table-row table-row_content" data-togglable="ENTRY" data-filterable-current=":ketraterm-input/main" data-filterable-set=":ketraterm-input/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-l-e-f-t/index.html">LEFT</a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="111134395%2FClasslikes%2F-1240825056"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-input/main"><div class="symbol monospace"><div class="block"><a href="-l-e-f-t/index.html">LEFT</a></div></div><div class="brief "><p class="paragraph">Cursor-left key.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="194689840%2FClasslikes%2F-1240825056" anchor-label="RIGHT" id="194689840%2FClasslikes%2F-1240825056" data-filterable-set=":ketraterm-input/main"></a>
+          <div class="table-row table-row_content" data-togglable="ENTRY" data-filterable-current=":ketraterm-input/main" data-filterable-set=":ketraterm-input/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-r-i-g-h-t/index.html">RIGHT</a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="194689840%2FClasslikes%2F-1240825056"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-input/main"><div class="symbol monospace"><div class="block"><a href="-r-i-g-h-t/index.html">RIGHT</a></div></div><div class="brief "><p class="paragraph">Cursor-right key.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="1675096467%2FClasslikes%2F-1240825056" anchor-label="HOME" id="1675096467%2FClasslikes%2F-1240825056" data-filterable-set=":ketraterm-input/main"></a>
+          <div class="table-row table-row_content" data-togglable="ENTRY" data-filterable-current=":ketraterm-input/main" data-filterable-set=":ketraterm-input/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-h-o-m-e/index.html">HOME</a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="1675096467%2FClasslikes%2F-1240825056"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-input/main"><div class="symbol monospace"><div class="block"><a href="-h-o-m-e/index.html">HOME</a></div></div><div class="brief "><p class="paragraph">Home key.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="1456921007%2FClasslikes%2F-1240825056" anchor-label="END" id="1456921007%2FClasslikes%2F-1240825056" data-filterable-set=":ketraterm-input/main"></a>
+          <div class="table-row table-row_content" data-togglable="ENTRY" data-filterable-current=":ketraterm-input/main" data-filterable-set=":ketraterm-input/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-e-n-d/index.html">END</a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="1456921007%2FClasslikes%2F-1240825056"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-input/main"><div class="symbol monospace"><div class="block"><a href="-e-n-d/index.html">END</a></div></div><div class="brief "><p class="paragraph">End key.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-1359841473%2FClasslikes%2F-1240825056" anchor-label="PAGE_UP" id="-1359841473%2FClasslikes%2F-1240825056" data-filterable-set=":ketraterm-input/main"></a>
+          <div class="table-row table-row_content" data-togglable="ENTRY" data-filterable-current=":ketraterm-input/main" data-filterable-set=":ketraterm-input/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-p-a-g-e_-u-p/index.html">PAGE_UP</a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-1359841473%2FClasslikes%2F-1240825056"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-input/main"><div class="symbol monospace"><div class="block"><a href="-p-a-g-e_-u-p/index.html">PAGE_UP</a></div></div><div class="brief "><p class="paragraph">Page-up key.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="1714854662%2FClasslikes%2F-1240825056" anchor-label="PAGE_DOWN" id="1714854662%2FClasslikes%2F-1240825056" data-filterable-set=":ketraterm-input/main"></a>
+          <div class="table-row table-row_content" data-togglable="ENTRY" data-filterable-current=":ketraterm-input/main" data-filterable-set=":ketraterm-input/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-p-a-g-e_-d-o-w-n/index.html">PAGE_DOWN</a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="1714854662%2FClasslikes%2F-1240825056"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-input/main"><div class="symbol monospace"><div class="block"><a href="-p-a-g-e_-d-o-w-n/index.html">PAGE_DOWN</a></div></div><div class="brief "><p class="paragraph">Page-down key.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-864423443%2FClasslikes%2F-1240825056" anchor-label="INSERT" id="-864423443%2FClasslikes%2F-1240825056" data-filterable-set=":ketraterm-input/main"></a>
+          <div class="table-row table-row_content" data-togglable="ENTRY" data-filterable-current=":ketraterm-input/main" data-filterable-set=":ketraterm-input/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-i-n-s-e-r-t/index.html">INSERT</a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-864423443%2FClasslikes%2F-1240825056"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-input/main"><div class="symbol monospace"><div class="block"><a href="-i-n-s-e-r-t/index.html">INSERT</a></div></div><div class="brief "><p class="paragraph">Insert key.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="1176414559%2FClasslikes%2F-1240825056" anchor-label="DELETE" id="1176414559%2FClasslikes%2F-1240825056" data-filterable-set=":ketraterm-input/main"></a>
+          <div class="table-row table-row_content" data-togglable="ENTRY" data-filterable-current=":ketraterm-input/main" data-filterable-set=":ketraterm-input/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-d-e-l-e-t-e/index.html">DELETE</a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="1176414559%2FClasslikes%2F-1240825056"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-input/main"><div class="symbol monospace"><div class="block"><a href="-d-e-l-e-t-e/index.html">DELETE</a></div></div><div class="brief "><p class="paragraph">Delete key.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-1211129261%2FClasslikes%2F-1240825056" anchor-label="BACKSPACE" id="-1211129261%2FClasslikes%2F-1240825056" data-filterable-set=":ketraterm-input/main"></a>
+          <div class="table-row table-row_content" data-togglable="ENTRY" data-filterable-current=":ketraterm-input/main" data-filterable-set=":ketraterm-input/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-b-a-c-k-s-p-a-c-e/index.html">BACKSPACE</a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-1211129261%2FClasslikes%2F-1240825056"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-input/main"><div class="symbol monospace"><div class="block"><a href="-b-a-c-k-s-p-a-c-e/index.html">BACKSPACE</a></div></div><div class="brief "><p class="paragraph">Backspace key.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-1573896468%2FClasslikes%2F-1240825056" anchor-label="ENTER" id="-1573896468%2FClasslikes%2F-1240825056" data-filterable-set=":ketraterm-input/main"></a>
+          <div class="table-row table-row_content" data-togglable="ENTRY" data-filterable-current=":ketraterm-input/main" data-filterable-set=":ketraterm-input/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-e-n-t-e-r/index.html">ENTER</a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-1573896468%2FClasslikes%2F-1240825056"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-input/main"><div class="symbol monospace"><div class="block"><a href="-e-n-t-e-r/index.html">ENTER</a></div></div><div class="brief "><p class="paragraph">Main keyboard enter key.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-1417947415%2FClasslikes%2F-1240825056" anchor-label="TAB" id="-1417947415%2FClasslikes%2F-1240825056" data-filterable-set=":ketraterm-input/main"></a>
+          <div class="table-row table-row_content" data-togglable="ENTRY" data-filterable-current=":ketraterm-input/main" data-filterable-set=":ketraterm-input/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-t-a-b/index.html">TAB</a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-1417947415%2FClasslikes%2F-1240825056"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-input/main"><div class="symbol monospace"><div class="block"><a href="-t-a-b/index.html">TAB</a></div></div><div class="brief "><p class="paragraph">Tab key.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-318373451%2FClasslikes%2F-1240825056" anchor-label="ESCAPE" id="-318373451%2FClasslikes%2F-1240825056" data-filterable-set=":ketraterm-input/main"></a>
+          <div class="table-row table-row_content" data-togglable="ENTRY" data-filterable-current=":ketraterm-input/main" data-filterable-set=":ketraterm-input/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-e-s-c-a-p-e/index.html">ESCAPE</a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-318373451%2FClasslikes%2F-1240825056"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-input/main"><div class="symbol monospace"><div class="block"><a href="-e-s-c-a-p-e/index.html">ESCAPE</a></div></div><div class="brief "><p class="paragraph">Escape key.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="1495050335%2FClasslikes%2F-1240825056" anchor-label="F1" id="1495050335%2FClasslikes%2F-1240825056" data-filterable-set=":ketraterm-input/main"></a>
+          <div class="table-row table-row_content" data-togglable="ENTRY" data-filterable-current=":ketraterm-input/main" data-filterable-set=":ketraterm-input/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-f1/index.html">F1</a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="1495050335%2FClasslikes%2F-1240825056"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-input/main"><div class="symbol monospace"><div class="block"><a href="-f1/index.html">F1</a></div></div><div class="brief "><p class="paragraph">Function key F1.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-869686112%2FClasslikes%2F-1240825056" anchor-label="F2" id="-869686112%2FClasslikes%2F-1240825056" data-filterable-set=":ketraterm-input/main"></a>
+          <div class="table-row table-row_content" data-togglable="ENTRY" data-filterable-current=":ketraterm-input/main" data-filterable-set=":ketraterm-input/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-f2/index.html">F2</a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-869686112%2FClasslikes%2F-1240825056"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-input/main"><div class="symbol monospace"><div class="block"><a href="-f2/index.html">F2</a></div></div><div class="brief "><p class="paragraph">Function key F2.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="1060544737%2FClasslikes%2F-1240825056" anchor-label="F3" id="1060544737%2FClasslikes%2F-1240825056" data-filterable-set=":ketraterm-input/main"></a>
+          <div class="table-row table-row_content" data-togglable="ENTRY" data-filterable-current=":ketraterm-input/main" data-filterable-set=":ketraterm-input/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-f3/index.html">F3</a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="1060544737%2FClasslikes%2F-1240825056"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-input/main"><div class="symbol monospace"><div class="block"><a href="-f3/index.html">F3</a></div></div><div class="brief "><p class="paragraph">Function key F3.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-1304191710%2FClasslikes%2F-1240825056" anchor-label="F4" id="-1304191710%2FClasslikes%2F-1240825056" data-filterable-set=":ketraterm-input/main"></a>
+          <div class="table-row table-row_content" data-togglable="ENTRY" data-filterable-current=":ketraterm-input/main" data-filterable-set=":ketraterm-input/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-f4/index.html">F4</a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-1304191710%2FClasslikes%2F-1240825056"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-input/main"><div class="symbol monospace"><div class="block"><a href="-f4/index.html">F4</a></div></div><div class="brief "><p class="paragraph">Function key F4.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="626039139%2FClasslikes%2F-1240825056" anchor-label="F5" id="626039139%2FClasslikes%2F-1240825056" data-filterable-set=":ketraterm-input/main"></a>
+          <div class="table-row table-row_content" data-togglable="ENTRY" data-filterable-current=":ketraterm-input/main" data-filterable-set=":ketraterm-input/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-f5/index.html">F5</a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="626039139%2FClasslikes%2F-1240825056"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-input/main"><div class="symbol monospace"><div class="block"><a href="-f5/index.html">F5</a></div></div><div class="brief "><p class="paragraph">Function key F5.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-1738697308%2FClasslikes%2F-1240825056" anchor-label="F6" id="-1738697308%2FClasslikes%2F-1240825056" data-filterable-set=":ketraterm-input/main"></a>
+          <div class="table-row table-row_content" data-togglable="ENTRY" data-filterable-current=":ketraterm-input/main" data-filterable-set=":ketraterm-input/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-f6/index.html">F6</a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-1738697308%2FClasslikes%2F-1240825056"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-input/main"><div class="symbol monospace"><div class="block"><a href="-f6/index.html">F6</a></div></div><div class="brief "><p class="paragraph">Function key F6.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="191533541%2FClasslikes%2F-1240825056" anchor-label="F7" id="191533541%2FClasslikes%2F-1240825056" data-filterable-set=":ketraterm-input/main"></a>
+          <div class="table-row table-row_content" data-togglable="ENTRY" data-filterable-current=":ketraterm-input/main" data-filterable-set=":ketraterm-input/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-f7/index.html">F7</a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="191533541%2FClasslikes%2F-1240825056"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-input/main"><div class="symbol monospace"><div class="block"><a href="-f7/index.html">F7</a></div></div><div class="brief "><p class="paragraph">Function key F7.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="2121764390%2FClasslikes%2F-1240825056" anchor-label="F8" id="2121764390%2FClasslikes%2F-1240825056" data-filterable-set=":ketraterm-input/main"></a>
+          <div class="table-row table-row_content" data-togglable="ENTRY" data-filterable-current=":ketraterm-input/main" data-filterable-set=":ketraterm-input/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-f8/index.html">F8</a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="2121764390%2FClasslikes%2F-1240825056"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-input/main"><div class="symbol monospace"><div class="block"><a href="-f8/index.html">F8</a></div></div><div class="brief "><p class="paragraph">Function key F8.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-242972057%2FClasslikes%2F-1240825056" anchor-label="F9" id="-242972057%2FClasslikes%2F-1240825056" data-filterable-set=":ketraterm-input/main"></a>
+          <div class="table-row table-row_content" data-togglable="ENTRY" data-filterable-current=":ketraterm-input/main" data-filterable-set=":ketraterm-input/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-f9/index.html">F9</a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-242972057%2FClasslikes%2F-1240825056"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-input/main"><div class="symbol monospace"><div class="block"><a href="-f9/index.html">F9</a></div></div><div class="brief "><p class="paragraph">Function key F9.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="922238041%2FClasslikes%2F-1240825056" anchor-label="F10" id="922238041%2FClasslikes%2F-1240825056" data-filterable-set=":ketraterm-input/main"></a>
+          <div class="table-row table-row_content" data-togglable="ENTRY" data-filterable-current=":ketraterm-input/main" data-filterable-set=":ketraterm-input/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-f10/index.html">F10</a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="922238041%2FClasslikes%2F-1240825056"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-input/main"><div class="symbol monospace"><div class="block"><a href="-f10/index.html">F10</a></div></div><div class="brief "><p class="paragraph">Function key F10.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-1442498406%2FClasslikes%2F-1240825056" anchor-label="F11" id="-1442498406%2FClasslikes%2F-1240825056" data-filterable-set=":ketraterm-input/main"></a>
+          <div class="table-row table-row_content" data-togglable="ENTRY" data-filterable-current=":ketraterm-input/main" data-filterable-set=":ketraterm-input/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-f11/index.html">F11</a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-1442498406%2FClasslikes%2F-1240825056"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-input/main"><div class="symbol monospace"><div class="block"><a href="-f11/index.html">F11</a></div></div><div class="brief "><p class="paragraph">Function key F11.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="487732443%2FClasslikes%2F-1240825056" anchor-label="F12" id="487732443%2FClasslikes%2F-1240825056" data-filterable-set=":ketraterm-input/main"></a>
+          <div class="table-row table-row_content" data-togglable="ENTRY" data-filterable-current=":ketraterm-input/main" data-filterable-set=":ketraterm-input/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-f12/index.html">F12</a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="487732443%2FClasslikes%2F-1240825056"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-input/main"><div class="symbol monospace"><div class="block"><a href="-f12/index.html">F12</a></div></div><div class="brief "><p class="paragraph">Function key F12.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-1877004004%2FClasslikes%2F-1240825056" anchor-label="F13" id="-1877004004%2FClasslikes%2F-1240825056" data-filterable-set=":ketraterm-input/main"></a>
+          <div class="table-row table-row_content" data-togglable="ENTRY" data-filterable-current=":ketraterm-input/main" data-filterable-set=":ketraterm-input/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-f13/index.html">F13</a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-1877004004%2FClasslikes%2F-1240825056"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-input/main"><div class="symbol monospace"><div class="block"><a href="-f13/index.html">F13</a></div></div><div class="brief "><p class="paragraph">Function key F13.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="53226845%2FClasslikes%2F-1240825056" anchor-label="F14" id="53226845%2FClasslikes%2F-1240825056" data-filterable-set=":ketraterm-input/main"></a>
+          <div class="table-row table-row_content" data-togglable="ENTRY" data-filterable-current=":ketraterm-input/main" data-filterable-set=":ketraterm-input/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-f14/index.html">F14</a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="53226845%2FClasslikes%2F-1240825056"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-input/main"><div class="symbol monospace"><div class="block"><a href="-f14/index.html">F14</a></div></div><div class="brief "><p class="paragraph">Function key F14.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="1983457694%2FClasslikes%2F-1240825056" anchor-label="F15" id="1983457694%2FClasslikes%2F-1240825056" data-filterable-set=":ketraterm-input/main"></a>
+          <div class="table-row table-row_content" data-togglable="ENTRY" data-filterable-current=":ketraterm-input/main" data-filterable-set=":ketraterm-input/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-f15/index.html">F15</a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="1983457694%2FClasslikes%2F-1240825056"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-input/main"><div class="symbol monospace"><div class="block"><a href="-f15/index.html">F15</a></div></div><div class="brief "><p class="paragraph">Function key F15.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-381278753%2FClasslikes%2F-1240825056" anchor-label="F16" id="-381278753%2FClasslikes%2F-1240825056" data-filterable-set=":ketraterm-input/main"></a>
+          <div class="table-row table-row_content" data-togglable="ENTRY" data-filterable-current=":ketraterm-input/main" data-filterable-set=":ketraterm-input/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-f16/index.html">F16</a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-381278753%2FClasslikes%2F-1240825056"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-input/main"><div class="symbol monospace"><div class="block"><a href="-f16/index.html">F16</a></div></div><div class="brief "><p class="paragraph">Function key F16.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="1548952096%2FClasslikes%2F-1240825056" anchor-label="F17" id="1548952096%2FClasslikes%2F-1240825056" data-filterable-set=":ketraterm-input/main"></a>
+          <div class="table-row table-row_content" data-togglable="ENTRY" data-filterable-current=":ketraterm-input/main" data-filterable-set=":ketraterm-input/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-f17/index.html">F17</a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="1548952096%2FClasslikes%2F-1240825056"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-input/main"><div class="symbol monospace"><div class="block"><a href="-f17/index.html">F17</a></div></div><div class="brief "><p class="paragraph">Function key F17.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-815784351%2FClasslikes%2F-1240825056" anchor-label="F18" id="-815784351%2FClasslikes%2F-1240825056" data-filterable-set=":ketraterm-input/main"></a>
+          <div class="table-row table-row_content" data-togglable="ENTRY" data-filterable-current=":ketraterm-input/main" data-filterable-set=":ketraterm-input/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-f18/index.html">F18</a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-815784351%2FClasslikes%2F-1240825056"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-input/main"><div class="symbol monospace"><div class="block"><a href="-f18/index.html">F18</a></div></div><div class="brief "><p class="paragraph">Function key F18.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="1114446498%2FClasslikes%2F-1240825056" anchor-label="F19" id="1114446498%2FClasslikes%2F-1240825056" data-filterable-set=":ketraterm-input/main"></a>
+          <div class="table-row table-row_content" data-togglable="ENTRY" data-filterable-current=":ketraterm-input/main" data-filterable-set=":ketraterm-input/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-f19/index.html">F19</a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="1114446498%2FClasslikes%2F-1240825056"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-input/main"><div class="symbol monospace"><div class="block"><a href="-f19/index.html">F19</a></div></div><div class="brief "><p class="paragraph">Function key F19.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="629852216%2FClasslikes%2F-1240825056" anchor-label="F20" id="629852216%2FClasslikes%2F-1240825056" data-filterable-set=":ketraterm-input/main"></a>
+          <div class="table-row table-row_content" data-togglable="ENTRY" data-filterable-current=":ketraterm-input/main" data-filterable-set=":ketraterm-input/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-f20/index.html">F20</a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="629852216%2FClasslikes%2F-1240825056"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-input/main"><div class="symbol monospace"><div class="block"><a href="-f20/index.html">F20</a></div></div><div class="brief "><p class="paragraph">Function key F20.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-1734884231%2FClasslikes%2F-1240825056" anchor-label="F21" id="-1734884231%2FClasslikes%2F-1240825056" data-filterable-set=":ketraterm-input/main"></a>
+          <div class="table-row table-row_content" data-togglable="ENTRY" data-filterable-current=":ketraterm-input/main" data-filterable-set=":ketraterm-input/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-f21/index.html">F21</a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-1734884231%2FClasslikes%2F-1240825056"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-input/main"><div class="symbol monospace"><div class="block"><a href="-f21/index.html">F21</a></div></div><div class="brief "><p class="paragraph">Function key F21.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="195346618%2FClasslikes%2F-1240825056" anchor-label="F22" id="195346618%2FClasslikes%2F-1240825056" data-filterable-set=":ketraterm-input/main"></a>
+          <div class="table-row table-row_content" data-togglable="ENTRY" data-filterable-current=":ketraterm-input/main" data-filterable-set=":ketraterm-input/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-f22/index.html">F22</a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="195346618%2FClasslikes%2F-1240825056"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-input/main"><div class="symbol monospace"><div class="block"><a href="-f22/index.html">F22</a></div></div><div class="brief "><p class="paragraph">Function key F22.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="2125577467%2FClasslikes%2F-1240825056" anchor-label="F23" id="2125577467%2FClasslikes%2F-1240825056" data-filterable-set=":ketraterm-input/main"></a>
+          <div class="table-row table-row_content" data-togglable="ENTRY" data-filterable-current=":ketraterm-input/main" data-filterable-set=":ketraterm-input/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-f23/index.html">F23</a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="2125577467%2FClasslikes%2F-1240825056"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-input/main"><div class="symbol monospace"><div class="block"><a href="-f23/index.html">F23</a></div></div><div class="brief "><p class="paragraph">Function key F23.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-239158980%2FClasslikes%2F-1240825056" anchor-label="F24" id="-239158980%2FClasslikes%2F-1240825056" data-filterable-set=":ketraterm-input/main"></a>
+          <div class="table-row table-row_content" data-togglable="ENTRY" data-filterable-current=":ketraterm-input/main" data-filterable-set=":ketraterm-input/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-f24/index.html">F24</a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-239158980%2FClasslikes%2F-1240825056"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-input/main"><div class="symbol monospace"><div class="block"><a href="-f24/index.html">F24</a></div></div><div class="brief "><p class="paragraph">Function key F24.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="1691071869%2FClasslikes%2F-1240825056" anchor-label="F25" id="1691071869%2FClasslikes%2F-1240825056" data-filterable-set=":ketraterm-input/main"></a>
+          <div class="table-row table-row_content" data-togglable="ENTRY" data-filterable-current=":ketraterm-input/main" data-filterable-set=":ketraterm-input/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-f25/index.html">F25</a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="1691071869%2FClasslikes%2F-1240825056"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-input/main"><div class="symbol monospace"><div class="block"><a href="-f25/index.html">F25</a></div></div><div class="brief "><p class="paragraph">Function key F25.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-673664578%2FClasslikes%2F-1240825056" anchor-label="F26" id="-673664578%2FClasslikes%2F-1240825056" data-filterable-set=":ketraterm-input/main"></a>
+          <div class="table-row table-row_content" data-togglable="ENTRY" data-filterable-current=":ketraterm-input/main" data-filterable-set=":ketraterm-input/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-f26/index.html">F26</a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-673664578%2FClasslikes%2F-1240825056"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-input/main"><div class="symbol monospace"><div class="block"><a href="-f26/index.html">F26</a></div></div><div class="brief "><p class="paragraph">Function key F26.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="1256566271%2FClasslikes%2F-1240825056" anchor-label="F27" id="1256566271%2FClasslikes%2F-1240825056" data-filterable-set=":ketraterm-input/main"></a>
+          <div class="table-row table-row_content" data-togglable="ENTRY" data-filterable-current=":ketraterm-input/main" data-filterable-set=":ketraterm-input/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-f27/index.html">F27</a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="1256566271%2FClasslikes%2F-1240825056"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-input/main"><div class="symbol monospace"><div class="block"><a href="-f27/index.html">F27</a></div></div><div class="brief "><p class="paragraph">Function key F27.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-1108170176%2FClasslikes%2F-1240825056" anchor-label="F28" id="-1108170176%2FClasslikes%2F-1240825056" data-filterable-set=":ketraterm-input/main"></a>
+          <div class="table-row table-row_content" data-togglable="ENTRY" data-filterable-current=":ketraterm-input/main" data-filterable-set=":ketraterm-input/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-f28/index.html">F28</a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-1108170176%2FClasslikes%2F-1240825056"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-input/main"><div class="symbol monospace"><div class="block"><a href="-f28/index.html">F28</a></div></div><div class="brief "><p class="paragraph">Function key F28.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="822060673%2FClasslikes%2F-1240825056" anchor-label="F29" id="822060673%2FClasslikes%2F-1240825056" data-filterable-set=":ketraterm-input/main"></a>
+          <div class="table-row table-row_content" data-togglable="ENTRY" data-filterable-current=":ketraterm-input/main" data-filterable-set=":ketraterm-input/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-f29/index.html">F29</a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="822060673%2FClasslikes%2F-1240825056"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-input/main"><div class="symbol monospace"><div class="block"><a href="-f29/index.html">F29</a></div></div><div class="brief "><p class="paragraph">Function key F29.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="337466391%2FClasslikes%2F-1240825056" anchor-label="F30" id="337466391%2FClasslikes%2F-1240825056" data-filterable-set=":ketraterm-input/main"></a>
+          <div class="table-row table-row_content" data-togglable="ENTRY" data-filterable-current=":ketraterm-input/main" data-filterable-set=":ketraterm-input/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-f30/index.html">F30</a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="337466391%2FClasslikes%2F-1240825056"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-input/main"><div class="symbol monospace"><div class="block"><a href="-f30/index.html">F30</a></div></div><div class="brief "><p class="paragraph">Function key F30.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-2027270056%2FClasslikes%2F-1240825056" anchor-label="F31" id="-2027270056%2FClasslikes%2F-1240825056" data-filterable-set=":ketraterm-input/main"></a>
+          <div class="table-row table-row_content" data-togglable="ENTRY" data-filterable-current=":ketraterm-input/main" data-filterable-set=":ketraterm-input/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-f31/index.html">F31</a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-2027270056%2FClasslikes%2F-1240825056"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-input/main"><div class="symbol monospace"><div class="block"><a href="-f31/index.html">F31</a></div></div><div class="brief "><p class="paragraph">Function key F31.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-97039207%2FClasslikes%2F-1240825056" anchor-label="F32" id="-97039207%2FClasslikes%2F-1240825056" data-filterable-set=":ketraterm-input/main"></a>
+          <div class="table-row table-row_content" data-togglable="ENTRY" data-filterable-current=":ketraterm-input/main" data-filterable-set=":ketraterm-input/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-f32/index.html">F32</a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-97039207%2FClasslikes%2F-1240825056"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-input/main"><div class="symbol monospace"><div class="block"><a href="-f32/index.html">F32</a></div></div><div class="brief "><p class="paragraph">Function key F32.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="1833191642%2FClasslikes%2F-1240825056" anchor-label="F33" id="1833191642%2FClasslikes%2F-1240825056" data-filterable-set=":ketraterm-input/main"></a>
+          <div class="table-row table-row_content" data-togglable="ENTRY" data-filterable-current=":ketraterm-input/main" data-filterable-set=":ketraterm-input/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-f33/index.html">F33</a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="1833191642%2FClasslikes%2F-1240825056"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-input/main"><div class="symbol monospace"><div class="block"><a href="-f33/index.html">F33</a></div></div><div class="brief "><p class="paragraph">Function key F33.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-531544805%2FClasslikes%2F-1240825056" anchor-label="F34" id="-531544805%2FClasslikes%2F-1240825056" data-filterable-set=":ketraterm-input/main"></a>
+          <div class="table-row table-row_content" data-togglable="ENTRY" data-filterable-current=":ketraterm-input/main" data-filterable-set=":ketraterm-input/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-f34/index.html">F34</a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-531544805%2FClasslikes%2F-1240825056"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-input/main"><div class="symbol monospace"><div class="block"><a href="-f34/index.html">F34</a></div></div><div class="brief "><p class="paragraph">Function key F34.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="1398686044%2FClasslikes%2F-1240825056" anchor-label="F35" id="1398686044%2FClasslikes%2F-1240825056" data-filterable-set=":ketraterm-input/main"></a>
+          <div class="table-row table-row_content" data-togglable="ENTRY" data-filterable-current=":ketraterm-input/main" data-filterable-set=":ketraterm-input/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-f35/index.html">F35</a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="1398686044%2FClasslikes%2F-1240825056"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-input/main"><div class="symbol monospace"><div class="block"><a href="-f35/index.html">F35</a></div></div><div class="brief "><p class="paragraph">Function key F35.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="1184139325%2FClasslikes%2F-1240825056" anchor-label="CAPS_LOCK" id="1184139325%2FClasslikes%2F-1240825056" data-filterable-set=":ketraterm-input/main"></a>
+          <div class="table-row table-row_content" data-togglable="ENTRY" data-filterable-current=":ketraterm-input/main" data-filterable-set=":ketraterm-input/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-c-a-p-s_-l-o-c-k/index.html">CAPS_LOCK</a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="1184139325%2FClasslikes%2F-1240825056"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-input/main"><div class="symbol monospace"><div class="block"><a href="-c-a-p-s_-l-o-c-k/index.html">CAPS_LOCK</a></div></div><div class="brief "><p class="paragraph">Caps Lock key.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-1684954927%2FClasslikes%2F-1240825056" anchor-label="SCROLL_LOCK" id="-1684954927%2FClasslikes%2F-1240825056" data-filterable-set=":ketraterm-input/main"></a>
+          <div class="table-row table-row_content" data-togglable="ENTRY" data-filterable-current=":ketraterm-input/main" data-filterable-set=":ketraterm-input/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-s-c-r-o-l-l_-l-o-c-k/index.html">SCROLL_LOCK</a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-1684954927%2FClasslikes%2F-1240825056"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-input/main"><div class="symbol monospace"><div class="block"><a href="-s-c-r-o-l-l_-l-o-c-k/index.html">SCROLL_LOCK</a></div></div><div class="brief "><p class="paragraph">Scroll Lock key.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="310417496%2FClasslikes%2F-1240825056" anchor-label="NUM_LOCK" id="310417496%2FClasslikes%2F-1240825056" data-filterable-set=":ketraterm-input/main"></a>
+          <div class="table-row table-row_content" data-togglable="ENTRY" data-filterable-current=":ketraterm-input/main" data-filterable-set=":ketraterm-input/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-n-u-m_-l-o-c-k/index.html">NUM_LOCK</a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="310417496%2FClasslikes%2F-1240825056"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-input/main"><div class="symbol monospace"><div class="block"><a href="-n-u-m_-l-o-c-k/index.html">NUM_LOCK</a></div></div><div class="brief "><p class="paragraph">Num Lock key.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-428902702%2FClasslikes%2F-1240825056" anchor-label="PRINT_SCREEN" id="-428902702%2FClasslikes%2F-1240825056" data-filterable-set=":ketraterm-input/main"></a>
+          <div class="table-row table-row_content" data-togglable="ENTRY" data-filterable-current=":ketraterm-input/main" data-filterable-set=":ketraterm-input/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-p-r-i-n-t_-s-c-r-e-e-n/index.html">PRINT_SCREEN</a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-428902702%2FClasslikes%2F-1240825056"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-input/main"><div class="symbol monospace"><div class="block"><a href="-p-r-i-n-t_-s-c-r-e-e-n/index.html">PRINT_SCREEN</a></div></div><div class="brief "><p class="paragraph">Print Screen key.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-2112442998%2FClasslikes%2F-1240825056" anchor-label="PAUSE" id="-2112442998%2FClasslikes%2F-1240825056" data-filterable-set=":ketraterm-input/main"></a>
+          <div class="table-row table-row_content" data-togglable="ENTRY" data-filterable-current=":ketraterm-input/main" data-filterable-set=":ketraterm-input/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-p-a-u-s-e/index.html">PAUSE</a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-2112442998%2FClasslikes%2F-1240825056"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-input/main"><div class="symbol monospace"><div class="block"><a href="-p-a-u-s-e/index.html">PAUSE</a></div></div><div class="brief "><p class="paragraph">Pause key.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-2107624941%2FClasslikes%2F-1240825056" anchor-label="MENU" id="-2107624941%2FClasslikes%2F-1240825056" data-filterable-set=":ketraterm-input/main"></a>
+          <div class="table-row table-row_content" data-togglable="ENTRY" data-filterable-current=":ketraterm-input/main" data-filterable-set=":ketraterm-input/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-m-e-n-u/index.html">MENU</a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-2107624941%2FClasslikes%2F-1240825056"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-input/main"><div class="symbol monospace"><div class="block"><a href="-m-e-n-u/index.html">MENU</a></div></div><div class="brief "><p class="paragraph">Context-menu key.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-1503213011%2FClasslikes%2F-1240825056" anchor-label="NUMPAD_LEFT" id="-1503213011%2FClasslikes%2F-1240825056" data-filterable-set=":ketraterm-input/main"></a>
+          <div class="table-row table-row_content" data-togglable="ENTRY" data-filterable-current=":ketraterm-input/main" data-filterable-set=":ketraterm-input/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-n-u-m-p-a-d_-l-e-f-t/index.html">NUMPAD_LEFT</a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-1503213011%2FClasslikes%2F-1240825056"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-input/main"><div class="symbol monospace"><div class="block"><a href="-n-u-m-p-a-d_-l-e-f-t/index.html">NUMPAD_LEFT</a></div></div><div class="brief "><p class="paragraph">Numeric keypad Left key.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="1689527806%2FClasslikes%2F-1240825056" anchor-label="NUMPAD_RIGHT" id="1689527806%2FClasslikes%2F-1240825056" data-filterable-set=":ketraterm-input/main"></a>
+          <div class="table-row table-row_content" data-togglable="ENTRY" data-filterable-current=":ketraterm-input/main" data-filterable-set=":ketraterm-input/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-n-u-m-p-a-d_-r-i-g-h-t/index.html">NUMPAD_RIGHT</a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="1689527806%2FClasslikes%2F-1240825056"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-input/main"><div class="symbol monospace"><div class="block"><a href="-n-u-m-p-a-d_-r-i-g-h-t/index.html">NUMPAD_RIGHT</a></div></div><div class="brief "><p class="paragraph">Numeric keypad Right key.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="444243521%2FClasslikes%2F-1240825056" anchor-label="NUMPAD_UP" id="444243521%2FClasslikes%2F-1240825056" data-filterable-set=":ketraterm-input/main"></a>
+          <div class="table-row table-row_content" data-togglable="ENTRY" data-filterable-current=":ketraterm-input/main" data-filterable-set=":ketraterm-input/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-n-u-m-p-a-d_-u-p/index.html">NUMPAD_UP</a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="444243521%2FClasslikes%2F-1240825056"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-input/main"><div class="symbol monospace"><div class="block"><a href="-n-u-m-p-a-d_-u-p/index.html">NUMPAD_UP</a></div></div><div class="brief "><p class="paragraph">Numeric keypad Up key.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="273746312%2FClasslikes%2F-1240825056" anchor-label="NUMPAD_DOWN" id="273746312%2FClasslikes%2F-1240825056" data-filterable-set=":ketraterm-input/main"></a>
+          <div class="table-row table-row_content" data-togglable="ENTRY" data-filterable-current=":ketraterm-input/main" data-filterable-set=":ketraterm-input/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-n-u-m-p-a-d_-d-o-w-n/index.html">NUMPAD_DOWN</a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="273746312%2FClasslikes%2F-1240825056"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-input/main"><div class="symbol monospace"><div class="block"><a href="-n-u-m-p-a-d_-d-o-w-n/index.html">NUMPAD_DOWN</a></div></div><div class="brief "><p class="paragraph">Numeric keypad Down key.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="660366989%2FClasslikes%2F-1240825056" anchor-label="NUMPAD_PAGE_UP" id="660366989%2FClasslikes%2F-1240825056" data-filterable-set=":ketraterm-input/main"></a>
+          <div class="table-row table-row_content" data-togglable="ENTRY" data-filterable-current=":ketraterm-input/main" data-filterable-set=":ketraterm-input/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-n-u-m-p-a-d_-p-a-g-e_-u-p/index.html">NUMPAD_PAGE_UP</a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="660366989%2FClasslikes%2F-1240825056"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-input/main"><div class="symbol monospace"><div class="block"><a href="-n-u-m-p-a-d_-p-a-g-e_-u-p/index.html">NUMPAD_PAGE_UP</a></div></div><div class="brief "><p class="paragraph">Numeric keypad Page Up key.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="1809968852%2FClasslikes%2F-1240825056" anchor-label="NUMPAD_PAGE_DOWN" id="1809968852%2FClasslikes%2F-1240825056" data-filterable-set=":ketraterm-input/main"></a>
+          <div class="table-row table-row_content" data-togglable="ENTRY" data-filterable-current=":ketraterm-input/main" data-filterable-set=":ketraterm-input/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-n-u-m-p-a-d_-p-a-g-e_-d-o-w-n/index.html">NUMPAD_PAGE_DOWN</a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="1809968852%2FClasslikes%2F-1240825056"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-input/main"><div class="symbol monospace"><div class="block"><a href="-n-u-m-p-a-d_-p-a-g-e_-d-o-w-n/index.html">NUMPAD_PAGE_DOWN</a></div></div><div class="brief "><p class="paragraph">Numeric keypad Page Down key.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="60749061%2FClasslikes%2F-1240825056" anchor-label="NUMPAD_HOME" id="60749061%2FClasslikes%2F-1240825056" data-filterable-set=":ketraterm-input/main"></a>
+          <div class="table-row table-row_content" data-togglable="ENTRY" data-filterable-current=":ketraterm-input/main" data-filterable-set=":ketraterm-input/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-n-u-m-p-a-d_-h-o-m-e/index.html">NUMPAD_HOME</a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="60749061%2FClasslikes%2F-1240825056"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-input/main"><div class="symbol monospace"><div class="block"><a href="-n-u-m-p-a-d_-h-o-m-e/index.html">NUMPAD_HOME</a></div></div><div class="brief "><p class="paragraph">Numeric keypad Home key.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-2058838019%2FClasslikes%2F-1240825056" anchor-label="NUMPAD_END" id="-2058838019%2FClasslikes%2F-1240825056" data-filterable-set=":ketraterm-input/main"></a>
+          <div class="table-row table-row_content" data-togglable="ENTRY" data-filterable-current=":ketraterm-input/main" data-filterable-set=":ketraterm-input/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-n-u-m-p-a-d_-e-n-d/index.html">NUMPAD_END</a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-2058838019%2FClasslikes%2F-1240825056"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-input/main"><div class="symbol monospace"><div class="block"><a href="-n-u-m-p-a-d_-e-n-d/index.html">NUMPAD_END</a></div></div><div class="brief "><p class="paragraph">Numeric keypad End key.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-1769086753%2FClasslikes%2F-1240825056" anchor-label="NUMPAD_INSERT" id="-1769086753%2FClasslikes%2F-1240825056" data-filterable-set=":ketraterm-input/main"></a>
+          <div class="table-row table-row_content" data-togglable="ENTRY" data-filterable-current=":ketraterm-input/main" data-filterable-set=":ketraterm-input/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-n-u-m-p-a-d_-i-n-s-e-r-t/index.html">NUMPAD_INSERT</a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-1769086753%2FClasslikes%2F-1240825056"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-input/main"><div class="symbol monospace"><div class="block"><a href="-n-u-m-p-a-d_-i-n-s-e-r-t/index.html">NUMPAD_INSERT</a></div></div><div class="brief "><p class="paragraph">Numeric keypad Insert key.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="271751249%2FClasslikes%2F-1240825056" anchor-label="NUMPAD_DELETE" id="271751249%2FClasslikes%2F-1240825056" data-filterable-set=":ketraterm-input/main"></a>
+          <div class="table-row table-row_content" data-togglable="ENTRY" data-filterable-current=":ketraterm-input/main" data-filterable-set=":ketraterm-input/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-n-u-m-p-a-d_-d-e-l-e-t-e/index.html">NUMPAD_DELETE</a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="271751249%2FClasslikes%2F-1240825056"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-input/main"><div class="symbol monospace"><div class="block"><a href="-n-u-m-p-a-d_-d-e-l-e-t-e/index.html">NUMPAD_DELETE</a></div></div><div class="brief "><p class="paragraph">Numeric keypad Delete key.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="1817786243%2FClasslikes%2F-1240825056" anchor-label="MEDIA_PLAY" id="1817786243%2FClasslikes%2F-1240825056" data-filterable-set=":ketraterm-input/main"></a>
+          <div class="table-row table-row_content" data-togglable="ENTRY" data-filterable-current=":ketraterm-input/main" data-filterable-set=":ketraterm-input/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-m-e-d-i-a_-p-l-a-y/index.html">MEDIA_PLAY</a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="1817786243%2FClasslikes%2F-1240825056"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-input/main"><div class="symbol monospace"><div class="block"><a href="-m-e-d-i-a_-p-l-a-y/index.html">MEDIA_PLAY</a></div></div><div class="brief "><p class="paragraph">Media play key.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-779875697%2FClasslikes%2F-1240825056" anchor-label="MEDIA_PAUSE" id="-779875697%2FClasslikes%2F-1240825056" data-filterable-set=":ketraterm-input/main"></a>
+          <div class="table-row table-row_content" data-togglable="ENTRY" data-filterable-current=":ketraterm-input/main" data-filterable-set=":ketraterm-input/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-m-e-d-i-a_-p-a-u-s-e/index.html">MEDIA_PAUSE</a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-779875697%2FClasslikes%2F-1240825056"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-input/main"><div class="symbol monospace"><div class="block"><a href="-m-e-d-i-a_-p-a-u-s-e/index.html">MEDIA_PAUSE</a></div></div><div class="brief "><p class="paragraph">Media pause key.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-1906068774%2FClasslikes%2F-1240825056" anchor-label="MEDIA_PLAY_PAUSE" id="-1906068774%2FClasslikes%2F-1240825056" data-filterable-set=":ketraterm-input/main"></a>
+          <div class="table-row table-row_content" data-togglable="ENTRY" data-filterable-current=":ketraterm-input/main" data-filterable-set=":ketraterm-input/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-m-e-d-i-a_-p-l-a-y_-p-a-u-s-e/index.html">MEDIA_PLAY_PAUSE</a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-1906068774%2FClasslikes%2F-1240825056"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-input/main"><div class="symbol monospace"><div class="block"><a href="-m-e-d-i-a_-p-l-a-y_-p-a-u-s-e/index.html">MEDIA_PLAY_PAUSE</a></div></div><div class="brief "><p class="paragraph">Media play/pause key.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-1113919173%2FClasslikes%2F-1240825056" anchor-label="MEDIA_REVERSE" id="-1113919173%2FClasslikes%2F-1240825056" data-filterable-set=":ketraterm-input/main"></a>
+          <div class="table-row table-row_content" data-togglable="ENTRY" data-filterable-current=":ketraterm-input/main" data-filterable-set=":ketraterm-input/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-m-e-d-i-a_-r-e-v-e-r-s-e/index.html">MEDIA_REVERSE</a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-1113919173%2FClasslikes%2F-1240825056"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-input/main"><div class="symbol monospace"><div class="block"><a href="-m-e-d-i-a_-r-e-v-e-r-s-e/index.html">MEDIA_REVERSE</a></div></div><div class="brief "><p class="paragraph">Media reverse key.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="1195159505%2FClasslikes%2F-1240825056" anchor-label="MEDIA_STOP" id="1195159505%2FClasslikes%2F-1240825056" data-filterable-set=":ketraterm-input/main"></a>
+          <div class="table-row table-row_content" data-togglable="ENTRY" data-filterable-current=":ketraterm-input/main" data-filterable-set=":ketraterm-input/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-m-e-d-i-a_-s-t-o-p/index.html">MEDIA_STOP</a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="1195159505%2FClasslikes%2F-1240825056"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-input/main"><div class="symbol monospace"><div class="block"><a href="-m-e-d-i-a_-s-t-o-p/index.html">MEDIA_STOP</a></div></div><div class="brief "><p class="paragraph">Media stop key.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-1265979759%2FClasslikes%2F-1240825056" anchor-label="MEDIA_FAST_FORWARD" id="-1265979759%2FClasslikes%2F-1240825056" data-filterable-set=":ketraterm-input/main"></a>
+          <div class="table-row table-row_content" data-togglable="ENTRY" data-filterable-current=":ketraterm-input/main" data-filterable-set=":ketraterm-input/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-m-e-d-i-a_-f-a-s-t_-f-o-r-w-a-r-d/index.html">MEDIA_FAST_FORWARD</a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-1265979759%2FClasslikes%2F-1240825056"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-input/main"><div class="symbol monospace"><div class="block"><a href="-m-e-d-i-a_-f-a-s-t_-f-o-r-w-a-r-d/index.html">MEDIA_FAST_FORWARD</a></div></div><div class="brief "><p class="paragraph">Media fast-forward key.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="1051940874%2FClasslikes%2F-1240825056" anchor-label="MEDIA_REWIND" id="1051940874%2FClasslikes%2F-1240825056" data-filterable-set=":ketraterm-input/main"></a>
+          <div class="table-row table-row_content" data-togglable="ENTRY" data-filterable-current=":ketraterm-input/main" data-filterable-set=":ketraterm-input/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-m-e-d-i-a_-r-e-w-i-n-d/index.html">MEDIA_REWIND</a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="1051940874%2FClasslikes%2F-1240825056"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-input/main"><div class="symbol monospace"><div class="block"><a href="-m-e-d-i-a_-r-e-w-i-n-d/index.html">MEDIA_REWIND</a></div></div><div class="brief "><p class="paragraph">Media rewind key.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-594064810%2FClasslikes%2F-1240825056" anchor-label="MEDIA_TRACK_NEXT" id="-594064810%2FClasslikes%2F-1240825056" data-filterable-set=":ketraterm-input/main"></a>
+          <div class="table-row table-row_content" data-togglable="ENTRY" data-filterable-current=":ketraterm-input/main" data-filterable-set=":ketraterm-input/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-m-e-d-i-a_-t-r-a-c-k_-n-e-x-t/index.html">MEDIA_TRACK_NEXT</a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-594064810%2FClasslikes%2F-1240825056"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-input/main"><div class="symbol monospace"><div class="block"><a href="-m-e-d-i-a_-t-r-a-c-k_-n-e-x-t/index.html">MEDIA_TRACK_NEXT</a></div></div><div class="brief "><p class="paragraph">Media next-track key.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-2017836070%2FClasslikes%2F-1240825056" anchor-label="MEDIA_TRACK_PREVIOUS" id="-2017836070%2FClasslikes%2F-1240825056" data-filterable-set=":ketraterm-input/main"></a>
+          <div class="table-row table-row_content" data-togglable="ENTRY" data-filterable-current=":ketraterm-input/main" data-filterable-set=":ketraterm-input/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-m-e-d-i-a_-t-r-a-c-k_-p-r-e-v-i-o-u-s/index.html">MEDIA_TRACK_PREVIOUS</a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-2017836070%2FClasslikes%2F-1240825056"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-input/main"><div class="symbol monospace"><div class="block"><a href="-m-e-d-i-a_-t-r-a-c-k_-p-r-e-v-i-o-u-s/index.html">MEDIA_TRACK_PREVIOUS</a></div></div><div class="brief "><p class="paragraph">Media previous-track key.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-1123424992%2FClasslikes%2F-1240825056" anchor-label="MEDIA_RECORD" id="-1123424992%2FClasslikes%2F-1240825056" data-filterable-set=":ketraterm-input/main"></a>
+          <div class="table-row table-row_content" data-togglable="ENTRY" data-filterable-current=":ketraterm-input/main" data-filterable-set=":ketraterm-input/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-m-e-d-i-a_-r-e-c-o-r-d/index.html">MEDIA_RECORD</a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-1123424992%2FClasslikes%2F-1240825056"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-input/main"><div class="symbol monospace"><div class="block"><a href="-m-e-d-i-a_-r-e-c-o-r-d/index.html">MEDIA_RECORD</a></div></div><div class="brief "><p class="paragraph">Media record key.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="1175769755%2FClasslikes%2F-1240825056" anchor-label="VOLUME_DOWN" id="1175769755%2FClasslikes%2F-1240825056" data-filterable-set=":ketraterm-input/main"></a>
+          <div class="table-row table-row_content" data-togglable="ENTRY" data-filterable-current=":ketraterm-input/main" data-filterable-set=":ketraterm-input/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-v-o-l-u-m-e_-d-o-w-n/index.html">VOLUME_DOWN</a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="1175769755%2FClasslikes%2F-1240825056"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-input/main"><div class="symbol monospace"><div class="block"><a href="-v-o-l-u-m-e_-d-o-w-n/index.html">VOLUME_DOWN</a></div></div><div class="brief "><p class="paragraph">Volume-down key.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="2058588180%2FClasslikes%2F-1240825056" anchor-label="VOLUME_UP" id="2058588180%2FClasslikes%2F-1240825056" data-filterable-set=":ketraterm-input/main"></a>
+          <div class="table-row table-row_content" data-togglable="ENTRY" data-filterable-current=":ketraterm-input/main" data-filterable-set=":ketraterm-input/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-v-o-l-u-m-e_-u-p/index.html">VOLUME_UP</a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="2058588180%2FClasslikes%2F-1240825056"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-input/main"><div class="symbol monospace"><div class="block"><a href="-v-o-l-u-m-e_-u-p/index.html">VOLUME_UP</a></div></div><div class="brief "><p class="paragraph">Volume-up key.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-92700206%2FClasslikes%2F-1240825056" anchor-label="VOLUME_MUTE" id="-92700206%2FClasslikes%2F-1240825056" data-filterable-set=":ketraterm-input/main"></a>
+          <div class="table-row table-row_content" data-togglable="ENTRY" data-filterable-current=":ketraterm-input/main" data-filterable-set=":ketraterm-input/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-v-o-l-u-m-e_-m-u-t-e/index.html">VOLUME_MUTE</a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-92700206%2FClasslikes%2F-1240825056"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-input/main"><div class="symbol monospace"><div class="block"><a href="-v-o-l-u-m-e_-m-u-t-e/index.html">VOLUME_MUTE</a></div></div><div class="brief "><p class="paragraph">Volume-mute key.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-652168802%2FClasslikes%2F-1240825056" anchor-label="LEFT_SHIFT" id="-652168802%2FClasslikes%2F-1240825056" data-filterable-set=":ketraterm-input/main"></a>
+          <div class="table-row table-row_content" data-togglable="ENTRY" data-filterable-current=":ketraterm-input/main" data-filterable-set=":ketraterm-input/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-l-e-f-t_-s-h-i-f-t/index.html">LEFT_SHIFT</a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-652168802%2FClasslikes%2F-1240825056"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-input/main"><div class="symbol monospace"><div class="block"><a href="-l-e-f-t_-s-h-i-f-t/index.html">LEFT_SHIFT</a></div></div><div class="brief "><p class="paragraph">Left Shift key.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-1395372231%2FClasslikes%2F-1240825056" anchor-label="LEFT_CONTROL" id="-1395372231%2FClasslikes%2F-1240825056" data-filterable-set=":ketraterm-input/main"></a>
+          <div class="table-row table-row_content" data-togglable="ENTRY" data-filterable-current=":ketraterm-input/main" data-filterable-set=":ketraterm-input/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-l-e-f-t_-c-o-n-t-r-o-l/index.html">LEFT_CONTROL</a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-1395372231%2FClasslikes%2F-1240825056"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-input/main"><div class="symbol monospace"><div class="block"><a href="-l-e-f-t_-c-o-n-t-r-o-l/index.html">LEFT_CONTROL</a></div></div><div class="brief "><p class="paragraph">Left Control key.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="879760005%2FClasslikes%2F-1240825056" anchor-label="LEFT_ALT" id="879760005%2FClasslikes%2F-1240825056" data-filterable-set=":ketraterm-input/main"></a>
+          <div class="table-row table-row_content" data-togglable="ENTRY" data-filterable-current=":ketraterm-input/main" data-filterable-set=":ketraterm-input/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-l-e-f-t_-a-l-t/index.html">LEFT_ALT</a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="879760005%2FClasslikes%2F-1240825056"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-input/main"><div class="symbol monospace"><div class="block"><a href="-l-e-f-t_-a-l-t/index.html">LEFT_ALT</a></div></div><div class="brief "><p class="paragraph">Left Alt key.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-1002402089%2FClasslikes%2F-1240825056" anchor-label="LEFT_SUPER" id="-1002402089%2FClasslikes%2F-1240825056" data-filterable-set=":ketraterm-input/main"></a>
+          <div class="table-row table-row_content" data-togglable="ENTRY" data-filterable-current=":ketraterm-input/main" data-filterable-set=":ketraterm-input/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-l-e-f-t_-s-u-p-e-r/index.html">LEFT_SUPER</a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-1002402089%2FClasslikes%2F-1240825056"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-input/main"><div class="symbol monospace"><div class="block"><a href="-l-e-f-t_-s-u-p-e-r/index.html">LEFT_SUPER</a></div></div><div class="brief "><p class="paragraph">Left Super key.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-950249976%2FClasslikes%2F-1240825056" anchor-label="LEFT_HYPER" id="-950249976%2FClasslikes%2F-1240825056" data-filterable-set=":ketraterm-input/main"></a>
+          <div class="table-row table-row_content" data-togglable="ENTRY" data-filterable-current=":ketraterm-input/main" data-filterable-set=":ketraterm-input/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-l-e-f-t_-h-y-p-e-r/index.html">LEFT_HYPER</a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-950249976%2FClasslikes%2F-1240825056"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-input/main"><div class="symbol monospace"><div class="block"><a href="-l-e-f-t_-h-y-p-e-r/index.html">LEFT_HYPER</a></div></div><div class="brief "><p class="paragraph">Left Hyper key.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="556468401%2FClasslikes%2F-1240825056" anchor-label="LEFT_META" id="556468401%2FClasslikes%2F-1240825056" data-filterable-set=":ketraterm-input/main"></a>
+          <div class="table-row table-row_content" data-togglable="ENTRY" data-filterable-current=":ketraterm-input/main" data-filterable-set=":ketraterm-input/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-l-e-f-t_-m-e-t-a/index.html">LEFT_META</a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="556468401%2FClasslikes%2F-1240825056"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-input/main"><div class="symbol monospace"><div class="block"><a href="-l-e-f-t_-m-e-t-a/index.html">LEFT_META</a></div></div><div class="brief "><p class="paragraph">Left Meta key.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="1481488979%2FClasslikes%2F-1240825056" anchor-label="RIGHT_SHIFT" id="1481488979%2FClasslikes%2F-1240825056" data-filterable-set=":ketraterm-input/main"></a>
+          <div class="table-row table-row_content" data-togglable="ENTRY" data-filterable-current=":ketraterm-input/main" data-filterable-set=":ketraterm-input/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-r-i-g-h-t_-s-h-i-f-t/index.html">RIGHT_SHIFT</a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="1481488979%2FClasslikes%2F-1240825056"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-input/main"><div class="symbol monospace"><div class="block"><a href="-r-i-g-h-t_-s-h-i-f-t/index.html">RIGHT_SHIFT</a></div></div><div class="brief "><p class="paragraph">Right Shift key.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="350355118%2FClasslikes%2F-1240825056" anchor-label="RIGHT_CONTROL" id="350355118%2FClasslikes%2F-1240825056" data-filterable-set=":ketraterm-input/main"></a>
+          <div class="table-row table-row_content" data-togglable="ENTRY" data-filterable-current=":ketraterm-input/main" data-filterable-set=":ketraterm-input/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-r-i-g-h-t_-c-o-n-t-r-o-l/index.html">RIGHT_CONTROL</a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="350355118%2FClasslikes%2F-1240825056"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-input/main"><div class="symbol monospace"><div class="block"><a href="-r-i-g-h-t_-c-o-n-t-r-o-l/index.html">RIGHT_CONTROL</a></div></div><div class="brief "><p class="paragraph">Right Control key.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-1589525382%2FClasslikes%2F-1240825056" anchor-label="RIGHT_ALT" id="-1589525382%2FClasslikes%2F-1240825056" data-filterable-set=":ketraterm-input/main"></a>
+          <div class="table-row table-row_content" data-togglable="ENTRY" data-filterable-current=":ketraterm-input/main" data-filterable-set=":ketraterm-input/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-r-i-g-h-t_-a-l-t/index.html">RIGHT_ALT</a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-1589525382%2FClasslikes%2F-1240825056"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-input/main"><div class="symbol monospace"><div class="block"><a href="-r-i-g-h-t_-a-l-t/index.html">RIGHT_ALT</a></div></div><div class="brief "><p class="paragraph">Right Alt key.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="1131255692%2FClasslikes%2F-1240825056" anchor-label="RIGHT_SUPER" id="1131255692%2FClasslikes%2F-1240825056" data-filterable-set=":ketraterm-input/main"></a>
+          <div class="table-row table-row_content" data-togglable="ENTRY" data-filterable-current=":ketraterm-input/main" data-filterable-set=":ketraterm-input/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-r-i-g-h-t_-s-u-p-e-r/index.html">RIGHT_SUPER</a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="1131255692%2FClasslikes%2F-1240825056"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-input/main"><div class="symbol monospace"><div class="block"><a href="-r-i-g-h-t_-s-u-p-e-r/index.html">RIGHT_SUPER</a></div></div><div class="brief "><p class="paragraph">Right Super key.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="1183407805%2FClasslikes%2F-1240825056" anchor-label="RIGHT_HYPER" id="1183407805%2FClasslikes%2F-1240825056" data-filterable-set=":ketraterm-input/main"></a>
+          <div class="table-row table-row_content" data-togglable="ENTRY" data-filterable-current=":ketraterm-input/main" data-filterable-set=":ketraterm-input/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-r-i-g-h-t_-h-y-p-e-r/index.html">RIGHT_HYPER</a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="1183407805%2FClasslikes%2F-1240825056"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-input/main"><div class="symbol monospace"><div class="block"><a href="-r-i-g-h-t_-h-y-p-e-r/index.html">RIGHT_HYPER</a></div></div><div class="brief "><p class="paragraph">Right Hyper key.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="1318032732%2FClasslikes%2F-1240825056" anchor-label="RIGHT_META" id="1318032732%2FClasslikes%2F-1240825056" data-filterable-set=":ketraterm-input/main"></a>
+          <div class="table-row table-row_content" data-togglable="ENTRY" data-filterable-current=":ketraterm-input/main" data-filterable-set=":ketraterm-input/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-r-i-g-h-t_-m-e-t-a/index.html">RIGHT_META</a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="1318032732%2FClasslikes%2F-1240825056"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-input/main"><div class="symbol monospace"><div class="block"><a href="-r-i-g-h-t_-m-e-t-a/index.html">RIGHT_META</a></div></div><div class="brief "><p class="paragraph">Right Meta key.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-696561920%2FClasslikes%2F-1240825056" anchor-label="ISO_LEVEL3_SHIFT" id="-696561920%2FClasslikes%2F-1240825056" data-filterable-set=":ketraterm-input/main"></a>
+          <div class="table-row table-row_content" data-togglable="ENTRY" data-filterable-current=":ketraterm-input/main" data-filterable-set=":ketraterm-input/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-i-s-o_-l-e-v-e-l3_-s-h-i-f-t/index.html">ISO_LEVEL3_SHIFT</a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-696561920%2FClasslikes%2F-1240825056"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-input/main"><div class="symbol monospace"><div class="block"><a href="-i-s-o_-l-e-v-e-l3_-s-h-i-f-t/index.html">ISO_LEVEL3_SHIFT</a></div></div><div class="brief "><p class="paragraph">ISO Level 3 Shift key.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-333095422%2FClasslikes%2F-1240825056" anchor-label="ISO_LEVEL5_SHIFT" id="-333095422%2FClasslikes%2F-1240825056" data-filterable-set=":ketraterm-input/main"></a>
+          <div class="table-row table-row_content" data-togglable="ENTRY" data-filterable-current=":ketraterm-input/main" data-filterable-set=":ketraterm-input/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-i-s-o_-l-e-v-e-l5_-s-h-i-f-t/index.html">ISO_LEVEL5_SHIFT</a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-333095422%2FClasslikes%2F-1240825056"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-input/main"><div class="symbol monospace"><div class="block"><a href="-i-s-o_-l-e-v-e-l5_-s-h-i-f-t/index.html">ISO_LEVEL5_SHIFT</a></div></div><div class="brief "><p class="paragraph">ISO Level 5 Shift key.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="562041327%2FClasslikes%2F-1240825056" anchor-label="PF1" id="562041327%2FClasslikes%2F-1240825056" data-filterable-set=":ketraterm-input/main"></a>
+          <div class="table-row table-row_content" data-togglable="ENTRY" data-filterable-current=":ketraterm-input/main" data-filterable-set=":ketraterm-input/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-p-f1/index.html">PF1</a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="562041327%2FClasslikes%2F-1240825056"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-input/main"><div class="symbol monospace"><div class="block"><a href="-p-f1/index.html">PF1</a></div></div><div class="brief "><p class="paragraph">Keypad PF1 key.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-1802695120%2FClasslikes%2F-1240825056" anchor-label="PF2" id="-1802695120%2FClasslikes%2F-1240825056" data-filterable-set=":ketraterm-input/main"></a>
+          <div class="table-row table-row_content" data-togglable="ENTRY" data-filterable-current=":ketraterm-input/main" data-filterable-set=":ketraterm-input/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-p-f2/index.html">PF2</a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-1802695120%2FClasslikes%2F-1240825056"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-input/main"><div class="symbol monospace"><div class="block"><a href="-p-f2/index.html">PF2</a></div></div><div class="brief "><p class="paragraph">Keypad PF2 key.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="127535729%2FClasslikes%2F-1240825056" anchor-label="PF3" id="127535729%2FClasslikes%2F-1240825056" data-filterable-set=":ketraterm-input/main"></a>
+          <div class="table-row table-row_content" data-togglable="ENTRY" data-filterable-current=":ketraterm-input/main" data-filterable-set=":ketraterm-input/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-p-f3/index.html">PF3</a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="127535729%2FClasslikes%2F-1240825056"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-input/main"><div class="symbol monospace"><div class="block"><a href="-p-f3/index.html">PF3</a></div></div><div class="brief "><p class="paragraph">Keypad PF3 key.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="2057766578%2FClasslikes%2F-1240825056" anchor-label="PF4" id="2057766578%2FClasslikes%2F-1240825056" data-filterable-set=":ketraterm-input/main"></a>
+          <div class="table-row table-row_content" data-togglable="ENTRY" data-filterable-current=":ketraterm-input/main" data-filterable-set=":ketraterm-input/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-p-f4/index.html">PF4</a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="2057766578%2FClasslikes%2F-1240825056"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-input/main"><div class="symbol monospace"><div class="block"><a href="-p-f4/index.html">PF4</a></div></div><div class="brief "><p class="paragraph">Keypad PF4 key.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-1539872920%2FClasslikes%2F-1240825056" anchor-label="NUMPAD_SPACE" id="-1539872920%2FClasslikes%2F-1240825056" data-filterable-set=":ketraterm-input/main"></a>
+          <div class="table-row table-row_content" data-togglable="ENTRY" data-filterable-current=":ketraterm-input/main" data-filterable-set=":ketraterm-input/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-n-u-m-p-a-d_-s-p-a-c-e/index.html">NUMPAD_SPACE</a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-1539872920%2FClasslikes%2F-1240825056"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-input/main"><div class="symbol monospace"><div class="block"><a href="-n-u-m-p-a-d_-s-p-a-c-e/index.html">NUMPAD_SPACE</a></div></div><div class="brief "><p class="paragraph">Numeric keypad space key.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-638739145%2FClasslikes%2F-1240825056" anchor-label="NUMPAD_TAB" id="-638739145%2FClasslikes%2F-1240825056" data-filterable-set=":ketraterm-input/main"></a>
+          <div class="table-row table-row_content" data-togglable="ENTRY" data-filterable-current=":ketraterm-input/main" data-filterable-set=":ketraterm-input/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-n-u-m-p-a-d_-t-a-b/index.html">NUMPAD_TAB</a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-638739145%2FClasslikes%2F-1240825056"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-input/main"><div class="symbol monospace"><div class="block"><a href="-n-u-m-p-a-d_-t-a-b/index.html">NUMPAD_TAB</a></div></div><div class="brief "><p class="paragraph">Numeric keypad tab key.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-79058502%2FClasslikes%2F-1240825056" anchor-label="NUMPAD_ENTER" id="-79058502%2FClasslikes%2F-1240825056" data-filterable-set=":ketraterm-input/main"></a>
+          <div class="table-row table-row_content" data-togglable="ENTRY" data-filterable-current=":ketraterm-input/main" data-filterable-set=":ketraterm-input/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-n-u-m-p-a-d_-e-n-t-e-r/index.html">NUMPAD_ENTER</a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-79058502%2FClasslikes%2F-1240825056"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-input/main"><div class="symbol monospace"><div class="block"><a href="-n-u-m-p-a-d_-e-n-t-e-r/index.html">NUMPAD_ENTER</a></div></div><div class="brief "><p class="paragraph">Numeric keypad enter key.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="1044908703%2FClasslikes%2F-1240825056" anchor-label="NUMPAD_DIVIDE" id="1044908703%2FClasslikes%2F-1240825056" data-filterable-set=":ketraterm-input/main"></a>
+          <div class="table-row table-row_content" data-togglable="ENTRY" data-filterable-current=":ketraterm-input/main" data-filterable-set=":ketraterm-input/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-n-u-m-p-a-d_-d-i-v-i-d-e/index.html">NUMPAD_DIVIDE</a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="1044908703%2FClasslikes%2F-1240825056"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-input/main"><div class="symbol monospace"><div class="block"><a href="-n-u-m-p-a-d_-d-i-v-i-d-e/index.html">NUMPAD_DIVIDE</a></div></div><div class="brief "><p class="paragraph">Numeric keypad divide key.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-691330422%2FClasslikes%2F-1240825056" anchor-label="NUMPAD_MULTIPLY" id="-691330422%2FClasslikes%2F-1240825056" data-filterable-set=":ketraterm-input/main"></a>
+          <div class="table-row table-row_content" data-togglable="ENTRY" data-filterable-current=":ketraterm-input/main" data-filterable-set=":ketraterm-input/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-n-u-m-p-a-d_-m-u-l-t-i-p-l-y/index.html">NUMPAD_MULTIPLY</a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-691330422%2FClasslikes%2F-1240825056"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-input/main"><div class="symbol monospace"><div class="block"><a href="-n-u-m-p-a-d_-m-u-l-t-i-p-l-y/index.html">NUMPAD_MULTIPLY</a></div></div><div class="brief "><p class="paragraph">Numeric keypad multiply key.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-1711336582%2FClasslikes%2F-1240825056" anchor-label="NUMPAD_SUBTRACT" id="-1711336582%2FClasslikes%2F-1240825056" data-filterable-set=":ketraterm-input/main"></a>
+          <div class="table-row table-row_content" data-togglable="ENTRY" data-filterable-current=":ketraterm-input/main" data-filterable-set=":ketraterm-input/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-n-u-m-p-a-d_-s-u-b-t-r-a-c-t/index.html">NUMPAD_SUBTRACT</a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-1711336582%2FClasslikes%2F-1240825056"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-input/main"><div class="symbol monospace"><div class="block"><a href="-n-u-m-p-a-d_-s-u-b-t-r-a-c-t/index.html">NUMPAD_SUBTRACT</a></div></div><div class="brief "><p class="paragraph">Numeric keypad subtract key.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-1533843133%2FClasslikes%2F-1240825056" anchor-label="NUMPAD_ADD" id="-1533843133%2FClasslikes%2F-1240825056" data-filterable-set=":ketraterm-input/main"></a>
+          <div class="table-row table-row_content" data-togglable="ENTRY" data-filterable-current=":ketraterm-input/main" data-filterable-set=":ketraterm-input/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-n-u-m-p-a-d_-a-d-d/index.html">NUMPAD_ADD</a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-1533843133%2FClasslikes%2F-1240825056"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-input/main"><div class="symbol monospace"><div class="block"><a href="-n-u-m-p-a-d_-a-d-d/index.html">NUMPAD_ADD</a></div></div><div class="brief "><p class="paragraph">Numeric keypad add key.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="1180819703%2FClasslikes%2F-1240825056" anchor-label="NUMPAD_COMMA" id="1180819703%2FClasslikes%2F-1240825056" data-filterable-set=":ketraterm-input/main"></a>
+          <div class="table-row table-row_content" data-togglable="ENTRY" data-filterable-current=":ketraterm-input/main" data-filterable-set=":ketraterm-input/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-n-u-m-p-a-d_-c-o-m-m-a/index.html">NUMPAD_COMMA</a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="1180819703%2FClasslikes%2F-1240825056"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-input/main"><div class="symbol monospace"><div class="block"><a href="-n-u-m-p-a-d_-c-o-m-m-a/index.html">NUMPAD_COMMA</a></div></div><div class="brief "><p class="paragraph">Numeric keypad comma key.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-934611449%2FClasslikes%2F-1240825056" anchor-label="NUMPAD_SEPARATOR" id="-934611449%2FClasslikes%2F-1240825056" data-filterable-set=":ketraterm-input/main"></a>
+          <div class="table-row table-row_content" data-togglable="ENTRY" data-filterable-current=":ketraterm-input/main" data-filterable-set=":ketraterm-input/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-n-u-m-p-a-d_-s-e-p-a-r-a-t-o-r/index.html">NUMPAD_SEPARATOR</a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-934611449%2FClasslikes%2F-1240825056"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-input/main"><div class="symbol monospace"><div class="block"><a href="-n-u-m-p-a-d_-s-e-p-a-r-a-t-o-r/index.html">NUMPAD_SEPARATOR</a></div></div><div class="brief "><p class="paragraph">Numeric keypad separator key.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-768686235%2FClasslikes%2F-1240825056" anchor-label="NUMPAD_EQUALS" id="-768686235%2FClasslikes%2F-1240825056" data-filterable-set=":ketraterm-input/main"></a>
+          <div class="table-row table-row_content" data-togglable="ENTRY" data-filterable-current=":ketraterm-input/main" data-filterable-set=":ketraterm-input/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-n-u-m-p-a-d_-e-q-u-a-l-s/index.html">NUMPAD_EQUALS</a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-768686235%2FClasslikes%2F-1240825056"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-input/main"><div class="symbol monospace"><div class="block"><a href="-n-u-m-p-a-d_-e-q-u-a-l-s/index.html">NUMPAD_EQUALS</a></div></div><div class="brief "><p class="paragraph">Numeric keypad equals key.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="1414351819%2FClasslikes%2F-1240825056" anchor-label="NUMPAD_BEGIN" id="1414351819%2FClasslikes%2F-1240825056" data-filterable-set=":ketraterm-input/main"></a>
+          <div class="table-row table-row_content" data-togglable="ENTRY" data-filterable-current=":ketraterm-input/main" data-filterable-set=":ketraterm-input/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-n-u-m-p-a-d_-b-e-g-i-n/index.html">NUMPAD_BEGIN</a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="1414351819%2FClasslikes%2F-1240825056"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-input/main"><div class="symbol monospace"><div class="block"><a href="-n-u-m-p-a-d_-b-e-g-i-n/index.html">NUMPAD_BEGIN</a></div></div><div class="brief "><p class="paragraph">Numeric keypad begin key, usually the keypad 5 navigation function.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-433401613%2FClasslikes%2F-1240825056" anchor-label="NUMPAD_DECIMAL" id="-433401613%2FClasslikes%2F-1240825056" data-filterable-set=":ketraterm-input/main"></a>
+          <div class="table-row table-row_content" data-togglable="ENTRY" data-filterable-current=":ketraterm-input/main" data-filterable-set=":ketraterm-input/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-n-u-m-p-a-d_-d-e-c-i-m-a-l/index.html">NUMPAD_DECIMAL</a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-433401613%2FClasslikes%2F-1240825056"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-input/main"><div class="symbol monospace"><div class="block"><a href="-n-u-m-p-a-d_-d-e-c-i-m-a-l/index.html">NUMPAD_DECIMAL</a></div></div><div class="brief "><p class="paragraph">Numeric keypad decimal key.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-718077902%2FClasslikes%2F-1240825056" anchor-label="NUMPAD_0" id="-718077902%2FClasslikes%2F-1240825056" data-filterable-set=":ketraterm-input/main"></a>
+          <div class="table-row table-row_content" data-togglable="ENTRY" data-filterable-current=":ketraterm-input/main" data-filterable-set=":ketraterm-input/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-n-u-m-p-a-d_0/index.html">NUMPAD_0</a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-718077902%2FClasslikes%2F-1240825056"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-input/main"><div class="symbol monospace"><div class="block"><a href="-n-u-m-p-a-d_0/index.html">NUMPAD_0</a></div></div><div class="brief "><p class="paragraph">Numeric keypad 0 key.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="1212152947%2FClasslikes%2F-1240825056" anchor-label="NUMPAD_1" id="1212152947%2FClasslikes%2F-1240825056" data-filterable-set=":ketraterm-input/main"></a>
+          <div class="table-row table-row_content" data-togglable="ENTRY" data-filterable-current=":ketraterm-input/main" data-filterable-set=":ketraterm-input/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-n-u-m-p-a-d_1/index.html">NUMPAD_1</a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="1212152947%2FClasslikes%2F-1240825056"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-input/main"><div class="symbol monospace"><div class="block"><a href="-n-u-m-p-a-d_1/index.html">NUMPAD_1</a></div></div><div class="brief "><p class="paragraph">Numeric keypad 1 key.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-1152583500%2FClasslikes%2F-1240825056" anchor-label="NUMPAD_2" id="-1152583500%2FClasslikes%2F-1240825056" data-filterable-set=":ketraterm-input/main"></a>
+          <div class="table-row table-row_content" data-togglable="ENTRY" data-filterable-current=":ketraterm-input/main" data-filterable-set=":ketraterm-input/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-n-u-m-p-a-d_2/index.html">NUMPAD_2</a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-1152583500%2FClasslikes%2F-1240825056"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-input/main"><div class="symbol monospace"><div class="block"><a href="-n-u-m-p-a-d_2/index.html">NUMPAD_2</a></div></div><div class="brief "><p class="paragraph">Numeric keypad 2 key.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="777647349%2FClasslikes%2F-1240825056" anchor-label="NUMPAD_3" id="777647349%2FClasslikes%2F-1240825056" data-filterable-set=":ketraterm-input/main"></a>
+          <div class="table-row table-row_content" data-togglable="ENTRY" data-filterable-current=":ketraterm-input/main" data-filterable-set=":ketraterm-input/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-n-u-m-p-a-d_3/index.html">NUMPAD_3</a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="777647349%2FClasslikes%2F-1240825056"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-input/main"><div class="symbol monospace"><div class="block"><a href="-n-u-m-p-a-d_3/index.html">NUMPAD_3</a></div></div><div class="brief "><p class="paragraph">Numeric keypad 3 key.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-1587089098%2FClasslikes%2F-1240825056" anchor-label="NUMPAD_4" id="-1587089098%2FClasslikes%2F-1240825056" data-filterable-set=":ketraterm-input/main"></a>
+          <div class="table-row table-row_content" data-togglable="ENTRY" data-filterable-current=":ketraterm-input/main" data-filterable-set=":ketraterm-input/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-n-u-m-p-a-d_4/index.html">NUMPAD_4</a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-1587089098%2FClasslikes%2F-1240825056"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-input/main"><div class="symbol monospace"><div class="block"><a href="-n-u-m-p-a-d_4/index.html">NUMPAD_4</a></div></div><div class="brief "><p class="paragraph">Numeric keypad 4 key.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="343141751%2FClasslikes%2F-1240825056" anchor-label="NUMPAD_5" id="343141751%2FClasslikes%2F-1240825056" data-filterable-set=":ketraterm-input/main"></a>
+          <div class="table-row table-row_content" data-togglable="ENTRY" data-filterable-current=":ketraterm-input/main" data-filterable-set=":ketraterm-input/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-n-u-m-p-a-d_5/index.html">NUMPAD_5</a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="343141751%2FClasslikes%2F-1240825056"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-input/main"><div class="symbol monospace"><div class="block"><a href="-n-u-m-p-a-d_5/index.html">NUMPAD_5</a></div></div><div class="brief "><p class="paragraph">Numeric keypad 5 key.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-2021594696%2FClasslikes%2F-1240825056" anchor-label="NUMPAD_6" id="-2021594696%2FClasslikes%2F-1240825056" data-filterable-set=":ketraterm-input/main"></a>
+          <div class="table-row table-row_content" data-togglable="ENTRY" data-filterable-current=":ketraterm-input/main" data-filterable-set=":ketraterm-input/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-n-u-m-p-a-d_6/index.html">NUMPAD_6</a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-2021594696%2FClasslikes%2F-1240825056"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-input/main"><div class="symbol monospace"><div class="block"><a href="-n-u-m-p-a-d_6/index.html">NUMPAD_6</a></div></div><div class="brief "><p class="paragraph">Numeric keypad 6 key.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-91363847%2FClasslikes%2F-1240825056" anchor-label="NUMPAD_7" id="-91363847%2FClasslikes%2F-1240825056" data-filterable-set=":ketraterm-input/main"></a>
+          <div class="table-row table-row_content" data-togglable="ENTRY" data-filterable-current=":ketraterm-input/main" data-filterable-set=":ketraterm-input/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-n-u-m-p-a-d_7/index.html">NUMPAD_7</a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-91363847%2FClasslikes%2F-1240825056"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-input/main"><div class="symbol monospace"><div class="block"><a href="-n-u-m-p-a-d_7/index.html">NUMPAD_7</a></div></div><div class="brief "><p class="paragraph">Numeric keypad 7 key.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="1838867002%2FClasslikes%2F-1240825056" anchor-label="NUMPAD_8" id="1838867002%2FClasslikes%2F-1240825056" data-filterable-set=":ketraterm-input/main"></a>
+          <div class="table-row table-row_content" data-togglable="ENTRY" data-filterable-current=":ketraterm-input/main" data-filterable-set=":ketraterm-input/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-n-u-m-p-a-d_8/index.html">NUMPAD_8</a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="1838867002%2FClasslikes%2F-1240825056"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-input/main"><div class="symbol monospace"><div class="block"><a href="-n-u-m-p-a-d_8/index.html">NUMPAD_8</a></div></div><div class="brief "><p class="paragraph">Numeric keypad 8 key.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-525869445%2FClasslikes%2F-1240825056" anchor-label="NUMPAD_9" id="-525869445%2FClasslikes%2F-1240825056" data-filterable-set=":ketraterm-input/main"></a>
+          <div class="table-row table-row_content" data-togglable="ENTRY" data-filterable-current=":ketraterm-input/main" data-filterable-set=":ketraterm-input/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-n-u-m-p-a-d_9/index.html">NUMPAD_9</a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-525869445%2FClasslikes%2F-1240825056"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-input/main"><div class="symbol monospace"><div class="block"><a href="-n-u-m-p-a-d_9/index.html">NUMPAD_9</a></div></div><div class="brief "><p class="paragraph">Numeric keypad 9 key.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div data-togglable="PROPERTY">
+        <h2 class="tableheader">Properties</h2>
+        <div class="table"><a data-name="-129859954%2FProperties%2F-1240825056" anchor-label="entries" id="-129859954%2FProperties%2F-1240825056" data-filterable-set=":ketraterm-input/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-input/main" data-filterable-set=":ketraterm-input/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="entries.html"><span><span>entries</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-129859954%2FProperties%2F-1240825056"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-input/main"><div class="symbol monospace"><span class="token keyword">val </span><a href="entries.html">entries</a><span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin.enums/-enum-entries/index.html">EnumEntries</a><span class="token operator">&lt;</span><a href="index.html">TerminalKey</a><span class="token operator">&gt;</span></div><div class="brief "><p class="paragraph">Returns a representation of an immutable list of all enum entries, in the order they're declared.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-372974862%2FProperties%2F-1240825056" anchor-label="name" id="-372974862%2FProperties%2F-1240825056" data-filterable-set=":ketraterm-input/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-input/main" data-filterable-set=":ketraterm-input/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="../../io.github.ketraterm.input.policy/-paste-line-ending-policy/-c-a-r-r-i-a-g-e_-r-e-t-u-r-n_-a-n-d_-l-i-n-e_-f-e-e-d/index.html#-372974862%2FProperties%2F-1240825056"><span><span>name</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-372974862%2FProperties%2F-1240825056"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-input/main"><div class="symbol monospace"><span class="token keyword">val </span><a href="../../io.github.ketraterm.input.policy/-paste-line-ending-policy/-c-a-r-r-i-a-g-e_-r-e-t-u-r-n_-a-n-d_-l-i-n-e_-f-e-e-d/index.html#-372974862%2FProperties%2F-1240825056">name</a><span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-string/index.html">String</a></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-739389684%2FProperties%2F-1240825056" anchor-label="ordinal" id="-739389684%2FProperties%2F-1240825056" data-filterable-set=":ketraterm-input/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-input/main" data-filterable-set=":ketraterm-input/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="../../io.github.ketraterm.input.policy/-paste-line-ending-policy/-c-a-r-r-i-a-g-e_-r-e-t-u-r-n_-a-n-d_-l-i-n-e_-f-e-e-d/index.html#-739389684%2FProperties%2F-1240825056"><span><span>ordinal</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-739389684%2FProperties%2F-1240825056"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-input/main"><div class="symbol monospace"><span class="token keyword">val </span><a href="../../io.github.ketraterm.input.policy/-paste-line-ending-policy/-c-a-r-r-i-a-g-e_-r-e-t-u-r-n_-a-n-d_-l-i-n-e_-f-e-e-d/index.html#-739389684%2FProperties%2F-1240825056">ordinal</a><span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div data-togglable="FUNCTION">
+        <h2 class="tableheader">Functions</h2>
+        <div class="table"><a data-name="1930163662%2FFunctions%2F-1240825056" anchor-label="valueOf" id="1930163662%2FFunctions%2F-1240825056" data-filterable-set=":ketraterm-input/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-input/main" data-filterable-set=":ketraterm-input/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="value-of.html"><span>value</span><wbr><span><span>Of</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="1930163662%2FFunctions%2F-1240825056"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-input/main"><div class="symbol monospace"><span class="token keyword">fun </span><a href="value-of.html"><span class="token function">valueOf</span></a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">value<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-string/index.html">String</a></span></span><span class="token punctuation">)</span><span class="token operator">: </span><a href="index.html">TerminalKey</a></div><div class="brief "><p class="paragraph">Returns the enum constant of this type with the specified name. The string must match exactly an identifier used to declare an enum constant in this type. (Extraneous whitespace characters are not permitted.)</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="196993882%2FFunctions%2F-1240825056" anchor-label="values" id="196993882%2FFunctions%2F-1240825056" data-filterable-set=":ketraterm-input/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-input/main" data-filterable-set=":ketraterm-input/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="values.html"><span><span>values</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="196993882%2FFunctions%2F-1240825056"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-input/main"><div class="symbol monospace"><span class="token keyword">fun </span><a href="values.html"><span class="token function">values</span></a><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-array/index.html">Array</a><span class="token operator">&lt;</span><a href="index.html">TerminalKey</a><span class="token operator">&gt;</span></div><div class="brief "><p class="paragraph">Returns an array containing the constants of this enum type, in the order they're declared.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+    <div class="footer">
+        <div class="footer--container">
+            <a href="#content" id="go-to-top-link" class="footer--button footer--button_go-to-top"></a>
+            <div class="footer--content">
+                <div>
+                    <span>Generated by </span>
+                    <a class="footer--link footer--link_external" href="https://github.com/Kotlin/dokka">
+                        Dokka
+                    </a>
+                    <div>© 2026 Copyright</div>
+                </div>
+            </div>
+        </div>
+    </div>
+        </div>
+    </div>
+</div>
+</body>
+</html>

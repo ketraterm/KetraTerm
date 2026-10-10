@@ -1,0 +1,180 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="description" content="A modular Kotlin/JVM terminal emulator library for Swing and headless applications.">
+  <meta name="color-scheme" content="light dark">
+  <title>KetraTerm Session (:ketraterm-session) · KetraTerm Library</title>
+  <link rel="icon" href="../../../assets/logo.svg" type="image/svg+xml">
+  <link rel="preload" href="../../../assets/fonts/manrope-variable.ttf" as="font" type="font/ttf" crossorigin>
+  <link rel="stylesheet" href="../../../assets/styles.css">
+  <script type="importmap">{"imports":{"mermaid":"../../../assets/mermaid/mermaid.esm.min.mjs"}}</script>
+  <script type="module" src="../../../assets/site.js"></script>
+</head>
+<body data-product="library" data-version="Development">
+  <a class="skip" href="#main">Skip to content</a>
+  <header class="site-header">
+    <div class="site-identity">
+      <a class="brand" href="../../../index.html" aria-label="KetraTerm Library home"><img class="brand-mark" src="../../../assets/logo.svg" alt="" width="34" height="34">KetraTerm</a>
+      <nav class="product-navigation" aria-label="KetraTerm products"><a href="https://ketraterm.github.io/KetraTerm/">App</a><a href="../../../index.html" aria-current="true">Library</a></nav>
+    </div>
+    <details class="site-navigation" open><summary>Menu</summary><nav aria-label="Library navigation"><a   href="../docs/README.html">Guides</a><a aria-current="true"  href="../modules.html">Modules</a><a   href="../../../versions.html">API & versions</a><a   href="../CHANGELOG.html">Changelog</a><a  class="nav-primary" href="../README.html">Get started</a></nav></details>
+    <button class="theme-toggle" type="button" aria-label="Switch to light theme">Light</button>
+  </header>
+  <div class="docs-shell"><aside class="sidebar" aria-label="Documentation navigation"><details class="nav-disclosure" open><summary class="mobile-nav-toggle">Browse library guides</summary><div><label class="search-label">Find a library guide<input type="search" data-doc-search placeholder="Search library docs" autocomplete="off" data-index="../search.json"></label><div class="search-results" aria-live="polite"></div><details open><summary>Start here</summary><a  href="../docs/README.html">Documentation</a><a  href="../README.html">Installation</a><a  href="../modules.html">Module guides</a><a  href="../CHANGELOG.html">Changelog</a></details><details open><summary>Capabilities</summary><a  href="../docs/terminal-feature-map.html">Feature map</a><a  href="../docs/features/terminal.html">Terminal</a><a  href="../docs/features/shells.html">Shell integration</a><a  href="../docs/features/desktop.html">Swing view & hosts</a><a  href="../docs/features/completion.html">Completion</a><a  href="../docs/features/embedding.html">Embedding</a><a  href="../docs/terminal-feature-gap-map.html">Known limits</a></details><details open><summary>Embedding guides</summary><a  href="../docs/library/configuration.html">Configuration</a><a  href="../docs/library/compatibility.html">Compatibility</a><a  href="../docs/library/render-ownership.html">Render ownership</a></details><details open><summary>Reference</summary><a  href="../docs/reference/protocol.html">Protocols</a><a  href="../docs/reference/notifications.html">Notifications</a><a  href="../docs/reference/storage.html">Storage & privacy</a></details><details open><summary>Development</summary><a  href="../ARCHITECTURE.html">Architecture</a><a  href="../CONTRIBUTING.html">Contributing</a><a  href="../docs/development/conformance-testing.html">Conformance testing</a></details></div></details></aside><main id="main" tabindex="-1" class="article article-with-outline"><div class="article-top"><nav class="breadcrumb" aria-label="Breadcrumb"><ol><li><a href="../../../index.html">Library</a></li><li><a href="../modules.html">Modules</a></li><li><span aria-current="page">KetraTerm Session (:ketraterm-session)</span></li></ol></nav><div class="doc-version"><span>Development</span><a href="../../../versions.html">All versions</a></div></div><details class="page-outline" open><summary>On this page</summary><nav aria-label="On this page"><a class="depth-2" href="#usage">Usage</a><a class="depth-2" href="#input-and-lifecycle">Input and lifecycle</a><a class="depth-2" href="#rendering-and-local-operations">Rendering and local operations</a><a class="depth-2" href="#host-owned-shell-integration">Host-owned shell integration</a><a class="depth-2" href="#ketraterms-optional-producer">KetraTerm&#39;s optional producer</a><a class="depth-2" href="#custom-assembly">Custom assembly</a></nav></details><div class="article-content"><div class="prose"><h1 id="ketraterm-session-ketraterm-session">KetraTerm Session (<code>:ketraterm-session</code>)</h1>
+<p><code>TerminalSession</code> connects a transport connector to parsing, terminal state,
+input encoding, and render publication. It serializes terminal mutation and
+orders application input, terminal replies, and startup input through one
+bounded writer. It has no dependency on Swing or a PTY implementation.</p>
+<p>For local processes, use the <a href="../ketraterm-pty/README.html">PTY module</a>. For an
+existing transport, supply a <a href="../ketraterm-transport-api/README.html"><code>TerminalConnector</code></a>
+as shown below. See the <a href="../README.html">root README</a> for dependency selection.</p>
+<h2 id="usage">Usage</h2>
+<p>This example runs an already-created connector until closure. <code>copyFrame</code> copies
+the borrowed frame into storage owned by the renderer; it must return promptly
+and retain neither the cache nor its arrays.</p>
+<pre><code class="language-kotlin">import io.github.ketraterm.core.TerminalBuffers
+import io.github.ketraterm.render.cache.TerminalRenderCache
+import io.github.ketraterm.session.TerminalSession
+import io.github.ketraterm.session.TerminalSessionCloseEvent
+import io.github.ketraterm.session.TerminalSessionState
+import io.github.ketraterm.transport.TerminalConnector
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.flow.collect
+import kotlinx.coroutines.flow.filterIsInstance
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
+
+suspend fun runTerminal(
+    connector: TerminalConnector,
+    copyFrame: (TerminalRenderCache) -&gt; Unit,
+): TerminalSessionCloseEvent = coroutineScope {
+    val terminal = TerminalBuffers.create(width = 80, height = 24)
+    val session = TerminalSession.create(terminal = terminal, connector = connector)
+    val frames = launch {
+        session.renderGeneration.collect {
+            session.readPublishedFrame(copyFrame)
+        }
+    }
+    try {
+        session.start(columns = 80, rows = 24)
+        session.requestRender(scrollbackOffset = 0)
+        session.state.filterIsInstance&lt;TerminalSessionState.Closed&gt;().first().event
+    } finally {
+        frames.cancel()
+        session.close()
+    }
+}
+</code></pre>
+<p>The connector owns inbound delivery. Do not also feed bytes into the session
+from another producer. <code>start</code> is synchronous and permits one attempt; it may
+block in the connector. Input is accepted only after connector startup succeeds.
+Startup failure closes the session and rethrows the failure.</p>
+<p>Successful construction transfers exclusive runtime access to the mutable
+terminal and connector. Configure the core before assembly; afterward, use
+session APIs for input, settings, and frame reads. A failed <code>create</code> leaves the
+connector with its caller. Session closure cancels session workers but does not
+close the supplied dispatchers or cancel consumer collection scopes.</p>
+<h2 id="input-and-lifecycle">Input and lifecycle</h2>
+<p>Use <code>submitInput</code> with semantic key, mouse, focus, paste, or text-replacement
+events. A list of events is admitted as one operation whose bytes cannot
+interleave with later input or replies. <code>submitBytes</code> is for trusted, already
+encoded host input: it copies the requested slice without paste framing or
+sanitization. Existing <code>encode*</code> methods use the same admission path and discard
+its result.</p>
+<p><code>TerminalInputAdmission.ACCEPTED</code> means queue admission. It does not confirm a
+connector write or shell execution, and includes empty or mode-suppressed input.
+Other results distinguish incomplete startup, closure, and capacity exhaustion.
+Capacity exhaustion closes the session without admitting the rejected operation.
+Transport failure or closure can interrupt accepted output; bytes are not retried.
+See <a href="docs/session-concurrency-locks.html#admission-and-ordering">admission and ordering</a>
+for budgets and conditional editing.</p>
+<p>Observe <code>state</code> for <code>Created</code>, <code>Running</code>, and retained <code>Closed(event)</code>.
+<code>isClosed</code> becomes true when shutdown starts; <code>Closed</code> is published after cleanup
+and final-frame publication have been attempted. State flows do not complete on
+closure, so consumers own cancellation of their collectors. Calls to <code>close</code>
+are idempotent, but a concurrent close can return before the first close finishes.</p>
+<p>Retained output remains readable after closure. See
+<a href="docs/session-concurrency-locks.html#closed-session-presentation">closed-session presentation</a>.</p>
+<h2 id="rendering-and-local-operations">Rendering and local operations</h2>
+<p><code>readRenderFrame</code> borrows live terminal data under mutation serialization.
+<code>readPublishedFrame</code> borrows the latest copied cache and returns null before the
+first publication. Both are safe from any thread, including after closure.
+Read or copy only within the callback; do not retain borrowed storage, mutate it,
+wait for UI work, close the session, or reenter session mutation.</p>
+<p><code>renderGeneration</code> identifies successful publications. <code>requestRender</code> replaces
+the session&#39;s requested viewport; one session has one published viewport.
+Independent scroll positions cannot share that publication. A synchronous frame
+read with an explicit offset does not change the published viewport.
+See <a href="docs/asynchronous-render-coalescing.html">render scheduling</a>.</p>
+<p><code>resizeViewport</code> returns the new scrollback offset, history size, and discarded
+row baseline together; apply the complete result when preserving scroll position.
+Resize may block in the connector and is not a barrier for queued input.
+<code>clearBuffer</code> clears the active screen and history without sending connector input
+or resetting the parser. It returns false after shutdown begins. See the
+<a href="docs/session-concurrency-locks.html#local-buffer-clear">clear contract</a> before
+retaining selection or shell anchors across a clear.</p>
+<h2 id="host-owned-shell-integration">Host-owned shell integration</h2>
+<p>A plain session has no shell metadata producer. An embedding host can supply its
+bounded terminal-facing timeline, versioned editing state, and prompt readiness:</p>
+<pre><code class="language-kotlin">import io.github.ketraterm.core.TerminalBuffers
+import io.github.ketraterm.session.TerminalSession
+import io.github.ketraterm.session.TerminalShellCommandLineState
+import io.github.ketraterm.session.TerminalShellIntegrationFactory
+import io.github.ketraterm.session.TerminalShellIntegrationState
+import io.github.ketraterm.transport.TerminalConnector
+import kotlinx.coroutines.flow.StateFlow
+
+fun createHostSession(
+    connector: TerminalConnector,
+    shellState: TerminalShellIntegrationState,
+    commandLine: TerminalShellCommandLineState,
+    promptReady: StateFlow&lt;Boolean&gt;,
+): TerminalSession = TerminalSession.create(
+    terminal = TerminalBuffers.create(width = 80, height = 24),
+    connector = connector,
+    shellIntegration = TerminalShellIntegrationFactory.host(
+        state = shellState,
+        commandLine = commandLine,
+        promptReady = promptReady,
+    ),
+)
+</code></pre>
+<p>Use a distinct projection per session and publish metadata in output order.
+Publish unknown editing state as null. For asynchronous suggestions, capture
+<code>captureCommandEdit()</code> and submit with <code>submitInput(expected, events)</code> so stale
+edits are rejected. See <a href="docs/session-concurrency-locks.html#conditional-command-edits">conditional edits</a>
+and the <a href="docs/session-concurrency-locks.html#selected-shell-integration">producer contract</a>.</p>
+<h2 id="ketraterms-optional-producer">KetraTerm&#39;s optional producer</h2>
+<p>Add <a href="../ketraterm-shell-integration/README.html"><code>ketraterm-shell-integration</code></a> and
+select <code>OscShellIntegration</code> through <code>shellIntegration</code> when launching a shell
+with compatible hooks. Factory selection does not install shell scripts.</p>
+<h2 id="custom-assembly">Custom assembly</h2>
+<p><code>TerminalSession.create(terminal, renderReader, connector)</code> supports separate core
+and render collaborators describing the same state. Initial frame dimensions
+are checked before ownership transfers; matching dimensions alone do not prove
+that the collaborators share state.</p>
+<p><code>inputEncoderFactory</code> creates independent admission and streaming encoders with
+session-owned mode sources, output sinks, and input policy. <code>parserFactory</code>
+receives the assembled command sink and live clipboard-write budget. Pass both
+to <code>TerminalParsers.create</code> when adding a custom OSC handler so built-in services
+remain wired. Factories must create fresh instances without I/O or background jobs.
+See <a href="docs/session-concurrency-locks.html#ordered-custom-osc-handling">ordered custom OSC handling</a>.</p>
+<p>The low-level constructor accepts caller-assembled parser, response reader,
+render publisher, and host adapter. The caller owns their consistent wiring;
+the session does not wrap an already-built parser. Use standard <code>create</code> assembly
+unless that wiring must be supplied independently.</p>
+<p>OSC 52 clipboard reads use an optional <code>TerminalClipboardReader</code>. The host owns
+consent and native access; session owns permission checks, deadlines, and bounded
+reply commitment. A missing provider produces an empty reply when replies are
+permitted. See <a href="docs/session-concurrency-locks.html#clipboard-read-lifetime-and-output-commitment">clipboard lifetime</a>.</p>
+<p>For maintainer ownership and validation entry points, see <a href="Module.html">Module.md</a>.</p>
+</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/e3c7f9c626934093d35a67ca97afbbf1b343f28d/ketraterm-session/README.md">View source on GitHub ↗</a></div></div></main></div>
+  <footer>
+    <a class="brand" href="../../../index.html"><img class="brand-mark" src="../../../assets/logo.svg" alt="" width="34" height="34">KetraTerm Library</a>
+    <p>Open source · Apache 2.0</p>
+    <div><a href="https://github.com/ketraterm/KetraTerm">GitHub ↗</a><a href="https://github.com/ketraterm/KetraTerm/issues">Issues ↗</a><a class="product-switch" href="https://ketraterm.github.io/KetraTerm/">Desktop app ↗</a></div>
+  </footer>
+</body>
+</html>

@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="description" content="KetraTerm is a desktop terminal for Windows, macOS, and Linux.">
+  <meta name="color-scheme" content="light dark">
+  <title>App guide · KetraTerm</title>
+  <link rel="icon" href="assets/logo.svg" type="image/svg+xml">
+  <link rel="preload" href="assets/fonts/manrope-variable.ttf" as="font" type="font/ttf" crossorigin>
+  <link rel="stylesheet" href="assets/styles.css">
+  <script type="importmap">{"imports":{"mermaid":"assets/mermaid/mermaid.esm.min.mjs"}}</script>
+  <script type="module" src="assets/site.js"></script>
+</head>
+<body data-product="app" data-version="v0.3.0 · Stable release">
+  <a class="skip" href="#main">Skip to content</a>
+  <header class="site-header">
+    <div class="site-identity">
+      <a class="brand" href="index.html" aria-label="KetraTerm home"><img class="brand-mark" src="assets/logo.svg" alt="" width="34" height="34">KetraTerm</a>
+      <nav class="product-navigation" aria-label="KetraTerm products"><a href="index.html" aria-current="true">App</a><a href="library/index.html">Library</a></nav>
+    </div>
+    <details class="site-navigation" open><summary>Menu</summary><nav aria-label="App navigation"><a   href="gallery.html">Screenshots</a><a aria-current="page"  href="guide.html">Guide</a><a   href="settings.html">Settings</a><a   href="changelog.html">Changelog</a><a  class="nav-primary" href="download.html">Download</a></nav></details>
+    <button class="theme-toggle" type="button" aria-label="Switch to light theme">Light</button>
+  </header>
+  <div class="docs-shell"><aside class="sidebar" aria-label="Documentation navigation"><details class="nav-disclosure" open><summary class="mobile-nav-toggle">Browse app guides</summary><div><label class="search-label">Find app help<input type="search" data-doc-search placeholder="Search app guides" autocomplete="off" data-index="search.json"></label><div class="search-results" aria-live="polite"></div><details open><summary>Using KetraTerm</summary><a aria-current="page" href="guide.html">App guide</a><a  href="settings.html">Settings reference</a><a  href="changelog.html">App changelog</a></details></div></details></aside><main id="main" tabindex="-1" class="article article-with-outline"><div class="article-top"><nav class="breadcrumb" aria-label="Breadcrumb"><ol><li><a href="index.html">KetraTerm</a></li><li><span aria-current="page">App guide</span></li></ol></nav><div class="doc-version"><span>v0.3.0 · Stable release</span></div></div><details class="page-outline" open><summary>On this page</summary><nav aria-label="On this page"><a class="depth-2" href="#shells-and-sessions">Shells and sessions</a><a class="depth-2" href="#commands-and-output">Commands and output</a><a class="depth-2" href="#appearance-and-settings">Appearance and settings</a><a class="depth-2" href="#completion">Completion</a><a class="depth-2" href="#terminal-permissions">Terminal permissions</a></nav></details><div class="article-content"><div class="prose"><h1 id="using-ketraterm">Using KetraTerm</h1>
+<p>This guide covers KetraTerm 0.3.0. Platform packages include a Java runtime;
+the Java-preinstalled archive requires Java 25.</p>
+<h2 id="shells-and-sessions">Shells and sessions</h2>
+<p>Choose an installed shell from the profile menu when opening a terminal.
+Use tabs for separate sessions and split panes to keep sessions side by side.
+Tabs can have custom names and accent colors. Sessions are not restored after
+restarting the app.</p>
+<h2 id="commands-and-output">Commands and output</h2>
+<p>Interactive PowerShell, Bash, zsh, and fish launches receive prompt hooks for
+command markers, exit status, navigation between retained commands, and copying
+or exporting command output. Prompt customizations can affect command tracking.
+Command Prompt and Nushell do not receive these hooks.</p>
+<p>Terminal search covers the visible screen and retained history. Hold Shift to
+use local mouse selection when a terminal application has enabled mouse reporting.</p>
+<h2 id="appearance-and-settings">Appearance and settings</h2>
+<p>Open settings to choose a theme and font, adjust line height and cursor
+appearance, and configure the shell and terminal permissions. Saved appearance
+settings update open panes; process and buffer settings apply to new terminals.</p>
+<p>The <a href="settings.html">settings reference</a> lists configuration keys and defaults.
+Restart the app after editing <code>config.toml</code> directly.</p>
+<h2 id="completion">Completion</h2>
+<p>KetraTerm suggestions are disabled by default. To enable them, set
+<code>smart_suggestions_enabled = true</code> under <code>[behavior]</code> in <code>config.toml</code>, then
+restart the app. The settings dialog does not expose this switch in 0.3.0.</p>
+<p>Suggestions require an editable command context from shell integration. Press
+Ctrl+Space to request them, navigate with arrows or Page Up/Page Down, accept
+with Tab, and dismiss with Escape. Enter accepts an already selected suggestion
+by default. Shell-native Tab completion works independently.</p>
+<p>Suggestions combine built-in command specifications, local files and directories,
+and bounded learning. Remote and WSL paths do not provide a remote filesystem
+completion service. Learning stays in memory unless persistence is explicitly
+enabled; persisted command data can contain sensitive text.</p>
+<h2 id="terminal-permissions">Terminal permissions</h2>
+<p>Clipboard permissions govern requests from terminal programs separately from
+your explicit copy and paste actions. In 0.3.0, clipboard writes ask by default
+for local launches and are denied for direct SSH launches; reads are denied.
+The local/remote classification is based on the launched process: starting SSH
+inside a local shell does not change it.</p>
+<p>Window manipulation and terminal-requested window resizing are disabled by
+default. See the <a href="changelog.html">app changelog</a> for
+released changes.</p>
+</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/e3c7f9c626934093d35a67ca97afbbf1b343f28d/website/released-app/v0.3.0/guide.md">View source on GitHub ↗</a></div></div></main></div>
+  <footer>
+    <a class="brand" href="index.html"><img class="brand-mark" src="assets/logo.svg" alt="" width="34" height="34">KetraTerm</a>
+    <p>Open source · Apache 2.0</p>
+    <div><a href="https://github.com/ketraterm/KetraTerm">GitHub ↗</a><a href="https://github.com/ketraterm/KetraTerm/issues">Issues ↗</a><a class="product-switch" href="library/index.html">For developers ↗</a></div>
+  </footer>
+</body>
+</html>

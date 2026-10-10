@@ -1,0 +1,208 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="description" content="A modular Kotlin/JVM terminal emulator library for Swing and headless applications.">
+  <meta name="color-scheme" content="light dark">
+  <title>Protocol limits and replies · KetraTerm Library</title>
+  <link rel="icon" href="../../../../assets/logo.svg" type="image/svg+xml">
+  <link rel="preload" href="../../../../assets/fonts/manrope-variable.ttf" as="font" type="font/ttf" crossorigin>
+  <link rel="stylesheet" href="../../../../assets/styles.css">
+  <script type="importmap">{"imports":{"mermaid":"../../../../assets/mermaid/mermaid.esm.min.mjs"}}</script>
+  <script type="module" src="../../../../assets/site.js"></script>
+</head>
+<body data-product="library" data-version="Development">
+  <a class="skip" href="#main">Skip to content</a>
+  <header class="site-header">
+    <div class="site-identity">
+      <a class="brand" href="../../../../index.html" aria-label="KetraTerm Library home"><img class="brand-mark" src="../../../../assets/logo.svg" alt="" width="34" height="34">KetraTerm</a>
+      <nav class="product-navigation" aria-label="KetraTerm products"><a href="https://ketraterm.github.io/KetraTerm/">App</a><a href="../../../../index.html" aria-current="true">Library</a></nav>
+    </div>
+    <details class="site-navigation" open><summary>Menu</summary><nav aria-label="Library navigation"><a aria-current="true"  href="../README.html">Guides</a><a   href="../../modules.html">Modules</a><a   href="../../../../versions.html">API & versions</a><a   href="../../CHANGELOG.html">Changelog</a><a  class="nav-primary" href="../../README.html">Get started</a></nav></details>
+    <button class="theme-toggle" type="button" aria-label="Switch to light theme">Light</button>
+  </header>
+  <div class="docs-shell"><aside class="sidebar" aria-label="Documentation navigation"><details class="nav-disclosure" open><summary class="mobile-nav-toggle">Browse library guides</summary><div><label class="search-label">Find a library guide<input type="search" data-doc-search placeholder="Search library docs" autocomplete="off" data-index="../../search.json"></label><div class="search-results" aria-live="polite"></div><details open><summary>Start here</summary><a  href="../README.html">Documentation</a><a  href="../../README.html">Installation</a><a  href="../../modules.html">Module guides</a><a  href="../../CHANGELOG.html">Changelog</a></details><details open><summary>Capabilities</summary><a  href="../terminal-feature-map.html">Feature map</a><a  href="../features/terminal.html">Terminal</a><a  href="../features/shells.html">Shell integration</a><a  href="../features/desktop.html">Swing view & hosts</a><a  href="../features/completion.html">Completion</a><a  href="../features/embedding.html">Embedding</a><a  href="../terminal-feature-gap-map.html">Known limits</a></details><details open><summary>Embedding guides</summary><a  href="../library/configuration.html">Configuration</a><a  href="../library/compatibility.html">Compatibility</a><a  href="../library/render-ownership.html">Render ownership</a></details><details open><summary>Reference</summary><a aria-current="page" href="protocol.html">Protocols</a><a  href="notifications.html">Notifications</a><a  href="storage.html">Storage & privacy</a></details><details open><summary>Development</summary><a  href="../../ARCHITECTURE.html">Architecture</a><a  href="../../CONTRIBUTING.html">Contributing</a><a  href="../development/conformance-testing.html">Conformance testing</a></details></div></details></aside><main id="main" tabindex="-1" class="article article-with-outline"><div class="article-top"><nav class="breadcrumb" aria-label="Breadcrumb"><ol><li><a href="../../../../index.html">Library</a></li><li><span>Reference</span></li><li><span aria-current="page">Protocol limits and replies</span></li></ol></nav><div class="doc-version"><span>Development</span><a href="../../../../versions.html">All versions</a></div></div><details class="page-outline" open><summary>On this page</summary><nav aria-label="On this page"><a class="depth-2" href="#csi-parameters">CSI parameters</a><a class="depth-2" href="#osc-encoding">OSC encoding</a><a class="depth-2" href="#payload-limits">Payload limits</a><a class="depth-2" href="#query-allowlists">Query allowlists</a><a class="depth-2" href="#mode-status-reports">Mode status reports</a><a class="depth-2" href="#streaming-grapheme-placement">Streaming grapheme placement</a></nav></details><div class="article-content"><div class="prose"><h1 id="protocol-limits-and-replies">Protocol limits and replies</h1>
+<p>This reference records boundary behavior for parser and host implementers.
+For a capability overview, see <a href="../features/terminal.html">terminal features</a>.</p>
+<h2 id="csi-parameters">CSI parameters</h2>
+<p>CSI collection has a shared limit of 32 semicolon/colon fields, including omitted
+fields. Opening field 33 rejects the entire command; no truncated SGR, mode,
+cursor, or query is dispatched. Numeric saturation is independent of this limit.
+CAN/SUB cancels, ESC starts a new sequence, and reset/EOF discards unfinished
+state. Ordinary C0 handling continues during rejection.</p>
+<h2 id="osc-encoding">OSC encoding</h2>
+<p>Built-in OSC commands use UTF-8. There is no locale encoding fallback or raw
+8-bit C1 termination inside payloads.</p>
+<div class="table-scroll"><table>
+<thead>
+<tr>
+<th>Family</th>
+<th>Encoding and malformed-input behavior</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Titles (0/1/2), notifications (9/777)</td>
+<td>Replacement decoding; repaired text still passes host policy and length checks.</td>
+</tr>
+<tr>
+<td>Directory (7), palette (4/10/11/12), shell markers (133)</td>
+<td>Strict UTF-8; reject malformed commands without updating state.</td>
+</tr>
+<tr>
+<td>Hyperlinks (8)</td>
+<td>Strict UTF-8; malformed or completed oversized commands end active link context without changing retained links.</td>
+</tr>
+<tr>
+<td>Clipboard (52)</td>
+<td>ASCII envelope and strict Base64/UTF-8 text; invalid payloads are rejected before consent or access.</td>
+</tr>
+</tbody></table></div>
+<p>BEL or <code>ESC \</code> completes OSC. CAN/SUB, reset, and EOF discard unfinished commands.
+Other C0 controls and DEL are ignored inside OSC. Unknown numeric commands are
+ignored unless a custom handler is installed. Recovery preserves later commands.
+Host title/notification limits count UTF-16 code units and avoid splitting a valid
+surrogate pair; they do not guarantee grapheme-boundary truncation.</p>
+<h2 id="payload-limits">Payload limits</h2>
+<p>Limits count collected bytes, including family headers/separators and excluding
+introducers, terminators, and ignored control bytes.</p>
+<div class="table-scroll"><table>
+<thead>
+<tr>
+<th>Family</th>
+<th>Collection limit</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Titles, directory, hyperlinks, notifications, palette 4, shell markers</td>
+<td>4,096 bytes.</td>
+</tr>
+<tr>
+<td>Dynamic colors 10/11/12</td>
+<td>256 bytes.</td>
+</tr>
+<tr>
+<td>DECRQSS</td>
+<td>64 bytes.</td>
+</tr>
+<tr>
+<td>XTGETTCAP</td>
+<td>4,096 bytes.</td>
+</tr>
+<tr>
+<td>Custom OSC</td>
+<td>4,096 bytes by default; configurable full-envelope limit, with a separate 4,096-byte header limit.</td>
+</tr>
+<tr>
+<td>OSC 52</td>
+<td>Ordinary 4,096-byte limit; eligible writes use a budget derived from the active decoded-text limit.</td>
+</tr>
+</tbody></table></div>
+<p>Overflow stops collection and consumes through termination/cancellation without
+dispatching a truncated prefix. An oversized OSC 8 ends active link context;
+other rejected commands preserve prior metadata. Oversized DCS queries receive
+no reply. DCS terminates with ST, not BEL.</p>
+<p>Session-integrated clipboard writes permit up to 1 MiB of decoded text by default.
+Standalone parsers without that integration retain the ordinary collection limit.
+Permissions and decoded-size limits are checked again before execution.</p>
+<h2 id="query-allowlists">Query allowlists</h2>
+<div class="table-scroll"><table>
+<thead>
+<tr>
+<th>Query</th>
+<th>Reply scope</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>DECRQSS</td>
+<td>SGR (<code>m</code>), vertical margins (<code>r</code>), horizontal margins (<code>s</code>), cursor style (<code>SP q</code>). Unsupported selectors receive empty failure replies.</td>
+</tr>
+<tr>
+<td>XTGETTCAP</td>
+<td>Terminal name (<code>TN</code>/<code>name</code>), color count (<code>Co</code>/<code>colors</code>), and true-color support (<code>RGB</code>/<code>Tc</code>).</td>
+</tr>
+<tr>
+<td>Device identity</td>
+<td><code>TERM=xterm-256color</code>, <code>COLORTERM=truecolor</code>, VT420-class primary DA, and secondary DA. No DA3 unique identity.</td>
+</tr>
+<tr>
+<td>Cursor position</td>
+<td>One-based coordinates, relative to active origin/margins when origin mode is enabled.</td>
+</tr>
+<tr>
+<td>Color scheme</td>
+<td><code>CSI ?996n</code> reports dark/light host preference. Application color overrides do not change that preference.</td>
+</tr>
+<tr>
+<td>Rectangle checksum</td>
+<td>Active page only, base VT420 16-bit algorithm; no xterm XTCHECKSUM extensions.</td>
+</tr>
+</tbody></table></div>
+<p>Denying terminal responses suppresses success and failure replies alike.
+Unsupported queries with defined failure responses use those responses rather
+than echoing request text.</p>
+<h2 id="mode-status-reports">Mode status reports</h2>
+<p>DECRQM returns set (<code>1</code>), reset (<code>2</code>), or unsupported (<code>0</code>). ANSI and DEC namespaces
+are independent; no modes claim permanent-set/reset status.</p>
+<div class="table-scroll"><table>
+<thead>
+<tr>
+<th>Namespace</th>
+<th>Queryable modes</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>ANSI</td>
+<td>4, 20.</td>
+</tr>
+<tr>
+<td>DEC core</td>
+<td>1, 3, 5, 6, 7, 12, 25, 66, 69, 1004, 2004, 2026.</td>
+</tr>
+<tr>
+<td>DEC mouse tracking</td>
+<td>9, 1000, 1002, 1003.</td>
+</tr>
+<tr>
+<td>DEC mouse encoding</td>
+<td>1005, 1006, 1015, 1016.</td>
+</tr>
+<tr>
+<td>DEC alternate screen</td>
+<td>47, 1047, 1049 report the active buffer.</td>
+</tr>
+<tr>
+<td>DEC Backarrow</td>
+<td>67 reports the application override or current host Backspace default.</td>
+</tr>
+<tr>
+<td>DEC host actions</td>
+<td>1042/1043 require host capability declarations.</td>
+</tr>
+</tbody></table></div>
+<p>Mode 3 reports the last DECCOLM selection, not measured window width. Mode 1048
+is an action and reports unsupported. Standalone declares supported bell actions;
+IntelliJ does not. Requests accept one mode parameter; malformed, overflowing,
+cancelled, or incomplete requests receive no reply. Queries do not mutate state.
+See the <a href="../../ketraterm-protocol/docs/protocol-modes.html">mode reference</a> for names.</p>
+<h2 id="streaming-grapheme-placement">Streaming grapheme placement</h2>
+<p>Printable prefixes are published at each parser call boundary. Segmentation
+continues across calls; retained continuations update the same cell with its
+original attributes. Core adjusts the following cursor and pending wrap.</p>
+<p>Publication commits grid effects. Later width changes do not relocate the
+cluster, reverse completed wraps/scrolls/insert shifts, or restore overwritten
+text. Narrowing frees a spacer as blank; widening consumes a neighboring cell
+when it fits. At the right margin, text remains in the single available cell.
+A rejected initial write has no continuation target.</p>
+<p>Whole-input and split-input placement can therefore differ at margins, over
+occupied cells, and on tiny grids. Retained text, cell integrity, and following
+text must still be preserved. See <a href="../../ketraterm-parser/docs/grapheme-segmentation.html#bounded-retention">grapheme retention</a>
+and <a href="../development/conformance-testing.html#streaming-placement">verification</a>.</p>
+</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/e3c7f9c626934093d35a67ca97afbbf1b343f28d/docs/reference/protocol.md">View source on GitHub ↗</a></div></div></main></div>
+  <footer>
+    <a class="brand" href="../../../../index.html"><img class="brand-mark" src="../../../../assets/logo.svg" alt="" width="34" height="34">KetraTerm Library</a>
+    <p>Open source · Apache 2.0</p>
+    <div><a href="https://github.com/ketraterm/KetraTerm">GitHub ↗</a><a href="https://github.com/ketraterm/KetraTerm/issues">Issues ↗</a><a class="product-switch" href="https://ketraterm.github.io/KetraTerm/">Desktop app ↗</a></div>
+  </footer>
+</body>
+</html>

@@ -1,0 +1,167 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="description" content="A modular Kotlin/JVM terminal emulator library for Swing and headless applications.">
+  <meta name="color-scheme" content="light dark">
+  <title>Library compatibility · KetraTerm Library</title>
+  <link rel="icon" href="../../../../assets/logo.svg" type="image/svg+xml">
+  <link rel="preload" href="../../../../assets/fonts/manrope-variable.ttf" as="font" type="font/ttf" crossorigin>
+  <link rel="stylesheet" href="../../../../assets/styles.css">
+  <script type="importmap">{"imports":{"mermaid":"../../../../assets/mermaid/mermaid.esm.min.mjs"}}</script>
+  <script type="module" src="../../../../assets/site.js"></script>
+</head>
+<body data-product="library" data-version="Development">
+  <a class="skip" href="#main">Skip to content</a>
+  <header class="site-header">
+    <div class="site-identity">
+      <a class="brand" href="../../../../index.html" aria-label="KetraTerm Library home"><img class="brand-mark" src="../../../../assets/logo.svg" alt="" width="34" height="34">KetraTerm</a>
+      <nav class="product-navigation" aria-label="KetraTerm products"><a href="https://ketraterm.github.io/KetraTerm/">App</a><a href="../../../../index.html" aria-current="true">Library</a></nav>
+    </div>
+    <details class="site-navigation" open><summary>Menu</summary><nav aria-label="Library navigation"><a aria-current="true"  href="../README.html">Guides</a><a   href="../../modules.html">Modules</a><a   href="../../../../versions.html">API & versions</a><a   href="../../CHANGELOG.html">Changelog</a><a  class="nav-primary" href="../../README.html">Get started</a></nav></details>
+    <button class="theme-toggle" type="button" aria-label="Switch to light theme">Light</button>
+  </header>
+  <div class="docs-shell"><aside class="sidebar" aria-label="Documentation navigation"><details class="nav-disclosure" open><summary class="mobile-nav-toggle">Browse library guides</summary><div><label class="search-label">Find a library guide<input type="search" data-doc-search placeholder="Search library docs" autocomplete="off" data-index="../../search.json"></label><div class="search-results" aria-live="polite"></div><details open><summary>Start here</summary><a  href="../README.html">Documentation</a><a  href="../../README.html">Installation</a><a  href="../../modules.html">Module guides</a><a  href="../../CHANGELOG.html">Changelog</a></details><details open><summary>Capabilities</summary><a  href="../terminal-feature-map.html">Feature map</a><a  href="../features/terminal.html">Terminal</a><a  href="../features/shells.html">Shell integration</a><a  href="../features/desktop.html">Swing view & hosts</a><a  href="../features/completion.html">Completion</a><a  href="../features/embedding.html">Embedding</a><a  href="../terminal-feature-gap-map.html">Known limits</a></details><details open><summary>Embedding guides</summary><a  href="configuration.html">Configuration</a><a aria-current="page" href="compatibility.html">Compatibility</a><a  href="render-ownership.html">Render ownership</a></details><details open><summary>Reference</summary><a  href="../reference/protocol.html">Protocols</a><a  href="../reference/notifications.html">Notifications</a><a  href="../reference/storage.html">Storage & privacy</a></details><details open><summary>Development</summary><a  href="../../ARCHITECTURE.html">Architecture</a><a  href="../../CONTRIBUTING.html">Contributing</a><a  href="../development/conformance-testing.html">Conformance testing</a></details></div></details></aside><main id="main" tabindex="-1" class="article article-with-outline"><div class="article-top"><nav class="breadcrumb" aria-label="Breadcrumb"><ol><li><a href="../../../../index.html">Library</a></li><li><span>Embedding guides</span></li><li><span aria-current="page">Library compatibility</span></li></ol></nav><div class="doc-version"><span>Development</span><a href="../../../../versions.html">All versions</a></div></div><details class="page-outline" open><summary>On this page</summary><nav aria-label="On this page"><a class="depth-2" href="#supported-boundary">Supported boundary</a><a class="depth-2" href="#evolution-rules">Evolution rules</a><a class="depth-2" href="#verification-and-baseline-changes">Verification and baseline changes</a><a class="depth-2" href="#development-migrations">Development migrations</a></nav></details><div class="article-content"><div class="prose"><h1 id="library-compatibility">Library compatibility</h1>
+<p>KetraTerm&#39;s published libraries support Kotlin and Java hosts. The current 0.x
+API snapshots are a development baseline, not a stable API freeze or a promise
+of compatibility with earlier 0.x releases. Starting at 1.0, releases within one
+major version preserve supported source, binary, and behavioral contracts.</p>
+<h2 id="supported-boundary">Supported boundary</h2>
+<div class="table-scroll"><table>
+<thead>
+<tr>
+<th>Offering</th>
+<th>Published JVM modules</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Headless pipeline</td>
+<td>protocol, parser, core, host, input, render-api, render-cache, transport-api, session</td>
+</tr>
+<tr>
+<td>Swing view</td>
+<td>ui-swing</td>
+</tr>
+<tr>
+<td>Local processes and shell metadata</td>
+<td>pty, shell-integration</td>
+</tr>
+<tr>
+<td>Completion</td>
+<td>completion, completion-host</td>
+</tr>
+<tr>
+<td>Swing host controls</td>
+<td>ui-swing-host</td>
+</tr>
+</tbody></table></div>
+<p>Names have the <code>ketraterm-</code> prefix. The constraints-only BOM and dependency-only
+headless/Swing entry points are additional metadata publications. Use one
+KetraTerm version throughout the dependency graph; see <a href="../../README.html#using-the-libraries">installation</a>
+and <a href="../../ketraterm-bom/README.html#maven">Maven setup</a>.</p>
+<p>Public/protected declarations in published libraries are supported contracts.
+Kotlin internal/private declarations are excluded, except published inline
+bridges that already-compiled callers can reference. Workspace, completion
+persistence, app, testkit, benchmarks, and IntelliJ product implementation APIs
+are outside the supported publication boundary.</p>
+<p>Kotlin 2.4 and JDK 25 are the minimum supported consumer versions. The build uses
+Kotlin 2.4.20, JVM target 25, and JVM default-method compatibility bridges.
+Consumer checks exercise Kotlin 2.4.0/2.4.20 and both Gradle metadata and POM-only
+resolution. A host replacing dependencies with a platform runtime must verify
+that runtime separately.</p>
+<h2 id="evolution-rules">Evolution rules</h2>
+<ul>
+<li>Preserve JVM signatures, Kotlin metadata, defaults, and documented semantics.</li>
+<li>Preserve constructor, copy, component, and default-call shapes of value data
+classes. Adding a defaulted constructor field can still break binaries.</li>
+<li>Grow configurable snapshots through their existing builder/update entry points;
+preserve existing property types and defaults.</li>
+<li>Preserve overloads and Kotlin default-call methods. Java overload generation
+does not make Kotlin default-argument changes binary compatible.</li>
+<li>Treat interfaces as implementer contracts. New abstract members and new
+enum/sealed variants need source and compiled-consumer assessment.</li>
+<li>Preserve public packed values, encoded enum order, constants, and inline bridge
+behavior; signature checks cannot detect semantic drift.</li>
+<li>Keep public dependency types available through publication metadata.</li>
+<li>During a stable major version, deprecate with a replacement before removal;
+incompatible removal belongs in a new major release.</li>
+</ul>
+<h2 id="verification-and-baseline-changes">Verification and baseline changes</h2>
+<p>Supported modules use explicit API mode and checked-in ABI snapshots. Published
+consumer fixtures compile and run independent Java/Kotlin clients; retained
+binaries test upgrades without recompilation. Deliberate linkage-failure controls
+check that the upgrade harness detects missing symbols.</p>
+<p><code>./gradlew publicationChecks</code> runs the library publication gates against a local
+repository without uploading. The <a href="https://github.com/ketraterm/KetraTerm/blob/e3c7f9c626934093d35a67ca97afbbf1b343f28d/ketraterm-testkit/src/consumerTest/README.md">consumer fixture guide</a>
+explains individual checks and baseline refreshes. A deliberate development
+baseline refresh must record the break and migration; it cannot be presented as
+proof of compatibility with the removed API.</p>
+<p>ABI checks do not establish threading, lifecycle, coordinate, or protocol
+correctness. Those require semantic tests and the module contracts. Product
+release verification remains separate; see the <a href="../terminal-feature-gap-map.html#product-and-release-work">gap map</a>.</p>
+<h2 id="development-migrations">Development migrations</h2>
+<p>These earlier 0.x changes require affected consumers to recompile. Detailed
+release history remains in the <a href="../../CHANGELOG.html">changelog</a>.</p>
+<div class="table-scroll"><table>
+<thead>
+<tr>
+<th>Earlier shape</th>
+<th>Current integration</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Growing settings constructors, named-argument copies, destructuring</td>
+<td>Immutable <code>create</code>/<code>copy</code> callbacks or Java builders; use getters.</td>
+</tr>
+<tr>
+<td>Swing history/window-permission settings</td>
+<td>Core/PTY history configuration and session host policy.</td>
+</tr>
+<tr>
+<td>Session render-publisher access</td>
+<td><code>readPublishedFrame</code>; retain mutable producer references at assembly.</td>
+</tr>
+<tr>
+<td>Public integer render leases</td>
+<td>Scoped <code>readCurrent</code> or session reads; see <a href="render-ownership.html">reader ownership</a>.</td>
+</tr>
+<tr>
+<td>Constructor-bound suggestion provider/edit target</td>
+<td>EDT provider/target setters and request-scoped editing authority.</td>
+</tr>
+<tr>
+<td>Global suggestion feedback handler</td>
+<td>Request-owned source/interaction observer with actual acceptance results.</td>
+</tr>
+<tr>
+<td>Old suggestion show/request/candidate shapes</td>
+<td>Begin, publish/collect, and present an interaction; update custom presentation to snapshot-based callbacks.</td>
+</tr>
+<tr>
+<td>Pre-bound custom input encoder</td>
+<td><code>TerminalInputEncoderFactory</code> with session-owned output; implement synchronous input-policy updates.</td>
+</tr>
+<tr>
+<td>Earlier buffer factory return type</td>
+<td><code>TerminalRenderBuffer</code>; changed JVM return descriptors require recompilation.</td>
+</tr>
+<tr>
+<td>Non-null shortcut lookup</td>
+<td>Handle null for legitimately unbound actions.</td>
+</tr>
+<tr>
+<td>Workspace/persistence development artifacts</td>
+<td>Product-only modules; library hosts own these concerns.</td>
+</tr>
+</tbody></table></div>
+<p>See <a href="configuration.html">configuration</a>, <a href="../../ketraterm-session/README.html#custom-assembly">session assembly</a>,
+and <a href="../../ketraterm-ui-swing/README.html">Swing APIs</a> for current usage.</p>
+</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/e3c7f9c626934093d35a67ca97afbbf1b343f28d/docs/library/compatibility.md">View source on GitHub ↗</a></div></div></main></div>
+  <footer>
+    <a class="brand" href="../../../../index.html"><img class="brand-mark" src="../../../../assets/logo.svg" alt="" width="34" height="34">KetraTerm Library</a>
+    <p>Open source · Apache 2.0</p>
+    <div><a href="https://github.com/ketraterm/KetraTerm">GitHub ↗</a><a href="https://github.com/ketraterm/KetraTerm/issues">Issues ↗</a><a class="product-switch" href="https://ketraterm.github.io/KetraTerm/">Desktop app ↗</a></div>
+  </footer>
+</body>
+</html>

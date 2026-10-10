@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="description" content="A modular Kotlin/JVM terminal emulator library for Swing and headless applications.">
+  <meta name="color-scheme" content="light dark">
+  <title>Render reader ownership · KetraTerm Library</title>
+  <link rel="icon" href="../../../../assets/logo.svg" type="image/svg+xml">
+  <link rel="preload" href="../../../../assets/fonts/manrope-variable.ttf" as="font" type="font/ttf" crossorigin>
+  <link rel="stylesheet" href="../../../../assets/styles.css">
+  <script type="importmap">{"imports":{"mermaid":"../../../../assets/mermaid/mermaid.esm.min.mjs"}}</script>
+  <script type="module" src="../../../../assets/site.js"></script>
+</head>
+<body data-product="library" data-version="Development">
+  <a class="skip" href="#main">Skip to content</a>
+  <header class="site-header">
+    <div class="site-identity">
+      <a class="brand" href="../../../../index.html" aria-label="KetraTerm Library home"><img class="brand-mark" src="../../../../assets/logo.svg" alt="" width="34" height="34">KetraTerm</a>
+      <nav class="product-navigation" aria-label="KetraTerm products"><a href="https://ketraterm.github.io/KetraTerm/">App</a><a href="../../../../index.html" aria-current="true">Library</a></nav>
+    </div>
+    <details class="site-navigation" open><summary>Menu</summary><nav aria-label="Library navigation"><a aria-current="true"  href="../README.html">Guides</a><a   href="../../modules.html">Modules</a><a   href="../../../../versions.html">API & versions</a><a   href="../../CHANGELOG.html">Changelog</a><a  class="nav-primary" href="../../README.html">Get started</a></nav></details>
+    <button class="theme-toggle" type="button" aria-label="Switch to light theme">Light</button>
+  </header>
+  <div class="docs-shell"><aside class="sidebar" aria-label="Documentation navigation"><details class="nav-disclosure" open><summary class="mobile-nav-toggle">Browse library guides</summary><div><label class="search-label">Find a library guide<input type="search" data-doc-search placeholder="Search library docs" autocomplete="off" data-index="../../search.json"></label><div class="search-results" aria-live="polite"></div><details open><summary>Start here</summary><a  href="../README.html">Documentation</a><a  href="../../README.html">Installation</a><a  href="../../modules.html">Module guides</a><a  href="../../CHANGELOG.html">Changelog</a></details><details open><summary>Capabilities</summary><a  href="../terminal-feature-map.html">Feature map</a><a  href="../features/terminal.html">Terminal</a><a  href="../features/shells.html">Shell integration</a><a  href="../features/desktop.html">Swing view & hosts</a><a  href="../features/completion.html">Completion</a><a  href="../features/embedding.html">Embedding</a><a  href="../terminal-feature-gap-map.html">Known limits</a></details><details open><summary>Embedding guides</summary><a  href="configuration.html">Configuration</a><a  href="compatibility.html">Compatibility</a><a aria-current="page" href="render-ownership.html">Render ownership</a></details><details open><summary>Reference</summary><a  href="../reference/protocol.html">Protocols</a><a  href="../reference/notifications.html">Notifications</a><a  href="../reference/storage.html">Storage & privacy</a></details><details open><summary>Development</summary><a  href="../../ARCHITECTURE.html">Architecture</a><a  href="../../CONTRIBUTING.html">Contributing</a><a  href="../development/conformance-testing.html">Conformance testing</a></details></div></details></aside><main id="main" tabindex="-1" class="article"><div class="article-top"><nav class="breadcrumb" aria-label="Breadcrumb"><ol><li><a href="../../../../index.html">Library</a></li><li><span>Embedding guides</span></li><li><span aria-current="page">Render reader ownership</span></li></ol></nav><div class="doc-version"><span>Development</span><a href="../../../../versions.html">All versions</a></div></div><div class="article-content"><div class="prose"><h1 id="render-reader-ownership">Render reader ownership</h1>
+<p>A session exposes borrowed render frames and a read-only shell metadata view.
+The host retains mutable producers at construction; consumers do not recover
+publication authority from the session.</p>
+<div class="table-scroll"><table>
+<thead>
+<tr>
+<th>Access</th>
+<th>Ownership</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>TerminalSession.readPublishedFrame</code></td>
+<td>Borrows the latest copied cache; returns null before first publication and remains readable after closure.</td>
+</tr>
+<tr>
+<td><code>TerminalRenderPublisher.readCurrent</code></td>
+<td>Borrows a standalone publisher&#39;s latest cache. The publisher&#39;s owner controls writes.</td>
+</tr>
+<tr>
+<td><code>TerminalShellIntegrationView</code></td>
+<td>Thread-safe observation and primitive copies; separate reads may see different revisions.</td>
+</tr>
+<tr>
+<td><code>TerminalShellIntegrationState</code></td>
+<td>Producer-owned mutable state; closing a session does not close or clear a supplied host model.</td>
+</tr>
+</tbody></table></div>
+<p>Frame callbacks must not modify or retain cache storage, close the session, or
+reenter mutation/publication. A read does not request a fresh frame; publication
+is controlled by render requests and generation observation.</p>
+<p>Use scoped readers. The publisher&#39;s acquire/release bridges exist for cross-module
+use and must be paired exactly once in <code>finally</code>. Inline readers preserve that
+cleanup and Kotlin non-local returns without exposing buffer indexing. A cache
+reference cannot detect every duplicate-release misuse by concurrent callers.</p>
+<p>The <a href="../../ketraterm-render-cache/docs/triple-buffering-concurrency.html">publication contract</a>
+defines leasing and concurrency; the <a href="../../ketraterm-session/docs/session-concurrency-locks.html">session contract</a>
+defines synchronization. <a href="https://github.com/ketraterm/KetraTerm/blob/e3c7f9c626934093d35a67ca97afbbf1b343f28d/ketraterm-testkit/src/consumerTest/README.md">Consumer fixtures</a>
+verify the supported binary boundary. Lease measurements belong to
+<a href="../../ketraterm-benchmarks/README.html">the benchmark suite</a>, not an API performance guarantee.</p>
+</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/e3c7f9c626934093d35a67ca97afbbf1b343f28d/docs/library/render-ownership.md">View source on GitHub ↗</a></div></div></main></div>
+  <footer>
+    <a class="brand" href="../../../../index.html"><img class="brand-mark" src="../../../../assets/logo.svg" alt="" width="34" height="34">KetraTerm Library</a>
+    <p>Open source · Apache 2.0</p>
+    <div><a href="https://github.com/ketraterm/KetraTerm">GitHub ↗</a><a href="https://github.com/ketraterm/KetraTerm/issues">Issues ↗</a><a class="product-switch" href="https://ketraterm.github.io/KetraTerm/">Desktop app ↗</a></div>
+  </footer>
+</body>
+</html>

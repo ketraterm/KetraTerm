@@ -1,0 +1,310 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="description" content="KetraTerm is a desktop terminal for Windows, macOS, and Linux.">
+  <meta name="color-scheme" content="light dark">
+  <title>Settings reference · KetraTerm</title>
+  <link rel="icon" href="assets/logo.svg" type="image/svg+xml">
+  <link rel="preload" href="assets/fonts/manrope-variable.ttf" as="font" type="font/ttf" crossorigin>
+  <link rel="stylesheet" href="assets/styles.css">
+  <script type="importmap">{"imports":{"mermaid":"assets/mermaid/mermaid.esm.min.mjs"}}</script>
+  <script type="module" src="assets/site.js"></script>
+</head>
+<body data-product="app" data-version="v0.3.0 · Stable release">
+  <a class="skip" href="#main">Skip to content</a>
+  <header class="site-header">
+    <div class="site-identity">
+      <a class="brand" href="index.html" aria-label="KetraTerm home"><img class="brand-mark" src="assets/logo.svg" alt="" width="34" height="34">KetraTerm</a>
+      <nav class="product-navigation" aria-label="KetraTerm products"><a href="index.html" aria-current="true">App</a><a href="library/index.html">Library</a></nav>
+    </div>
+    <details class="site-navigation" open><summary>Menu</summary><nav aria-label="App navigation"><a   href="gallery.html">Screenshots</a><a   href="guide.html">Guide</a><a aria-current="page"  href="settings.html">Settings</a><a   href="changelog.html">Changelog</a><a  class="nav-primary" href="download.html">Download</a></nav></details>
+    <button class="theme-toggle" type="button" aria-label="Switch to light theme">Light</button>
+  </header>
+  <div class="docs-shell"><aside class="sidebar" aria-label="Documentation navigation"><details class="nav-disclosure" open><summary class="mobile-nav-toggle">Browse app guides</summary><div><label class="search-label">Find app help<input type="search" data-doc-search placeholder="Search app guides" autocomplete="off" data-index="search.json"></label><div class="search-results" aria-live="polite"></div><details open><summary>Using KetraTerm</summary><a  href="guide.html">App guide</a><a aria-current="page" href="settings.html">Settings reference</a><a  href="changelog.html">App changelog</a></details></div></details></aside><main id="main" tabindex="-1" class="article article-with-outline"><div class="article-top"><nav class="breadcrumb" aria-label="Breadcrumb"><ol><li><a href="index.html">KetraTerm</a></li><li><span aria-current="page">Settings reference</span></li></ol></nav><div class="doc-version"><span>v0.3.0 · Stable release</span></div></div><details class="page-outline" open><summary>On this page</summary><nav aria-label="On this page"><a class="depth-2" href="#configuration-file">Configuration file</a><a class="depth-2" href="#window-font-and-theme">Window, font, and theme</a><a class="depth-2" href="#behavior">Behavior</a><a class="depth-2" href="#shell">Shell</a><a class="depth-2" href="#terminal-permissions">Terminal permissions</a><a class="depth-2" href="#loading-and-saving">Loading and saving</a></nav></details><div class="article-content"><div class="prose"><h1 id="app-settings">App settings</h1>
+<p>This reference covers KetraTerm 0.3.0. Use the settings dialog for live updates;
+direct edits to <code>config.toml</code> take effect on the next app launch. Saving settings
+rewrites the file, including its generated comments.</p>
+<h2 id="configuration-file">Configuration file</h2>
+<p>The first nonblank override wins: the JVM property <code>ketraterm.config.path</code>,
+then the environment variable <code>KetraTerm_CONFIG_PATH</code>. Both name a file.
+Otherwise the app uses:</p>
+<div class="table-scroll"><table>
+<thead>
+<tr>
+<th>Platform</th>
+<th>Default path</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Windows</td>
+<td><code>%APPDATA%\KetraTerm\config.toml</code>; without <code>APPDATA</code>, <code>~\.config\ketraterm\config.toml</code>.</td>
+</tr>
+<tr>
+<td>macOS</td>
+<td><code>~/Library/Application Support/KetraTerm/config.toml</code>.</td>
+</tr>
+<tr>
+<td>Linux and other platforms</td>
+<td><code>$XDG_CONFIG_HOME/ketraterm/config.toml</code>; without <code>XDG_CONFIG_HOME</code>, <code>~/.config/ketraterm/config.toml</code>.</td>
+</tr>
+</tbody></table></div>
+<p>Use section headers and one <code>key = value</code> per physical line. The parser accepts
+a configuration subset of TOML. Use the generated file as the format template.
+For Windows paths, single-quoted strings preserve backslashes.</p>
+<pre><code class="language-toml">[font]
+size = 16
+
+[theme]
+name = &quot;nord&quot;
+
+[shell]
+path = &#39;C:\Program Files\PowerShell\7\pwsh.exe&#39;
+startup_command = &#39;npm run dev&#39;
+</code></pre>
+<h2 id="window-font-and-theme">Window, font, and theme</h2>
+<div class="table-scroll"><table>
+<thead>
+<tr>
+<th>Section</th>
+<th>Key</th>
+<th>Default</th>
+<th>Accepted values</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>window</code></td>
+<td><code>columns</code></td>
+<td><code>100</code></td>
+<td>Integer, 10..1000.</td>
+</tr>
+<tr>
+<td><code>window</code></td>
+<td><code>rows</code></td>
+<td><code>30</code></td>
+<td>Integer, 10..500.</td>
+</tr>
+<tr>
+<td><code>window</code></td>
+<td><code>scrollback_lines</code></td>
+<td><code>1000</code></td>
+<td>Integer, 0..1000000.</td>
+</tr>
+<tr>
+<td><code>font</code></td>
+<td><code>family</code></td>
+<td>Platform default</td>
+<td>Windows: <code>Cascadia Mono</code>; macOS: <code>Menlo</code>; elsewhere: <code>Monospaced</code>.</td>
+</tr>
+<tr>
+<td><code>font</code></td>
+<td><code>size</code></td>
+<td><code>16</code></td>
+<td>Integer points, 10..56.</td>
+</tr>
+<tr>
+<td><code>font</code></td>
+<td><code>line_height</code></td>
+<td><code>1.0</code></td>
+<td>Multiplier, 0.7..1.5.</td>
+</tr>
+<tr>
+<td><code>font</code></td>
+<td><code>use_system_fallback_fonts</code></td>
+<td><code>true</code></td>
+<td>Boolean.</td>
+</tr>
+<tr>
+<td><code>theme</code></td>
+<td><code>name</code></td>
+<td><code>&quot;one-dark&quot;</code></td>
+<td><code>campbell</code>, <code>one-dark</code>, <code>nord</code>, <code>tokyo-night</code>, <code>everforest</code>.</td>
+</tr>
+</tbody></table></div>
+<p>Window dimensions and scrollback capacity apply to new terminals.</p>
+<h2 id="behavior">Behavior</h2>
+<p>These keys belong to <code>[behavior]</code>.</p>
+<div class="table-scroll"><table>
+<thead>
+<tr>
+<th>Key</th>
+<th>Default</th>
+<th>Meaning or accepted values</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>cursor_shape</code></td>
+<td><code>&quot;block&quot;</code></td>
+<td><code>block</code>, <code>underline</code>, or <code>beam</code>.</td>
+</tr>
+<tr>
+<td><code>cursor_blink_millis</code></td>
+<td><code>600</code></td>
+<td>Integer, 0..10000; zero disables blinking.</td>
+</tr>
+<tr>
+<td><code>treat_ambiguous_as_wide</code></td>
+<td><code>false</code></td>
+<td>East Asian Ambiguous characters occupy two cells.</td>
+</tr>
+<tr>
+<td><code>audible_bell</code></td>
+<td><code>true</code></td>
+<td>System beep on BEL.</td>
+</tr>
+<tr>
+<td><code>visual_bell</code></td>
+<td><code>true</code></td>
+<td>Visual pulse on BEL.</td>
+</tr>
+<tr>
+<td><code>paste_on_middle_click</code></td>
+<td><code>true</code></td>
+<td>Middle-button clipboard paste.</td>
+</tr>
+<tr>
+<td><code>paste_sanitization</code></td>
+<td><code>&quot;raw&quot;</code></td>
+<td><code>raw</code>, <code>strip-c0</code>, or <code>normalize-line-endings</code>.</td>
+</tr>
+<tr>
+<td><code>shell_request_resize_window</code></td>
+<td><code>false</code></td>
+<td>Permit terminal-requested window resizing.</td>
+</tr>
+<tr>
+<td><code>shell_request_window_manipulation</code></td>
+<td><code>false</code></td>
+<td>Permit move, minimize, maximize, raise, and lower requests.</td>
+</tr>
+<tr>
+<td><code>desktop_notifications_enabled</code></td>
+<td><code>true</code></td>
+<td>Permit desktop notifications.</td>
+</tr>
+<tr>
+<td><code>smart_suggestions_enabled</code></td>
+<td><code>false</code></td>
+<td>Enable completion and learning.</td>
+</tr>
+<tr>
+<td><code>shell_suggestions_enabled</code></td>
+<td><code>true</code></td>
+<td>Show automatic suggestions when completion is enabled.</td>
+</tr>
+<tr>
+<td><code>accept_selected_suggestion_with_enter</code></td>
+<td><code>true</code></td>
+<td>Enter accepts a selected suggestion.</td>
+</tr>
+<tr>
+<td><code>suggestion_learning_persistence_enabled</code></td>
+<td><code>false</code></td>
+<td>Persist completion-learning data when completion is enabled.</td>
+</tr>
+<tr>
+<td><code>scroll_on_output</code></td>
+<td><code>true</code></td>
+<td>Follow new process output.</td>
+</tr>
+<tr>
+<td><code>show_foreground_process_name</code></td>
+<td><code>true</code></td>
+<td>Use detected process names as automatic tab-title fallbacks.</td>
+</tr>
+</tbody></table></div>
+<p>Completion and persistence switches are available through the file; the 0.3.0
+settings dialog hides those controls. Persisted command data can contain
+sensitive text.</p>
+<h2 id="shell">Shell</h2>
+<p>These keys belong to <code>[shell]</code>.</p>
+<div class="table-scroll"><table>
+<thead>
+<tr>
+<th>Key</th>
+<th>Default</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>path</code></td>
+<td>Platform shell</td>
+<td>Executable path or name. Windows: <code>powershell.exe</code>; elsewhere: <code>$SHELL</code>, falling back to <code>/bin/bash</code>.</td>
+</tr>
+<tr>
+<td><code>start_directory</code></td>
+<td>User home</td>
+<td>Working directory for new terminals.</td>
+</tr>
+<tr>
+<td><code>startup_command</code></td>
+<td><code>&quot;&quot;</code></td>
+<td>One command line submitted after the first complete interactive prompt; blank disables it.</td>
+</tr>
+</tbody></table></div>
+<p>Startup commands require a directly configured interactive PowerShell, Bash,
+zsh, or fish shell with hooks enabled. WSL launchers, unsupported shells, and
+explicit command/script launches cannot use them. Input before submission
+cancels the pending command. The command must fit on one line, contain no
+control characters, and be at most 16384 UTF-16 code units.</p>
+<h2 id="terminal-permissions">Terminal permissions</h2>
+<p>These keys belong to <code>[security]</code>. In 0.3.0, local/remote classification depends
+on the launched executable; an SSH command typed inside a local shell retains
+the local session&#39;s permissions.</p>
+<div class="table-scroll"><table>
+<thead>
+<tr>
+<th>Key</th>
+<th>Default</th>
+<th>Accepted values</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>clipboard_local_write</code></td>
+<td><code>&quot;prompt&quot;</code></td>
+<td><code>allow</code>, <code>prompt</code>, <code>allowlist</code>, <code>deny</code>.</td>
+</tr>
+<tr>
+<td><code>clipboard_remote_write</code></td>
+<td><code>&quot;deny&quot;</code></td>
+<td><code>allow</code>, <code>prompt</code>, <code>allowlist</code>, <code>deny</code>.</td>
+</tr>
+<tr>
+<td><code>clipboard_read</code></td>
+<td><code>&quot;deny&quot;</code></td>
+<td><code>allow</code>, <code>prompt</code>, <code>allowlist</code>, <code>deny</code>.</td>
+</tr>
+<tr>
+<td><code>clipboard_max_decoded_bytes</code></td>
+<td><code>1048576</code></td>
+<td>Integer, 0..2147483647; decoded payload limit.</td>
+</tr>
+<tr>
+<td><code>title_local_permission</code></td>
+<td><code>&quot;allow&quot;</code></td>
+<td><code>allow</code>, <code>deny</code>.</td>
+</tr>
+<tr>
+<td><code>title_remote_permission</code></td>
+<td><code>&quot;deny&quot;</code></td>
+<td><code>allow</code>, <code>deny</code>.</td>
+</tr>
+</tbody></table></div>
+<p>These permissions govern terminal requests separately from explicit user copy
+and paste actions. The app does not configure a clipboard allowlist, so
+<code>allowlist</code> denies requests.</p>
+<h2 id="loading-and-saving">Loading and saving</h2>
+<p>A missing file is created with defaults. Numeric settings are clamped to their
+bounds; malformed values generally use the field default. A configuration load
+failure attempts to preserve the old file as <code>&lt;filename&gt;.broken</code> and write a
+default configuration. Settings saves use atomic replacement; a failed save
+keeps the active settings unchanged.</p>
+</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/e3c7f9c626934093d35a67ca97afbbf1b343f28d/website/released-app/v0.3.0/settings.md">View source on GitHub ↗</a></div></div></main></div>
+  <footer>
+    <a class="brand" href="index.html"><img class="brand-mark" src="assets/logo.svg" alt="" width="34" height="34">KetraTerm</a>
+    <p>Open source · Apache 2.0</p>
+    <div><a href="https://github.com/ketraterm/KetraTerm">GitHub ↗</a><a href="https://github.com/ketraterm/KetraTerm/issues">Issues ↗</a><a class="product-switch" href="library/index.html">For developers ↗</a></div>
+  </footer>
+</body>
+</html>

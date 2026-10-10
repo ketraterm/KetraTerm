@@ -1,0 +1,269 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="description" content="A modular Kotlin/JVM terminal emulator library for Swing and headless applications.">
+  <meta name="color-scheme" content="light dark">
+  <title>Keyboard Input Protocol Vocabulary · KetraTerm Library</title>
+  <link rel="icon" href="../../../../assets/logo.svg" type="image/svg+xml">
+  <link rel="preload" href="../../../../assets/fonts/manrope-variable.ttf" as="font" type="font/ttf" crossorigin>
+  <link rel="stylesheet" href="../../../../assets/styles.css">
+  <script type="importmap">{"imports":{"mermaid":"../../../../assets/mermaid/mermaid.esm.min.mjs"}}</script>
+  <script type="module" src="../../../../assets/site.js"></script>
+</head>
+<body data-product="library" data-version="Development">
+  <a class="skip" href="#main">Skip to content</a>
+  <header class="site-header">
+    <div class="site-identity">
+      <a class="brand" href="../../../../index.html" aria-label="KetraTerm Library home"><img class="brand-mark" src="../../../../assets/logo.svg" alt="" width="34" height="34">KetraTerm</a>
+      <nav class="product-navigation" aria-label="KetraTerm products"><a href="https://ketraterm.github.io/KetraTerm/">App</a><a href="../../../../index.html" aria-current="true">Library</a></nav>
+    </div>
+    <details class="site-navigation" open><summary>Menu</summary><nav aria-label="Library navigation"><a   href="../../docs/README.html">Guides</a><a aria-current="true"  href="../../modules.html">Modules</a><a   href="../../../../versions.html">API & versions</a><a   href="../../CHANGELOG.html">Changelog</a><a  class="nav-primary" href="../../README.html">Get started</a></nav></details>
+    <button class="theme-toggle" type="button" aria-label="Switch to light theme">Light</button>
+  </header>
+  <div class="docs-shell"><aside class="sidebar" aria-label="Documentation navigation"><details class="nav-disclosure" open><summary class="mobile-nav-toggle">Browse library guides</summary><div><label class="search-label">Find a library guide<input type="search" data-doc-search placeholder="Search library docs" autocomplete="off" data-index="../../search.json"></label><div class="search-results" aria-live="polite"></div><details open><summary>Start here</summary><a  href="../../docs/README.html">Documentation</a><a  href="../../README.html">Installation</a><a  href="../../modules.html">Module guides</a><a  href="../../CHANGELOG.html">Changelog</a></details><details open><summary>Capabilities</summary><a  href="../../docs/terminal-feature-map.html">Feature map</a><a  href="../../docs/features/terminal.html">Terminal</a><a  href="../../docs/features/shells.html">Shell integration</a><a  href="../../docs/features/desktop.html">Swing view & hosts</a><a  href="../../docs/features/completion.html">Completion</a><a  href="../../docs/features/embedding.html">Embedding</a><a  href="../../docs/terminal-feature-gap-map.html">Known limits</a></details><details open><summary>Embedding guides</summary><a  href="../../docs/library/configuration.html">Configuration</a><a  href="../../docs/library/compatibility.html">Compatibility</a><a  href="../../docs/library/render-ownership.html">Render ownership</a></details><details open><summary>Reference</summary><a  href="../../docs/reference/protocol.html">Protocols</a><a  href="../../docs/reference/notifications.html">Notifications</a><a  href="../../docs/reference/storage.html">Storage & privacy</a></details><details open><summary>Development</summary><a  href="../../ARCHITECTURE.html">Architecture</a><a  href="../../CONTRIBUTING.html">Contributing</a><a  href="../../docs/development/conformance-testing.html">Conformance testing</a></details></div></details></aside><main id="main" tabindex="-1" class="article article-with-outline"><div class="article-top"><nav class="breadcrumb" aria-label="Breadcrumb"><ol><li><a href="../../../../index.html">Library</a></li><li><a href="../../modules.html">Modules</a></li><li><a href="../README.html">ketraterm-protocol</a></li><li><span aria-current="page">Keyboard Input Protocol Vocabulary</span></li></ol></nav><div class="doc-version"><span>Development</span><a href="../../../../versions.html">All versions</a></div></div><details class="page-outline" open><summary>On this page</summary><nav aria-label="On this page"><a class="depth-2" href="#1-xterm-modifyotherkeys-mode">1. xterm modifyOtherKeys Mode</a><a class="depth-2" href="#2-xterm-formatotherkeys-mode">2. xterm formatOtherKeys Mode</a><a class="depth-3" href="#xterm-key-resources">Xterm Key Resources</a><a class="depth-2" href="#3-kitty-keyboard-progressive-enhancement-flags">3. Kitty Keyboard Progressive Enhancement Flags</a><a class="depth-2" href="#4-kitty-keyboard-event-types">4. Kitty Keyboard Event Types</a><a class="depth-2" href="#5-kitty-keyboard-functional-key-codes">5. Kitty Keyboard Functional Key Codes</a></nav></details><div class="article-content"><div class="prose"><h1 id="keyboard-input-protocol-vocabulary">Keyboard Input Protocol Vocabulary</h1>
+<p>Shared constants in <code>io.github.ketraterm.protocol.keyboard</code>. Parser recognizes
+controls, core stores negotiated state, and input chooses reports. This guide
+covers values and representations; the
+<a href="../../ketraterm-input/docs/terminal-input-contract.html#keyboard-contract">input contract</a>
+owns encoding behavior.</p>
+<h2 id="1-xterm-modifyotherkeys-mode">1. xterm <code>modifyOtherKeys</code> Mode</h2>
+<p><code>ModifyOtherKeysMode</code> defines the levels for ordinary keys:</p>
+<div class="table-scroll"><table>
+<thead>
+<tr>
+<th align="left">Constant</th>
+<th align="left">Value</th>
+<th align="left">Meaning</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="left"><code>DISABLED</code></td>
+<td align="left"><code>0</code></td>
+<td align="left">Use legacy ordinary-key encoding.</td>
+</tr>
+<tr>
+<td align="left"><code>MODE_1</code></td>
+<td align="left"><code>1</code></td>
+<td align="left">Encode modified keys with an ambiguous or missing legacy representation.</td>
+</tr>
+<tr>
+<td align="left"><code>MODE_2</code></td>
+<td align="left"><code>2</code></td>
+<td align="left">Encode modified ordinary and control-equivalent keys.</td>
+</tr>
+<tr>
+<td align="left"><code>MODE_3</code></td>
+<td align="left"><code>3</code></td>
+<td align="left">Encode ordinary keys even without modifiers.</td>
+</tr>
+</tbody></table></div>
+<p>Explicit resource disable is represented separately as <code>-1</code>; it is not another
+<code>ModifyOtherKeysMode</code> constant.</p>
+<h2 id="2-xterm-formatotherkeys-mode">2. xterm <code>formatOtherKeys</code> Mode</h2>
+<p><code>FormatOtherKeysMode</code> selects the report shape, independently of whether
+<code>modifyOtherKeys</code> is enabled:</p>
+<div class="table-scroll"><table>
+<thead>
+<tr>
+<th align="left">Constant</th>
+<th align="left">Value</th>
+<th align="left">Report</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="left"><code>DEFAULT</code></td>
+<td align="left"><code>0</code></td>
+<td align="left"><code>CSI 27 ; modifier ; codepoint ~</code></td>
+</tr>
+<tr>
+<td align="left"><code>CSI_U</code></td>
+<td align="left"><code>1</code></td>
+<td align="left"><code>CSI codepoint ; modifier u</code></td>
+</tr>
+</tbody></table></div>
+<p>An xterm CSI-u report does not imply Kitty keyboard negotiation or Kitty key
+identities.</p>
+<h3 id="xterm-key-resources">Xterm Key Resources</h3>
+<p>Modifier and format controls share <code>XtermKeyResource</code> IDs:</p>
+<div class="table-scroll"><table>
+<thead>
+<tr>
+<th align="left">Constant</th>
+<th align="left">ID</th>
+<th align="left">Key family</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="left"><code>KEYBOARD</code></td>
+<td align="left"><code>0</code></td>
+<td align="left">Legacy/VT220 modifier admission mask.</td>
+</tr>
+<tr>
+<td align="left"><code>CURSOR_KEYS</code></td>
+<td align="left"><code>1</code></td>
+<td align="left">Cursor and editing keypad keys.</td>
+</tr>
+<tr>
+<td align="left"><code>FUNCTION_KEYS</code></td>
+<td align="left"><code>2</code></td>
+<td align="left">Numbered and miscellaneous function keys.</td>
+</tr>
+<tr>
+<td align="left"><code>KEYPAD_KEYS</code></td>
+<td align="left"><code>3</code></td>
+<td align="left">Numeric keypad.</td>
+</tr>
+<tr>
+<td align="left"><code>OTHER_KEYS</code></td>
+<td align="left"><code>4</code></td>
+<td align="left">Ordinary keys.</td>
+</tr>
+<tr>
+<td align="left"><code>MODIFIER_KEYS</code></td>
+<td align="left"><code>6</code></td>
+<td align="left">Physical modifier keys.</td>
+</tr>
+<tr>
+<td align="left"><code>SPECIAL_KEYS</code></td>
+<td align="left"><code>7</code></td>
+<td align="left">Remaining predefined keys.</td>
+</tr>
+</tbody></table></div>
+<p>ID <code>5</code> is reserved for string actions and excluded by <code>isSupported</code>. Validation
+helpers accept modifier values <code>-1..15</code> for ID <code>0</code>, <code>-1..3</code> for ID <code>4</code>, and
+<code>-1..4</code> for other supported IDs. Format validation accepts only <code>0</code> or <code>1</code> for a
+supported ID. A semantic validation helper accepting <code>-1</code> does not make it a
+valid numeric parameter for every wire command.</p>
+<p>See <a href="../../ketraterm-input/docs/terminal-input-contract.html#xterm-key-resources">xterm key resources</a>
+for defaults, set/reset/disable/query syntax, and per-family encoding rules.</p>
+<h2 id="3-kitty-keyboard-progressive-enhancement-flags">3. Kitty Keyboard Progressive Enhancement Flags</h2>
+<p><code>KittyKeyboardProgressiveFlag</code> uses these independent bits:</p>
+<div class="table-scroll"><table>
+<thead>
+<tr>
+<th align="left">Constant</th>
+<th align="left">Value</th>
+<th align="left">Meaning</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="left"><code>DISAMBIGUATE_ESCAPE_CODES</code></td>
+<td align="left"><code>1</code></td>
+<td align="left">Distinguish legacy escape-code collisions.</td>
+</tr>
+<tr>
+<td align="left"><code>REPORT_EVENT_TYPES</code></td>
+<td align="left"><code>2</code></td>
+<td align="left">Include press, repeat, or release metadata.</td>
+</tr>
+<tr>
+<td align="left"><code>REPORT_ALTERNATE_KEYS</code></td>
+<td align="left"><code>4</code></td>
+<td align="left">Include alternate key values for shortcut matching.</td>
+</tr>
+<tr>
+<td align="left"><code>REPORT_ALL_KEYS_AS_ESCAPE_CODES</code></td>
+<td align="left"><code>8</code></td>
+<td align="left">Report text-producing keys as escape sequences.</td>
+</tr>
+<tr>
+<td align="left"><code>REPORT_ASSOCIATED_TEXT</code></td>
+<td align="left"><code>16</code></td>
+<td align="left">Include associated text as a codepoint list.</td>
+</tr>
+</tbody></table></div>
+<p><code>ENCODER_SUPPORTED_MASK</code> is <code>31</code>; <code>DEFAULT_HOST_SUPPORTED_MASK</code> is <code>9</code> (bits <code>1</code>
+and <code>8</code>). The encoder mask describes encoding capability, while the host mask
+limits negotiated flags to metadata the integration can provide. A per-session
+host mask must be a subset of the encoder mask and must reflect the adapter&#39;s
+actual event information.</p>
+<p><code>KittyKeyboardFlagApplicationMode</code> defines the optional second parameter of
+<code>CSI = flags ; mode u</code>: <code>REPLACE = 1</code>, <code>SET = 2</code>, and <code>CLEAR = 3</code>. These operation
+values are separate from the flag bits.</p>
+<h2 id="4-kitty-keyboard-event-types">4. Kitty Keyboard Event Types</h2>
+<p><code>KittyKeyboardEventType</code> uses the event-type subparameter of the second CSI-u
+field:</p>
+<div class="table-scroll"><table>
+<thead>
+<tr>
+<th align="left">Constant</th>
+<th align="left">Value</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="left"><code>PRESS</code></td>
+<td align="left"><code>1</code></td>
+</tr>
+<tr>
+<td align="left"><code>REPEAT</code></td>
+<td align="left"><code>2</code></td>
+</tr>
+<tr>
+<td align="left"><code>RELEASE</code></td>
+<td align="left"><code>3</code></td>
+</tr>
+</tbody></table></div>
+<p>Press is the protocol default when that subparameter is absent. Admission of
+repeat/release reports depends on the active flags and encoder event contract.</p>
+<h2 id="5-kitty-keyboard-functional-key-codes">5. Kitty Keyboard Functional Key Codes</h2>
+<p>Printable keys use Unicode scalar values. Functional keys use protocol-defined
+codes, including control-equivalent values and private-use values; they do not
+start at a single generic offset.</p>
+<p><code>KittyKeyboardFunctionalKeyCode</code> includes:</p>
+<div class="table-scroll"><table>
+<thead>
+<tr>
+<th align="left">Constants</th>
+<th align="left">Values</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="left"><code>TAB</code>, <code>ENTER</code>, <code>ESCAPE</code>, <code>BACKSPACE</code></td>
+<td align="left"><code>9</code>, <code>13</code>, <code>27</code>, <code>127</code></td>
+</tr>
+<tr>
+<td align="left"><code>F13</code>, <code>F35</code></td>
+<td align="left"><code>57376</code>, <code>57398</code> (contiguous range endpoints)</td>
+</tr>
+<tr>
+<td align="left"><code>CAPS_LOCK</code></td>
+<td align="left"><code>57358</code> (first lock/system-key code)</td>
+</tr>
+<tr>
+<td align="left"><code>KP_0</code> through <code>KP_9</code></td>
+<td align="left"><code>57399..57408</code></td>
+</tr>
+<tr>
+<td align="left"><code>KP_DECIMAL</code> through <code>KP_SEPARATOR</code></td>
+<td align="left"><code>57409..57416</code></td>
+</tr>
+<tr>
+<td align="left"><code>KP_LEFT</code></td>
+<td align="left"><code>57417</code> (first keypad-navigation code)</td>
+</tr>
+<tr>
+<td align="left"><code>KP_BEGIN</code></td>
+<td align="left"><code>57427</code></td>
+</tr>
+<tr>
+<td align="left"><code>MEDIA_PLAY</code></td>
+<td align="left"><code>57428</code> (first media/volume code)</td>
+</tr>
+<tr>
+<td align="left"><code>LEFT_SHIFT</code></td>
+<td align="left"><code>57441</code> (first physical modifier-key code)</td>
+</tr>
+</tbody></table></div>
+<p>The constants establish wire identities. Input&#39;s normalized key vocabulary and
+the host adapter determine which events can be supplied; do not infer adapter
+coverage from the presence of a code.</p>
+</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/e3c7f9c626934093d35a67ca97afbbf1b343f28d/ketraterm-protocol/docs/input-protocols.md">View source on GitHub ↗</a></div></div></main></div>
+  <footer>
+    <a class="brand" href="../../../../index.html"><img class="brand-mark" src="../../../../assets/logo.svg" alt="" width="34" height="34">KetraTerm Library</a>
+    <p>Open source · Apache 2.0</p>
+    <div><a href="https://github.com/ketraterm/KetraTerm">GitHub ↗</a><a href="https://github.com/ketraterm/KetraTerm/issues">Issues ↗</a><a class="product-switch" href="https://ketraterm.github.io/KetraTerm/">Desktop app ↗</a></div>
+  </footer>
+</body>
+</html>

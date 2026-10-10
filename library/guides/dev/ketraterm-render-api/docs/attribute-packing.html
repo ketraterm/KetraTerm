@@ -1,0 +1,262 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="description" content="A modular Kotlin/JVM terminal emulator library for Swing and headless applications.">
+  <meta name="color-scheme" content="light dark">
+  <title>Stable Public Render Attribute Packing · KetraTerm Library</title>
+  <link rel="icon" href="../../../../assets/logo.svg" type="image/svg+xml">
+  <link rel="preload" href="../../../../assets/fonts/manrope-variable.ttf" as="font" type="font/ttf" crossorigin>
+  <link rel="stylesheet" href="../../../../assets/styles.css">
+  <script type="importmap">{"imports":{"mermaid":"../../../../assets/mermaid/mermaid.esm.min.mjs"}}</script>
+  <script type="module" src="../../../../assets/site.js"></script>
+</head>
+<body data-product="library" data-version="Development">
+  <a class="skip" href="#main">Skip to content</a>
+  <header class="site-header">
+    <div class="site-identity">
+      <a class="brand" href="../../../../index.html" aria-label="KetraTerm Library home"><img class="brand-mark" src="../../../../assets/logo.svg" alt="" width="34" height="34">KetraTerm</a>
+      <nav class="product-navigation" aria-label="KetraTerm products"><a href="https://ketraterm.github.io/KetraTerm/">App</a><a href="../../../../index.html" aria-current="true">Library</a></nav>
+    </div>
+    <details class="site-navigation" open><summary>Menu</summary><nav aria-label="Library navigation"><a   href="../../docs/README.html">Guides</a><a aria-current="true"  href="../../modules.html">Modules</a><a   href="../../../../versions.html">API & versions</a><a   href="../../CHANGELOG.html">Changelog</a><a  class="nav-primary" href="../../README.html">Get started</a></nav></details>
+    <button class="theme-toggle" type="button" aria-label="Switch to light theme">Light</button>
+  </header>
+  <div class="docs-shell"><aside class="sidebar" aria-label="Documentation navigation"><details class="nav-disclosure" open><summary class="mobile-nav-toggle">Browse library guides</summary><div><label class="search-label">Find a library guide<input type="search" data-doc-search placeholder="Search library docs" autocomplete="off" data-index="../../search.json"></label><div class="search-results" aria-live="polite"></div><details open><summary>Start here</summary><a  href="../../docs/README.html">Documentation</a><a  href="../../README.html">Installation</a><a  href="../../modules.html">Module guides</a><a  href="../../CHANGELOG.html">Changelog</a></details><details open><summary>Capabilities</summary><a  href="../../docs/terminal-feature-map.html">Feature map</a><a  href="../../docs/features/terminal.html">Terminal</a><a  href="../../docs/features/shells.html">Shell integration</a><a  href="../../docs/features/desktop.html">Swing view & hosts</a><a  href="../../docs/features/completion.html">Completion</a><a  href="../../docs/features/embedding.html">Embedding</a><a  href="../../docs/terminal-feature-gap-map.html">Known limits</a></details><details open><summary>Embedding guides</summary><a  href="../../docs/library/configuration.html">Configuration</a><a  href="../../docs/library/compatibility.html">Compatibility</a><a  href="../../docs/library/render-ownership.html">Render ownership</a></details><details open><summary>Reference</summary><a  href="../../docs/reference/protocol.html">Protocols</a><a  href="../../docs/reference/notifications.html">Notifications</a><a  href="../../docs/reference/storage.html">Storage & privacy</a></details><details open><summary>Development</summary><a  href="../../ARCHITECTURE.html">Architecture</a><a  href="../../CONTRIBUTING.html">Contributing</a><a  href="../../docs/development/conformance-testing.html">Conformance testing</a></details></div></details></aside><main id="main" tabindex="-1" class="article article-with-outline"><div class="article-top"><nav class="breadcrumb" aria-label="Breadcrumb"><ol><li><a href="../../../../index.html">Library</a></li><li><a href="../../modules.html">Modules</a></li><li><a href="../README.html">ketraterm-render-api</a></li><li><span aria-current="page">Stable Public Render Attribute Packing</span></li></ol></nav><div class="doc-version"><span>Development</span><a href="../../../../versions.html">All versions</a></div></div><details class="page-outline" open><summary>On this page</summary><nav aria-label="On this page"><a class="depth-2" href="#1-primary-attribute-word-terminalrenderattrs">1. Primary Attribute Word (TerminalRenderAttrs)</a><a class="depth-3" href="#bit-layout-mapping">Bit Layout Mapping</a><a class="depth-3" href="#color-encoding-rules">Color Encoding Rules</a><a class="depth-3" href="#underline-styles-3-bits">Underline Styles (3 bits)</a><a class="depth-2" href="#2-extra-attribute-word-terminalrenderextraattrs">2. Extra Attribute Word (TerminalRenderExtraAttrs)</a><a class="depth-3" href="#bit-layout-mapping-1">Bit Layout Mapping</a><a class="depth-2" href="#3-usage--access">3. Usage &amp; Access</a><a class="depth-2" href="#cell-flags">Cell flags</a></nav></details><div class="article-content"><div class="prose"><h1 id="stable-public-render-attribute-packing">Stable Public Render Attribute Packing</h1>
+<p>Render attributes use primitive <code>Long</code> words. This public encoding is independent
+of core&#39;s private storage layout. Consumers should use <code>TerminalRenderAttrs</code> and
+<code>TerminalRenderExtraAttrs</code> helpers rather than copy bit arithmetic into renderers.</p>
+<h2 id="1-primary-attribute-word-terminalrenderattrs">1. Primary Attribute Word (<code>TerminalRenderAttrs</code>)</h2>
+<h3 id="bit-layout-mapping">Bit Layout Mapping</h3>
+<div class="table-scroll"><table>
+<thead>
+<tr>
+<th>Bits</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>0..1</td>
+<td>Foreground color kind</td>
+</tr>
+<tr>
+<td>2..25</td>
+<td>Foreground color value</td>
+</tr>
+<tr>
+<td>26..27</td>
+<td>Background color kind</td>
+</tr>
+<tr>
+<td>28..51</td>
+<td>Background color value</td>
+</tr>
+<tr>
+<td>52</td>
+<td>Bold</td>
+</tr>
+<tr>
+<td>53</td>
+<td>Faint</td>
+</tr>
+<tr>
+<td>54</td>
+<td>Italic</td>
+</tr>
+<tr>
+<td>55..57</td>
+<td>Underline style</td>
+</tr>
+<tr>
+<td>58</td>
+<td>Blink</td>
+</tr>
+<tr>
+<td>59</td>
+<td>Inverse video</td>
+</tr>
+<tr>
+<td>60</td>
+<td>Invisible text</td>
+</tr>
+<tr>
+<td>61</td>
+<td>Strikethrough</td>
+</tr>
+<tr>
+<td>62..63</td>
+<td>Reserved; currently zero</td>
+</tr>
+</tbody></table></div>
+<p><code>TerminalRenderAttrs.DEFAULT</code> is zero: default colors and no styles.</p>
+<h3 id="color-encoding-rules">Color Encoding Rules</h3>
+<div class="table-scroll"><table>
+<thead>
+<tr>
+<th><code>TerminalRenderColorKind</code></th>
+<th>Kind value</th>
+<th>Valid color value</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>DEFAULT</code></td>
+<td>0</td>
+<td>Exactly 0</td>
+</tr>
+<tr>
+<td><code>INDEXED</code></td>
+<td>1</td>
+<td><code>0..255</code></td>
+</tr>
+<tr>
+<td><code>RGB</code></td>
+<td>2</td>
+<td><code>0..0xFFFFFF</code>, encoded as <code>0xRRGGBB</code></td>
+</tr>
+</tbody></table></div>
+<p>Kind 3 is not defined. Pack helpers reject unsupported kinds and out-of-range
+values with <code>IllegalArgumentException</code>. Decoder helpers extract fields without
+validating an arbitrary input word; use pack helpers when constructing words.</p>
+<h3 id="underline-styles-3-bits">Underline Styles (3 bits)</h3>
+<div class="table-scroll"><table>
+<thead>
+<tr>
+<th><code>TerminalRenderUnderline</code></th>
+<th>Value</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>NONE</code></td>
+<td>0</td>
+</tr>
+<tr>
+<td><code>SINGLE</code></td>
+<td>1</td>
+</tr>
+<tr>
+<td><code>DOUBLE</code></td>
+<td>2</td>
+</tr>
+<tr>
+<td><code>CURLY</code></td>
+<td>3</td>
+</tr>
+<tr>
+<td><code>DOTTED</code></td>
+<td>4</td>
+</tr>
+<tr>
+<td><code>DASHED</code></td>
+<td>5</td>
+</tr>
+</tbody></table></div>
+<p><code>TerminalRenderAttrs.pack</code> rejects other underline-style values.</p>
+<h2 id="2-extra-attribute-word-terminalrenderextraattrs">2. Extra Attribute Word (<code>TerminalRenderExtraAttrs</code>)</h2>
+<h3 id="bit-layout-mapping-1">Bit Layout Mapping</h3>
+<div class="table-scroll"><table>
+<thead>
+<tr>
+<th>Bits</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>0..1</td>
+<td>Underline color kind</td>
+</tr>
+<tr>
+<td>2..25</td>
+<td>Underline color value</td>
+</tr>
+<tr>
+<td>26</td>
+<td>Overline</td>
+</tr>
+<tr>
+<td>27..63</td>
+<td>Reserved; currently zero</td>
+</tr>
+</tbody></table></div>
+<p><code>TerminalRenderExtraAttrs.DEFAULT</code> is zero. Underline colors use the same kinds
+and validation as primary colors. Consumers that do not need this channel can
+omit <code>extraAttrWords</code> in <code>copyLine</code>.</p>
+<h2 id="3-usage--access">3. Usage &amp; Access</h2>
+<p>Construct an attribute word and resolve its foreground color:</p>
+<pre><code class="language-kotlin">import io.github.ketraterm.render.api.TerminalColorPalette
+import io.github.ketraterm.render.api.TerminalRenderAttrs
+import io.github.ketraterm.render.api.TerminalRenderColorKind
+import io.github.ketraterm.render.api.TerminalRenderUnderline
+
+fun main() {
+    val word = TerminalRenderAttrs.pack(
+        foregroundKind = TerminalRenderColorKind.INDEXED,
+        foregroundValue = 2,
+        bold = true,
+        underlineStyle = TerminalRenderUnderline.SINGLE,
+    )
+    val palette = TerminalColorPalette()
+    check(TerminalRenderAttrs.isBold(word))
+    check(palette.foreground(word) == palette.indexedColor(10))
+}
+</code></pre>
+<p><code>TerminalColorPalette.foreground</code> and <code>background</code> resolve default, indexed, and
+RGB colors to ARGB. They apply inverse and invisible attributes. With
+<code>boldAsBright</code>, bold indexed foregrounds <code>0..7</code> resolve through entries <code>8..15</code>.
+Faint does not change the resolved palette color; renderers decide how to present
+that style. Underline, overline, and blink presentation also belong to renderers.</p>
+<p>A palette requires exactly 256 indexed colors, defensively copies the supplied
+array, and offers caller-owned copies through <code>copyIndexedColorsInto</code> or
+<code>toIndexedColorsArray</code>. Its <code>isDark</code> preference is host-declared, independent of
+individual color values.</p>
+<h2 id="cell-flags">Cell flags</h2>
+<p><code>TerminalRenderCellFlags</code> is a separate <code>Int</code> bit set. The valid combinations are:</p>
+<div class="table-scroll"><table>
+<thead>
+<tr>
+<th>Combination</th>
+<th>Interpretation</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>EMPTY</code></td>
+<td>No glyph; still has cell attributes.</td>
+</tr>
+<tr>
+<td><code>EMPTY or WRAP_PADDING</code></td>
+<td>Artificial final-column blank before a wide glyph wraps.</td>
+</tr>
+<tr>
+<td><code>CODEPOINT</code></td>
+<td><code>codeWords</code> holds a Unicode scalar value.</td>
+</tr>
+<tr>
+<td><code>CODEPOINT or WIDE_LEADING</code></td>
+<td>Scalar glyph occupies this and the next column.</td>
+</tr>
+<tr>
+<td><code>CLUSTER</code></td>
+<td>Grapheme delivered through a cluster sink.</td>
+</tr>
+<tr>
+<td><code>CLUSTER or WIDE_LEADING</code></td>
+<td>Cluster occupies this and the next column.</td>
+</tr>
+<tr>
+<td><code>WIDE_TRAILING</code></td>
+<td>Continuation column; do not draw another glyph.</td>
+</tr>
+</tbody></table></div>
+<p><code>isValidCombination</code> validates the bit combination, not its position in a row.
+<code>WRAP_PADDING</code> is valid only at the last column of a row whose <code>lineWrapped</code> is
+true. Logical text extraction omits that padding when joining wrapped rows;
+painting and rectangular selection preserve its physical geometry.</p>
+<p>The bit values are <code>EMPTY=1</code>, <code>CODEPOINT=2</code>, <code>CLUSTER=4</code>, <code>WIDE_LEADING=8</code>,
+<code>WIDE_TRAILING=16</code>, and <code>WRAP_PADDING=32</code>. Prefer the named constants.</p>
+</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/e3c7f9c626934093d35a67ca97afbbf1b343f28d/ketraterm-render-api/docs/attribute-packing.md">View source on GitHub ↗</a></div></div></main></div>
+  <footer>
+    <a class="brand" href="../../../../index.html"><img class="brand-mark" src="../../../../assets/logo.svg" alt="" width="34" height="34">KetraTerm Library</a>
+    <p>Open source · Apache 2.0</p>
+    <div><a href="https://github.com/ketraterm/KetraTerm">GitHub ↗</a><a href="https://github.com/ketraterm/KetraTerm/issues">Issues ↗</a><a class="product-switch" href="https://ketraterm.github.io/KetraTerm/">Desktop app ↗</a></div>
+  </footer>
+</body>
+</html>

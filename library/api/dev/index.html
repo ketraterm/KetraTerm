@@ -1,0 +1,306 @@
+<!DOCTYPE html>
+<html class="no-js" lang="en">
+<head>
+    <meta name="viewport" content="width=device-width, initial-scale=1" charset="UTF-8">
+    <title>All modules</title>
+    <link href="images/logo-icon.svg" rel="icon" type="image/svg">
+        <script>var pathToRoot = "";</script>
+    <script>document.documentElement.classList.replace("no-js", "js");</script>
+    <script>const storage = localStorage.getItem("dokka-dark-mode")
+      if (storage == null) {
+        const osDarkSchemePreferred = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches
+        if (osDarkSchemePreferred === true) {
+          document.getElementsByTagName("html")[0].classList.add("theme-dark")
+        }
+      } else {
+        const savedDarkMode = JSON.parse(storage)
+        if (savedDarkMode === true) {
+          document.getElementsByTagName("html")[0].classList.add("theme-dark")
+        }
+      }
+    </script>
+<script type="text/javascript" src="scripts/sourceset_dependencies.js" async="async"></script>
+<link href="styles/style.css" rel="Stylesheet">
+<link href="styles/main.css" rel="Stylesheet">
+<link href="styles/prism.css" rel="Stylesheet">
+<link href="styles/logo-styles.css" rel="Stylesheet">
+<link href="ui-kit/ui-kit.min.css" rel="Stylesheet">
+<script type="text/javascript" src="scripts/safe-local-storage_blocking.js"></script>
+<script type="text/javascript" src="scripts/navigation-loader.js" async="async"></script>
+<script type="text/javascript" src="scripts/platform-content-handler.js" async="async"></script>
+<script type="text/javascript" src="scripts/main.js" defer="defer"></script>
+<script type="text/javascript" src="scripts/prism.js" async="async"></script>
+<script type="text/javascript" src="ui-kit/ui-kit.min.js" defer="defer"></script>
+<!-- ketraterm-api-stylesheet:start -->
+<link rel="icon" href="../../assets/logo.svg" type="image/svg+xml">
+<link rel="stylesheet" href="../../assets/api-navigation.css">
+<!-- ketraterm-api-stylesheet:end --></head>
+<body>
+<div class="root"><!-- ketraterm-api-navigation:start -->
+<div class="ketraterm-api-navigation">
+  <a class="ketraterm-api-brand" href="../../index.html" aria-label="KetraTerm Library home"><img src="../../assets/logo.svg" alt="" width="28" height="28">KetraTerm</a>
+  <nav class="ketraterm-api-products" aria-label="KetraTerm products"><a href="https://ketraterm.github.io/KetraTerm/">App</a><a href="../../index.html" aria-current="true">Library</a></nav>
+  <div class="ketraterm-api-reference"><span>API · Development</span><a href="../../versions.html">All versions</a></div>
+</div>
+<!-- ketraterm-api-navigation:end -->
+    <header class="navigation theme-dark" id="navigation-wrapper" role="banner">
+            <a class="library-name--link" href="index.html">
+                    KetraTerm
+            </a>
+        <button class="navigation-controls--btn navigation-controls--btn_toc ui-kit_mobile-only" id="toc-toggle"
+                type="button">Toggle table of contents
+        </button>
+        <div class="navigation-controls--break ui-kit_mobile-only"></div>
+        <div class="library-version" id="library-version">
+        </div>
+        <div class="navigation-controls">
+            <button class="navigation-controls--btn navigation-controls--btn_theme" id="theme-toggle-button"
+                    type="button">Switch theme
+            </button>
+            <div class="navigation-controls--btn navigation-controls--btn_search" id="searchBar" role="button">Search in
+                API
+            </div>
+        </div>
+    </header>
+    <div id="container">
+        <nav id="leftColumn" class="sidebar" data-item-type="SECTION" data-item-config='{"defaultSize": 280, "minSize": 200, "maxSize": 400}'>
+            <a class="toc--skip-link" href="#main">Skip to content</a>
+            <div class="dropdown theme-dark_mobile" data-role="dropdown" id="toc-dropdown">
+                <ul role="listbox" id="toc-listbox" class="dropdown--list dropdown--list_toc-list"
+                    data-role="dropdown-listbox" aria-label="Table of contents">
+                    <div class="dropdown--header">
+                            <span>
+                                    KetraTerm
+                            </span>
+                        <button class="button" data-role="dropdown-toggle" aria-label="Close table of contents">
+                            <i class="ui-kit-icon ui-kit-icon_cross"></i>
+                        </button>
+                    </div>
+                    <div class="sidebar--inner" id="sideMenu"></div>
+                </ul>
+                <div class="dropdown--overlay"></div>
+            </div>
+        </nav>
+        <div id="resizer" class="resizer" data-item-type="BAR"></div>
+        <div id="main" data-item-type="SECTION" role="main">
+<div class="main-content" id="content" pageIds="KetraTerm::.ext/allModules///PointingToDeclaration//0">
+  <div class="breadcrumbs"></div>
+  <div class="cover ">
+    <h2 class="">All modules:</h2>
+    <div class="table"><a data-name="1652587553%2FMain%2F0" anchor-label="ketraterm-completion" id="1652587553%2FMain%2F0" data-filterable-set=""></a>
+      <div class="table-row table-row_multimodule">
+        <div class="main-subrow ">
+          <div class="w-100"><span class="inline-flex">
+              <div><a href="ketraterm-completion/index.html">ketraterm-completion</a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="1652587553%2FMain%2F0"></span>
+                <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+              </span></span></div>
+          <div><span class="brief-comment">
+              <p class="paragraph">This module owns command-line tokenization, semantic context resolution, structured source evaluation, deterministic ranking, and bounded in-memory learning. It depends on Kotlin coroutines and has no terminal-module dependencies; source evaluation does not require a terminal session or UI. The README.md supplies the consumer entry point.</p>
+            </span></div>
+        </div>
+      </div>
+<a data-name="-1824274292%2FMain%2F0" anchor-label="ketraterm-completion-host" id="-1824274292%2FMain%2F0" data-filterable-set=""></a>
+      <div class="table-row table-row_multimodule">
+        <div class="main-subrow ">
+          <div class="w-100"><span class="inline-flex">
+              <div><a href="ketraterm-completion-host/index.html">ketraterm-completion-host</a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-1824274292%2FMain%2F0"></span>
+                <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+              </span></span></div>
+          <div><span class="brief-comment">
+              <p class="paragraph">Local filesystem support for host-composed completion sources. The package <code class="lang-kotlin">io.github.ketraterm.completion.host</code> contains:</p>
+            </span></div>
+        </div>
+      </div>
+<a data-name="-1881077058%2FMain%2F0" anchor-label="ketraterm-core" id="-1881077058%2FMain%2F0" data-filterable-set=""></a>
+      <div class="table-row table-row_multimodule">
+        <div class="main-subrow ">
+          <div class="w-100"><span class="inline-flex">
+              <div><a href="ketraterm-core/index.html">ketraterm-core</a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-1881077058%2FMain%2F0"></span>
+                <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+              </span></span></div>
+          <div><span class="brief-comment">
+              <p class="paragraph">The headless state engine. Semantic writer, cursor, and mode operations mutate primary or alternate screen state; readers expose that state through public core roles and primitive render frames.</p>
+            </span></div>
+        </div>
+      </div>
+<a data-name="-1283624747%2FMain%2F0" anchor-label="ketraterm-host" id="-1283624747%2FMain%2F0" data-filterable-set=""></a>
+      <div class="table-row table-row_multimodule">
+        <div class="main-subrow ">
+          <div class="w-100"><span class="inline-flex">
+              <div><a href="ketraterm-host/index.html">ketraterm-host</a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-1283624747%2FMain%2F0"></span>
+                <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+              </span></span></div>
+          <div><span class="brief-comment">
+              <p class="paragraph">Parser-to-core command mapping and host-control policy for the terminal pipeline. The public package is <code class="lang-kotlin">io.github.ketraterm.host</code>.</p>
+            </span></div>
+        </div>
+      </div>
+<a data-name="-143721509%2FMain%2F0" anchor-label="ketraterm-input" id="-143721509%2FMain%2F0" data-filterable-set=""></a>
+      <div class="table-row table-row_multimodule">
+        <div class="main-subrow ">
+          <div class="w-100"><span class="inline-flex">
+              <div><a href="ketraterm-input/index.html">ketraterm-input</a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-143721509%2FMain%2F0"></span>
+                <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+              </span></span></div>
+          <div><span class="brief-comment">
+              <p class="paragraph">Host-bound encoding for platform-neutral input events. The public facade reads core input modes and writes through <code class="lang-kotlin">TerminalHostOutput</code>; the module neither parses terminal output nor owns a connector.</p>
+            </span></div>
+        </div>
+      </div>
+<a data-name="-1902646466%2FMain%2F0" anchor-label="ketraterm-parser" id="-1902646466%2FMain%2F0" data-filterable-set=""></a>
+      <div class="table-row table-row_multimodule">
+        <div class="main-subrow ">
+          <div class="w-100"><span class="inline-flex">
+              <div><a href="ketraterm-parser/index.html">ketraterm-parser</a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-1902646466%2FMain%2F0"></span>
+                <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+              </span></span></div>
+          <div><span class="brief-comment">
+              <p class="paragraph">Converts ordered terminal host bytes into semantic commands. The public entry points are io.github.ketraterm.parser.api.TerminalParsers and io.github.ketraterm.parser.api.TerminalOutputParser; the destination is io.github.ketraterm.parser.spi.TerminalCommandSink. This module depends only on <code class="lang-kotlin">ketraterm-protocol</code>.</p>
+            </span></div>
+        </div>
+      </div>
+<a data-name="157433829%2FMain%2F0" anchor-label="ketraterm-protocol" id="157433829%2FMain%2F0" data-filterable-set=""></a>
+      <div class="table-row table-row_multimodule">
+        <div class="main-subrow ">
+          <div class="w-100"><span class="inline-flex">
+              <div><a href="ketraterm-protocol/index.html">ketraterm-protocol</a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="157433829%2FMain%2F0"></span>
+                <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+              </span></span></div>
+          <div><span class="brief-comment">
+              <p class="paragraph">Shared protocol vocabulary. Its only production dependency is the Kotlin standard library. The module contains identifiers, semantic values, small validation helpers, and a host-bound byte sink; parsing and terminal behavior remain in their owning layers.</p>
+            </span></div>
+        </div>
+      </div>
+<a data-name="2085221392%2FMain%2F0" anchor-label="ketraterm-pty" id="2085221392%2FMain%2F0" data-filterable-set=""></a>
+      <div class="table-row table-row_multimodule">
+        <div class="main-subrow ">
+          <div class="w-100"><span class="inline-flex">
+              <div><a href="ketraterm-pty/index.html">ketraterm-pty</a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="2085221392%2FMain%2F0"></span>
+                <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+              </span></span></div>
+          <div><span class="brief-comment">
+              <p class="paragraph">Local PTY process and connector lifecycle, with convenience construction of the shared session runtime. Public APIs live in <code class="lang-kotlin">io.github.ketraterm.pty</code>; the README.md covers host assembly.</p>
+            </span></div>
+        </div>
+      </div>
+<a data-name="-866918278%2FMain%2F0" anchor-label="ketraterm-render-api" id="-866918278%2FMain%2F0" data-filterable-set=""></a>
+      <div class="table-row table-row_multimodule">
+        <div class="main-subrow ">
+          <div class="w-100"><span class="inline-flex">
+              <div><a href="ketraterm-render-api/index.html">ketraterm-render-api</a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-866918278%2FMain%2F0"></span>
+                <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+              </span></span></div>
+          <div><span class="brief-comment">
+              <p class="paragraph">Primitive renderer-facing contracts in <code class="lang-kotlin">io.github.ketraterm.render.api</code>. Its only production dependency is the Kotlin standard library.</p>
+            </span></div>
+        </div>
+      </div>
+<a data-name="-863251630%2FMain%2F0" anchor-label="ketraterm-render-cache" id="-863251630%2FMain%2F0" data-filterable-set=""></a>
+      <div class="table-row table-row_multimodule">
+        <div class="main-subrow ">
+          <div class="w-100"><span class="inline-flex">
+              <div><a href="ketraterm-render-cache/index.html">ketraterm-render-cache</a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-863251630%2FMain%2F0"></span>
+                <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+              </span></span></div>
+          <div><span class="brief-comment">
+              <p class="paragraph">Renderer-owned primitive storage and leased publication of copied terminal frames. Its sole production dependency is <code class="lang-kotlin">ketraterm-render-api</code>; synchronization with terminal mutation belongs to the source reader.</p>
+            </span></div>
+        </div>
+      </div>
+<a data-name="981635471%2FMain%2F0" anchor-label="ketraterm-session" id="981635471%2FMain%2F0" data-filterable-set=""></a>
+      <div class="table-row table-row_multimodule">
+        <div class="main-subrow ">
+          <div class="w-100"><span class="inline-flex">
+              <div><a href="ketraterm-session/index.html">ketraterm-session</a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="981635471%2FMain%2F0"></span>
+                <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+              </span></span></div>
+          <div><span class="brief-comment">
+              <p class="paragraph">The runtime boundary joining transport, parser, core, host mapping, input encoding, and render publication. Public contracts live in <code class="lang-kotlin">io.github.ketraterm.session</code>; the README.md covers consumer assembly.</p>
+            </span></div>
+        </div>
+      </div>
+<a data-name="-134734706%2FMain%2F0" anchor-label="ketraterm-shell-integration" id="-134734706%2FMain%2F0" data-filterable-set=""></a>
+      <div class="table-row table-row_multimodule">
+        <div class="main-subrow ">
+          <div class="w-100"><span class="inline-flex">
+              <div><a href="ketraterm-shell-integration/index.html">ketraterm-shell-integration</a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-134734706%2FMain%2F0"></span>
+                <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+              </span></span></div>
+          <div><span class="brief-comment">
+              <p class="paragraph">Optional OSC-based producer for the shell metadata contracts in <code class="lang-kotlin">ketraterm-session</code>. The public package <code class="lang-kotlin">io.github.ketraterm.shell.integration</code> exposes <code class="lang-kotlin">OscShellIntegration</code> and its configuration factory. Session, PTY, and Swing do not depend on this module.</p>
+            </span></div>
+        </div>
+      </div>
+<a data-name="1977921455%2FMain%2F0" anchor-label="ketraterm-transport-api" id="1977921455%2FMain%2F0" data-filterable-set=""></a>
+      <div class="table-row table-row_multimodule">
+        <div class="main-subrow ">
+          <div class="w-100"><span class="inline-flex">
+              <div><a href="ketraterm-transport-api/index.html">ketraterm-transport-api</a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="1977921455%2FMain%2F0"></span>
+                <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+              </span></span></div>
+          <div><span class="brief-comment">
+              <p class="paragraph">Transport-neutral byte-stream contracts. The only production dependency is the Kotlin standard library. The package <code class="lang-kotlin">io.github.ketraterm.transport</code> contains <code class="lang-kotlin">TerminalConnector</code>, <code class="lang-kotlin">TerminalConnectorListener</code>, and byte-range validation.</p>
+            </span></div>
+        </div>
+      </div>
+<a data-name="-49545064%2FMain%2F0" anchor-label="ketraterm-ui-swing" id="-49545064%2FMain%2F0" data-filterable-set=""></a>
+      <div class="table-row table-row_multimodule">
+        <div class="main-subrow ">
+          <div class="w-100"><span class="inline-flex">
+              <div><a href="ketraterm-ui-swing/index.html">ketraterm-ui-swing</a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-49545064%2FMain%2F0"></span>
+                <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+              </span></span></div>
+          <div><span class="brief-comment">
+              <p class="paragraph">Reusable Swing rendering and interaction for a host-owned <code class="lang-kotlin">TerminalSession</code>. The public component is <code class="lang-kotlin">io.github.ketraterm.ui.swing.api.SwingTerminal</code>. See the README.md#how-to-use for construction and lifecycle.</p>
+            </span></div>
+        </div>
+      </div>
+<a data-name="-497322379%2FMain%2F0" anchor-label="ketraterm-ui-swing-host" id="-497322379%2FMain%2F0" data-filterable-set=""></a>
+      <div class="table-row table-row_multimodule">
+        <div class="main-subrow ">
+          <div class="w-100"><span class="inline-flex">
+              <div><a href="ketraterm-ui-swing-host/index.html">ketraterm-ui-swing-host</a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-497322379%2FMain%2F0"></span>
+                <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+              </span></span></div>
+          <div><span class="brief-comment">
+              <p class="paragraph">Optional host-facing Swing helpers in <code class="lang-kotlin">io.github.ketraterm.ui.swing.host</code>. The source module's <code class="lang-kotlin">README.md</code> describes consumer wiring and lifecycle.</p>
+            </span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+    <div class="footer">
+        <div class="footer--container">
+            <a href="#content" id="go-to-top-link" class="footer--button footer--button_go-to-top"></a>
+            <div class="footer--content">
+                <div>
+                    <span>Generated by </span>
+                    <a class="footer--link footer--link_external" href="https://github.com/Kotlin/dokka">
+                        Dokka
+                    </a>
+                    <div>© 2026 Copyright</div>
+                </div>
+            </div>
+        </div>
+    </div>
+        </div>
+    </div>
+</div>
+</body>
+</html>

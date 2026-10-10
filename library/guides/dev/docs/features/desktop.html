@@ -1,0 +1,205 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="description" content="A modular Kotlin/JVM terminal emulator library for Swing and headless applications.">
+  <meta name="color-scheme" content="light dark">
+  <title>Desktop features · KetraTerm Library</title>
+  <link rel="icon" href="../../../../assets/logo.svg" type="image/svg+xml">
+  <link rel="preload" href="../../../../assets/fonts/manrope-variable.ttf" as="font" type="font/ttf" crossorigin>
+  <link rel="stylesheet" href="../../../../assets/styles.css">
+  <script type="importmap">{"imports":{"mermaid":"../../../../assets/mermaid/mermaid.esm.min.mjs"}}</script>
+  <script type="module" src="../../../../assets/site.js"></script>
+</head>
+<body data-product="library" data-version="Development">
+  <a class="skip" href="#main">Skip to content</a>
+  <header class="site-header">
+    <div class="site-identity">
+      <a class="brand" href="../../../../index.html" aria-label="KetraTerm Library home"><img class="brand-mark" src="../../../../assets/logo.svg" alt="" width="34" height="34">KetraTerm</a>
+      <nav class="product-navigation" aria-label="KetraTerm products"><a href="https://ketraterm.github.io/KetraTerm/">App</a><a href="../../../../index.html" aria-current="true">Library</a></nav>
+    </div>
+    <details class="site-navigation" open><summary>Menu</summary><nav aria-label="Library navigation"><a aria-current="true"  href="../README.html">Guides</a><a   href="../../modules.html">Modules</a><a   href="../../../../versions.html">API & versions</a><a   href="../../CHANGELOG.html">Changelog</a><a  class="nav-primary" href="../../README.html">Get started</a></nav></details>
+    <button class="theme-toggle" type="button" aria-label="Switch to light theme">Light</button>
+  </header>
+  <div class="docs-shell"><aside class="sidebar" aria-label="Documentation navigation"><details class="nav-disclosure" open><summary class="mobile-nav-toggle">Browse library guides</summary><div><label class="search-label">Find a library guide<input type="search" data-doc-search placeholder="Search library docs" autocomplete="off" data-index="../../search.json"></label><div class="search-results" aria-live="polite"></div><details open><summary>Start here</summary><a  href="../README.html">Documentation</a><a  href="../../README.html">Installation</a><a  href="../../modules.html">Module guides</a><a  href="../../CHANGELOG.html">Changelog</a></details><details open><summary>Capabilities</summary><a  href="../terminal-feature-map.html">Feature map</a><a  href="terminal.html">Terminal</a><a  href="shells.html">Shell integration</a><a aria-current="page" href="desktop.html">Swing view & hosts</a><a  href="completion.html">Completion</a><a  href="embedding.html">Embedding</a><a  href="../terminal-feature-gap-map.html">Known limits</a></details><details open><summary>Embedding guides</summary><a  href="../library/configuration.html">Configuration</a><a  href="../library/compatibility.html">Compatibility</a><a  href="../library/render-ownership.html">Render ownership</a></details><details open><summary>Reference</summary><a  href="../reference/protocol.html">Protocols</a><a  href="../reference/notifications.html">Notifications</a><a  href="../reference/storage.html">Storage & privacy</a></details><details open><summary>Development</summary><a  href="../../ARCHITECTURE.html">Architecture</a><a  href="../../CONTRIBUTING.html">Contributing</a><a  href="../development/conformance-testing.html">Conformance testing</a></details></div></details></aside><main id="main" tabindex="-1" class="article article-with-outline"><div class="article-top"><nav class="breadcrumb" aria-label="Breadcrumb"><ol><li><a href="../../../../index.html">Library</a></li><li><span>Capabilities</span></li><li><span aria-current="page">Desktop features</span></li></ol></nav><div class="doc-version"><span>Development</span><a href="../../../../versions.html">All versions</a></div></div><details class="page-outline" open><summary>On this page</summary><nav aria-label="On this page"><a class="depth-2" href="#shared-terminal-view">Shared terminal view</a><a class="depth-2" href="#product-integration">Product integration</a></nav></details><div class="article-content"><div class="prose"><h1 id="desktop-features">Desktop features</h1>
+<p>The standalone app and IntelliJ plugin use the same Swing terminal. Product
+controls and platform integrations are listed separately below.</p>
+<h2 id="shared-terminal-view">Shared terminal view</h2>
+<div class="table-scroll"><table>
+<thead>
+<tr>
+<th>Feature</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Text rendering</td>
+<td>Java2D rendering, script-run shaping, bidirectional text, font fallback, and Windows color-emoji rasterization.</td>
+</tr>
+<tr>
+<td>Terminal glyphs</td>
+<td>Programmatic drawing of supported box-drawing, block, and geometric characters for consistent cell alignment.</td>
+</tr>
+<tr>
+<td>Appearance</td>
+<td>Themes, fonts, line height, signed integer column spacing, padding, cursor styling, and selection colors.</td>
+</tr>
+<tr>
+<td>Scrolling</td>
+<td>Smooth row scrolling, precise wheel accumulation, keyboard paging, scrollbars, and selection autoscroll.</td>
+</tr>
+<tr>
+<td>Selection</td>
+<td>Linear/block selection, double-click word selection, triple-click row selection, command-block selection, Select All, and wrap-aware copying.</td>
+</tr>
+<tr>
+<td>Search</td>
+<td>Asynchronous text search across the viewport and retained history, including soft-wrapped lines, case sensitivity, match highlighting, and next/previous navigation.</td>
+</tr>
+<tr>
+<td>Hyperlinks</td>
+<td>OSC 8 and detected links, hover styling, activation policies, context actions, and custom detectors.</td>
+</tr>
+<tr>
+<td>Clipboard interaction</td>
+<td>Copy/paste, optional copy on selection, and configurable clipboard/primary-selection middle-button paste.</td>
+</tr>
+<tr>
+<td>Mouse routing</td>
+<td>Application reporting, Shift override for local interaction, and independently configurable alternate-screen wheel-to-arrow input.</td>
+</tr>
+<tr>
+<td>Prompt presentation</td>
+<td>Gutter, divider, or hidden decorations; requires <a href="shells.html">shell metadata</a>.</td>
+</tr>
+<tr>
+<td>Bell</td>
+<td>Configurable visual indicator; sound and desktop attention are product-owned.</td>
+</tr>
+<tr>
+<td>Clear screen</td>
+<td>Sends Ctrl+L to request clearing/redrawing by the foreground program; clears local selection, search, and suggestions.</td>
+</tr>
+<tr>
+<td>Closed sessions</td>
+<td>Final output remains visible, scrollable, selectable, and searchable.</td>
+</tr>
+<tr>
+<td>Completion presentation</td>
+<td>Embedded suggestion list or host-owned UI; see <a href="completion.html">availability and sources</a>.</td>
+</tr>
+<tr>
+<td>Localization</td>
+<td>English catalogs with host-supplied translations and resource overrides.</td>
+</tr>
+</tbody></table></div>
+<p>Fractional column spacing is unavailable. Resizing a live grid clears physical
+selection; resizing closed-session presentation preserves stored content.
+See the <a href="../../ketraterm-ui-swing/README.html">Swing guide</a> for configuration.</p>
+<h2 id="product-integration">Product integration</h2>
+<div class="table-scroll"><table>
+<thead>
+<tr>
+<th>Feature</th>
+<th>Standalone</th>
+<th>IntelliJ plugin</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Sessions</td>
+<td>Windows, tabs, and split panes.</td>
+<td>Project tool-window tabs.</td>
+</tr>
+<tr>
+<td>Local shells</td>
+<td>Shared <a href="shells.html">profile discovery and hooks</a>.</td>
+<td>Shared profile discovery and hooks.</td>
+</tr>
+<tr>
+<td>Settings</td>
+<td>TOML configuration and settings dialog, with live appearance updates.</td>
+<td>IDE application settings with live updates, and project startup commands.</td>
+</tr>
+<tr>
+<td>Appearance</td>
+<td>FlatLaf window chrome and terminal themes.</td>
+<td>IDE theme/font integration and native UI components.</td>
+</tr>
+<tr>
+<td>Shortcuts</td>
+<td>Built-in platform shortcuts.</td>
+<td>Active IDE keymap integration.</td>
+</tr>
+<tr>
+<td>Open terminal here</td>
+<td>Open another terminal at the current local directory.</td>
+<td>Project View, editor, editor-tab, and terminal context actions.</td>
+</tr>
+<tr>
+<td>Tab titles</td>
+<td>Custom, application, foreground-process, directory, and profile titles.</td>
+<td>Same title sources.</td>
+</tr>
+<tr>
+<td>Tab colors</td>
+<td>User-selected tab accent colors with reset.</td>
+<td>No corresponding product control.</td>
+</tr>
+<tr>
+<td>Close confirmation</td>
+<td>Confirms termination when shell metadata reports a running command, including grouped pane/window closure.</td>
+<td>Confirms tab closure when shell metadata reports a running command.</td>
+</tr>
+<tr>
+<td>Tab restoration</td>
+<td>No persisted workspace restoration.</td>
+<td>Remembers order, selected tab, profile, custom title, and local directory; starts restored shells lazily.</td>
+</tr>
+<tr>
+<td>Project JDK</td>
+<td>Uses the configured process environment.</td>
+<td>Optional project JDK <code>JAVA_HOME</code> and <code>PATH</code> injection for new local sessions.</td>
+</tr>
+<tr>
+<td>Link navigation</td>
+<td>Host URL/file actions.</td>
+<td>IDE console filters, project files, and editor navigation.</td>
+</tr>
+<tr>
+<td>Command output</td>
+<td>Copy and file export of retained output.</td>
+<td>Copy and host actions for retained output.</td>
+</tr>
+<tr>
+<td>Clipboard permissions</td>
+<td>Session-bound consent dialogs.</td>
+<td>Consent and clipboard access bound to the originating IDE client.</td>
+</tr>
+<tr>
+<td>Bell handling</td>
+<td>Independent audible/visual settings; urgency requests desktop attention where supported, and pop-on-bell raises the window.</td>
+<td>Visual bell.</td>
+</tr>
+<tr>
+<td>Notifications</td>
+<td>Terminal-originated desktop notifications through the system tray where supported.</td>
+<td>IDE notifications. Both products apply terminal-output permissions.</td>
+</tr>
+</tbody></table></div>
+<p>Foreground-process titles use a Unix process-group lookup or a Windows
+descendant heuristic; they do not identify programs inside SSH or WSL. Restored
+IntelliJ tabs start new processes and do not restore output or running commands.
+Project JDK injection excludes WSL launchers and WSL SDK paths.
+Close confirmation relies on shell command markers; it is not a general detector
+of every process running in a session.</p>
+<p>See the <a href="https://github.com/ketraterm/KetraTerm/blob/e3c7f9c626934093d35a67ca97afbbf1b343f28d/ketraterm-app/README.md">standalone README</a> and
+<a href="https://github.com/ketraterm/KetraTerm/blob/e3c7f9c626934093d35a67ca97afbbf1b343f28d/ketraterm-intellij-plugin/README.md">plugin README</a> for installation and use.</p>
+</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/e3c7f9c626934093d35a67ca97afbbf1b343f28d/docs/features/desktop.md">View source on GitHub ↗</a></div></div></main></div>
+  <footer>
+    <a class="brand" href="../../../../index.html"><img class="brand-mark" src="../../../../assets/logo.svg" alt="" width="34" height="34">KetraTerm Library</a>
+    <p>Open source · Apache 2.0</p>
+    <div><a href="https://github.com/ketraterm/KetraTerm">GitHub ↗</a><a href="https://github.com/ketraterm/KetraTerm/issues">Issues ↗</a><a class="product-switch" href="https://ketraterm.github.io/KetraTerm/">Desktop app ↗</a></div>
+  </footer>
+</body>
+</html>

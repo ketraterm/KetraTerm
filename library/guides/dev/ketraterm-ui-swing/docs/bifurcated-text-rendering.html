@@ -1,0 +1,196 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="description" content="A modular Kotlin/JVM terminal emulator library for Swing and headless applications.">
+  <meta name="color-scheme" content="light dark">
+  <title>Terminal text rendering and font fallback · KetraTerm Library</title>
+  <link rel="icon" href="../../../../assets/logo.svg" type="image/svg+xml">
+  <link rel="preload" href="../../../../assets/fonts/manrope-variable.ttf" as="font" type="font/ttf" crossorigin>
+  <link rel="stylesheet" href="../../../../assets/styles.css">
+  <script type="importmap">{"imports":{"mermaid":"../../../../assets/mermaid/mermaid.esm.min.mjs"}}</script>
+  <script type="module" src="../../../../assets/site.js"></script>
+</head>
+<body data-product="library" data-version="Development">
+  <a class="skip" href="#main">Skip to content</a>
+  <header class="site-header">
+    <div class="site-identity">
+      <a class="brand" href="../../../../index.html" aria-label="KetraTerm Library home"><img class="brand-mark" src="../../../../assets/logo.svg" alt="" width="34" height="34">KetraTerm</a>
+      <nav class="product-navigation" aria-label="KetraTerm products"><a href="https://ketraterm.github.io/KetraTerm/">App</a><a href="../../../../index.html" aria-current="true">Library</a></nav>
+    </div>
+    <details class="site-navigation" open><summary>Menu</summary><nav aria-label="Library navigation"><a   href="../../docs/README.html">Guides</a><a aria-current="true"  href="../../modules.html">Modules</a><a   href="../../../../versions.html">API & versions</a><a   href="../../CHANGELOG.html">Changelog</a><a  class="nav-primary" href="../../README.html">Get started</a></nav></details>
+    <button class="theme-toggle" type="button" aria-label="Switch to light theme">Light</button>
+  </header>
+  <div class="docs-shell"><aside class="sidebar" aria-label="Documentation navigation"><details class="nav-disclosure" open><summary class="mobile-nav-toggle">Browse library guides</summary><div><label class="search-label">Find a library guide<input type="search" data-doc-search placeholder="Search library docs" autocomplete="off" data-index="../../search.json"></label><div class="search-results" aria-live="polite"></div><details open><summary>Start here</summary><a  href="../../docs/README.html">Documentation</a><a  href="../../README.html">Installation</a><a  href="../../modules.html">Module guides</a><a  href="../../CHANGELOG.html">Changelog</a></details><details open><summary>Capabilities</summary><a  href="../../docs/terminal-feature-map.html">Feature map</a><a  href="../../docs/features/terminal.html">Terminal</a><a  href="../../docs/features/shells.html">Shell integration</a><a  href="../../docs/features/desktop.html">Swing view & hosts</a><a  href="../../docs/features/completion.html">Completion</a><a  href="../../docs/features/embedding.html">Embedding</a><a  href="../../docs/terminal-feature-gap-map.html">Known limits</a></details><details open><summary>Embedding guides</summary><a  href="../../docs/library/configuration.html">Configuration</a><a  href="../../docs/library/compatibility.html">Compatibility</a><a  href="../../docs/library/render-ownership.html">Render ownership</a></details><details open><summary>Reference</summary><a  href="../../docs/reference/protocol.html">Protocols</a><a  href="../../docs/reference/notifications.html">Notifications</a><a  href="../../docs/reference/storage.html">Storage & privacy</a></details><details open><summary>Development</summary><a  href="../../ARCHITECTURE.html">Architecture</a><a  href="../../CONTRIBUTING.html">Contributing</a><a  href="../../docs/development/conformance-testing.html">Conformance testing</a></details></div></details></aside><main id="main" tabindex="-1" class="article article-with-outline"><div class="article-top"><nav class="breadcrumb" aria-label="Breadcrumb"><ol><li><a href="../../../../index.html">Library</a></li><li><a href="../../modules.html">Modules</a></li><li><a href="../README.html">ketraterm-ui-swing</a></li><li><span aria-current="page">Terminal text rendering and font fallback</span></li></ol></nav><div class="doc-version"><span>Development</span><a href="../../../../versions.html">All versions</a></div></div><details class="page-outline" open><summary>On this page</summary><nav aria-label="On this page"><a class="depth-2" href="#cell-and-run-dispatch">Cell and run dispatch</a><a class="depth-2" href="#native-emoji-image-caching">Native emoji image caching</a><a class="depth-2" href="#contextual-shaping-and-terminal-geometry">Contextual shaping and terminal geometry</a><a class="depth-2" href="#font-resolution">Font resolution</a><a class="depth-2" href="#allocation-measurement-boundaries">Allocation measurement boundaries</a></nav></details><div class="article-content"><div class="prose"><h1 id="terminal-text-rendering-and-font-fallback">Terminal text rendering and font fallback</h1>
+<p><code>TerminalTextPainter</code> consumes logical cells from the copied render cache.
+<code>TerminalBidiLayout</code> places those cells in the same visual columns used by
+backgrounds, overlays, cursor geometry, and hit testing. Bidi affects placement
+and shaping direction without changing a cell&#39;s rendering policy. These types
+are internal; hosts configure fonts through <code>SwingSettings</code> and <code>SwingHostServices</code>.</p>
+<h2 id="cell-and-run-dispatch">Cell and run dispatch</h2>
+<div class="table-scroll"><table>
+<thead>
+<tr>
+<th>Content</th>
+<th>Rendering path</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Compatible LTR ASCII</td>
+<td><code>drawChars</code> when font advances match the grid; otherwise a cached vector with explicit cell positions</td>
+</tr>
+<tr>
+<td>Contextual scripts / ordinary text in RTL runs</td>
+<td>Contextually shaped vectors positioned by terminal-cell ownership</td>
+</tr>
+<tr>
+<td>Supported box, block, and geometric characters</td>
+<td>Programmatic cell primitives</td>
+</tr>
+<tr>
+<td>Emoji presentation sequences</td>
+<td>Available platform rasterizer, then Java2D fallback</td>
+</tr>
+<tr>
+<td>Other scalars and clusters</td>
+<td>Bounded cached <code>TextLayout</code> fallback</td>
+</tr>
+</tbody></table></div>
+<p><code>columnSpacing</code> changes the cell advance rather than the font size. Negative
+spacing retains the uncondensed glyph-fitting budget while primitives,
+backgrounds, cursor, and hit testing use the adjusted grid. Text can overlap
+neighboring cells within a run; existing paint-span clipping still applies.</p>
+<p>ASCII batching compares foreground, font style, visibility, decorations, and
+hyperlink state. Backgrounds are separate runs. ASCII does not invoke contextual
+shaping or fallback-font searches. Its ink is clipped to the run&#39;s cell span;
+matching advances alone do not prevent italic or antialiased overhang. When the
+caller clip is already contained, painting leaves it untouched. Otherwise it
+intersects and restores the exact clip, including nonrectangular shapes.</p>
+<p>Ordinary cells and block-cursor foreground share primitive, emoji, and fallback
+dispatch. A directional character elsewhere in a row does not disable primitives
+or emoji. Classification precedes access to the lazy emoji rasterizer.</p>
+<h2 id="native-emoji-image-caching">Native emoji image caching</h2>
+<p><code>TerminalEmojiImageCache</code> retains up to 1,024 images or unsupported results for one
+rasterizer. Identity is code point content plus raster pixel size; equivalent
+scalar and single-code-point cluster requests share an entry. Position, color,
+and cell span do not affect identity when raster size is unchanged. Lookups use
+reusable keys and borrowed cluster slices. Misses snapshot the content and create
+text for rasterization. Borrowed slices are released after lookup, and negative
+results share the same bounded LRU as images.</p>
+<p>The current platform rasterizer reads installed Segoe UI Emoji COLR/CPAL data on
+Windows. Other platforms use Java2D fallback. Native painting does not depend on
+JetBrains Runtime detection. Initialization and misses are synchronous: the first
+qualifying emoji may load and parse the font on the painting thread, normally
+the EDT. Classification avoids this work for ordinary text but does not move it
+off-thread. Cache-hit measurements exclude initialization and rasterization.</p>
+<h2 id="contextual-shaping-and-terminal-geometry">Contextual shaping and terminal geometry</h2>
+<p>Shaping spans are constrained by direction, font style, Unicode script, and cell
+category. Foreground colors, decorations, hover, and concealment determine paint
+spans without breaking neighboring shaping context.</p>
+<p>The run buffer records a terminal-cell owner for each UTF-16 unit, including
+surrogate pairs and combining sequences. <code>Font.layoutGlyphVector</code> provides
+contextual shaping. The cache maps glyph indices back to those owners and positions
+complete glyph groups at their assigned visual cell spans. Combining marks retain
+their base-relative offsets; ligatures own the union of consumed cells. Oversized
+groups are fitted using each group&#39;s glyph-size budget, which retains the original
+font width when spacing is condensed. The entire line is not proportionally fitted.</p>
+<p>Large vectors retain bounded glyph batches. Uniform paint spans submit the whole
+vector; partial styles and cursor clips submit only intersecting batches. Batches
+preserve glyph codes, positions, and transforms and are built on cache insertion.
+The block cursor paints the same positioned context under its cell clip instead
+of shaping an isolated character. Concealed or hidden blinking cells still
+suppress foreground painting.</p>
+<p>A shaping window admits at most 2,048 code points / 4,096 UTF-16 units and stops
+before splitting a terminal cluster. Long spans continue through windows with
+shaped-cluster lookahead and lookbehind. A cluster occupying the whole budget is
+consumed; lookbehind is dropped when it would prevent progress. These bounds
+preserve coverage but cannot promise unbounded contextual equivalence for every
+font. Oversized individual clusters have a separate fallback bound.</p>
+<p>Cached vectors are read-only after positioning. Identity includes text, cell
+ownership/span, style, direction, cell advance, and glyph-fitting width.
+Font-source, font-generation, and font-render-context changes invalidate relevant entries. Lookup scratch
+buffers are reused and belong to the calling painter.</p>
+<h2 id="font-resolution">Font resolution</h2>
+<p>Ordinary text tries the primary font, optional host resolver, configured fallback
+fonts, then enabled system fallbacks. Emoji presentation prefers the host
+resolver and configured/system emoji fonts before the ordinary pipeline. Resolved
+fonts use the configured size. Fallback and unsupported lookups use bounded
+caches. System scanning is outside the ASCII path.</p>
+<p>Native dispatch and font preference share <code>TerminalEmojiPresentation</code> for
+scalars, cluster slices, and UTF-16 text. An emoji base is required; a joiner or
+variation selector alone does not classify ordinary script text as emoji. VS15
+retains text presentation. Platform font substitution must not give an emoji
+font precedence over a capable primary font for ordinary text.</p>
+<h2 id="allocation-measurement-boundaries">Allocation measurement boundaries</h2>
+<p>Component painters and scratch buffers belong to the EDT. Unit tests assert
+cache reuse/invalidation, glyph geometry, pixels, and publication ordering.
+Allocation measurements use JMH warmup, forks, and a GC profiler, rather than
+exact-byte unit-test assertions. Internal helper benchmarks have private frozen
+frames and graphics; component/controller benchmarks dispatch batches to the EDT
+and include amortized dispatch cost.</p>
+<div class="table-scroll"><table>
+<thead>
+<tr>
+<th>Benchmark</th>
+<th>Boundary</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>TerminalTextRenderingBenchmark</code></td>
+<td>Warm style scanning, shaped lookup, contained-clip ASCII, and clipped glyph batches; direct Java2D controls</td>
+</tr>
+<tr>
+<td><code>TerminalFontConfigurationBenchmark</code></td>
+<td>Unchanged configuration and retained unsupported-glyph lookup</td>
+</tr>
+<tr>
+<td><code>TerminalEmojiBenchmark</code></td>
+<td>Image/negative cache hits using a recording rasterizer; excludes OS font loading</td>
+</tr>
+<tr>
+<td><code>TerminalBidiBenchmark</code></td>
+<td>Cached mapping/projection and overscan frame acceptance</td>
+</tr>
+<tr>
+<td><code>TerminalRepaintBenchmark</code></td>
+<td>Search projection and damage planning</td>
+</tr>
+<tr>
+<td><code>TerminalScrollbarBenchmark</code></td>
+<td>Overlay painting with direct drawing controls</td>
+</tr>
+<tr>
+<td><code>TerminalViewportPublicationBenchmark</code></td>
+<td>EDT primitive publication and callbacks; excludes public snapshot construction</td>
+</tr>
+<tr>
+<td><code>TerminalSearchRefreshBenchmark</code></td>
+<td>Unchanged active search refresh with retained history</td>
+</tr>
+<tr>
+<td><code>SwingPaintBenchmark</code></td>
+<td>Complete static component paint in EDT batches</td>
+</tr>
+</tbody></table></div>
+<p>See the <a href="../../ketraterm-benchmarks/README.html">benchmark guide</a> for commands and
+measurement requirements. Use matching glyphs, positions, transforms, clips, and
+font-render contexts when comparing painter operations.</p>
+<p>Complete component painting creates a <code>Graphics2D</code> copy and may project a
+selection. Java2D clipping, transforms, and drawing can allocate. Cold font
+loading, layout construction, rasterization, cache growth, session publication,
+and host callbacks have separate costs. Helper cache-hit measurements do not
+establish zero allocation for a complete frame or live-window input latency.</p>
+<p>Raster comparisons must preserve antialiased coverage and exact shaping input.
+Erase the old cursor region before comparing a repaint; repeated <code>SrcOver</code>
+drawing is not idempotent. Keep joiners in Arabic reference text: removing a ZWJ
+can change ligature formation. Compare caches with direct shaping of the same
+text and painter output with the complete contextual input.</p>
+</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/e3c7f9c626934093d35a67ca97afbbf1b343f28d/ketraterm-ui-swing/docs/bifurcated-text-rendering.md">View source on GitHub ↗</a></div></div></main></div>
+  <footer>
+    <a class="brand" href="../../../../index.html"><img class="brand-mark" src="../../../../assets/logo.svg" alt="" width="34" height="34">KetraTerm Library</a>
+    <p>Open source · Apache 2.0</p>
+    <div><a href="https://github.com/ketraterm/KetraTerm">GitHub ↗</a><a href="https://github.com/ketraterm/KetraTerm/issues">Issues ↗</a><a class="product-switch" href="https://ketraterm.github.io/KetraTerm/">Desktop app ↗</a></div>
+  </footer>
+</body>
+</html>

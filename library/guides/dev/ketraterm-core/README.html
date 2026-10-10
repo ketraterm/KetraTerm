@@ -1,0 +1,98 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="description" content="A modular Kotlin/JVM terminal emulator library for Swing and headless applications.">
+  <meta name="color-scheme" content="light dark">
+  <title>KetraTerm Core (:ketraterm-core) · KetraTerm Library</title>
+  <link rel="icon" href="../../../assets/logo.svg" type="image/svg+xml">
+  <link rel="preload" href="../../../assets/fonts/manrope-variable.ttf" as="font" type="font/ttf" crossorigin>
+  <link rel="stylesheet" href="../../../assets/styles.css">
+  <script type="importmap">{"imports":{"mermaid":"../../../assets/mermaid/mermaid.esm.min.mjs"}}</script>
+  <script type="module" src="../../../assets/site.js"></script>
+</head>
+<body data-product="library" data-version="Development">
+  <a class="skip" href="#main">Skip to content</a>
+  <header class="site-header">
+    <div class="site-identity">
+      <a class="brand" href="../../../index.html" aria-label="KetraTerm Library home"><img class="brand-mark" src="../../../assets/logo.svg" alt="" width="34" height="34">KetraTerm</a>
+      <nav class="product-navigation" aria-label="KetraTerm products"><a href="https://ketraterm.github.io/KetraTerm/">App</a><a href="../../../index.html" aria-current="true">Library</a></nav>
+    </div>
+    <details class="site-navigation" open><summary>Menu</summary><nav aria-label="Library navigation"><a   href="../docs/README.html">Guides</a><a aria-current="true"  href="../modules.html">Modules</a><a   href="../../../versions.html">API & versions</a><a   href="../CHANGELOG.html">Changelog</a><a  class="nav-primary" href="../README.html">Get started</a></nav></details>
+    <button class="theme-toggle" type="button" aria-label="Switch to light theme">Light</button>
+  </header>
+  <div class="docs-shell"><aside class="sidebar" aria-label="Documentation navigation"><details class="nav-disclosure" open><summary class="mobile-nav-toggle">Browse library guides</summary><div><label class="search-label">Find a library guide<input type="search" data-doc-search placeholder="Search library docs" autocomplete="off" data-index="../search.json"></label><div class="search-results" aria-live="polite"></div><details open><summary>Start here</summary><a  href="../docs/README.html">Documentation</a><a  href="../README.html">Installation</a><a  href="../modules.html">Module guides</a><a  href="../CHANGELOG.html">Changelog</a></details><details open><summary>Capabilities</summary><a  href="../docs/terminal-feature-map.html">Feature map</a><a  href="../docs/features/terminal.html">Terminal</a><a  href="../docs/features/shells.html">Shell integration</a><a  href="../docs/features/desktop.html">Swing view & hosts</a><a  href="../docs/features/completion.html">Completion</a><a  href="../docs/features/embedding.html">Embedding</a><a  href="../docs/terminal-feature-gap-map.html">Known limits</a></details><details open><summary>Embedding guides</summary><a  href="../docs/library/configuration.html">Configuration</a><a  href="../docs/library/compatibility.html">Compatibility</a><a  href="../docs/library/render-ownership.html">Render ownership</a></details><details open><summary>Reference</summary><a  href="../docs/reference/protocol.html">Protocols</a><a  href="../docs/reference/notifications.html">Notifications</a><a  href="../docs/reference/storage.html">Storage & privacy</a></details><details open><summary>Development</summary><a  href="../ARCHITECTURE.html">Architecture</a><a  href="../CONTRIBUTING.html">Contributing</a><a  href="../docs/development/conformance-testing.html">Conformance testing</a></details></div></details></aside><main id="main" tabindex="-1" class="article article-with-outline"><div class="article-top"><nav class="breadcrumb" aria-label="Breadcrumb"><ol><li><a href="../../../index.html">Library</a></li><li><a href="../modules.html">Modules</a></li><li><span aria-current="page">KetraTerm Core (:ketraterm-core)</span></li></ol></nav><div class="doc-version"><span>Development</span><a href="../../../versions.html">All versions</a></div></div><details class="page-outline" open><summary>On this page</summary><nav aria-label="On this page"><a class="depth-2" href="#how-to-use">How to Use</a><a class="depth-2" href="#reading-and-synchronization">Reading and synchronization</a><a class="depth-2" href="#terminal-responses">Terminal responses</a><a class="depth-2" href="#sub-documentation">Sub-Documentation</a></nav></details><div class="article-content"><div class="prose"><h1 id="ketraterm-core-ketraterm-core">KetraTerm Core (<code>:ketraterm-core</code>)</h1>
+<p>Headless terminal state for Kotlin/JVM 25. Core owns the grid, cursor, margins,
+scrollback, cell attributes, terminal modes, and Unicode cell-width policy. It
+accepts semantic operations; escape-sequence parsing belongs to
+<a href="../ketraterm-parser/README.html"><code>ketraterm-parser</code></a> and
+<a href="../ketraterm-host/README.html"><code>ketraterm-host</code></a>.</p>
+<h2 id="how-to-use">How to Use</h2>
+<pre><code class="language-kotlin">import io.github.ketraterm.core.TerminalBuffers
+import io.github.ketraterm.core.model.CellColor
+
+fun main() {
+    val buffer = TerminalBuffers.create(width = 80, height = 24, maxHistory = 1000)
+    buffer.writeText(&quot;Hello, KetraTerm!&quot;)
+    buffer.carriageReturn()
+    buffer.newLine()
+    buffer.setPenColors(
+        foreground = CellColor.indexed(2),
+        background = CellColor.DEFAULT,
+        bold = true,
+    )
+    buffer.writeText(&quot;Green, bold text&quot;)
+    buffer.positionCursor(col = 10, row = 5)
+    buffer.writeCodepoint(&#39;X&#39;.code)
+
+    check(buffer.getCodepointAt(col = 10, row = 5) == &#39;X&#39;.code)
+    println(buffer.getScreenAsString())
+}
+</code></pre>
+<p><code>writeText</code> writes literal scalar values. It does not interpret <code>\n</code>, <code>\r</code>, <code>\t</code>,
+escape sequences, or grapheme boundaries. Use explicit control operations as
+above, or connect a parser through the host adapter for terminal output.
+<code>writeCluster</code> accepts a pre-segmented grapheme and copies its codepoints before
+returning.</p>
+<p>Cursor and reader coordinates are zero-based. Margin and rectangle methods use
+the DEC coordinate conventions documented on those methods. Dimensions must be
+positive; <code>maxHistory</code> is nonnegative, and zero disables primary scrollback.</p>
+<h2 id="reading-and-synchronization">Reading and synchronization</h2>
+<p><code>TerminalBuffers.create</code> returns a <code>TerminalRenderBuffer</code>: the complete
+<code>TerminalBuffer</code> API plus <code>TerminalRenderFrameReader</code>. The factory installs no
+lock. Serialize mutations, cursor/grid reads, response draining, and frame reads
+with each other. A borrowed <code>TerminalLine</code> or render frame must stay within that
+serialized read; copy data before releasing it. Frame callbacks cannot nest on
+the same buffer.</p>
+<p>Mode snapshots from the standard buffer are atomic. Capture one packed snapshot
+when decoding several input fields; reading a mode snapshot does not make a
+separate cursor or grid read coherent.</p>
+<p><code>getScreenAsString</code> and <code>getAttrAt</code> are allocating inspection conveniences for
+tests and debugging. Renderers should copy the primitive render frame or use
+<a href="../ketraterm-render-cache/README.html"><code>ketraterm-render-cache</code></a>. A
+<a href="../ketraterm-session/README.html"><code>TerminalSession</code></a> supplies the synchronization
+and outbound-write boundary when assembling a complete terminal pipeline.</p>
+<h2 id="terminal-responses">Terminal responses</h2>
+<p><code>TerminalResponseChannel</code> is part of <code>TerminalBuffer</code>. Query methods enqueue
+terminal-to-host responses; <code>readResponseBytes</code> drains them into a caller-owned
+array. These bytes go to the process or connector&#39;s <strong>input</strong> side. A session
+performs this drain and serialized write automatically.</p>
+<p>The host adapter applies terminal-response security permission before invoking
+queries, and core limits responses to its capability allowlist. Direct embedders
+must enforce the same permission before issuing query operations.</p>
+<h2 id="sub-documentation">Sub-Documentation</h2>
+<ul>
+<li><a href="docs/terminal-core-contract.html">Core contract</a>: coordinates, writes, borrowed reads, reset, and resize semantics.</li>
+<li><a href="docs/grid-storage-layout.html">Grid storage layout</a>: internal arrays, row recycling, and cluster ownership.</li>
+<li><a href="Module.html">Module guide</a>: maintainer boundaries and data flow.</li>
+<li><a href="../docs/terminal-feature-map.html">Feature map</a> and <a href="../docs/terminal-feature-gap-map.html">gap map</a>: supported behavior and deferred work.</li>
+</ul>
+</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/e3c7f9c626934093d35a67ca97afbbf1b343f28d/ketraterm-core/README.md">View source on GitHub ↗</a></div></div></main></div>
+  <footer>
+    <a class="brand" href="../../../index.html"><img class="brand-mark" src="../../../assets/logo.svg" alt="" width="34" height="34">KetraTerm Library</a>
+    <p>Open source · Apache 2.0</p>
+    <div><a href="https://github.com/ketraterm/KetraTerm">GitHub ↗</a><a href="https://github.com/ketraterm/KetraTerm/issues">Issues ↗</a><a class="product-switch" href="https://ketraterm.github.io/KetraTerm/">Desktop app ↗</a></div>
+  </footer>
+</body>
+</html>

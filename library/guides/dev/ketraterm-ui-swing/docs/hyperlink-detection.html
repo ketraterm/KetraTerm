@@ -1,0 +1,129 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="description" content="A modular Kotlin/JVM terminal emulator library for Swing and headless applications.">
+  <meta name="color-scheme" content="light dark">
+  <title>Hyperlink detection · KetraTerm Library</title>
+  <link rel="icon" href="../../../../assets/logo.svg" type="image/svg+xml">
+  <link rel="preload" href="../../../../assets/fonts/manrope-variable.ttf" as="font" type="font/ttf" crossorigin>
+  <link rel="stylesheet" href="../../../../assets/styles.css">
+  <script type="importmap">{"imports":{"mermaid":"../../../../assets/mermaid/mermaid.esm.min.mjs"}}</script>
+  <script type="module" src="../../../../assets/site.js"></script>
+</head>
+<body data-product="library" data-version="Development">
+  <a class="skip" href="#main">Skip to content</a>
+  <header class="site-header">
+    <div class="site-identity">
+      <a class="brand" href="../../../../index.html" aria-label="KetraTerm Library home"><img class="brand-mark" src="../../../../assets/logo.svg" alt="" width="34" height="34">KetraTerm</a>
+      <nav class="product-navigation" aria-label="KetraTerm products"><a href="https://ketraterm.github.io/KetraTerm/">App</a><a href="../../../../index.html" aria-current="true">Library</a></nav>
+    </div>
+    <details class="site-navigation" open><summary>Menu</summary><nav aria-label="Library navigation"><a   href="../../docs/README.html">Guides</a><a aria-current="true"  href="../../modules.html">Modules</a><a   href="../../../../versions.html">API & versions</a><a   href="../../CHANGELOG.html">Changelog</a><a  class="nav-primary" href="../../README.html">Get started</a></nav></details>
+    <button class="theme-toggle" type="button" aria-label="Switch to light theme">Light</button>
+  </header>
+  <div class="docs-shell"><aside class="sidebar" aria-label="Documentation navigation"><details class="nav-disclosure" open><summary class="mobile-nav-toggle">Browse library guides</summary><div><label class="search-label">Find a library guide<input type="search" data-doc-search placeholder="Search library docs" autocomplete="off" data-index="../../search.json"></label><div class="search-results" aria-live="polite"></div><details open><summary>Start here</summary><a  href="../../docs/README.html">Documentation</a><a  href="../../README.html">Installation</a><a  href="../../modules.html">Module guides</a><a  href="../../CHANGELOG.html">Changelog</a></details><details open><summary>Capabilities</summary><a  href="../../docs/terminal-feature-map.html">Feature map</a><a  href="../../docs/features/terminal.html">Terminal</a><a  href="../../docs/features/shells.html">Shell integration</a><a  href="../../docs/features/desktop.html">Swing view & hosts</a><a  href="../../docs/features/completion.html">Completion</a><a  href="../../docs/features/embedding.html">Embedding</a><a  href="../../docs/terminal-feature-gap-map.html">Known limits</a></details><details open><summary>Embedding guides</summary><a  href="../../docs/library/configuration.html">Configuration</a><a  href="../../docs/library/compatibility.html">Compatibility</a><a  href="../../docs/library/render-ownership.html">Render ownership</a></details><details open><summary>Reference</summary><a  href="../../docs/reference/protocol.html">Protocols</a><a  href="../../docs/reference/notifications.html">Notifications</a><a  href="../../docs/reference/storage.html">Storage & privacy</a></details><details open><summary>Development</summary><a  href="../../ARCHITECTURE.html">Architecture</a><a  href="../../CONTRIBUTING.html">Contributing</a><a  href="../../docs/development/conformance-testing.html">Conformance testing</a></details></div></details></aside><main id="main" tabindex="-1" class="article article-with-outline"><div class="article-top"><nav class="breadcrumb" aria-label="Breadcrumb"><ol><li><a href="../../../../index.html">Library</a></li><li><a href="../../modules.html">Modules</a></li><li><a href="../README.html">ketraterm-ui-swing</a></li><li><span aria-current="page">Hyperlink detection</span></li></ol></nav><div class="doc-version"><span>Development</span><a href="../../../../versions.html">All versions</a></div></div><details class="page-outline" open><summary>On this page</summary><nav aria-label="On this page"><a class="depth-2" href="#execution-and-ownership">Execution and ownership</a><a class="depth-2" href="#source-coordinates-and-dependencies">Source coordinates and dependencies</a><a class="depth-2" href="#configuration-and-ordered-state">Configuration and ordered state</a><a class="depth-2" href="#retention-projection-and-interaction">Retention, projection, and interaction</a><a class="depth-2" href="#migration">Migration</a></nav></details><div class="article-content"><div class="prose"><h1 id="hyperlink-detection">Hyperlink detection</h1>
+<p>This contract applies to host-provided <code>SwingHyperlinkDetector</code> implementations.
+The <a href="../README.html#hyperlink-detector-contract-and-migration">README</a> introduces
+configuration. Terminal-authored OSC 8 links use <code>hyperlinkHandler</code>; detected
+links carry their own <code>SwingHyperlinkAction</code>.</p>
+<h2 id="execution-and-ownership">Execution and ownership</h2>
+<p><code>detect(request)</code> is suspending and runs outside painting and Swing event handling.
+Return a completed <code>List&lt;SwingHyperlink&gt;</code> and do not mutate the list or results
+later. An empty list is successful analysis without links. Failures and
+cancellation must throw; propagate coroutine cancellation rather than reporting
+empty success. Discovery may allocate bounded strings, results, and collections.
+Do not access Swing state from the detector.</p>
+<p>Calls are serialized within each context. The binding owns cancellation and
+rejects obsolete results after source, binding, provider, or analysis changes.
+A detector that ignores cancellation occupies its context until it returns.
+Activation and hover callbacks run on the EDT, outside painting.</p>
+<div class="table-scroll"><table>
+<thead>
+<tr>
+<th>Context</th>
+<th>Use when</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>INDEPENDENT_LINE</code></td>
+<td>Each logical line can be analyzed without preceding lines; unchanged lines may be omitted</td>
+</tr>
+<tr>
+<td><code>ORDERED_CONTENT</code></td>
+<td>Provider state consumes source order or results may refer to earlier lines</td>
+</tr>
+<tr>
+<td><code>INDEPENDENT_AND_ORDERED</code></td>
+<td>One detector supports both independently scheduled lanes and permits concurrent calls between them</td>
+</tr>
+</tbody></table></div>
+<p>Each request selects one lane. Independent text-derived links do not wait for
+ordered provider work.</p>
+<h2 id="source-coordinates-and-dependencies">Source coordinates and dependencies</h2>
+<p>Requests defensively copy logical text and physical-row anchors. Soft-wrapped
+rows form one logical line; wrap padding and wide trailing cells are omitted,
+and one newline is appended. Positions contain the first absolute physical row
+of the logical line and a UTF-16 offset in its text. They are not viewport rows,
+cell columns, or global console offsets.</p>
+<p>Use <code>request.range</code> or <code>request.hyperlink</code> to create ranges. A result contains
+its highlighted source range, validation dependency range, action, optional
+complete copyable URI, prepared presentation, and activation policy. Dependencies
+must include all characters that affect recognition or navigation, including
+token delimiters. The single-line factory defaults to the whole logical line for
+independent results and the supplied batch for ordered results; narrow them only
+when the action is independent of the omitted context.</p>
+<p>Ordered results identify the source position consumed when they were produced
+through <code>consumedThrough</code>. They may highlight earlier retained lines. Unknown or
+out-of-bounds coordinates are ignored. <code>lineFirstId</code> supplies a stable source
+identity for host historical metadata; platform-specific cumulative console
+offsets remain host-owned.</p>
+<h2 id="configuration-and-ordered-state">Configuration and ordered state</h2>
+<p><code>configurationGeneration</code> is an equality-only invalidation value. Publish the
+changed configuration and a distinct generation before emitting
+<code>configurationChanges</code>. A notification with the same generation does not
+invalidate results; without a notification, the new generation is observed at
+the next reconciliation. The binding owns collection of the notification flow.</p>
+<p>Configuration refresh keeps prepared links until replacement results arrive,
+including successful empty replacements. Replacing the detector instance retires
+its old actions immediately; use replacement when stale actions must not remain
+usable.</p>
+<p>Ordered state belongs to the request&#39;s binding, source, provider, and analysis
+epochs. Reconstruct it when earlier content changes or an interrupted invocation
+has tainted it. An <code>analysisEpoch</code> change requires replay from retained source;
+ordinary eviction advances <code>firstRetainedRow</code> without restarting the chain.
+Implement <code>discardOrderedState</code> when retaining provider state. The owner invokes
+it only after the ordered call exits. It must be nonblocking, thread-independent,
+and separate from independent-lane state.</p>
+<h2 id="retention-projection-and-interaction">Retention, projection, and interaction</h2>
+<p>Binding-owned discovery retains occurrences and successful empty analysis across
+scrolling. Frame preparation projects prepared links into visible cells rather
+than calling providers. Changed dependencies invalidate activation before
+rediscovery; reflow and source replacement invalidate the affected source state.
+Temporary hiding preserves discovery. Unbinding or disposal cancels it and
+releases retained results.</p>
+<p>OSC 8 links win overlap resolution, followed by visible links, narrower ranges,
+and stable provider order. <code>MODIFIER</code> activation uses Ctrl or Cmd on macOS;
+<code>DIRECT</code> uses an ordinary primary click. Activation occurs on release only when
+the pressed occurrence still matches and no drag occurred. Application mouse
+reporting takes priority unless Shift forces local interaction. Hover callbacks
+are balanced per occurrence even if results share an action.</p>
+<p>Resolve colors and framework presentation before publication. Painting reads
+prepared normal, hovered, active, and followed styles; it performs no provider
+lookup. Terminal-authored underline and concealment retain precedence. Supply
+<code>uri</code> when the complete destination can be copied. Context menus capture the
+action and URI when opened, retaining their original target across later output
+or rebinding.</p>
+<h2 id="migration">Migration</h2>
+<p>Detectors return <code>List&lt;SwingHyperlink&gt;</code> from suspending <code>detect(request)</code> instead
+of publishing through a sink. Replace <code>LOGICAL_LINE</code> / <code>VIEWPORT</code> contexts with
+<code>INDEPENDENT_LINE</code> / <code>ORDERED_CONTENT</code>. Positions use logical-line row anchors
+and UTF-16 offsets instead of cumulative console offsets.</p>
+</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/e3c7f9c626934093d35a67ca97afbbf1b343f28d/ketraterm-ui-swing/docs/hyperlink-detection.md">View source on GitHub ↗</a></div></div></main></div>
+  <footer>
+    <a class="brand" href="../../../../index.html"><img class="brand-mark" src="../../../../assets/logo.svg" alt="" width="34" height="34">KetraTerm Library</a>
+    <p>Open source · Apache 2.0</p>
+    <div><a href="https://github.com/ketraterm/KetraTerm">GitHub ↗</a><a href="https://github.com/ketraterm/KetraTerm/issues">Issues ↗</a><a class="product-switch" href="https://ketraterm.github.io/KetraTerm/">Desktop app ↗</a></div>
+  </footer>
+</body>
+</html>

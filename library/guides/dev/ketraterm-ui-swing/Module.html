@@ -1,0 +1,106 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="description" content="A modular Kotlin/JVM terminal emulator library for Swing and headless applications.">
+  <meta name="color-scheme" content="light dark">
+  <title>Module ketraterm-ui-swing · KetraTerm Library</title>
+  <link rel="icon" href="../../../assets/logo.svg" type="image/svg+xml">
+  <link rel="preload" href="../../../assets/fonts/manrope-variable.ttf" as="font" type="font/ttf" crossorigin>
+  <link rel="stylesheet" href="../../../assets/styles.css">
+  <script type="importmap">{"imports":{"mermaid":"../../../assets/mermaid/mermaid.esm.min.mjs"}}</script>
+  <script type="module" src="../../../assets/site.js"></script>
+</head>
+<body data-product="library" data-version="Development">
+  <a class="skip" href="#main">Skip to content</a>
+  <header class="site-header">
+    <div class="site-identity">
+      <a class="brand" href="../../../index.html" aria-label="KetraTerm Library home"><img class="brand-mark" src="../../../assets/logo.svg" alt="" width="34" height="34">KetraTerm</a>
+      <nav class="product-navigation" aria-label="KetraTerm products"><a href="https://ketraterm.github.io/KetraTerm/">App</a><a href="../../../index.html" aria-current="true">Library</a></nav>
+    </div>
+    <details class="site-navigation" open><summary>Menu</summary><nav aria-label="Library navigation"><a   href="../docs/README.html">Guides</a><a aria-current="true"  href="../modules.html">Modules</a><a   href="../../../versions.html">API & versions</a><a   href="../CHANGELOG.html">Changelog</a><a  class="nav-primary" href="../README.html">Get started</a></nav></details>
+    <button class="theme-toggle" type="button" aria-label="Switch to light theme">Light</button>
+  </header>
+  <div class="docs-shell"><aside class="sidebar" aria-label="Documentation navigation"><details class="nav-disclosure" open><summary class="mobile-nav-toggle">Browse library guides</summary><div><label class="search-label">Find a library guide<input type="search" data-doc-search placeholder="Search library docs" autocomplete="off" data-index="../search.json"></label><div class="search-results" aria-live="polite"></div><details open><summary>Start here</summary><a  href="../docs/README.html">Documentation</a><a  href="../README.html">Installation</a><a  href="../modules.html">Module guides</a><a  href="../CHANGELOG.html">Changelog</a></details><details open><summary>Capabilities</summary><a  href="../docs/terminal-feature-map.html">Feature map</a><a  href="../docs/features/terminal.html">Terminal</a><a  href="../docs/features/shells.html">Shell integration</a><a  href="../docs/features/desktop.html">Swing view & hosts</a><a  href="../docs/features/completion.html">Completion</a><a  href="../docs/features/embedding.html">Embedding</a><a  href="../docs/terminal-feature-gap-map.html">Known limits</a></details><details open><summary>Embedding guides</summary><a  href="../docs/library/configuration.html">Configuration</a><a  href="../docs/library/compatibility.html">Compatibility</a><a  href="../docs/library/render-ownership.html">Render ownership</a></details><details open><summary>Reference</summary><a  href="../docs/reference/protocol.html">Protocols</a><a  href="../docs/reference/notifications.html">Notifications</a><a  href="../docs/reference/storage.html">Storage & privacy</a></details><details open><summary>Development</summary><a  href="../ARCHITECTURE.html">Architecture</a><a  href="../CONTRIBUTING.html">Contributing</a><a  href="../docs/development/conformance-testing.html">Conformance testing</a></details></div></details></aside><main id="main" tabindex="-1" class="article article-with-outline"><div class="article-top"><nav class="breadcrumb" aria-label="Breadcrumb"><ol><li><a href="../../../index.html">Library</a></li><li><a href="../modules.html">Modules</a></li><li><a href="README.html">ketraterm-ui-swing</a></li><li><span aria-current="page">Module ketraterm-ui-swing</span></li></ol></nav><div class="doc-version"><span>Development</span><a href="../../../versions.html">All versions</a></div></div><details class="page-outline" open><summary>On this page</summary><nav aria-label="On this page"><a class="depth-2" href="#ownership">Ownership</a><a class="depth-2" href="#data-flow-and-threading">Data flow and threading</a><a class="depth-2" href="#maintainer-entry-points">Maintainer entry points</a><a class="depth-2" href="#consumer-and-abi-verification">Consumer and ABI verification</a></nav></details><div class="article-content"><div class="prose"><h1 id="module-ketraterm-ui-swing">Module ketraterm-ui-swing</h1>
+<p>Reusable Swing rendering and interaction for a host-owned <code>TerminalSession</code>.
+The public component is <code>io.github.ketraterm.ui.swing.api.SwingTerminal</code>.
+See the <a href="README.html#how-to-use">README</a> for construction and lifecycle.</p>
+<h2 id="ownership">Ownership</h2>
+<p>This module owns Java2D painting, visual cell geometry, selection, search
+presentation, viewport interaction, input collection, hyperlink discovery, and
+suggestion UI coordination. Session creation, transport choice, connection
+lifetime, completion engines, and product action policy belong to the host.</p>
+<p>The Gradle API dependencies are <code>ketraterm-session</code> and Kotlin immutable
+collections. Input encoding, render API/cache, and coroutine support are
+implementation dependencies. Standard JDK Swing/AWT provides the UI toolkit.
+There is no PTY, application, or IntelliJ dependency.</p>
+<h2 id="data-flow-and-threading">Data flow and threading</h2>
+<p>Session render publication is copied into an EDT-owned cache. Painting and hit
+testing share visual geometry; routine painting does not read a live session
+frame. Search, selection extraction, and discovery may take synchronized source
+reads. Background search and hyperlink workers publish results through binding
+and revision checks; they never access Swing state directly.</p>
+<p>The EDT owns components, settings installation, painters, and UI controllers.
+Public methods document any asynchronous dispatch or snapshot exceptions.
+Binding applies view settings and geometry to the session. One controlling view
+per session is supported. Unbinding and disposal release view work without
+closing the session.</p>
+<h2 id="maintainer-entry-points">Maintainer entry points</h2>
+<div class="table-scroll"><table>
+<thead>
+<tr>
+<th>Area</th>
+<th>Package / contract</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Component and host services</td>
+<td><code>api</code>; <a href="README.html#binding-and-configuration-ownership">binding contract</a></td>
+</tr>
+<tr>
+<td>Settings and palette</td>
+<td><code>settings</code>; immutable snapshots with detached builders</td>
+</tr>
+<tr>
+<td>Input collection</td>
+<td><code>input</code>; Swing gestures routed to session input</td>
+</tr>
+<tr>
+<td>Painting and font caches</td>
+<td><code>render</code>; <a href="docs/bifurcated-text-rendering.html">text rendering</a></td>
+</tr>
+<tr>
+<td>Viewport and damage</td>
+<td><code>viewport</code>; <a href="docs/swing-repaint-optimization.html">repaint contract</a></td>
+</tr>
+<tr>
+<td>Search / suggestions</td>
+<td><code>search</code> / <code>suggestion</code>; cancellable component-owned work</td>
+</tr>
+<tr>
+<td>Hyperlink discovery</td>
+<td><code>api</code>; <a href="docs/hyperlink-detection.html">detector contract</a></td>
+</tr>
+</tbody></table></div>
+<p>Internal helper benchmarks are compiled in this module&#39;s associated <code>jmh</code>
+source set. <code>benchmarkElements</code> exports them to the central
+<code>ketraterm-benchmarks</code> harness. Tests use deterministic frames and fake sessions;
+public consumption and ABI checks are described below.</p>
+<p>Supported capabilities and deferred work are recorded in the root
+<a href="../docs/terminal-feature-map.html">feature map</a> and
+<a href="../docs/terminal-feature-gap-map.html">gap map</a>.</p>
+<h2 id="consumer-and-abi-verification">Consumer and ABI verification</h2>
+<p>The <a href="README.html#how-to-use">README example</a> is compiled by the <a href="https://github.com/ketraterm/KetraTerm/blob/e3c7f9c626934093d35a67ca97afbbf1b343f28d/ketraterm-testkit/src/consumerTest/README.md">consumer fixtures</a>.</p>
+<pre><code class="language-shell">./gradlew :ketraterm-ui-swing:test :ketraterm-ui-swing:checkKotlinAbi
+./gradlew :ketraterm-testkit:publishedConsumerTest
+</code></pre>
+<p>See the <a href="../docs/library/compatibility.html">compatibility contract</a> before updating ABI baselines.</p>
+</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/e3c7f9c626934093d35a67ca97afbbf1b343f28d/ketraterm-ui-swing/Module.md">View source on GitHub ↗</a></div></div></main></div>
+  <footer>
+    <a class="brand" href="../../../index.html"><img class="brand-mark" src="../../../assets/logo.svg" alt="" width="34" height="34">KetraTerm Library</a>
+    <p>Open source · Apache 2.0</p>
+    <div><a href="https://github.com/ketraterm/KetraTerm">GitHub ↗</a><a href="https://github.com/ketraterm/KetraTerm/issues">Issues ↗</a><a class="product-switch" href="https://ketraterm.github.io/KetraTerm/">Desktop app ↗</a></div>
+  </footer>
+</body>
+</html>

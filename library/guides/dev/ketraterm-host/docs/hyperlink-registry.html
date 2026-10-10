@@ -1,0 +1,109 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="description" content="A modular Kotlin/JVM terminal emulator library for Swing and headless applications.">
+  <meta name="color-scheme" content="light dark">
+  <title>OSC 8 Hyperlink Registry &amp; Cache Invalidation · KetraTerm Library</title>
+  <link rel="icon" href="../../../../assets/logo.svg" type="image/svg+xml">
+  <link rel="preload" href="../../../../assets/fonts/manrope-variable.ttf" as="font" type="font/ttf" crossorigin>
+  <link rel="stylesheet" href="../../../../assets/styles.css">
+  <script type="importmap">{"imports":{"mermaid":"../../../../assets/mermaid/mermaid.esm.min.mjs"}}</script>
+  <script type="module" src="../../../../assets/site.js"></script>
+</head>
+<body data-product="library" data-version="Development">
+  <a class="skip" href="#main">Skip to content</a>
+  <header class="site-header">
+    <div class="site-identity">
+      <a class="brand" href="../../../../index.html" aria-label="KetraTerm Library home"><img class="brand-mark" src="../../../../assets/logo.svg" alt="" width="34" height="34">KetraTerm</a>
+      <nav class="product-navigation" aria-label="KetraTerm products"><a href="https://ketraterm.github.io/KetraTerm/">App</a><a href="../../../../index.html" aria-current="true">Library</a></nav>
+    </div>
+    <details class="site-navigation" open><summary>Menu</summary><nav aria-label="Library navigation"><a   href="../../docs/README.html">Guides</a><a aria-current="true"  href="../../modules.html">Modules</a><a   href="../../../../versions.html">API & versions</a><a   href="../../CHANGELOG.html">Changelog</a><a  class="nav-primary" href="../../README.html">Get started</a></nav></details>
+    <button class="theme-toggle" type="button" aria-label="Switch to light theme">Light</button>
+  </header>
+  <div class="docs-shell"><aside class="sidebar" aria-label="Documentation navigation"><details class="nav-disclosure" open><summary class="mobile-nav-toggle">Browse library guides</summary><div><label class="search-label">Find a library guide<input type="search" data-doc-search placeholder="Search library docs" autocomplete="off" data-index="../../search.json"></label><div class="search-results" aria-live="polite"></div><details open><summary>Start here</summary><a  href="../../docs/README.html">Documentation</a><a  href="../../README.html">Installation</a><a  href="../../modules.html">Module guides</a><a  href="../../CHANGELOG.html">Changelog</a></details><details open><summary>Capabilities</summary><a  href="../../docs/terminal-feature-map.html">Feature map</a><a  href="../../docs/features/terminal.html">Terminal</a><a  href="../../docs/features/shells.html">Shell integration</a><a  href="../../docs/features/desktop.html">Swing view & hosts</a><a  href="../../docs/features/completion.html">Completion</a><a  href="../../docs/features/embedding.html">Embedding</a><a  href="../../docs/terminal-feature-gap-map.html">Known limits</a></details><details open><summary>Embedding guides</summary><a  href="../../docs/library/configuration.html">Configuration</a><a  href="../../docs/library/compatibility.html">Compatibility</a><a  href="../../docs/library/render-ownership.html">Render ownership</a></details><details open><summary>Reference</summary><a  href="../../docs/reference/protocol.html">Protocols</a><a  href="../../docs/reference/notifications.html">Notifications</a><a  href="../../docs/reference/storage.html">Storage & privacy</a></details><details open><summary>Development</summary><a  href="../../ARCHITECTURE.html">Architecture</a><a  href="../../CONTRIBUTING.html">Contributing</a><a  href="../../docs/development/conformance-testing.html">Conformance testing</a></details></div></details></aside><main id="main" tabindex="-1" class="article article-with-outline"><div class="article-top"><nav class="breadcrumb" aria-label="Breadcrumb"><ol><li><a href="../../../../index.html">Library</a></li><li><a href="../../modules.html">Modules</a></li><li><a href="../README.html">ketraterm-host</a></li><li><span aria-current="page">OSC 8 Hyperlink Registry &amp; Cache Invalidation</span></li></ol></nav><div class="doc-version"><span>Development</span><a href="../../../../versions.html">All versions</a></div></div><details class="page-outline" open><summary>On this page</summary><nav aria-label="On this page"><a class="depth-2" href="#1-cell-hyperlink-representation">1. Cell Hyperlink Representation</a><a class="depth-2" href="#2-double-indexed-lru-registry-hostcommandadapter">2. Double-Indexed LRU Registry (HostCommandAdapter)</a><a class="depth-2" href="#3-eviction--safety-limits-hostpolicy">3. Eviction &amp; Safety Limits (HostPolicy)</a><a class="depth-2" href="#4-identity-lifetime-and-reset">4. Identity Lifetime and Reset</a></nav></details><div class="article-content"><div class="prose"><h1 id="osc-8-hyperlink-registry--cache-invalidation">OSC 8 Hyperlink Registry &amp; Cache Invalidation</h1>
+<p><code>HostCommandAdapter</code> retains bounded OSC 8 metadata while core cells and render
+frames carry numeric hyperlink IDs. Registry access must be serialized with
+adapter commands and core mutation. A session provides that boundary for its
+consumers.</p>
+<h2 id="1-cell-hyperlink-representation">1. Cell Hyperlink Representation</h2>
+<p>A cell&#39;s <code>hyperlinkId</code> is an <code>Int</code>: zero means no hyperlink; positive values
+identify registry entries. Closing OSC 8 clears the active writing hyperlink
+without removing entries used by already written cells.</p>
+<p><code>hyperlinkUri(id)</code> returns the retained URI or <code>null</code>. A cell can remain visible
+after its entry is evicted, reset, or otherwise unavailable, so consumers must
+handle a failed lookup. The adapter checks OSC 8 permission and URI/ID length
+limits; it does not enforce a browser scheme allowlist or open a destination.
+The embedding host owns validation and explicit activation of a resolved URI.</p>
+<h2 id="2-double-indexed-lru-registry-hostcommandadapter">2. Double-Indexed LRU Registry (<code>HostCommandAdapter</code>)</h2>
+<p>An access-ordered key-to-ID index controls retention; an ID-to-key index serves
+URI lookup. Both indexes change together under the serialized command owner.</p>
+<p>An explicit application <code>(id, URI)</code> pair reuses its numeric ID while retained
+and refreshes its recency. An anonymous link creates a distinct occurrence even
+when its URI matches a previous one. URI lookup itself does not refresh recency.</p>
+<p><code>hyperlinkRegistered</code> is emitted only for a new entry. <code>hyperlinkRemoved</code> follows
+an eviction, after the removed ID is unresolvable. Hard reset emits one
+<code>hyperlinksCleared</code> event for a nonempty registry instead of per-ID removals.
+These callbacks do not activate links.</p>
+<h2 id="3-eviction--safety-limits-hostpolicy">3. Eviction &amp; Safety Limits (<code>HostPolicy</code>)</h2>
+<p><a href="https://github.com/ketraterm/KetraTerm/blob/e3c7f9c626934093d35a67ca97afbbf1b343f28d/ketraterm-host/src/main/kotlin/io/github/ketraterm/host/HostPolicy.kt"><code>HostPolicy</code></a> bounds
+retention and accepted payload sizes:</p>
+<div class="table-scroll"><table>
+<thead>
+<tr>
+<th>Setting</th>
+<th>Default</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>maxHyperlinkEntries</code></td>
+<td><code>4096</code></td>
+<td>Maximum retained entries after an accepted open; must be positive</td>
+</tr>
+<tr>
+<td><code>maxHyperlinkUriLength</code></td>
+<td><code>4096</code></td>
+<td>Maximum URI length in UTF-16 code units; must be nonnegative</td>
+</tr>
+<tr>
+<td><code>maxHyperlinkIdLength</code></td>
+<td><code>256</code></td>
+<td>Maximum application ID length in UTF-16 code units; must be nonnegative</td>
+</tr>
+</tbody></table></div>
+<p>Denied or oversized opens clear the active hyperlink instead of truncating a
+destination or attaching the previous link to subsequent text.</p>
+<p>Policy replacement only publishes a volatile value; it does not mutate the
+registry or emit callbacks. The next accepted open captures the entry limit and
+evicts enough least-recently-used entries from both indexes to satisfy it,
+reserving a slot for a new entry. Explicit-key reuse refreshes recency before
+trimming and preserves that entry. Denied, invalid, and exhausted new opens do
+not trigger eviction. Work depends on the retained entry count, independently
+of the configured limit&#39;s magnitude.</p>
+<p>All removal callbacks precede replacement registration. Callback failures
+propagate and stop admission; completed removals remain coherent in both
+indexes. A later accepted open resumes enforcing the limit. Callbacks must not
+reenter mutation.</p>
+<h2 id="4-identity-lifetime-and-reset">4. Identity Lifetime and Reset</h2>
+<p>An issued numeric ID resolves to its original URI or becomes unresolved. It
+never resolves to a different URI during that adapter&#39;s lifetime. Cells,
+copied render data, and pending host actions may outlive a registry entry.</p>
+<p>Soft reset clears only the active hyperlink; retained entries remain
+resolvable. Hard reset clears active metadata and the registry without
+restarting allocation. Eviction likewise does not recycle IDs. Reopening an
+evicted explicit key therefore receives a new ID.</p>
+<p>IDs increase from <code>1</code> through <code>Int.MAX_VALUE</code>. Once exhausted, new entries are
+refused without evicting retained entries; subsequent text receives ID zero.
+Retained explicit pairs can still be reused. Hard reset does not undo
+exhaustion. A new adapter begins a new identity lifetime, so numeric IDs from
+different adapters must never be mixed.</p>
+</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/e3c7f9c626934093d35a67ca97afbbf1b343f28d/ketraterm-host/docs/hyperlink-registry.md">View source on GitHub ↗</a></div></div></main></div>
+  <footer>
+    <a class="brand" href="../../../../index.html"><img class="brand-mark" src="../../../../assets/logo.svg" alt="" width="34" height="34">KetraTerm Library</a>
+    <p>Open source · Apache 2.0</p>
+    <div><a href="https://github.com/ketraterm/KetraTerm">GitHub ↗</a><a href="https://github.com/ketraterm/KetraTerm/issues">Issues ↗</a><a class="product-switch" href="https://ketraterm.github.io/KetraTerm/">Desktop app ↗</a></div>
+  </footer>
+</body>
+</html>

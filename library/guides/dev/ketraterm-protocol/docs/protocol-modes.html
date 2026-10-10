@@ -1,0 +1,291 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="description" content="A modular Kotlin/JVM terminal emulator library for Swing and headless applications.">
+  <meta name="color-scheme" content="light dark">
+  <title>Terminal Protocol Modes Reference · KetraTerm Library</title>
+  <link rel="icon" href="../../../../assets/logo.svg" type="image/svg+xml">
+  <link rel="preload" href="../../../../assets/fonts/manrope-variable.ttf" as="font" type="font/ttf" crossorigin>
+  <link rel="stylesheet" href="../../../../assets/styles.css">
+  <script type="importmap">{"imports":{"mermaid":"../../../../assets/mermaid/mermaid.esm.min.mjs"}}</script>
+  <script type="module" src="../../../../assets/site.js"></script>
+</head>
+<body data-product="library" data-version="Development">
+  <a class="skip" href="#main">Skip to content</a>
+  <header class="site-header">
+    <div class="site-identity">
+      <a class="brand" href="../../../../index.html" aria-label="KetraTerm Library home"><img class="brand-mark" src="../../../../assets/logo.svg" alt="" width="34" height="34">KetraTerm</a>
+      <nav class="product-navigation" aria-label="KetraTerm products"><a href="https://ketraterm.github.io/KetraTerm/">App</a><a href="../../../../index.html" aria-current="true">Library</a></nav>
+    </div>
+    <details class="site-navigation" open><summary>Menu</summary><nav aria-label="Library navigation"><a   href="../../docs/README.html">Guides</a><a aria-current="true"  href="../../modules.html">Modules</a><a   href="../../../../versions.html">API & versions</a><a   href="../../CHANGELOG.html">Changelog</a><a  class="nav-primary" href="../../README.html">Get started</a></nav></details>
+    <button class="theme-toggle" type="button" aria-label="Switch to light theme">Light</button>
+  </header>
+  <div class="docs-shell"><aside class="sidebar" aria-label="Documentation navigation"><details class="nav-disclosure" open><summary class="mobile-nav-toggle">Browse library guides</summary><div><label class="search-label">Find a library guide<input type="search" data-doc-search placeholder="Search library docs" autocomplete="off" data-index="../../search.json"></label><div class="search-results" aria-live="polite"></div><details open><summary>Start here</summary><a  href="../../docs/README.html">Documentation</a><a  href="../../README.html">Installation</a><a  href="../../modules.html">Module guides</a><a  href="../../CHANGELOG.html">Changelog</a></details><details open><summary>Capabilities</summary><a  href="../../docs/terminal-feature-map.html">Feature map</a><a  href="../../docs/features/terminal.html">Terminal</a><a  href="../../docs/features/shells.html">Shell integration</a><a  href="../../docs/features/desktop.html">Swing view & hosts</a><a  href="../../docs/features/completion.html">Completion</a><a  href="../../docs/features/embedding.html">Embedding</a><a  href="../../docs/terminal-feature-gap-map.html">Known limits</a></details><details open><summary>Embedding guides</summary><a  href="../../docs/library/configuration.html">Configuration</a><a  href="../../docs/library/compatibility.html">Compatibility</a><a  href="../../docs/library/render-ownership.html">Render ownership</a></details><details open><summary>Reference</summary><a  href="../../docs/reference/protocol.html">Protocols</a><a  href="../../docs/reference/notifications.html">Notifications</a><a  href="../../docs/reference/storage.html">Storage & privacy</a></details><details open><summary>Development</summary><a  href="../../ARCHITECTURE.html">Architecture</a><a  href="../../CONTRIBUTING.html">Contributing</a><a  href="../../docs/development/conformance-testing.html">Conformance testing</a></details></div></details></aside><main id="main" tabindex="-1" class="article article-with-outline"><div class="article-top"><nav class="breadcrumb" aria-label="Breadcrumb"><ol><li><a href="../../../../index.html">Library</a></li><li><a href="../../modules.html">Modules</a></li><li><a href="../README.html">ketraterm-protocol</a></li><li><span aria-current="page">Terminal Protocol Modes Reference</span></li></ol></nav><div class="doc-version"><span>Development</span><a href="../../../../versions.html">All versions</a></div></div><details class="page-outline" open><summary>On this page</summary><nav aria-label="On this page"><a class="depth-2" href="#1-standard-ansi-modes">1. Standard ANSI Modes</a><a class="depth-2" href="#2-dec-private-modes">2. DEC Private Modes</a><a class="depth-3" href="#cursor--display-settings">Cursor &amp; Display Settings</a><a class="depth-3" href="#margins--buffers">Margins &amp; Buffers</a><a class="depth-3" href="#mouse-tracking--reporting">Mouse Tracking &amp; Reporting</a><a class="depth-3" href="#modern-enhancements">Modern Enhancements</a><a class="depth-2" href="#3-mode-status-and-host-capabilities">3. Mode Status and Host Capabilities</a></nav></details><div class="article-content"><div class="prose"><h1 id="terminal-protocol-modes-reference">Terminal Protocol Modes Reference</h1>
+<p>Mode identifiers declared by <code>AnsiMode</code> and <code>DecPrivateMode</code>. These are wire
+parameters, not packed-state bit positions. Their presence in this module does
+not authorize a host action or guarantee an encoding path. Consult the
+<a href="../../docs/terminal-feature-map.html">feature map</a> for support status, the
+<a href="../../ketraterm-core/docs/terminal-core-contract.html#mode-state-contract">core contract</a>
+for state semantics, and the
+<a href="../../ketraterm-input/docs/terminal-input-contract.html">input contract</a> for reports.</p>
+<p><code>CSI</code> denotes the control-sequence introducer, commonly transmitted as <code>ESC [</code>.</p>
+<h2 id="1-standard-ansi-modes">1. Standard ANSI Modes</h2>
+<p><code>CSI Pn h</code> sets an ANSI mode; <code>CSI Pn l</code> resets it.</p>
+<div class="table-scroll"><table>
+<thead>
+<tr>
+<th align="left">Constant</th>
+<th align="left">Value</th>
+<th align="left">Meaning</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="left"><code>INSERT</code></td>
+<td align="left"><code>4</code></td>
+<td align="left">Insert characters at the cursor rather than overwrite.</td>
+</tr>
+<tr>
+<td align="left"><code>NEW_LINE</code></td>
+<td align="left"><code>20</code></td>
+<td align="left">Line feeds also return the cursor to the first column.</td>
+</tr>
+</tbody></table></div>
+<h2 id="2-dec-private-modes">2. DEC Private Modes</h2>
+<p><code>CSI ? Pn h</code> sets a DEC private mode; <code>CSI ? Pn l</code> resets it.</p>
+<h3 id="cursor--display-settings">Cursor &amp; Display Settings</h3>
+<div class="table-scroll"><table>
+<thead>
+<tr>
+<th align="left">Constant</th>
+<th align="left">Value</th>
+<th align="left">Meaning</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="left"><code>APPLICATION_CURSOR_KEYS</code></td>
+<td align="left"><code>1</code></td>
+<td align="left">Select application cursor-key sequences.</td>
+</tr>
+<tr>
+<td align="left"><code>REVERSE_VIDEO</code></td>
+<td align="left"><code>5</code></td>
+<td align="left">Select reverse display presentation.</td>
+</tr>
+<tr>
+<td align="left"><code>ORIGIN</code></td>
+<td align="left"><code>6</code></td>
+<td align="left">Address the cursor relative to active margins.</td>
+</tr>
+<tr>
+<td align="left"><code>AUTO_WRAP</code></td>
+<td align="left"><code>7</code></td>
+<td align="left">Enable automatic line wrapping at the right margin.</td>
+</tr>
+<tr>
+<td align="left"><code>CURSOR_BLINK</code></td>
+<td align="left"><code>12</code></td>
+<td align="left">Request a blinking cursor.</td>
+</tr>
+<tr>
+<td align="left"><code>CURSOR_VISIBLE</code></td>
+<td align="left"><code>25</code></td>
+<td align="left">Show the cursor.</td>
+</tr>
+<tr>
+<td align="left"><code>APPLICATION_KEYPAD</code></td>
+<td align="left"><code>66</code></td>
+<td align="left">Select application numeric-keypad sequences.</td>
+</tr>
+<tr>
+<td align="left"><code>BACKARROW_KEY</code></td>
+<td align="left"><code>67</code></td>
+<td align="left">Backspace sends BS when set and DEL when reset.</td>
+</tr>
+</tbody></table></div>
+<h3 id="margins--buffers">Margins &amp; Buffers</h3>
+<div class="table-scroll"><table>
+<thead>
+<tr>
+<th align="left">Constant</th>
+<th align="left">Value</th>
+<th align="left">Meaning</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="left"><code>DECCOLM</code></td>
+<td align="left"><code>3</code></td>
+<td align="left">Select 132 columns when set, 80 when reset.</td>
+</tr>
+<tr>
+<td align="left"><code>LEFT_RIGHT_MARGIN</code></td>
+<td align="left"><code>69</code></td>
+<td align="left">Enable left/right margin controls (DECSLRM).</td>
+</tr>
+<tr>
+<td align="left"><code>ALT_SCREEN</code></td>
+<td align="left"><code>47</code></td>
+<td align="left">Switch primary/alternate screens without clearing or saving the cursor.</td>
+</tr>
+<tr>
+<td align="left"><code>ALT_SCREEN_BUFFER</code></td>
+<td align="left"><code>1047</code></td>
+<td align="left">Enter a cleared alternate screen; exit without restoring a saved cursor.</td>
+</tr>
+<tr>
+<td align="left"><code>SAVE_RESTORE_CURSOR</code></td>
+<td align="left"><code>1048</code></td>
+<td align="left">Save cursor state on set, restore it on reset.</td>
+</tr>
+<tr>
+<td align="left"><code>ALT_SCREEN_SAVE_CURSOR</code></td>
+<td align="left"><code>1049</code></td>
+<td align="left">Save the primary cursor and enter a cleared alternate screen; restore on exit.</td>
+</tr>
+</tbody></table></div>
+<p>The <a href="../../ketraterm-core/docs/terminal-core-contract.html#primary-and-alternate-screens">core lifecycle contract</a>
+describes repeated switches, cursor presentation, and alternate content retention.
+<code>DECCOLM</code> also clears and resets state; it is not a general-purpose resize API.</p>
+<h3 id="mouse-tracking--reporting">Mouse Tracking &amp; Reporting</h3>
+<p>Tracking modes select which events are reported; encoding modes select their wire
+format. They are independent selections.</p>
+<div class="table-scroll"><table>
+<thead>
+<tr>
+<th align="left">Constant</th>
+<th align="left">Value</th>
+<th align="left">Meaning</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="left"><code>MOUSE_X10</code></td>
+<td align="left"><code>9</code></td>
+<td align="left">Button presses only.</td>
+</tr>
+<tr>
+<td align="left"><code>MOUSE_NORMAL</code></td>
+<td align="left"><code>1000</code></td>
+<td align="left">Button press/release and wheel events.</td>
+</tr>
+<tr>
+<td align="left"><code>MOUSE_BUTTON_EVENT</code></td>
+<td align="left"><code>1002</code></td>
+<td align="left">Normal tracking plus motion with a button held.</td>
+</tr>
+<tr>
+<td align="left"><code>MOUSE_ANY_EVENT</code></td>
+<td align="left"><code>1003</code></td>
+<td align="left">Normal tracking plus motion, including hover.</td>
+</tr>
+<tr>
+<td align="left"><code>FOCUS_REPORTING</code></td>
+<td align="left"><code>1004</code></td>
+<td align="left">Focus gain/loss reports.</td>
+</tr>
+<tr>
+<td align="left"><code>MOUSE_UTF8</code></td>
+<td align="left"><code>1005</code></td>
+<td align="left">UTF-8 extended mouse coordinates.</td>
+</tr>
+<tr>
+<td align="left"><code>MOUSE_SGR</code></td>
+<td align="left"><code>1006</code></td>
+<td align="left">SGR decimal reports with cell coordinates.</td>
+</tr>
+<tr>
+<td align="left"><code>MOUSE_URXVT</code></td>
+<td align="left"><code>1015</code></td>
+<td align="left">urxvt decimal mouse reports.</td>
+</tr>
+<tr>
+<td align="left"><code>MOUSE_SGR_PIXELS</code></td>
+<td align="left"><code>1016</code></td>
+<td align="left">SGR decimal reports with pixel coordinates.</td>
+</tr>
+</tbody></table></div>
+<p>The <a href="../../ketraterm-input/docs/terminal-input-contract.html#mouse-contract">mouse contract</a>
+defines coordinate bounds and admission. Encoding vocabulary does not imply that
+every encoding is enabled by the encoder&#39;s policy.</p>
+<h3 id="modern-enhancements">Modern Enhancements</h3>
+<div class="table-scroll"><table>
+<thead>
+<tr>
+<th align="left">Constant</th>
+<th align="left">Value</th>
+<th align="left">Meaning</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="left"><code>BRACKETED_PASTE</code></td>
+<td align="left"><code>2004</code></td>
+<td align="left">Surround a paste with <code>CSI 200 ~</code> and <code>CSI 201 ~</code>.</td>
+</tr>
+<tr>
+<td align="left"><code>BELL_IS_URGENT</code></td>
+<td align="left"><code>1042</code></td>
+<td align="left">Request host attention on BEL.</td>
+</tr>
+<tr>
+<td align="left"><code>POP_ON_BELL</code></td>
+<td align="left"><code>1043</code></td>
+<td align="left">Request that the host raise its window on BEL.</td>
+</tr>
+<tr>
+<td align="left"><code>SYNCHRONIZED_OUTPUT</code></td>
+<td align="left"><code>2026</code></td>
+<td align="left">Hold render publication while a group of updates is applied.</td>
+</tr>
+</tbody></table></div>
+<p>Bracketed paste lets applications distinguish pasted text from typed input; the
+markers do not enforce application behavior or prevent execution. Synchronized
+output continues parsing and grid mutation; the session controls publication and
+releases a held frame on reset or timeout.</p>
+<h2 id="3-mode-status-and-host-capabilities">3. Mode Status and Host Capabilities</h2>
+<p><code>TerminalModeStatus</code> defines the DECRPM status parameter:</p>
+<div class="table-scroll"><table>
+<thead>
+<tr>
+<th align="left">Constant</th>
+<th align="left">Value</th>
+<th align="left">Meaning</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="left"><code>UNRECOGNIZED</code></td>
+<td align="left"><code>0</code></td>
+<td align="left">No supported status report for this mode.</td>
+</tr>
+<tr>
+<td align="left"><code>SET</code></td>
+<td align="left"><code>1</code></td>
+<td align="left">Currently set.</td>
+</tr>
+<tr>
+<td align="left"><code>RESET</code></td>
+<td align="left"><code>2</code></td>
+<td align="left">Currently reset.</td>
+</tr>
+<tr>
+<td align="left"><code>PERMANENTLY_SET</code></td>
+<td align="left"><code>3</code></td>
+<td align="left">Fixed in the set state.</td>
+</tr>
+<tr>
+<td align="left"><code>PERMANENTLY_RESET</code></td>
+<td align="left"><code>4</code></td>
+<td align="left">Fixed in the reset state.</td>
+</tr>
+</tbody></table></div>
+<p><code>TerminalHostModeCapability.URGENT_BELL</code> (<code>2</code>) and <code>POP_ON_BELL</code> (<code>4</code>) describe
+host actions available to status reporting; <code>ALL</code> is their combined mask (<code>6</code>).
+A host can expose a capability while denying an individual request. These bits
+are neither DEC mode numbers nor policy permissions.</p>
+</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/e3c7f9c626934093d35a67ca97afbbf1b343f28d/ketraterm-protocol/docs/protocol-modes.md">View source on GitHub ↗</a></div></div></main></div>
+  <footer>
+    <a class="brand" href="../../../../index.html"><img class="brand-mark" src="../../../../assets/logo.svg" alt="" width="34" height="34">KetraTerm Library</a>
+    <p>Open source · Apache 2.0</p>
+    <div><a href="https://github.com/ketraterm/KetraTerm">GitHub ↗</a><a href="https://github.com/ketraterm/KetraTerm/issues">Issues ↗</a><a class="product-switch" href="https://ketraterm.github.io/KetraTerm/">Desktop app ↗</a></div>
+  </footer>
+</body>
+</html>

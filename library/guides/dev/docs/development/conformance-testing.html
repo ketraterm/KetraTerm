@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="description" content="A modular Kotlin/JVM terminal emulator library for Swing and headless applications.">
+  <meta name="color-scheme" content="light dark">
+  <title>Terminal Conformance Testing · KetraTerm Library</title>
+  <link rel="icon" href="../../../../assets/logo.svg" type="image/svg+xml">
+  <link rel="preload" href="../../../../assets/fonts/manrope-variable.ttf" as="font" type="font/ttf" crossorigin>
+  <link rel="stylesheet" href="../../../../assets/styles.css">
+  <script type="importmap">{"imports":{"mermaid":"../../../../assets/mermaid/mermaid.esm.min.mjs"}}</script>
+  <script type="module" src="../../../../assets/site.js"></script>
+</head>
+<body data-product="library" data-version="Development">
+  <a class="skip" href="#main">Skip to content</a>
+  <header class="site-header">
+    <div class="site-identity">
+      <a class="brand" href="../../../../index.html" aria-label="KetraTerm Library home"><img class="brand-mark" src="../../../../assets/logo.svg" alt="" width="34" height="34">KetraTerm</a>
+      <nav class="product-navigation" aria-label="KetraTerm products"><a href="https://ketraterm.github.io/KetraTerm/">App</a><a href="../../../../index.html" aria-current="true">Library</a></nav>
+    </div>
+    <details class="site-navigation" open><summary>Menu</summary><nav aria-label="Library navigation"><a aria-current="true"  href="../README.html">Guides</a><a   href="../../modules.html">Modules</a><a   href="../../../../versions.html">API & versions</a><a   href="../../CHANGELOG.html">Changelog</a><a  class="nav-primary" href="../../README.html">Get started</a></nav></details>
+    <button class="theme-toggle" type="button" aria-label="Switch to light theme">Light</button>
+  </header>
+  <div class="docs-shell"><aside class="sidebar" aria-label="Documentation navigation"><details class="nav-disclosure" open><summary class="mobile-nav-toggle">Browse library guides</summary><div><label class="search-label">Find a library guide<input type="search" data-doc-search placeholder="Search library docs" autocomplete="off" data-index="../../search.json"></label><div class="search-results" aria-live="polite"></div><details open><summary>Start here</summary><a  href="../README.html">Documentation</a><a  href="../../README.html">Installation</a><a  href="../../modules.html">Module guides</a><a  href="../../CHANGELOG.html">Changelog</a></details><details open><summary>Capabilities</summary><a  href="../terminal-feature-map.html">Feature map</a><a  href="../features/terminal.html">Terminal</a><a  href="../features/shells.html">Shell integration</a><a  href="../features/desktop.html">Swing view & hosts</a><a  href="../features/completion.html">Completion</a><a  href="../features/embedding.html">Embedding</a><a  href="../terminal-feature-gap-map.html">Known limits</a></details><details open><summary>Embedding guides</summary><a  href="../library/configuration.html">Configuration</a><a  href="../library/compatibility.html">Compatibility</a><a  href="../library/render-ownership.html">Render ownership</a></details><details open><summary>Reference</summary><a  href="../reference/protocol.html">Protocols</a><a  href="../reference/notifications.html">Notifications</a><a  href="../reference/storage.html">Storage & privacy</a></details><details open><summary>Development</summary><a  href="../../ARCHITECTURE.html">Architecture</a><a  href="../../CONTRIBUTING.html">Contributing</a><a aria-current="page" href="conformance-testing.html">Conformance testing</a></details></div></details></aside><main id="main" tabindex="-1" class="article article-with-outline"><div class="article-top"><nav class="breadcrumb" aria-label="Breadcrumb"><ol><li><a href="../../../../index.html">Library</a></li><li><span>Development</span></li><li><span aria-current="page">Terminal Conformance Testing</span></li></ol></nav><div class="doc-version"><span>Development</span><a href="../../../../versions.html">All versions</a></div></div><details class="page-outline" open><summary>On this page</summary><nav aria-label="On this page"><a class="depth-2" href="#differential-campaign">Differential campaign</a><a class="depth-2" href="#resize-and-reflow-campaign">Resize and reflow campaign</a><a class="depth-2" href="#independent-grid-physics-model">Independent grid-physics model</a><a class="depth-2" href="#reproducing-failures">Reproducing failures</a><a class="depth-2" href="#streaming-placement">Streaming placement</a></nav></details><div class="article-content"><div class="prose"><h1 id="terminal-conformance-testing">Terminal Conformance Testing</h1>
+<p>KetraTerm verifies terminal behavior with complementary deterministic test
+strategies. No single external emulator is treated as a universal oracle:
+terminal implementations legitimately differ in policy areas such as
+width-changing resize and logical-line reflow.</p>
+<h2 id="differential-campaign">Differential campaign</h2>
+<p>The xterm.js campaign replays generated protocol streams through KetraTerm and
+the version-pinned <code>@xterm/headless</code> oracle. Comparisons are restricted to state
+that both implementations expose. Intentional policy differences must declare
+their rationale and exact allowed mismatch paths.</p>
+<pre><code class="language-bash">./gradlew :ketraterm-testkit:xtermDifferentialSmokeTest
+./gradlew :ketraterm-testkit:xtermDifferentialNightlyTest
+</code></pre>
+<p>Pull requests run 100 deterministic cases. The scheduled campaign runs 100,000
+cases in four seed-range shards.</p>
+<h2 id="resize-and-reflow-campaign">Resize and reflow campaign</h2>
+<p>The resize campaign constructs mixed-width Unicode state and repeatedly changes
+the viewport width and height. It verifies exact grapheme preservation, cursor
+bounds, dimensions, render-cell flags, and wide-cell adjacency. This is an
+invariant campaign focused on KetraTerm&#39;s own resize and reflow policy.</p>
+<pre><code class="language-bash">./gradlew :ketraterm-testkit:resizeReflowInvariantSmokeTest
+./gradlew :ketraterm-testkit:resizeReflowInvariantNightlyTest
+</code></pre>
+<h2 id="independent-grid-physics-model">Independent grid-physics model</h2>
+<p>The grid-physics campaign executes each generated operation against the real
+parser-to-core pipeline and a deliberately small independent model. It covers:</p>
+<ul>
+<li>ASCII, combining clusters, CJK characters, and width-two emoji;</li>
+<li>deferred wrap, DECAWM, CR, LF, BS, CUP, CUF, and CUB;</li>
+<li>DECSTBM, DECSLRM, DECLRMM, and DECOM;</li>
+<li>RI, IL, DL, SU, and SD;</li>
+<li>full-screen and partial-region scrolling, including scrollback admission;</li>
+<li>wide occupants crossing horizontal line-mutation slice boundaries.</li>
+</ul>
+<p>The comparison includes cell and cluster contents, wide spans, cursor position,
+mode state, soft-wrap markers, scrolling, and retained history.</p>
+<pre><code class="language-bash">./gradlew :ketraterm-testkit:cursorWrapModelSmokeTest
+./gradlew :ketraterm-testkit:cursorWrapModelNightlyTest
+</code></pre>
+<p>Pull requests run 100 cases. Nightly CI runs 25,000 cases in four deterministic
+ranges of 6,250.</p>
+<h2 id="reproducing-failures">Reproducing failures</h2>
+<p>Every campaign uses a fixed base seed plus a global case index. Select an exact
+range with the corresponding <code>StartIndex</code> and <code>Cases</code> Gradle properties:</p>
+<pre><code class="language-bash">./gradlew :ketraterm-testkit:cursorWrapModelNightlyTest \
+  -PcursorWrapStartIndex=12500 \
+  -PcursorWrapCases=6250
+</code></pre>
+<p>Campaign manifests record the implementation or oracle version where
+applicable, base seed, case range, commit SHA, comparison scope, and status.
+Failures are automatically minimized and written beneath the relevant
+<code>ketraterm-testkit/build/reports</code> campaign directory. CI uploads manifests for
+all runs and retains minimized operation streams plus JUnit reports on failure.</p>
+<h2 id="streaming-placement">Streaming placement</h2>
+<p>The <a href="../reference/protocol.html#streaming-grapheme-placement">streaming placement contract</a>
+commits published grid effects. <code>HostGraphemePolicyTest</code> verifies that policy.
+Four retained <code>HostGraphemeTest</code> oracles test the stronger, unsupported requirement
+that every byte split produces identical placement:</p>
+<ul>
+<li>Narrowing does not restore an overwritten neighbor.</li>
+<li>Widening at a margin can differ from an initially wide write.</li>
+<li>Late narrowing does not undo history eviction on a one-cell grid.</li>
+<li>Late narrowing does not move an already wrapped cluster back.</li>
+</ul>
+<p>The <code>knownR06Failure</code> helper reports only recorded assertion failures as
+skipped/aborted. Additional failures, changed messages, or unexpected passes fail
+the test and require review. A skip does not establish that later iterations of
+an oracle passed. Ordinary grapheme and byte-stream tests remain active.</p>
+<p><code>./gradlew :ketraterm-host:test --tests &#39;*HostGrapheme*&#39; --tests &#39;*KnownR06FailureTest&#39;</code>
+runs this focused verification.</p>
+</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/e3c7f9c626934093d35a67ca97afbbf1b343f28d/docs/development/conformance-testing.md">View source on GitHub ↗</a></div></div></main></div>
+  <footer>
+    <a class="brand" href="../../../../index.html"><img class="brand-mark" src="../../../../assets/logo.svg" alt="" width="34" height="34">KetraTerm Library</a>
+    <p>Open source · Apache 2.0</p>
+    <div><a href="https://github.com/ketraterm/KetraTerm">GitHub ↗</a><a href="https://github.com/ketraterm/KetraTerm/issues">Issues ↗</a><a class="product-switch" href="https://ketraterm.github.io/KetraTerm/">Desktop app ↗</a></div>
+  </footer>
+</body>
+</html>

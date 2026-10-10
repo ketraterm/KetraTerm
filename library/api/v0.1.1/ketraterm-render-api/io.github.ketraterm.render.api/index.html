@@ -1,0 +1,359 @@
+<!doctype html>
+<html class="no-js" lang="en">
+<head>
+    <meta name="viewport" content="width=device-width, initial-scale=1" charset="UTF-8">
+    <title>io.github.ketraterm.render.api</title>
+<link href="../../images/logo-icon.svg" rel="icon" type="image/svg"><script>var pathToRoot = "../../";</script>
+    <script>document.documentElement.classList.replace("no-js", "js");</script>
+    <script>const storage = localStorage.getItem("dokka-dark-mode")
+      if (storage == null) {
+        const osDarkSchemePreferred = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches
+        if (osDarkSchemePreferred === true) {
+          document.getElementsByTagName("html")[0].classList.add("theme-dark")
+        }
+      } else {
+        const savedDarkMode = JSON.parse(storage)
+        if (savedDarkMode === true) {
+          document.getElementsByTagName("html")[0].classList.add("theme-dark")
+        }
+      }
+    </script>
+<script type="text/javascript" src="../../scripts/sourceset_dependencies.js" async></script>
+<link href="../../styles/style.css" rel="Stylesheet">
+<link href="../../styles/main.css" rel="Stylesheet">
+<link href="../../styles/prism.css" rel="Stylesheet">
+<link href="../../styles/logo-styles.css" rel="Stylesheet">
+<link href="../../ui-kit/ui-kit.min.css" rel="Stylesheet">
+<script type="text/javascript" src="../../scripts/safe-local-storage_blocking.js"></script>
+<script type="text/javascript" src="../../scripts/navigation-loader.js" async></script>
+<script type="text/javascript" src="../../scripts/platform-content-handler.js" async></script>
+<script type="text/javascript" src="../../scripts/main.js" defer></script>
+<script type="text/javascript" src="../../scripts/prism.js" async></script>
+<script type="text/javascript" src="../../ui-kit/ui-kit.min.js" defer></script><!-- ketraterm-api-stylesheet:start -->
+<link rel="icon" href="../../../../assets/logo.svg" type="image/svg+xml">
+<link rel="stylesheet" href="../../../../assets/api-navigation.css">
+<!-- ketraterm-api-stylesheet:end --></head>
+<body>
+<div class="root"><!-- ketraterm-api-navigation:start -->
+<div class="ketraterm-api-navigation">
+  <a class="ketraterm-api-brand" href="../../../../index.html" aria-label="KetraTerm Library home"><img src="../../../../assets/logo.svg" alt="" width="28" height="28">KetraTerm</a>
+  <nav class="ketraterm-api-products" aria-label="KetraTerm products"><a href="https://ketraterm.github.io/KetraTerm/">App</a><a href="../../../../index.html" aria-current="true">Library</a></nav>
+  <div class="ketraterm-api-reference"><span>API · v0.1.1</span><a href="../../../../versions.html">All versions</a></div>
+</div>
+<!-- ketraterm-api-navigation:end -->
+    <header class="navigation theme-dark" id="navigation-wrapper" role="banner">
+<a class="library-name--link" href="../../index.html">
+                    KetraTerm
+            </a>        <button class="navigation-controls--btn navigation-controls--btn_toc ui-kit_mobile-only" id="toc-toggle" type="button">Toggle table of contents
+        </button>
+        <div class="navigation-controls--break ui-kit_mobile-only"></div>
+        <div class="library-version" id="library-version">
+        </div>
+        <div class="navigation-controls">
+        <ul class="filter-section filter-section_loading" id="filter-section" aria-label="Target filter">
+                <button class="platform-tag platform-selector jvm-like" data-active="" aria-pressed="true" data-filter=":ketraterm-render-api/main">jvm</button>
+            <div class="dropdown filter-section--dropdown" data-role="dropdown" id="filter-section-dropdown">
+                <button class="button button_dropdown filter-section--dropdown-toggle" role="combobox" data-role="dropdown-toggle" aria-controls="platform-tags-listbox" aria-haspopup="listbox" aria-expanded="false" aria-label="Toggle source sets"></button>
+                <ul role="listbox" id="platform-tags-listbox" class="dropdown--list" data-role="dropdown-listbox" aria-label="Target filter">
+                    <div class="dropdown--header"><span>Target filter</span>
+                        <button class="button" data-role="dropdown-toggle" aria-label="Close target filter">
+                            <i class="ui-kit-icon ui-kit-icon_cross"></i>
+                        </button>
+                    </div>
+                        <li role="option" class="dropdown--option platform-selector-option jvm-like" tabindex="0">
+                            <label class="checkbox">
+                                <input type="checkbox" class="checkbox--input" id=":ketraterm-render-api/main" data-filter=":ketraterm-render-api/main">
+                                <span class="checkbox--icon"></span>
+                                jvm
+                            </label>
+                        </li>
+                </ul>
+                <div class="dropdown--overlay"></div>
+            </div>
+        </ul>
+            <button class="navigation-controls--btn navigation-controls--btn_theme" id="theme-toggle-button" type="button">Switch theme
+            </button>
+            <div class="navigation-controls--btn navigation-controls--btn_search" id="searchBar" role="button">Search in
+                API
+            </div>
+        </div>
+    </header>
+    <div id="container">
+        <nav id="leftColumn" class="sidebar" data-item-type="SECTION" data-item-config="{&quot;defaultSize&quot;: 280, &quot;minSize&quot;: 200, &quot;maxSize&quot;: 400}">
+            <a class="toc--skip-link" href="#main">Skip to content</a>
+            <div class="dropdown theme-dark_mobile" data-role="dropdown" id="toc-dropdown">
+                <ul role="listbox" id="toc-listbox" class="dropdown--list dropdown--list_toc-list" data-role="dropdown-listbox" aria-label="Table of contents">
+                    <div class="dropdown--header">
+                            <span>
+                                    KetraTerm
+                            </span>
+                        <button class="button" data-role="dropdown-toggle" aria-label="Close table of contents">
+                            <i class="ui-kit-icon ui-kit-icon_cross"></i>
+                        </button>
+                    </div>
+                    <div class="sidebar--inner" id="sideMenu"></div>
+                </ul>
+                <div class="dropdown--overlay"></div>
+            </div>
+        </nav>
+        <div id="resizer" class="resizer" data-item-type="BAR"></div>
+        <div id="main" data-item-type="SECTION" role="main">
+<div class="main-content" data-page-type="package" id="content" pageids="ketraterm-render-api::io.github.ketraterm.render.api////PointingToDeclaration//1947863099">
+  <div class="breadcrumbs"><a href="../index.html">ketraterm-render-api</a><span class="delimiter">/</span><span class="current">io.github.ketraterm.render.api</span></div>
+  <div class="cover ">
+    <h1 class="cover"><span><span>Package-level</span></span> <span><span>declarations</span></span></h1>
+  </div>
+  <div class="tabbedcontent">
+    <div class="tabs-section" tabs-section="tabs-section"><button class="section-tab" data-active="" data-togglable="TYPE">Types</button></div>
+    <div class="tabs-section-body">
+      <div data-togglable="TYPE">
+        <h2 class="tableheader">Types</h2>
+        <div class="table"><a data-name="1902970316%2FClasslikes%2F1947863099" anchor-label="TerminalColorPalette" id="1902970316%2FClasslikes%2F1947863099" data-filterable-set=":ketraterm-render-api/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-render-api/main" data-filterable-set=":ketraterm-render-api/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-terminal-color-palette/index.html"><span>Terminal</span><wbr><span>Color</span><wbr><span><span>Palette</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="1902970316%2FClasslikes%2F1947863099"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-render-api/main"><div class="symbol monospace"><span class="token keyword">class </span><a href="-terminal-color-palette/index.html">TerminalColorPalette</a><span class="token punctuation">(</span><span class="parameters "><span class="parameter "><span class="token keyword">val </span>defaultForeground<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a><span class="token operator"> = </span>0xFFFFFFFF.toInt()<span class="token punctuation">, </span></span><span class="parameter "><span class="token keyword">val </span>defaultBackground<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a><span class="token operator"> = </span>0xFF000000.toInt()<span class="token punctuation">, </span></span><span class="parameter "><span class="token keyword">val </span>selectionForeground<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a><span class="token operator"> = </span>0xFFFFFFFF.toInt()<span class="token punctuation">, </span></span><span class="parameter "><span class="token keyword">val </span>selectionBackground<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a><span class="token operator"> = </span>0xFF000000.toInt()<span class="token punctuation">, </span></span><span class="parameter "><span class="token keyword">val </span>cursorForeground<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a><span class="token operator"> = </span>0xFF000000.toInt()<span class="token punctuation">, </span></span><span class="parameter "><span class="token keyword">val </span>cursorBackground<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a><span class="token operator"> = </span>0xFFFFFFFF.toInt()<span class="token punctuation">, </span></span><span class="parameter ">indexedColors<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int-array/index.html">IntArray</a><span class="token operator"> = </span>defaultIndexedColors()<span class="token punctuation">, </span></span><span class="parameter "><span class="token keyword">val </span>boldAsBright<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-boolean/index.html">Boolean</a><span class="token operator"> = </span><span class="token boolean">true</span></span></span><span class="token punctuation">)</span></div><div class="brief "><p class="paragraph">Immutable resolved terminal color palette.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="522432114%2FClasslikes%2F1947863099" anchor-label="TerminalRenderAttrs" id="522432114%2FClasslikes%2F1947863099" data-filterable-set=":ketraterm-render-api/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-render-api/main" data-filterable-set=":ketraterm-render-api/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-terminal-render-attrs/index.html"><span>Terminal</span><wbr><span>Render</span><wbr><span><span>Attrs</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="522432114%2FClasslikes%2F1947863099"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-render-api/main"><div class="symbol monospace"><span class="token keyword">object </span><a href="-terminal-render-attrs/index.html">TerminalRenderAttrs</a></div><div class="brief "><p class="paragraph">Stable public render attribute word decoder and packer.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-73181190%2FClasslikes%2F1947863099" anchor-label="TerminalRenderBufferKind" id="-73181190%2FClasslikes%2F1947863099" data-filterable-set=":ketraterm-render-api/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-render-api/main" data-filterable-set=":ketraterm-render-api/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-terminal-render-buffer-kind/index.html"><span>Terminal</span><wbr><span>Render</span><wbr><span>Buffer</span><wbr><span><span>Kind</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-73181190%2FClasslikes%2F1947863099"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-render-api/main"><div class="symbol monospace"><span class="token keyword">enum </span><a href="-terminal-render-buffer-kind/index.html">TerminalRenderBufferKind</a> : <a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-enum/index.html">Enum</a><span class="token operator">&lt;</span><a href="-terminal-render-buffer-kind/index.html">TerminalRenderBufferKind</a><span class="token operator">&gt; </span></div><div class="brief "><p class="paragraph">Identifies the visible terminal screen buffer.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-2068015953%2FClasslikes%2F1947863099" anchor-label="TerminalRenderCellFlags" id="-2068015953%2FClasslikes%2F1947863099" data-filterable-set=":ketraterm-render-api/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-render-api/main" data-filterable-set=":ketraterm-render-api/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-terminal-render-cell-flags/index.html"><span>Terminal</span><wbr><span>Render</span><wbr><span>Cell</span><wbr><span><span>Flags</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-2068015953%2FClasslikes%2F1947863099"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-render-api/main"><div class="symbol monospace"><span class="token keyword">object </span><a href="-terminal-render-cell-flags/index.html">TerminalRenderCellFlags</a></div><div class="brief "><p class="paragraph">Public render cell flag bit set.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-2041982083%2FClasslikes%2F1947863099" anchor-label="TerminalRenderClusterDataSink" id="-2041982083%2FClasslikes%2F1947863099" data-filterable-set=":ketraterm-render-api/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-render-api/main" data-filterable-set=":ketraterm-render-api/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-terminal-render-cluster-data-sink/index.html"><span>Terminal</span><wbr><span>Render</span><wbr><span>Cluster</span><wbr><span>Data</span><wbr><span><span>Sink</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-2041982083%2FClasslikes%2F1947863099"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-render-api/main"><div class="symbol monospace"><span class="token keyword">fun </span><span class="token keyword">interface </span><a href="-terminal-render-cluster-data-sink/index.html">TerminalRenderClusterDataSink</a></div><div class="brief "><p class="paragraph">Receives grapheme cluster code points while a row is copied.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="908093319%2FClasslikes%2F1947863099" anchor-label="TerminalRenderClusterSink" id="908093319%2FClasslikes%2F1947863099" data-filterable-set=":ketraterm-render-api/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-render-api/main" data-filterable-set=":ketraterm-render-api/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-terminal-render-cluster-sink/index.html"><span>Terminal</span><wbr><span>Render</span><wbr><span>Cluster</span><wbr><span><span>Sink</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="908093319%2FClasslikes%2F1947863099"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-render-api/main"><div class="symbol monospace"><span class="token keyword">fun </span><span class="token keyword">interface </span><a href="-terminal-render-cluster-sink/index.html">TerminalRenderClusterSink</a></div><div class="brief "><p class="paragraph">Receives grapheme cluster text while a row is copied.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="1950949789%2FClasslikes%2F1947863099" anchor-label="TerminalRenderColorKind" id="1950949789%2FClasslikes%2F1947863099" data-filterable-set=":ketraterm-render-api/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-render-api/main" data-filterable-set=":ketraterm-render-api/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-terminal-render-color-kind/index.html"><span>Terminal</span><wbr><span>Render</span><wbr><span>Color</span><wbr><span><span>Kind</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="1950949789%2FClasslikes%2F1947863099"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-render-api/main"><div class="symbol monospace"><span class="token keyword">object </span><a href="-terminal-render-color-kind/index.html">TerminalRenderColorKind</a></div><div class="brief "><p class="paragraph">Color encoding kind used by <a href="-terminal-render-attrs/index.html">TerminalRenderAttrs</a>.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-1576124072%2FClasslikes%2F1947863099" anchor-label="TerminalRenderCursor" id="-1576124072%2FClasslikes%2F1947863099" data-filterable-set=":ketraterm-render-api/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-render-api/main" data-filterable-set=":ketraterm-render-api/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-terminal-render-cursor/index.html"><span>Terminal</span><wbr><span>Render</span><wbr><span><span>Cursor</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-1576124072%2FClasslikes%2F1947863099"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-render-api/main"><div class="symbol monospace"><span class="token keyword">data </span><span class="token keyword">class </span><a href="-terminal-render-cursor/index.html">TerminalRenderCursor</a><span class="token punctuation">(</span><span class="parameters "><span class="parameter "><span class="token keyword">val </span>column<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a><span class="token punctuation">, </span></span><span class="parameter "><span class="token keyword">val </span>row<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a><span class="token punctuation">, </span></span><span class="parameter "><span class="token keyword">val </span>visible<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-boolean/index.html">Boolean</a><span class="token punctuation">, </span></span><span class="parameter "><span class="token keyword">val </span>blinking<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-boolean/index.html">Boolean</a><span class="token punctuation">, </span></span><span class="parameter "><span class="token keyword">val </span>shape<span class="token operator">: </span><a href="-terminal-render-cursor-shape/index.html">TerminalRenderCursorShape</a><span class="token punctuation">, </span></span><span class="parameter "><span class="token keyword">val </span>generation<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-long/index.html">Long</a></span></span><span class="token punctuation">)</span></div><div class="brief "><p class="paragraph">Stable public cursor overlay model for renderers.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-1293439223%2FClasslikes%2F1947863099" anchor-label="TerminalRenderCursorShape" id="-1293439223%2FClasslikes%2F1947863099" data-filterable-set=":ketraterm-render-api/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-render-api/main" data-filterable-set=":ketraterm-render-api/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-terminal-render-cursor-shape/index.html"><span>Terminal</span><wbr><span>Render</span><wbr><span>Cursor</span><wbr><span><span>Shape</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-1293439223%2FClasslikes%2F1947863099"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-render-api/main"><div class="symbol monospace"><span class="token keyword">enum </span><a href="-terminal-render-cursor-shape/index.html">TerminalRenderCursorShape</a> : <a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-enum/index.html">Enum</a><span class="token operator">&lt;</span><a href="-terminal-render-cursor-shape/index.html">TerminalRenderCursorShape</a><span class="token operator">&gt; </span></div><div class="brief "><p class="paragraph">Renderer-facing cursor shape.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="1536451205%2FClasslikes%2F1947863099" anchor-label="TerminalRenderCursorSink" id="1536451205%2FClasslikes%2F1947863099" data-filterable-set=":ketraterm-render-api/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-render-api/main" data-filterable-set=":ketraterm-render-api/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-terminal-render-cursor-sink/index.html"><span>Terminal</span><wbr><span>Render</span><wbr><span>Cursor</span><wbr><span><span>Sink</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="1536451205%2FClasslikes%2F1947863099"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-render-api/main"><div class="symbol monospace"><span class="token keyword">fun </span><span class="token keyword">interface </span><a href="-terminal-render-cursor-sink/index.html">TerminalRenderCursorSink</a></div><div class="brief "><p class="paragraph">Receives primitive cursor overlay state from a short-lived render frame.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-1363985604%2FClasslikes%2F1947863099" anchor-label="TerminalRenderExtraAttrs" id="-1363985604%2FClasslikes%2F1947863099" data-filterable-set=":ketraterm-render-api/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-render-api/main" data-filterable-set=":ketraterm-render-api/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-terminal-render-extra-attrs/index.html"><span>Terminal</span><wbr><span>Render</span><wbr><span>Extra</span><wbr><span><span>Attrs</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-1363985604%2FClasslikes%2F1947863099"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-render-api/main"><div class="symbol monospace"><span class="token keyword">object </span><a href="-terminal-render-extra-attrs/index.html">TerminalRenderExtraAttrs</a></div><div class="brief "><p class="paragraph">Stable public render extra-attribute word decoder and packer.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-1209543673%2FClasslikes%2F1947863099" anchor-label="TerminalRenderFrame" id="-1209543673%2FClasslikes%2F1947863099" data-filterable-set=":ketraterm-render-api/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-render-api/main" data-filterable-set=":ketraterm-render-api/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-terminal-render-frame/index.html"><span>Terminal</span><wbr><span>Render</span><wbr><span><span>Frame</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-1209543673%2FClasslikes%2F1947863099"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-render-api/main"><div class="symbol monospace"><span class="token keyword">interface </span><a href="-terminal-render-frame/index.html">TerminalRenderFrame</a></div><div class="brief "><p class="paragraph">Short-lived primitive view of the terminal's render state for one viewport.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-426845519%2FClasslikes%2F1947863099" anchor-label="TerminalRenderFrameConsumer" id="-426845519%2FClasslikes%2F1947863099" data-filterable-set=":ketraterm-render-api/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-render-api/main" data-filterable-set=":ketraterm-render-api/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-terminal-render-frame-consumer/index.html"><span>Terminal</span><wbr><span>Render</span><wbr><span>Frame</span><wbr><span><span>Consumer</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-426845519%2FClasslikes%2F1947863099"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-render-api/main"><div class="symbol monospace"><span class="token keyword">fun </span><span class="token keyword">interface </span><a href="-terminal-render-frame-consumer/index.html">TerminalRenderFrameConsumer</a></div><div class="brief "><p class="paragraph">Receives a short-lived <a href="-terminal-render-frame/index.html">TerminalRenderFrame</a> during a render read callback.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="1223330820%2FClasslikes%2F1947863099" anchor-label="TerminalRenderFrameReader" id="1223330820%2FClasslikes%2F1947863099" data-filterable-set=":ketraterm-render-api/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-render-api/main" data-filterable-set=":ketraterm-render-api/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-terminal-render-frame-reader/index.html"><span>Terminal</span><wbr><span>Render</span><wbr><span>Frame</span><wbr><span><span>Reader</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="1223330820%2FClasslikes%2F1947863099"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-render-api/main"><div class="symbol monospace"><span class="token keyword">interface </span><a href="-terminal-render-frame-reader/index.html">TerminalRenderFrameReader</a></div><div class="brief "><p class="paragraph">Provides a short-lived render frame view.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-2059852280%2FClasslikes%2F1947863099" anchor-label="TerminalRenderUnderline" id="-2059852280%2FClasslikes%2F1947863099" data-filterable-set=":ketraterm-render-api/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-render-api/main" data-filterable-set=":ketraterm-render-api/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-terminal-render-underline/index.html"><span>Terminal</span><wbr><span>Render</span><wbr><span><span>Underline</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-2059852280%2FClasslikes%2F1947863099"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-render-api/main"><div class="symbol monospace"><span class="token keyword">object </span><a href="-terminal-render-underline/index.html">TerminalRenderUnderline</a></div><div class="brief "><p class="paragraph">Public render underline style identifiers.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+    <div class="footer">
+        <div class="footer--container">
+            <a href="#content" id="go-to-top-link" class="footer--button footer--button_go-to-top"></a>
+            <div class="footer--content">
+                <div>
+                    <span>Generated by </span>
+                    <a class="footer--link footer--link_external" href="https://github.com/Kotlin/dokka">
+                        Dokka
+                    </a>
+                    <div>© 2026 Copyright</div>
+                </div>
+            </div>
+        </div>
+    </div>
+        </div>
+    </div>
+</div>
+</body>
+</html>

@@ -1,0 +1,161 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="description" content="A modular Kotlin/JVM terminal emulator library for Swing and headless applications.">
+  <meta name="color-scheme" content="light dark">
+  <title>ANSI Finite-State Machine &amp; CSI Dispatch Specification · KetraTerm Library</title>
+  <link rel="icon" href="../../../../assets/logo.svg" type="image/svg+xml">
+  <link rel="preload" href="../../../../assets/fonts/manrope-variable.ttf" as="font" type="font/ttf" crossorigin>
+  <link rel="stylesheet" href="../../../../assets/styles.css">
+  <script type="importmap">{"imports":{"mermaid":"../../../../assets/mermaid/mermaid.esm.min.mjs"}}</script>
+  <script type="module" src="../../../../assets/site.js"></script>
+</head>
+<body data-product="library" data-version="Development">
+  <a class="skip" href="#main">Skip to content</a>
+  <header class="site-header">
+    <div class="site-identity">
+      <a class="brand" href="../../../../index.html" aria-label="KetraTerm Library home"><img class="brand-mark" src="../../../../assets/logo.svg" alt="" width="34" height="34">KetraTerm</a>
+      <nav class="product-navigation" aria-label="KetraTerm products"><a href="https://ketraterm.github.io/KetraTerm/">App</a><a href="../../../../index.html" aria-current="true">Library</a></nav>
+    </div>
+    <details class="site-navigation" open><summary>Menu</summary><nav aria-label="Library navigation"><a   href="../../docs/README.html">Guides</a><a aria-current="true"  href="../../modules.html">Modules</a><a   href="../../../../versions.html">API & versions</a><a   href="../../CHANGELOG.html">Changelog</a><a  class="nav-primary" href="../../README.html">Get started</a></nav></details>
+    <button class="theme-toggle" type="button" aria-label="Switch to light theme">Light</button>
+  </header>
+  <div class="docs-shell"><aside class="sidebar" aria-label="Documentation navigation"><details class="nav-disclosure" open><summary class="mobile-nav-toggle">Browse library guides</summary><div><label class="search-label">Find a library guide<input type="search" data-doc-search placeholder="Search library docs" autocomplete="off" data-index="../../search.json"></label><div class="search-results" aria-live="polite"></div><details open><summary>Start here</summary><a  href="../../docs/README.html">Documentation</a><a  href="../../README.html">Installation</a><a  href="../../modules.html">Module guides</a><a  href="../../CHANGELOG.html">Changelog</a></details><details open><summary>Capabilities</summary><a  href="../../docs/terminal-feature-map.html">Feature map</a><a  href="../../docs/features/terminal.html">Terminal</a><a  href="../../docs/features/shells.html">Shell integration</a><a  href="../../docs/features/desktop.html">Swing view & hosts</a><a  href="../../docs/features/completion.html">Completion</a><a  href="../../docs/features/embedding.html">Embedding</a><a  href="../../docs/terminal-feature-gap-map.html">Known limits</a></details><details open><summary>Embedding guides</summary><a  href="../../docs/library/configuration.html">Configuration</a><a  href="../../docs/library/compatibility.html">Compatibility</a><a  href="../../docs/library/render-ownership.html">Render ownership</a></details><details open><summary>Reference</summary><a  href="../../docs/reference/protocol.html">Protocols</a><a  href="../../docs/reference/notifications.html">Notifications</a><a  href="../../docs/reference/storage.html">Storage & privacy</a></details><details open><summary>Development</summary><a  href="../../ARCHITECTURE.html">Architecture</a><a  href="../../CONTRIBUTING.html">Contributing</a><a  href="../../docs/development/conformance-testing.html">Conformance testing</a></details></div></details></aside><main id="main" tabindex="-1" class="article article-with-outline"><div class="article-top"><nav class="breadcrumb" aria-label="Breadcrumb"><ol><li><a href="../../../../index.html">Library</a></li><li><a href="../../modules.html">Modules</a></li><li><a href="../README.html">ketraterm-parser</a></li><li><span aria-current="page">ANSI Finite-State Machine &amp; CSI Dispatch Specification</span></li></ol></nav><div class="doc-version"><span>Development</span><a href="../../../../versions.html">All versions</a></div></div><details class="page-outline" open><summary>On this page</summary><nav aria-label="On this page"><a class="depth-2" href="#1-the-state-machine-architecture">1. The State Machine Architecture</a><a class="depth-2" href="#2-csi-command-signatures">2. CSI Command Signatures</a><a class="depth-2" href="#3-dispatch-table">3. Dispatch table</a><a class="depth-2" href="#4-parser-recovery-and-security-safeguards">4. Parser Recovery and Security Safeguards</a><a class="depth-2" href="#validation">Validation</a></nav></details><div class="article-content"><div class="prose"><h1 id="ansi-finite-state-machine--csi-dispatch-specification">ANSI Finite-State Machine &amp; CSI Dispatch Specification</h1>
+<p>This document describes parser routing and collection contracts. Protocol support
+is tracked in the <a href="../../docs/terminal-feature-map.html">feature map</a>; the classes
+described here are internal implementation details.</p>
+<h2 id="1-the-state-machine-architecture">1. The State Machine Architecture</h2>
+<p><code>TerminalParser</code> coordinates two routes: printable UTF-8 decoding and the ANSI
+state machine. A pending printable UTF-8 scalar takes priority. Once resolved,
+normal byte routing resumes, including bounded replay of a non-continuation byte.</p>
+<p>The ANSI route separates three responsibilities:</p>
+<ol>
+<li><a href="https://github.com/ketraterm/KetraTerm/blob/e3c7f9c626934093d35a67ca97afbbf1b343f28d/ketraterm-parser/src/main/kotlin/io/github/ketraterm/parser/ansi/ByteClass.kt">ByteClass</a>
+maps <code>0x00..0x7f</code> into 15 control/ASCII classes and <code>0x80..0xff</code> into the
+<code>UTF8_PAYLOAD</code> routing class. Raw C1 bytes are not 8-bit control introducers.</li>
+<li><a href="https://github.com/ketraterm/KetraTerm/blob/e3c7f9c626934093d35a67ca97afbbf1b343f28d/ketraterm-parser/src/main/kotlin/io/github/ketraterm/parser/ansi/AnsiStateMachine.kt">AnsiStateMachine</a>
+performs a flat <code>IntArray</code> lookup for the current state and routing class.
+Each entry packs an action in the low eight bits and the next state above it.
+There are 16 states and 32 reserved columns per state, with 16 active routing
+classes. Lookup uses <code>(state shl 5) or byteClass</code>.</li>
+<li><a href="https://github.com/ketraterm/KetraTerm/blob/e3c7f9c626934093d35a67ca97afbbf1b343f28d/ketraterm-parser/src/main/kotlin/io/github/ketraterm/parser/ansi/ActionEngine.kt">ActionEngine</a>
+updates reusable sequence state and delegates semantic operations to the
+dispatchers or printable processor.</li>
+</ol>
+<p>Non-ASCII bytes are printable ingress only in <code>GROUND</code>. OSC/DCS bodies collect
+them as opaque bytes; ignored strings discard them. In active ESC/CSI grammar,
+they terminate the incomplete sequence without dispatching a stale final byte.</p>
+<p>The matrix lookup does fixed work per byte. That does not make an entire parser
+call allocation-free: completed metadata commands may decode strings, and
+explicitly permitted larger OSC bodies may grow collection storage.</p>
+<h2 id="2-csi-command-signatures">2. CSI Command Signatures</h2>
+<p>CSI dispatch distinguishes the final byte, private marker, and ordered
+intermediates. <a href="https://github.com/ketraterm/KetraTerm/blob/e3c7f9c626934093d35a67ca97afbbf1b343f28d/ketraterm-parser/src/main/kotlin/io/github/ketraterm/parser/ansi/CsiSignature.kt">CsiSignature</a>
+packs them into a primitive <code>Long</code>:</p>
+<div class="table-scroll"><table>
+<thead>
+<tr>
+<th>Bits</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>0..7</code></td>
+<td>Final byte</td>
+</tr>
+<tr>
+<td><code>8..15</code></td>
+<td>Private marker, or zero</td>
+</tr>
+<tr>
+<td><code>16..47</code></td>
+<td>Up to four intermediate bytes, low to high</td>
+</tr>
+<tr>
+<td><code>48..51</code></td>
+<td>Intermediate count</td>
+</tr>
+<tr>
+<td><code>52..63</code></td>
+<td>Zero</td>
+</tr>
+</tbody></table></div>
+<p>Parameters are separate from this key. A reusable <code>IntArray</code> holds up to 32
+fields; <code>-1</code> represents an omitted field. A bit mask records fields opened by a
+colon. Opening a 33rd field rejects the entire CSI before dispatch. Decimal
+overflow saturates the retained value to <code>Int.MAX_VALUE</code> and records saturation
+for dispatchers that require exact values. The intermediate collector retains
+the first four bytes; additional intermediate bytes are dropped.</p>
+<p><a id="3-high-speed-dispatch-table"></a></p>
+<h2 id="3-dispatch-table">3. Dispatch table</h2>
+<p><a href="https://github.com/ketraterm/KetraTerm/blob/e3c7f9c626934093d35a67ca97afbbf1b343f28d/ketraterm-parser/src/main/kotlin/io/github/ketraterm/parser/ansi/GeneratedCsiDispatchTable.kt">GeneratedCsiDispatchTable</a>
+stores sorted structural signatures in a <code>LongArray</code> and corresponding command
+IDs in an <code>IntArray</code>. Binary search selects the command; the dispatcher then
+interprets its parameters and emits semantic sink operations. An unmatched key
+does not fall back to a final-byte-only command.</p>
+<p>Structural actions flush pending printable text before command dispatch. This
+preserves callback order and prevents later text from extending a grapheme across
+a structural operation.</p>
+<h2 id="4-parser-recovery-and-security-safeguards">4. Parser Recovery and Security Safeguards</h2>
+<p>OSC ends with BEL or <code>ESC \</code>; DCS ends with <code>ESC \</code>. CAN/SUB cancel collected
+strings without dispatch. Ordinary C0 controls are ignored in OSC; in a DCS
+body they are retained as payload rather than executed. DEL is ignored. String
+escape states handle a split <code>ESC \</code> without confusing it with a standalone ESC
+command.</p>
+<p><a href="https://github.com/ketraterm/KetraTerm/blob/e3c7f9c626934093d35a67ca97afbbf1b343f28d/ketraterm-parser/src/main/kotlin/io/github/ketraterm/parser/ansi/ControlStringPolicy.kt">ControlStringPolicy</a>
+sets collection limits before decoding. Limits count stored bytes, including
+family headers and separators, excluding introducers, terminators, and controls
+ignored by that string&#39;s rules:</p>
+<div class="table-scroll"><table>
+<thead>
+<tr>
+<th>Collection</th>
+<th>Limit</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Ordinary OSC envelopes and DCS <code>+q</code></td>
+<td>4096 bytes</td>
+</tr>
+<tr>
+<td>OSC dynamic colors <code>10</code>, <code>11</code>, <code>12</code></td>
+<td>256 bytes</td>
+</tr>
+<tr>
+<td>DCS <code>$q</code></td>
+<td>64 bytes</td>
+</tr>
+<tr>
+<td>Custom OSC</td>
+<td>4096 bytes by default, independently configurable</td>
+</tr>
+<tr>
+<td>Eligible OSC 52 writes</td>
+<td>Ordinary bound or a larger checked limit from the host&#39;s decoded-byte budget</td>
+</tr>
+</tbody></table></div>
+<p>Unsupported families stop collecting their bodies after identification. Overflow
+stops further storage and rejects the completed command; OSC 8 also ends an
+existing hyperlink to avoid retaining stale link state. Eligible larger OSC
+collection grows on demand. Temporary storage is released on completion,
+cancellation, overflow, reset, EOF, and custom callback failure.</p>
+<p>Collection limits do not authorize clipboard changes or terminal replies. The
+sink&#39;s owning layers validate complete requests and apply current permissions.
+<code>endOfInput</code> discards unfinished OSC/DCS commands. <code>reset</code> discards parser-owned
+state without emitting sink commands.</p>
+<h2 id="validation">Validation</h2>
+<p><code>AnsiStateMachineTest</code> checks routing, and <code>ActionEngineTest</code> checks collection and
+mutation invariants. <code>ControlStringPayloadPolicyTest</code>, <code>CustomOscHandlerTest</code>,
+<code>CustomOscLimitTest</code>, and <code>TerminalParserTest</code> cover exact bounds, chunking,
+cancellation, ordering, and recovery. Run <code>./gradlew :ketraterm-parser:test</code> from
+the repository root; semantic changes also require the affected host tests.</p>
+</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/e3c7f9c626934093d35a67ca97afbbf1b343f28d/ketraterm-parser/docs/ansi-fsm-specification.md">View source on GitHub ↗</a></div></div></main></div>
+  <footer>
+    <a class="brand" href="../../../../index.html"><img class="brand-mark" src="../../../../assets/logo.svg" alt="" width="34" height="34">KetraTerm Library</a>
+    <p>Open source · Apache 2.0</p>
+    <div><a href="https://github.com/ketraterm/KetraTerm">GitHub ↗</a><a href="https://github.com/ketraterm/KetraTerm/issues">Issues ↗</a><a class="product-switch" href="https://ketraterm.github.io/KetraTerm/">Desktop app ↗</a></div>
+  </footer>
+</body>
+</html>

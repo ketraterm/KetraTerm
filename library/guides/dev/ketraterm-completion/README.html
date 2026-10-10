@@ -1,0 +1,125 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="description" content="A modular Kotlin/JVM terminal emulator library for Swing and headless applications.">
+  <meta name="color-scheme" content="light dark">
+  <title>KetraTerm Completion (:ketraterm-completion) · KetraTerm Library</title>
+  <link rel="icon" href="../../../assets/logo.svg" type="image/svg+xml">
+  <link rel="preload" href="../../../assets/fonts/manrope-variable.ttf" as="font" type="font/ttf" crossorigin>
+  <link rel="stylesheet" href="../../../assets/styles.css">
+  <script type="importmap">{"imports":{"mermaid":"../../../assets/mermaid/mermaid.esm.min.mjs"}}</script>
+  <script type="module" src="../../../assets/site.js"></script>
+</head>
+<body data-product="library" data-version="Development">
+  <a class="skip" href="#main">Skip to content</a>
+  <header class="site-header">
+    <div class="site-identity">
+      <a class="brand" href="../../../index.html" aria-label="KetraTerm Library home"><img class="brand-mark" src="../../../assets/logo.svg" alt="" width="34" height="34">KetraTerm</a>
+      <nav class="product-navigation" aria-label="KetraTerm products"><a href="https://ketraterm.github.io/KetraTerm/">App</a><a href="../../../index.html" aria-current="true">Library</a></nav>
+    </div>
+    <details class="site-navigation" open><summary>Menu</summary><nav aria-label="Library navigation"><a   href="../docs/README.html">Guides</a><a aria-current="true"  href="../modules.html">Modules</a><a   href="../../../versions.html">API & versions</a><a   href="../CHANGELOG.html">Changelog</a><a  class="nav-primary" href="../README.html">Get started</a></nav></details>
+    <button class="theme-toggle" type="button" aria-label="Switch to light theme">Light</button>
+  </header>
+  <div class="docs-shell"><aside class="sidebar" aria-label="Documentation navigation"><details class="nav-disclosure" open><summary class="mobile-nav-toggle">Browse library guides</summary><div><label class="search-label">Find a library guide<input type="search" data-doc-search placeholder="Search library docs" autocomplete="off" data-index="../search.json"></label><div class="search-results" aria-live="polite"></div><details open><summary>Start here</summary><a  href="../docs/README.html">Documentation</a><a  href="../README.html">Installation</a><a  href="../modules.html">Module guides</a><a  href="../CHANGELOG.html">Changelog</a></details><details open><summary>Capabilities</summary><a  href="../docs/terminal-feature-map.html">Feature map</a><a  href="../docs/features/terminal.html">Terminal</a><a  href="../docs/features/shells.html">Shell integration</a><a  href="../docs/features/desktop.html">Swing view & hosts</a><a  href="../docs/features/completion.html">Completion</a><a  href="../docs/features/embedding.html">Embedding</a><a  href="../docs/terminal-feature-gap-map.html">Known limits</a></details><details open><summary>Embedding guides</summary><a  href="../docs/library/configuration.html">Configuration</a><a  href="../docs/library/compatibility.html">Compatibility</a><a  href="../docs/library/render-ownership.html">Render ownership</a></details><details open><summary>Reference</summary><a  href="../docs/reference/protocol.html">Protocols</a><a  href="../docs/reference/notifications.html">Notifications</a><a  href="../docs/reference/storage.html">Storage & privacy</a></details><details open><summary>Development</summary><a  href="../ARCHITECTURE.html">Architecture</a><a  href="../CONTRIBUTING.html">Contributing</a><a  href="../docs/development/conformance-testing.html">Conformance testing</a></details></div></details></aside><main id="main" tabindex="-1" class="article article-with-outline"><div class="article-top"><nav class="breadcrumb" aria-label="Breadcrumb"><ol><li><a href="../../../index.html">Library</a></li><li><a href="../modules.html">Modules</a></li><li><span aria-current="page">KetraTerm Completion (:ketraterm-completion)</span></li></ol></nav><div class="doc-version"><span>Development</span><a href="../../../versions.html">All versions</a></div></div><details class="page-outline" open><summary>On this page</summary><nav aria-label="On this page"><a class="depth-2" href="#add-the-dependency">Add the dependency</a><a class="depth-2" href="#request-completions">Request completions</a><a class="depth-2" href="#customize-the-engine">Customize the engine</a><a class="depth-2" href="#optional-learning-and-localization">Optional learning and localization</a><a class="depth-2" href="#further-reading">Further reading</a></nav></details><div class="article-content"><div class="prose"><h1 id="ketraterm-completion-ketraterm-completion">KetraTerm Completion (<code>:ketraterm-completion</code>)</h1>
+<p>Command-line completion for Kotlin/JVM hosts. The engine combines command
+specifications, host-provided sources, and optional in-memory learning into
+progressive, ranked suggestions with explicit text replacement ranges.</p>
+<p>The module has no terminal, UI, process, or filesystem dependency. Its coroutine
+API can serve a headless caller or a host-owned suggestion UI.</p>
+<h2 id="add-the-dependency">Add the dependency</h2>
+<p>Use the <code>io.github.ketraterm:ketraterm-completion</code> artifact with the version
+alignment and repository setup in the <a href="../README.html#using-the-libraries">root README</a>.
+The module exposes <code>kotlinx-coroutines-core</code> transitively.</p>
+<h2 id="request-completions">Request completions</h2>
+<p>Request a suggestion from the built-in command catalog:</p>
+<pre><code class="language-kotlin">import io.github.ketraterm.completion.api.TerminalCompletionEngines
+import io.github.ketraterm.completion.api.TerminalCompletionRequest
+import io.github.ketraterm.completion.api.TerminalShellCapabilities
+import kotlinx.coroutines.flow.last
+
+suspend fun main() {
+    val engine = TerminalCompletionEngines.fromSources(sources = emptyList())
+    val line = &quot;git che&quot;
+    val request = TerminalCompletionRequest(
+        commandLine = line,
+        cursorOffset = line.length,
+        shellCapabilities = TerminalShellCapabilities.POSIX,
+    )
+    val candidate = engine.completions(request).last().firstOrNull() ?: return
+    val completedLine = line.replaceRange(
+        candidate.replacementStartOffset,
+        candidate.replacementEndOffset,
+        candidate.replacementText,
+    )
+    println(completedLine) // git checkout
+}
+</code></pre>
+<p><code>completions</code> returns a cold <code>Flow</code>: collection starts source evaluation.
+<code>last()</code> waits for the final ranking; an interactive UI should collect each
+emission and cancel the preceding collection when its request becomes obsolete.
+Each emission is a complete replacement snapshot, rather than a list of additions.</p>
+<p>Offsets are UTF-16 indices in the original request. The cursor must be within the
+line and must not split a surrogate pair; invalid offsets throw
+<code>IllegalArgumentException</code>. Apply a candidate only while that captured command
+line and editing context are still current. Display text and match ranges are
+presentation data; insertion uses <code>replacementText</code> and its replacement range.</p>
+<p>Select shell capabilities from authoritative host metadata. Use <code>POSIX</code> or
+<code>POWERSHELL</code> for their supported lexical and quoting contracts, and the default
+<code>PLAIN</code> for other shells. The engine does not infer a dialect from a profile id.</p>
+<h2 id="customize-the-engine">Customize the engine</h2>
+<p>Pass <code>commandSpecs</code> to <code>TerminalCompletionEngines.fromSources</code> to replace the
+built-in catalog. <code>TerminalCommandSpecs.defaults()</code> returns a shared immutable
+catalog; custom <code>TerminalCommandSpec</code>, <code>TerminalOptionSpec</code>, and
+<code>TerminalArgumentSpec</code> models describe commands, option values, and positional
+arguments. Keep custom catalogs and their nested collections unchanged while
+the engine is in use. The engine evaluates its catalog automatically.</p>
+<p>Register host sources with <code>TerminalCompletionSourceEntry</code>. Source factories in
+<code>TerminalCompletionSources</code> cover direct paths, fuzzy paths, Gradle tasks, and
+dynamic value domains. A custom <code>TerminalCompletionSource</code> receives the request,
+the engine&#39;s already-resolved context, and an output limit. It may perform
+bounded suspending host work; it must cooperate with cancellation and move
+blocking operations to an appropriate dispatcher. Reusable filesystem access
+lives in <a href="../ketraterm-completion-host/README.html">completion-host</a>.</p>
+<p>Custom engines can resolve and share context with
+<code>TerminalCompletionContext.resolve(request, commandSpecs)</code>. See the
+<a href="docs/completion-architecture.html#custom-engines-and-direct-source-evaluation">custom-engine contract</a>.</p>
+<p>An ordinary source exception is reported through
+<code>TerminalCompletionSourceFailureHandler</code> and contributes an empty result.
+Unexpected errors fail collection and cancel sibling sources. Request
+cancellation cancels all source work. See the
+<a href="docs/completion-architecture.html#evaluation-and-failure-behavior">evaluation contract</a>
+for concurrency and result bounds.</p>
+<h2 id="optional-learning-and-localization">Optional learning and localization</h2>
+<p>Share a <code>TerminalCompletionLearningStore</code> through the engine&#39;s <code>learningStore</code>
+parameter. Hosts record authoritative command results and explicit suggestion
+feedback. The store performs no I/O; persistence consumes its immutable
+<code>snapshot()</code> and hydrates through <code>mergeSnapshot()</code> once per distinct aggregate
+event set.</p>
+<p>The optional <code>replayFilter</code> constructor argument adds a host restriction to the
+built-in plaintext policy. <code>TerminalCompletionLearningStore(replayFilter = { false })</code>
+retains opaque ranking evidence while disabling plaintext replay. The filter
+also applies to imported replay rows; <code>clear()</code> removes learning without
+replacing the filter or capacity. See the <a href="docs/completion-architecture.html#learning-and-privacy">learning and privacy contract</a>
+for concurrency, failure, and retention rules.</p>
+<p>Use <code>TerminalCommandSpecs.defaults(locale)</code> for localized catalog descriptions
+and <code>TerminalCompletionMessages</code> with the engine and applicable source factories
+for generated descriptions. Canonical command tokens and insertion behavior
+remain unchanged; provider-supplied descriptions remain provider-owned.</p>
+<h2 id="further-reading">Further reading</h2>
+<ul>
+<li><a href="Module.html">Module and package ownership</a></li>
+<li><a href="docs/completion-architecture.html">Completion architecture and contracts</a></li>
+<li><a href="../ketraterm-ui-swing-host/README.html">Swing completion bridge</a></li>
+<li><a href="../docs/terminal-feature-map.html">Supported behavior</a> and
+<a href="../docs/terminal-feature-gap-map.html">deferred work</a></li>
+</ul>
+</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/e3c7f9c626934093d35a67ca97afbbf1b343f28d/ketraterm-completion/README.md">View source on GitHub ↗</a></div></div></main></div>
+  <footer>
+    <a class="brand" href="../../../index.html"><img class="brand-mark" src="../../../assets/logo.svg" alt="" width="34" height="34">KetraTerm Library</a>
+    <p>Open source · Apache 2.0</p>
+    <div><a href="https://github.com/ketraterm/KetraTerm">GitHub ↗</a><a href="https://github.com/ketraterm/KetraTerm/issues">Issues ↗</a><a class="product-switch" href="https://ketraterm.github.io/KetraTerm/">Desktop app ↗</a></div>
+  </footer>
+</body>
+</html>

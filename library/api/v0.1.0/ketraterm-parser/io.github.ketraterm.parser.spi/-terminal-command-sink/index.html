@@ -1,0 +1,1620 @@
+<!doctype html>
+<html class="no-js" lang="en">
+<head>
+    <meta name="viewport" content="width=device-width, initial-scale=1" charset="UTF-8">
+    <title>TerminalCommandSink</title>
+<link href="../../../images/logo-icon.svg" rel="icon" type="image/svg"><script>var pathToRoot = "../../../";</script>
+    <script>document.documentElement.classList.replace("no-js", "js");</script>
+    <script>const storage = localStorage.getItem("dokka-dark-mode")
+      if (storage == null) {
+        const osDarkSchemePreferred = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches
+        if (osDarkSchemePreferred === true) {
+          document.getElementsByTagName("html")[0].classList.add("theme-dark")
+        }
+      } else {
+        const savedDarkMode = JSON.parse(storage)
+        if (savedDarkMode === true) {
+          document.getElementsByTagName("html")[0].classList.add("theme-dark")
+        }
+      }
+    </script>
+<script type="text/javascript" src="../../../scripts/sourceset_dependencies.js" async></script>
+<link href="../../../styles/style.css" rel="Stylesheet">
+<link href="../../../styles/main.css" rel="Stylesheet">
+<link href="../../../styles/prism.css" rel="Stylesheet">
+<link href="../../../styles/logo-styles.css" rel="Stylesheet">
+<link href="../../../ui-kit/ui-kit.min.css" rel="Stylesheet">
+<script type="text/javascript" src="../../../scripts/safe-local-storage_blocking.js"></script>
+<script type="text/javascript" src="../../../scripts/navigation-loader.js" async></script>
+<script type="text/javascript" src="../../../scripts/platform-content-handler.js" async></script>
+<script type="text/javascript" src="../../../scripts/main.js" defer></script>
+<script type="text/javascript" src="../../../scripts/prism.js" async></script>
+<script type="text/javascript" src="../../../ui-kit/ui-kit.min.js" defer></script><!-- ketraterm-api-stylesheet:start -->
+<link rel="icon" href="../../../../../assets/logo.svg" type="image/svg+xml">
+<link rel="stylesheet" href="../../../../../assets/api-navigation.css">
+<!-- ketraterm-api-stylesheet:end --></head>
+<body>
+<div class="root"><!-- ketraterm-api-navigation:start -->
+<div class="ketraterm-api-navigation">
+  <a class="ketraterm-api-brand" href="../../../../../index.html" aria-label="KetraTerm Library home"><img src="../../../../../assets/logo.svg" alt="" width="28" height="28">KetraTerm</a>
+  <nav class="ketraterm-api-products" aria-label="KetraTerm products"><a href="https://ketraterm.github.io/KetraTerm/">App</a><a href="../../../../../index.html" aria-current="true">Library</a></nav>
+  <div class="ketraterm-api-reference"><span>API · v0.1.0</span><a href="../../../../../versions.html">All versions</a></div>
+</div>
+<!-- ketraterm-api-navigation:end -->
+    <header class="navigation theme-dark" id="navigation-wrapper" role="banner">
+<a class="library-name--link" href="../../../index.html">
+                    KetraTerm
+            </a>        <button class="navigation-controls--btn navigation-controls--btn_toc ui-kit_mobile-only" id="toc-toggle" type="button">Toggle table of contents
+        </button>
+        <div class="navigation-controls--break ui-kit_mobile-only"></div>
+        <div class="library-version" id="library-version">
+        </div>
+        <div class="navigation-controls">
+        <ul class="filter-section filter-section_loading" id="filter-section" aria-label="Target filter">
+                <button class="platform-tag platform-selector jvm-like" data-active="" aria-pressed="true" data-filter=":ketraterm-parser/main">jvm</button>
+            <div class="dropdown filter-section--dropdown" data-role="dropdown" id="filter-section-dropdown">
+                <button class="button button_dropdown filter-section--dropdown-toggle" role="combobox" data-role="dropdown-toggle" aria-controls="platform-tags-listbox" aria-haspopup="listbox" aria-expanded="false" aria-label="Toggle source sets"></button>
+                <ul role="listbox" id="platform-tags-listbox" class="dropdown--list" data-role="dropdown-listbox" aria-label="Target filter">
+                    <div class="dropdown--header"><span>Target filter</span>
+                        <button class="button" data-role="dropdown-toggle" aria-label="Close target filter">
+                            <i class="ui-kit-icon ui-kit-icon_cross"></i>
+                        </button>
+                    </div>
+                        <li role="option" class="dropdown--option platform-selector-option jvm-like" tabindex="0">
+                            <label class="checkbox">
+                                <input type="checkbox" class="checkbox--input" id=":ketraterm-parser/main" data-filter=":ketraterm-parser/main">
+                                <span class="checkbox--icon"></span>
+                                jvm
+                            </label>
+                        </li>
+                </ul>
+                <div class="dropdown--overlay"></div>
+            </div>
+        </ul>
+            <button class="navigation-controls--btn navigation-controls--btn_theme" id="theme-toggle-button" type="button">Switch theme
+            </button>
+            <div class="navigation-controls--btn navigation-controls--btn_search" id="searchBar" role="button">Search in
+                API
+            </div>
+        </div>
+    </header>
+    <div id="container">
+        <nav id="leftColumn" class="sidebar" data-item-type="SECTION" data-item-config="{&quot;defaultSize&quot;: 280, &quot;minSize&quot;: 200, &quot;maxSize&quot;: 400}">
+            <a class="toc--skip-link" href="#main">Skip to content</a>
+            <div class="dropdown theme-dark_mobile" data-role="dropdown" id="toc-dropdown">
+                <ul role="listbox" id="toc-listbox" class="dropdown--list dropdown--list_toc-list" data-role="dropdown-listbox" aria-label="Table of contents">
+                    <div class="dropdown--header">
+                            <span>
+                                    KetraTerm
+                            </span>
+                        <button class="button" data-role="dropdown-toggle" aria-label="Close table of contents">
+                            <i class="ui-kit-icon ui-kit-icon_cross"></i>
+                        </button>
+                    </div>
+                    <div class="sidebar--inner" id="sideMenu"></div>
+                </ul>
+                <div class="dropdown--overlay"></div>
+            </div>
+        </nav>
+        <div id="resizer" class="resizer" data-item-type="BAR"></div>
+        <div id="main" data-item-type="SECTION" role="main">
+<div class="main-content" data-page-type="classlike" id="content" pageids="ketraterm-parser::io.github.ketraterm.parser.spi/TerminalCommandSink///PointingToDeclaration//257867639">
+  <div class="breadcrumbs"><a href="../../index.html">ketraterm-parser</a><span class="delimiter">/</span><a href="../index.html">io.github.ketraterm.parser.spi</a><span class="delimiter">/</span><span class="current">TerminalCommandSink</span></div>
+  <div class="cover ">
+    <h1 class="cover"><span>Terminal</span><wbr><span>Command</span><wbr><span><span>Sink</span></span></h1>
+    <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-parser/main"><div class="symbol monospace"><span class="token keyword">interface </span><a href="index.html">TerminalCommandSink</a></div><p class="paragraph">Parser-facing terminal command sink.</p><p class="paragraph">This is the narrow semantic handoff boundary from :terminal-parser to :terminal-core.</p><p class="paragraph">Rules:</p><ul><li><p class="paragraph">The parser emits terminal operations.</p></li><li><p class="paragraph">The sink/core owns grid physics, bounds clamping, wrapping, margins, storage, and mode persistence.</p></li><li><p class="paragraph">The parser must not know terminal width, height, cursor bounds, or rendering details.</p></li></ul></div></div>
+  </div>
+  <div class="tabbedcontent">
+    <div class="tabs-section" tabs-section="tabs-section"><button class="section-tab" data-active="" data-togglable="CONSTRUCTOR,TYPE,PROPERTY,FUNCTION">Members</button></div>
+    <div class="tabs-section-body">
+      <div data-togglable="FUNCTION">
+        <h2 class="tableheader">Functions</h2>
+        <div class="table"><a data-name="-368820048%2FFunctions%2F257867639" anchor-label="appendToPreviousCluster" id="-368820048%2FFunctions%2F257867639" data-filterable-set=":ketraterm-parser/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-parser/main" data-filterable-set=":ketraterm-parser/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="append-to-previous-cluster.html"><span>append</span><wbr><span>To</span><wbr><span>Previous</span><wbr><span><span>Cluster</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-368820048%2FFunctions%2F257867639"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-parser/main"><div class="symbol monospace"><span class="token keyword">abstract </span><span class="token keyword">fun </span><a href="append-to-previous-cluster.html"><span class="token function">appendToPreviousCluster</span></a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">codepoint<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a></span></span><span class="token punctuation">)</span></div><div class="brief "><p class="paragraph">Appends one grapheme-continuation codepoint to the most recently written printable cell without moving the cursor.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-1999661646%2FFunctions%2F257867639" anchor-label="applyKittyKeyboardFlags" id="-1999661646%2FFunctions%2F257867639" data-filterable-set=":ketraterm-parser/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-parser/main" data-filterable-set=":ketraterm-parser/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="apply-kitty-keyboard-flags.html"><span>apply</span><wbr><span>Kitty</span><wbr><span>Keyboard</span><wbr><span><span>Flags</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-1999661646%2FFunctions%2F257867639"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-parser/main"><div class="symbol monospace"><span class="token keyword">abstract </span><span class="token keyword">fun </span><a href="apply-kitty-keyboard-flags.html"><span class="token function">applyKittyKeyboardFlags</span></a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">flags<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a><span class="token punctuation">, </span></span><span class="parameter ">applicationMode<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a></span></span><span class="token punctuation">)</span></div><div class="brief "><p class="paragraph">Kitty keyboard progressive-enhancement flag application, <code class="lang-kotlin">CSI = flags ; mode u</code>.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="96350849%2FFunctions%2F257867639" anchor-label="backspace" id="96350849%2FFunctions%2F257867639" data-filterable-set=":ketraterm-parser/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-parser/main" data-filterable-set=":ketraterm-parser/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="backspace.html"><span><span>backspace</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="96350849%2FFunctions%2F257867639"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-parser/main"><div class="symbol monospace"><span class="token keyword">abstract </span><span class="token keyword">fun </span><a href="backspace.html"><span class="token function">backspace</span></a><span class="token punctuation">(</span><span class="token punctuation">)</span></div><div class="brief "><p class="paragraph">Moves the cursor one column to the left (BS, <code class="lang-kotlin">0x08</code>).</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="70696919%2FFunctions%2F257867639" anchor-label="bell" id="70696919%2FFunctions%2F257867639" data-filterable-set=":ketraterm-parser/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-parser/main" data-filterable-set=":ketraterm-parser/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="bell.html"><span><span>bell</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="70696919%2FFunctions%2F257867639"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-parser/main"><div class="symbol monospace"><span class="token keyword">abstract </span><span class="token keyword">fun </span><a href="bell.html"><span class="token function">bell</span></a><span class="token punctuation">(</span><span class="token punctuation">)</span></div><div class="brief "><p class="paragraph">Triggers the terminal bell/alert sound (BEL, <code class="lang-kotlin">0x07</code>).</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="873165142%2FFunctions%2F257867639" anchor-label="carriageReturn" id="873165142%2FFunctions%2F257867639" data-filterable-set=":ketraterm-parser/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-parser/main" data-filterable-set=":ketraterm-parser/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="carriage-return.html"><span>carriage</span><wbr><span><span>Return</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="873165142%2FFunctions%2F257867639"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-parser/main"><div class="symbol monospace"><span class="token keyword">abstract </span><span class="token keyword">fun </span><a href="carriage-return.html"><span class="token function">carriageReturn</span></a><span class="token punctuation">(</span><span class="token punctuation">)</span></div><div class="brief "><p class="paragraph">Moves the cursor to the left margin on the current row (CR, <code class="lang-kotlin">0x0D</code>).</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-682465366%2FFunctions%2F257867639" anchor-label="clearAllTabStops" id="-682465366%2FFunctions%2F257867639" data-filterable-set=":ketraterm-parser/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-parser/main" data-filterable-set=":ketraterm-parser/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="clear-all-tab-stops.html"><span>clear</span><wbr><span>All</span><wbr><span>Tab</span><wbr><span><span>Stops</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-682465366%2FFunctions%2F257867639"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-parser/main"><div class="symbol monospace"><span class="token keyword">abstract </span><span class="token keyword">fun </span><a href="clear-all-tab-stops.html"><span class="token function">clearAllTabStops</span></a><span class="token punctuation">(</span><span class="token punctuation">)</span></div><div class="brief "><p class="paragraph">Clears all tab stops (TBC 3).</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-1502410864%2FFunctions%2F257867639" anchor-label="clearTabStop" id="-1502410864%2FFunctions%2F257867639" data-filterable-set=":ketraterm-parser/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-parser/main" data-filterable-set=":ketraterm-parser/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="clear-tab-stop.html"><span>clear</span><wbr><span>Tab</span><wbr><span><span>Stop</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-1502410864%2FFunctions%2F257867639"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-parser/main"><div class="symbol monospace"><span class="token keyword">abstract </span><span class="token keyword">fun </span><a href="clear-tab-stop.html"><span class="token function">clearTabStop</span></a><span class="token punctuation">(</span><span class="token punctuation">)</span></div><div class="brief "><p class="paragraph">Clears the tab stop at the current cursor column (TBC 0).</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-1085073313%2FFunctions%2F257867639" anchor-label="cursorBackward" id="-1085073313%2FFunctions%2F257867639" data-filterable-set=":ketraterm-parser/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-parser/main" data-filterable-set=":ketraterm-parser/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="cursor-backward.html"><span>cursor</span><wbr><span><span>Backward</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-1085073313%2FFunctions%2F257867639"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-parser/main"><div class="symbol monospace"><span class="token keyword">abstract </span><span class="token keyword">fun </span><a href="cursor-backward.html"><span class="token function">cursorBackward</span></a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">n<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a></span></span><span class="token punctuation">)</span></div><div class="brief "><p class="paragraph">Moves the cursor backward (left) by <a href="cursor-backward.html">n</a> columns.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="133929473%2FFunctions%2F257867639" anchor-label="cursorBackwardTabs" id="133929473%2FFunctions%2F257867639" data-filterable-set=":ketraterm-parser/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-parser/main" data-filterable-set=":ketraterm-parser/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="cursor-backward-tabs.html"><span>cursor</span><wbr><span>Backward</span><wbr><span><span>Tabs</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="133929473%2FFunctions%2F257867639"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-parser/main"><div class="symbol monospace"><span class="token keyword">abstract </span><span class="token keyword">fun </span><a href="cursor-backward-tabs.html"><span class="token function">cursorBackwardTabs</span></a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">n<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a></span></span><span class="token punctuation">)</span></div><div class="brief "><p class="paragraph">Moves the cursor backward (left) by <a href="cursor-backward-tabs.html">n</a> tab stops.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="596306624%2FFunctions%2F257867639" anchor-label="cursorDown" id="596306624%2FFunctions%2F257867639" data-filterable-set=":ketraterm-parser/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-parser/main" data-filterable-set=":ketraterm-parser/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="cursor-down.html"><span>cursor</span><wbr><span><span>Down</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="596306624%2FFunctions%2F257867639"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-parser/main"><div class="symbol monospace"><span class="token keyword">abstract </span><span class="token keyword">fun </span><a href="cursor-down.html"><span class="token function">cursorDown</span></a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">n<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a></span></span><span class="token punctuation">)</span></div><div class="brief "><p class="paragraph">Moves the cursor down by <a href="cursor-down.html">n</a> rows.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="1945146703%2FFunctions%2F257867639" anchor-label="cursorForward" id="1945146703%2FFunctions%2F257867639" data-filterable-set=":ketraterm-parser/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-parser/main" data-filterable-set=":ketraterm-parser/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="cursor-forward.html"><span>cursor</span><wbr><span><span>Forward</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="1945146703%2FFunctions%2F257867639"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-parser/main"><div class="symbol monospace"><span class="token keyword">abstract </span><span class="token keyword">fun </span><a href="cursor-forward.html"><span class="token function">cursorForward</span></a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">n<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a></span></span><span class="token punctuation">)</span></div><div class="brief "><p class="paragraph">Moves the cursor forward (right) by <a href="cursor-forward.html">n</a> columns.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="112271089%2FFunctions%2F257867639" anchor-label="cursorForwardTabs" id="112271089%2FFunctions%2F257867639" data-filterable-set=":ketraterm-parser/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-parser/main" data-filterable-set=":ketraterm-parser/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="cursor-forward-tabs.html"><span>cursor</span><wbr><span>Forward</span><wbr><span><span>Tabs</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="112271089%2FFunctions%2F257867639"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-parser/main"><div class="symbol monospace"><span class="token keyword">abstract </span><span class="token keyword">fun </span><a href="cursor-forward-tabs.html"><span class="token function">cursorForwardTabs</span></a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">n<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a></span></span><span class="token punctuation">)</span></div><div class="brief "><p class="paragraph">Moves the cursor forward (right) by <a href="cursor-forward-tabs.html">n</a> tab stops.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-1573559237%2FFunctions%2F257867639" anchor-label="cursorNextLine" id="-1573559237%2FFunctions%2F257867639" data-filterable-set=":ketraterm-parser/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-parser/main" data-filterable-set=":ketraterm-parser/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="cursor-next-line.html"><span>cursor</span><wbr><span>Next</span><wbr><span><span>Line</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-1573559237%2FFunctions%2F257867639"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-parser/main"><div class="symbol monospace"><span class="token keyword">abstract </span><span class="token keyword">fun </span><a href="cursor-next-line.html"><span class="token function">cursorNextLine</span></a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">n<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a></span></span><span class="token punctuation">)</span></div><div class="brief "><p class="paragraph">Moves the cursor down by <a href="cursor-next-line.html">n</a> lines and positions it at the beginning of the line.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="1284545591%2FFunctions%2F257867639" anchor-label="cursorPreviousLine" id="1284545591%2FFunctions%2F257867639" data-filterable-set=":ketraterm-parser/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-parser/main" data-filterable-set=":ketraterm-parser/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="cursor-previous-line.html"><span>cursor</span><wbr><span>Previous</span><wbr><span><span>Line</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="1284545591%2FFunctions%2F257867639"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-parser/main"><div class="symbol monospace"><span class="token keyword">abstract </span><span class="token keyword">fun </span><a href="cursor-previous-line.html"><span class="token function">cursorPreviousLine</span></a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">n<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a></span></span><span class="token punctuation">)</span></div><div class="brief "><p class="paragraph">Moves the cursor up by <a href="cursor-previous-line.html">n</a> lines and positions it at the beginning of the line.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="615181287%2FFunctions%2F257867639" anchor-label="cursorUp" id="615181287%2FFunctions%2F257867639" data-filterable-set=":ketraterm-parser/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-parser/main" data-filterable-set=":ketraterm-parser/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="cursor-up.html"><span>cursor</span><wbr><span><span>Up</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="615181287%2FFunctions%2F257867639"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-parser/main"><div class="symbol monospace"><span class="token keyword">abstract </span><span class="token keyword">fun </span><a href="cursor-up.html"><span class="token function">cursorUp</span></a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">n<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a></span></span><span class="token punctuation">)</span></div><div class="brief "><p class="paragraph">Moves the cursor up by <a href="cursor-up.html">n</a> rows.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="1065099513%2FFunctions%2F257867639" anchor-label="decaln" id="1065099513%2FFunctions%2F257867639" data-filterable-set=":ketraterm-parser/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-parser/main" data-filterable-set=":ketraterm-parser/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="decaln.html"><span><span>decaln</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="1065099513%2FFunctions%2F257867639"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-parser/main"><div class="symbol monospace"><span class="token keyword">abstract </span><span class="token keyword">fun </span><a href="decaln.html"><span class="token function">decaln</span></a><span class="token punctuation">(</span><span class="token punctuation">)</span></div><div class="brief "><p class="paragraph">DEC Screen Alignment Test (DECALN): ESC # 8.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="424321667%2FFunctions%2F257867639" anchor-label="deleteCharacters" id="424321667%2FFunctions%2F257867639" data-filterable-set=":ketraterm-parser/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-parser/main" data-filterable-set=":ketraterm-parser/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="delete-characters.html"><span>delete</span><wbr><span><span>Characters</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="424321667%2FFunctions%2F257867639"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-parser/main"><div class="symbol monospace"><span class="token keyword">abstract </span><span class="token keyword">fun </span><a href="delete-characters.html"><span class="token function">deleteCharacters</span></a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">n<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a></span></span><span class="token punctuation">)</span></div><div class="brief "><p class="paragraph">Deletes <a href="delete-characters.html">n</a> characters starting at the cursor position (DCH).</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="445270634%2FFunctions%2F257867639" anchor-label="deleteLines" id="445270634%2FFunctions%2F257867639" data-filterable-set=":ketraterm-parser/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-parser/main" data-filterable-set=":ketraterm-parser/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="delete-lines.html"><span>delete</span><wbr><span><span>Lines</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="445270634%2FFunctions%2F257867639"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-parser/main"><div class="symbol monospace"><span class="token keyword">abstract </span><span class="token keyword">fun </span><a href="delete-lines.html"><span class="token function">deleteLines</span></a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">n<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a></span></span><span class="token punctuation">)</span></div><div class="brief "><p class="paragraph">Deletes <a href="delete-lines.html">n</a> lines starting at the cursor row (DL).</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="1414474731%2FFunctions%2F257867639" anchor-label="deminimizeWindow" id="1414474731%2FFunctions%2F257867639" data-filterable-set=":ketraterm-parser/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-parser/main" data-filterable-set=":ketraterm-parser/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="deminimize-window.html"><span>deminimize</span><wbr><span><span>Window</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="1414474731%2FFunctions%2F257867639"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-parser/main"><div class="symbol monospace"><span class="token keyword">abstract </span><span class="token keyword">fun </span><a href="deminimize-window.html"><span class="token function">deminimizeWindow</span></a><span class="token punctuation">(</span><span class="token punctuation">)</span></div><div class="brief "><p class="paragraph">De-minimizes (restores/de-iconifies) the terminal window.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="2032894735%2FFunctions%2F257867639" anchor-label="endHyperlink" id="2032894735%2FFunctions%2F257867639" data-filterable-set=":ketraterm-parser/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-parser/main" data-filterable-set=":ketraterm-parser/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="end-hyperlink.html"><span>end</span><wbr><span><span>Hyperlink</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="2032894735%2FFunctions%2F257867639"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-parser/main"><div class="symbol monospace"><span class="token keyword">abstract </span><span class="token keyword">fun </span><a href="end-hyperlink.html"><span class="token function">endHyperlink</span></a><span class="token punctuation">(</span><span class="token punctuation">)</span></div><div class="brief "><p class="paragraph">Ends the active OSC 8 hyperlink context.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-1491794482%2FFunctions%2F257867639" anchor-label="eraseCharacters" id="-1491794482%2FFunctions%2F257867639" data-filterable-set=":ketraterm-parser/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-parser/main" data-filterable-set=":ketraterm-parser/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="erase-characters.html"><span>erase</span><wbr><span><span>Characters</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-1491794482%2FFunctions%2F257867639"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-parser/main"><div class="symbol monospace"><span class="token keyword">abstract </span><span class="token keyword">fun </span><a href="erase-characters.html"><span class="token function">eraseCharacters</span></a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">n<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a></span></span><span class="token punctuation">)</span></div><div class="brief "><p class="paragraph">Erases <a href="erase-characters.html">n</a> characters starting at the cursor position (ECH).</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="384962627%2FFunctions%2F257867639" anchor-label="eraseInDisplay" id="384962627%2FFunctions%2F257867639" data-filterable-set=":ketraterm-parser/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-parser/main" data-filterable-set=":ketraterm-parser/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="erase-in-display.html"><span>erase</span><wbr><span>In</span><wbr><span><span>Display</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="384962627%2FFunctions%2F257867639"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-parser/main"><div class="symbol monospace"><span class="token keyword">abstract </span><span class="token keyword">fun </span><a href="erase-in-display.html"><span class="token function">eraseInDisplay</span></a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">mode<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a><span class="token punctuation">, </span></span><span class="parameter ">selective<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-boolean/index.html">Boolean</a></span></span><span class="token punctuation">)</span></div><div class="brief "><p class="paragraph">Erases cells in the viewport (ED / DECSED).</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="322833413%2FFunctions%2F257867639" anchor-label="eraseInLine" id="322833413%2FFunctions%2F257867639" data-filterable-set=":ketraterm-parser/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-parser/main" data-filterable-set=":ketraterm-parser/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="erase-in-line.html"><span>erase</span><wbr><span>In</span><wbr><span><span>Line</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="322833413%2FFunctions%2F257867639"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-parser/main"><div class="symbol monospace"><span class="token keyword">abstract </span><span class="token keyword">fun </span><a href="erase-in-line.html"><span class="token function">eraseInLine</span></a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">mode<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a><span class="token punctuation">, </span></span><span class="parameter ">selective<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-boolean/index.html">Boolean</a></span></span><span class="token punctuation">)</span></div><div class="brief "><p class="paragraph">Erases cells in the active line (EL / DECSEL).</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-641121227%2FFunctions%2F257867639" anchor-label="insertCharacters" id="-641121227%2FFunctions%2F257867639" data-filterable-set=":ketraterm-parser/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-parser/main" data-filterable-set=":ketraterm-parser/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="insert-characters.html"><span>insert</span><wbr><span><span>Characters</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-641121227%2FFunctions%2F257867639"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-parser/main"><div class="symbol monospace"><span class="token keyword">abstract </span><span class="token keyword">fun </span><a href="insert-characters.html"><span class="token function">insertCharacters</span></a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">n<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a></span></span><span class="token punctuation">)</span></div><div class="brief "><p class="paragraph">Inserts <a href="insert-characters.html">n</a> blank characters at the cursor position (ICH).</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-1399463560%2FFunctions%2F257867639" anchor-label="insertLines" id="-1399463560%2FFunctions%2F257867639" data-filterable-set=":ketraterm-parser/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-parser/main" data-filterable-set=":ketraterm-parser/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="insert-lines.html"><span>insert</span><wbr><span><span>Lines</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-1399463560%2FFunctions%2F257867639"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-parser/main"><div class="symbol monospace"><span class="token keyword">abstract </span><span class="token keyword">fun </span><a href="insert-lines.html"><span class="token function">insertLines</span></a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">n<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a></span></span><span class="token punctuation">)</span></div><div class="brief "><p class="paragraph">Inserts <a href="insert-lines.html">n</a> blank lines at the cursor row (IL).</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="489607560%2FFunctions%2F257867639" anchor-label="lineFeed" id="489607560%2FFunctions%2F257867639" data-filterable-set=":ketraterm-parser/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-parser/main" data-filterable-set=":ketraterm-parser/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="line-feed.html"><span>line</span><wbr><span><span>Feed</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="489607560%2FFunctions%2F257867639"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-parser/main"><div class="symbol monospace"><span class="token keyword">abstract </span><span class="token keyword">fun </span><a href="line-feed.html"><span class="token function">lineFeed</span></a><span class="token punctuation">(</span><span class="token punctuation">)</span></div><div class="brief "><p class="paragraph">Executes a line feed (LF, <code class="lang-kotlin">0x0A</code>), moving the cursor down one row.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-1571263441%2FFunctions%2F257867639" anchor-label="lowerWindow" id="-1571263441%2FFunctions%2F257867639" data-filterable-set=":ketraterm-parser/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-parser/main" data-filterable-set=":ketraterm-parser/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="lower-window.html"><span>lower</span><wbr><span><span>Window</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-1571263441%2FFunctions%2F257867639"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-parser/main"><div class="symbol monospace"><span class="token keyword">abstract </span><span class="token keyword">fun </span><a href="lower-window.html"><span class="token function">lowerWindow</span></a><span class="token punctuation">(</span><span class="token punctuation">)</span></div><div class="brief "><p class="paragraph">Lowers the terminal window to the bottom of the window stack.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="1768178380%2FFunctions%2F257867639" anchor-label="minimizeWindow" id="1768178380%2FFunctions%2F257867639" data-filterable-set=":ketraterm-parser/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-parser/main" data-filterable-set=":ketraterm-parser/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="minimize-window.html"><span>minimize</span><wbr><span><span>Window</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="1768178380%2FFunctions%2F257867639"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-parser/main"><div class="symbol monospace"><span class="token keyword">abstract </span><span class="token keyword">fun </span><a href="minimize-window.html"><span class="token function">minimizeWindow</span></a><span class="token punctuation">(</span><span class="token punctuation">)</span></div><div class="brief "><p class="paragraph">Minimizes (iconifies) the terminal window.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-1044093722%2FFunctions%2F257867639" anchor-label="moveWindow" id="-1044093722%2FFunctions%2F257867639" data-filterable-set=":ketraterm-parser/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-parser/main" data-filterable-set=":ketraterm-parser/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="move-window.html"><span>move</span><wbr><span><span>Window</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-1044093722%2FFunctions%2F257867639"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-parser/main"><div class="symbol monospace"><span class="token keyword">abstract </span><span class="token keyword">fun </span><a href="move-window.html"><span class="token function">moveWindow</span></a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">x<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a><span class="token punctuation">, </span></span><span class="parameter ">y<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a></span></span><span class="token punctuation">)</span></div><div class="brief "><p class="paragraph">Moves the terminal window to the specified screen coordinates in pixels.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-1809216173%2FFunctions%2F257867639" anchor-label="nextLine" id="-1809216173%2FFunctions%2F257867639" data-filterable-set=":ketraterm-parser/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-parser/main" data-filterable-set=":ketraterm-parser/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="next-line.html"><span>next</span><wbr><span><span>Line</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-1809216173%2FFunctions%2F257867639"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-parser/main"><div class="symbol monospace"><span class="token keyword">abstract </span><span class="token keyword">fun </span><a href="next-line.html"><span class="token function">nextLine</span></a><span class="token punctuation">(</span><span class="token punctuation">)</span></div><div class="brief "><p class="paragraph">Moves the cursor to the left margin on the next row (NEL, <code class="lang-kotlin">ESC E</code>).</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-1451835256%2FFunctions%2F257867639" anchor-label="popKittyKeyboardFlags" id="-1451835256%2FFunctions%2F257867639" data-filterable-set=":ketraterm-parser/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-parser/main" data-filterable-set=":ketraterm-parser/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="pop-kitty-keyboard-flags.html"><span>pop</span><wbr><span>Kitty</span><wbr><span>Keyboard</span><wbr><span><span>Flags</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-1451835256%2FFunctions%2F257867639"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-parser/main"><div class="symbol monospace"><span class="token keyword">abstract </span><span class="token keyword">fun </span><a href="pop-kitty-keyboard-flags.html"><span class="token function">popKittyKeyboardFlags</span></a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">count<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a></span></span><span class="token punctuation">)</span></div><div class="brief "><p class="paragraph">Kitty keyboard stack pop, <code class="lang-kotlin">CSI &lt; count u</code>.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="1760947805%2FFunctions%2F257867639" anchor-label="popTitleStack" id="1760947805%2FFunctions%2F257867639" data-filterable-set=":ketraterm-parser/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-parser/main" data-filterable-set=":ketraterm-parser/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="pop-title-stack.html"><span>pop</span><wbr><span>Title</span><wbr><span><span>Stack</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="1760947805%2FFunctions%2F257867639"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-parser/main"><div class="symbol monospace"><span class="token keyword">abstract </span><span class="token keyword">fun </span><a href="pop-title-stack.html"><span class="token function">popTitleStack</span></a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">scope<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a></span></span><span class="token punctuation">)</span></div><div class="brief "><p class="paragraph">Pops the xterm title stack for the given scope.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="848691065%2FFunctions%2F257867639" anchor-label="pushKittyKeyboardFlags" id="848691065%2FFunctions%2F257867639" data-filterable-set=":ketraterm-parser/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-parser/main" data-filterable-set=":ketraterm-parser/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="push-kitty-keyboard-flags.html"><span>push</span><wbr><span>Kitty</span><wbr><span>Keyboard</span><wbr><span><span>Flags</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="848691065%2FFunctions%2F257867639"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-parser/main"><div class="symbol monospace"><span class="token keyword">abstract </span><span class="token keyword">fun </span><a href="push-kitty-keyboard-flags.html"><span class="token function">pushKittyKeyboardFlags</span></a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">flags<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a></span></span><span class="token punctuation">)</span></div><div class="brief "><p class="paragraph">Kitty keyboard stack push, <code class="lang-kotlin">CSI &gt; flags u</code>.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-1076384178%2FFunctions%2F257867639" anchor-label="pushTitleStack" id="-1076384178%2FFunctions%2F257867639" data-filterable-set=":ketraterm-parser/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-parser/main" data-filterable-set=":ketraterm-parser/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="push-title-stack.html"><span>push</span><wbr><span>Title</span><wbr><span><span>Stack</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-1076384178%2FFunctions%2F257867639"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-parser/main"><div class="symbol monospace"><span class="token keyword">abstract </span><span class="token keyword">fun </span><a href="push-title-stack.html"><span class="token function">pushTitleStack</span></a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">scope<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a></span></span><span class="token punctuation">)</span></div><div class="brief "><p class="paragraph">Xterm title stack push/pop scopes:</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-1960737294%2FFunctions%2F257867639" anchor-label="queryDynamicColor" id="-1960737294%2FFunctions%2F257867639" data-filterable-set=":ketraterm-parser/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-parser/main" data-filterable-set=":ketraterm-parser/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="query-dynamic-color.html"><span>query</span><wbr><span>Dynamic</span><wbr><span><span>Color</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-1960737294%2FFunctions%2F257867639"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-parser/main"><div class="symbol monospace"><span class="token keyword">abstract </span><span class="token keyword">fun </span><a href="query-dynamic-color.html"><span class="token function">queryDynamicColor</span></a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">target<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a></span></span><span class="token punctuation">)</span></div><div class="brief "><p class="paragraph">Queries a dynamic color.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="796512302%2FFunctions%2F257867639" anchor-label="queryPaletteColor" id="796512302%2FFunctions%2F257867639" data-filterable-set=":ketraterm-parser/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-parser/main" data-filterable-set=":ketraterm-parser/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="query-palette-color.html"><span>query</span><wbr><span>Palette</span><wbr><span><span>Color</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="796512302%2FFunctions%2F257867639"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-parser/main"><div class="symbol monospace"><span class="token keyword">abstract </span><span class="token keyword">fun </span><a href="query-palette-color.html"><span class="token function">queryPaletteColor</span></a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">index<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a></span></span><span class="token punctuation">)</span></div><div class="brief "><p class="paragraph">Queries an individual color in the active 256-color palette.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="939310383%2FFunctions%2F257867639" anchor-label="queryStatusString" id="939310383%2FFunctions%2F257867639" data-filterable-set=":ketraterm-parser/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-parser/main" data-filterable-set=":ketraterm-parser/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="query-status-string.html"><span>query</span><wbr><span>Status</span><wbr><span><span>String</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="939310383%2FFunctions%2F257867639"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-parser/main"><div class="symbol monospace"><span class="token keyword">abstract </span><span class="token keyword">fun </span><a href="query-status-string.html"><span class="token function">queryStatusString</span></a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">query<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-string/index.html">String</a></span></span><span class="token punctuation">)</span></div><div class="brief "><p class="paragraph">Queries a status string (DECRQSS).</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-1482597658%2FFunctions%2F257867639" anchor-label="queryTerminfo" id="-1482597658%2FFunctions%2F257867639" data-filterable-set=":ketraterm-parser/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-parser/main" data-filterable-set=":ketraterm-parser/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="query-terminfo.html"><span>query</span><wbr><span><span>Terminfo</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-1482597658%2FFunctions%2F257867639"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-parser/main"><div class="symbol monospace"><span class="token keyword">abstract </span><span class="token keyword">fun </span><a href="query-terminfo.html"><span class="token function">queryTerminfo</span></a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">rawPayload<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-string/index.html">String</a></span></span><span class="token punctuation">)</span></div><div class="brief "><p class="paragraph">Queries terminfo capabilities (XTGETTCAP).</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="1536528868%2FFunctions%2F257867639" anchor-label="raiseWindow" id="1536528868%2FFunctions%2F257867639" data-filterable-set=":ketraterm-parser/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-parser/main" data-filterable-set=":ketraterm-parser/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="raise-window.html"><span>raise</span><wbr><span><span>Window</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="1536528868%2FFunctions%2F257867639"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-parser/main"><div class="symbol monospace"><span class="token keyword">abstract </span><span class="token keyword">fun </span><a href="raise-window.html"><span class="token function">raiseWindow</span></a><span class="token punctuation">(</span><span class="token punctuation">)</span></div><div class="brief "><p class="paragraph">Raises the terminal window to the front of the window stack.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="1878498550%2FFunctions%2F257867639" anchor-label="requestClipboard" id="1878498550%2FFunctions%2F257867639" data-filterable-set=":ketraterm-parser/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-parser/main" data-filterable-set=":ketraterm-parser/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="request-clipboard.html"><span>request</span><wbr><span><span>Clipboard</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="1878498550%2FFunctions%2F257867639"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-parser/main"><div class="symbol monospace"><span class="token keyword">open </span><span class="token keyword">fun </span><a href="request-clipboard.html"><span class="token function">requestClipboard</span></a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">selection<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-string/index.html">String</a><span class="token punctuation">, </span></span><span class="parameter ">encodedData<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-string/index.html">String</a></span></span><span class="token punctuation">)</span></div><div class="brief "><p class="paragraph">Reports an OSC 52 terminal clipboard request.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-1807515621%2FFunctions%2F257867639" anchor-label="requestDeviceAttributes" id="-1807515621%2FFunctions%2F257867639" data-filterable-set=":ketraterm-parser/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-parser/main" data-filterable-set=":ketraterm-parser/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="request-device-attributes.html"><span>request</span><wbr><span>Device</span><wbr><span><span>Attributes</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-1807515621%2FFunctions%2F257867639"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-parser/main"><div class="symbol monospace"><span class="token keyword">abstract </span><span class="token keyword">fun </span><a href="request-device-attributes.html"><span class="token function">requestDeviceAttributes</span></a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">kind<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a><span class="token punctuation">, </span></span><span class="parameter ">parameter<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a></span></span><span class="token punctuation">)</span></div><div class="brief "><p class="paragraph">DA request.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-1387997327%2FFunctions%2F257867639" anchor-label="requestDeviceStatusReport" id="-1387997327%2FFunctions%2F257867639" data-filterable-set=":ketraterm-parser/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-parser/main" data-filterable-set=":ketraterm-parser/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="request-device-status-report.html"><span>request</span><wbr><span>Device</span><wbr><span>Status</span><wbr><span><span>Report</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-1387997327%2FFunctions%2F257867639"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-parser/main"><div class="symbol monospace"><span class="token keyword">abstract </span><span class="token keyword">fun </span><a href="request-device-status-report.html"><span class="token function">requestDeviceStatusReport</span></a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">mode<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a><span class="token punctuation">, </span></span><span class="parameter ">decPrivate<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-boolean/index.html">Boolean</a></span></span><span class="token punctuation">)</span></div><div class="brief "><p class="paragraph">DSR/CPR request: CSI Ps n or CSI ? Ps n.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-1776755285%2FFunctions%2F257867639" anchor-label="requestWindowReport" id="-1776755285%2FFunctions%2F257867639" data-filterable-set=":ketraterm-parser/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-parser/main" data-filterable-set=":ketraterm-parser/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="request-window-report.html"><span>request</span><wbr><span>Window</span><wbr><span><span>Report</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-1776755285%2FFunctions%2F257867639"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-parser/main"><div class="symbol monospace"><span class="token keyword">abstract </span><span class="token keyword">fun </span><a href="request-window-report.html"><span class="token function">requestWindowReport</span></a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">mode<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a></span></span><span class="token punctuation">)</span></div><div class="brief "><p class="paragraph">Safe xterm window report request.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="343911066%2FFunctions%2F257867639" anchor-label="resetAttributes" id="343911066%2FFunctions%2F257867639" data-filterable-set=":ketraterm-parser/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-parser/main" data-filterable-set=":ketraterm-parser/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="reset-attributes.html"><span>reset</span><wbr><span><span>Attributes</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="343911066%2FFunctions%2F257867639"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-parser/main"><div class="symbol monospace"><span class="token keyword">abstract </span><span class="token keyword">fun </span><a href="reset-attributes.html"><span class="token function">resetAttributes</span></a><span class="token punctuation">(</span><span class="token punctuation">)</span></div><div class="brief "><p class="paragraph">Resets all active pen attributes to defaults (SGR 0).</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-431865060%2FFunctions%2F257867639" anchor-label="resetKeyFormatOption" id="-431865060%2FFunctions%2F257867639" data-filterable-set=":ketraterm-parser/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-parser/main" data-filterable-set=":ketraterm-parser/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="reset-key-format-option.html"><span>reset</span><wbr><span>Key</span><wbr><span>Format</span><wbr><span><span>Option</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-431865060%2FFunctions%2F257867639"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-parser/main"><div class="symbol monospace"><span class="token keyword">abstract </span><span class="token keyword">fun </span><a href="reset-key-format-option.html"><span class="token function">resetKeyFormatOption</span></a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">resource<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a></span></span><span class="token punctuation">)</span></div><div class="brief "><p class="paragraph">Resets one xterm key format option, <code class="lang-kotlin">CSI &gt; Pp f</code>.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-1786472567%2FFunctions%2F257867639" anchor-label="resetKeyFormatOptions" id="-1786472567%2FFunctions%2F257867639" data-filterable-set=":ketraterm-parser/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-parser/main" data-filterable-set=":ketraterm-parser/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="reset-key-format-options.html"><span>reset</span><wbr><span>Key</span><wbr><span>Format</span><wbr><span><span>Options</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-1786472567%2FFunctions%2F257867639"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-parser/main"><div class="symbol monospace"><span class="token keyword">abstract </span><span class="token keyword">fun </span><a href="reset-key-format-options.html"><span class="token function">resetKeyFormatOptions</span></a><span class="token punctuation">(</span><span class="token punctuation">)</span></div><div class="brief "><p class="paragraph">Resets all supported xterm key format options, <code class="lang-kotlin">CSI &gt; f</code>.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="545060092%2FFunctions%2F257867639" anchor-label="resetKeyModifierOption" id="545060092%2FFunctions%2F257867639" data-filterable-set=":ketraterm-parser/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-parser/main" data-filterable-set=":ketraterm-parser/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="reset-key-modifier-option.html"><span>reset</span><wbr><span>Key</span><wbr><span>Modifier</span><wbr><span><span>Option</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="545060092%2FFunctions%2F257867639"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-parser/main"><div class="symbol monospace"><span class="token keyword">abstract </span><span class="token keyword">fun </span><a href="reset-key-modifier-option.html"><span class="token function">resetKeyModifierOption</span></a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">resource<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a></span></span><span class="token punctuation">)</span></div><div class="brief "><p class="paragraph">Resets one xterm key modifier option, <code class="lang-kotlin">CSI &gt; Pp m</code>.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-8369751%2FFunctions%2F257867639" anchor-label="resetKeyModifierOptions" id="-8369751%2FFunctions%2F257867639" data-filterable-set=":ketraterm-parser/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-parser/main" data-filterable-set=":ketraterm-parser/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="reset-key-modifier-options.html"><span>reset</span><wbr><span>Key</span><wbr><span>Modifier</span><wbr><span><span>Options</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-8369751%2FFunctions%2F257867639"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-parser/main"><div class="symbol monospace"><span class="token keyword">abstract </span><span class="token keyword">fun </span><a href="reset-key-modifier-options.html"><span class="token function">resetKeyModifierOptions</span></a><span class="token punctuation">(</span><span class="token punctuation">)</span></div><div class="brief "><p class="paragraph">Resets all supported xterm key modifier options, <code class="lang-kotlin">CSI &gt; m</code>.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-2121864683%2FFunctions%2F257867639" anchor-label="resetTerminal" id="-2121864683%2FFunctions%2F257867639" data-filterable-set=":ketraterm-parser/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-parser/main" data-filterable-set=":ketraterm-parser/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="reset-terminal.html"><span>reset</span><wbr><span><span>Terminal</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-2121864683%2FFunctions%2F257867639"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-parser/main"><div class="symbol monospace"><span class="token keyword">abstract </span><span class="token keyword">fun </span><a href="reset-terminal.html"><span class="token function">resetTerminal</span></a><span class="token punctuation">(</span><span class="token punctuation">)</span></div><div class="brief "><p class="paragraph">RIS full terminal reset: ESC c.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-1992020599%2FFunctions%2F257867639" anchor-label="resizeWindow" id="-1992020599%2FFunctions%2F257867639" data-filterable-set=":ketraterm-parser/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-parser/main" data-filterable-set=":ketraterm-parser/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="resize-window.html"><span>resize</span><wbr><span><span>Window</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-1992020599%2FFunctions%2F257867639"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-parser/main"><div class="symbol monospace"><span class="token keyword">abstract </span><span class="token keyword">fun </span><a href="resize-window.html"><span class="token function">resizeWindow</span></a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">rows<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a><span class="token punctuation">, </span></span><span class="parameter ">columns<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a></span></span><span class="token punctuation">)</span></div><div class="brief "><p class="paragraph">Requests that the host resize the terminal window to the specified grid dimensions.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-1711866468%2FFunctions%2F257867639" anchor-label="restoreCursor" id="-1711866468%2FFunctions%2F257867639" data-filterable-set=":ketraterm-parser/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-parser/main" data-filterable-set=":ketraterm-parser/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="restore-cursor.html"><span>restore</span><wbr><span><span>Cursor</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-1711866468%2FFunctions%2F257867639"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-parser/main"><div class="symbol monospace"><span class="token keyword">abstract </span><span class="token keyword">fun </span><a href="restore-cursor.html"><span class="token function">restoreCursor</span></a><span class="token punctuation">(</span><span class="token punctuation">)</span></div><div class="brief "><p class="paragraph">Restores the cursor position, SGR attributes, wrap state, and origin mode.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="1225547114%2FFunctions%2F257867639" anchor-label="reverseIndex" id="1225547114%2FFunctions%2F257867639" data-filterable-set=":ketraterm-parser/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-parser/main" data-filterable-set=":ketraterm-parser/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="reverse-index.html"><span>reverse</span><wbr><span><span>Index</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="1225547114%2FFunctions%2F257867639"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-parser/main"><div class="symbol monospace"><span class="token keyword">abstract </span><span class="token keyword">fun </span><a href="reverse-index.html"><span class="token function">reverseIndex</span></a><span class="token punctuation">(</span><span class="token punctuation">)</span></div><div class="brief "><p class="paragraph">Executes a reverse index (RI, <code class="lang-kotlin">ESC M</code>), moving the cursor up one row.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="672348647%2FFunctions%2F257867639" anchor-label="saveCursor" id="672348647%2FFunctions%2F257867639" data-filterable-set=":ketraterm-parser/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-parser/main" data-filterable-set=":ketraterm-parser/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="save-cursor.html"><span>save</span><wbr><span><span>Cursor</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="672348647%2FFunctions%2F257867639"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-parser/main"><div class="symbol monospace"><span class="token keyword">abstract </span><span class="token keyword">fun </span><a href="save-cursor.html"><span class="token function">saveCursor</span></a><span class="token punctuation">(</span><span class="token punctuation">)</span></div><div class="brief "><p class="paragraph">Saves the current cursor position, SGR attributes, wrap state, and origin mode.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="1255059305%2FFunctions%2F257867639" anchor-label="scrollDown" id="1255059305%2FFunctions%2F257867639" data-filterable-set=":ketraterm-parser/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-parser/main" data-filterable-set=":ketraterm-parser/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="scroll-down.html"><span>scroll</span><wbr><span><span>Down</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="1255059305%2FFunctions%2F257867639"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-parser/main"><div class="symbol monospace"><span class="token keyword">abstract </span><span class="token keyword">fun </span><a href="scroll-down.html"><span class="token function">scrollDown</span></a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">n<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a></span></span><span class="token punctuation">)</span></div><div class="brief "><p class="paragraph">Scrolls the active scroll region down by <a href="scroll-down.html">n</a> lines (SD).</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-197540144%2FFunctions%2F257867639" anchor-label="scrollUp" id="-197540144%2FFunctions%2F257867639" data-filterable-set=":ketraterm-parser/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-parser/main" data-filterable-set=":ketraterm-parser/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="scroll-up.html"><span>scroll</span><wbr><span><span>Up</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-197540144%2FFunctions%2F257867639"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-parser/main"><div class="symbol monospace"><span class="token keyword">abstract </span><span class="token keyword">fun </span><a href="scroll-up.html"><span class="token function">scrollUp</span></a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">n<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a></span></span><span class="token punctuation">)</span></div><div class="brief "><p class="paragraph">Scrolls the active scroll region up by <a href="scroll-up.html">n</a> lines (SU).</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="69799118%2FFunctions%2F257867639" anchor-label="setAnsiMode" id="69799118%2FFunctions%2F257867639" data-filterable-set=":ketraterm-parser/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-parser/main" data-filterable-set=":ketraterm-parser/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="set-ansi-mode.html"><span>set</span><wbr><span>Ansi</span><wbr><span><span>Mode</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="69799118%2FFunctions%2F257867639"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-parser/main"><div class="symbol monospace"><span class="token keyword">abstract </span><span class="token keyword">fun </span><a href="set-ansi-mode.html"><span class="token function">setAnsiMode</span></a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">mode<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a><span class="token punctuation">, </span></span><span class="parameter ">enable<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-boolean/index.html">Boolean</a></span></span><span class="token punctuation">)</span></div><div class="brief "><p class="paragraph">ANSI mode set/reset.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-1965701719%2FFunctions%2F257867639" anchor-label="setBackgroundDefault" id="-1965701719%2FFunctions%2F257867639" data-filterable-set=":ketraterm-parser/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-parser/main" data-filterable-set=":ketraterm-parser/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="set-background-default.html"><span>set</span><wbr><span>Background</span><wbr><span><span>Default</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-1965701719%2FFunctions%2F257867639"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-parser/main"><div class="symbol monospace"><span class="token keyword">abstract </span><span class="token keyword">fun </span><a href="set-background-default.html"><span class="token function">setBackgroundDefault</span></a><span class="token punctuation">(</span><span class="token punctuation">)</span></div><div class="brief "><p class="paragraph">Resets background color to the default.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-1357607081%2FFunctions%2F257867639" anchor-label="setBackgroundIndexed" id="-1357607081%2FFunctions%2F257867639" data-filterable-set=":ketraterm-parser/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-parser/main" data-filterable-set=":ketraterm-parser/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="set-background-indexed.html"><span>set</span><wbr><span>Background</span><wbr><span><span>Indexed</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-1357607081%2FFunctions%2F257867639"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-parser/main"><div class="symbol monospace"><span class="token keyword">abstract </span><span class="token keyword">fun </span><a href="set-background-indexed.html"><span class="token function">setBackgroundIndexed</span></a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">index<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a></span></span><span class="token punctuation">)</span></div><div class="brief "><p class="paragraph">Sets background indexed color.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="40449563%2FFunctions%2F257867639" anchor-label="setBackgroundRgb" id="40449563%2FFunctions%2F257867639" data-filterable-set=":ketraterm-parser/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-parser/main" data-filterable-set=":ketraterm-parser/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="set-background-rgb.html"><span>set</span><wbr><span>Background</span><wbr><span><span>Rgb</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="40449563%2FFunctions%2F257867639"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-parser/main"><div class="symbol monospace"><span class="token keyword">abstract </span><span class="token keyword">fun </span><a href="set-background-rgb.html"><span class="token function">setBackgroundRgb</span></a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">red<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a><span class="token punctuation">, </span></span><span class="parameter ">green<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a><span class="token punctuation">, </span></span><span class="parameter ">blue<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a></span></span><span class="token punctuation">)</span></div><div class="brief "><p class="paragraph">Sets background RGB color.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-1181563547%2FFunctions%2F257867639" anchor-label="setBlink" id="-1181563547%2FFunctions%2F257867639" data-filterable-set=":ketraterm-parser/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-parser/main" data-filterable-set=":ketraterm-parser/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="set-blink.html"><span>set</span><wbr><span><span>Blink</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-1181563547%2FFunctions%2F257867639"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-parser/main"><div class="symbol monospace"><span class="token keyword">abstract </span><span class="token keyword">fun </span><a href="set-blink.html"><span class="token function">setBlink</span></a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">enabled<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-boolean/index.html">Boolean</a></span></span><span class="token punctuation">)</span></div><div class="brief "><p class="paragraph">Sets blinking style.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="1542644286%2FFunctions%2F257867639" anchor-label="setBold" id="1542644286%2FFunctions%2F257867639" data-filterable-set=":ketraterm-parser/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-parser/main" data-filterable-set=":ketraterm-parser/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="set-bold.html"><span>set</span><wbr><span><span>Bold</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="1542644286%2FFunctions%2F257867639"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-parser/main"><div class="symbol monospace"><span class="token keyword">abstract </span><span class="token keyword">fun </span><a href="set-bold.html"><span class="token function">setBold</span></a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">enabled<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-boolean/index.html">Boolean</a></span></span><span class="token punctuation">)</span></div><div class="brief "><p class="paragraph">Sets bold weight.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-1508911854%2FFunctions%2F257867639" anchor-label="setConceal" id="-1508911854%2FFunctions%2F257867639" data-filterable-set=":ketraterm-parser/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-parser/main" data-filterable-set=":ketraterm-parser/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="set-conceal.html"><span>set</span><wbr><span><span>Conceal</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-1508911854%2FFunctions%2F257867639"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-parser/main"><div class="symbol monospace"><span class="token keyword">abstract </span><span class="token keyword">fun </span><a href="set-conceal.html"><span class="token function">setConceal</span></a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">enabled<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-boolean/index.html">Boolean</a></span></span><span class="token punctuation">)</span></div><div class="brief "><p class="paragraph">Sets conceal style.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="1804630269%2FFunctions%2F257867639" anchor-label="setCurrentWorkingDirectoryUri" id="1804630269%2FFunctions%2F257867639" data-filterable-set=":ketraterm-parser/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-parser/main" data-filterable-set=":ketraterm-parser/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="set-current-working-directory-uri.html"><span>set</span><wbr><span>Current</span><wbr><span>Working</span><wbr><span>Directory</span><wbr><span><span>Uri</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="1804630269%2FFunctions%2F257867639"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-parser/main"><div class="symbol monospace"><span class="token keyword">abstract </span><span class="token keyword">fun </span><a href="set-current-working-directory-uri.html"><span class="token function">setCurrentWorkingDirectoryUri</span></a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">uri<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-string/index.html">String</a></span></span><span class="token punctuation">)</span></div><div class="brief "><p class="paragraph">Reports the shell's current working directory as an OSC 7 file URI.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-1351484530%2FFunctions%2F257867639" anchor-label="setCursorAbsolute" id="-1351484530%2FFunctions%2F257867639" data-filterable-set=":ketraterm-parser/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-parser/main" data-filterable-set=":ketraterm-parser/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="set-cursor-absolute.html"><span>set</span><wbr><span>Cursor</span><wbr><span><span>Absolute</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-1351484530%2FFunctions%2F257867639"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-parser/main"><div class="symbol monospace"><span class="token keyword">abstract </span><span class="token keyword">fun </span><a href="set-cursor-absolute.html"><span class="token function">setCursorAbsolute</span></a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">row<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a><span class="token punctuation">, </span></span><span class="parameter ">col<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a></span></span><span class="token punctuation">)</span></div><div class="brief "><p class="paragraph">Row and column are parser-translated to zero-origin before handoff. The core may clamp; the parser must not.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-864265488%2FFunctions%2F257867639" anchor-label="setCursorColumn" id="-864265488%2FFunctions%2F257867639" data-filterable-set=":ketraterm-parser/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-parser/main" data-filterable-set=":ketraterm-parser/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="set-cursor-column.html"><span>set</span><wbr><span>Cursor</span><wbr><span><span>Column</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-864265488%2FFunctions%2F257867639"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-parser/main"><div class="symbol monospace"><span class="token keyword">abstract </span><span class="token keyword">fun </span><a href="set-cursor-column.html"><span class="token function">setCursorColumn</span></a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">col<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a></span></span><span class="token punctuation">)</span></div><div class="brief "><p class="paragraph">Column is parser-translated to zero-origin before handoff. The core may clamp; the parser must not.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="633197558%2FFunctions%2F257867639" anchor-label="setCursorRow" id="633197558%2FFunctions%2F257867639" data-filterable-set=":ketraterm-parser/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-parser/main" data-filterable-set=":ketraterm-parser/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="set-cursor-row.html"><span>set</span><wbr><span>Cursor</span><wbr><span><span>Row</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="633197558%2FFunctions%2F257867639"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-parser/main"><div class="symbol monospace"><span class="token keyword">abstract </span><span class="token keyword">fun </span><a href="set-cursor-row.html"><span class="token function">setCursorRow</span></a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">row<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a></span></span><span class="token punctuation">)</span></div><div class="brief "><p class="paragraph">Row is parser-translated to zero-origin before handoff. The core may clamp; the parser must not.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-29360257%2FFunctions%2F257867639" anchor-label="setCursorStyle" id="-29360257%2FFunctions%2F257867639" data-filterable-set=":ketraterm-parser/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-parser/main" data-filterable-set=":ketraterm-parser/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="set-cursor-style.html"><span>set</span><wbr><span>Cursor</span><wbr><span><span>Style</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-29360257%2FFunctions%2F257867639"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-parser/main"><div class="symbol monospace"><span class="token keyword">abstract </span><span class="token keyword">fun </span><a href="set-cursor-style.html"><span class="token function">setCursorStyle</span></a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">style<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a></span></span><span class="token punctuation">)</span></div><div class="brief "><p class="paragraph">Sets the shape/style of the cursor.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-1354565393%2FFunctions%2F257867639" anchor-label="setDecMode" id="-1354565393%2FFunctions%2F257867639" data-filterable-set=":ketraterm-parser/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-parser/main" data-filterable-set=":ketraterm-parser/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="set-dec-mode.html"><span>set</span><wbr><span>Dec</span><wbr><span><span>Mode</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-1354565393%2FFunctions%2F257867639"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-parser/main"><div class="symbol monospace"><span class="token keyword">abstract </span><span class="token keyword">fun </span><a href="set-dec-mode.html"><span class="token function">setDecMode</span></a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">mode<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a><span class="token punctuation">, </span></span><span class="parameter ">enable<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-boolean/index.html">Boolean</a></span></span><span class="token punctuation">)</span></div><div class="brief "><p class="paragraph">DEC private mode set/reset.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="701257349%2FFunctions%2F257867639" anchor-label="setDynamicColor" id="701257349%2FFunctions%2F257867639" data-filterable-set=":ketraterm-parser/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-parser/main" data-filterable-set=":ketraterm-parser/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="set-dynamic-color.html"><span>set</span><wbr><span>Dynamic</span><wbr><span><span>Color</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="701257349%2FFunctions%2F257867639"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-parser/main"><div class="symbol monospace"><span class="token keyword">abstract </span><span class="token keyword">fun </span><a href="set-dynamic-color.html"><span class="token function">setDynamicColor</span></a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">target<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a><span class="token punctuation">, </span></span><span class="parameter ">color<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a></span></span><span class="token punctuation">)</span></div><div class="brief "><p class="paragraph">Sets a dynamic color (foreground, background, or cursor color).</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-75358099%2FFunctions%2F257867639" anchor-label="setFaint" id="-75358099%2FFunctions%2F257867639" data-filterable-set=":ketraterm-parser/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-parser/main" data-filterable-set=":ketraterm-parser/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="set-faint.html"><span>set</span><wbr><span><span>Faint</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-75358099%2FFunctions%2F257867639"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-parser/main"><div class="symbol monospace"><span class="token keyword">abstract </span><span class="token keyword">fun </span><a href="set-faint.html"><span class="token function">setFaint</span></a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">enabled<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-boolean/index.html">Boolean</a></span></span><span class="token punctuation">)</span></div><div class="brief "><p class="paragraph">Sets faint (dim) weight.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-1108851266%2FFunctions%2F257867639" anchor-label="setForegroundDefault" id="-1108851266%2FFunctions%2F257867639" data-filterable-set=":ketraterm-parser/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-parser/main" data-filterable-set=":ketraterm-parser/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="set-foreground-default.html"><span>set</span><wbr><span>Foreground</span><wbr><span><span>Default</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-1108851266%2FFunctions%2F257867639"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-parser/main"><div class="symbol monospace"><span class="token keyword">abstract </span><span class="token keyword">fun </span><a href="set-foreground-default.html"><span class="token function">setForegroundDefault</span></a><span class="token punctuation">(</span><span class="token punctuation">)</span></div><div class="brief "><p class="paragraph">Resets foreground color to the default.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="1137293612%2FFunctions%2F257867639" anchor-label="setForegroundIndexed" id="1137293612%2FFunctions%2F257867639" data-filterable-set=":ketraterm-parser/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-parser/main" data-filterable-set=":ketraterm-parser/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="set-foreground-indexed.html"><span>set</span><wbr><span>Foreground</span><wbr><span><span>Indexed</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="1137293612%2FFunctions%2F257867639"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-parser/main"><div class="symbol monospace"><span class="token keyword">abstract </span><span class="token keyword">fun </span><a href="set-foreground-indexed.html"><span class="token function">setForegroundIndexed</span></a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">index<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a></span></span><span class="token punctuation">)</span></div><div class="brief "><p class="paragraph">Sets foreground indexed color.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="474576048%2FFunctions%2F257867639" anchor-label="setForegroundRgb" id="474576048%2FFunctions%2F257867639" data-filterable-set=":ketraterm-parser/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-parser/main" data-filterable-set=":ketraterm-parser/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="set-foreground-rgb.html"><span>set</span><wbr><span>Foreground</span><wbr><span><span>Rgb</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="474576048%2FFunctions%2F257867639"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-parser/main"><div class="symbol monospace"><span class="token keyword">abstract </span><span class="token keyword">fun </span><a href="set-foreground-rgb.html"><span class="token function">setForegroundRgb</span></a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">red<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a><span class="token punctuation">, </span></span><span class="parameter ">green<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a><span class="token punctuation">, </span></span><span class="parameter ">blue<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a></span></span><span class="token punctuation">)</span></div><div class="brief "><p class="paragraph">Sets foreground RGB color.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="2126102832%2FFunctions%2F257867639" anchor-label="setIconAndWindowTitle" id="2126102832%2FFunctions%2F257867639" data-filterable-set=":ketraterm-parser/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-parser/main" data-filterable-set=":ketraterm-parser/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="set-icon-and-window-title.html"><span>set</span><wbr><span>Icon</span><wbr><span>And</span><wbr><span>Window</span><wbr><span><span>Title</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="2126102832%2FFunctions%2F257867639"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-parser/main"><div class="symbol monospace"><span class="token keyword">abstract </span><span class="token keyword">fun </span><a href="set-icon-and-window-title.html"><span class="token function">setIconAndWindowTitle</span></a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">title<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-string/index.html">String</a></span></span><span class="token punctuation">)</span></div><div class="brief "><p class="paragraph">Sets both icon and window titles.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-1514174937%2FFunctions%2F257867639" anchor-label="setIconTitle" id="-1514174937%2FFunctions%2F257867639" data-filterable-set=":ketraterm-parser/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-parser/main" data-filterable-set=":ketraterm-parser/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="set-icon-title.html"><span>set</span><wbr><span>Icon</span><wbr><span><span>Title</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-1514174937%2FFunctions%2F257867639"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-parser/main"><div class="symbol monospace"><span class="token keyword">abstract </span><span class="token keyword">fun </span><a href="set-icon-title.html"><span class="token function">setIconTitle</span></a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">title<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-string/index.html">String</a></span></span><span class="token punctuation">)</span></div><div class="brief "><p class="paragraph">Sets the icon title.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="666349393%2FFunctions%2F257867639" anchor-label="setInverse" id="666349393%2FFunctions%2F257867639" data-filterable-set=":ketraterm-parser/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-parser/main" data-filterable-set=":ketraterm-parser/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="set-inverse.html"><span>set</span><wbr><span><span>Inverse</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="666349393%2FFunctions%2F257867639"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-parser/main"><div class="symbol monospace"><span class="token keyword">abstract </span><span class="token keyword">fun </span><a href="set-inverse.html"><span class="token function">setInverse</span></a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">enabled<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-boolean/index.html">Boolean</a></span></span><span class="token punctuation">)</span></div><div class="brief "><p class="paragraph">Sets inverse (reverse-video) style.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-1637587981%2FFunctions%2F257867639" anchor-label="setItalic" id="-1637587981%2FFunctions%2F257867639" data-filterable-set=":ketraterm-parser/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-parser/main" data-filterable-set=":ketraterm-parser/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="set-italic.html"><span>set</span><wbr><span><span>Italic</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-1637587981%2FFunctions%2F257867639"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-parser/main"><div class="symbol monospace"><span class="token keyword">abstract </span><span class="token keyword">fun </span><a href="set-italic.html"><span class="token function">setItalic</span></a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">enabled<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-boolean/index.html">Boolean</a></span></span><span class="token punctuation">)</span></div><div class="brief "><p class="paragraph">Sets italic style.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-1855400114%2FFunctions%2F257867639" anchor-label="setKeyFormatOption" id="-1855400114%2FFunctions%2F257867639" data-filterable-set=":ketraterm-parser/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-parser/main" data-filterable-set=":ketraterm-parser/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="set-key-format-option.html"><span>set</span><wbr><span>Key</span><wbr><span>Format</span><wbr><span><span>Option</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-1855400114%2FFunctions%2F257867639"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-parser/main"><div class="symbol monospace"><span class="token keyword">abstract </span><span class="token keyword">fun </span><a href="set-key-format-option.html"><span class="token function">setKeyFormatOption</span></a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">resource<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a><span class="token punctuation">, </span></span><span class="parameter ">value<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a></span></span><span class="token punctuation">)</span></div><div class="brief "><p class="paragraph">Xterm key format option set, <code class="lang-kotlin">CSI &gt; Pp ; Pv f</code>.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-1195455954%2FFunctions%2F257867639" anchor-label="setKeyModifierOption" id="-1195455954%2FFunctions%2F257867639" data-filterable-set=":ketraterm-parser/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-parser/main" data-filterable-set=":ketraterm-parser/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="set-key-modifier-option.html"><span>set</span><wbr><span>Key</span><wbr><span>Modifier</span><wbr><span><span>Option</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-1195455954%2FFunctions%2F257867639"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-parser/main"><div class="symbol monospace"><span class="token keyword">abstract </span><span class="token keyword">fun </span><a href="set-key-modifier-option.html"><span class="token function">setKeyModifierOption</span></a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">resource<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a><span class="token punctuation">, </span></span><span class="parameter ">value<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a></span></span><span class="token punctuation">)</span></div><div class="brief "><p class="paragraph">Xterm key modifier option set, <code class="lang-kotlin">CSI &gt; Pp ; Pv m</code>.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-1565111279%2FFunctions%2F257867639" anchor-label="setLeftRightMargins" id="-1565111279%2FFunctions%2F257867639" data-filterable-set=":ketraterm-parser/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-parser/main" data-filterable-set=":ketraterm-parser/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="set-left-right-margins.html"><span>set</span><wbr><span>Left</span><wbr><span>Right</span><wbr><span><span>Margins</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-1565111279%2FFunctions%2F257867639"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-parser/main"><div class="symbol monospace"><span class="token keyword">abstract </span><span class="token keyword">fun </span><a href="set-left-right-margins.html"><span class="token function">setLeftRightMargins</span></a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">left<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a><span class="token punctuation">, </span></span><span class="parameter ">right<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a></span></span><span class="token punctuation">)</span></div><div class="brief "><p class="paragraph">DECSLRM left/right margins.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-336336215%2FFunctions%2F257867639" anchor-label="setMaximized" id="-336336215%2FFunctions%2F257867639" data-filterable-set=":ketraterm-parser/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-parser/main" data-filterable-set=":ketraterm-parser/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="set-maximized.html"><span>set</span><wbr><span><span>Maximized</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-336336215%2FFunctions%2F257867639"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-parser/main"><div class="symbol monospace"><span class="token keyword">abstract </span><span class="token keyword">fun </span><a href="set-maximized.html"><span class="token function">setMaximized</span></a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">maximize<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-boolean/index.html">Boolean</a></span></span><span class="token punctuation">)</span></div><div class="brief "><p class="paragraph">Maximizes or restores the terminal window.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="427346971%2FFunctions%2F257867639" anchor-label="setOverline" id="427346971%2FFunctions%2F257867639" data-filterable-set=":ketraterm-parser/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-parser/main" data-filterable-set=":ketraterm-parser/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="set-overline.html"><span>set</span><wbr><span><span>Overline</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="427346971%2FFunctions%2F257867639"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-parser/main"><div class="symbol monospace"><span class="token keyword">abstract </span><span class="token keyword">fun </span><a href="set-overline.html"><span class="token function">setOverline</span></a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">enabled<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-boolean/index.html">Boolean</a></span></span><span class="token punctuation">)</span></div><div class="brief "><p class="paragraph">Sets overline decoration.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="98864841%2FFunctions%2F257867639" anchor-label="setPaletteColor" id="98864841%2FFunctions%2F257867639" data-filterable-set=":ketraterm-parser/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-parser/main" data-filterable-set=":ketraterm-parser/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="set-palette-color.html"><span>set</span><wbr><span>Palette</span><wbr><span><span>Color</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="98864841%2FFunctions%2F257867639"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-parser/main"><div class="symbol monospace"><span class="token keyword">abstract </span><span class="token keyword">fun </span><a href="set-palette-color.html"><span class="token function">setPaletteColor</span></a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">index<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a><span class="token punctuation">, </span></span><span class="parameter ">color<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a></span></span><span class="token punctuation">)</span></div><div class="brief "><p class="paragraph">Sets a specific ANSI indexed color.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-1857580670%2FFunctions%2F257867639" anchor-label="setScrollRegion" id="-1857580670%2FFunctions%2F257867639" data-filterable-set=":ketraterm-parser/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-parser/main" data-filterable-set=":ketraterm-parser/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="set-scroll-region.html"><span>set</span><wbr><span>Scroll</span><wbr><span><span>Region</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-1857580670%2FFunctions%2F257867639"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-parser/main"><div class="symbol monospace"><span class="token keyword">abstract </span><span class="token keyword">fun </span><a href="set-scroll-region.html"><span class="token function">setScrollRegion</span></a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">top<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a><span class="token punctuation">, </span></span><span class="parameter ">bottom<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a></span></span><span class="token punctuation">)</span></div><div class="brief "><p class="paragraph">DECSTBM scroll region.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-836986784%2FFunctions%2F257867639" anchor-label="setSelectiveEraseProtection" id="-836986784%2FFunctions%2F257867639" data-filterable-set=":ketraterm-parser/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-parser/main" data-filterable-set=":ketraterm-parser/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="set-selective-erase-protection.html"><span>set</span><wbr><span>Selective</span><wbr><span>Erase</span><wbr><span><span>Protection</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-836986784%2FFunctions%2F257867639"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-parser/main"><div class="symbol monospace"><span class="token keyword">abstract </span><span class="token keyword">fun </span><a href="set-selective-erase-protection.html"><span class="token function">setSelectiveEraseProtection</span></a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">enabled<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-boolean/index.html">Boolean</a></span></span><span class="token punctuation">)</span></div><div class="brief "><p class="paragraph">Sets selective erase protection (DECSCA).</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="939892494%2FFunctions%2F257867639" anchor-label="setStrikethrough" id="939892494%2FFunctions%2F257867639" data-filterable-set=":ketraterm-parser/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-parser/main" data-filterable-set=":ketraterm-parser/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="set-strikethrough.html"><span>set</span><wbr><span><span>Strikethrough</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="939892494%2FFunctions%2F257867639"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-parser/main"><div class="symbol monospace"><span class="token keyword">abstract </span><span class="token keyword">fun </span><a href="set-strikethrough.html"><span class="token function">setStrikethrough</span></a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">enabled<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-boolean/index.html">Boolean</a></span></span><span class="token punctuation">)</span></div><div class="brief "><p class="paragraph">Sets strikethrough decoration.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="1754727653%2FFunctions%2F257867639" anchor-label="setTabStop" id="1754727653%2FFunctions%2F257867639" data-filterable-set=":ketraterm-parser/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-parser/main" data-filterable-set=":ketraterm-parser/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="set-tab-stop.html"><span>set</span><wbr><span>Tab</span><wbr><span><span>Stop</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="1754727653%2FFunctions%2F257867639"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-parser/main"><div class="symbol monospace"><span class="token keyword">abstract </span><span class="token keyword">fun </span><a href="set-tab-stop.html"><span class="token function">setTabStop</span></a><span class="token punctuation">(</span><span class="token punctuation">)</span></div><div class="brief "><p class="paragraph">Sets a tab stop at the current cursor column (HTS).</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="688450802%2FFunctions%2F257867639" anchor-label="setUnderlineColorDefault" id="688450802%2FFunctions%2F257867639" data-filterable-set=":ketraterm-parser/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-parser/main" data-filterable-set=":ketraterm-parser/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="set-underline-color-default.html"><span>set</span><wbr><span>Underline</span><wbr><span>Color</span><wbr><span><span>Default</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="688450802%2FFunctions%2F257867639"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-parser/main"><div class="symbol monospace"><span class="token keyword">abstract </span><span class="token keyword">fun </span><a href="set-underline-color-default.html"><span class="token function">setUnderlineColorDefault</span></a><span class="token punctuation">(</span><span class="token punctuation">)</span></div><div class="brief "><p class="paragraph">Resets underline color to the default.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-1241911456%2FFunctions%2F257867639" anchor-label="setUnderlineColorIndexed" id="-1241911456%2FFunctions%2F257867639" data-filterable-set=":ketraterm-parser/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-parser/main" data-filterable-set=":ketraterm-parser/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="set-underline-color-indexed.html"><span>set</span><wbr><span>Underline</span><wbr><span>Color</span><wbr><span><span>Indexed</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-1241911456%2FFunctions%2F257867639"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-parser/main"><div class="symbol monospace"><span class="token keyword">abstract </span><span class="token keyword">fun </span><a href="set-underline-color-indexed.html"><span class="token function">setUnderlineColorIndexed</span></a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">index<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a></span></span><span class="token punctuation">)</span></div><div class="brief "><p class="paragraph">Sets underline indexed color.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="431228388%2FFunctions%2F257867639" anchor-label="setUnderlineColorRgb" id="431228388%2FFunctions%2F257867639" data-filterable-set=":ketraterm-parser/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-parser/main" data-filterable-set=":ketraterm-parser/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="set-underline-color-rgb.html"><span>set</span><wbr><span>Underline</span><wbr><span>Color</span><wbr><span><span>Rgb</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="431228388%2FFunctions%2F257867639"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-parser/main"><div class="symbol monospace"><span class="token keyword">abstract </span><span class="token keyword">fun </span><a href="set-underline-color-rgb.html"><span class="token function">setUnderlineColorRgb</span></a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">red<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a><span class="token punctuation">, </span></span><span class="parameter ">green<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a><span class="token punctuation">, </span></span><span class="parameter ">blue<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a></span></span><span class="token punctuation">)</span></div><div class="brief "><p class="paragraph">Sets underline RGB color.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="1014800407%2FFunctions%2F257867639" anchor-label="setUnderlineStyle" id="1014800407%2FFunctions%2F257867639" data-filterable-set=":ketraterm-parser/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-parser/main" data-filterable-set=":ketraterm-parser/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="set-underline-style.html"><span>set</span><wbr><span>Underline</span><wbr><span><span>Style</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="1014800407%2FFunctions%2F257867639"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-parser/main"><div class="symbol monospace"><span class="token keyword">abstract </span><span class="token keyword">fun </span><a href="set-underline-style.html"><span class="token function">setUnderlineStyle</span></a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">style<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a></span></span><span class="token punctuation">)</span></div><div class="brief "><p class="paragraph">Sets underline style.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-47571440%2FFunctions%2F257867639" anchor-label="setWindowTitle" id="-47571440%2FFunctions%2F257867639" data-filterable-set=":ketraterm-parser/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-parser/main" data-filterable-set=":ketraterm-parser/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="set-window-title.html"><span>set</span><wbr><span>Window</span><wbr><span><span>Title</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-47571440%2FFunctions%2F257867639"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-parser/main"><div class="symbol monospace"><span class="token keyword">abstract </span><span class="token keyword">fun </span><a href="set-window-title.html"><span class="token function">setWindowTitle</span></a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">title<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-string/index.html">String</a></span></span><span class="token punctuation">)</span></div><div class="brief "><p class="paragraph">Sets the window title.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-554323872%2FFunctions%2F257867639" anchor-label="shellIntegrationMarker" id="-554323872%2FFunctions%2F257867639" data-filterable-set=":ketraterm-parser/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-parser/main" data-filterable-set=":ketraterm-parser/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="shell-integration-marker.html"><span>shell</span><wbr><span>Integration</span><wbr><span><span>Marker</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-554323872%2FFunctions%2F257867639"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-parser/main"><div class="symbol monospace"><span class="token keyword">abstract </span><span class="token keyword">fun </span><a href="shell-integration-marker.html"><span class="token function">shellIntegrationMarker</span></a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">event<span class="token operator">: </span><a href="../../../ketraterm-protocol/io.github.ketraterm.protocol/-shell-integration-event/index.html">ShellIntegrationEvent</a></span></span><span class="token punctuation">)</span></div><div class="brief "><p class="paragraph">Emits a FinalTerm-style OSC 133 shell integration marker.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-745650775%2FFunctions%2F257867639" anchor-label="showNotification" id="-745650775%2FFunctions%2F257867639" data-filterable-set=":ketraterm-parser/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-parser/main" data-filterable-set=":ketraterm-parser/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="show-notification.html"><span>show</span><wbr><span><span>Notification</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-745650775%2FFunctions%2F257867639"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-parser/main"><div class="symbol monospace"><span class="token keyword">abstract </span><span class="token keyword">fun </span><a href="show-notification.html"><span class="token function">showNotification</span></a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">title<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-string/index.html">String</a><span class="token punctuation">, </span></span><span class="parameter ">body<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-string/index.html">String</a><span class="token punctuation">, </span></span><span class="parameter ">level<span class="token operator">: </span><a href="../../../ketraterm-protocol/io.github.ketraterm.protocol/-notification-level/index.html">NotificationLevel</a></span></span><span class="token punctuation">)</span></div><div class="brief "><p class="paragraph">Requests a desktop notification.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-339353989%2FFunctions%2F257867639" anchor-label="softReset" id="-339353989%2FFunctions%2F257867639" data-filterable-set=":ketraterm-parser/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-parser/main" data-filterable-set=":ketraterm-parser/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="soft-reset.html"><span>soft</span><wbr><span><span>Reset</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-339353989%2FFunctions%2F257867639"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-parser/main"><div class="symbol monospace"><span class="token keyword">abstract </span><span class="token keyword">fun </span><a href="soft-reset.html"><span class="token function">softReset</span></a><span class="token punctuation">(</span><span class="token punctuation">)</span></div><div class="brief "><p class="paragraph">DECSTR soft terminal reset: CSI ! p.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-81338960%2FFunctions%2F257867639" anchor-label="startHyperlink" id="-81338960%2FFunctions%2F257867639" data-filterable-set=":ketraterm-parser/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-parser/main" data-filterable-set=":ketraterm-parser/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="start-hyperlink.html"><span>start</span><wbr><span><span>Hyperlink</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-81338960%2FFunctions%2F257867639"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-parser/main"><div class="symbol monospace"><span class="token keyword">abstract </span><span class="token keyword">fun </span><a href="start-hyperlink.html"><span class="token function">startHyperlink</span></a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">uri<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-string/index.html">String</a><span class="token punctuation">, </span></span><span class="parameter ">id<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-string/index.html">String</a><span class="token operator">?</span></span></span><span class="token punctuation">)</span></div><div class="brief "><p class="paragraph">Starts an OSC 8 hyperlink context.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="638067307%2FFunctions%2F257867639" anchor-label="tab" id="638067307%2FFunctions%2F257867639" data-filterable-set=":ketraterm-parser/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-parser/main" data-filterable-set=":ketraterm-parser/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="tab.html"><span><span>tab</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="638067307%2FFunctions%2F257867639"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-parser/main"><div class="symbol monospace"><span class="token keyword">abstract </span><span class="token keyword">fun </span><a href="tab.html"><span class="token function">tab</span></a><span class="token punctuation">(</span><span class="token punctuation">)</span></div><div class="brief "><p class="paragraph">Advances the cursor to the next tab stop (HT, <code class="lang-kotlin">0x09</code>).</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-100702927%2FFunctions%2F257867639" anchor-label="writeCluster" id="-100702927%2FFunctions%2F257867639" data-filterable-set=":ketraterm-parser/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-parser/main" data-filterable-set=":ketraterm-parser/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="write-cluster.html"><span>write</span><wbr><span><span>Cluster</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-100702927%2FFunctions%2F257867639"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-parser/main"><div class="symbol monospace"><span class="token keyword">abstract </span><span class="token keyword">fun </span><a href="write-cluster.html"><span class="token function">writeCluster</span></a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">codepoints<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int-array/index.html">IntArray</a><span class="token punctuation">, </span></span><span class="parameter ">length<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a></span></span><span class="token punctuation">)</span></div><div class="brief "><p class="paragraph">Writes a pre-segmented multi-codepoint grapheme cluster to the grid.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-1265106124%2FFunctions%2F257867639" anchor-label="writeCodepoint" id="-1265106124%2FFunctions%2F257867639" data-filterable-set=":ketraterm-parser/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-parser/main" data-filterable-set=":ketraterm-parser/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="write-codepoint.html"><span>write</span><wbr><span><span>Codepoint</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-1265106124%2FFunctions%2F257867639"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-parser/main"><div class="symbol monospace"><span class="token keyword">abstract </span><span class="token keyword">fun </span><a href="write-codepoint.html"><span class="token function">writeCodepoint</span></a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">codepoint<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a></span></span><span class="token punctuation">)</span></div><div class="brief "><p class="paragraph">Writes a single Unicode codepoint to the grid at the cursor position.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+    <div class="footer">
+        <div class="footer--container">
+            <a href="#content" id="go-to-top-link" class="footer--button footer--button_go-to-top"></a>
+            <div class="footer--content">
+                <div>
+                    <span>Generated by </span>
+                    <a class="footer--link footer--link_external" href="https://github.com/Kotlin/dokka">
+                        Dokka
+                    </a>
+                    <div>© 2026 Copyright</div>
+                </div>
+            </div>
+        </div>
+    </div>
+        </div>
+    </div>
+</div>
+</body>
+</html>

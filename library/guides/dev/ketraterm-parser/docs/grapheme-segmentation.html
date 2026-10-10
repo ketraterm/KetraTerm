@@ -1,0 +1,126 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="description" content="A modular Kotlin/JVM terminal emulator library for Swing and headless applications.">
+  <meta name="color-scheme" content="light dark">
+  <title>Streaming UTF-8 Decoding &amp; UAX #29 Grapheme Segmentation · KetraTerm Library</title>
+  <link rel="icon" href="../../../../assets/logo.svg" type="image/svg+xml">
+  <link rel="preload" href="../../../../assets/fonts/manrope-variable.ttf" as="font" type="font/ttf" crossorigin>
+  <link rel="stylesheet" href="../../../../assets/styles.css">
+  <script type="importmap">{"imports":{"mermaid":"../../../../assets/mermaid/mermaid.esm.min.mjs"}}</script>
+  <script type="module" src="../../../../assets/site.js"></script>
+</head>
+<body data-product="library" data-version="Development">
+  <a class="skip" href="#main">Skip to content</a>
+  <header class="site-header">
+    <div class="site-identity">
+      <a class="brand" href="../../../../index.html" aria-label="KetraTerm Library home"><img class="brand-mark" src="../../../../assets/logo.svg" alt="" width="34" height="34">KetraTerm</a>
+      <nav class="product-navigation" aria-label="KetraTerm products"><a href="https://ketraterm.github.io/KetraTerm/">App</a><a href="../../../../index.html" aria-current="true">Library</a></nav>
+    </div>
+    <details class="site-navigation" open><summary>Menu</summary><nav aria-label="Library navigation"><a   href="../../docs/README.html">Guides</a><a aria-current="true"  href="../../modules.html">Modules</a><a   href="../../../../versions.html">API & versions</a><a   href="../../CHANGELOG.html">Changelog</a><a  class="nav-primary" href="../../README.html">Get started</a></nav></details>
+    <button class="theme-toggle" type="button" aria-label="Switch to light theme">Light</button>
+  </header>
+  <div class="docs-shell"><aside class="sidebar" aria-label="Documentation navigation"><details class="nav-disclosure" open><summary class="mobile-nav-toggle">Browse library guides</summary><div><label class="search-label">Find a library guide<input type="search" data-doc-search placeholder="Search library docs" autocomplete="off" data-index="../../search.json"></label><div class="search-results" aria-live="polite"></div><details open><summary>Start here</summary><a  href="../../docs/README.html">Documentation</a><a  href="../../README.html">Installation</a><a  href="../../modules.html">Module guides</a><a  href="../../CHANGELOG.html">Changelog</a></details><details open><summary>Capabilities</summary><a  href="../../docs/terminal-feature-map.html">Feature map</a><a  href="../../docs/features/terminal.html">Terminal</a><a  href="../../docs/features/shells.html">Shell integration</a><a  href="../../docs/features/desktop.html">Swing view & hosts</a><a  href="../../docs/features/completion.html">Completion</a><a  href="../../docs/features/embedding.html">Embedding</a><a  href="../../docs/terminal-feature-gap-map.html">Known limits</a></details><details open><summary>Embedding guides</summary><a  href="../../docs/library/configuration.html">Configuration</a><a  href="../../docs/library/compatibility.html">Compatibility</a><a  href="../../docs/library/render-ownership.html">Render ownership</a></details><details open><summary>Reference</summary><a  href="../../docs/reference/protocol.html">Protocols</a><a  href="../../docs/reference/notifications.html">Notifications</a><a  href="../../docs/reference/storage.html">Storage & privacy</a></details><details open><summary>Development</summary><a  href="../../ARCHITECTURE.html">Architecture</a><a  href="../../CONTRIBUTING.html">Contributing</a><a  href="../../docs/development/conformance-testing.html">Conformance testing</a></details></div></details></aside><main id="main" tabindex="-1" class="article article-with-outline"><div class="article-top"><nav class="breadcrumb" aria-label="Breadcrumb"><ol><li><a href="../../../../index.html">Library</a></li><li><a href="../../modules.html">Modules</a></li><li><a href="../README.html">ketraterm-parser</a></li><li><span aria-current="page">Streaming UTF-8 Decoding &amp; UAX #29 Grapheme Segmentation</span></li></ol></nav><div class="doc-version"><span>Development</span><a href="../../../../versions.html">All versions</a></div></div><details class="page-outline" open><summary>On this page</summary><nav aria-label="On this page"><a class="depth-2" href="#1-streaming-utf-8-decoder-utf8decoder">1. Streaming UTF-8 Decoder (Utf8Decoder)</a><a class="depth-2" href="#2-grapheme-segmentation-unicode-uax-29">2. Grapheme Segmentation (Unicode UAX #29)</a><a class="depth-2" href="#3-grapheme-publication">3. Grapheme publication</a><a class="depth-3" href="#bounded-retention">Bounded retention</a><a class="depth-2" href="#charset-saverestore-ownership">Charset save/restore ownership</a><a class="depth-2" href="#validation">Validation</a></nav></details><div class="article-content"><div class="prose"><h1 id="streaming-utf-8-decoding--uax-29-grapheme-segmentation">Streaming UTF-8 Decoding &amp; UAX #29 Grapheme Segmentation</h1>
+<p>The parser decodes printable UTF-8, applies charset mapping, and assembles
+graphemes before invoking the command sink. Core owns cell width, storage,
+wrapping, and cursor effects. This document describes that text handoff; the
+<a href="../../docs/terminal-feature-map.html">feature map</a> and
+<a href="../../docs/terminal-feature-gap-map.html">gap map</a> define supported scope.</p>
+<h2 id="1-streaming-utf-8-decoder-utf8decoder">1. Streaming UTF-8 Decoder (<code>Utf8Decoder</code>)</h2>
+<p><a href="https://github.com/ketraterm/KetraTerm/blob/e3c7f9c626934093d35a67ca97afbbf1b343f28d/ketraterm-parser/src/main/kotlin/io/github/ketraterm/parser/utf8/Utf8Decoder.kt">Utf8Decoder</a>
+stores incomplete scalar state in primitive fields and returns a packed integer
+containing output/replay flags and the scalar. It rejects invalid leading bytes,
+overlong encodings, surrogates, and values above <code>U+10FFFF</code>.</p>
+<p>Malformed input emits <code>U+FFFD</code>. If a pending scalar receives a byte outside the
+continuation range, the decoder resets and asks <code>TerminalParser</code> to route that
+byte again once. Thus <code>C3 ESC [ A</code> produces replacement text followed by a
+cursor-up command. A continuation-range byte violating that scalar&#39;s bounds is
+consumed as part of the malformed subsequence. An incomplete printable scalar
+at EOF also produces replacement text; reset discards it.</p>
+<p>Printable decoding occurs in <code>GROUND</code>. OSC/DCS collection preserves raw payload
+bytes, with decoding or validation performed when a complete command dispatches.
+Custom OSC handlers receive undecoded bytes. Raw C1 bytes are not treated as
+8-bit control introducers by the UTF-8 parser.</p>
+<h2 id="2-grapheme-segmentation-unicode-uax-29">2. Grapheme Segmentation (Unicode UAX #29)</h2>
+<p>After charset mapping, <a href="https://github.com/ketraterm/KetraTerm/blob/e3c7f9c626934093d35a67ca97afbbf1b343f28d/ketraterm-parser/src/main/kotlin/io/github/ketraterm/parser/unicode/UnicodeClass.kt">UnicodeClass</a>
+returns packed grapheme-break and <code>Extended_Pictographic</code> properties.
+<a href="https://github.com/ketraterm/KetraTerm/blob/e3c7f9c626934093d35a67ca97afbbf1b343f28d/ketraterm-parser/src/main/kotlin/io/github/ketraterm/parser/unicode/GraphemeSegmenter.kt">GraphemeSegmenter</a>
+uses these properties plus bounded context for controls, combining marks,
+spacing marks, prepend characters, Hangul, regional-indicator pairs, and emoji
+ZWJ continuations. Ordinary adjacent bases take a short boundary path.</p>
+<p>Classification data is generated from Unicode <strong>17.0.0</strong>. Printable ASCII bypasses
+the table; other values use a two-stage indexed lookup with shared 128-codepoint
+blocks. The immutable Latin-1 string representation avoids per-parser table
+copies and per-codepoint allocation. JVM compact-string settings affect storage,
+not classification. A property-data version is not a claim of complete conformance
+to every UAX #29 segmentation rule.</p>
+<p>Regenerate using <code>tools/generate-unicode-tables.ps1</code> from the repository root,
+then run formatting and parser tests. <code>UnicodeClassTest</code> compares every Unicode
+codepoint against independent, pinned <code>GraphemeBreakProperty.txt</code> and
+<code>emoji-data.txt</code> resources. Upgrade those resources deliberately; the generator
+does not rewrite this oracle. <code>GraphemeSegmenterTest</code> checks implemented boundary
+rules separately from property classification.</p>
+<p><a id="3-the-grapheme-assembler-optimization-graphemeassembler"></a></p>
+<h2 id="3-grapheme-publication">3. Grapheme publication</h2>
+<p><a href="https://github.com/ketraterm/KetraTerm/blob/e3c7f9c626934093d35a67ca97afbbf1b343f28d/ketraterm-parser/src/main/kotlin/io/github/ketraterm/parser/unicode/GraphemeAssembler.kt">GraphemeAssembler</a>
+publishes decoded text promptly without waiting for the next grapheme boundary:</p>
+<ol>
+<li>The first publication uses <code>writeCodepoint</code> for one scalar or <code>writeCluster</code>
+for a longer retained prefix.</li>
+<li>A continuation published later uses <code>updatePreviousCluster</code> with the complete
+retained sequence, including the earlier prefix. The sink applies it to the
+same text target and preserves the original attributes.</li>
+</ol>
+<p>Both <code>accept</code> and <code>acceptByte</code> publish at their call boundary when the parser is
+in <code>GROUND</code>. <code>flushForRender</code> keeps segmentation context; unchanged prefixes are
+not published again. A pending UTF-8 scalar does not delay an already decoded
+prefix. The next grapheme or a structural action publishes any pending update
+before clearing context. Reset discards pending context.</p>
+<p>Publication commits downstream grid effects. Retaining segmentation across calls
+does not guarantee identical placement for different chunkings of a grapheme
+whose width changes after publication. See the
+<a href="../../docs/reference/protocol.html#streaming-grapheme-placement">streaming placement policy</a>.</p>
+<p><code>writeCluster</code> and <code>updatePreviousCluster</code> borrow the reusable <code>IntArray</code> only for
+the synchronous call. The sink must consume or copy its valid prefix before
+returning. It must not reconstruct a continuation from partial text or retain
+the parser&#39;s array. Optional <code>TerminalAsciiCommandSink</code> batching likewise borrows
+an ASCII slice, with the final base retained for a possible later continuation.</p>
+<h3 id="bounded-retention">Bounded retention</h3>
+<p>Factory-created parsers retain the first <strong>32 Unicode codepoints</strong> of each
+grapheme, including its base, in one reusable array. This is a terminal resource
+policy, not a grapheme boundary or a byte/UTF-16 limit.</p>
+<p>Once full, the parser discards further continuations without sink writes while
+still advancing segmentation context. Filling the buffer never ends the active
+grapheme. The next actual boundary starts a new retained cluster; controls and
+UTF-8 recovery continue through their normal paths.</p>
+<p>Only retained text reaches core and contributes to width, rendering, and copied
+text. A base plus 40 combining marks retains the base and first 31 marks; the
+remaining marks create no additional cells. A discarded variation selector
+cannot change the retained prefix&#39;s width. This factory policy imposes no new
+32-codepoint restriction on direct core cluster writes.</p>
+<h2 id="charset-saverestore-ownership">Charset save/restore ownership</h2>
+<p>Live G0-G3 designations and GL/GR shifts are parser-owned. DEC/SCO and 1048
+save/restore use separate primary/alternate charset slots selected from the
+sink&#39;s effective screen. Effective 1049 entry saves primary state; its exit
+restores it. Clearing alternate entry through 1047/1049 resets that screen&#39;s
+saved slot. Repeated or rejected screen requests do not alter these slots.</p>
+<p>Restore clears transient single shifts. Unsaved slots, RIS, and DECSTR use ASCII
+designations, GL=G0, and GR=G2. A sink must expose effective screen selection
+synchronously before its mode callback returns. Direct host resets of core
+should be paired with parser reset to keep parser-owned state aligned.</p>
+<h2 id="validation">Validation</h2>
+<p><code>Utf8DecoderTest</code> covers malformed input and bounded replay.
+<code>GraphemeSegmenterTest</code> and <code>UnicodeClassTest</code> separate boundary rules from data
+classification. <code>TerminalParserTest</code> exercises publication, retained-prefix
+updates, charset saves, overflow, and chunk boundaries through byte streams.
+Cross-layer placement and storage behavior are verified in core/host tests.</p>
+</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/e3c7f9c626934093d35a67ca97afbbf1b343f28d/ketraterm-parser/docs/grapheme-segmentation.md">View source on GitHub ↗</a></div></div></main></div>
+  <footer>
+    <a class="brand" href="../../../../index.html"><img class="brand-mark" src="../../../../assets/logo.svg" alt="" width="34" height="34">KetraTerm Library</a>
+    <p>Open source · Apache 2.0</p>
+    <div><a href="https://github.com/ketraterm/KetraTerm">GitHub ↗</a><a href="https://github.com/ketraterm/KetraTerm/issues">Issues ↗</a><a class="product-switch" href="https://ketraterm.github.io/KetraTerm/">Desktop app ↗</a></div>
+  </footer>
+</body>
+</html>

@@ -1,0 +1,231 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="description" content="A modular Kotlin/JVM terminal emulator library for Swing and headless applications.">
+  <meta name="color-scheme" content="light dark">
+  <title>Command completion · KetraTerm Library</title>
+  <link rel="icon" href="../../../../assets/logo.svg" type="image/svg+xml">
+  <link rel="preload" href="../../../../assets/fonts/manrope-variable.ttf" as="font" type="font/ttf" crossorigin>
+  <link rel="stylesheet" href="../../../../assets/styles.css">
+  <script type="importmap">{"imports":{"mermaid":"../../../../assets/mermaid/mermaid.esm.min.mjs"}}</script>
+  <script type="module" src="../../../../assets/site.js"></script>
+</head>
+<body data-product="library" data-version="Development">
+  <a class="skip" href="#main">Skip to content</a>
+  <header class="site-header">
+    <div class="site-identity">
+      <a class="brand" href="../../../../index.html" aria-label="KetraTerm Library home"><img class="brand-mark" src="../../../../assets/logo.svg" alt="" width="34" height="34">KetraTerm</a>
+      <nav class="product-navigation" aria-label="KetraTerm products"><a href="https://ketraterm.github.io/KetraTerm/">App</a><a href="../../../../index.html" aria-current="true">Library</a></nav>
+    </div>
+    <details class="site-navigation" open><summary>Menu</summary><nav aria-label="Library navigation"><a aria-current="true"  href="../README.html">Guides</a><a   href="../../modules.html">Modules</a><a   href="../../../../versions.html">API & versions</a><a   href="../../CHANGELOG.html">Changelog</a><a  class="nav-primary" href="../../README.html">Get started</a></nav></details>
+    <button class="theme-toggle" type="button" aria-label="Switch to light theme">Light</button>
+  </header>
+  <div class="docs-shell"><aside class="sidebar" aria-label="Documentation navigation"><details class="nav-disclosure" open><summary class="mobile-nav-toggle">Browse library guides</summary><div><label class="search-label">Find a library guide<input type="search" data-doc-search placeholder="Search library docs" autocomplete="off" data-index="../../search.json"></label><div class="search-results" aria-live="polite"></div><details open><summary>Start here</summary><a  href="../README.html">Documentation</a><a  href="../../README.html">Installation</a><a  href="../../modules.html">Module guides</a><a  href="../../CHANGELOG.html">Changelog</a></details><details open><summary>Capabilities</summary><a  href="../terminal-feature-map.html">Feature map</a><a  href="terminal.html">Terminal</a><a  href="shells.html">Shell integration</a><a  href="desktop.html">Swing view & hosts</a><a aria-current="page" href="completion.html">Completion</a><a  href="embedding.html">Embedding</a><a  href="../terminal-feature-gap-map.html">Known limits</a></details><details open><summary>Embedding guides</summary><a  href="../library/configuration.html">Configuration</a><a  href="../library/compatibility.html">Compatibility</a><a  href="../library/render-ownership.html">Render ownership</a></details><details open><summary>Reference</summary><a  href="../reference/protocol.html">Protocols</a><a  href="../reference/notifications.html">Notifications</a><a  href="../reference/storage.html">Storage & privacy</a></details><details open><summary>Development</summary><a  href="../../ARCHITECTURE.html">Architecture</a><a  href="../../CONTRIBUTING.html">Contributing</a><a  href="../development/conformance-testing.html">Conformance testing</a></details></div></details></aside><main id="main" tabindex="-1" class="article article-with-outline"><div class="article-top"><nav class="breadcrumb" aria-label="Breadcrumb"><ol><li><a href="../../../../index.html">Library</a></li><li><span>Capabilities</span></li><li><span aria-current="page">Command completion</span></li></ol></nav><div class="doc-version"><span>Development</span><a href="../../../../versions.html">All versions</a></div></div><details class="page-outline" open><summary>On this page</summary><nav aria-label="On this page"><a class="depth-2" href="#availability">Availability</a><a class="depth-2" href="#sources-by-host">Sources by host</a><a class="depth-2" href="#built-in-command-catalog">Built-in command catalog</a><a class="depth-2" href="#matching-and-interaction">Matching and interaction</a><a class="depth-2" href="#library-customization">Library customization</a><a class="depth-2" href="#learning-and-privacy">Learning and privacy</a></nav></details><div class="article-content"><div class="prose"><h1 id="command-completion">Command completion</h1>
+<p>KetraTerm&#39;s optional completion engine combines command specifications, paths,
+host-provided sources, and bounded local learning. It can run independently of
+a terminal or use the Swing/IntelliJ suggestion UI.</p>
+<h2 id="availability">Availability</h2>
+<p>Completion is <strong>disabled by default in both products</strong>. Its settings controls
+are currently hidden. Standalone users can enable <code>smart_suggestions_enabled</code>
+in the <a href="https://ketraterm.github.io/KetraTerm/settings.html">TOML configuration</a>;
+the IntelliJ plugin retains persisted preferences but exposes no settings toggle.
+Library hosts enable and configure their own provider and presentation.</p>
+<p>Terminal suggestions require an editable command context, normally supplied by
+<a href="shells.html#prompt-hooks-and-completion-dialects">shell hooks</a>.
+Unsupported shells do not gain command tracking merely by enabling completion.
+Custom hosts can supply their own context and editing authority.</p>
+<h2 id="sources-by-host">Sources by host</h2>
+<p>This table describes the sources available when completion is enabled.</p>
+<div class="table-scroll"><table>
+<thead>
+<tr>
+<th>Source</th>
+<th>Standalone</th>
+<th>IntelliJ plugin</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Built-in command specifications</td>
+<td>Yes</td>
+<td>Yes</td>
+</tr>
+<tr>
+<td>Files and directories</td>
+<td>Bounded local directory scans.</td>
+<td>IDE virtual filesystem with local scan fallback.</td>
+</tr>
+<tr>
+<td>Project-wide files</td>
+<td>No project index.</td>
+<td>Project filename lookup and matching.</td>
+</tr>
+<tr>
+<td>Git branches and tags</td>
+<td>No dynamic source.</td>
+<td>Local/remote branches and tags from IDE repositories.</td>
+</tr>
+<tr>
+<td>Recent Git commits</td>
+<td>No dynamic source.</td>
+<td>Up to 50 commits for supported commit arguments.</td>
+</tr>
+<tr>
+<td>Git changed paths</td>
+<td>Ordinary path completion.</td>
+<td>IDE change-list paths for supported Git commands.</td>
+</tr>
+<tr>
+<td>Gradle tasks</td>
+<td>Built-in lifecycle tasks.</td>
+<td>Also tasks from the imported Gradle model.</td>
+</tr>
+<tr>
+<td>Learned commands and tokens</td>
+<td>In-memory learning when enabled.</td>
+<td>In-memory learning when enabled.</td>
+</tr>
+</tbody></table></div>
+<p>Local filesystem sources require locally resolvable paths. WSL or remote shell
+metadata does not provide a remote filesystem completion service.</p>
+<h2 id="built-in-command-catalog">Built-in command catalog</h2>
+<p>The catalog provides selected subcommands, options, and argument domains; it is
+not an exhaustive schema for every version of these tools.</p>
+<div class="table-scroll"><table>
+<thead>
+<tr>
+<th>Group</th>
+<th>Commands</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Files and navigation</td>
+<td><code>cd</code>, <code>pushd</code>, <code>ls</code>, <code>cat</code>, <code>mkdir</code>, <code>rm</code>, <code>cp</code>, <code>mv</code></td>
+</tr>
+<tr>
+<td>Version control</td>
+<td><code>git</code>, <code>gh</code></td>
+</tr>
+<tr>
+<td>Build and languages</td>
+<td><code>gradle</code> / <code>gradlew</code>, <code>cargo</code>, <code>go</code>, <code>kotlin</code>, <code>kotlinc</code></td>
+</tr>
+<tr>
+<td>Package managers</td>
+<td><code>npm</code>, <code>pnpm</code>, <code>yarn</code>, <code>bun</code>, <code>pip</code></td>
+</tr>
+<tr>
+<td>Containers and cloud</td>
+<td><code>docker</code>, <code>docker-compose</code>, <code>kubectl</code>, <code>aws</code></td>
+</tr>
+<tr>
+<td>Developer tools</td>
+<td><code>code</code>, <code>adb</code>, <code>ketra</code></td>
+</tr>
+</tbody></table></div>
+<h2 id="matching-and-interaction">Matching and interaction</h2>
+<div class="table-scroll"><table>
+<thead>
+<tr>
+<th>Feature</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Matching</td>
+<td>Exact, prefix, CamelHump, word-boundary/acronym, and substring matching.</td>
+</tr>
+<tr>
+<td>Context</td>
+<td>Active command segment, preceding arguments, option values, and end-of-options handling.</td>
+</tr>
+<tr>
+<td>Command specifications</td>
+<td>Aliases, nested/repeatable subcommands, ordered/variadic arguments, literal values, path kinds, and mutually exclusive option groups.</td>
+</tr>
+<tr>
+<td>Shell syntax</td>
+<td>POSIX and PowerShell subsets, plus conservative plain parsing; see the <a href="shells.html">shell matrix</a>.</td>
+</tr>
+<tr>
+<td>Paths</td>
+<td>Directory traversal, shell-aware escaping, and hidden entries when explicitly requested.</td>
+</tr>
+<tr>
+<td>Ranking</td>
+<td>Merged sources, deterministic ordering, contextual priority, and bounded learning boosts.</td>
+</tr>
+<tr>
+<td>Progressive results</td>
+<td>Sources can update results asynchronously; obsolete requests are cancelled.</td>
+</tr>
+<tr>
+<td>Presentation</td>
+<td>Matched-text highlighting, descriptions, source labels, keyboard/pointer navigation, and custom UI support.</td>
+</tr>
+<tr>
+<td>Acceptance</td>
+<td>A stale editing context is rejected before replacement is admitted.</td>
+</tr>
+</tbody></table></div>
+<p>With completion enabled, Ctrl+Space requests suggestions. The embedded view uses
+Tab to accept, arrows/Page Up/Page Down to navigate, and Escape to dismiss.
+Enter acceptance and automatic popups are preferences; IntelliJ also uses its
+active keymap. Shell-native Tab completion remains a separate facility.</p>
+<h2 id="library-customization">Library customization</h2>
+<div class="table-scroll"><table>
+<thead>
+<tr>
+<th>Extension</th>
+<th>Host control</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Catalog</td>
+<td>Replace or extend command specifications and localize descriptions without changing command tokens.</td>
+</tr>
+<tr>
+<td>Sources</td>
+<td>Register custom asynchronous sources with bounded priorities and a failure-reporting callback.</td>
+</tr>
+<tr>
+<td>Source adapters</td>
+<td>Supply directory listings, query-aware fuzzy paths, imported Gradle tasks, or dynamic argument values.</td>
+</tr>
+<tr>
+<td>Learning</td>
+<td>Supply a shared learning store and replay policy; enable ranking evidence independently of command replay.</td>
+</tr>
+<tr>
+<td>Presentation</td>
+<td>Replace the provider, popup view, suggestion keymap, or entire presentation target; customize source labels.</td>
+</tr>
+<tr>
+<td>Editing and feedback</td>
+<td>Supply request-scoped edit authority and observe acceptance/dismissal outcomes.</td>
+</tr>
+</tbody></table></div>
+<p>The engine performs no host I/O itself. Source adapters use host-supplied data;
+the Gradle adapter does not run Gradle to discover tasks. Ordinary source
+exceptions are reported while other sources continue; request cancellation
+cancels source work.</p>
+<h2 id="learning-and-privacy">Learning and privacy</h2>
+<p>Learning adjusts matching candidates using executions, acceptance, and explicit
+dismissal. Successful commands admitted by the replay policy can also supply
+history and observed-token suggestions. Hosts may independently disable replay
+retention while keeping ranking evidence.</p>
+<p>Persistence is opt-in. Approved replay may contain plaintext command data;
+filtering cannot identify every secret. See the <a href="../reference/storage.html">storage and privacy contract</a>
+for location, retention, and encoding.</p>
+<p>For integration, use the <a href="../../ketraterm-completion/README.html">completion README</a>,
+<a href="../../ketraterm-ui-swing-host/README.html#completion-bridge">Swing adapter guide</a>,
+and <a href="../../ketraterm-completion/docs/completion-architecture.html">engine architecture</a>.</p>
+</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/e3c7f9c626934093d35a67ca97afbbf1b343f28d/docs/features/completion.md">View source on GitHub ↗</a></div></div></main></div>
+  <footer>
+    <a class="brand" href="../../../../index.html"><img class="brand-mark" src="../../../../assets/logo.svg" alt="" width="34" height="34">KetraTerm Library</a>
+    <p>Open source · Apache 2.0</p>
+    <div><a href="https://github.com/ketraterm/KetraTerm">GitHub ↗</a><a href="https://github.com/ketraterm/KetraTerm/issues">Issues ↗</a><a class="product-switch" href="https://ketraterm.github.io/KetraTerm/">Desktop app ↗</a></div>
+  </footer>
+</body>
+</html>

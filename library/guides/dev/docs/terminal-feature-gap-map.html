@@ -1,0 +1,168 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="description" content="A modular Kotlin/JVM terminal emulator library for Swing and headless applications.">
+  <meta name="color-scheme" content="light dark">
+  <title>Feature gaps · KetraTerm Library</title>
+  <link rel="icon" href="../../../assets/logo.svg" type="image/svg+xml">
+  <link rel="preload" href="../../../assets/fonts/manrope-variable.ttf" as="font" type="font/ttf" crossorigin>
+  <link rel="stylesheet" href="../../../assets/styles.css">
+  <script type="importmap">{"imports":{"mermaid":"../../../assets/mermaid/mermaid.esm.min.mjs"}}</script>
+  <script type="module" src="../../../assets/site.js"></script>
+</head>
+<body data-product="library" data-version="Development">
+  <a class="skip" href="#main">Skip to content</a>
+  <header class="site-header">
+    <div class="site-identity">
+      <a class="brand" href="../../../index.html" aria-label="KetraTerm Library home"><img class="brand-mark" src="../../../assets/logo.svg" alt="" width="34" height="34">KetraTerm</a>
+      <nav class="product-navigation" aria-label="KetraTerm products"><a href="https://ketraterm.github.io/KetraTerm/">App</a><a href="../../../index.html" aria-current="true">Library</a></nav>
+    </div>
+    <details class="site-navigation" open><summary>Menu</summary><nav aria-label="Library navigation"><a aria-current="true"  href="README.html">Guides</a><a   href="../modules.html">Modules</a><a   href="../../../versions.html">API & versions</a><a   href="../CHANGELOG.html">Changelog</a><a  class="nav-primary" href="../README.html">Get started</a></nav></details>
+    <button class="theme-toggle" type="button" aria-label="Switch to light theme">Light</button>
+  </header>
+  <div class="docs-shell"><aside class="sidebar" aria-label="Documentation navigation"><details class="nav-disclosure" open><summary class="mobile-nav-toggle">Browse library guides</summary><div><label class="search-label">Find a library guide<input type="search" data-doc-search placeholder="Search library docs" autocomplete="off" data-index="../search.json"></label><div class="search-results" aria-live="polite"></div><details open><summary>Start here</summary><a  href="README.html">Documentation</a><a  href="../README.html">Installation</a><a  href="../modules.html">Module guides</a><a  href="../CHANGELOG.html">Changelog</a></details><details open><summary>Capabilities</summary><a  href="terminal-feature-map.html">Feature map</a><a  href="features/terminal.html">Terminal</a><a  href="features/shells.html">Shell integration</a><a  href="features/desktop.html">Swing view & hosts</a><a  href="features/completion.html">Completion</a><a  href="features/embedding.html">Embedding</a><a aria-current="page" href="terminal-feature-gap-map.html">Known limits</a></details><details open><summary>Embedding guides</summary><a  href="library/configuration.html">Configuration</a><a  href="library/compatibility.html">Compatibility</a><a  href="library/render-ownership.html">Render ownership</a></details><details open><summary>Reference</summary><a  href="reference/protocol.html">Protocols</a><a  href="reference/notifications.html">Notifications</a><a  href="reference/storage.html">Storage & privacy</a></details><details open><summary>Development</summary><a  href="../ARCHITECTURE.html">Architecture</a><a  href="../CONTRIBUTING.html">Contributing</a><a  href="development/conformance-testing.html">Conformance testing</a></details></div></details></aside><main id="main" tabindex="-1" class="article article-with-outline"><div class="article-top"><nav class="breadcrumb" aria-label="Breadcrumb"><ol><li><a href="../../../index.html">Library</a></li><li><span>Capabilities</span></li><li><span aria-current="page">Feature gaps</span></li></ol></nav><div class="doc-version"><span>Development</span><a href="../../../versions.html">All versions</a></div></div><details class="page-outline" open><summary>On this page</summary><nav aria-label="On this page"><a class="depth-2" href="#product-and-release-work">Product and release work</a><a class="depth-2" href="#transports-and-execution-environments">Transports and execution environments</a><a class="depth-2" href="#input">Input</a><a class="depth-2" href="#optional-protocol-work">Optional protocol work</a><a class="depth-2" href="#accepted-limitations">Accepted limitations</a><a class="depth-2" href="#intentional-exclusions">Intentional exclusions</a><a class="depth-2" href="#status-labels">Status Labels</a></nav></details><div class="article-content"><div class="prose"><h1 id="feature-gaps">Feature gaps</h1>
+<p>Open work and deliberate limitations. Implemented features belong in the
+<a href="terminal-feature-map.html">feature catalog</a>; completed fixes belong in Git history
+and the <a href="../CHANGELOG.html">changelog</a>. Entries here are not release commitments.</p>
+<h2 id="product-and-release-work">Product and release work</h2>
+<div class="table-scroll"><table>
+<thead>
+<tr>
+<th>Owner</th>
+<th>Remaining work</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>TODO(host/profile)</code></td>
+<td>Restore completion settings controls and learning-reset actions in both products, with defaults, persistence, and tests updated together. The master switch remains off by default.</td>
+</tr>
+<tr>
+<td><code>TODO(host/profile)</code></td>
+<td>Gate binary/plugin delivery on checks of the exact release revision: opt-in native PTY tests (<code>-Dterminal.pty.host=true</code>), package checks, supported-IDE Plugin Verifier runs, and installed-product smoke tests. Ordinary CI runs tests and ABI checks, and Maven publication runs publication checks; binary release jobs do not depend on the full verification set.</td>
+</tr>
+<tr>
+<td><code>TODO(policy)</code></td>
+<td>Establish reproducible allocation and latency budgets for startup, warmed operation, changing content, history growth, and platform painting. Include retained heap and disposal; short local measurements are not a release baseline.</td>
+</tr>
+</tbody></table></div>
+<h2 id="transports-and-execution-environments">Transports and execution environments</h2>
+<div class="table-scroll"><table>
+<thead>
+<tr>
+<th>Owner</th>
+<th>Remaining work</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>TODO(transport)</code></td>
+<td>A built-in SSH connector, remote-session lifecycle, permissions, and appropriate paste defaults. Running <code>ssh</code> inside a local shell does not provide this integration.</td>
+</tr>
+<tr>
+<td><code>TODO(host/profile)</code></td>
+<td>WSL-aware directory, JDK, and startup-command mapping. Existing explicit-shell hooks do not provide guest filesystem completion or remote process metadata; see <a href="features/shells.html">shell support</a>.</td>
+</tr>
+<tr>
+<td><code>TODO(host/profile)</code></td>
+<td>Dev Container launch contexts and container-aware host services; no built-in container-session integration exists.</td>
+</tr>
+</tbody></table></div>
+<p><a id="input-module-gaps"></a>
+<a id="deferred-kitty-keyboard-protocol-scope"></a></p>
+<h2 id="input">Input</h2>
+<div class="table-scroll"><table>
+<thead>
+<tr>
+<th>Owner</th>
+<th>Remaining work</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>TODO(host/profile)</code></td>
+<td>Native rich-input adapters with layout-aware key identity, IME text, and complete lifecycle metadata. Portable Swing must not advertise Kitty flags 2, 4, or 16 before these inputs are reliable.</td>
+</tr>
+<tr>
+<td><code>TODO(parser/core/input)</code></td>
+<td>Layout-aware modifyOtherKeys modifier masks, including <code>CSI &gt; 4 : 1 m</code>. The parser rejects colon subparameters for this command; no corresponding negotiated mask is stored or applied by the encoder.</td>
+</tr>
+</tbody></table></div>
+<h2 id="optional-protocol-work">Optional protocol work</h2>
+<div class="table-scroll"><table>
+<thead>
+<tr>
+<th>Owner</th>
+<th>Remaining work</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>TODO(parser/core/render/ui/policy)</code></td>
+<td>Sixel and Kitty graphics: decoding, bounded transfer/decompression, retained-image budgets, render contracts, and painting. Kitty graphics requires APC dispatch.</td>
+</tr>
+<tr>
+<td><code>TODO(parser/core/policy)</code></td>
+<td>xterm XTCHECKSUM extensions beyond the implemented base VT420 checksum.</td>
+</tr>
+<tr>
+<td><code>TODO(parser)</code></td>
+<td>Additional ISO 2022 national replacement sets: UK, Dutch, Finnish, French, German, Italian, Norwegian/Danish, Spanish, Swedish, Swiss, and Portuguese.</td>
+</tr>
+<tr>
+<td><code>TODO(host/profile)</code></td>
+<td>Built-in desktop OSC 52 writes to primary/secondary selections and cut buffers, and reads from secondary selections and cut buffers. Library callbacks already expose selection-aware requests; custom hosts can implement these destinations.</td>
+</tr>
+</tbody></table></div>
+<h2 id="accepted-limitations">Accepted limitations</h2>
+<ul>
+<li>Streaming grapheme updates do not roll back published wraps, scrolling,
+overwrites, or insert shifts. Placement can depend on chunk boundaries; see the
+<a href="reference/protocol.html#streaming-grapheme-placement">placement contract</a>
+and <a href="development/conformance-testing.html#streaming-placement">verification disposition</a>.</li>
+<li>The streaming parser retains at most 32 codepoints per grapheme; further
+continuations affect segmentation but are not emitted. Direct core cluster
+storage does not impose this parser limit.</li>
+<li>One session has one viewport. Independently scrolling views of one process
+and standalone reuse of the Swing renderer are outside the current API.</li>
+<li>Column spacing uses integer logical pixels; fractional cell advances are unavailable.</li>
+<li>Portable Swing exposes only the key metadata available through AWT.</li>
+<li>Color-scheme reporting is query-only; mode 2031 notifications are unavailable.</li>
+<li>Highlight mouse tracking (mode 1001) is unsupported.</li>
+<li>Native color-emoji rasterization is Windows-specific. Other platforms use
+Java2D/font fallback; the library has no equivalent native color-emoji backend.</li>
+<li>The screen-size query reports terminal-grid dimensions, not the monitor&#39;s
+capacity in cells; there is no separate host-supplied screen-size value.</li>
+<li>No supported generation-specific completed-paint observer is exposed by Swing.
+Frame publication does not prove screen presentation.</li>
+</ul>
+<h2 id="intentional-exclusions">Intentional exclusions</h2>
+<ul>
+<li>Literal parity with every historical xterm extension.</li>
+<li>Tektronix 4014, printer passthrough, and X11 font-loading protocols.</li>
+<li>ReGIS/vector graphics and raw 8-bit C1 mode without a demonstrated modern use case.</li>
+<li>Unbounded OSC/DCS responses or clipboard access that bypasses host policy.</li>
+<li>DA3 unique identity replies and window-position reports.</li>
+<li>XTSETTCAP mutation of the advertised capability identity.</li>
+</ul>
+<h2 id="status-labels">Status Labels</h2>
+<ul>
+<li><code>TODO(parser)</code>: byte/protocol recognition or semantic dispatch is missing.</li>
+<li><code>TODO(core)</code>: terminal state, grid physics, pen storage, or public API is missing.</li>
+<li><code>TODO(host)</code>: parser and core both have enough shape, but the integration bridge is incomplete.</li>
+<li><code>TODO(session)</code>: runtime synchronization, host-side state, or session-owned metadata is missing.</li>
+<li><code>TODO(transport)</code>: a connector implementation or transport integration is missing.</li>
+<li><code>TODO(render)</code>: render contracts or copied render data are missing.</li>
+<li><code>TODO(ui)</code>: reusable UI presentation, interaction, or rendering behavior is missing.</li>
+<li><code>TODO(input)</code>: host-bound keyboard/mouse/paste encoding is missing.</li>
+<li><code>TODO(completion)</code>: completion evaluation, ranking, learning, or source-work lifecycle is missing or incorrect.</li>
+<li><code>TODO(host/profile)</code>: product host integration, profile, or settings behavior is missing.</li>
+<li><code>TODO(policy)</code>: feature needs an explicit security or compatibility policy before implementation.</li>
+</ul>
+<p>Combined labels name every owner needed to close one gap; <code>host/profile</code> means product-host integration rather than the parser-to-core adapter. A policy or test limitation alone does not imply missing parser behavior.</p>
+</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/e3c7f9c626934093d35a67ca97afbbf1b343f28d/docs/terminal-feature-gap-map.md">View source on GitHub ↗</a></div></div></main></div>
+  <footer>
+    <a class="brand" href="../../../index.html"><img class="brand-mark" src="../../../assets/logo.svg" alt="" width="34" height="34">KetraTerm Library</a>
+    <p>Open source · Apache 2.0</p>
+    <div><a href="https://github.com/ketraterm/KetraTerm">GitHub ↗</a><a href="https://github.com/ketraterm/KetraTerm/issues">Issues ↗</a><a class="product-switch" href="https://ketraterm.github.io/KetraTerm/">Desktop app ↗</a></div>
+  </footer>
+</body>
+</html>

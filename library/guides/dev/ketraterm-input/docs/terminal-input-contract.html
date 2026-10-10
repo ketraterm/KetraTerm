@@ -1,0 +1,387 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="description" content="A modular Kotlin/JVM terminal emulator library for Swing and headless applications.">
+  <meta name="color-scheme" content="light dark">
+  <title>Terminal Input Contract · KetraTerm Library</title>
+  <link rel="icon" href="../../../../assets/logo.svg" type="image/svg+xml">
+  <link rel="preload" href="../../../../assets/fonts/manrope-variable.ttf" as="font" type="font/ttf" crossorigin>
+  <link rel="stylesheet" href="../../../../assets/styles.css">
+  <script type="importmap">{"imports":{"mermaid":"../../../../assets/mermaid/mermaid.esm.min.mjs"}}</script>
+  <script type="module" src="../../../../assets/site.js"></script>
+</head>
+<body data-product="library" data-version="Development">
+  <a class="skip" href="#main">Skip to content</a>
+  <header class="site-header">
+    <div class="site-identity">
+      <a class="brand" href="../../../../index.html" aria-label="KetraTerm Library home"><img class="brand-mark" src="../../../../assets/logo.svg" alt="" width="34" height="34">KetraTerm</a>
+      <nav class="product-navigation" aria-label="KetraTerm products"><a href="https://ketraterm.github.io/KetraTerm/">App</a><a href="../../../../index.html" aria-current="true">Library</a></nav>
+    </div>
+    <details class="site-navigation" open><summary>Menu</summary><nav aria-label="Library navigation"><a   href="../../docs/README.html">Guides</a><a aria-current="true"  href="../../modules.html">Modules</a><a   href="../../../../versions.html">API & versions</a><a   href="../../CHANGELOG.html">Changelog</a><a  class="nav-primary" href="../../README.html">Get started</a></nav></details>
+    <button class="theme-toggle" type="button" aria-label="Switch to light theme">Light</button>
+  </header>
+  <div class="docs-shell"><aside class="sidebar" aria-label="Documentation navigation"><details class="nav-disclosure" open><summary class="mobile-nav-toggle">Browse library guides</summary><div><label class="search-label">Find a library guide<input type="search" data-doc-search placeholder="Search library docs" autocomplete="off" data-index="../../search.json"></label><div class="search-results" aria-live="polite"></div><details open><summary>Start here</summary><a  href="../../docs/README.html">Documentation</a><a  href="../../README.html">Installation</a><a  href="../../modules.html">Module guides</a><a  href="../../CHANGELOG.html">Changelog</a></details><details open><summary>Capabilities</summary><a  href="../../docs/terminal-feature-map.html">Feature map</a><a  href="../../docs/features/terminal.html">Terminal</a><a  href="../../docs/features/shells.html">Shell integration</a><a  href="../../docs/features/desktop.html">Swing view & hosts</a><a  href="../../docs/features/completion.html">Completion</a><a  href="../../docs/features/embedding.html">Embedding</a><a  href="../../docs/terminal-feature-gap-map.html">Known limits</a></details><details open><summary>Embedding guides</summary><a  href="../../docs/library/configuration.html">Configuration</a><a  href="../../docs/library/compatibility.html">Compatibility</a><a  href="../../docs/library/render-ownership.html">Render ownership</a></details><details open><summary>Reference</summary><a  href="../../docs/reference/protocol.html">Protocols</a><a  href="../../docs/reference/notifications.html">Notifications</a><a  href="../../docs/reference/storage.html">Storage & privacy</a></details><details open><summary>Development</summary><a  href="../../ARCHITECTURE.html">Architecture</a><a  href="../../CONTRIBUTING.html">Contributing</a><a  href="../../docs/development/conformance-testing.html">Conformance testing</a></details></div></details></aside><main id="main" tabindex="-1" class="article article-with-outline"><div class="article-top"><nav class="breadcrumb" aria-label="Breadcrumb"><ol><li><a href="../../../../index.html">Library</a></li><li><a href="../../modules.html">Modules</a></li><li><a href="../README.html">ketraterm-input</a></li><li><span aria-current="page">Terminal Input Contract</span></li></ol></nav><div class="doc-version"><span>Development</span><a href="../../../../versions.html">All versions</a></div></div><details class="page-outline" open><summary>On this page</summary><nav aria-label="On this page"><a class="depth-2" href="#public-api-surfaces">Public API Surfaces</a><a class="depth-2" href="#event-contract">Event Contract</a><a class="depth-2" href="#mode-state-contract">Mode-State Contract</a><a class="depth-2" href="#ordering-and-threading">Ordering And Threading</a><a class="depth-2" href="#keyboard-contract">Keyboard Contract</a><a class="depth-3" href="#xterm-key-resources">Xterm key resources</a><a class="depth-2" href="#mouse-contract">Mouse Contract</a><a class="depth-2" href="#paste-and-focus-contract">Paste And Focus Contract</a><a class="depth-3" href="#paste-api-migration">Paste API Migration</a><a class="depth-3" href="#focus-reports">Focus Reports</a><a class="depth-2" href="#host-output-contract">Host Output Contract</a><a class="depth-2" href="#clipboard-read-replies">Clipboard read replies</a></nav></details><div class="article-content"><div class="prose"><h1 id="terminal-input-contract">Terminal Input Contract</h1>
+<p>This contract describes the public behavior of <code>ketraterm-input</code>. It covers
+normalized events, mode-dependent encoding, policy, byte ownership, and failures.
+<a href="../../docs/features/terminal.html#keyboard-mouse-and-paste">Protocol support and host capability limits</a>
+and <a href="../../docs/terminal-feature-gap-map.html#input-module-gaps">deferred work</a>
+remain in the canonical maps.</p>
+<h2 id="public-api-surfaces">Public API Surfaces</h2>
+<p><code>TerminalInputEncoders.create(inputState, output, policy)</code> returns a
+<code>TerminalInputEncoder</code> with <code>encodeKey</code>, <code>encodePaste</code>, <code>encodeTextReplacement</code>,
+<code>encodeFocus</code>, <code>encodeMouse</code>, and <code>setInputPolicy</code> methods. Encoding is synchronous
+and returns <code>Unit</code>; a valid event can intentionally emit no bytes.</p>
+<p>Events implement the sealed <code>TerminalInputEvent</code> vocabulary. Policy is an
+immutable <code>TerminalInputPolicy</code> value. <code>TerminalClipboardReply</code> prepares owned
+OSC 52 response payloads separately from ordinary input.</p>
+<p>A session accepts a <code>TerminalInputEncoderFactory</code> for custom encoding. It calls
+that factory twice, for independent admission and bulk encoders. Return fresh
+instances with no shared mutable encoding state: their calls can run concurrently,
+although calls on each instance are serialized. Construction must not read modes,
+emit bytes, start jobs, or retain external I/O. Read the supplied mode source and
+write only through the supplied sink during encoding calls. Policy updates must
+apply before returning, or fail before changing state.</p>
+<h2 id="event-contract">Event Contract</h2>
+<p>Invalid events fail at construction with <code>IllegalArgumentException</code>. Valid events
+follow the active protocol and explicit suppression/fallback policy.</p>
+<div class="table-scroll"><table>
+<thead>
+<tr>
+<th>Event</th>
+<th>Construction and meaning</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>TerminalKeyEvent.key(key, modifiers, type)</code></td>
+<td>A non-printable key such as <code>UP</code>, <code>ENTER</code>, or <code>BACKSPACE</code>.</td>
+</tr>
+<tr>
+<td><code>TerminalKeyEvent.codepoint(codepoint, ...)</code></td>
+<td>A Unicode scalar produced by a known text-producing key.</td>
+</tr>
+<tr>
+<td><code>TerminalKeyEvent.text(associatedText, modifiers, type)</code></td>
+<td>Committed text with no physical-key identity.</td>
+</tr>
+<tr>
+<td><code>TerminalPasteEvent(text)</code></td>
+<td>Clipboard or other pasted text; empty text is accepted.</td>
+</tr>
+<tr>
+<td><code>TerminalTextReplacementEvent(deleteAfterCursorCount, deleteBeforeCursorCount, replacementText)</code></td>
+<td>Delete actions, then Backspace actions, then optional paste. Counts are non-negative editor actions, not UTF-16 units or code points.</td>
+</tr>
+<tr>
+<td><code>TerminalFocusEvent(focused)</code></td>
+<td>A focus transition; reporting depends on the current mode.</td>
+</tr>
+<tr>
+<td><code>TerminalMouseEvent(...)</code></td>
+<td>A press, release, motion, or wheel event with zero-based coordinates.</td>
+</tr>
+</tbody></table></div>
+<p>Key events contain exactly one of <code>key</code> or <code>codepoint</code>. The scalar path rejects
+surrogates, values outside <code>0..0x10FFFF</code>, C0 controls, and DEL. Special control
+keys use <code>TerminalKey</code>. <code>NO_CODEPOINT</code> is <code>-1</code>; <code>TEXT_ONLY_CODEPOINT</code> is <code>0</code> and
+requires non-empty associated text. Associated text rejects malformed UTF-16,
+C0/C1 controls, and DEL.</p>
+<p>Known printable-key events may include <code>unshiftedCodepoint</code>,
+<code>shiftedCodepoint</code>, <code>baseLayoutCodepoint</code>, and <code>associatedText</code>. Scalars must be
+valid; a shifted scalar requires the Shift modifier. These values describe
+physical-key identity and produced text separately. Leave unknown values at
+their defaults. Special-key and text-only events cannot carry physical-key
+scalar metadata. Host adapters must report <code>PRESS</code>, <code>REPEAT</code>, and <code>RELEASE</code>
+truthfully rather than inventing lifecycle information.</p>
+<p>Modifier masks contain only <code>TerminalModifiers</code> bits. Combine them with bitwise
+OR. They are not wire parameters: xterm modifiers map Shift/Alt/Ctrl and a merged
+Super/Hyper/Meta bit to a one-based value; lock bits are omitted. Kitty parameters
+retain all eight modifier bits and add one.</p>
+<p>Mouse cell coordinates must be non-negative. Pixel coordinates accept <code>-1</code> for
+missing data or a non-negative value. Press requires a concrete non-wheel button;
+wheel events require a wheel direction. Motion and release may use <code>NONE</code>, but
+SGR-family encoding suppresses a release without button identity.</p>
+<h2 id="mode-state-contract">Mode-State Contract</h2>
+<p>The factory implementation reads <code>TerminalInputState.getInputModeBits()</code> once
+per event. An entire text replacement uses that same snapshot for Delete,
+Backspace, and paste phases. Custom state implementations must return one
+coherent mode word. Interpret it with <code>TerminalInputState</code> helpers, not raw bit
+positions.</p>
+<p>This word includes cursor/keypad modes, newline mode, DECBKM, bracketed paste,
+focus reporting, mouse tracking/encoding, xterm key resources, and Kitty flags.
+A coherent mode read does not synchronize grid reads or terminal mutation.</p>
+<h2 id="ordering-and-threading">Ordering And Threading</h2>
+<p>The default encoder is not thread-safe. Serialize encoding and policy updates,
+and order its output with other producers such as parser/core responses. The
+encoder owns reusable scratch storage and no transport lifecycle.</p>
+<p><code>TerminalHostOutput</code> must consume or copy each supplied range before returning;
+the encoder may immediately reuse it. Sink exceptions propagate. Already written
+bytes cannot be rolled back, so an operation may be partially emitted. Buffered
+paste and replacement bytes are cleared after either success or failure and do
+not leak into the next event.</p>
+<p>Use <code>TerminalSession</code> when session admission and outbound ordering are required.
+Its <code>submitInput</code> methods admit semantic events or bounded compound input;
+<code>submitBytes</code> admits copied exact bytes. The encoder interface itself provides
+neither admission results nor transport completion. A session orders a whole
+paste, text commit, or text replacement with other input and terminal responses.
+See the <a href="../../ketraterm-session/docs/session-concurrency-locks.html#admission-and-ordering">session admission contract</a>.</p>
+<h2 id="keyboard-contract">Keyboard Contract</h2>
+<p>Unmodified scalar input normally emits UTF-8. Legacy encoding provides explicit
+Ctrl mappings, mode-dependent special/keypad sequences, and policy-controlled
+Alt/Meta prefixes. Unsupported modifier combinations suppress by default;
+<code>UnsupportedModifiedKeyPolicy.EMIT_UNMODIFIED</code> selects a fallback instead.</p>
+<p>Legacy Backspace defaults to DEL. <code>BackspacePolicy.BACKSPACE</code> selects BS until
+an explicit DECBKM override: DECSET 67 selects BS and DECRST 67 selects DEL,
+until terminal reset. Enter normally sends CR; with LNM active it adds LF unless
+<code>EnterNewLineModePolicy.SEND_CR</code> is selected. Extended keyboard reports can
+represent these keys independently of their legacy byte choices.</p>
+<p>PF1-PF4 are distinct from physical F1-F4. Application cursor mode affects
+unmodified cursor keys; application keypad mode affects normalized keypad keys.
+The <a href="keyboard-mouse-encoding.html">wire reference</a> gives representative sequences.</p>
+<p><code>TerminalKeyEvent.text(...)</code> emits its entire associated text as UTF-8 for press
+and repeat in legacy modes and Kitty modes without report-all flag <code>8</code>. Modifiers
+are metadata already accounted for by the host&#39;s text production; they do not
+trigger Ctrl mapping, ESC prefixes, or modifyOtherKeys transformation. Release
+emits nothing in these text modes. This is committed text, so paste framing and
+paste transformations do not apply. The marker <code>0</code> never becomes a NUL byte.</p>
+<p>In Kitty report-all mode, text-only events require associated-text flag <code>16</code> and
+use CSI-u key code <code>0</code>; without flag <code>16</code>, the event is suppressed. Nonzero Kitty
+flags take precedence over xterm resource encoding for known keys. Event-type
+flag <code>2</code> encodes lifecycle metadata, flag <code>4</code> uses supplied alternate-key values,
+and flag <code>16</code> uses validated associated text. A host session must admit only the
+flags for which its adapter supplies complete metadata; encoder capability alone
+is not a host capability declaration. Without event-type reporting, repeat uses
+press encoding and release is suppressed.</p>
+<h3 id="xterm-key-resources">Xterm key resources</h3>
+<p>Modifier and format state are independent for each decimal resource ID:</p>
+<div class="table-scroll"><table>
+<thead>
+<tr>
+<th>ID</th>
+<th>Modifier resource</th>
+<th>Accepted modifier levels</th>
+<th>Modifier default</th>
+<th>Format default</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>0</td>
+<td>modifyKeyboard</td>
+<td>0..15</td>
+<td>0</td>
+<td>0</td>
+</tr>
+<tr>
+<td>1</td>
+<td>modifyCursorKeys</td>
+<td>0..4</td>
+<td>2</td>
+<td>0</td>
+</tr>
+<tr>
+<td>2</td>
+<td>modifyFunctionKeys</td>
+<td>0..4</td>
+<td>2</td>
+<td>0</td>
+</tr>
+<tr>
+<td>3</td>
+<td>modifyKeypadKeys</td>
+<td>0..4</td>
+<td>0</td>
+<td>0</td>
+</tr>
+<tr>
+<td>4</td>
+<td>modifyOtherKeys</td>
+<td>0..3</td>
+<td>0</td>
+<td>0</td>
+</tr>
+<tr>
+<td>6</td>
+<td>modifyModifierKeys</td>
+<td>0..4</td>
+<td>0</td>
+<td>0</td>
+</tr>
+<tr>
+<td>7</td>
+<td>modifySpecialKeys</td>
+<td>0..4</td>
+<td>0</td>
+<td>0</td>
+</tr>
+</tbody></table></div>
+<p>Every format accepts <code>0</code> (original xterm report) or <code>1</code> (CSI-u). Format selection
+changes extended-report layout without enabling reporting. Resource 0 stores its
+own legacy/VT220 keyboard mask; it does not overwrite other resources or change
+KetraTerm&#39;s PC keyboard encoding.</p>
+<p>These terminal controls are parsed and applied by parser/host/core; input reads
+the resulting state:</p>
+<ul>
+<li><code>CSI &gt; id ; value m</code> sets modifier state; final <code>f</code> sets format state.
+An omitted or empty value restores that resource&#39;s default. Omitting both
+parameters restores the corresponding family.</li>
+<li><code>CSI &gt; id n</code> explicitly disables a modifier resource. An omitted ID selects
+function keys (2). Disable is distinct from level 0: typed state uses <code>-1</code>,
+and queries serialize that sentinel as <code>65535</code>. The set control does not
+accept <code>65535</code>.</li>
+<li><code>CSI ? id m</code> queries modifiers; <code>CSI ? id g</code> queries formats. Replies use
+<code>CSI &gt; id ; value m</code> and <code>CSI &gt; id ; value f</code>, respectively. A valid ID list
+replies in request order, including duplicates.</li>
+<li>Malformed queries are rejected before any reply. Reserved ID 5 and unknown
+IDs are outside the reply allowlist and remain silent. These controls define
+no failure reply. Denying terminal responses suppresses queries&#39; replies
+without suppressing state changes.</li>
+<li>Set/reset accepts at most two fields; disable accepts at most one. Invalid
+syntax, colon subparameters, overflow, and out-of-range levels preserve state.
+Hard/soft terminal reset restores both families. A family reset preserves
+unrelated input modes, including Kitty flags.</li>
+</ul>
+<p>For modified cursor/function keys, level 0 retains the old first-parameter/SS3
+form, level 1 forces CSI, level 2 uses a second modifier parameter, and level 3
+adds <code>&gt;</code>. Unmodified keys retain normal/application forms. Explicit cursor
+disable omits the modifier. Explicit function disable uses Shift/Ctrl to select
+higher function numbers (+12/+24). Editing keys retain numbered CSI reports at
+levels <code>-1..3</code>. PF1-PF4 retain their modified CSI reports independently of the
+function resource; keypad resource 3 selects their extended reports.</p>
+<p>Level 4 selects extended reports for cursor/editing, function, keypad, modifier,
+and special-key families. Both unmodified and modified presses/repeats report;
+release is suppressed. Format 0 emits <code>CSI 27 ; modifier ; code ~</code>; format 1
+emits <code>CSI code ; modifier u</code>. Codes use xterm identities, not Kitty functional
+key numbers. <code>modifyOtherKeys</code> uses its separate levels <code>0..3</code>.</p>
+<p>The <a href="https://invisible-island.net/xterm/ctlseqs/ctlseqs.html">xterm control reference</a>
+and <a href="https://invisible-island.net/xterm/manpage/xterm.html">resource manual</a>
+provide protocol background. KetraTerm&#39;s reset-all controls apply to all seven
+listed resources.</p>
+<h2 id="mouse-contract">Mouse Contract</h2>
+<p>Tracking and coordinate encoding are separate modes. Unknown tracking or
+encoding values emit no mouse report.</p>
+<div class="table-scroll"><table>
+<thead>
+<tr>
+<th>Tracking mode</th>
+<th>Reported events</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>NONE</code></td>
+<td>None.</td>
+</tr>
+<tr>
+<td><code>X10</code></td>
+<td>Press only.</td>
+</tr>
+<tr>
+<td><code>NORMAL</code></td>
+<td>Press, release, and wheel.</td>
+</tr>
+<tr>
+<td><code>BUTTON_EVENT</code></td>
+<td>Normal events and motion with a concrete button.</td>
+</tr>
+<tr>
+<td><code>ANY_EVENT</code></td>
+<td>All normalized mouse events, including no-button motion.</td>
+</tr>
+</tbody></table></div>
+<p>Cell coordinates become one-based at the wire boundary. SGR-Pixels uses pixel
+coordinates instead; each missing pixel coordinate independently falls back to
+its corresponding cell coordinate. Decimal encodings accept the full
+non-negative <code>Int</code> range and convert <code>Int.MAX_VALUE</code> to <code>2147483648</code> safely.</p>
+<div class="table-scroll"><table>
+<thead>
+<tr>
+<th>Encoding</th>
+<th>Coordinate contract</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>DEFAULT</code></td>
+<td>Legacy bytes; one-based maximum 223. Suppress out-of-range events by default or clamp with <code>MouseCoordinateLimitPolicy.CLAMP_TO_MAX</code>.</td>
+</tr>
+<tr>
+<td><code>UTF8</code></td>
+<td>UTF-8 extended reports; suppress if either one-based coordinate exceeds 2015.</td>
+</tr>
+<tr>
+<td><code>SGR</code></td>
+<td>Decimal cell coordinates; preserve button identity on release with lowercase <code>m</code>.</td>
+</tr>
+<tr>
+<td><code>SGR_PIXELS</code></td>
+<td>SGR framing with decimal pixel coordinates and the fallback above.</td>
+</tr>
+<tr>
+<td><code>URXVT</code></td>
+<td>Decimal cell coordinates with legacy button packing.</td>
+</tr>
+</tbody></table></div>
+<p>Legacy, UTF-8, and URXVT releases use button code 3. Mouse modifiers pack Shift,
+Alt, and Ctrl; other modifier bits are ignored. An event represents one wheel
+report, not a fractional wheel delta. The UI adapter owns gesture interpretation,
+pixel-to-cell conversion, and any decision to handle a gesture locally.</p>
+<h2 id="paste-and-focus-contract">Paste And Focus Contract</h2>
+<p><code>PasteControlPolicy.PRESERVE</code> is the default.
+<code>STRIP_C0_EXCEPT_TAB_CR_LF</code> removes C0 controls except TAB, CR, and LF; it does
+not strip DEL or C1. When bracketed paste is active, the transformed payload is
+wrapped in <code>ESC[200~</code> and <code>ESC[201~</code>, including for an empty paste.</p>
+<p>Both control policies protect bracketed framing. After optional filtering:</p>
+<ul>
+<li>ESC (<code>U+001B</code>) becomes <code>U+241B</code>.</li>
+<li>ETX (<code>U+0003</code>) becomes <code>U+2403</code>.</li>
+<li>CSI (<code>U+009B</code>) becomes the six literal ASCII characters <code>\u009b</code>.</li>
+</ul>
+<p>The protected payload contains none of those three control characters. Protection
+classifies Unicode scalars, not UTF-8 continuation bytes. Removed characters
+cannot join fragments into another delimiter; literal text such as <code>\x1b</code>
+remains ordinary text. Bracketed payloads preserve original line endings.</p>
+<p>Unbracketed paste applies the chosen control policy without those framing
+replacements. <code>PasteLineEndingPolicy</code> independently preserves line endings or
+canonicalizes CRLF, lone CR, and LF to LF, CR, or CRLF. Each CRLF pair is one
+boundary. Local PTY hosts select CR so pasted line boundaries have Enter-key
+semantics. All paste paths replace unpaired UTF-16 surrogates with <code>U+FFFD</code>.
+Valid supplementary scalars and combining sequences retain their UTF-8 bytes.</p>
+<p>Unchanged text uses the sink&#39;s direct UTF-8 path. Transformed paste and repeated
+deletion output use bounded reusable buffers rather than a clipboard-sized
+intermediate string or byte array. Text replacement applies normal paste policy
+to its insertion phase.</p>
+<h3 id="paste-api-migration">Paste API Migration</h3>
+<p>See the <a href="../../CHANGELOG.html">library changelog</a> for the <code>PasteControlPolicy</code> migration.</p>
+<h3 id="focus-reports">Focus Reports</h3>
+<p>Focus events emit <code>CSI I</code> for focus gained and <code>CSI O</code> for focus lost only when
+focus reporting is enabled in the captured mode snapshot.</p>
+<h2 id="host-output-contract">Host Output Contract</h2>
+<p><code>TerminalHostOutput</code> is synchronous from the caller&#39;s perspective. <code>writeByte</code>
+receives <code>0..255</code>; <code>writeBytes</code> receives an explicit offset/length range that must
+be consumed or copied before return. <code>writeAscii</code> is for ASCII text; implementations
+should reject non-ASCII input rather than change wire bytes. <code>writeUtf8</code> encodes
+Unicode text. The sink itself does not guarantee ordering across independent
+producers.</p>
+<h2 id="clipboard-read-replies">Clipboard read replies</h2>
+<p><code>TerminalClipboardReply.prepare(selection, text, maxDecodedBytes, maxWireBytes)</code>
+validates selectors, scalar UTF-16, the raw UTF-8 limit, and the complete wire-byte
+budget before emitting anything. The string-selector overload normalizes valid
+selectors and returns <code>null</code> for unknown ones. Malformed text or exceeded bounds
+also returns <code>null</code>; negative budgets throw <code>IllegalArgumentException</code>.</p>
+<p>Preparation retains an owned Base64 byte array and clears the temporary UTF-8
+array. <code>byteCount</code> includes the OSC introducer, selectors, payload, and ST.
+<code>writeTo(output)</code> emits a complete OSC 52 reply with padded Base64 and seven-bit
+ST, using payload ranges no larger than 16 KiB. Modes and paste transformations
+do not apply.</p>
+<p>The caller owns whole-frame ordering and must close the reply after writing or
+discard. Close clears retained payload storage; subsequent writes throw
+<code>IllegalStateException</code>. Closing must not race a writer. This cleanup cannot
+erase JVM strings or platform clipboard data. Session owns authorization,
+deadlines, and transport commitment; input does not read the clipboard.</p>
+</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/e3c7f9c626934093d35a67ca97afbbf1b343f28d/ketraterm-input/docs/terminal-input-contract.md">View source on GitHub ↗</a></div></div></main></div>
+  <footer>
+    <a class="brand" href="../../../../index.html"><img class="brand-mark" src="../../../../assets/logo.svg" alt="" width="34" height="34">KetraTerm Library</a>
+    <p>Open source · Apache 2.0</p>
+    <div><a href="https://github.com/ketraterm/KetraTerm">GitHub ↗</a><a href="https://github.com/ketraterm/KetraTerm/issues">Issues ↗</a><a class="product-switch" href="https://ketraterm.github.io/KetraTerm/">Desktop app ↗</a></div>
+  </footer>
+</body>
+</html>

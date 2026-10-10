@@ -1,0 +1,214 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="description" content="A modular Kotlin/JVM terminal emulator library for Swing and headless applications.">
+  <meta name="color-scheme" content="light dark">
+  <title>Shell support · KetraTerm Library</title>
+  <link rel="icon" href="../../../../assets/logo.svg" type="image/svg+xml">
+  <link rel="preload" href="../../../../assets/fonts/manrope-variable.ttf" as="font" type="font/ttf" crossorigin>
+  <link rel="stylesheet" href="../../../../assets/styles.css">
+  <script type="importmap">{"imports":{"mermaid":"../../../../assets/mermaid/mermaid.esm.min.mjs"}}</script>
+  <script type="module" src="../../../../assets/site.js"></script>
+</head>
+<body data-product="library" data-version="Development">
+  <a class="skip" href="#main">Skip to content</a>
+  <header class="site-header">
+    <div class="site-identity">
+      <a class="brand" href="../../../../index.html" aria-label="KetraTerm Library home"><img class="brand-mark" src="../../../../assets/logo.svg" alt="" width="34" height="34">KetraTerm</a>
+      <nav class="product-navigation" aria-label="KetraTerm products"><a href="https://ketraterm.github.io/KetraTerm/">App</a><a href="../../../../index.html" aria-current="true">Library</a></nav>
+    </div>
+    <details class="site-navigation" open><summary>Menu</summary><nav aria-label="Library navigation"><a aria-current="true"  href="../README.html">Guides</a><a   href="../../modules.html">Modules</a><a   href="../../../../versions.html">API & versions</a><a   href="../../CHANGELOG.html">Changelog</a><a  class="nav-primary" href="../../README.html">Get started</a></nav></details>
+    <button class="theme-toggle" type="button" aria-label="Switch to light theme">Light</button>
+  </header>
+  <div class="docs-shell"><aside class="sidebar" aria-label="Documentation navigation"><details class="nav-disclosure" open><summary class="mobile-nav-toggle">Browse library guides</summary><div><label class="search-label">Find a library guide<input type="search" data-doc-search placeholder="Search library docs" autocomplete="off" data-index="../../search.json"></label><div class="search-results" aria-live="polite"></div><details open><summary>Start here</summary><a  href="../README.html">Documentation</a><a  href="../../README.html">Installation</a><a  href="../../modules.html">Module guides</a><a  href="../../CHANGELOG.html">Changelog</a></details><details open><summary>Capabilities</summary><a  href="../terminal-feature-map.html">Feature map</a><a  href="terminal.html">Terminal</a><a aria-current="page" href="shells.html">Shell integration</a><a  href="desktop.html">Swing view & hosts</a><a  href="completion.html">Completion</a><a  href="embedding.html">Embedding</a><a  href="../terminal-feature-gap-map.html">Known limits</a></details><details open><summary>Embedding guides</summary><a  href="../library/configuration.html">Configuration</a><a  href="../library/compatibility.html">Compatibility</a><a  href="../library/render-ownership.html">Render ownership</a></details><details open><summary>Reference</summary><a  href="../reference/protocol.html">Protocols</a><a  href="../reference/notifications.html">Notifications</a><a  href="../reference/storage.html">Storage & privacy</a></details><details open><summary>Development</summary><a  href="../../ARCHITECTURE.html">Architecture</a><a  href="../../CONTRIBUTING.html">Contributing</a><a  href="../development/conformance-testing.html">Conformance testing</a></details></div></details></aside><main id="main" tabindex="-1" class="article article-with-outline"><div class="article-top"><nav class="breadcrumb" aria-label="Breadcrumb"><ol><li><a href="../../../../index.html">Library</a></li><li><span>Capabilities</span></li><li><span aria-current="page">Shell support</span></li></ol></nav><div class="doc-version"><span>Development</span><a href="../../../../versions.html">All versions</a></div></div><details class="page-outline" open><summary>On this page</summary><nav aria-label="On this page"><a class="depth-2" href="#automatic-discovery">Automatic discovery</a><a class="depth-2" href="#prompt-hooks-and-completion-dialects">Prompt hooks and completion dialects</a><a class="depth-2" href="#features-supplied-by-shell-metadata">Features supplied by shell metadata</a><a class="depth-2" href="#launch-integration">Launch integration</a></nav></details><div class="article-content"><div class="prose"><h1 id="shell-support">Shell support</h1>
+<p>The standalone app and IntelliJ plugin share local shell discovery and startup
+hooks. Library users choose their own process, transport, and shell integration.</p>
+<h2 id="automatic-discovery">Automatic discovery</h2>
+<p>Profiles are offered in the order below. A configured shell or explicit launch
+command can override the default.</p>
+<div class="table-scroll"><table>
+<thead>
+<tr>
+<th>Platform</th>
+<th>Profiles</th>
+<th>Discovery</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Windows</td>
+<td>Windows PowerShell</td>
+<td>System installation, with <code>powershell.exe</code> as fallback.</td>
+</tr>
+<tr>
+<td>Windows</td>
+<td>PowerShell</td>
+<td><code>pwsh.exe</code> on <code>PATH</code>, then PowerShell 7/6 installation directories.</td>
+</tr>
+<tr>
+<td>Windows</td>
+<td>Git Bash</td>
+<td><code>git-bash.exe</code> on <code>PATH</code> or standard Git installation directories; prefers its <code>bin/bash.exe</code>.</td>
+</tr>
+<tr>
+<td>Windows</td>
+<td>WSL</td>
+<td><code>wsl.exe</code> on <code>PATH</code> or in <code>System32</code>; launches the default distribution.</td>
+</tr>
+<tr>
+<td>Windows</td>
+<td>Ubuntu</td>
+<td><code>ubuntu.exe</code> on <code>PATH</code>.</td>
+</tr>
+<tr>
+<td>Windows</td>
+<td>Command Prompt</td>
+<td><code>COMSPEC</code>, with <code>cmd.exe</code> as fallback.</td>
+</tr>
+<tr>
+<td>Linux / macOS</td>
+<td>zsh, Bash, fish, Nushell, sh</td>
+<td><code>PATH</code>, then <code>/usr/bin</code>, <code>/bin</code>, <code>/usr/local/bin</code>, and <code>/opt/homebrew/bin</code>. Only found executables are offered.</td>
+</tr>
+</tbody></table></div>
+<p>If no Unix shell is discovered, the registry uses the PTY default command.
+Discovery does not enumerate WSL distributions. Other shells can be configured
+explicitly; recognition alone does not install shell hooks.</p>
+<h2 id="prompt-hooks-and-completion-dialects">Prompt hooks and completion dialects</h2>
+<p>Hooks emit OSC 133 prompt/command markers and OSC 7 working-directory reports.
+The marker lifecycle is <code>A</code> (prompt start), <code>B</code> (input start), <code>C</code> (command
+start), and <code>D</code> (command finish, with optional exit status).
+They are installed for supported interactive launches when shell integration is
+enabled. Explicit script/command execution and incompatible startup flags can
+prevent installation.</p>
+<div class="table-scroll"><table>
+<thead>
+<tr>
+<th>Shell / launch</th>
+<th>Automatic hooks</th>
+<th>Completion dialect</th>
+<th>Startup command</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Windows PowerShell / PowerShell</td>
+<td>Yes</td>
+<td>PowerShell</td>
+<td>Yes</td>
+</tr>
+<tr>
+<td>Bash / Git Bash</td>
+<td>Yes</td>
+<td>POSIX</td>
+<td>Yes</td>
+</tr>
+<tr>
+<td>zsh</td>
+<td>Yes</td>
+<td>POSIX</td>
+<td>Yes</td>
+</tr>
+<tr>
+<td>fish</td>
+<td>Yes</td>
+<td>Plain</td>
+<td>Yes</td>
+</tr>
+<tr>
+<td>WSL / Ubuntu with explicitly selected Bash, zsh, or fish</td>
+<td>Yes</td>
+<td>POSIX profile mapping</td>
+<td>No</td>
+</tr>
+<tr>
+<td>WSL / Ubuntu with unknown default shell</td>
+<td>No</td>
+<td>POSIX profile mapping</td>
+<td>No</td>
+</tr>
+<tr>
+<td>sh, dash, ksh, ash</td>
+<td>No</td>
+<td>POSIX</td>
+<td>No</td>
+</tr>
+<tr>
+<td>Command Prompt, Nushell, unknown shells</td>
+<td>No</td>
+<td>Plain</td>
+<td>No</td>
+</tr>
+</tbody></table></div>
+<p>The dialect controls completion tokenization and escaping; it is not a complete
+shell grammar. Fish deliberately uses conservative plain parsing in direct
+profiles. WSL profiles currently use POSIX parsing regardless of their selected
+shell. Completion also needs an available editable command context; a dialect
+alone does not provide that context. See <a href="completion.html#availability">completion availability</a>.</p>
+<p>Startup commands are single-line commands submitted once after a supported
+direct shell reports readiness. User input before readiness cancels submission.
+They require shell integration and are unavailable for WSL launchers.</p>
+<p>PowerShell command-start/finish tracking requires a <code>PSConsoleHostReadLine</code>
+function to wrap. Without it, the bootstrap still supplies prompt and directory
+reports. PowerShell directory reports cover filesystem locations only.</p>
+<h2 id="features-supplied-by-shell-metadata">Features supplied by shell metadata</h2>
+<div class="table-scroll"><table>
+<thead>
+<tr>
+<th>Feature</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Prompt decorations</td>
+<td>Gutter dots, divider bands, or no decoration.</td>
+</tr>
+<tr>
+<td>Command navigation</td>
+<td>Move between retained commands and select a command block.</td>
+</tr>
+<tr>
+<td>Command results</td>
+<td>Exit status, timestamps, and failed-output indicators.</td>
+</tr>
+<tr>
+<td>Output extraction</td>
+<td>Copy or export retained command output with soft wraps reconstructed.</td>
+</tr>
+<tr>
+<td>Working directory</td>
+<td>Directory-aware titles, local actions, and completion context.</td>
+</tr>
+<tr>
+<td>Command text</td>
+<td>Bounded reconstruction of retained input for completion and learning; ambiguous text remains unavailable.</td>
+</tr>
+<tr>
+<td>Host observation</td>
+<td>Running-command state, metadata revisions, and command-finished/directory-change listeners.</td>
+</tr>
+<tr>
+<td>Editing context</td>
+<td>Prompt readiness, active command-line snapshots, and change signals for context-checked completion edits.</td>
+</tr>
+</tbody></table></div>
+<p>Markers can also come from a manually configured shell or a host-owned metadata
+producer. Startup hooks do not guarantee that every prompt customization will
+emit usable metadata. Remote directory reports are metadata, not local paths.</p>
+<h2 id="launch-integration">Launch integration</h2>
+<p>Profiles carry an executable/argument list, working directory, and environment.
+Hosts can also select variables and a PATH prefix to reapply after supported
+interactive shell startup files; without hooks, these affect only the initial
+process environment. The IntelliJ product uses this for its optional project JDK.
+Native standalone profiles also receive the <code>ketra version</code>, <code>ketra info</code>, and
+<code>ketra config</code> companion commands. WSL/Ubuntu launchers do not receive that native helper.</p>
+<p>See <a href="../../ketraterm-workspace/README.html#profiles-and-launch-options">workspace launch configuration</a>
+and <a href="../../ketraterm-shell-integration/README.html">shell integration</a> for composition.</p>
+</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/e3c7f9c626934093d35a67ca97afbbf1b343f28d/docs/features/shells.md">View source on GitHub ↗</a></div></div></main></div>
+  <footer>
+    <a class="brand" href="../../../../index.html"><img class="brand-mark" src="../../../../assets/logo.svg" alt="" width="34" height="34">KetraTerm Library</a>
+    <p>Open source · Apache 2.0</p>
+    <div><a href="https://github.com/ketraterm/KetraTerm">GitHub ↗</a><a href="https://github.com/ketraterm/KetraTerm/issues">Issues ↗</a><a class="product-switch" href="https://ketraterm.github.io/KetraTerm/">Desktop app ↗</a></div>
+  </footer>
+</body>
+</html>

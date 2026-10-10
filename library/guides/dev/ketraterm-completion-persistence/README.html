@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="description" content="A modular Kotlin/JVM terminal emulator library for Swing and headless applications.">
+  <meta name="color-scheme" content="light dark">
+  <title>Completion learning persistence · KetraTerm Library</title>
+  <link rel="icon" href="../../../assets/logo.svg" type="image/svg+xml">
+  <link rel="preload" href="../../../assets/fonts/manrope-variable.ttf" as="font" type="font/ttf" crossorigin>
+  <link rel="stylesheet" href="../../../assets/styles.css">
+  <script type="importmap">{"imports":{"mermaid":"../../../assets/mermaid/mermaid.esm.min.mjs"}}</script>
+  <script type="module" src="../../../assets/site.js"></script>
+</head>
+<body data-product="library" data-version="Development">
+  <a class="skip" href="#main">Skip to content</a>
+  <header class="site-header">
+    <div class="site-identity">
+      <a class="brand" href="../../../index.html" aria-label="KetraTerm Library home"><img class="brand-mark" src="../../../assets/logo.svg" alt="" width="34" height="34">KetraTerm</a>
+      <nav class="product-navigation" aria-label="KetraTerm products"><a href="https://ketraterm.github.io/KetraTerm/">App</a><a href="../../../index.html" aria-current="true">Library</a></nav>
+    </div>
+    <details class="site-navigation" open><summary>Menu</summary><nav aria-label="Library navigation"><a   href="../docs/README.html">Guides</a><a aria-current="true"  href="../modules.html">Modules</a><a   href="../../../versions.html">API & versions</a><a   href="../CHANGELOG.html">Changelog</a><a  class="nav-primary" href="../README.html">Get started</a></nav></details>
+    <button class="theme-toggle" type="button" aria-label="Switch to light theme">Light</button>
+  </header>
+  <div class="docs-shell"><aside class="sidebar" aria-label="Documentation navigation"><details class="nav-disclosure" open><summary class="mobile-nav-toggle">Browse library guides</summary><div><label class="search-label">Find a library guide<input type="search" data-doc-search placeholder="Search library docs" autocomplete="off" data-index="../search.json"></label><div class="search-results" aria-live="polite"></div><details open><summary>Start here</summary><a  href="../docs/README.html">Documentation</a><a  href="../README.html">Installation</a><a  href="../modules.html">Module guides</a><a  href="../CHANGELOG.html">Changelog</a></details><details open><summary>Capabilities</summary><a  href="../docs/terminal-feature-map.html">Feature map</a><a  href="../docs/features/terminal.html">Terminal</a><a  href="../docs/features/shells.html">Shell integration</a><a  href="../docs/features/desktop.html">Swing view & hosts</a><a  href="../docs/features/completion.html">Completion</a><a  href="../docs/features/embedding.html">Embedding</a><a  href="../docs/terminal-feature-gap-map.html">Known limits</a></details><details open><summary>Embedding guides</summary><a  href="../docs/library/configuration.html">Configuration</a><a  href="../docs/library/compatibility.html">Compatibility</a><a  href="../docs/library/render-ownership.html">Render ownership</a></details><details open><summary>Reference</summary><a  href="../docs/reference/protocol.html">Protocols</a><a  href="../docs/reference/notifications.html">Notifications</a><a  href="../docs/reference/storage.html">Storage & privacy</a></details><details open><summary>Development</summary><a  href="../ARCHITECTURE.html">Architecture</a><a  href="../CONTRIBUTING.html">Contributing</a><a  href="../docs/development/conformance-testing.html">Conformance testing</a></details></div></details></aside><main id="main" tabindex="-1" class="article article-with-outline"><div class="article-top"><nav class="breadcrumb" aria-label="Breadcrumb"><ol><li><a href="../../../index.html">Library</a></li><li><a href="../modules.html">Modules</a></li><li><span aria-current="page">Completion learning persistence</span></li></ol></nav><div class="doc-version"><span>Development</span><a href="../../../versions.html">All versions</a></div></div><details class="page-outline" open><summary>On this page</summary><nav aria-label="On this page"><a class="depth-2" href="#integration">Integration</a><a class="depth-2" href="#lifecycle-and-failures">Lifecycle and failures</a><a class="depth-2" href="#storage-and-privacy">Storage and privacy</a></nav></details><div class="article-content"><div class="prose"><h1 id="completion-learning-persistence">Completion learning persistence</h1>
+<p><code>ketraterm-completion-persistence</code> stores bounded completion-learning snapshots
+for the standalone application and IntelliJ plugin. It is a shared product
+implementation module, outside the supported Maven publication and public ABI
+boundary. It is not included in the library entry points or BOM.</p>
+<p><code>TerminalCompletionLearningCoordinator</code> connects a
+<code>TerminalCompletionLearningStore</code> to one fixed local file. Recording changes
+memory synchronously; a worker in the host&#39;s coroutine scope handles file I/O.
+The completion engine continues to read the same store without waiting for disk.</p>
+<h2 id="integration">Integration</h2>
+<p>The product chooses the data directory, persistence enablement, diagnostics, and
+lifecycle scope. Use <code>currentFileName()</code> to resolve the format-specific filename.
+Supply the same learning store to the completion engine and coordinator, and
+record mutations through the coordinator so they are marked dirty for storage.</p>
+<p>The coordinator runs in the supplied scope, using <code>Dispatchers.IO</code> by default.
+Keep one coordinator per learning store and one writer per destination file.</p>
+<h2 id="lifecycle-and-failures">Lifecycle and failures</h2>
+<p>When persistence is first enabled, the worker loads the fixed file once and
+merges it with learning already recorded in memory. Disabling and re-enabling
+does not reload it. Do not separately preload the same aggregate snapshot;
+merging it twice would double-count its evidence.</p>
+<p>Changed snapshots are checkpointed after a 30-second interval. Later recording
+events do not postpone an already scheduled checkpoint. Disabling persistence
+keeps in-memory learning and cancels pending checkpoints; file I/O already in
+progress can finish.</p>
+<ul>
+<li><code>closeAndFlush()</code> stops accepting events, waits for the worker, and writes
+outstanding changes when persistence is enabled. Repeated calls are safe.</li>
+<li><code>closeWithoutFlush()</code> stops accepting events and cancels and joins the worker.
+It drops pending work, but cannot undo file I/O already in progress.</li>
+<li><code>resetLearning()</code> clears memory immediately and schedules an empty snapshot
+<strong>even when persistence is disabled</strong>. It supersedes an in-flight load and
+allows replacement of a previously rejected file.</li>
+</ul>
+<p>A missing file is normal. An unreadable, malformed, oversized, or unsupported
+file blocks ordinary writes for that coordinator&#39;s lifetime. The load-failure
+callback runs once, with the original read exception when available; exceptions
+from the callback are ignored. An explicit reset can clear this block.</p>
+<p>A failed checkpoint is retried after a newer mutation or once during flushing
+shutdown. An unrecovered final write failure is thrown by <code>closeAndFlush()</code>.
+The load-failure callback does not report write failures.</p>
+<p>Product shutdown should bound its final flush wait and then cancel the worker&#39;s
+scope if that budget expires. Cancelling a close waiter does not cancel the
+worker. Blocking filesystem calls may finish after coroutine cancellation;
+shutdown must not rely on immediate interruption of those calls.</p>
+<h2 id="storage-and-privacy">Storage and privacy</h2>
+<p>Snapshots use a versioned format with opaque ranking rows and optional plaintext
+replay rows. Unsupported schemas are rejected.</p>
+<p>The store&#39;s <code>replayFilter</code> also applies when hydration merges imported replay
+rows. At the file boundary, replay is checked again against the built-in
+<code>TerminalCompletionReplayPolicy</code> and matching successful ranking evidence.
+See the completion engine&#39;s <a href="../ketraterm-completion/docs/completion-architecture.html#learning-and-privacy">learning and privacy contract</a>
+for eligibility, context matching, and host-filter requirements.</p>
+<p>Writes use a unique temporary file in the destination directory and replace the
+target atomically when the filesystem supports it, with ordinary replacement as
+the fallback. File and row bounds are enforced on both read and write. This is
+bounded snapshot persistence, without a cross-process coordination or crash
+durability guarantee. Products should assign one writer to a destination.</p>
+<p>For implementation details, see <a href="Module.html">Module.md</a>.</p>
+</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/e3c7f9c626934093d35a67ca97afbbf1b343f28d/ketraterm-completion-persistence/README.md">View source on GitHub ↗</a></div></div></main></div>
+  <footer>
+    <a class="brand" href="../../../index.html"><img class="brand-mark" src="../../../assets/logo.svg" alt="" width="34" height="34">KetraTerm Library</a>
+    <p>Open source · Apache 2.0</p>
+    <div><a href="https://github.com/ketraterm/KetraTerm">GitHub ↗</a><a href="https://github.com/ketraterm/KetraTerm/issues">Issues ↗</a><a class="product-switch" href="https://ketraterm.github.io/KetraTerm/">Desktop app ↗</a></div>
+  </footer>
+</body>
+</html>

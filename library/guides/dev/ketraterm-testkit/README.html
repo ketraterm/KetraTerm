@@ -1,0 +1,227 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="description" content="A modular Kotlin/JVM terminal emulator library for Swing and headless applications.">
+  <meta name="color-scheme" content="light dark">
+  <title>KetraTerm Testkit · KetraTerm Library</title>
+  <link rel="icon" href="../../../assets/logo.svg" type="image/svg+xml">
+  <link rel="preload" href="../../../assets/fonts/manrope-variable.ttf" as="font" type="font/ttf" crossorigin>
+  <link rel="stylesheet" href="../../../assets/styles.css">
+  <script type="importmap">{"imports":{"mermaid":"../../../assets/mermaid/mermaid.esm.min.mjs"}}</script>
+  <script type="module" src="../../../assets/site.js"></script>
+</head>
+<body data-product="library" data-version="Development">
+  <a class="skip" href="#main">Skip to content</a>
+  <header class="site-header">
+    <div class="site-identity">
+      <a class="brand" href="../../../index.html" aria-label="KetraTerm Library home"><img class="brand-mark" src="../../../assets/logo.svg" alt="" width="34" height="34">KetraTerm</a>
+      <nav class="product-navigation" aria-label="KetraTerm products"><a href="https://ketraterm.github.io/KetraTerm/">App</a><a href="../../../index.html" aria-current="true">Library</a></nav>
+    </div>
+    <details class="site-navigation" open><summary>Menu</summary><nav aria-label="Library navigation"><a   href="../docs/README.html">Guides</a><a aria-current="true"  href="../modules.html">Modules</a><a   href="../../../versions.html">API & versions</a><a   href="../CHANGELOG.html">Changelog</a><a  class="nav-primary" href="../README.html">Get started</a></nav></details>
+    <button class="theme-toggle" type="button" aria-label="Switch to light theme">Light</button>
+  </header>
+  <div class="docs-shell"><aside class="sidebar" aria-label="Documentation navigation"><details class="nav-disclosure" open><summary class="mobile-nav-toggle">Browse library guides</summary><div><label class="search-label">Find a library guide<input type="search" data-doc-search placeholder="Search library docs" autocomplete="off" data-index="../search.json"></label><div class="search-results" aria-live="polite"></div><details open><summary>Start here</summary><a  href="../docs/README.html">Documentation</a><a  href="../README.html">Installation</a><a  href="../modules.html">Module guides</a><a  href="../CHANGELOG.html">Changelog</a></details><details open><summary>Capabilities</summary><a  href="../docs/terminal-feature-map.html">Feature map</a><a  href="../docs/features/terminal.html">Terminal</a><a  href="../docs/features/shells.html">Shell integration</a><a  href="../docs/features/desktop.html">Swing view & hosts</a><a  href="../docs/features/completion.html">Completion</a><a  href="../docs/features/embedding.html">Embedding</a><a  href="../docs/terminal-feature-gap-map.html">Known limits</a></details><details open><summary>Embedding guides</summary><a  href="../docs/library/configuration.html">Configuration</a><a  href="../docs/library/compatibility.html">Compatibility</a><a  href="../docs/library/render-ownership.html">Render ownership</a></details><details open><summary>Reference</summary><a  href="../docs/reference/protocol.html">Protocols</a><a  href="../docs/reference/notifications.html">Notifications</a><a  href="../docs/reference/storage.html">Storage & privacy</a></details><details open><summary>Development</summary><a  href="../ARCHITECTURE.html">Architecture</a><a  href="../CONTRIBUTING.html">Contributing</a><a  href="../docs/development/conformance-testing.html">Conformance testing</a></details></div></details></aside><main id="main" tabindex="-1" class="article article-with-outline"><div class="article-top"><nav class="breadcrumb" aria-label="Breadcrumb"><ol><li><a href="../../../index.html">Library</a></li><li><a href="../modules.html">Modules</a></li><li><span aria-current="page">KetraTerm Testkit</span></li></ol></nav><div class="doc-version"><span>Development</span><a href="../../../versions.html">All versions</a></div></div><details class="page-outline" open><summary>On this page</summary><nav aria-label="On this page"><a class="depth-2" href="#how-to-use-in-tests">How to Use in Tests</a><a class="depth-3" href="#mockconnector">MockConnector</a><a class="depth-3" href="#headless-conformance-replay">Headless conformance replay</a><a class="depth-2" href="#running-testkit-tests">Running Testkit Tests</a><a class="depth-3" href="#generated-campaigns">Generated campaigns</a></nav></details><div class="article-content"><div class="prose"><h1 id="ketraterm-testkit">KetraTerm Testkit</h1>
+<p>Repository test support for connector simulation, deterministic terminal replay,
+and independent conformance checks. Testkit is used by KetraTerm&#39;s own modules;
+it is not a published Maven library.</p>
+<h2 id="how-to-use-in-tests">How to Use in Tests</h2>
+<p>Add project dependencies to the test source set that needs the helpers. Declare
+production APIs that your tests import directly; testkit does not re-export its
+implementation dependencies. The connector example below needs transport API:</p>
+<pre><code class="language-kotlin">// In a KetraTerm module&#39;s build.gradle.kts.
+dependencies {
+    testImplementation(project(&quot;:ketraterm-testkit&quot;))
+    testImplementation(project(&quot;:ketraterm-transport-api&quot;))
+}
+</code></pre>
+<h3 id="mockconnector">MockConnector</h3>
+<p><a href="https://github.com/ketraterm/KetraTerm/blob/e3c7f9c626934093d35a67ca97afbbf1b343f28d/ketraterm-testkit/src/main/kotlin/io/github/ketraterm/testkit/MockConnector.kt"><code>MockConnector</code></a>
+implements the raw-byte connector contract. <code>feedFromHost</code> calls the installed
+listener synchronously with the supplied array and slice; it does not copy or
+parse incoming bytes. The listener must consume or copy that slice before the
+callback returns. Outbound writes are copied, and <code>writtenBytes</code> returns a fresh
+array containing all captured writes.</p>
+<pre><code class="language-kotlin">import io.github.ketraterm.testkit.MockConnector
+import io.github.ketraterm.transport.TerminalConnectorListener
+
+fun main() {
+    val connector = MockConnector()
+    var received = &quot;&quot;
+    var remoteExitCode: Int? = null
+    connector.start(object : TerminalConnectorListener {
+        override fun onBytes(bytes: ByteArray, offset: Int, length: Int) {
+            received = bytes.decodeToString(offset, offset + length)
+        }
+
+        override fun onClosed(exitCode: Int?) {
+            remoteExitCode = exitCode
+        }
+
+        override fun onError(error: Throwable) = throw error
+    })
+
+    connector.feedFromHost(&quot;hello&quot;.encodeToByteArray())
+    val reply = &quot;reply&quot;.encodeToByteArray()
+    connector.write(reply, 0, reply.size)
+    check(received == &quot;hello&quot;)
+    check(connector.writtenBytes.contentEquals(reply))
+
+    connector.simulateClosed(0)
+    check(remoteExitCode == 0)
+    connector.close()
+    check(connector.startCount == 1 &amp;&amp; connector.closeCount == 1)
+}
+</code></pre>
+<p><code>start</code> accepts one listener and rejects restart or start after local closure.
+<code>close</code> records each call and prevents subsequent writes and resizes; it does not
+emit a remote exit callback. Trigger remote closure or failure explicitly with
+<code>simulateClosed</code> or <code>simulateCrash</code>. These helpers notify the listener without
+changing <code>isClosed</code>, which records local closure only. <code>resizeCalls</code> records
+ordered <code>(columns, rows)</code> pairs. Serialize access to the fake; it does not add
+concurrency control.</p>
+<h3 id="headless-conformance-replay">Headless conformance replay</h3>
+<p><a href="https://github.com/ketraterm/KetraTerm/blob/e3c7f9c626934093d35a67ca97afbbf1b343f28d/ketraterm-testkit/src/main/kotlin/io/github/ketraterm/testkit/TerminalConformanceHarness.kt"><code>TerminalConformanceHarness</code></a>
+wires the production parser, host adapter, core, response queue, and render reader
+without a session, PTY, or UI. A harness retains state between <code>apply</code>, <code>replay</code>,
+and <code>snapshot</code> calls. Create a fresh instance for each independent run.</p>
+<p>A <a href="https://github.com/ketraterm/KetraTerm/blob/e3c7f9c626934093d35a67ca97afbbf1b343f28d/ketraterm-testkit/src/main/kotlin/io/github/ketraterm/testkit/TerminalReplayTranscript.kt"><code>TerminalReplayTranscript</code></a>
+preserves input chunk boundaries, interleaved resizes, and explicit end-of-input
+placement. Input events copy their source bytes. <code>chunked</code> and <code>bytewise</code> do not
+append end-of-input automatically; <code>TerminalReplayChunkings.exhaustive</code> does so
+by default.</p>
+<pre><code class="language-kotlin">import io.github.ketraterm.testkit.TerminalConformanceDiffer
+import io.github.ketraterm.testkit.TerminalConformanceHarness
+import io.github.ketraterm.testkit.TerminalReplayChunkings
+
+fun assertChunkingInvariant(bytes: ByteArray) {
+    val variants = TerminalReplayChunkings.exhaustive(bytes)
+    val expected = TerminalConformanceHarness(80, 24).replay(variants.first().transcript)
+    for (variant in variants.drop(1)) {
+        val actual = TerminalConformanceHarness(80, 24).replay(variant.transcript)
+        val diff = TerminalConformanceDiffer.compare(expected, actual)
+        check(diff.isEmpty) { &quot;${variant.name}: ${diff.format()}&quot; }
+    }
+}
+</code></pre>
+<p>Snapshots copy retained history and the live grid, including cell attributes,
+clusters, hyperlinks, wraps, cursor, modes, host metadata, and cumulative response
+bytes. They omit internal storage handles and generation counters.
+<code>TerminalConformanceDiffer</code> returns bounded field-level differences.
+<code>exhaustive</code> covers every two-way split plus selected fragmented partitions; its
+quadratic byte copying is appropriate for small protocol fixtures.</p>
+<h2 id="running-testkit-tests">Running Testkit Tests</h2>
+<p>Run commands from the repository root with JDK 25; use <code>gradlew.bat</code> on Windows.</p>
+<pre><code class="language-text">./gradlew :ketraterm-testkit:test
+./gradlew :ketraterm-testkit:publishedConsumerTest
+./gradlew :ketraterm-testkit:publicationVerificationTest
+</code></pre>
+<p>Ordinary <code>test</code> covers helper behavior, specification fixtures, model regressions,
+and Java compilation against exported project API variants. It skips opt-in
+oracle/generated campaigns and excludes the separate publication and retained
+client suites. <code>check</code> also runs <code>publishedConsumerTest</code>; packaging verification
+is separate and is included in the root <code>publicationChecks</code> aggregate. See the
+<a href="https://github.com/ketraterm/KetraTerm/blob/e3c7f9c626934093d35a67ca97afbbf1b343f28d/ketraterm-testkit/src/consumerTest/README.md">published-consumer guide</a> for prerequisites,
+compiler/metadata combinations, and retained client baselines.</p>
+<h3 id="generated-campaigns">Generated campaigns</h3>
+<div class="table-scroll"><table>
+<thead>
+<tr>
+<th>Task</th>
+<th align="right">Default cases</th>
+<th>Check</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>xtermDifferentialTest</code></td>
+<td align="right">2,000 generated cases plus fixed corpus</td>
+<td>Independent headless xterm.js comparison.</td>
+</tr>
+<tr>
+<td><code>xtermDifferentialSmokeTest</code></td>
+<td align="right">100</td>
+<td>Generated xterm.js comparison.</td>
+</tr>
+<tr>
+<td><code>xtermDifferentialNightlyTest</code></td>
+<td align="right">100,000</td>
+<td>Generated xterm.js comparison.</td>
+</tr>
+<tr>
+<td><code>xtermDifferentialReleaseAudit</code></td>
+<td align="right">500,000</td>
+<td>Generated xterm.js comparison.</td>
+</tr>
+<tr>
+<td><code>resizeReflowInvariantSmokeTest</code></td>
+<td align="right">100</td>
+<td>Mixed-width text and repeated resize invariants.</td>
+</tr>
+<tr>
+<td><code>resizeReflowInvariantNightlyTest</code></td>
+<td align="right">10,000</td>
+<td>Mixed-width text and repeated resize invariants.</td>
+</tr>
+<tr>
+<td><code>cursorWrapModelSmokeTest</code></td>
+<td align="right">100</td>
+<td>Independent grid model comparison.</td>
+</tr>
+<tr>
+<td><code>cursorWrapModelNightlyTest</code></td>
+<td align="right">25,000</td>
+<td>Independent grid model comparison.</td>
+</tr>
+</tbody></table></div>
+<p>Invoke these tasks with the <code>:ketraterm-testkit:</code> prefix. xterm tasks require
+Node.js and npm on <code>PATH</code>; they install locked dependencies with
+<code>npm ci --ignore-scripts</code> and run the oracle&#39;s unit tests first. See the
+<a href="https://github.com/ketraterm/KetraTerm/blob/e3c7f9c626934093d35a67ca97afbbf1b343f28d/tools/xterm-oracle/README.md">oracle guide</a> for process protocol and setup.
+Resize/reflow and grid-model campaigns require no Node.js or native terminal.</p>
+<p>Override case counts and deterministic shards with the matching Gradle properties:</p>
+<div class="table-scroll"><table>
+<thead>
+<tr>
+<th>Campaign</th>
+<th>Count</th>
+<th>First index</th>
+<th>Reports under module <code>build/reports/</code></th>
+</tr>
+</thead>
+<tbody><tr>
+<td>xterm differential</td>
+<td><code>xtermDifferentialCases</code></td>
+<td><code>xtermDifferentialStartIndex</code></td>
+<td><code>xterm-differential/</code></td>
+</tr>
+<tr>
+<td>Resize/reflow</td>
+<td><code>resizeReflowCases</code></td>
+<td><code>resizeReflowStartIndex</code></td>
+<td><code>resize-reflow-invariant/</code></td>
+</tr>
+<tr>
+<td>Grid model</td>
+<td><code>cursorWrapCases</code></td>
+<td><code>cursorWrapStartIndex</code></td>
+<td><code>cursor-wrap-model/</code></td>
+</tr>
+</tbody></table></div>
+<p>For example:</p>
+<pre><code class="language-text">./gradlew :ketraterm-testkit:cursorWrapModelSmokeTest -PcursorWrapCases=250 -PcursorWrapStartIndex=500
+</code></pre>
+<p>Campaign reports retain deterministic replay metadata and manifests. Failures
+include reduced reproductions and structural differences. Differential tests
+compare the observable intersection with the oracle; intentional disagreements
+must name their rationale and exact mismatch paths. KetraTerm&#39;s resize/reflow
+policy is checked by its own invariants rather than treated as xterm parity.</p>
+<p>See <a href="Module.html">Module.md</a> for helper structure and dependencies.</p>
+</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/e3c7f9c626934093d35a67ca97afbbf1b343f28d/ketraterm-testkit/README.md">View source on GitHub ↗</a></div></div></main></div>
+  <footer>
+    <a class="brand" href="../../../index.html"><img class="brand-mark" src="../../../assets/logo.svg" alt="" width="34" height="34">KetraTerm Library</a>
+    <p>Open source · Apache 2.0</p>
+    <div><a href="https://github.com/ketraterm/KetraTerm">GitHub ↗</a><a href="https://github.com/ketraterm/KetraTerm/issues">Issues ↗</a><a class="product-switch" href="https://ketraterm.github.io/KetraTerm/">Desktop app ↗</a></div>
+  </footer>
+</body>
+</html>

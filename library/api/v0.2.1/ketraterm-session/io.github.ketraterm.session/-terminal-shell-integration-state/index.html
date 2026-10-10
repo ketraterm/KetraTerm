@@ -1,0 +1,544 @@
+<!doctype html>
+<html class="no-js" lang="en">
+<head>
+    <meta name="viewport" content="width=device-width, initial-scale=1" charset="UTF-8">
+    <title>TerminalShellIntegrationState</title>
+<link href="../../../images/logo-icon.svg" rel="icon" type="image/svg"><script>var pathToRoot = "../../../";</script>
+    <script>document.documentElement.classList.replace("no-js", "js");</script>
+    <script>const storage = localStorage.getItem("dokka-dark-mode")
+      if (storage == null) {
+        const osDarkSchemePreferred = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches
+        if (osDarkSchemePreferred === true) {
+          document.getElementsByTagName("html")[0].classList.add("theme-dark")
+        }
+      } else {
+        const savedDarkMode = JSON.parse(storage)
+        if (savedDarkMode === true) {
+          document.getElementsByTagName("html")[0].classList.add("theme-dark")
+        }
+      }
+    </script>
+<script type="text/javascript" src="../../../scripts/sourceset_dependencies.js" async></script>
+<link href="../../../styles/style.css" rel="Stylesheet">
+<link href="../../../styles/main.css" rel="Stylesheet">
+<link href="../../../styles/prism.css" rel="Stylesheet">
+<link href="../../../styles/logo-styles.css" rel="Stylesheet">
+<link href="../../../ui-kit/ui-kit.min.css" rel="Stylesheet">
+<script type="text/javascript" src="../../../scripts/safe-local-storage_blocking.js"></script>
+<script type="text/javascript" src="../../../scripts/navigation-loader.js" async></script>
+<script type="text/javascript" src="../../../scripts/platform-content-handler.js" async></script>
+<script type="text/javascript" src="../../../scripts/main.js" defer></script>
+<script type="text/javascript" src="../../../scripts/prism.js" async></script>
+<script type="text/javascript" src="../../../ui-kit/ui-kit.min.js" defer></script><!-- ketraterm-api-stylesheet:start -->
+<link rel="icon" href="../../../../../assets/logo.svg" type="image/svg+xml">
+<link rel="stylesheet" href="../../../../../assets/api-navigation.css">
+<!-- ketraterm-api-stylesheet:end --></head>
+<body>
+<div class="root"><!-- ketraterm-api-navigation:start -->
+<div class="ketraterm-api-navigation">
+  <a class="ketraterm-api-brand" href="../../../../../index.html" aria-label="KetraTerm Library home"><img src="../../../../../assets/logo.svg" alt="" width="28" height="28">KetraTerm</a>
+  <nav class="ketraterm-api-products" aria-label="KetraTerm products"><a href="https://ketraterm.github.io/KetraTerm/">App</a><a href="../../../../../index.html" aria-current="true">Library</a></nav>
+  <div class="ketraterm-api-reference"><span>API · v0.2.1</span><a href="../../../../../versions.html">All versions</a></div>
+</div>
+<!-- ketraterm-api-navigation:end -->
+    <header class="navigation theme-dark" id="navigation-wrapper" role="banner">
+<a class="library-name--link" href="../../../index.html">
+                    KetraTerm
+            </a>        <button class="navigation-controls--btn navigation-controls--btn_toc ui-kit_mobile-only" id="toc-toggle" type="button">Toggle table of contents
+        </button>
+        <div class="navigation-controls--break ui-kit_mobile-only"></div>
+        <div class="library-version" id="library-version">
+        </div>
+        <div class="navigation-controls">
+        <ul class="filter-section filter-section_loading" id="filter-section" aria-label="Target filter">
+                <button class="platform-tag platform-selector jvm-like" data-active="" aria-pressed="true" data-filter=":ketraterm-session/main">jvm</button>
+            <div class="dropdown filter-section--dropdown" data-role="dropdown" id="filter-section-dropdown">
+                <button class="button button_dropdown filter-section--dropdown-toggle" role="combobox" data-role="dropdown-toggle" aria-controls="platform-tags-listbox" aria-haspopup="listbox" aria-expanded="false" aria-label="Toggle source sets"></button>
+                <ul role="listbox" id="platform-tags-listbox" class="dropdown--list" data-role="dropdown-listbox" aria-label="Target filter">
+                    <div class="dropdown--header"><span>Target filter</span>
+                        <button class="button" data-role="dropdown-toggle" aria-label="Close target filter">
+                            <i class="ui-kit-icon ui-kit-icon_cross"></i>
+                        </button>
+                    </div>
+                        <li role="option" class="dropdown--option platform-selector-option jvm-like" tabindex="0">
+                            <label class="checkbox">
+                                <input type="checkbox" class="checkbox--input" id=":ketraterm-session/main" data-filter=":ketraterm-session/main">
+                                <span class="checkbox--icon"></span>
+                                jvm
+                            </label>
+                        </li>
+                </ul>
+                <div class="dropdown--overlay"></div>
+            </div>
+        </ul>
+            <button class="navigation-controls--btn navigation-controls--btn_theme" id="theme-toggle-button" type="button">Switch theme
+            </button>
+            <div class="navigation-controls--btn navigation-controls--btn_search" id="searchBar" role="button">Search in
+                API
+            </div>
+        </div>
+    </header>
+    <div id="container">
+        <nav id="leftColumn" class="sidebar" data-item-type="SECTION" data-item-config="{&quot;defaultSize&quot;: 280, &quot;minSize&quot;: 200, &quot;maxSize&quot;: 400}">
+            <a class="toc--skip-link" href="#main">Skip to content</a>
+            <div class="dropdown theme-dark_mobile" data-role="dropdown" id="toc-dropdown">
+                <ul role="listbox" id="toc-listbox" class="dropdown--list dropdown--list_toc-list" data-role="dropdown-listbox" aria-label="Table of contents">
+                    <div class="dropdown--header">
+                            <span>
+                                    KetraTerm
+                            </span>
+                        <button class="button" data-role="dropdown-toggle" aria-label="Close table of contents">
+                            <i class="ui-kit-icon ui-kit-icon_cross"></i>
+                        </button>
+                    </div>
+                    <div class="sidebar--inner" id="sideMenu"></div>
+                </ul>
+                <div class="dropdown--overlay"></div>
+            </div>
+        </nav>
+        <div id="resizer" class="resizer" data-item-type="BAR"></div>
+        <div id="main" data-item-type="SECTION" role="main">
+<div class="main-content" data-page-type="classlike" id="content" pageids="ketraterm-session::io.github.ketraterm.session/TerminalShellIntegrationState///PointingToDeclaration//-1853948372">
+  <div class="breadcrumbs"><a href="../../index.html">ketraterm-session</a><span class="delimiter">/</span><a href="../index.html">io.github.ketraterm.session</a><span class="delimiter">/</span><span class="current">TerminalShellIntegrationState</span></div>
+  <div class="cover ">
+    <h1 class="cover"><span>Terminal</span><wbr><span>Shell</span><wbr><span>Integration</span><wbr><span><span>State</span></span></h1>
+    <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-session/main"><div class="symbol monospace"><span class="token keyword">class </span><a href="index.html">TerminalShellIntegrationState</a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">capacity<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a><span class="token operator"> = </span>DEFAULT_CAPACITY<span class="token punctuation">, </span></span><span class="parameter ">maxCommandTextLength<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a><span class="token operator"> = </span>DEFAULT_SHELL_INTEGRATION_COMMAND_TEXT_LENGTH<span class="token punctuation">, </span></span><span class="parameter ">epochMillis<span class="token operator">: </span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token operator"> -&gt; </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-long/index.html">Long</a><span class="token operator"> = </span>System::currentTimeMillis</span></span><span class="token punctuation">)</span></div><p class="paragraph">Session-owned OSC 133 shell command timeline.</p><p class="paragraph">This model intentionally lives outside terminal core. Core owns bytes already committed to the terminal grid; shell integration markers are host metadata about prompt and command lifecycle. Records are anchored to stable core line identities, not absolute row numbers, so scrollback movement and resize reflow do not detach decorations from the content they describe.</p><p class="paragraph">Storage is data-oriented: each command field is a primitive column, records are append-only until bounded eviction, and paint paths consume only projected primitive arrays. All methods are thread-safe. Writers are normally invoked from the serialized session parser path; readers are UI threads that snapshot visible rows before painting.</p><h4 class="tableheader">Parameters</h4><div class="table"><div class="table-row table-row_content" data-filterable-current=":ketraterm-session/main" data-filterable-set=":ketraterm-session/main"><div class="main-subrow keyValue "><div class=""><span class="inline-flex"><div><u><span><span>capacity</span></span></u></div></span></div><div><div class="title"><p class="paragraph">maximum retained command records before oldest-record eviction.</p></div></div></div></div><div class="table-row table-row_content" data-filterable-current=":ketraterm-session/main" data-filterable-set=":ketraterm-session/main"><div class="main-subrow keyValue "><div class=""><span class="inline-flex"><div><u><span>max</span><wbr><span>Command</span><wbr><span>Text</span><wbr><span><span>Length</span></span></u></div></span></div><div><div class="title"><p class="paragraph">maximum retained UTF-16 command-text length per record; longer extracted text is stored as unknown.</p></div></div></div></div><div class="table-row table-row_content" data-filterable-current=":ketraterm-session/main" data-filterable-set=":ketraterm-session/main"><div class="main-subrow keyValue "><div class=""><span class="inline-flex"><div><u><span>epoch</span><wbr><span><span>Millis</span></span></u></div></span></div><div><div class="title"><p class="paragraph">wall-clock source used for command metadata timestamps.</p></div></div></div></div></div></div></div>
+  </div>
+  <div class="tabbedcontent">
+    <div class="tabs-section" tabs-section="tabs-section"><button class="section-tab" data-active="" data-togglable="CONSTRUCTOR,TYPE,PROPERTY,FUNCTION">Members</button></div>
+    <div class="tabs-section-body">
+      <div data-togglable="CONSTRUCTOR">
+        <h2 class="tableheader">Constructors</h2>
+        <div class="table"><a data-name="-1070539809%2FConstructors%2F-1853948372" anchor-label="TerminalShellIntegrationState" id="-1070539809%2FConstructors%2F-1853948372" data-filterable-set=":ketraterm-session/main"></a>
+          <div class="table-row table-row_content" data-togglable="CONSTRUCTOR" data-filterable-current=":ketraterm-session/main" data-filterable-set=":ketraterm-session/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-terminal-shell-integration-state.html"><span>Terminal</span><wbr><span>Shell</span><wbr><span>Integration</span><wbr><span><span>State</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-1070539809%2FConstructors%2F-1853948372"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-session/main"><div class="symbol monospace"><span class="token keyword">constructor</span><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">capacity<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a><span class="token operator"> = </span>DEFAULT_CAPACITY<span class="token punctuation">, </span></span><span class="parameter ">maxCommandTextLength<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a><span class="token operator"> = </span>DEFAULT_SHELL_INTEGRATION_COMMAND_TEXT_LENGTH<span class="token punctuation">, </span></span><span class="parameter ">epochMillis<span class="token operator">: </span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token operator"> -&gt; </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-long/index.html">Long</a><span class="token operator"> = </span>System::currentTimeMillis</span></span><span class="token punctuation">)</span></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div data-togglable="FUNCTION">
+        <h2 class="tableheader">Functions</h2>
+        <div class="table"><a data-name="691893123%2FFunctions%2F-1853948372" anchor-label="clear" id="691893123%2FFunctions%2F-1853948372" data-filterable-set=":ketraterm-session/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-session/main" data-filterable-set=":ketraterm-session/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="clear.html"><span><span>clear</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="691893123%2FFunctions%2F-1853948372"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-session/main"><div class="symbol monospace"><span class="token keyword">fun </span><a href="clear.html"><span class="token function">clear</span></a><span class="token punctuation">(</span><span class="token punctuation">)</span></div><div class="brief "><p class="paragraph">Clears all stored prompt and command timeline records.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="173347071%2FFunctions%2F-1853948372" anchor-label="commandAnchorLineId" id="173347071%2FFunctions%2F-1853948372" data-filterable-set=":ketraterm-session/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-session/main" data-filterable-set=":ketraterm-session/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="command-anchor-line-id.html"><span>command</span><wbr><span>Anchor</span><wbr><span>Line</span><wbr><span><span>Id</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="173347071%2FFunctions%2F-1853948372"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-session/main"><div class="symbol monospace"><span class="token keyword">fun </span><a href="command-anchor-line-id.html"><span class="token function">commandAnchorLineId</span></a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">recordId<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a></span></span><span class="token punctuation">)</span><span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-long/index.html">Long</a></div><div class="brief "><p class="paragraph">Returns the preferred navigation anchor line for <a href="command-anchor-line-id.html">recordId</a>.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-1594218188%2FFunctions%2F-1853948372" anchor-label="commandMetadata" id="-1594218188%2FFunctions%2F-1853948372" data-filterable-set=":ketraterm-session/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-session/main" data-filterable-set=":ketraterm-session/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="command-metadata.html"><span>command</span><wbr><span><span>Metadata</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-1594218188%2FFunctions%2F-1853948372"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-session/main"><div class="symbol monospace"><span class="token keyword">fun </span><a href="command-metadata.html"><span class="token function">commandMetadata</span></a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">recordId<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a></span></span><span class="token punctuation">)</span><span class="token operator">: </span><a href="../-terminal-shell-integration-command-metadata/index.html">TerminalShellIntegrationCommandMetadata</a><span class="token operator">?</span></div><div class="brief "><p class="paragraph">Returns an immutable metadata snapshot for <a href="command-metadata.html">recordId</a>.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="1722963559%2FFunctions%2F-1853948372" anchor-label="commandRecordIdAtLine" id="1722963559%2FFunctions%2F-1853948372" data-filterable-set=":ketraterm-session/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-session/main" data-filterable-set=":ketraterm-session/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="command-record-id-at-line.html"><span>command</span><wbr><span>Record</span><wbr><span>Id</span><wbr><span>At</span><wbr><span><span>Line</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="1722963559%2FFunctions%2F-1853948372"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-session/main"><div class="symbol monospace"><span class="token keyword">fun </span><a href="command-record-id-at-line.html"><span class="token function">commandRecordIdAtLine</span></a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">lineId<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-long/index.html">Long</a></span></span><span class="token punctuation">)</span><span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a></div><div class="brief "><p class="paragraph">Returns the retained command record that owns <a href="command-record-id-at-line.html">lineId</a>.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-2138324362%2FFunctions%2F-1853948372" anchor-label="commandText" id="-2138324362%2FFunctions%2F-1853948372" data-filterable-set=":ketraterm-session/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-session/main" data-filterable-set=":ketraterm-session/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="command-text.html"><span>command</span><wbr><span><span>Text</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-2138324362%2FFunctions%2F-1853948372"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-session/main"><div class="symbol monospace"><span class="token keyword">fun </span><a href="command-text.html"><span class="token function">commandText</span></a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">recordId<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a></span></span><span class="token punctuation">)</span><span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-string/index.html">String</a><span class="token operator">?</span></div><div class="brief "><p class="paragraph">Returns the retained command text for <a href="command-text.html">recordId</a>.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="1285210851%2FFunctions%2F-1853948372" anchor-label="commandWorkingDirectoryUri" id="1285210851%2FFunctions%2F-1853948372" data-filterable-set=":ketraterm-session/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-session/main" data-filterable-set=":ketraterm-session/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="command-working-directory-uri.html"><span>command</span><wbr><span>Working</span><wbr><span>Directory</span><wbr><span><span>Uri</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="1285210851%2FFunctions%2F-1853948372"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-session/main"><div class="symbol monospace"><span class="token keyword">fun </span><a href="command-working-directory-uri.html"><span class="token function">commandWorkingDirectoryUri</span></a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">recordId<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a></span></span><span class="token punctuation">)</span><span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-string/index.html">String</a><span class="token operator">?</span></div><div class="brief "><p class="paragraph">Returns the OSC 7 working-directory URI snapshotted when <a href="command-working-directory-uri.html">recordId</a> began.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="1588841878%2FFunctions%2F-1853948372" anchor-label="copyCommandBlockRange" id="1588841878%2FFunctions%2F-1853948372" data-filterable-set=":ketraterm-session/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-session/main" data-filterable-set=":ketraterm-session/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="copy-command-block-range.html"><span>copy</span><wbr><span>Command</span><wbr><span>Block</span><wbr><span><span>Range</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="1588841878%2FFunctions%2F-1853948372"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-session/main"><div class="symbol monospace"><span class="token keyword">fun </span><a href="copy-command-block-range.html"><span class="token function">copyCommandBlockRange</span></a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">recordId<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a><span class="token punctuation">, </span></span><span class="parameter ">destination<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-long-array/index.html">LongArray</a><span class="token punctuation">, </span></span><span class="parameter ">destinationOffset<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a><span class="token operator"> = </span><span class="token constant">0</span></span></span><span class="token punctuation">)</span><span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-boolean/index.html">Boolean</a></div><div class="brief "><p class="paragraph">Copies the selectable prompt/input-and-output line range for <a href="copy-command-block-range.html">recordId</a>.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="1308147760%2FFunctions%2F-1853948372" anchor-label="copyCommandOutputRange" id="1308147760%2FFunctions%2F-1853948372" data-filterable-set=":ketraterm-session/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-session/main" data-filterable-set=":ketraterm-session/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="copy-command-output-range.html"><span>copy</span><wbr><span>Command</span><wbr><span>Output</span><wbr><span><span>Range</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="1308147760%2FFunctions%2F-1853948372"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-session/main"><div class="symbol monospace"><span class="token keyword">fun </span><a href="copy-command-output-range.html"><span class="token function">copyCommandOutputRange</span></a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">recordId<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a><span class="token punctuation">, </span></span><span class="parameter ">destination<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-long-array/index.html">LongArray</a><span class="token punctuation">, </span></span><span class="parameter ">destinationOffset<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a><span class="token operator"> = </span><span class="token constant">0</span></span></span><span class="token punctuation">)</span><span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-boolean/index.html">Boolean</a></div><div class="brief "><p class="paragraph">Copies the command-output line range for <a href="copy-command-output-range.html">recordId</a>.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="148717792%2FFunctions%2F-1853948372" anchor-label="copyRecords" id="148717792%2FFunctions%2F-1853948372" data-filterable-set=":ketraterm-session/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-session/main" data-filterable-set=":ketraterm-session/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="copy-records.html"><span>copy</span><wbr><span><span>Records</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="148717792%2FFunctions%2F-1853948372"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-session/main"><div class="symbol monospace"><span class="token keyword">fun </span><a href="copy-records.html"><span class="token function">copyRecords</span></a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">recordIds<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int-array/index.html">IntArray</a><span class="token punctuation">, </span></span><span class="parameter ">lifecycleStates<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int-array/index.html">IntArray</a><span class="token punctuation">, </span></span><span class="parameter ">promptStartLineIds<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-long-array/index.html">LongArray</a><span class="token punctuation">, </span></span><span class="parameter ">promptEndLineIds<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-long-array/index.html">LongArray</a><span class="token punctuation">, </span></span><span class="parameter ">commandStartLineIds<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-long-array/index.html">LongArray</a><span class="token punctuation">, </span></span><span class="parameter ">commandEndLineIds<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-long-array/index.html">LongArray</a><span class="token punctuation">, </span></span><span class="parameter ">exitCodes<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int-array/index.html">IntArray</a><span class="token punctuation">, </span></span><span class="parameter ">destinationOffset<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a><span class="token punctuation">, </span></span><span class="parameter ">maxRecords<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a></span></span><span class="token punctuation">)</span><span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a></div><div class="brief "><p class="paragraph">Copies retained shell command records into caller-owned primitive arrays.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="2035389284%2FFunctions%2F-1853948372" anchor-label="copyViewport" id="2035389284%2FFunctions%2F-1853948372" data-filterable-set=":ketraterm-session/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-session/main" data-filterable-set=":ketraterm-session/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="copy-viewport.html"><span>copy</span><wbr><span><span>Viewport</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="2035389284%2FFunctions%2F-1853948372"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-session/main"><div class="symbol monospace"><span class="token keyword">fun </span><a href="copy-viewport.html"><span class="token function">copyViewport</span></a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">lineIds<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-long-array/index.html">LongArray</a><span class="token punctuation">, </span></span><span class="parameter ">rowCount<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a><span class="token punctuation">, </span></span><span class="parameter ">promptStarts<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-boolean-array/index.html">BooleanArray</a><span class="token punctuation">, </span></span><span class="parameter ">commandStarts<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-boolean-array/index.html">BooleanArray</a><span class="token punctuation">, </span></span><span class="parameter ">commandEnds<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-boolean-array/index.html">BooleanArray</a><span class="token punctuation">, </span></span><span class="parameter ">commandRecordIds<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int-array/index.html">IntArray</a><span class="token punctuation">, </span></span><span class="parameter ">commandLifecycleStates<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int-array/index.html">IntArray</a><span class="token punctuation">, </span></span><span class="parameter ">failedCommandRails<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-boolean-array/index.html">BooleanArray</a><span class="token operator">?</span><span class="token operator"> = </span>null<span class="token punctuation">, </span></span><span class="parameter ">destinationOffset<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a><span class="token operator"> = </span><span class="token constant">0</span></span></span><span class="token punctuation">)</span></div><div class="brief "><p class="paragraph">Copies projected shell decorations for a visible viewport.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="806452403%2FFunctions%2F-1853948372" anchor-label="currentWorkingDirectoryUri" id="806452403%2FFunctions%2F-1853948372" data-filterable-set=":ketraterm-session/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-session/main" data-filterable-set=":ketraterm-session/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="current-working-directory-uri.html"><span>current</span><wbr><span>Working</span><wbr><span>Directory</span><wbr><span><span>Uri</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="806452403%2FFunctions%2F-1853948372"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-session/main"><div class="symbol monospace"><span class="token keyword">fun </span><a href="current-working-directory-uri.html"><span class="token function">currentWorkingDirectoryUri</span></a><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-string/index.html">String</a><span class="token operator">?</span></div><div class="brief "><p class="paragraph">Returns the latest accepted OSC 7 URI, or <code class="lang-kotlin">null</code> before one is received.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-617280725%2FFunctions%2F-1853948372" anchor-label="hasFailedCommandOutputAtLine" id="-617280725%2FFunctions%2F-1853948372" data-filterable-set=":ketraterm-session/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-session/main" data-filterable-set=":ketraterm-session/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="has-failed-command-output-at-line.html"><span>has</span><wbr><span>Failed</span><wbr><span>Command</span><wbr><span>Output</span><wbr><span>At</span><wbr><span><span>Line</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-617280725%2FFunctions%2F-1853948372"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-session/main"><div class="symbol monospace"><span class="token keyword">fun </span><a href="has-failed-command-output-at-line.html"><span class="token function">hasFailedCommandOutputAtLine</span></a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">lineId<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-long/index.html">Long</a></span></span><span class="token punctuation">)</span><span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-boolean/index.html">Boolean</a></div><div class="brief "><p class="paragraph">Returns whether <a href="has-failed-command-output-at-line.html">lineId</a> belongs to a failed command range.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-534090790%2FFunctions%2F-1853948372" anchor-label="hasPromptStartAtLine" id="-534090790%2FFunctions%2F-1853948372" data-filterable-set=":ketraterm-session/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-session/main" data-filterable-set=":ketraterm-session/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="has-prompt-start-at-line.html"><span>has</span><wbr><span>Prompt</span><wbr><span>Start</span><wbr><span>At</span><wbr><span><span>Line</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-534090790%2FFunctions%2F-1853948372"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-session/main"><div class="symbol monospace"><span class="token keyword">fun </span><a href="has-prompt-start-at-line.html"><span class="token function">hasPromptStartAtLine</span></a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">lineId<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-long/index.html">Long</a></span></span><span class="token punctuation">)</span><span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-boolean/index.html">Boolean</a></div><div class="brief "><p class="paragraph">Returns whether <a href="has-prompt-start-at-line.html">lineId</a> has a prompt-start marker.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-2002667094%2FFunctions%2F-1853948372" anchor-label="hasRunningCommand" id="-2002667094%2FFunctions%2F-1853948372" data-filterable-set=":ketraterm-session/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-session/main" data-filterable-set=":ketraterm-session/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="has-running-command.html"><span>has</span><wbr><span>Running</span><wbr><span><span>Command</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-2002667094%2FFunctions%2F-1853948372"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-session/main"><div class="symbol monospace"><span class="token keyword">fun </span><a href="has-running-command.html"><span class="token function">hasRunningCommand</span></a><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-boolean/index.html">Boolean</a></div><div class="brief "><p class="paragraph">Returns true while shell integration reports a command between command-start and command-finished markers.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-236199424%2FFunctions%2F-1853948372" anchor-label="latestCommandRecordId" id="-236199424%2FFunctions%2F-1853948372" data-filterable-set=":ketraterm-session/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-session/main" data-filterable-set=":ketraterm-session/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="latest-command-record-id.html"><span>latest</span><wbr><span>Command</span><wbr><span>Record</span><wbr><span><span>Id</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-236199424%2FFunctions%2F-1853948372"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-session/main"><div class="symbol monospace"><span class="token keyword">fun </span><a href="latest-command-record-id.html"><span class="token function">latestCommandRecordId</span></a><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a></div><div class="brief "><p class="paragraph">Returns the newest retained command record id, skipping prompt-only records.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-1568967478%2FFunctions%2F-1853948372" anchor-label="nextCommandRecordId" id="-1568967478%2FFunctions%2F-1853948372" data-filterable-set=":ketraterm-session/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-session/main" data-filterable-set=":ketraterm-session/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="next-command-record-id.html"><span>next</span><wbr><span>Command</span><wbr><span>Record</span><wbr><span><span>Id</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-1568967478%2FFunctions%2F-1853948372"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-session/main"><div class="symbol monospace"><span class="token keyword">fun </span><a href="next-command-record-id.html"><span class="token function">nextCommandRecordId</span></a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">recordId<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a></span></span><span class="token punctuation">)</span><span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a></div><div class="brief "><p class="paragraph">Returns the next retained command record after <a href="next-command-record-id.html">recordId</a>.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="1927369755%2FFunctions%2F-1853948372" anchor-label="nextCommandRecordIdAfterLine" id="1927369755%2FFunctions%2F-1853948372" data-filterable-set=":ketraterm-session/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-session/main" data-filterable-set=":ketraterm-session/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="next-command-record-id-after-line.html"><span>next</span><wbr><span>Command</span><wbr><span>Record</span><wbr><span>Id</span><wbr><span>After</span><wbr><span><span>Line</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="1927369755%2FFunctions%2F-1853948372"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-session/main"><div class="symbol monospace"><span class="token keyword">fun </span><a href="next-command-record-id-after-line.html"><span class="token function">nextCommandRecordIdAfterLine</span></a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">lineId<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-long/index.html">Long</a></span></span><span class="token punctuation">)</span><span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a></div><div class="brief "><p class="paragraph">Returns the nearest retained command record after <a href="next-command-record-id-after-line.html">lineId</a>.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="1621150710%2FFunctions%2F-1853948372" anchor-label="observeLiveBottomRow" id="1621150710%2FFunctions%2F-1853948372" data-filterable-set=":ketraterm-session/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-session/main" data-filterable-set=":ketraterm-session/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="observe-live-bottom-row.html"><span>observe</span><wbr><span>Live</span><wbr><span>Bottom</span><wbr><span><span>Row</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="1621150710%2FFunctions%2F-1853948372"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-session/main"><div class="symbol monospace"><span class="token keyword">fun </span><a href="observe-live-bottom-row.html"><span class="token function">observeLiveBottomRow</span></a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">bottomAbsoluteRow<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-long/index.html">Long</a></span></span><span class="token punctuation">)</span></div><div class="brief "><p class="paragraph">Observes the newest live viewport bottom row.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="618834510%2FFunctions%2F-1853948372" anchor-label="previousCommandRecordId" id="618834510%2FFunctions%2F-1853948372" data-filterable-set=":ketraterm-session/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-session/main" data-filterable-set=":ketraterm-session/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="previous-command-record-id.html"><span>previous</span><wbr><span>Command</span><wbr><span>Record</span><wbr><span><span>Id</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="618834510%2FFunctions%2F-1853948372"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-session/main"><div class="symbol monospace"><span class="token keyword">fun </span><a href="previous-command-record-id.html"><span class="token function">previousCommandRecordId</span></a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">recordId<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a></span></span><span class="token punctuation">)</span><span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a></div><div class="brief "><p class="paragraph">Returns the previous retained command record before <a href="previous-command-record-id.html">recordId</a>.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="1993897724%2FFunctions%2F-1853948372" anchor-label="previousCommandRecordIdBeforeLine" id="1993897724%2FFunctions%2F-1853948372" data-filterable-set=":ketraterm-session/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-session/main" data-filterable-set=":ketraterm-session/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="previous-command-record-id-before-line.html"><span>previous</span><wbr><span>Command</span><wbr><span>Record</span><wbr><span>Id</span><wbr><span>Before</span><wbr><span><span>Line</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="1993897724%2FFunctions%2F-1853948372"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-session/main"><div class="symbol monospace"><span class="token keyword">fun </span><a href="previous-command-record-id-before-line.html"><span class="token function">previousCommandRecordIdBeforeLine</span></a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">lineId<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-long/index.html">Long</a></span></span><span class="token punctuation">)</span><span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a></div><div class="brief "><p class="paragraph">Returns the nearest retained command record before <a href="previous-command-record-id-before-line.html">lineId</a>.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-1512572421%2FFunctions%2F-1853948372" anchor-label="recordCommandFinished" id="-1512572421%2FFunctions%2F-1853948372" data-filterable-set=":ketraterm-session/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-session/main" data-filterable-set=":ketraterm-session/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="record-command-finished.html"><span>record</span><wbr><span>Command</span><wbr><span><span>Finished</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-1512572421%2FFunctions%2F-1853948372"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-session/main"><div class="symbol monospace"><span class="token keyword">fun </span><a href="record-command-finished.html"><span class="token function">recordCommandFinished</span></a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">lineId<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-long/index.html">Long</a><span class="token punctuation">, </span></span><span class="parameter ">exitCode<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a><span class="token operator">?</span></span></span><span class="token punctuation">)</span></div><div class="brief "><p class="paragraph">Records command completion.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-2101351539%2FFunctions%2F-1853948372" anchor-label="recordCommandStart" id="-2101351539%2FFunctions%2F-1853948372" data-filterable-set=":ketraterm-session/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-session/main" data-filterable-set=":ketraterm-session/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="record-command-start.html"><span>record</span><wbr><span>Command</span><wbr><span><span>Start</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-2101351539%2FFunctions%2F-1853948372"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-session/main"><div class="symbol monospace"><span class="token keyword">fun </span><a href="record-command-start.html"><span class="token function">recordCommandStart</span></a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">lineId<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-long/index.html">Long</a><span class="token punctuation">, </span></span><span class="parameter ">includeLine<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-boolean/index.html">Boolean</a><span class="token punctuation">, </span></span><span class="parameter ">commandText<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-string/index.html">String</a><span class="token operator">?</span><span class="token operator"> = </span>null<span class="token punctuation">, </span></span><span class="parameter ">workingDirectoryUri<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-string/index.html">String</a><span class="token operator">?</span><span class="token operator"> = </span>null</span></span><span class="token punctuation">)</span></div><div class="brief "><p class="paragraph">Records command execution start.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-1922676366%2FFunctions%2F-1853948372" anchor-label="recordCount" id="-1922676366%2FFunctions%2F-1853948372" data-filterable-set=":ketraterm-session/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-session/main" data-filterable-set=":ketraterm-session/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="record-count.html"><span>record</span><wbr><span><span>Count</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-1922676366%2FFunctions%2F-1853948372"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-session/main"><div class="symbol monospace"><span class="token keyword">fun </span><a href="record-count.html"><span class="token function">recordCount</span></a><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a></div><div class="brief "><p class="paragraph">Returns the current number of retained shell command records.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="1504196120%2FFunctions%2F-1853948372" anchor-label="recordCurrentWorkingDirectory" id="1504196120%2FFunctions%2F-1853948372" data-filterable-set=":ketraterm-session/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-session/main" data-filterable-set=":ketraterm-session/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="record-current-working-directory.html"><span>record</span><wbr><span>Current</span><wbr><span>Working</span><wbr><span><span>Directory</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="1504196120%2FFunctions%2F-1853948372"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-session/main"><div class="symbol monospace"><span class="token keyword">fun </span><a href="record-current-working-directory.html"><span class="token function">recordCurrentWorkingDirectory</span></a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">uri<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-string/index.html">String</a></span></span><span class="token punctuation">)</span></div><div class="brief "><p class="paragraph">Records the latest host-validated OSC 7 current-working-directory URI.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-1166155697%2FFunctions%2F-1853948372" anchor-label="recordPromptEnd" id="-1166155697%2FFunctions%2F-1853948372" data-filterable-set=":ketraterm-session/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-session/main" data-filterable-set=":ketraterm-session/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="record-prompt-end.html"><span>record</span><wbr><span>Prompt</span><wbr><span><span>End</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-1166155697%2FFunctions%2F-1853948372"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-session/main"><div class="symbol monospace"><span class="token keyword">fun </span><a href="record-prompt-end.html"><span class="token function">recordPromptEnd</span></a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">lineId<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-long/index.html">Long</a></span></span><span class="token punctuation">)</span></div><div class="brief "><p class="paragraph">Records the end of the active shell prompt.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-1479664042%2FFunctions%2F-1853948372" anchor-label="recordPromptStart" id="-1479664042%2FFunctions%2F-1853948372" data-filterable-set=":ketraterm-session/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-session/main" data-filterable-set=":ketraterm-session/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="record-prompt-start.html"><span>record</span><wbr><span>Prompt</span><wbr><span><span>Start</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-1479664042%2FFunctions%2F-1853948372"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-session/main"><div class="symbol monospace"><span class="token keyword">fun </span><a href="record-prompt-start.html"><span class="token function">recordPromptStart</span></a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">lineId<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-long/index.html">Long</a></span></span><span class="token punctuation">)</span></div><div class="brief "><p class="paragraph">Records the start of a shell prompt.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+    <div class="footer">
+        <div class="footer--container">
+            <a href="#content" id="go-to-top-link" class="footer--button footer--button_go-to-top"></a>
+            <div class="footer--content">
+                <div>
+                    <span>Generated by </span>
+                    <a class="footer--link footer--link_external" href="https://github.com/Kotlin/dokka">
+                        Dokka
+                    </a>
+                    <div>© 2026 Copyright</div>
+                </div>
+            </div>
+        </div>
+    </div>
+        </div>
+    </div>
+</div>
+</body>
+</html>

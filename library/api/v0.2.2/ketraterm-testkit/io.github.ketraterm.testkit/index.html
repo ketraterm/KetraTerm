@@ -1,0 +1,539 @@
+<!doctype html>
+<html class="no-js" lang="en">
+<head>
+    <meta name="viewport" content="width=device-width, initial-scale=1" charset="UTF-8">
+    <title>io.github.ketraterm.testkit</title>
+<link href="../../images/logo-icon.svg" rel="icon" type="image/svg"><script>var pathToRoot = "../../";</script>
+    <script>document.documentElement.classList.replace("no-js", "js");</script>
+    <script>const storage = localStorage.getItem("dokka-dark-mode")
+      if (storage == null) {
+        const osDarkSchemePreferred = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches
+        if (osDarkSchemePreferred === true) {
+          document.getElementsByTagName("html")[0].classList.add("theme-dark")
+        }
+      } else {
+        const savedDarkMode = JSON.parse(storage)
+        if (savedDarkMode === true) {
+          document.getElementsByTagName("html")[0].classList.add("theme-dark")
+        }
+      }
+    </script>
+<script type="text/javascript" src="../../scripts/sourceset_dependencies.js" async></script>
+<link href="../../styles/style.css" rel="Stylesheet">
+<link href="../../styles/main.css" rel="Stylesheet">
+<link href="../../styles/prism.css" rel="Stylesheet">
+<link href="../../styles/logo-styles.css" rel="Stylesheet">
+<link href="../../ui-kit/ui-kit.min.css" rel="Stylesheet">
+<script type="text/javascript" src="../../scripts/safe-local-storage_blocking.js"></script>
+<script type="text/javascript" src="../../scripts/navigation-loader.js" async></script>
+<script type="text/javascript" src="../../scripts/platform-content-handler.js" async></script>
+<script type="text/javascript" src="../../scripts/main.js" defer></script>
+<script type="text/javascript" src="../../scripts/prism.js" async></script>
+<script type="text/javascript" src="../../ui-kit/ui-kit.min.js" defer></script><!-- ketraterm-api-stylesheet:start -->
+<link rel="icon" href="../../../../assets/logo.svg" type="image/svg+xml">
+<link rel="stylesheet" href="../../../../assets/api-navigation.css">
+<!-- ketraterm-api-stylesheet:end --></head>
+<body>
+<div class="root"><!-- ketraterm-api-navigation:start -->
+<div class="ketraterm-api-navigation">
+  <a class="ketraterm-api-brand" href="../../../../index.html" aria-label="KetraTerm Library home"><img src="../../../../assets/logo.svg" alt="" width="28" height="28">KetraTerm</a>
+  <nav class="ketraterm-api-products" aria-label="KetraTerm products"><a href="https://ketraterm.github.io/KetraTerm/">App</a><a href="../../../../index.html" aria-current="true">Library</a></nav>
+  <div class="ketraterm-api-reference"><span>API · v0.2.2</span><a href="../../../../versions.html">All versions</a></div>
+</div>
+<!-- ketraterm-api-navigation:end -->
+    <header class="navigation theme-dark" id="navigation-wrapper" role="banner">
+<a class="library-name--link" href="../../index.html">
+                    KetraTerm
+            </a>        <button class="navigation-controls--btn navigation-controls--btn_toc ui-kit_mobile-only" id="toc-toggle" type="button">Toggle table of contents
+        </button>
+        <div class="navigation-controls--break ui-kit_mobile-only"></div>
+        <div class="library-version" id="library-version">
+        </div>
+        <div class="navigation-controls">
+        <ul class="filter-section filter-section_loading" id="filter-section" aria-label="Target filter">
+                <button class="platform-tag platform-selector jvm-like" data-active="" aria-pressed="true" data-filter=":ketraterm-testkit/main">jvm</button>
+            <div class="dropdown filter-section--dropdown" data-role="dropdown" id="filter-section-dropdown">
+                <button class="button button_dropdown filter-section--dropdown-toggle" role="combobox" data-role="dropdown-toggle" aria-controls="platform-tags-listbox" aria-haspopup="listbox" aria-expanded="false" aria-label="Toggle source sets"></button>
+                <ul role="listbox" id="platform-tags-listbox" class="dropdown--list" data-role="dropdown-listbox" aria-label="Target filter">
+                    <div class="dropdown--header"><span>Target filter</span>
+                        <button class="button" data-role="dropdown-toggle" aria-label="Close target filter">
+                            <i class="ui-kit-icon ui-kit-icon_cross"></i>
+                        </button>
+                    </div>
+                        <li role="option" class="dropdown--option platform-selector-option jvm-like" tabindex="0">
+                            <label class="checkbox">
+                                <input type="checkbox" class="checkbox--input" id=":ketraterm-testkit/main" data-filter=":ketraterm-testkit/main">
+                                <span class="checkbox--icon"></span>
+                                jvm
+                            </label>
+                        </li>
+                </ul>
+                <div class="dropdown--overlay"></div>
+            </div>
+        </ul>
+            <button class="navigation-controls--btn navigation-controls--btn_theme" id="theme-toggle-button" type="button">Switch theme
+            </button>
+            <div class="navigation-controls--btn navigation-controls--btn_search" id="searchBar" role="button">Search in
+                API
+            </div>
+        </div>
+    </header>
+    <div id="container">
+        <nav id="leftColumn" class="sidebar" data-item-type="SECTION" data-item-config="{&quot;defaultSize&quot;: 280, &quot;minSize&quot;: 200, &quot;maxSize&quot;: 400}">
+            <a class="toc--skip-link" href="#main">Skip to content</a>
+            <div class="dropdown theme-dark_mobile" data-role="dropdown" id="toc-dropdown">
+                <ul role="listbox" id="toc-listbox" class="dropdown--list dropdown--list_toc-list" data-role="dropdown-listbox" aria-label="Table of contents">
+                    <div class="dropdown--header">
+                            <span>
+                                    KetraTerm
+                            </span>
+                        <button class="button" data-role="dropdown-toggle" aria-label="Close table of contents">
+                            <i class="ui-kit-icon ui-kit-icon_cross"></i>
+                        </button>
+                    </div>
+                    <div class="sidebar--inner" id="sideMenu"></div>
+                </ul>
+                <div class="dropdown--overlay"></div>
+            </div>
+        </nav>
+        <div id="resizer" class="resizer" data-item-type="BAR"></div>
+        <div id="main" data-item-type="SECTION" role="main">
+<div class="main-content" data-page-type="package" id="content" pageids="ketraterm-testkit::io.github.ketraterm.testkit////PointingToDeclaration//549485722">
+  <div class="breadcrumbs"><a href="../index.html">ketraterm-testkit</a><span class="delimiter">/</span><span class="current">io.github.ketraterm.testkit</span></div>
+  <div class="cover ">
+    <h1 class="cover"><span><span>Package-level</span></span> <span><span>declarations</span></span></h1>
+  </div>
+  <div class="tabbedcontent">
+    <div class="tabs-section" tabs-section="tabs-section"><button class="section-tab" data-active="" data-togglable="TYPE">Types</button></div>
+    <div class="tabs-section-body">
+      <div data-togglable="TYPE">
+        <h2 class="tableheader">Types</h2>
+        <div class="table"><a data-name="331184437%2FClasslikes%2F549485722" anchor-label="MockConnector" id="331184437%2FClasslikes%2F549485722" data-filterable-set=":ketraterm-testkit/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-testkit/main" data-filterable-set=":ketraterm-testkit/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-mock-connector/index.html"><span>Mock</span><wbr><span><span>Connector</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="331184437%2FClasslikes%2F549485722"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-testkit/main"><div class="symbol monospace"><span class="token keyword">class </span><a href="-mock-connector/index.html">MockConnector</a> : <a href="../../ketraterm-transport-api/io.github.ketraterm.transport/-terminal-connector/index.html">TerminalConnector</a></div><div class="brief "><p class="paragraph">In-memory connector for session and transport-adapter tests.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-564172059%2FClasslikes%2F549485722" anchor-label="TerminalByteSequence" id="-564172059%2FClasslikes%2F549485722" data-filterable-set=":ketraterm-testkit/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-testkit/main" data-filterable-set=":ketraterm-testkit/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-terminal-byte-sequence/index.html"><span>Terminal</span><wbr><span>Byte</span><wbr><span><span>Sequence</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-564172059%2FClasslikes%2F549485722"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-testkit/main"><div class="symbol monospace"><span class="token keyword">class </span><a href="-terminal-byte-sequence/index.html">TerminalByteSequence</a></div><div class="brief "><p class="paragraph">Immutable byte sequence with content-based value semantics.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="855019816%2FClasslikes%2F549485722" anchor-label="TerminalCellSnapshot" id="855019816%2FClasslikes%2F549485722" data-filterable-set=":ketraterm-testkit/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-testkit/main" data-filterable-set=":ketraterm-testkit/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-terminal-cell-snapshot/index.html"><span>Terminal</span><wbr><span>Cell</span><wbr><span><span>Snapshot</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="855019816%2FClasslikes%2F549485722"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-testkit/main"><div class="symbol monospace"><span class="token keyword">data </span><span class="token keyword">class </span><a href="-terminal-cell-snapshot/index.html">TerminalCellSnapshot</a><span class="token punctuation">(</span><span class="parameters "><span class="parameter "><span class="token keyword">val </span>codepoint<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a><span class="token punctuation">, </span></span><span class="parameter "><span class="token keyword">val </span>cluster<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-string/index.html">String</a><span class="token operator">?</span><span class="token punctuation">, </span></span><span class="parameter "><span class="token keyword">val </span>attributes<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-long/index.html">Long</a><span class="token punctuation">, </span></span><span class="parameter "><span class="token keyword">val </span>extraAttributes<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-long/index.html">Long</a><span class="token punctuation">, </span></span><span class="parameter "><span class="token keyword">val </span>flags<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a><span class="token punctuation">, </span></span><span class="parameter "><span class="token keyword">val </span>hyperlinkId<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a></span></span><span class="token punctuation">)</span></div><div class="brief "><p class="paragraph">One public-render-ABI cell in a conformance snapshot.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-1736735846%2FClasslikes%2F549485722" anchor-label="TerminalConformanceDiff" id="-1736735846%2FClasslikes%2F549485722" data-filterable-set=":ketraterm-testkit/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-testkit/main" data-filterable-set=":ketraterm-testkit/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-terminal-conformance-diff/index.html"><span>Terminal</span><wbr><span>Conformance</span><wbr><span><span>Diff</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-1736735846%2FClasslikes%2F549485722"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-testkit/main"><div class="symbol monospace"><span class="token keyword">data </span><span class="token keyword">class </span><a href="-terminal-conformance-diff/index.html">TerminalConformanceDiff</a><span class="token punctuation">(</span><span class="parameters "><span class="parameter "><span class="token keyword">val </span>differences<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin.collections/-list/index.html">List</a><span class="token operator">&lt;</span><a href="-terminal-conformance-difference/index.html">TerminalConformanceDifference</a><span class="token operator">&gt;</span><span class="token punctuation">, </span></span><span class="parameter "><span class="token keyword">val </span>truncated<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-boolean/index.html">Boolean</a></span></span><span class="token punctuation">)</span></div><div class="brief "><p class="paragraph">Bounded comparison result for two terminal conformance snapshots.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-1465356979%2FClasslikes%2F549485722" anchor-label="TerminalConformanceDiffer" id="-1465356979%2FClasslikes%2F549485722" data-filterable-set=":ketraterm-testkit/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-testkit/main" data-filterable-set=":ketraterm-testkit/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-terminal-conformance-differ/index.html"><span>Terminal</span><wbr><span>Conformance</span><wbr><span><span>Differ</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-1465356979%2FClasslikes%2F549485722"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-testkit/main"><div class="symbol monospace"><span class="token keyword">object </span><a href="-terminal-conformance-differ/index.html">TerminalConformanceDiffer</a></div><div class="brief "><p class="paragraph">Field-level comparer for canonical terminal conformance snapshots.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="180164322%2FClasslikes%2F549485722" anchor-label="TerminalConformanceDifference" id="180164322%2FClasslikes%2F549485722" data-filterable-set=":ketraterm-testkit/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-testkit/main" data-filterable-set=":ketraterm-testkit/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-terminal-conformance-difference/index.html"><span>Terminal</span><wbr><span>Conformance</span><wbr><span><span>Difference</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="180164322%2FClasslikes%2F549485722"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-testkit/main"><div class="symbol monospace"><span class="token keyword">data </span><span class="token keyword">class </span><a href="-terminal-conformance-difference/index.html">TerminalConformanceDifference</a><span class="token punctuation">(</span><span class="parameters "><span class="parameter "><span class="token keyword">val </span>path<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-string/index.html">String</a><span class="token punctuation">, </span></span><span class="parameter "><span class="token keyword">val </span>expected<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-string/index.html">String</a><span class="token punctuation">, </span></span><span class="parameter "><span class="token keyword">val </span>actual<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-string/index.html">String</a><span class="token punctuation">, </span></span><span class="parameter "><span class="token keyword">val </span>context<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-string/index.html">String</a><span class="token operator">?</span><span class="token operator"> = </span>null</span></span><span class="token punctuation">)</span></div><div class="brief "><p class="paragraph">One field-level mismatch between two terminal conformance snapshots.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="1827829555%2FClasslikes%2F549485722" anchor-label="TerminalConformanceHarness" id="1827829555%2FClasslikes%2F549485722" data-filterable-set=":ketraterm-testkit/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-testkit/main" data-filterable-set=":ketraterm-testkit/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-terminal-conformance-harness/index.html"><span>Terminal</span><wbr><span>Conformance</span><wbr><span><span>Harness</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="1827829555%2FClasslikes%2F549485722"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-testkit/main"><div class="symbol monospace"><span class="token keyword">class </span><a href="-terminal-conformance-harness/index.html">TerminalConformanceHarness</a>&nbsp;<span><span class="token annotation builtin">@</span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin.jvm/-jvm-overloads/index.html"><span class="token annotation builtin">JvmOverloads</span></a>&nbsp;</span><span class="token keyword">constructor</span><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">columns<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a><span class="token punctuation">, </span></span><span class="parameter ">rows<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a><span class="token punctuation">, </span></span><span class="parameter ">maxHistory<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a><span class="token operator"> = </span><span class="token constant">1000</span></span></span><span class="token punctuation">)</span></div><div class="brief "><p class="paragraph">Deterministic headless parser-to-core conformance harness.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="588990395%2FClasslikes%2F549485722" anchor-label="TerminalConformanceSnapshot" id="588990395%2FClasslikes%2F549485722" data-filterable-set=":ketraterm-testkit/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-testkit/main" data-filterable-set=":ketraterm-testkit/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-terminal-conformance-snapshot/index.html"><span>Terminal</span><wbr><span>Conformance</span><wbr><span><span>Snapshot</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="588990395%2FClasslikes%2F549485722"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-testkit/main"><div class="symbol monospace"><span class="token keyword">data </span><span class="token keyword">class </span><a href="-terminal-conformance-snapshot/index.html">TerminalConformanceSnapshot</a><span class="token punctuation">(</span><span class="parameters "><span class="parameter "><span class="token keyword">val </span>columns<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a><span class="token punctuation">, </span></span><span class="parameter "><span class="token keyword">val </span>visibleRows<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a><span class="token punctuation">, </span></span><span class="parameter "><span class="token keyword">val </span>historyRows<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a><span class="token punctuation">, </span></span><span class="parameter "><span class="token keyword">val </span>discardedRows<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-long/index.html">Long</a><span class="token punctuation">, </span></span><span class="parameter "><span class="token keyword">val </span>liveRowStart<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a><span class="token punctuation">, </span></span><span class="parameter "><span class="token keyword">val </span>activeBuffer<span class="token operator">: </span><a href="-terminal-snapshot-buffer-kind/index.html">TerminalSnapshotBufferKind</a><span class="token punctuation">, </span></span><span class="parameter "><span class="token keyword">val </span>cursor<span class="token operator">: </span><a href="-terminal-cursor-snapshot/index.html">TerminalCursorSnapshot</a><span class="token punctuation">, </span></span><span class="parameter "><span class="token keyword">val </span>modes<span class="token operator">: </span><a href="-terminal-mode-state-snapshot/index.html">TerminalModeStateSnapshot</a><span class="token punctuation">, </span></span><span class="parameter "><span class="token keyword">val </span>retainedRows<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin.collections/-list/index.html">List</a><span class="token operator">&lt;</span><a href="-terminal-row-snapshot/index.html">TerminalRowSnapshot</a><span class="token operator">&gt;</span><span class="token punctuation">, </span></span><span class="parameter "><span class="token keyword">val </span>windowTitle<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-string/index.html">String</a><span class="token punctuation">, </span></span><span class="parameter "><span class="token keyword">val </span>iconTitle<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-string/index.html">String</a><span class="token punctuation">, </span></span><span class="parameter "><span class="token keyword">val </span>activeHyperlinkUri<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-string/index.html">String</a><span class="token operator">?</span><span class="token punctuation">, </span></span><span class="parameter "><span class="token keyword">val </span>activeHyperlinkId<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-string/index.html">String</a><span class="token operator">?</span><span class="token punctuation">, </span></span><span class="parameter "><span class="token keyword">val </span>outboundBytes<span class="token operator">: </span><a href="-terminal-byte-sequence/index.html">TerminalByteSequence</a></span></span><span class="token punctuation">)</span></div><div class="brief "><p class="paragraph">Canonical observable result of a parser-to-core terminal replay.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-1261917580%2FClasslikes%2F549485722" anchor-label="TerminalCursorSnapshot" id="-1261917580%2FClasslikes%2F549485722" data-filterable-set=":ketraterm-testkit/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-testkit/main" data-filterable-set=":ketraterm-testkit/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-terminal-cursor-snapshot/index.html"><span>Terminal</span><wbr><span>Cursor</span><wbr><span><span>Snapshot</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-1261917580%2FClasslikes%2F549485722"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-testkit/main"><div class="symbol monospace"><span class="token keyword">data </span><span class="token keyword">class </span><a href="-terminal-cursor-snapshot/index.html">TerminalCursorSnapshot</a><span class="token punctuation">(</span><span class="parameters "><span class="parameter "><span class="token keyword">val </span>column<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a><span class="token punctuation">, </span></span><span class="parameter "><span class="token keyword">val </span>row<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a><span class="token punctuation">, </span></span><span class="parameter "><span class="token keyword">val </span>visible<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-boolean/index.html">Boolean</a><span class="token punctuation">, </span></span><span class="parameter "><span class="token keyword">val </span>blinking<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-boolean/index.html">Boolean</a><span class="token punctuation">, </span></span><span class="parameter "><span class="token keyword">val </span>shape<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-string/index.html">String</a></span></span><span class="token punctuation">)</span></div><div class="brief "><p class="paragraph">Cursor state detached from a short-lived render frame.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="1849769437%2FClasslikes%2F549485722" anchor-label="TerminalDifferentialComparator" id="1849769437%2FClasslikes%2F549485722" data-filterable-set=":ketraterm-testkit/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-testkit/main" data-filterable-set=":ketraterm-testkit/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-terminal-differential-comparator/index.html"><span>Terminal</span><wbr><span>Differential</span><wbr><span><span>Comparator</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="1849769437%2FClasslikes%2F549485722"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-testkit/main"><div class="symbol monospace"><span class="token keyword">object </span><a href="-terminal-differential-comparator/index.html">TerminalDifferentialComparator</a></div><div class="brief "><p class="paragraph">Compares only semantics exposed by both KetraTerm and the public xterm.js API.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="433408821%2FClasslikes%2F549485722" anchor-label="TerminalDifferentialOracle" id="433408821%2FClasslikes%2F549485722" data-filterable-set=":ketraterm-testkit/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-testkit/main" data-filterable-set=":ketraterm-testkit/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-terminal-differential-oracle/index.html"><span>Terminal</span><wbr><span>Differential</span><wbr><span><span>Oracle</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="433408821%2FClasslikes%2F549485722"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-testkit/main"><div class="symbol monospace"><span class="token keyword">fun </span><span class="token keyword">interface </span><a href="-terminal-differential-oracle/index.html">TerminalDifferentialOracle</a></div><div class="brief "><p class="paragraph">Independent terminal implementation capable of replaying KetraTerm transcripts.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="1104634230%2FClasslikes%2F549485722" anchor-label="TerminalDifferentialResult" id="1104634230%2FClasslikes%2F549485722" data-filterable-set=":ketraterm-testkit/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-testkit/main" data-filterable-set=":ketraterm-testkit/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-terminal-differential-result/index.html"><span>Terminal</span><wbr><span>Differential</span><wbr><span><span>Result</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="1104634230%2FClasslikes%2F549485722"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-testkit/main"><div class="symbol monospace"><span class="token keyword">data </span><span class="token keyword">class </span><a href="-terminal-differential-result/index.html">TerminalDifferentialResult</a><span class="token punctuation">(</span><span class="parameters "><span class="parameter "><span class="token keyword">val </span>oracle<span class="token operator">: </span><a href="-terminal-oracle-identity/index.html">TerminalOracleIdentity</a><span class="token punctuation">, </span></span><span class="parameter "><span class="token keyword">val </span>differences<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin.collections/-list/index.html">List</a><span class="token operator">&lt;</span><a href="-terminal-conformance-difference/index.html">TerminalConformanceDifference</a><span class="token operator">&gt;</span><span class="token punctuation">, </span></span><span class="parameter "><span class="token keyword">val </span>truncated<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-boolean/index.html">Boolean</a></span></span><span class="token punctuation">)</span></div><div class="brief "><p class="paragraph">Result of comparing KetraTerm with an independent terminal implementation.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-661377406%2FClasslikes%2F549485722" anchor-label="TerminalModeStateSnapshot" id="-661377406%2FClasslikes%2F549485722" data-filterable-set=":ketraterm-testkit/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-testkit/main" data-filterable-set=":ketraterm-testkit/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-terminal-mode-state-snapshot/index.html"><span>Terminal</span><wbr><span>Mode</span><wbr><span>State</span><wbr><span><span>Snapshot</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-661377406%2FClasslikes%2F549485722"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-testkit/main"><div class="symbol monospace"><span class="token keyword">data </span><span class="token keyword">class </span><a href="-terminal-mode-state-snapshot/index.html">TerminalModeStateSnapshot</a><span class="token punctuation">(</span><span class="parameters "><span class="parameter "><span class="token keyword">val </span>insertMode<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-boolean/index.html">Boolean</a><span class="token punctuation">, </span></span><span class="parameter "><span class="token keyword">val </span>autoWrap<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-boolean/index.html">Boolean</a><span class="token punctuation">, </span></span><span class="parameter "><span class="token keyword">val </span>applicationCursorKeys<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-boolean/index.html">Boolean</a><span class="token punctuation">, </span></span><span class="parameter "><span class="token keyword">val </span>applicationKeypad<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-boolean/index.html">Boolean</a><span class="token punctuation">, </span></span><span class="parameter "><span class="token keyword">val </span>backarrowKeyModeExplicit<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-boolean/index.html">Boolean</a><span class="token punctuation">, </span></span><span class="parameter "><span class="token keyword">val </span>backarrowKeySendsBackspace<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-boolean/index.html">Boolean</a><span class="token punctuation">, </span></span><span class="parameter "><span class="token keyword">val </span>originMode<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-boolean/index.html">Boolean</a><span class="token punctuation">, </span></span><span class="parameter "><span class="token keyword">val </span>newLineMode<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-boolean/index.html">Boolean</a><span class="token punctuation">, </span></span><span class="parameter "><span class="token keyword">val </span>leftRightMarginMode<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-boolean/index.html">Boolean</a><span class="token punctuation">, </span></span><span class="parameter "><span class="token keyword">val </span>reverseVideo<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-boolean/index.html">Boolean</a><span class="token punctuation">, </span></span><span class="parameter "><span class="token keyword">val </span>cursorVisible<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-boolean/index.html">Boolean</a><span class="token punctuation">, </span></span><span class="parameter "><span class="token keyword">val </span>cursorBlinking<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-boolean/index.html">Boolean</a><span class="token punctuation">, </span></span><span class="parameter "><span class="token keyword">val </span>bracketedPaste<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-boolean/index.html">Boolean</a><span class="token punctuation">, </span></span><span class="parameter "><span class="token keyword">val </span>focusReporting<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-boolean/index.html">Boolean</a><span class="token punctuation">, </span></span><span class="parameter "><span class="token keyword">val </span>ambiguousWidthIsWide<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-boolean/index.html">Boolean</a><span class="token punctuation">, </span></span><span class="parameter "><span class="token keyword">val </span>mouseTrackingMode<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-string/index.html">String</a><span class="token punctuation">, </span></span><span class="parameter "><span class="token keyword">val </span>mouseEncodingMode<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-string/index.html">String</a><span class="token punctuation">, </span></span><span class="parameter "><span class="token keyword">val </span>modifyOtherKeysMode<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a><span class="token punctuation">, </span></span><span class="parameter "><span class="token keyword">val </span>formatOtherKeysMode<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a><span class="token punctuation">, </span></span><span class="parameter "><span class="token keyword">val </span>kittyKeyboardFlags<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a><span class="token punctuation">, </span></span><span class="parameter "><span class="token keyword">val </span>synchronizedOutput<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-boolean/index.html">Boolean</a><span class="token punctuation">, </span></span><span class="parameter "><span class="token keyword">val </span>bellIsUrgent<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-boolean/index.html">Boolean</a><span class="token punctuation">, </span></span><span class="parameter "><span class="token keyword">val </span>popOnBell<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-boolean/index.html">Boolean</a></span></span><span class="token punctuation">)</span></div><div class="brief "><p class="paragraph">Semantic durable-mode snapshot for differential comparisons.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-694187894%2FClasslikes%2F549485722" anchor-label="TerminalOracleCellSnapshot" id="-694187894%2FClasslikes%2F549485722" data-filterable-set=":ketraterm-testkit/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-testkit/main" data-filterable-set=":ketraterm-testkit/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-terminal-oracle-cell-snapshot/index.html"><span>Terminal</span><wbr><span>Oracle</span><wbr><span>Cell</span><wbr><span><span>Snapshot</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-694187894%2FClasslikes%2F549485722"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-testkit/main"><div class="symbol monospace"><span class="token keyword">data </span><span class="token keyword">class </span><a href="-terminal-oracle-cell-snapshot/index.html">TerminalOracleCellSnapshot</a><span class="token punctuation">(</span><span class="parameters "><span class="parameter "><span class="token keyword">val </span>text<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-string/index.html">String</a><span class="token punctuation">, </span></span><span class="parameter "><span class="token keyword">val </span>width<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a><span class="token punctuation">, </span></span><span class="parameter "><span class="token keyword">val </span>foreground<span class="token operator">: </span><a href="-terminal-oracle-color/index.html">TerminalOracleColor</a><span class="token punctuation">, </span></span><span class="parameter "><span class="token keyword">val </span>background<span class="token operator">: </span><a href="-terminal-oracle-color/index.html">TerminalOracleColor</a><span class="token punctuation">, </span></span><span class="parameter "><span class="token keyword">val </span>bold<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-boolean/index.html">Boolean</a><span class="token punctuation">, </span></span><span class="parameter "><span class="token keyword">val </span>italic<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-boolean/index.html">Boolean</a><span class="token punctuation">, </span></span><span class="parameter "><span class="token keyword">val </span>dim<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-boolean/index.html">Boolean</a><span class="token punctuation">, </span></span><span class="parameter "><span class="token keyword">val </span>underline<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-boolean/index.html">Boolean</a><span class="token punctuation">, </span></span><span class="parameter "><span class="token keyword">val </span>blink<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-boolean/index.html">Boolean</a><span class="token punctuation">, </span></span><span class="parameter "><span class="token keyword">val </span>inverse<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-boolean/index.html">Boolean</a><span class="token punctuation">, </span></span><span class="parameter "><span class="token keyword">val </span>invisible<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-boolean/index.html">Boolean</a><span class="token punctuation">, </span></span><span class="parameter "><span class="token keyword">val </span>strikethrough<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-boolean/index.html">Boolean</a><span class="token punctuation">, </span></span><span class="parameter "><span class="token keyword">val </span>overline<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-boolean/index.html">Boolean</a></span></span><span class="token punctuation">)</span></div><div class="brief "><p class="paragraph">Cell state available through the public xterm.js buffer API.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="1890140207%2FClasslikes%2F549485722" anchor-label="TerminalOracleColor" id="1890140207%2FClasslikes%2F549485722" data-filterable-set=":ketraterm-testkit/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-testkit/main" data-filterable-set=":ketraterm-testkit/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-terminal-oracle-color/index.html"><span>Terminal</span><wbr><span>Oracle</span><wbr><span><span>Color</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="1890140207%2FClasslikes%2F549485722"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-testkit/main"><div class="symbol monospace"><span class="token keyword">data </span><span class="token keyword">class </span><a href="-terminal-oracle-color/index.html">TerminalOracleColor</a><span class="token punctuation">(</span><span class="parameters "><span class="parameter "><span class="token keyword">val </span>kind<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-string/index.html">String</a><span class="token punctuation">, </span></span><span class="parameter "><span class="token keyword">val </span>value<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a></span></span><span class="token punctuation">)</span></div><div class="brief "><p class="paragraph">Normalized color exposed by an independent terminal oracle.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="1938519954%2FClasslikes%2F549485722" anchor-label="TerminalOracleIdentity" id="1938519954%2FClasslikes%2F549485722" data-filterable-set=":ketraterm-testkit/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-testkit/main" data-filterable-set=":ketraterm-testkit/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-terminal-oracle-identity/index.html"><span>Terminal</span><wbr><span>Oracle</span><wbr><span><span>Identity</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="1938519954%2FClasslikes%2F549485722"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-testkit/main"><div class="symbol monospace"><span class="token keyword">data </span><span class="token keyword">class </span><a href="-terminal-oracle-identity/index.html">TerminalOracleIdentity</a><span class="token punctuation">(</span><span class="parameters "><span class="parameter "><span class="token keyword">val </span>name<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-string/index.html">String</a><span class="token punctuation">, </span></span><span class="parameter "><span class="token keyword">val </span>version<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-string/index.html">String</a></span></span><span class="token punctuation">)</span></div><div class="brief "><p class="paragraph">Identity reported by an independent terminal-emulation oracle.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="1124181097%2FClasslikes%2F549485722" anchor-label="TerminalOracleModeSnapshot" id="1124181097%2FClasslikes%2F549485722" data-filterable-set=":ketraterm-testkit/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-testkit/main" data-filterable-set=":ketraterm-testkit/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-terminal-oracle-mode-snapshot/index.html"><span>Terminal</span><wbr><span>Oracle</span><wbr><span>Mode</span><wbr><span><span>Snapshot</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="1124181097%2FClasslikes%2F549485722"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-testkit/main"><div class="symbol monospace"><span class="token keyword">data </span><span class="token keyword">class </span><a href="-terminal-oracle-mode-snapshot/index.html">TerminalOracleModeSnapshot</a><span class="token punctuation">(</span><span class="parameters "><span class="parameter "><span class="token keyword">val </span>insertMode<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-boolean/index.html">Boolean</a><span class="token punctuation">, </span></span><span class="parameter "><span class="token keyword">val </span>autoWrap<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-boolean/index.html">Boolean</a><span class="token punctuation">, </span></span><span class="parameter "><span class="token keyword">val </span>applicationCursorKeys<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-boolean/index.html">Boolean</a><span class="token punctuation">, </span></span><span class="parameter "><span class="token keyword">val </span>applicationKeypad<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-boolean/index.html">Boolean</a><span class="token punctuation">, </span></span><span class="parameter "><span class="token keyword">val </span>originMode<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-boolean/index.html">Boolean</a><span class="token punctuation">, </span></span><span class="parameter "><span class="token keyword">val </span>bracketedPaste<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-boolean/index.html">Boolean</a><span class="token punctuation">, </span></span><span class="parameter "><span class="token keyword">val </span>focusReporting<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-boolean/index.html">Boolean</a><span class="token punctuation">, </span></span><span class="parameter "><span class="token keyword">val </span>mouseTrackingMode<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-string/index.html">String</a><span class="token punctuation">, </span></span><span class="parameter "><span class="token keyword">val </span>synchronizedOutput<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-boolean/index.html">Boolean</a></span></span><span class="token punctuation">)</span></div><div class="brief "><p class="paragraph">Modes exposed by the stable public intersection with xterm.js.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-898957964%2FClasslikes%2F549485722" anchor-label="TerminalOracleRowSnapshot" id="-898957964%2FClasslikes%2F549485722" data-filterable-set=":ketraterm-testkit/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-testkit/main" data-filterable-set=":ketraterm-testkit/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-terminal-oracle-row-snapshot/index.html"><span>Terminal</span><wbr><span>Oracle</span><wbr><span>Row</span><wbr><span><span>Snapshot</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-898957964%2FClasslikes%2F549485722"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-testkit/main"><div class="symbol monospace"><span class="token keyword">data </span><span class="token keyword">class </span><a href="-terminal-oracle-row-snapshot/index.html">TerminalOracleRowSnapshot</a><span class="token punctuation">(</span><span class="parameters "><span class="parameter "><span class="token keyword">val </span>wrapsToNext<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-boolean/index.html">Boolean</a><span class="token punctuation">, </span></span><span class="parameter "><span class="token keyword">val </span>cells<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin.collections/-list/index.html">List</a><span class="token operator">&lt;</span><a href="-terminal-oracle-cell-snapshot/index.html">TerminalOracleCellSnapshot</a><span class="token operator">&gt;</span></span></span><span class="token punctuation">)</span></div><div class="brief "><p class="paragraph">One normalized retained row from an independent oracle.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="463250764%2FClasslikes%2F549485722" anchor-label="TerminalOracleSnapshot" id="463250764%2FClasslikes%2F549485722" data-filterable-set=":ketraterm-testkit/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-testkit/main" data-filterable-set=":ketraterm-testkit/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-terminal-oracle-snapshot/index.html"><span>Terminal</span><wbr><span>Oracle</span><wbr><span><span>Snapshot</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="463250764%2FClasslikes%2F549485722"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-testkit/main"><div class="symbol monospace"><span class="token keyword">data </span><span class="token keyword">class </span><a href="-terminal-oracle-snapshot/index.html">TerminalOracleSnapshot</a><span class="token punctuation">(</span><span class="parameters "><span class="parameter "><span class="token keyword">val </span>oracle<span class="token operator">: </span><a href="-terminal-oracle-identity/index.html">TerminalOracleIdentity</a><span class="token punctuation">, </span></span><span class="parameter "><span class="token keyword">val </span>columns<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a><span class="token punctuation">, </span></span><span class="parameter "><span class="token keyword">val </span>visibleRows<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a><span class="token punctuation">, </span></span><span class="parameter "><span class="token keyword">val </span>historyRows<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a><span class="token punctuation">, </span></span><span class="parameter "><span class="token keyword">val </span>liveRowStart<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a><span class="token punctuation">, </span></span><span class="parameter "><span class="token keyword">val </span>activeBuffer<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-string/index.html">String</a><span class="token punctuation">, </span></span><span class="parameter "><span class="token keyword">val </span>cursorColumn<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a><span class="token punctuation">, </span></span><span class="parameter "><span class="token keyword">val </span>cursorRow<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a><span class="token punctuation">, </span></span><span class="parameter "><span class="token keyword">val </span>modes<span class="token operator">: </span><a href="-terminal-oracle-mode-snapshot/index.html">TerminalOracleModeSnapshot</a><span class="token punctuation">, </span></span><span class="parameter "><span class="token keyword">val </span>retainedRows<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin.collections/-list/index.html">List</a><span class="token operator">&lt;</span><a href="-terminal-oracle-row-snapshot/index.html">TerminalOracleRowSnapshot</a><span class="token operator">&gt;</span><span class="token punctuation">, </span></span><span class="parameter "><span class="token keyword">val </span>windowTitle<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-string/index.html">String</a><span class="token punctuation">, </span></span><span class="parameter "><span class="token keyword">val </span>outboundBytes<span class="token operator">: </span><a href="-terminal-byte-sequence/index.html">TerminalByteSequence</a></span></span><span class="token punctuation">)</span></div><div class="brief "><p class="paragraph">Canonical state returned by a process-isolated terminal oracle.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="1983413726%2FClasslikes%2F549485722" anchor-label="TerminalPersistentProcessOracle" id="1983413726%2FClasslikes%2F549485722" data-filterable-set=":ketraterm-testkit/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-testkit/main" data-filterable-set=":ketraterm-testkit/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-terminal-persistent-process-oracle/index.html"><span>Terminal</span><wbr><span>Persistent</span><wbr><span>Process</span><wbr><span><span>Oracle</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="1983413726%2FClasslikes%2F549485722"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-testkit/main"><div class="symbol monospace"><span class="token keyword">class </span><a href="-terminal-persistent-process-oracle/index.html">TerminalPersistentProcessOracle</a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">command<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin.collections/-list/index.html">List</a><span class="token operator">&lt;</span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-string/index.html">String</a><span class="token operator">&gt;</span><span class="token punctuation">, </span></span><span class="parameter ">workingDirectory<span class="token operator">: </span><a href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/nio/file/Path.html">Path</a><span class="token operator">?</span><span class="token operator"> = </span>null<span class="token punctuation">, </span></span><span class="parameter ">timeout<span class="token operator">: </span><a href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/time/Duration.html">Duration</a><span class="token operator"> = </span>Duration.ofSeconds(10)</span></span><span class="token punctuation">)</span> : <a href="-terminal-differential-oracle/index.html">TerminalDifferentialOracle</a>, <a href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/AutoCloseable.html">AutoCloseable</a></div><div class="brief "><p class="paragraph">Persistent JSON-lines oracle client for high-volume differential campaigns.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="698235943%2FClasslikes%2F549485722" anchor-label="TerminalProcessOracle" id="698235943%2FClasslikes%2F549485722" data-filterable-set=":ketraterm-testkit/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-testkit/main" data-filterable-set=":ketraterm-testkit/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-terminal-process-oracle/index.html"><span>Terminal</span><wbr><span>Process</span><wbr><span><span>Oracle</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="698235943%2FClasslikes%2F549485722"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-testkit/main"><div class="symbol monospace"><span class="token keyword">class </span><a href="-terminal-process-oracle/index.html">TerminalProcessOracle</a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">command<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin.collections/-list/index.html">List</a><span class="token operator">&lt;</span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-string/index.html">String</a><span class="token operator">&gt;</span><span class="token punctuation">, </span></span><span class="parameter ">workingDirectory<span class="token operator">: </span><a href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/nio/file/Path.html">Path</a><span class="token operator">?</span><span class="token operator"> = </span>null<span class="token punctuation">, </span></span><span class="parameter ">timeout<span class="token operator">: </span><a href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/time/Duration.html">Duration</a><span class="token operator"> = </span>Duration.ofSeconds(10)</span></span><span class="token punctuation">)</span> : <a href="-terminal-differential-oracle/index.html">TerminalDifferentialOracle</a></div><div class="brief "><p class="paragraph">Versioned JSON-process implementation of <a href="-terminal-differential-oracle/index.html">TerminalDifferentialOracle</a>.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="81245330%2FClasslikes%2F549485722" anchor-label="TerminalReplayChunking" id="81245330%2FClasslikes%2F549485722" data-filterable-set=":ketraterm-testkit/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-testkit/main" data-filterable-set=":ketraterm-testkit/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-terminal-replay-chunking/index.html"><span>Terminal</span><wbr><span>Replay</span><wbr><span><span>Chunking</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="81245330%2FClasslikes%2F549485722"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-testkit/main"><div class="symbol monospace"><span class="token keyword">data </span><span class="token keyword">class </span><a href="-terminal-replay-chunking/index.html">TerminalReplayChunking</a><span class="token punctuation">(</span><span class="parameters "><span class="parameter "><span class="token keyword">val </span>name<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-string/index.html">String</a><span class="token punctuation">, </span></span><span class="parameter "><span class="token keyword">val </span>transcript<span class="token operator">: </span><a href="-terminal-replay-transcript/index.html">TerminalReplayTranscript</a></span></span><span class="token punctuation">)</span></div><div class="brief "><p class="paragraph">Named parser-chunking variant for one logical host byte stream.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-1857479971%2FClasslikes%2F549485722" anchor-label="TerminalReplayChunkings" id="-1857479971%2FClasslikes%2F549485722" data-filterable-set=":ketraterm-testkit/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-testkit/main" data-filterable-set=":ketraterm-testkit/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-terminal-replay-chunkings/index.html"><span>Terminal</span><wbr><span>Replay</span><wbr><span><span>Chunkings</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-1857479971%2FClasslikes%2F549485722"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-testkit/main"><div class="symbol monospace"><span class="token keyword">object </span><a href="-terminal-replay-chunkings/index.html">TerminalReplayChunkings</a></div><div class="brief "><p class="paragraph">Generates deterministic parser chunk partitions for conformance tests.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-1255725695%2FClasslikes%2F549485722" anchor-label="TerminalReplayEvent" id="-1255725695%2FClasslikes%2F549485722" data-filterable-set=":ketraterm-testkit/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-testkit/main" data-filterable-set=":ketraterm-testkit/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-terminal-replay-event/index.html"><span>Terminal</span><wbr><span>Replay</span><wbr><span><span>Event</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-1255725695%2FClasslikes%2F549485722"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-testkit/main"><div class="symbol monospace"><span class="token keyword">sealed </span><span class="token keyword">interface </span><a href="-terminal-replay-event/index.html">TerminalReplayEvent</a></div><div class="brief "><p class="paragraph">One deterministic operation in a headless terminal replay.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="1976447185%2FClasslikes%2F549485722" anchor-label="TerminalReplayTranscript" id="1976447185%2FClasslikes%2F549485722" data-filterable-set=":ketraterm-testkit/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-testkit/main" data-filterable-set=":ketraterm-testkit/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-terminal-replay-transcript/index.html"><span>Terminal</span><wbr><span>Replay</span><wbr><span><span>Transcript</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="1976447185%2FClasslikes%2F549485722"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-testkit/main"><div class="symbol monospace"><span class="token keyword">class </span><a href="-terminal-replay-transcript/index.html">TerminalReplayTranscript</a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">events<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin.collections/-list/index.html">List</a><span class="token operator">&lt;</span><a href="-terminal-replay-event/index.html">TerminalReplayEvent</a><span class="token operator">&gt;</span></span></span><span class="token punctuation">)</span></div><div class="brief "><p class="paragraph">Immutable ordered terminal replay artifact.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-1126078186%2FClasslikes%2F549485722" anchor-label="TerminalRowSnapshot" id="-1126078186%2FClasslikes%2F549485722" data-filterable-set=":ketraterm-testkit/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-testkit/main" data-filterable-set=":ketraterm-testkit/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-terminal-row-snapshot/index.html"><span>Terminal</span><wbr><span>Row</span><wbr><span><span>Snapshot</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-1126078186%2FClasslikes%2F549485722"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-testkit/main"><div class="symbol monospace"><span class="token keyword">data </span><span class="token keyword">class </span><a href="-terminal-row-snapshot/index.html">TerminalRowSnapshot</a><span class="token punctuation">(</span><span class="parameters "><span class="parameter "><span class="token keyword">val </span>wrapped<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-boolean/index.html">Boolean</a><span class="token punctuation">, </span></span><span class="parameter "><span class="token keyword">val </span>cells<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin.collections/-list/index.html">List</a><span class="token operator">&lt;</span><a href="-terminal-cell-snapshot/index.html">TerminalCellSnapshot</a><span class="token operator">&gt;</span></span></span><span class="token punctuation">)</span></div><div class="brief "><p class="paragraph">One retained terminal row.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="1687934998%2FClasslikes%2F549485722" anchor-label="TerminalSnapshotBufferKind" id="1687934998%2FClasslikes%2F549485722" data-filterable-set=":ketraterm-testkit/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-testkit/main" data-filterable-set=":ketraterm-testkit/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-terminal-snapshot-buffer-kind/index.html"><span>Terminal</span><wbr><span>Snapshot</span><wbr><span>Buffer</span><wbr><span><span>Kind</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="1687934998%2FClasslikes%2F549485722"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-testkit/main"><div class="symbol monospace"><span class="token keyword">enum </span><a href="-terminal-snapshot-buffer-kind/index.html">TerminalSnapshotBufferKind</a> : <a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-enum/index.html">Enum</a><span class="token operator">&lt;</span><a href="-terminal-snapshot-buffer-kind/index.html">TerminalSnapshotBufferKind</a><span class="token operator">&gt; </span></div><div class="brief "><p class="paragraph">Identifies the active screen in a conformance snapshot.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+    <div class="footer">
+        <div class="footer--container">
+            <a href="#content" id="go-to-top-link" class="footer--button footer--button_go-to-top"></a>
+            <div class="footer--content">
+                <div>
+                    <span>Generated by </span>
+                    <a class="footer--link footer--link_external" href="https://github.com/Kotlin/dokka">
+                        Dokka
+                    </a>
+                    <div>© 2026 Copyright</div>
+                </div>
+            </div>
+        </div>
+    </div>
+        </div>
+    </div>
+</div>
+</body>
+</html>

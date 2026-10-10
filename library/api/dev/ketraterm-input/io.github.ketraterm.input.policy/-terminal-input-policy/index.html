@@ -1,0 +1,274 @@
+<!doctype html>
+<html class="no-js" lang="en">
+<head>
+    <meta name="viewport" content="width=device-width, initial-scale=1" charset="UTF-8">
+    <title>TerminalInputPolicy</title>
+<link href="../../../images/logo-icon.svg" rel="icon" type="image/svg"><script>var pathToRoot = "../../../";</script>
+    <script>document.documentElement.classList.replace("no-js", "js");</script>
+    <script>const storage = localStorage.getItem("dokka-dark-mode")
+      if (storage == null) {
+        const osDarkSchemePreferred = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches
+        if (osDarkSchemePreferred === true) {
+          document.getElementsByTagName("html")[0].classList.add("theme-dark")
+        }
+      } else {
+        const savedDarkMode = JSON.parse(storage)
+        if (savedDarkMode === true) {
+          document.getElementsByTagName("html")[0].classList.add("theme-dark")
+        }
+      }
+    </script>
+<script type="text/javascript" src="../../../scripts/sourceset_dependencies.js" async></script>
+<link href="../../../styles/style.css" rel="Stylesheet">
+<link href="../../../styles/main.css" rel="Stylesheet">
+<link href="../../../styles/prism.css" rel="Stylesheet">
+<link href="../../../styles/logo-styles.css" rel="Stylesheet">
+<link href="../../../ui-kit/ui-kit.min.css" rel="Stylesheet">
+<script type="text/javascript" src="../../../scripts/safe-local-storage_blocking.js"></script>
+<script type="text/javascript" src="../../../scripts/navigation-loader.js" async></script>
+<script type="text/javascript" src="../../../scripts/platform-content-handler.js" async></script>
+<script type="text/javascript" src="../../../scripts/main.js" defer></script>
+<script type="text/javascript" src="../../../scripts/prism.js" async></script>
+<script type="text/javascript" src="../../../ui-kit/ui-kit.min.js" defer></script><!-- ketraterm-api-stylesheet:start -->
+<link rel="icon" href="../../../../../assets/logo.svg" type="image/svg+xml">
+<link rel="stylesheet" href="../../../../../assets/api-navigation.css">
+<!-- ketraterm-api-stylesheet:end --></head>
+<body>
+<div class="root"><!-- ketraterm-api-navigation:start -->
+<div class="ketraterm-api-navigation">
+  <a class="ketraterm-api-brand" href="../../../../../index.html" aria-label="KetraTerm Library home"><img src="../../../../../assets/logo.svg" alt="" width="28" height="28">KetraTerm</a>
+  <nav class="ketraterm-api-products" aria-label="KetraTerm products"><a href="https://ketraterm.github.io/KetraTerm/">App</a><a href="../../../../../index.html" aria-current="true">Library</a></nav>
+  <div class="ketraterm-api-reference"><span>API · Development</span><a href="../../../../../versions.html">All versions</a></div>
+</div>
+<!-- ketraterm-api-navigation:end -->
+    <header class="navigation theme-dark" id="navigation-wrapper" role="banner">
+<a class="library-name--link" href="../../../index.html">
+                    KetraTerm
+            </a>        <button class="navigation-controls--btn navigation-controls--btn_toc ui-kit_mobile-only" id="toc-toggle" type="button">Toggle table of contents
+        </button>
+        <div class="navigation-controls--break ui-kit_mobile-only"></div>
+        <div class="library-version" id="library-version">
+        </div>
+        <div class="navigation-controls">
+        <ul class="filter-section filter-section_loading" id="filter-section" aria-label="Target filter">
+                <button class="platform-tag platform-selector jvm-like" data-active="" aria-pressed="true" data-filter=":ketraterm-input/main">jvm</button>
+            <div class="dropdown filter-section--dropdown" data-role="dropdown" id="filter-section-dropdown">
+                <button class="button button_dropdown filter-section--dropdown-toggle" role="combobox" data-role="dropdown-toggle" aria-controls="platform-tags-listbox" aria-haspopup="listbox" aria-expanded="false" aria-label="Toggle source sets"></button>
+                <ul role="listbox" id="platform-tags-listbox" class="dropdown--list" data-role="dropdown-listbox" aria-label="Target filter">
+                    <div class="dropdown--header"><span>Target filter</span>
+                        <button class="button" data-role="dropdown-toggle" aria-label="Close target filter">
+                            <i class="ui-kit-icon ui-kit-icon_cross"></i>
+                        </button>
+                    </div>
+                        <li role="option" class="dropdown--option platform-selector-option jvm-like" tabindex="0">
+                            <label class="checkbox">
+                                <input type="checkbox" class="checkbox--input" id=":ketraterm-input/main" data-filter=":ketraterm-input/main">
+                                <span class="checkbox--icon"></span>
+                                jvm
+                            </label>
+                        </li>
+                </ul>
+                <div class="dropdown--overlay"></div>
+            </div>
+        </ul>
+            <button class="navigation-controls--btn navigation-controls--btn_theme" id="theme-toggle-button" type="button">Switch theme
+            </button>
+            <div class="navigation-controls--btn navigation-controls--btn_search" id="searchBar" role="button">Search in
+                API
+            </div>
+        </div>
+    </header>
+    <div id="container">
+        <nav id="leftColumn" class="sidebar" data-item-type="SECTION" data-item-config="{&quot;defaultSize&quot;: 280, &quot;minSize&quot;: 200, &quot;maxSize&quot;: 400}">
+            <a class="toc--skip-link" href="#main">Skip to content</a>
+            <div class="dropdown theme-dark_mobile" data-role="dropdown" id="toc-dropdown">
+                <ul role="listbox" id="toc-listbox" class="dropdown--list dropdown--list_toc-list" data-role="dropdown-listbox" aria-label="Table of contents">
+                    <div class="dropdown--header">
+                            <span>
+                                    KetraTerm
+                            </span>
+                        <button class="button" data-role="dropdown-toggle" aria-label="Close table of contents">
+                            <i class="ui-kit-icon ui-kit-icon_cross"></i>
+                        </button>
+                    </div>
+                    <div class="sidebar--inner" id="sideMenu"></div>
+                </ul>
+                <div class="dropdown--overlay"></div>
+            </div>
+        </nav>
+        <div id="resizer" class="resizer" data-item-type="BAR"></div>
+        <div id="main" data-item-type="SECTION" role="main">
+<div class="main-content" data-page-type="classlike" id="content" pageids="ketraterm-input::io.github.ketraterm.input.policy/TerminalInputPolicy///PointingToDeclaration//-1240825056">
+  <div class="breadcrumbs"><a href="../../index.html">ketraterm-input</a><span class="delimiter">/</span><a href="../index.html">io.github.ketraterm.input.policy</a><span class="delimiter">/</span><span class="current">TerminalInputPolicy</span></div>
+  <div class="cover ">
+    <h1 class="cover"><span>Terminal</span><wbr><span>Input</span><wbr><span><span>Policy</span></span></h1>
+    <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-input/main"><div class="symbol monospace"><span class="token keyword">data </span><span class="token keyword">class </span><a href="index.html">TerminalInputPolicy</a><span class="token punctuation">(</span><span class="parameters "><span class="parameter "><span class="token keyword">val </span>backspacePolicy<span class="token operator">: </span><a href="../-backspace-policy/index.html">BackspacePolicy</a><span class="token operator"> = </span>BackspacePolicy.DELETE<span class="token punctuation">, </span></span><span class="parameter "><span class="token keyword">val </span>metaKeyPolicy<span class="token operator">: </span><a href="../-meta-key-policy/index.html">MetaKeyPolicy</a><span class="token operator"> = </span>MetaKeyPolicy.ESC_PREFIX<span class="token punctuation">, </span></span><span class="parameter "><span class="token keyword">val </span>unsupportedModifiedKeyPolicy<span class="token operator">: </span><a href="../-unsupported-modified-key-policy/index.html">UnsupportedModifiedKeyPolicy</a><span class="token operator"> = </span>UnsupportedModifiedKeyPolicy.SUPPRESS<span class="token punctuation">, </span></span><span class="parameter "><span class="token keyword">val </span>altSendsEscapePrefix<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-boolean/index.html">Boolean</a><span class="token operator"> = </span><span class="token boolean">true</span><span class="token punctuation">, </span></span><span class="parameter "><span class="token keyword">val </span>enterNewLineModePolicy<span class="token operator">: </span><a href="../-enter-new-line-mode-policy/index.html">EnterNewLineModePolicy</a><span class="token operator"> = </span>EnterNewLineModePolicy.SEND_CR_LF<span class="token punctuation">, </span></span><span class="parameter "><span class="token keyword">val </span>mouseCoordinateLimitPolicy<span class="token operator">: </span><a href="../-mouse-coordinate-limit-policy/index.html">MouseCoordinateLimitPolicy</a><span class="token operator"> = </span>MouseCoordinateLimitPolicy.SUPPRESS_OUT_OF_RANGE<span class="token punctuation">, </span></span><span class="parameter "><span class="token keyword">val </span>pasteControlPolicy<span class="token operator">: </span><a href="../-paste-control-policy/index.html">PasteControlPolicy</a><span class="token operator"> = </span>PasteControlPolicy.PRESERVE<span class="token punctuation">, </span></span><span class="parameter "><span class="token keyword">val </span>pasteLineEndingPolicy<span class="token operator">: </span><a href="../-paste-line-ending-policy/index.html">PasteLineEndingPolicy</a><span class="token operator"> = </span>PasteLineEndingPolicy.PRESERVE</span></span><span class="token punctuation">)</span></div><p class="paragraph">Runtime choices for keyboard, mouse, and paste encoding.</p><p class="paragraph">The production encoder suppresses unsupported combinations by default rather than throwing, because UI toolkits may report platform-specific key states.</p></div></div>
+  </div>
+  <div class="tabbedcontent">
+    <div class="tabs-section" tabs-section="tabs-section"><button class="section-tab" data-active="" data-togglable="CONSTRUCTOR,TYPE,PROPERTY,FUNCTION">Members</button></div>
+    <div class="tabs-section-body">
+      <div data-togglable="CONSTRUCTOR">
+        <h2 class="tableheader">Constructors</h2>
+        <div class="table"><a data-name="1015732718%2FConstructors%2F-1240825056" anchor-label="TerminalInputPolicy" id="1015732718%2FConstructors%2F-1240825056" data-filterable-set=":ketraterm-input/main"></a>
+          <div class="table-row table-row_content" data-togglable="CONSTRUCTOR" data-filterable-current=":ketraterm-input/main" data-filterable-set=":ketraterm-input/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-terminal-input-policy.html"><span>Terminal</span><wbr><span>Input</span><wbr><span><span>Policy</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="1015732718%2FConstructors%2F-1240825056"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-input/main"><div class="symbol monospace"><span class="token keyword">constructor</span><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">backspacePolicy<span class="token operator">: </span><a href="../-backspace-policy/index.html">BackspacePolicy</a><span class="token operator"> = </span>BackspacePolicy.DELETE<span class="token punctuation">, </span></span><span class="parameter ">metaKeyPolicy<span class="token operator">: </span><a href="../-meta-key-policy/index.html">MetaKeyPolicy</a><span class="token operator"> = </span>MetaKeyPolicy.ESC_PREFIX<span class="token punctuation">, </span></span><span class="parameter ">unsupportedModifiedKeyPolicy<span class="token operator">: </span><a href="../-unsupported-modified-key-policy/index.html">UnsupportedModifiedKeyPolicy</a><span class="token operator"> = </span>UnsupportedModifiedKeyPolicy.SUPPRESS<span class="token punctuation">, </span></span><span class="parameter ">altSendsEscapePrefix<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-boolean/index.html">Boolean</a><span class="token operator"> = </span><span class="token boolean">true</span><span class="token punctuation">, </span></span><span class="parameter ">enterNewLineModePolicy<span class="token operator">: </span><a href="../-enter-new-line-mode-policy/index.html">EnterNewLineModePolicy</a><span class="token operator"> = </span>EnterNewLineModePolicy.SEND_CR_LF<span class="token punctuation">, </span></span><span class="parameter ">mouseCoordinateLimitPolicy<span class="token operator">: </span><a href="../-mouse-coordinate-limit-policy/index.html">MouseCoordinateLimitPolicy</a><span class="token operator"> = </span>MouseCoordinateLimitPolicy.SUPPRESS_OUT_OF_RANGE<span class="token punctuation">, </span></span><span class="parameter ">pasteControlPolicy<span class="token operator">: </span><a href="../-paste-control-policy/index.html">PasteControlPolicy</a><span class="token operator"> = </span>PasteControlPolicy.PRESERVE<span class="token punctuation">, </span></span><span class="parameter ">pasteLineEndingPolicy<span class="token operator">: </span><a href="../-paste-line-ending-policy/index.html">PasteLineEndingPolicy</a><span class="token operator"> = </span>PasteLineEndingPolicy.PRESERVE</span></span><span class="token punctuation">)</span></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div data-togglable="PROPERTY">
+        <h2 class="tableheader">Properties</h2>
+        <div class="table"><a data-name="554124700%2FProperties%2F-1240825056" anchor-label="altSendsEscapePrefix" id="554124700%2FProperties%2F-1240825056" data-filterable-set=":ketraterm-input/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-input/main" data-filterable-set=":ketraterm-input/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="alt-sends-escape-prefix.html"><span>alt</span><wbr><span>Sends</span><wbr><span>Escape</span><wbr><span><span>Prefix</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="554124700%2FProperties%2F-1240825056"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-input/main"><div class="symbol monospace"><span class="token keyword">val </span><a href="alt-sends-escape-prefix.html">altSendsEscapePrefix</a><span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-boolean/index.html">Boolean</a></div><div class="brief "><p class="paragraph">when true, Alt prefixes applicable legacy encodings with ESC.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="770929720%2FProperties%2F-1240825056" anchor-label="backspacePolicy" id="770929720%2FProperties%2F-1240825056" data-filterable-set=":ketraterm-input/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-input/main" data-filterable-set=":ketraterm-input/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="backspace-policy.html"><span>backspace</span><wbr><span><span>Policy</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="770929720%2FProperties%2F-1240825056"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-input/main"><div class="symbol monospace"><span class="token keyword">val </span><a href="backspace-policy.html">backspacePolicy</a><span class="token operator">: </span><a href="../-backspace-policy/index.html">BackspacePolicy</a></div><div class="brief "><p class="paragraph">initial Backspace byte before an explicit DECBKM set/reset overrides it for the current terminal reset epoch.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="60780512%2FProperties%2F-1240825056" anchor-label="enterNewLineModePolicy" id="60780512%2FProperties%2F-1240825056" data-filterable-set=":ketraterm-input/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-input/main" data-filterable-set=":ketraterm-input/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="enter-new-line-mode-policy.html"><span>enter</span><wbr><span>New</span><wbr><span>Line</span><wbr><span>Mode</span><wbr><span><span>Policy</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="60780512%2FProperties%2F-1240825056"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-input/main"><div class="symbol monospace"><span class="token keyword">val </span><a href="enter-new-line-mode-policy.html">enterNewLineModePolicy</a><span class="token operator">: </span><a href="../-enter-new-line-mode-policy/index.html">EnterNewLineModePolicy</a></div><div class="brief "><p class="paragraph">handling for unmodified Return/Enter when ANSI Line Feed/New Line mode is active.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-2048599491%2FProperties%2F-1240825056" anchor-label="metaKeyPolicy" id="-2048599491%2FProperties%2F-1240825056" data-filterable-set=":ketraterm-input/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-input/main" data-filterable-set=":ketraterm-input/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="meta-key-policy.html"><span>meta</span><wbr><span>Key</span><wbr><span><span>Policy</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-2048599491%2FProperties%2F-1240825056"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-input/main"><div class="symbol monospace"><span class="token keyword">val </span><a href="meta-key-policy.html">metaKeyPolicy</a><span class="token operator">: </span><a href="../-meta-key-policy/index.html">MetaKeyPolicy</a></div><div class="brief "><p class="paragraph">handling for Meta-only printable and legacy key encodings.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="1639779265%2FProperties%2F-1240825056" anchor-label="mouseCoordinateLimitPolicy" id="1639779265%2FProperties%2F-1240825056" data-filterable-set=":ketraterm-input/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-input/main" data-filterable-set=":ketraterm-input/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="mouse-coordinate-limit-policy.html"><span>mouse</span><wbr><span>Coordinate</span><wbr><span>Limit</span><wbr><span><span>Policy</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="1639779265%2FProperties%2F-1240825056"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-input/main"><div class="symbol monospace"><span class="token keyword">val </span><a href="mouse-coordinate-limit-policy.html">mouseCoordinateLimitPolicy</a><span class="token operator">: </span><a href="../-mouse-coordinate-limit-policy/index.html">MouseCoordinateLimitPolicy</a></div><div class="brief "><p class="paragraph">handling for legacy mouse coordinates outside the bounded <code class="lang-kotlin">ESC [ M</code> byte range.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-274802507%2FProperties%2F-1240825056" anchor-label="pasteControlPolicy" id="-274802507%2FProperties%2F-1240825056" data-filterable-set=":ketraterm-input/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-input/main" data-filterable-set=":ketraterm-input/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="paste-control-policy.html"><span>paste</span><wbr><span>Control</span><wbr><span><span>Policy</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-274802507%2FProperties%2F-1240825056"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-input/main"><div class="symbol monospace"><span class="token keyword">val </span><a href="paste-control-policy.html">pasteControlPolicy</a><span class="token operator">: </span><a href="../-paste-control-policy/index.html">PasteControlPolicy</a></div><div class="brief "><p class="paragraph">optional C0 filtering for pasted text. Bracketed-paste protection applies independently of this choice.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-607989591%2FProperties%2F-1240825056" anchor-label="pasteLineEndingPolicy" id="-607989591%2FProperties%2F-1240825056" data-filterable-set=":ketraterm-input/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-input/main" data-filterable-set=":ketraterm-input/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="paste-line-ending-policy.html"><span>paste</span><wbr><span>Line</span><wbr><span>Ending</span><wbr><span><span>Policy</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-607989591%2FProperties%2F-1240825056"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-input/main"><div class="symbol monospace"><span class="token keyword">val </span><a href="paste-line-ending-policy.html">pasteLineEndingPolicy</a><span class="token operator">: </span><a href="../-paste-line-ending-policy/index.html">PasteLineEndingPolicy</a></div><div class="brief "><p class="paragraph">newline canonicalization for unbracketed pasted text. Bracketed paste always preserves original line endings.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="385960638%2FProperties%2F-1240825056" anchor-label="unsupportedModifiedKeyPolicy" id="385960638%2FProperties%2F-1240825056" data-filterable-set=":ketraterm-input/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-input/main" data-filterable-set=":ketraterm-input/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="unsupported-modified-key-policy.html"><span>unsupported</span><wbr><span>Modified</span><wbr><span>Key</span><wbr><span><span>Policy</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="385960638%2FProperties%2F-1240825056"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-input/main"><div class="symbol monospace"><span class="token keyword">val </span><a href="unsupported-modified-key-policy.html">unsupportedModifiedKeyPolicy</a><span class="token operator">: </span><a href="../-unsupported-modified-key-policy/index.html">UnsupportedModifiedKeyPolicy</a></div><div class="brief "><p class="paragraph">handling for valid key events whose modifier combination has no supported encoding in the active protocol set.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+    <div class="footer">
+        <div class="footer--container">
+            <a href="#content" id="go-to-top-link" class="footer--button footer--button_go-to-top"></a>
+            <div class="footer--content">
+                <div>
+                    <span>Generated by </span>
+                    <a class="footer--link footer--link_external" href="https://github.com/Kotlin/dokka">
+                        Dokka
+                    </a>
+                    <div>© 2026 Copyright</div>
+                </div>
+            </div>
+        </div>
+    </div>
+        </div>
+    </div>
+</div>
+</body>
+</html>

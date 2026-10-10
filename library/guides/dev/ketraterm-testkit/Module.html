@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="description" content="A modular Kotlin/JVM terminal emulator library for Swing and headless applications.">
+  <meta name="color-scheme" content="light dark">
+  <title>Module ketraterm-testkit · KetraTerm Library</title>
+  <link rel="icon" href="../../../assets/logo.svg" type="image/svg+xml">
+  <link rel="preload" href="../../../assets/fonts/manrope-variable.ttf" as="font" type="font/ttf" crossorigin>
+  <link rel="stylesheet" href="../../../assets/styles.css">
+  <script type="importmap">{"imports":{"mermaid":"../../../assets/mermaid/mermaid.esm.min.mjs"}}</script>
+  <script type="module" src="../../../assets/site.js"></script>
+</head>
+<body data-product="library" data-version="Development">
+  <a class="skip" href="#main">Skip to content</a>
+  <header class="site-header">
+    <div class="site-identity">
+      <a class="brand" href="../../../index.html" aria-label="KetraTerm Library home"><img class="brand-mark" src="../../../assets/logo.svg" alt="" width="34" height="34">KetraTerm</a>
+      <nav class="product-navigation" aria-label="KetraTerm products"><a href="https://ketraterm.github.io/KetraTerm/">App</a><a href="../../../index.html" aria-current="true">Library</a></nav>
+    </div>
+    <details class="site-navigation" open><summary>Menu</summary><nav aria-label="Library navigation"><a   href="../docs/README.html">Guides</a><a aria-current="true"  href="../modules.html">Modules</a><a   href="../../../versions.html">API & versions</a><a   href="../CHANGELOG.html">Changelog</a><a  class="nav-primary" href="../README.html">Get started</a></nav></details>
+    <button class="theme-toggle" type="button" aria-label="Switch to light theme">Light</button>
+  </header>
+  <div class="docs-shell"><aside class="sidebar" aria-label="Documentation navigation"><details class="nav-disclosure" open><summary class="mobile-nav-toggle">Browse library guides</summary><div><label class="search-label">Find a library guide<input type="search" data-doc-search placeholder="Search library docs" autocomplete="off" data-index="../search.json"></label><div class="search-results" aria-live="polite"></div><details open><summary>Start here</summary><a  href="../docs/README.html">Documentation</a><a  href="../README.html">Installation</a><a  href="../modules.html">Module guides</a><a  href="../CHANGELOG.html">Changelog</a></details><details open><summary>Capabilities</summary><a  href="../docs/terminal-feature-map.html">Feature map</a><a  href="../docs/features/terminal.html">Terminal</a><a  href="../docs/features/shells.html">Shell integration</a><a  href="../docs/features/desktop.html">Swing view & hosts</a><a  href="../docs/features/completion.html">Completion</a><a  href="../docs/features/embedding.html">Embedding</a><a  href="../docs/terminal-feature-gap-map.html">Known limits</a></details><details open><summary>Embedding guides</summary><a  href="../docs/library/configuration.html">Configuration</a><a  href="../docs/library/compatibility.html">Compatibility</a><a  href="../docs/library/render-ownership.html">Render ownership</a></details><details open><summary>Reference</summary><a  href="../docs/reference/protocol.html">Protocols</a><a  href="../docs/reference/notifications.html">Notifications</a><a  href="../docs/reference/storage.html">Storage & privacy</a></details><details open><summary>Development</summary><a  href="../ARCHITECTURE.html">Architecture</a><a  href="../CONTRIBUTING.html">Contributing</a><a  href="../docs/development/conformance-testing.html">Conformance testing</a></details></div></details></aside><main id="main" tabindex="-1" class="article article-with-outline"><div class="article-top"><nav class="breadcrumb" aria-label="Breadcrumb"><ol><li><a href="../../../index.html">Library</a></li><li><a href="../modules.html">Modules</a></li><li><a href="README.html">ketraterm-testkit</a></li><li><span aria-current="page">Module ketraterm-testkit</span></li></ol></nav><div class="doc-version"><span>Development</span><a href="../../../versions.html">All versions</a></div></div><details class="page-outline" open><summary>On this page</summary><nav aria-label="On this page"><a class="depth-2" href="#upstream-dependencies">Upstream Dependencies</a><a class="depth-2" href="#public-api-surface">Public API Surface</a><a class="depth-2" href="#architectural-role">Architectural Role</a><a class="depth-2" href="#source-sets">Source sets</a><a class="depth-2" href="#running-testkit-tests">Running Testkit Tests</a></nav></details><div class="article-content"><div class="prose"><h1 id="module-ketraterm-testkit">Module ketraterm-testkit</h1>
+<p>Repository-only helpers for deterministic tests of transport and terminal
+semantics. This module is excluded from the supported Maven, ABI, and aggregated
+public API documentation boundary.</p>
+<h2 id="upstream-dependencies">Upstream Dependencies</h2>
+<p>Production composition uses public contracts from core, host, parser, and
+transport API. Jackson encodes and decodes the independent oracle&#39;s JSON process
+protocol. These are implementation dependencies. Consumers are test source sets,
+not production modules.</p>
+<h2 id="public-api-surface">Public API Surface</h2>
+<div class="table-scroll"><table>
+<thead>
+<tr>
+<th>Helper</th>
+<th>Responsibility</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>MockConnector</code></td>
+<td>Synchronous host-byte delivery, copied outbound capture, and explicit lifecycle simulation.</td>
+</tr>
+<tr>
+<td><code>TerminalReplayEvent</code> / <code>TerminalReplayTranscript</code></td>
+<td>Detached input chunks and ordered input, resize, and end-of-input events.</td>
+</tr>
+<tr>
+<td><code>TerminalConformanceHarness</code></td>
+<td>Stateful replay through the production parser-to-core pipeline and response collection.</td>
+</tr>
+<tr>
+<td><code>TerminalConformanceSnapshot</code></td>
+<td>Detached observable grid, cursor, modes, metadata, and response values.</td>
+</tr>
+<tr>
+<td><code>TerminalReplayChunkings</code></td>
+<td>Deterministic partitions for bounded chunk-invariance fixtures.</td>
+</tr>
+<tr>
+<td><code>TerminalConformanceDiffer</code></td>
+<td>Bounded structural snapshot diagnostics.</td>
+</tr>
+<tr>
+<td><code>TerminalDifferentialOracle</code> / <code>TerminalDifferentialComparator</code></td>
+<td>Independent emulator execution and comparison of explicitly shared observations.</td>
+</tr>
+</tbody></table></div>
+<h2 id="architectural-role">Architectural Role</h2>
+<p>The conformance harness owns its parser, adapter, core buffer, and copied snapshot
+values. It is stateful and must be recreated for independent runs. The connector
+fake forwards a borrowed host slice synchronously; it retains copies of writes.
+Neither helper adds a synchronization boundary.</p>
+<p><code>TerminalProcessOracle</code> launches one bounded process per replay.
+<code>TerminalPersistentProcessOracle</code> keeps a JSON-lines worker for repeated requests;
+its owner must close it. The repository&#39;s xterm adapter creates fresh emulator
+state per request. Oracle output describes a comparison scope, not an alternative
+source of truth for KetraTerm&#39;s semantics.</p>
+<p><a id="how-to-use-in-tests"></a></p>
+<h2 id="source-sets">Source sets</h2>
+<p>See the <a href="README.html">README</a> for dependency setup and complete usage examples.
+Reusable helpers belong in <code>src/main</code>; test corpora, generated campaigns, and
+publication verification belong in <code>src/test</code>. Isolated external-consumer sources
+and retained binaries live in <a href="https://github.com/ketraterm/KetraTerm/blob/e3c7f9c626934093d35a67ca97afbbf1b343f28d/ketraterm-testkit/src/consumerTest/README.md">src/consumerTest</a>.</p>
+<h2 id="running-testkit-tests">Running Testkit Tests</h2>
+<p>The <a href="README.html#running-testkit-tests">README task reference</a> separates ordinary
+tests, optional campaigns, and publication checks. The
+<a href="https://github.com/ketraterm/KetraTerm/blob/e3c7f9c626934093d35a67ca97afbbf1b343f28d/ketraterm-testkit/src/consumerTest/README.md">consumer guide</a> describes the staged Maven and
+compiled-client workflows.</p>
+</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/e3c7f9c626934093d35a67ca97afbbf1b343f28d/ketraterm-testkit/Module.md">View source on GitHub ↗</a></div></div></main></div>
+  <footer>
+    <a class="brand" href="../../../index.html"><img class="brand-mark" src="../../../assets/logo.svg" alt="" width="34" height="34">KetraTerm Library</a>
+    <p>Open source · Apache 2.0</p>
+    <div><a href="https://github.com/ketraterm/KetraTerm">GitHub ↗</a><a href="https://github.com/ketraterm/KetraTerm/issues">Issues ↗</a><a class="product-switch" href="https://ketraterm.github.io/KetraTerm/">Desktop app ↗</a></div>
+  </footer>
+</body>
+</html>

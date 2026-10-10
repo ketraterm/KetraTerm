@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="description" content="A modular Kotlin/JVM terminal emulator library for Swing and headless applications.">
+  <meta name="color-scheme" content="light dark">
+  <title>Libraries · KetraTerm Library</title>
+  <link rel="icon" href="assets/logo.svg" type="image/svg+xml">
+  <link rel="preload" href="assets/fonts/manrope-variable.ttf" as="font" type="font/ttf" crossorigin>
+  <link rel="stylesheet" href="assets/styles.css">
+  <script type="importmap">{"imports":{"mermaid":"assets/mermaid/mermaid.esm.min.mjs"}}</script>
+  <script type="module" src="assets/site.js"></script>
+</head>
+<body data-product="library" data-version="">
+  <a class="skip" href="#main">Skip to content</a>
+  <header class="site-header">
+    <div class="site-identity">
+      <a class="brand" href="index.html" aria-label="KetraTerm Library home"><img class="brand-mark" src="assets/logo.svg" alt="" width="34" height="34">KetraTerm</a>
+      <nav class="product-navigation" aria-label="KetraTerm products"><a href="https://ketraterm.github.io/KetraTerm/">App</a><a href="index.html" aria-current="true">Library</a></nav>
+    </div>
+    <details class="site-navigation" open><summary>Menu</summary><nav aria-label="Library navigation"><a   href="guides/dev/docs/README.html">Guides</a><a   href="guides/dev/modules.html">Modules</a><a   href="versions.html">API & versions</a><a   href="guides/dev/CHANGELOG.html">Changelog</a><a  class="nav-primary" href="guides/dev/README.html">Get started</a></nav></details>
+    <button class="theme-toggle" type="button" aria-label="Switch to light theme">Light</button>
+  </header>
+  <main id="main" tabindex="-1"><section class="wrap library-hero">
+    <div class="library-heading"><p class="product-label">Kotlin/JVM terminal library</p><h1>A terminal engine.<br>Built for your app.</h1><p class="lead">A modular terminal engine with Swing and headless entry points. You own the transport, host services, and presentation.</p><div class="actions"><a class="button" href="guides/dev/README.html">Get started</a><a class="button secondary" href="versions.html">API reference</a></div></div>
+    <div class="code-panel">
+      <div class="panel-title"><span>build.gradle.kts</span><span>Kotlin DSL</span></div>
+      <div class="entry-switch" role="group" aria-label="Choose a library entry point">
+        <button type="button" data-library-entry="swing" data-guide="guides/dev/ketraterm-swing/README.html" aria-pressed="true">Swing view</button><button type="button" data-library-entry="headless" data-guide="guides/dev/ketraterm-headless/README.html" aria-pressed="false">Headless session</button>
+      </div>
+      <pre><code><span class="code-key">dependencies</span> {
+    implementation(platform(
+        <span class="code-string">"io.github.ketraterm:ketraterm-bom:{version}"</span>
+    ))
+    implementation(
+        <span class="code-string">"io.github.ketraterm:<span id="library-dependency">ketraterm-swing</span>"</span>
+    )
+}</code></pre>
+      <div class="code-footer"><a id="library-entry-link" href="guides/dev/ketraterm-swing/README.html">Entry point guide ↗</a><a href="guides/dev/README.html#using-the-libraries">Repositories & versions ↗</a></div>
+    </div>
+  </section>
+  <div class="wrap"><div class="runtime-rail"><span>Java 25</span><span>Kotlin 2.4+</span><span>Kotlin & Java APIs</span><span>Apache 2.0</span></div></div>
+  <section class="wrap section">
+    <div class="section-heading"><h2>Compose the terminal you need.</h2><a href="guides/dev/modules.html">Browse modules ↗</a></div>
+    <div class="integration-map">
+      <a href="guides/dev/ketraterm-transport-api/README.html"><span class="integration-label">Your transport</span><h3>Ordered bytes in and out.</h3><p>Supply a connector. Add local PTY processes when you need them.</p><code>TerminalConnector</code></a>
+      <span class="pipeline-arrow" aria-hidden="true">→</span>
+      <a href="guides/dev/ketraterm-session/README.html"><span class="integration-label">Terminal session</span><h3>State, input, and lifecycle.</h3><p>Parse output, maintain grid and history, and serialize terminal input.</p><code>TerminalSession</code></a>
+      <span class="pipeline-arrow" aria-hidden="true">→</span>
+      <a href="guides/dev/ketraterm-ui-swing/README.html"><span class="integration-label">Your presentation</span><h3>A view that fits your host.</h3><p>Embed Swing or read frames for your own renderer.</p><code>SwingTerminal / frame readers</code></a>
+    </div>
+    <div class="integration-extras"><span>Add what your host needs.</span><a href="guides/dev/ketraterm-pty/README.html">Local PTY</a><a href="guides/dev/docs/features/shells.html">Shell integration</a><a href="guides/dev/docs/features/completion.html">Completion</a><a href="guides/dev/docs/library/configuration.html">Host services</a></div>
+  </section>
+  <section class="wrap section help-section">
+    <div><h2>Know the contracts.</h2><p>Supported capabilities, customization, and versioned reference material for your integration.</p></div>
+    <div class="link-list">
+      <a href="guides/dev/docs/terminal-feature-map.html">Terminal features <span aria-hidden="true">↗</span></a>
+      <a href="guides/dev/docs/features/embedding.html">Embedding & customization <span aria-hidden="true">↗</span></a>
+      <a href="guides/dev/docs/terminal-feature-gap-map.html">Known limitations <span aria-hidden="true">↗</span></a>
+      <a href="guides/dev/docs/library/compatibility.html">Compatibility & migrations <span aria-hidden="true">↗</span></a>
+      <a href="guides/dev/CHANGELOG.html">Library changelog <span aria-hidden="true">↗</span></a>
+    </div>
+  </section></main>
+  <footer>
+    <a class="brand" href="index.html"><img class="brand-mark" src="assets/logo.svg" alt="" width="34" height="34">KetraTerm Library</a>
+    <p>Open source · Apache 2.0</p>
+    <div><a href="https://github.com/ketraterm/KetraTerm">GitHub ↗</a><a href="https://github.com/ketraterm/KetraTerm/issues">Issues ↗</a><a class="product-switch" href="https://ketraterm.github.io/KetraTerm/">Desktop app ↗</a></div>
+  </footer>
+</body>
+</html>

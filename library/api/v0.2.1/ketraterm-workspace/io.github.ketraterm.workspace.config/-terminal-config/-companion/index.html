@@ -1,0 +1,750 @@
+<!doctype html>
+<html class="no-js" lang="en">
+<head>
+    <meta name="viewport" content="width=device-width, initial-scale=1" charset="UTF-8">
+    <title>Companion</title>
+<link href="../../../../images/logo-icon.svg" rel="icon" type="image/svg"><script>var pathToRoot = "../../../../";</script>
+    <script>document.documentElement.classList.replace("no-js", "js");</script>
+    <script>const storage = localStorage.getItem("dokka-dark-mode")
+      if (storage == null) {
+        const osDarkSchemePreferred = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches
+        if (osDarkSchemePreferred === true) {
+          document.getElementsByTagName("html")[0].classList.add("theme-dark")
+        }
+      } else {
+        const savedDarkMode = JSON.parse(storage)
+        if (savedDarkMode === true) {
+          document.getElementsByTagName("html")[0].classList.add("theme-dark")
+        }
+      }
+    </script>
+<script type="text/javascript" src="../../../../scripts/sourceset_dependencies.js" async></script>
+<link href="../../../../styles/style.css" rel="Stylesheet">
+<link href="../../../../styles/main.css" rel="Stylesheet">
+<link href="../../../../styles/prism.css" rel="Stylesheet">
+<link href="../../../../styles/logo-styles.css" rel="Stylesheet">
+<link href="../../../../ui-kit/ui-kit.min.css" rel="Stylesheet">
+<script type="text/javascript" src="../../../../scripts/safe-local-storage_blocking.js"></script>
+<script type="text/javascript" src="../../../../scripts/navigation-loader.js" async></script>
+<script type="text/javascript" src="../../../../scripts/platform-content-handler.js" async></script>
+<script type="text/javascript" src="../../../../scripts/main.js" defer></script>
+<script type="text/javascript" src="../../../../scripts/prism.js" async></script>
+<script type="text/javascript" src="../../../../ui-kit/ui-kit.min.js" defer></script><!-- ketraterm-api-stylesheet:start -->
+<link rel="icon" href="../../../../../../assets/logo.svg" type="image/svg+xml">
+<link rel="stylesheet" href="../../../../../../assets/api-navigation.css">
+<!-- ketraterm-api-stylesheet:end --></head>
+<body>
+<div class="root"><!-- ketraterm-api-navigation:start -->
+<div class="ketraterm-api-navigation">
+  <a class="ketraterm-api-brand" href="../../../../../../index.html" aria-label="KetraTerm Library home"><img src="../../../../../../assets/logo.svg" alt="" width="28" height="28">KetraTerm</a>
+  <nav class="ketraterm-api-products" aria-label="KetraTerm products"><a href="https://ketraterm.github.io/KetraTerm/">App</a><a href="../../../../../../index.html" aria-current="true">Library</a></nav>
+  <div class="ketraterm-api-reference"><span>API · v0.2.1</span><a href="../../../../../../versions.html">All versions</a></div>
+</div>
+<!-- ketraterm-api-navigation:end -->
+    <header class="navigation theme-dark" id="navigation-wrapper" role="banner">
+<a class="library-name--link" href="../../../../index.html">
+                    KetraTerm
+            </a>        <button class="navigation-controls--btn navigation-controls--btn_toc ui-kit_mobile-only" id="toc-toggle" type="button">Toggle table of contents
+        </button>
+        <div class="navigation-controls--break ui-kit_mobile-only"></div>
+        <div class="library-version" id="library-version">
+        </div>
+        <div class="navigation-controls">
+        <ul class="filter-section filter-section_loading" id="filter-section" aria-label="Target filter">
+                <button class="platform-tag platform-selector jvm-like" data-active="" aria-pressed="true" data-filter=":ketraterm-workspace/main">jvm</button>
+            <div class="dropdown filter-section--dropdown" data-role="dropdown" id="filter-section-dropdown">
+                <button class="button button_dropdown filter-section--dropdown-toggle" role="combobox" data-role="dropdown-toggle" aria-controls="platform-tags-listbox" aria-haspopup="listbox" aria-expanded="false" aria-label="Toggle source sets"></button>
+                <ul role="listbox" id="platform-tags-listbox" class="dropdown--list" data-role="dropdown-listbox" aria-label="Target filter">
+                    <div class="dropdown--header"><span>Target filter</span>
+                        <button class="button" data-role="dropdown-toggle" aria-label="Close target filter">
+                            <i class="ui-kit-icon ui-kit-icon_cross"></i>
+                        </button>
+                    </div>
+                        <li role="option" class="dropdown--option platform-selector-option jvm-like" tabindex="0">
+                            <label class="checkbox">
+                                <input type="checkbox" class="checkbox--input" id=":ketraterm-workspace/main" data-filter=":ketraterm-workspace/main">
+                                <span class="checkbox--icon"></span>
+                                jvm
+                            </label>
+                        </li>
+                </ul>
+                <div class="dropdown--overlay"></div>
+            </div>
+        </ul>
+            <button class="navigation-controls--btn navigation-controls--btn_theme" id="theme-toggle-button" type="button">Switch theme
+            </button>
+            <div class="navigation-controls--btn navigation-controls--btn_search" id="searchBar" role="button">Search in
+                API
+            </div>
+        </div>
+    </header>
+    <div id="container">
+        <nav id="leftColumn" class="sidebar" data-item-type="SECTION" data-item-config="{&quot;defaultSize&quot;: 280, &quot;minSize&quot;: 200, &quot;maxSize&quot;: 400}">
+            <a class="toc--skip-link" href="#main">Skip to content</a>
+            <div class="dropdown theme-dark_mobile" data-role="dropdown" id="toc-dropdown">
+                <ul role="listbox" id="toc-listbox" class="dropdown--list dropdown--list_toc-list" data-role="dropdown-listbox" aria-label="Table of contents">
+                    <div class="dropdown--header">
+                            <span>
+                                    KetraTerm
+                            </span>
+                        <button class="button" data-role="dropdown-toggle" aria-label="Close table of contents">
+                            <i class="ui-kit-icon ui-kit-icon_cross"></i>
+                        </button>
+                    </div>
+                    <div class="sidebar--inner" id="sideMenu"></div>
+                </ul>
+                <div class="dropdown--overlay"></div>
+            </div>
+        </nav>
+        <div id="resizer" class="resizer" data-item-type="BAR"></div>
+        <div id="main" data-item-type="SECTION" role="main">
+<div class="main-content" data-page-type="classlike" id="content" pageids="ketraterm-workspace::io.github.ketraterm.workspace.config/TerminalConfig.Companion///PointingToDeclaration//-2008736661">
+  <div class="breadcrumbs"><a href="../../../index.html">ketraterm-workspace</a><span class="delimiter">/</span><a href="../../index.html">io.github.ketraterm.workspace.config</a><span class="delimiter">/</span><a href="../index.html">TerminalConfig</a><span class="delimiter">/</span><span class="current">Companion</span></div>
+  <div class="cover ">
+    <h1 class="cover"><span><span>Companion</span></span></h1>
+    <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-workspace/main"><div class="symbol monospace"><span class="token keyword">object </span><a href="index.html">Companion</a></div><p class="paragraph">Published bounds and defaults for all terminal configuration fields.</p><p class="paragraph">These constants are the single source of truth shared by:</p><ul><li><p class="paragraph">TerminalConfig.init validity assertions.</p></li><li><p class="paragraph"><a href="../../-terminal-workspace-config-manager/index.html">TerminalWorkspaceConfigManager</a> TOML clamping before constructing a config.</p></li><li><p class="paragraph">The standalone settings dialog spinner min/max values.</p></li></ul><p class="paragraph">If you need to change a limit or default, change it here and it will be reflected everywhere automatically.</p></div></div>
+  </div>
+  <div class="tabbedcontent">
+    <div class="tabs-section" tabs-section="tabs-section"><button class="section-tab" data-active="" data-togglable="CONSTRUCTOR,TYPE,PROPERTY,FUNCTION">Members</button></div>
+    <div class="tabs-section-body">
+      <div data-togglable="PROPERTY">
+        <h2 class="tableheader">Properties</h2>
+        <div class="table"><a data-name="-81270762%2FProperties%2F-2008736661" anchor-label="COLUMNS_MAX" id="-81270762%2FProperties%2F-2008736661" data-filterable-set=":ketraterm-workspace/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-workspace/main" data-filterable-set=":ketraterm-workspace/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-c-o-l-u-m-n-s_-m-a-x.html"><span>COLUMNS_</span><wbr><span>MAX</span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-81270762%2FProperties%2F-2008736661"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-workspace/main"><div class="symbol monospace"><span class="token keyword">const </span><span class="token keyword">val </span><a href="-c-o-l-u-m-n-s_-m-a-x.html">COLUMNS_MAX</a><span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a><span class="token operator"> = </span><span class="token constant">1000</span></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-1288491288%2FProperties%2F-2008736661" anchor-label="COLUMNS_MIN" id="-1288491288%2FProperties%2F-2008736661" data-filterable-set=":ketraterm-workspace/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-workspace/main" data-filterable-set=":ketraterm-workspace/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-c-o-l-u-m-n-s_-m-i-n.html"><span>COLUMNS_</span><wbr><span>MIN</span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-1288491288%2FProperties%2F-2008736661"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-workspace/main"><div class="symbol monospace"><span class="token keyword">const </span><span class="token keyword">val </span><a href="-c-o-l-u-m-n-s_-m-i-n.html">COLUMNS_MIN</a><span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a><span class="token operator"> = </span><span class="token constant">10</span></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-1327938646%2FProperties%2F-2008736661" anchor-label="CURSOR_BLINK_MAX" id="-1327938646%2FProperties%2F-2008736661" data-filterable-set=":ketraterm-workspace/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-workspace/main" data-filterable-set=":ketraterm-workspace/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-c-u-r-s-o-r_-b-l-i-n-k_-m-a-x.html"><span>CURSOR_</span><wbr><span>BLINK_</span><wbr><span>MAX</span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-1327938646%2FProperties%2F-2008736661"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-workspace/main"><div class="symbol monospace"><span class="token keyword">const </span><span class="token keyword">val </span><a href="-c-u-r-s-o-r_-b-l-i-n-k_-m-a-x.html">CURSOR_BLINK_MAX</a><span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="1759808124%2FProperties%2F-2008736661" anchor-label="CURSOR_BLINK_MIN" id="1759808124%2FProperties%2F-2008736661" data-filterable-set=":ketraterm-workspace/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-workspace/main" data-filterable-set=":ketraterm-workspace/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-c-u-r-s-o-r_-b-l-i-n-k_-m-i-n.html"><span>CURSOR_</span><wbr><span>BLINK_</span><wbr><span>MIN</span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="1759808124%2FProperties%2F-2008736661"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-workspace/main"><div class="symbol monospace"><span class="token keyword">const </span><span class="token keyword">val </span><a href="-c-u-r-s-o-r_-b-l-i-n-k_-m-i-n.html">CURSOR_BLINK_MIN</a><span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a><span class="token operator"> = </span><span class="token constant">0</span></div><div class="brief "><p class="paragraph">Zero disables blinking.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-1403938204%2FProperties%2F-2008736661" anchor-label="DEFAULT_AUDIBLE_BELL" id="-1403938204%2FProperties%2F-2008736661" data-filterable-set=":ketraterm-workspace/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-workspace/main" data-filterable-set=":ketraterm-workspace/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-d-e-f-a-u-l-t_-a-u-d-i-b-l-e_-b-e-l-l.html"><span>DEFAULT_</span><wbr><span>AUDIBLE_</span><wbr><span>BELL</span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-1403938204%2FProperties%2F-2008736661"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-workspace/main"><div class="symbol monospace"><span class="token keyword">const </span><span class="token keyword">val </span><a href="-d-e-f-a-u-l-t_-a-u-d-i-b-l-e_-b-e-l-l.html">DEFAULT_AUDIBLE_BELL</a><span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-boolean/index.html">Boolean</a><span class="token operator"> = </span><span class="token boolean">true</span></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="1933349492%2FProperties%2F-2008736661" anchor-label="DEFAULT_CLIPBOARD_LOCAL_WRITE" id="1933349492%2FProperties%2F-2008736661" data-filterable-set=":ketraterm-workspace/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-workspace/main" data-filterable-set=":ketraterm-workspace/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-d-e-f-a-u-l-t_-c-l-i-p-b-o-a-r-d_-l-o-c-a-l_-w-r-i-t-e.html"><span>DEFAULT_</span><wbr><span>CLIPBOARD_</span><wbr><span>LOCAL_</span><wbr><span>WRITE</span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="1933349492%2FProperties%2F-2008736661"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-workspace/main"><div class="symbol monospace"><span class="token keyword">val </span><a href="-d-e-f-a-u-l-t_-c-l-i-p-b-o-a-r-d_-l-o-c-a-l_-w-r-i-t-e.html">DEFAULT_CLIPBOARD_LOCAL_WRITE</a><span class="token operator">: </span><a href="../../../../ketraterm-host/io.github.ketraterm.host/-terminal-clipboard-permission/index.html">TerminalClipboardPermission</a></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-1373649128%2FProperties%2F-2008736661" anchor-label="DEFAULT_CLIPBOARD_MAX_DECODED_BYTES" id="-1373649128%2FProperties%2F-2008736661" data-filterable-set=":ketraterm-workspace/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-workspace/main" data-filterable-set=":ketraterm-workspace/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-d-e-f-a-u-l-t_-c-l-i-p-b-o-a-r-d_-m-a-x_-d-e-c-o-d-e-d_-b-y-t-e-s.html"><span>DEFAULT_</span><wbr><span>CLIPBOARD_</span><wbr><span>MAX_</span><wbr><span>DECODED_</span><wbr><span>BYTES</span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-1373649128%2FProperties%2F-2008736661"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-workspace/main"><div class="symbol monospace"><span class="token keyword">const </span><span class="token keyword">val </span><a href="-d-e-f-a-u-l-t_-c-l-i-p-b-o-a-r-d_-m-a-x_-d-e-c-o-d-e-d_-b-y-t-e-s.html">DEFAULT_CLIPBOARD_MAX_DECODED_BYTES</a><span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="707411717%2FProperties%2F-2008736661" anchor-label="DEFAULT_CLIPBOARD_READ" id="707411717%2FProperties%2F-2008736661" data-filterable-set=":ketraterm-workspace/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-workspace/main" data-filterable-set=":ketraterm-workspace/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-d-e-f-a-u-l-t_-c-l-i-p-b-o-a-r-d_-r-e-a-d.html"><span>DEFAULT_</span><wbr><span>CLIPBOARD_</span><wbr><span>READ</span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="707411717%2FProperties%2F-2008736661"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-workspace/main"><div class="symbol monospace"><span class="token keyword">val </span><a href="-d-e-f-a-u-l-t_-c-l-i-p-b-o-a-r-d_-r-e-a-d.html">DEFAULT_CLIPBOARD_READ</a><span class="token operator">: </span><a href="../../../../ketraterm-host/io.github.ketraterm.host/-terminal-clipboard-permission/index.html">TerminalClipboardPermission</a></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="2136972821%2FProperties%2F-2008736661" anchor-label="DEFAULT_CLIPBOARD_REMOTE_WRITE" id="2136972821%2FProperties%2F-2008736661" data-filterable-set=":ketraterm-workspace/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-workspace/main" data-filterable-set=":ketraterm-workspace/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-d-e-f-a-u-l-t_-c-l-i-p-b-o-a-r-d_-r-e-m-o-t-e_-w-r-i-t-e.html"><span>DEFAULT_</span><wbr><span>CLIPBOARD_</span><wbr><span>REMOTE_</span><wbr><span>WRITE</span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="2136972821%2FProperties%2F-2008736661"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-workspace/main"><div class="symbol monospace"><span class="token keyword">val </span><a href="-d-e-f-a-u-l-t_-c-l-i-p-b-o-a-r-d_-r-e-m-o-t-e_-w-r-i-t-e.html">DEFAULT_CLIPBOARD_REMOTE_WRITE</a><span class="token operator">: </span><a href="../../../../ketraterm-host/io.github.ketraterm.host/-terminal-clipboard-permission/index.html">TerminalClipboardPermission</a></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="1426833241%2FProperties%2F-2008736661" anchor-label="DEFAULT_COLUMNS" id="1426833241%2FProperties%2F-2008736661" data-filterable-set=":ketraterm-workspace/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-workspace/main" data-filterable-set=":ketraterm-workspace/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-d-e-f-a-u-l-t_-c-o-l-u-m-n-s.html"><span>DEFAULT_</span><wbr><span>COLUMNS</span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="1426833241%2FProperties%2F-2008736661"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-workspace/main"><div class="symbol monospace"><span class="token keyword">const </span><span class="token keyword">val </span><a href="-d-e-f-a-u-l-t_-c-o-l-u-m-n-s.html">DEFAULT_COLUMNS</a><span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a><span class="token operator"> = </span><span class="token constant">100</span></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="1133917252%2FProperties%2F-2008736661" anchor-label="DEFAULT_CURSOR_BLINK_MILLIS" id="1133917252%2FProperties%2F-2008736661" data-filterable-set=":ketraterm-workspace/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-workspace/main" data-filterable-set=":ketraterm-workspace/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-d-e-f-a-u-l-t_-c-u-r-s-o-r_-b-l-i-n-k_-m-i-l-l-i-s.html"><span>DEFAULT_</span><wbr><span>CURSOR_</span><wbr><span>BLINK_</span><wbr><span>MILLIS</span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="1133917252%2FProperties%2F-2008736661"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-workspace/main"><div class="symbol monospace"><span class="token keyword">const </span><span class="token keyword">val </span><a href="-d-e-f-a-u-l-t_-c-u-r-s-o-r_-b-l-i-n-k_-m-i-l-l-i-s.html">DEFAULT_CURSOR_BLINK_MILLIS</a><span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a><span class="token operator"> = </span><span class="token constant">600</span></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-1874200500%2FProperties%2F-2008736661" anchor-label="DEFAULT_CURSOR_SHAPE" id="-1874200500%2FProperties%2F-2008736661" data-filterable-set=":ketraterm-workspace/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-workspace/main" data-filterable-set=":ketraterm-workspace/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-d-e-f-a-u-l-t_-c-u-r-s-o-r_-s-h-a-p-e.html"><span>DEFAULT_</span><wbr><span>CURSOR_</span><wbr><span>SHAPE</span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-1874200500%2FProperties%2F-2008736661"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-workspace/main"><div class="symbol monospace"><span class="token keyword">const </span><span class="token keyword">val </span><a href="-d-e-f-a-u-l-t_-c-u-r-s-o-r_-s-h-a-p-e.html">DEFAULT_CURSOR_SHAPE</a><span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-string/index.html">String</a></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="2121220847%2FProperties%2F-2008736661" anchor-label="DEFAULT_DESKTOP_NOTIFICATIONS_ENABLED" id="2121220847%2FProperties%2F-2008736661" data-filterable-set=":ketraterm-workspace/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-workspace/main" data-filterable-set=":ketraterm-workspace/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-d-e-f-a-u-l-t_-d-e-s-k-t-o-p_-n-o-t-i-f-i-c-a-t-i-o-n-s_-e-n-a-b-l-e-d.html"><span>DEFAULT_</span><wbr><span>DESKTOP_</span><wbr><span>NOTIFICATIONS_</span><wbr><span>ENABLED</span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="2121220847%2FProperties%2F-2008736661"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-workspace/main"><div class="symbol monospace"><span class="token keyword">const </span><span class="token keyword">val </span><a href="-d-e-f-a-u-l-t_-d-e-s-k-t-o-p_-n-o-t-i-f-i-c-a-t-i-o-n-s_-e-n-a-b-l-e-d.html">DEFAULT_DESKTOP_NOTIFICATIONS_ENABLED</a><span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-boolean/index.html">Boolean</a><span class="token operator"> = </span><span class="token boolean">true</span></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="444458274%2FProperties%2F-2008736661" anchor-label="DEFAULT_FONT_FAMILY" id="444458274%2FProperties%2F-2008736661" data-filterable-set=":ketraterm-workspace/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-workspace/main" data-filterable-set=":ketraterm-workspace/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-d-e-f-a-u-l-t_-f-o-n-t_-f-a-m-i-l-y.html"><span>DEFAULT_</span><wbr><span>FONT_</span><wbr><span>FAMILY</span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="444458274%2FProperties%2F-2008736661"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-workspace/main"><div class="symbol monospace"><span class="token keyword">val </span><a href="-d-e-f-a-u-l-t_-f-o-n-t_-f-a-m-i-l-y.html">DEFAULT_FONT_FAMILY</a><span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-string/index.html">String</a></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="602330469%2FProperties%2F-2008736661" anchor-label="DEFAULT_FONT_SIZE" id="602330469%2FProperties%2F-2008736661" data-filterable-set=":ketraterm-workspace/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-workspace/main" data-filterable-set=":ketraterm-workspace/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-d-e-f-a-u-l-t_-f-o-n-t_-s-i-z-e.html"><span>DEFAULT_</span><wbr><span>FONT_</span><wbr><span>SIZE</span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="602330469%2FProperties%2F-2008736661"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-workspace/main"><div class="symbol monospace"><span class="token keyword">const </span><span class="token keyword">val </span><a href="-d-e-f-a-u-l-t_-f-o-n-t_-s-i-z-e.html">DEFAULT_FONT_SIZE</a><span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a><span class="token operator"> = </span><span class="token constant">16</span></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-1033867164%2FProperties%2F-2008736661" anchor-label="DEFAULT_LINE_HEIGHT" id="-1033867164%2FProperties%2F-2008736661" data-filterable-set=":ketraterm-workspace/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-workspace/main" data-filterable-set=":ketraterm-workspace/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-d-e-f-a-u-l-t_-l-i-n-e_-h-e-i-g-h-t.html"><span>DEFAULT_</span><wbr><span>LINE_</span><wbr><span>HEIGHT</span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-1033867164%2FProperties%2F-2008736661"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-workspace/main"><div class="symbol monospace"><span class="token keyword">const </span><span class="token keyword">val </span><a href="-d-e-f-a-u-l-t_-l-i-n-e_-h-e-i-g-h-t.html">DEFAULT_LINE_HEIGHT</a><span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-float/index.html">Float</a><span class="token operator"> = </span><span class="token constant">1.0f</span></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="683788836%2FProperties%2F-2008736661" anchor-label="DEFAULT_PASTE_ON_MIDDLE_CLICK" id="683788836%2FProperties%2F-2008736661" data-filterable-set=":ketraterm-workspace/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-workspace/main" data-filterable-set=":ketraterm-workspace/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-d-e-f-a-u-l-t_-p-a-s-t-e_-o-n_-m-i-d-d-l-e_-c-l-i-c-k.html"><span>DEFAULT_</span><wbr><span>PASTE_</span><wbr><span>ON_</span><wbr><span>MIDDLE_</span><wbr><span>CLICK</span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="683788836%2FProperties%2F-2008736661"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-workspace/main"><div class="symbol monospace"><span class="token keyword">const </span><span class="token keyword">val </span><a href="-d-e-f-a-u-l-t_-p-a-s-t-e_-o-n_-m-i-d-d-l-e_-c-l-i-c-k.html">DEFAULT_PASTE_ON_MIDDLE_CLICK</a><span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-boolean/index.html">Boolean</a><span class="token operator"> = </span><span class="token boolean">true</span></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-716920246%2FProperties%2F-2008736661" anchor-label="DEFAULT_PASTE_SANITIZATION_POLICY" id="-716920246%2FProperties%2F-2008736661" data-filterable-set=":ketraterm-workspace/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-workspace/main" data-filterable-set=":ketraterm-workspace/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-d-e-f-a-u-l-t_-p-a-s-t-e_-s-a-n-i-t-i-z-a-t-i-o-n_-p-o-l-i-c-y.html"><span>DEFAULT_</span><wbr><span>PASTE_</span><wbr><span>SANITIZATION_</span><wbr><span>POLICY</span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-716920246%2FProperties%2F-2008736661"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-workspace/main"><div class="symbol monospace"><span class="token keyword">val </span><a href="-d-e-f-a-u-l-t_-p-a-s-t-e_-s-a-n-i-t-i-z-a-t-i-o-n_-p-o-l-i-c-y.html">DEFAULT_PASTE_SANITIZATION_POLICY</a><span class="token operator">: </span><a href="../../../../ketraterm-input/io.github.ketraterm.input.policy/-paste-sanitization-policy/index.html">PasteSanitizationPolicy</a></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-1607800566%2FProperties%2F-2008736661" anchor-label="DEFAULT_PERSISTENT_COMMAND_HISTORY_ENABLED" id="-1607800566%2FProperties%2F-2008736661" data-filterable-set=":ketraterm-workspace/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-workspace/main" data-filterable-set=":ketraterm-workspace/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-d-e-f-a-u-l-t_-p-e-r-s-i-s-t-e-n-t_-c-o-m-m-a-n-d_-h-i-s-t-o-r-y_-e-n-a-b-l-e-d.html"><span>DEFAULT_</span><wbr><span>PERSISTENT_</span><wbr><span>COMMAND_</span><wbr><span>HISTORY_</span><wbr><span>ENABLED</span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-1607800566%2FProperties%2F-2008736661"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-workspace/main"><div class="symbol monospace"><span class="token keyword">const </span><span class="token keyword">val </span><a href="-d-e-f-a-u-l-t_-p-e-r-s-i-s-t-e-n-t_-c-o-m-m-a-n-d_-h-i-s-t-o-r-y_-e-n-a-b-l-e-d.html">DEFAULT_PERSISTENT_COMMAND_HISTORY_ENABLED</a><span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-boolean/index.html">Boolean</a><span class="token operator"> = </span><span class="token boolean">false</span></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-1718050325%2FProperties%2F-2008736661" anchor-label="DEFAULT_ROWS" id="-1718050325%2FProperties%2F-2008736661" data-filterable-set=":ketraterm-workspace/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-workspace/main" data-filterable-set=":ketraterm-workspace/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-d-e-f-a-u-l-t_-r-o-w-s.html"><span>DEFAULT_</span><wbr><span>ROWS</span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-1718050325%2FProperties%2F-2008736661"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-workspace/main"><div class="symbol monospace"><span class="token keyword">const </span><span class="token keyword">val </span><a href="-d-e-f-a-u-l-t_-r-o-w-s.html">DEFAULT_ROWS</a><span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a><span class="token operator"> = </span><span class="token constant">30</span></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="1004895637%2FProperties%2F-2008736661" anchor-label="DEFAULT_SCROLL_ON_OUTPUT" id="1004895637%2FProperties%2F-2008736661" data-filterable-set=":ketraterm-workspace/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-workspace/main" data-filterable-set=":ketraterm-workspace/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-d-e-f-a-u-l-t_-s-c-r-o-l-l_-o-n_-o-u-t-p-u-t.html"><span>DEFAULT_</span><wbr><span>SCROLL_</span><wbr><span>ON_</span><wbr><span>OUTPUT</span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="1004895637%2FProperties%2F-2008736661"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-workspace/main"><div class="symbol monospace"><span class="token keyword">const </span><span class="token keyword">val </span><a href="-d-e-f-a-u-l-t_-s-c-r-o-l-l_-o-n_-o-u-t-p-u-t.html">DEFAULT_SCROLL_ON_OUTPUT</a><span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-boolean/index.html">Boolean</a><span class="token operator"> = </span><span class="token boolean">true</span></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="990918032%2FProperties%2F-2008736661" anchor-label="DEFAULT_SCROLLBACK_LINES" id="990918032%2FProperties%2F-2008736661" data-filterable-set=":ketraterm-workspace/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-workspace/main" data-filterable-set=":ketraterm-workspace/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-d-e-f-a-u-l-t_-s-c-r-o-l-l-b-a-c-k_-l-i-n-e-s.html"><span>DEFAULT_</span><wbr><span>SCROLLBACK_</span><wbr><span>LINES</span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="990918032%2FProperties%2F-2008736661"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-workspace/main"><div class="symbol monospace"><span class="token keyword">const </span><span class="token keyword">val </span><a href="-d-e-f-a-u-l-t_-s-c-r-o-l-l-b-a-c-k_-l-i-n-e-s.html">DEFAULT_SCROLLBACK_LINES</a><span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a><span class="token operator"> = </span><span class="token constant">1000</span></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-1188004368%2FProperties%2F-2008736661" anchor-label="DEFAULT_SHELL_PATH" id="-1188004368%2FProperties%2F-2008736661" data-filterable-set=":ketraterm-workspace/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-workspace/main" data-filterable-set=":ketraterm-workspace/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-d-e-f-a-u-l-t_-s-h-e-l-l_-p-a-t-h.html"><span>DEFAULT_</span><wbr><span>SHELL_</span><wbr><span>PATH</span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-1188004368%2FProperties%2F-2008736661"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-workspace/main"><div class="symbol monospace"><span class="token keyword">val </span><a href="-d-e-f-a-u-l-t_-s-h-e-l-l_-p-a-t-h.html">DEFAULT_SHELL_PATH</a><span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-string/index.html">String</a></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-1613750694%2FProperties%2F-2008736661" anchor-label="DEFAULT_SHELL_REQUEST_RESIZE_WINDOW" id="-1613750694%2FProperties%2F-2008736661" data-filterable-set=":ketraterm-workspace/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-workspace/main" data-filterable-set=":ketraterm-workspace/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-d-e-f-a-u-l-t_-s-h-e-l-l_-r-e-q-u-e-s-t_-r-e-s-i-z-e_-w-i-n-d-o-w.html"><span>DEFAULT_</span><wbr><span>SHELL_</span><wbr><span>REQUEST_</span><wbr><span>RESIZE_</span><wbr><span>WINDOW</span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-1613750694%2FProperties%2F-2008736661"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-workspace/main"><div class="symbol monospace"><span class="token keyword">const </span><span class="token keyword">val </span><a href="-d-e-f-a-u-l-t_-s-h-e-l-l_-r-e-q-u-e-s-t_-r-e-s-i-z-e_-w-i-n-d-o-w.html">DEFAULT_SHELL_REQUEST_RESIZE_WINDOW</a><span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-boolean/index.html">Boolean</a><span class="token operator"> = </span><span class="token boolean">false</span></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="1713277897%2FProperties%2F-2008736661" anchor-label="DEFAULT_SHELL_REQUEST_WINDOW_MANIPULATION" id="1713277897%2FProperties%2F-2008736661" data-filterable-set=":ketraterm-workspace/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-workspace/main" data-filterable-set=":ketraterm-workspace/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-d-e-f-a-u-l-t_-s-h-e-l-l_-r-e-q-u-e-s-t_-w-i-n-d-o-w_-m-a-n-i-p-u-l-a-t-i-o-n.html"><span>DEFAULT_</span><wbr><span>SHELL_</span><wbr><span>REQUEST_</span><wbr><span>WINDOW_</span><wbr><span><span>MANIPULATION</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="1713277897%2FProperties%2F-2008736661"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-workspace/main"><div class="symbol monospace"><span class="token keyword">const </span><span class="token keyword">val </span><a href="-d-e-f-a-u-l-t_-s-h-e-l-l_-r-e-q-u-e-s-t_-w-i-n-d-o-w_-m-a-n-i-p-u-l-a-t-i-o-n.html">DEFAULT_SHELL_REQUEST_WINDOW_MANIPULATION</a><span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-boolean/index.html">Boolean</a><span class="token operator"> = </span><span class="token boolean">false</span></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="450771316%2FProperties%2F-2008736661" anchor-label="DEFAULT_SHELL_SUGGESTIONS_ENABLED" id="450771316%2FProperties%2F-2008736661" data-filterable-set=":ketraterm-workspace/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-workspace/main" data-filterable-set=":ketraterm-workspace/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-d-e-f-a-u-l-t_-s-h-e-l-l_-s-u-g-g-e-s-t-i-o-n-s_-e-n-a-b-l-e-d.html"><span>DEFAULT_</span><wbr><span>SHELL_</span><wbr><span>SUGGESTIONS_</span><wbr><span>ENABLED</span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="450771316%2FProperties%2F-2008736661"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-workspace/main"><div class="symbol monospace"><span class="token keyword">const </span><span class="token keyword">val </span><a href="-d-e-f-a-u-l-t_-s-h-e-l-l_-s-u-g-g-e-s-t-i-o-n-s_-e-n-a-b-l-e-d.html">DEFAULT_SHELL_SUGGESTIONS_ENABLED</a><span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-boolean/index.html">Boolean</a><span class="token operator"> = </span><span class="token boolean">true</span></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="104616678%2FProperties%2F-2008736661" anchor-label="DEFAULT_START_DIRECTORY" id="104616678%2FProperties%2F-2008736661" data-filterable-set=":ketraterm-workspace/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-workspace/main" data-filterable-set=":ketraterm-workspace/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-d-e-f-a-u-l-t_-s-t-a-r-t_-d-i-r-e-c-t-o-r-y.html"><span>DEFAULT_</span><wbr><span>START_</span><wbr><span>DIRECTORY</span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="104616678%2FProperties%2F-2008736661"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-workspace/main"><div class="symbol monospace"><span class="token keyword">val </span><a href="-d-e-f-a-u-l-t_-s-t-a-r-t_-d-i-r-e-c-t-o-r-y.html">DEFAULT_START_DIRECTORY</a><span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-string/index.html">String</a></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="995819821%2FProperties%2F-2008736661" anchor-label="DEFAULT_THEME" id="995819821%2FProperties%2F-2008736661" data-filterable-set=":ketraterm-workspace/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-workspace/main" data-filterable-set=":ketraterm-workspace/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-d-e-f-a-u-l-t_-t-h-e-m-e.html"><span>DEFAULT_</span><wbr><span>THEME</span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="995819821%2FProperties%2F-2008736661"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-workspace/main"><div class="symbol monospace"><span class="token keyword">const </span><span class="token keyword">val </span><a href="-d-e-f-a-u-l-t_-t-h-e-m-e.html">DEFAULT_THEME</a><span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-string/index.html">String</a></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="1887634106%2FProperties%2F-2008736661" anchor-label="DEFAULT_TITLE_LOCAL_PERMISSION" id="1887634106%2FProperties%2F-2008736661" data-filterable-set=":ketraterm-workspace/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-workspace/main" data-filterable-set=":ketraterm-workspace/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-d-e-f-a-u-l-t_-t-i-t-l-e_-l-o-c-a-l_-p-e-r-m-i-s-s-i-o-n.html"><span>DEFAULT_</span><wbr><span>TITLE_</span><wbr><span>LOCAL_</span><wbr><span>PERMISSION</span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="1887634106%2FProperties%2F-2008736661"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-workspace/main"><div class="symbol monospace"><span class="token keyword">val </span><a href="-d-e-f-a-u-l-t_-t-i-t-l-e_-l-o-c-a-l_-p-e-r-m-i-s-s-i-o-n.html">DEFAULT_TITLE_LOCAL_PERMISSION</a><span class="token operator">: </span><a href="../../../../ketraterm-host/io.github.ketraterm.host/-terminal-title-permission/index.html">TerminalTitlePermission</a></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-293560203%2FProperties%2F-2008736661" anchor-label="DEFAULT_TITLE_REMOTE_PERMISSION" id="-293560203%2FProperties%2F-2008736661" data-filterable-set=":ketraterm-workspace/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-workspace/main" data-filterable-set=":ketraterm-workspace/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-d-e-f-a-u-l-t_-t-i-t-l-e_-r-e-m-o-t-e_-p-e-r-m-i-s-s-i-o-n.html"><span>DEFAULT_</span><wbr><span>TITLE_</span><wbr><span>REMOTE_</span><wbr><span>PERMISSION</span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-293560203%2FProperties%2F-2008736661"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-workspace/main"><div class="symbol monospace"><span class="token keyword">val </span><a href="-d-e-f-a-u-l-t_-t-i-t-l-e_-r-e-m-o-t-e_-p-e-r-m-i-s-s-i-o-n.html">DEFAULT_TITLE_REMOTE_PERMISSION</a><span class="token operator">: </span><a href="../../../../ketraterm-host/io.github.ketraterm.host/-terminal-title-permission/index.html">TerminalTitlePermission</a></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-1006126834%2FProperties%2F-2008736661" anchor-label="DEFAULT_TREAT_AMBIGUOUS_AS_WIDE" id="-1006126834%2FProperties%2F-2008736661" data-filterable-set=":ketraterm-workspace/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-workspace/main" data-filterable-set=":ketraterm-workspace/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-d-e-f-a-u-l-t_-t-r-e-a-t_-a-m-b-i-g-u-o-u-s_-a-s_-w-i-d-e.html"><span>DEFAULT_</span><wbr><span>TREAT_</span><wbr><span>AMBIGUOUS_</span><wbr><span>AS_</span><wbr><span>WIDE</span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-1006126834%2FProperties%2F-2008736661"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-workspace/main"><div class="symbol monospace"><span class="token keyword">const </span><span class="token keyword">val </span><a href="-d-e-f-a-u-l-t_-t-r-e-a-t_-a-m-b-i-g-u-o-u-s_-a-s_-w-i-d-e.html">DEFAULT_TREAT_AMBIGUOUS_AS_WIDE</a><span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-boolean/index.html">Boolean</a><span class="token operator"> = </span><span class="token boolean">false</span></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-325263465%2FProperties%2F-2008736661" anchor-label="DEFAULT_USE_SYSTEM_FALLBACK_FONTS" id="-325263465%2FProperties%2F-2008736661" data-filterable-set=":ketraterm-workspace/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-workspace/main" data-filterable-set=":ketraterm-workspace/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-d-e-f-a-u-l-t_-u-s-e_-s-y-s-t-e-m_-f-a-l-l-b-a-c-k_-f-o-n-t-s.html"><span>DEFAULT_</span><wbr><span>USE_</span><wbr><span>SYSTEM_</span><wbr><span>FALLBACK_</span><wbr><span>FONTS</span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-325263465%2FProperties%2F-2008736661"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-workspace/main"><div class="symbol monospace"><span class="token keyword">const </span><span class="token keyword">val </span><a href="-d-e-f-a-u-l-t_-u-s-e_-s-y-s-t-e-m_-f-a-l-l-b-a-c-k_-f-o-n-t-s.html">DEFAULT_USE_SYSTEM_FALLBACK_FONTS</a><span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-boolean/index.html">Boolean</a><span class="token operator"> = </span><span class="token boolean">true</span></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-1625249900%2FProperties%2F-2008736661" anchor-label="DEFAULT_VISUAL_BELL" id="-1625249900%2FProperties%2F-2008736661" data-filterable-set=":ketraterm-workspace/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-workspace/main" data-filterable-set=":ketraterm-workspace/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-d-e-f-a-u-l-t_-v-i-s-u-a-l_-b-e-l-l.html"><span>DEFAULT_</span><wbr><span>VISUAL_</span><wbr><span>BELL</span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-1625249900%2FProperties%2F-2008736661"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-workspace/main"><div class="symbol monospace"><span class="token keyword">const </span><span class="token keyword">val </span><a href="-d-e-f-a-u-l-t_-v-i-s-u-a-l_-b-e-l-l.html">DEFAULT_VISUAL_BELL</a><span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-boolean/index.html">Boolean</a><span class="token operator"> = </span><span class="token boolean">true</span></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="1041217442%2FProperties%2F-2008736661" anchor-label="FONT_SIZE_MAX" id="1041217442%2FProperties%2F-2008736661" data-filterable-set=":ketraterm-workspace/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-workspace/main" data-filterable-set=":ketraterm-workspace/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-f-o-n-t_-s-i-z-e_-m-a-x.html"><span>FONT_</span><wbr><span>SIZE_</span><wbr><span>MAX</span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="1041217442%2FProperties%2F-2008736661"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-workspace/main"><div class="symbol monospace"><span class="token keyword">const </span><span class="token keyword">val </span><a href="-f-o-n-t_-s-i-z-e_-m-a-x.html">FONT_SIZE_MAX</a><span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a><span class="token operator"> = </span><span class="token constant">56</span></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-166003084%2FProperties%2F-2008736661" anchor-label="FONT_SIZE_MIN" id="-166003084%2FProperties%2F-2008736661" data-filterable-set=":ketraterm-workspace/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-workspace/main" data-filterable-set=":ketraterm-workspace/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-f-o-n-t_-s-i-z-e_-m-i-n.html"><span>FONT_</span><wbr><span>SIZE_</span><wbr><span>MIN</span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-166003084%2FProperties%2F-2008736661"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-workspace/main"><div class="symbol monospace"><span class="token keyword">const </span><span class="token keyword">val </span><a href="-f-o-n-t_-s-i-z-e_-m-i-n.html">FONT_SIZE_MIN</a><span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a><span class="token operator"> = </span><span class="token constant">10</span></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="1709865633%2FProperties%2F-2008736661" anchor-label="LINE_HEIGHT_MAX" id="1709865633%2FProperties%2F-2008736661" data-filterable-set=":ketraterm-workspace/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-workspace/main" data-filterable-set=":ketraterm-workspace/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-l-i-n-e_-h-e-i-g-h-t_-m-a-x.html"><span>LINE_</span><wbr><span>HEIGHT_</span><wbr><span>MAX</span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="1709865633%2FProperties%2F-2008736661"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-workspace/main"><div class="symbol monospace"><span class="token keyword">const </span><span class="token keyword">val </span><a href="-l-i-n-e_-h-e-i-g-h-t_-m-a-x.html">LINE_HEIGHT_MAX</a><span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-float/index.html">Float</a><span class="token operator"> = </span><span class="token constant">1.5f</span></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="502645107%2FProperties%2F-2008736661" anchor-label="LINE_HEIGHT_MIN" id="502645107%2FProperties%2F-2008736661" data-filterable-set=":ketraterm-workspace/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-workspace/main" data-filterable-set=":ketraterm-workspace/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-l-i-n-e_-h-e-i-g-h-t_-m-i-n.html"><span>LINE_</span><wbr><span>HEIGHT_</span><wbr><span>MIN</span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="502645107%2FProperties%2F-2008736661"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-workspace/main"><div class="symbol monospace"><span class="token keyword">const </span><span class="token keyword">val </span><a href="-l-i-n-e_-h-e-i-g-h-t_-m-i-n.html">LINE_HEIGHT_MIN</a><span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-float/index.html">Float</a><span class="token operator"> = </span><span class="token constant">0.7f</span></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-1487723100%2FProperties%2F-2008736661" anchor-label="ROWS_MAX" id="-1487723100%2FProperties%2F-2008736661" data-filterable-set=":ketraterm-workspace/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-workspace/main" data-filterable-set=":ketraterm-workspace/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-r-o-w-s_-m-a-x.html"><span>ROWS_</span><wbr><span>MAX</span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-1487723100%2FProperties%2F-2008736661"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-workspace/main"><div class="symbol monospace"><span class="token keyword">const </span><span class="token keyword">val </span><a href="-r-o-w-s_-m-a-x.html">ROWS_MAX</a><span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a><span class="token operator"> = </span><span class="token constant">500</span></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="1600023670%2FProperties%2F-2008736661" anchor-label="ROWS_MIN" id="1600023670%2FProperties%2F-2008736661" data-filterable-set=":ketraterm-workspace/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-workspace/main" data-filterable-set=":ketraterm-workspace/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-r-o-w-s_-m-i-n.html"><span>ROWS_</span><wbr><span>MIN</span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="1600023670%2FProperties%2F-2008736661"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-workspace/main"><div class="symbol monospace"><span class="token keyword">const </span><span class="token keyword">val </span><a href="-r-o-w-s_-m-i-n.html">ROWS_MIN</a><span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a><span class="token operator"> = </span><span class="token constant">10</span></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="640221289%2FProperties%2F-2008736661" anchor-label="SCROLLBACK_MAX" id="640221289%2FProperties%2F-2008736661" data-filterable-set=":ketraterm-workspace/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-workspace/main" data-filterable-set=":ketraterm-workspace/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-s-c-r-o-l-l-b-a-c-k_-m-a-x.html"><span>SCROLLBACK_</span><wbr><span>MAX</span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="640221289%2FProperties%2F-2008736661"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-workspace/main"><div class="symbol monospace"><span class="token keyword">const </span><span class="token keyword">val </span><a href="-s-c-r-o-l-l-b-a-c-k_-m-a-x.html">SCROLLBACK_MAX</a><span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-566999237%2FProperties%2F-2008736661" anchor-label="SCROLLBACK_MIN" id="-566999237%2FProperties%2F-2008736661" data-filterable-set=":ketraterm-workspace/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-workspace/main" data-filterable-set=":ketraterm-workspace/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-s-c-r-o-l-l-b-a-c-k_-m-i-n.html"><span>SCROLLBACK_</span><wbr><span>MIN</span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-566999237%2FProperties%2F-2008736661"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-workspace/main"><div class="symbol monospace"><span class="token keyword">const </span><span class="token keyword">val </span><a href="-s-c-r-o-l-l-b-a-c-k_-m-i-n.html">SCROLLBACK_MIN</a><span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a><span class="token operator"> = </span><span class="token constant">0</span></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+    <div class="footer">
+        <div class="footer--container">
+            <a href="#content" id="go-to-top-link" class="footer--button footer--button_go-to-top"></a>
+            <div class="footer--content">
+                <div>
+                    <span>Generated by </span>
+                    <a class="footer--link footer--link_external" href="https://github.com/Kotlin/dokka">
+                        Dokka
+                    </a>
+                    <div>© 2026 Copyright</div>
+                </div>
+            </div>
+        </div>
+    </div>
+        </div>
+    </div>
+</div>
+</body>
+</html>

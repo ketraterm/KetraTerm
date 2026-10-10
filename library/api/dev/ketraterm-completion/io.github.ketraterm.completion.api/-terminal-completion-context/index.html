@@ -1,0 +1,473 @@
+<!doctype html>
+<html class="no-js" lang="en">
+<head>
+    <meta name="viewport" content="width=device-width, initial-scale=1" charset="UTF-8">
+    <title>TerminalCompletionContext</title>
+<link href="../../../images/logo-icon.svg" rel="icon" type="image/svg"><script>var pathToRoot = "../../../";</script>
+    <script>document.documentElement.classList.replace("no-js", "js");</script>
+    <script>const storage = localStorage.getItem("dokka-dark-mode")
+      if (storage == null) {
+        const osDarkSchemePreferred = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches
+        if (osDarkSchemePreferred === true) {
+          document.getElementsByTagName("html")[0].classList.add("theme-dark")
+        }
+      } else {
+        const savedDarkMode = JSON.parse(storage)
+        if (savedDarkMode === true) {
+          document.getElementsByTagName("html")[0].classList.add("theme-dark")
+        }
+      }
+    </script>
+<script type="text/javascript" src="../../../scripts/sourceset_dependencies.js" async></script>
+<link href="../../../styles/style.css" rel="Stylesheet">
+<link href="../../../styles/main.css" rel="Stylesheet">
+<link href="../../../styles/prism.css" rel="Stylesheet">
+<link href="../../../styles/logo-styles.css" rel="Stylesheet">
+<link href="../../../ui-kit/ui-kit.min.css" rel="Stylesheet">
+<script type="text/javascript" src="../../../scripts/safe-local-storage_blocking.js"></script>
+<script type="text/javascript" src="../../../scripts/navigation-loader.js" async></script>
+<script type="text/javascript" src="../../../scripts/platform-content-handler.js" async></script>
+<script type="text/javascript" src="../../../scripts/main.js" defer></script>
+<script type="text/javascript" src="../../../scripts/prism.js" async></script>
+<script type="text/javascript" src="../../../ui-kit/ui-kit.min.js" defer></script><!-- ketraterm-api-stylesheet:start -->
+<link rel="icon" href="../../../../../assets/logo.svg" type="image/svg+xml">
+<link rel="stylesheet" href="../../../../../assets/api-navigation.css">
+<!-- ketraterm-api-stylesheet:end --></head>
+<body>
+<div class="root"><!-- ketraterm-api-navigation:start -->
+<div class="ketraterm-api-navigation">
+  <a class="ketraterm-api-brand" href="../../../../../index.html" aria-label="KetraTerm Library home"><img src="../../../../../assets/logo.svg" alt="" width="28" height="28">KetraTerm</a>
+  <nav class="ketraterm-api-products" aria-label="KetraTerm products"><a href="https://ketraterm.github.io/KetraTerm/">App</a><a href="../../../../../index.html" aria-current="true">Library</a></nav>
+  <div class="ketraterm-api-reference"><span>API · Development</span><a href="../../../../../versions.html">All versions</a></div>
+</div>
+<!-- ketraterm-api-navigation:end -->
+    <header class="navigation theme-dark" id="navigation-wrapper" role="banner">
+<a class="library-name--link" href="../../../index.html">
+                    KetraTerm
+            </a>        <button class="navigation-controls--btn navigation-controls--btn_toc ui-kit_mobile-only" id="toc-toggle" type="button">Toggle table of contents
+        </button>
+        <div class="navigation-controls--break ui-kit_mobile-only"></div>
+        <div class="library-version" id="library-version">
+        </div>
+        <div class="navigation-controls">
+        <ul class="filter-section filter-section_loading" id="filter-section" aria-label="Target filter">
+                <button class="platform-tag platform-selector jvm-like" data-active="" aria-pressed="true" data-filter=":ketraterm-completion/main">jvm</button>
+            <div class="dropdown filter-section--dropdown" data-role="dropdown" id="filter-section-dropdown">
+                <button class="button button_dropdown filter-section--dropdown-toggle" role="combobox" data-role="dropdown-toggle" aria-controls="platform-tags-listbox" aria-haspopup="listbox" aria-expanded="false" aria-label="Toggle source sets"></button>
+                <ul role="listbox" id="platform-tags-listbox" class="dropdown--list" data-role="dropdown-listbox" aria-label="Target filter">
+                    <div class="dropdown--header"><span>Target filter</span>
+                        <button class="button" data-role="dropdown-toggle" aria-label="Close target filter">
+                            <i class="ui-kit-icon ui-kit-icon_cross"></i>
+                        </button>
+                    </div>
+                        <li role="option" class="dropdown--option platform-selector-option jvm-like" tabindex="0">
+                            <label class="checkbox">
+                                <input type="checkbox" class="checkbox--input" id=":ketraterm-completion/main" data-filter=":ketraterm-completion/main">
+                                <span class="checkbox--icon"></span>
+                                jvm
+                            </label>
+                        </li>
+                </ul>
+                <div class="dropdown--overlay"></div>
+            </div>
+        </ul>
+            <button class="navigation-controls--btn navigation-controls--btn_theme" id="theme-toggle-button" type="button">Switch theme
+            </button>
+            <div class="navigation-controls--btn navigation-controls--btn_search" id="searchBar" role="button">Search in
+                API
+            </div>
+        </div>
+    </header>
+    <div id="container">
+        <nav id="leftColumn" class="sidebar" data-item-type="SECTION" data-item-config="{&quot;defaultSize&quot;: 280, &quot;minSize&quot;: 200, &quot;maxSize&quot;: 400}">
+            <a class="toc--skip-link" href="#main">Skip to content</a>
+            <div class="dropdown theme-dark_mobile" data-role="dropdown" id="toc-dropdown">
+                <ul role="listbox" id="toc-listbox" class="dropdown--list dropdown--list_toc-list" data-role="dropdown-listbox" aria-label="Table of contents">
+                    <div class="dropdown--header">
+                            <span>
+                                    KetraTerm
+                            </span>
+                        <button class="button" data-role="dropdown-toggle" aria-label="Close table of contents">
+                            <i class="ui-kit-icon ui-kit-icon_cross"></i>
+                        </button>
+                    </div>
+                    <div class="sidebar--inner" id="sideMenu"></div>
+                </ul>
+                <div class="dropdown--overlay"></div>
+            </div>
+        </nav>
+        <div id="resizer" class="resizer" data-item-type="BAR"></div>
+        <div id="main" data-item-type="SECTION" role="main">
+<div class="main-content" data-page-type="classlike" id="content" pageids="ketraterm-completion::io.github.ketraterm.completion.api/TerminalCompletionContext///PointingToDeclaration//-293776716">
+  <div class="breadcrumbs"><a href="../../index.html">ketraterm-completion</a><span class="delimiter">/</span><a href="../index.html">io.github.ketraterm.completion.api</a><span class="delimiter">/</span><span class="current">TerminalCompletionContext</span></div>
+  <div class="cover ">
+    <h1 class="cover"><span>Terminal</span><wbr><span>Completion</span><wbr><span><span>Context</span></span></h1>
+    <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-completion/main"><div class="symbol monospace"><span class="token keyword">class </span><a href="index.html">TerminalCompletionContext</a></div><p class="paragraph">One parsed, spec-resolved completion context shared by every source.</p><p class="paragraph">The merged engine constructs this object once per request through <a href="-companion/resolve.html">resolve</a>. Custom engines use the same operation with their own command catalog. Source implementations consume it directly to determine eligibility, prefix matching, replacement ranges, and semantic argument kinds without re-tokenizing the command line. Context-owned collections reject mutation and are never reused by later requests. Command specifications remain catalog-owned; keep their nested collections unchanged while any context referencing them is in use.</p></div></div>
+  </div>
+  <div class="tabbedcontent">
+    <div class="tabs-section" tabs-section="tabs-section"><button class="section-tab" data-active="" data-togglable="CONSTRUCTOR,TYPE,PROPERTY,FUNCTION">Members</button></div>
+    <div class="tabs-section-body">
+      <div data-togglable="TYPE">
+        <h2 class="tableheader">Types</h2>
+        <div class="table"><a data-name="2000929863%2FClasslikes%2F-293776716" anchor-label="Companion" id="2000929863%2FClasslikes%2F-293776716" data-filterable-set=":ketraterm-completion/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-completion/main" data-filterable-set=":ketraterm-completion/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-companion/index.html"><span><span>Companion</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="2000929863%2FClasslikes%2F-293776716"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-completion/main"><div class="symbol monospace"><span class="token keyword">object </span><a href="-companion/index.html">Companion</a></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div data-togglable="PROPERTY">
+        <h2 class="tableheader">Properties</h2>
+        <div class="table"><a data-name="-785713441%2FProperties%2F-293776716" anchor-label="activeOption" id="-785713441%2FProperties%2F-293776716" data-filterable-set=":ketraterm-completion/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-completion/main" data-filterable-set=":ketraterm-completion/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="active-option.html"><span>active</span><wbr><span><span>Option</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-785713441%2FProperties%2F-293776716"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-completion/main"><div class="symbol monospace"><span class="token keyword">val </span><a href="active-option.html">activeOption</a><span class="token operator">: </span><a href="../../io.github.ketraterm.completion.model/-terminal-option-spec/index.html">TerminalOptionSpec</a><span class="token operator">?</span></div><div class="brief "><p class="paragraph">specification of the option whose value is being completed, or <code class="lang-kotlin">null</code> when not completing an option value.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-362563861%2FProperties%2F-293776716" anchor-label="activePosition" id="-362563861%2FProperties%2F-293776716" data-filterable-set=":ketraterm-completion/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-completion/main" data-filterable-set=":ketraterm-completion/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="active-position.html"><span>active</span><wbr><span><span>Position</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-362563861%2FProperties%2F-293776716"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-completion/main"><div class="symbol monospace"><span class="token keyword">val </span><a href="active-position.html">activePosition</a><span class="token operator">: </span><a href="../-terminal-completion-active-position/index.html">TerminalCompletionActivePosition</a></div><div class="brief "><p class="paragraph">semantic position of the active completion token (e.g. COMMAND, SUBCOMMAND, OPTION_NAME, OPTION_VALUE, POSITIONAL_ARGUMENT, OPERATOR).</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-1981236637%2FProperties%2F-293776716" anchor-label="activePositionalArgument" id="-1981236637%2FProperties%2F-293776716" data-filterable-set=":ketraterm-completion/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-completion/main" data-filterable-set=":ketraterm-completion/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="active-positional-argument.html"><span>active</span><wbr><span>Positional</span><wbr><span><span>Argument</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-1981236637%2FProperties%2F-293776716"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-completion/main"><div class="symbol monospace"><span class="token keyword">val </span><a href="active-positional-argument.html">activePositionalArgument</a><span class="token operator">: </span><a href="../../io.github.ketraterm.completion.model/-terminal-argument-spec/index.html">TerminalArgumentSpec</a><span class="token operator">?</span></div><div class="brief "><p class="paragraph">positional argument specification active at the cursor, or <code class="lang-kotlin">null</code> if unspecified or variadic limit reached.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="1675786082%2FProperties%2F-293776716" anchor-label="activePrefix" id="1675786082%2FProperties%2F-293776716" data-filterable-set=":ketraterm-completion/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-completion/main" data-filterable-set=":ketraterm-completion/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="active-prefix.html"><span>active</span><wbr><span><span>Prefix</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="1675786082%2FProperties%2F-293776716"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-completion/main"><div class="symbol monospace"><span class="token keyword">val </span><a href="active-prefix.html">activePrefix</a><span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-string/index.html">String</a></div><div class="brief "><p class="paragraph">decoded prefix text that candidates must match, taking attached option value prefixes (<code class="lang-kotlin">--key=val</code>) into account.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-1844133999%2FProperties%2F-293776716" anchor-label="activeTokenQuote" id="-1844133999%2FProperties%2F-293776716" data-filterable-set=":ketraterm-completion/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-completion/main" data-filterable-set=":ketraterm-completion/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="active-token-quote.html"><span>active</span><wbr><span>Token</span><wbr><span><span>Quote</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-1844133999%2FProperties%2F-293776716"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-completion/main"><div class="symbol monospace"><span class="token keyword">val </span><a href="active-token-quote.html">activeTokenQuote</a><span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-char/index.html">Char</a></div><div class="brief "><p class="paragraph">quote character enclosing the active token (<code class="lang-kotlin">'</code> or <code class="lang-kotlin">"</code>), or the null character <code class="lang-kotlin">\u0000</code> when unquoted.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="1591100117%2FProperties%2F-293776716" anchor-label="command" id="1591100117%2FProperties%2F-293776716" data-filterable-set=":ketraterm-completion/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-completion/main" data-filterable-set=":ketraterm-completion/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="command.html"><span><span>command</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="1591100117%2FProperties%2F-293776716"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-completion/main"><div class="symbol monospace"><span class="token keyword">val </span><a href="command.html">command</a><span class="token operator">: </span><a href="../../io.github.ketraterm.completion.model/-terminal-command-spec/index.html">TerminalCommandSpec</a><span class="token operator">?</span></div><div class="brief "><p class="paragraph">matched root command specification, or <code class="lang-kotlin">null</code> for unknown commands.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="1391560240%2FProperties%2F-293776716" anchor-label="commandPath" id="1391560240%2FProperties%2F-293776716" data-filterable-set=":ketraterm-completion/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-completion/main" data-filterable-set=":ketraterm-completion/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="command-path.html"><span>command</span><wbr><span><span>Path</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="1391560240%2FProperties%2F-293776716"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-completion/main"><div class="symbol monospace"><span class="token keyword">val </span><a href="command-path.html">commandPath</a><span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin.collections/-list/index.html">List</a><span class="token operator">&lt;</span><a href="../../io.github.ketraterm.completion.model/-terminal-command-spec/index.html">TerminalCommandSpec</a><span class="token operator">&gt;</span></div><div class="brief "><p class="paragraph">matched root-to-leaf command specification path reflecting the active subcommand hierarchy.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-939614084%2FProperties%2F-293776716" anchor-label="commandTokenIndex" id="-939614084%2FProperties%2F-293776716" data-filterable-set=":ketraterm-completion/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-completion/main" data-filterable-set=":ketraterm-completion/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="command-token-index.html"><span>command</span><wbr><span>Token</span><wbr><span><span>Index</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-939614084%2FProperties%2F-293776716"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-completion/main"><div class="symbol monospace"><span class="token keyword">val </span><a href="command-token-index.html">commandTokenIndex</a><span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a></div><div class="brief "><p class="paragraph">token index of the executable in the active command segment.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-1704173816%2FProperties%2F-293776716" anchor-label="currentCommand" id="-1704173816%2FProperties%2F-293776716" data-filterable-set=":ketraterm-completion/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-completion/main" data-filterable-set=":ketraterm-completion/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="current-command.html"><span>current</span><wbr><span><span>Command</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-1704173816%2FProperties%2F-293776716"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-completion/main"><div class="symbol monospace"><span class="token keyword">val </span><a href="current-command.html">currentCommand</a><span class="token operator">: </span><a href="../../io.github.ketraterm.completion.model/-terminal-command-spec/index.html">TerminalCommandSpec</a><span class="token operator">?</span></div><div class="brief "><p class="paragraph">deepest matched command specification in <a href="command-path.html">commandPath</a>, or <code class="lang-kotlin">null</code> when no command spec was matched.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-1311961503%2FProperties%2F-293776716" anchor-label="expectedHiddenPathPolicy" id="-1311961503%2FProperties%2F-293776716" data-filterable-set=":ketraterm-completion/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-completion/main" data-filterable-set=":ketraterm-completion/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="expected-hidden-path-policy.html"><span>expected</span><wbr><span>Hidden</span><wbr><span>Path</span><wbr><span><span>Policy</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-1311961503%2FProperties%2F-293776716"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-completion/main"><div class="symbol monospace"><span class="token keyword">val </span><a href="expected-hidden-path-policy.html">expectedHiddenPathPolicy</a><span class="token operator">: </span><a href="../../io.github.ketraterm.completion.model/-terminal-hidden-path-policy/index.html">TerminalHiddenPathPolicy</a></div><div class="brief "><p class="paragraph">hidden-entry policy expected at the cursor.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="800567305%2FProperties%2F-293776716" anchor-label="expectedPathKind" id="800567305%2FProperties%2F-293776716" data-filterable-set=":ketraterm-completion/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-completion/main" data-filterable-set=":ketraterm-completion/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="expected-path-kind.html"><span>expected</span><wbr><span>Path</span><wbr><span><span>Kind</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="800567305%2FProperties%2F-293776716"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-completion/main"><div class="symbol monospace"><span class="token keyword">val </span><a href="expected-path-kind.html">expectedPathKind</a><span class="token operator">: </span><a href="../../io.github.ketraterm.completion.model/-terminal-path-argument-kind/index.html">TerminalPathArgumentKind</a></div><div class="brief "><p class="paragraph">file-system path kind expected at the cursor (e.g. FILE, DIRECTORY, FILE_OR_DIRECTORY, or NONE).</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="1385366051%2FProperties%2F-293776716" anchor-label="expectedValueDomain" id="1385366051%2FProperties%2F-293776716" data-filterable-set=":ketraterm-completion/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-completion/main" data-filterable-set=":ketraterm-completion/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="expected-value-domain.html"><span>expected</span><wbr><span>Value</span><wbr><span><span>Domain</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="1385366051%2FProperties%2F-293776716"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-completion/main"><div class="symbol monospace"><span class="token keyword">val </span><a href="expected-value-domain.html">expectedValueDomain</a><span class="token operator">: </span><a href="../../io.github.ketraterm.completion.model/-terminal-completion-value-domain/index.html">TerminalCompletionValueDomain</a></div><div class="brief "><p class="paragraph">dynamic host-provided value domain expected at the cursor (e.g. GIT_BRANCH, ENVIRONMENT_VARIABLE, or NONE).</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-604070977%2FProperties%2F-293776716" anchor-label="optionsTerminated" id="-604070977%2FProperties%2F-293776716" data-filterable-set=":ketraterm-completion/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-completion/main" data-filterable-set=":ketraterm-completion/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="options-terminated.html"><span>options</span><wbr><span><span>Terminated</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-604070977%2FProperties%2F-293776716"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-completion/main"><div class="symbol monospace"><span class="token keyword">val </span><a href="options-terminated.html">optionsTerminated</a><span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-boolean/index.html">Boolean</a></div><div class="brief "><p class="paragraph">whether a <code class="lang-kotlin">--</code> token terminated option parsing before the cursor.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-899419289%2FProperties%2F-293776716" anchor-label="precedingArguments" id="-899419289%2FProperties%2F-293776716" data-filterable-set=":ketraterm-completion/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-completion/main" data-filterable-set=":ketraterm-completion/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="preceding-arguments.html"><span>preceding</span><wbr><span><span>Arguments</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-899419289%2FProperties%2F-293776716"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-completion/main"><div class="symbol monospace"><span class="token keyword">val </span><a href="preceding-arguments.html">precedingArguments</a><span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin.collections/-list/index.html">List</a><span class="token operator">&lt;</span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-string/index.html">String</a><span class="token operator">&gt;</span></div><div class="brief "><p class="paragraph">Decoded words after the executable and strictly before the active token, in input order. Includes subcommands, option names, values, and <code class="lang-kotlin">--</code>. Leading environment assignments and the executable are excluded. Available even without a command spec; empty at command/operator positions.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-367175269%2FProperties%2F-293776716" anchor-label="precedingPositionalArguments" id="-367175269%2FProperties%2F-293776716" data-filterable-set=":ketraterm-completion/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-completion/main" data-filterable-set=":ketraterm-completion/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="preceding-positional-arguments.html"><span>preceding</span><wbr><span>Positional</span><wbr><span><span>Arguments</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-367175269%2FProperties%2F-293776716"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-completion/main"><div class="symbol monospace"><span class="token keyword">val </span><a href="preceding-positional-arguments.html">precedingPositionalArguments</a><span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin.collections/-list/index.html">List</a><span class="token operator">&lt;</span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-string/index.html">String</a><span class="token operator">&gt;</span></div><div class="brief "><p class="paragraph">Decoded preceding positional values in input order, using the matched command spec's analysis. Excludes resolved subcommands, option names, option values, and the option terminator. After <code class="lang-kotlin">--</code>, words are positional. Empty when the command is unknown; use <a href="../../../ketraterm-completion/io.github.ketraterm.completion.api/-terminal-completion-context/preceding-arguments.html">precedingArguments</a> in that case. Unknown options have no inferred value ownership. The immutable list has the same segment, active-word exclusion, and lifetime as <a href="../../../ketraterm-completion/io.github.ketraterm.completion.api/-terminal-completion-context/preceding-arguments.html">precedingArguments</a>.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="1368845502%2FProperties%2F-293776716" anchor-label="replacementEndOffset" id="1368845502%2FProperties%2F-293776716" data-filterable-set=":ketraterm-completion/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-completion/main" data-filterable-set=":ketraterm-completion/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="replacement-end-offset.html"><span>replacement</span><wbr><span>End</span><wbr><span><span>Offset</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="1368845502%2FProperties%2F-293776716"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-completion/main"><div class="symbol monospace"><span class="token keyword">val </span><a href="replacement-end-offset.html">replacementEndOffset</a><span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a></div><div class="brief "><p class="paragraph">exclusive UTF-16 replacement end offset in the original request command line.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-713385833%2FProperties%2F-293776716" anchor-label="replacementStartOffset" id="-713385833%2FProperties%2F-293776716" data-filterable-set=":ketraterm-completion/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-completion/main" data-filterable-set=":ketraterm-completion/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="replacement-start-offset.html"><span>replacement</span><wbr><span>Start</span><wbr><span><span>Offset</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-713385833%2FProperties%2F-293776716"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-completion/main"><div class="symbol monospace"><span class="token keyword">val </span><a href="replacement-start-offset.html">replacementStartOffset</a><span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a></div><div class="brief "><p class="paragraph">inclusive UTF-16 replacement start offset in the original request command line.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="562973325%2FProperties%2F-293776716" anchor-label="staticValueCandidates" id="562973325%2FProperties%2F-293776716" data-filterable-set=":ketraterm-completion/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-completion/main" data-filterable-set=":ketraterm-completion/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="static-value-candidates.html"><span>static</span><wbr><span>Value</span><wbr><span><span>Candidates</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="562973325%2FProperties%2F-293776716"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-completion/main"><div class="symbol monospace"><span class="token keyword">val </span><a href="static-value-candidates.html">staticValueCandidates</a><span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin.collections/-list/index.html">List</a><span class="token operator">&lt;</span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-string/index.html">String</a><span class="token operator">&gt;</span></div><div class="brief "><p class="paragraph">static candidate values declared by the active option or positional argument specification.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="690368877%2FProperties%2F-293776716" anchor-label="subcommandCandidateSource" id="690368877%2FProperties%2F-293776716" data-filterable-set=":ketraterm-completion/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-completion/main" data-filterable-set=":ketraterm-completion/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="subcommand-candidate-source.html"><span>subcommand</span><wbr><span>Candidate</span><wbr><span><span>Source</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="690368877%2FProperties%2F-293776716"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-completion/main"><div class="symbol monospace"><span class="token keyword">val </span><a href="subcommand-candidate-source.html">subcommandCandidateSource</a><span class="token operator">: </span><a href="../../io.github.ketraterm.completion.model/-terminal-command-spec/index.html">TerminalCommandSpec</a><span class="token operator">?</span></div><div class="brief "><p class="paragraph">command specification whose subcommands are eligible for completion at the cursor.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-1853257765%2FProperties%2F-293776716" anchor-label="usedOptionExclusiveGroupIds" id="-1853257765%2FProperties%2F-293776716" data-filterable-set=":ketraterm-completion/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-completion/main" data-filterable-set=":ketraterm-completion/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="used-option-exclusive-group-ids.html"><span>used</span><wbr><span>Option</span><wbr><span>Exclusive</span><wbr><span>Group</span><wbr><span><span>Ids</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-1853257765%2FProperties%2F-293776716"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-completion/main"><div class="symbol monospace"><span class="token keyword">val </span><a href="used-option-exclusive-group-ids.html">usedOptionExclusiveGroupIds</a><span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin.collections/-set/index.html">Set</a><span class="token operator">&lt;</span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-string/index.html">String</a><span class="token operator">&gt;</span></div><div class="brief "><p class="paragraph">identifiers of exclusive option groups already supplied before the cursor.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div data-togglable="FUNCTION">
+        <h2 class="tableheader">Functions</h2>
+        <div class="table"><a data-name="-375236258%2FFunctions%2F-293776716" anchor-label="precedingOptionValues" id="-375236258%2FFunctions%2F-293776716" data-filterable-set=":ketraterm-completion/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-completion/main" data-filterable-set=":ketraterm-completion/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="preceding-option-values.html"><span>preceding</span><wbr><span>Option</span><wbr><span><span>Values</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-375236258%2FFunctions%2F-293776716"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-completion/main"><div class="symbol monospace"><span class="token keyword">fun </span><a href="preceding-option-values.html"><span class="token function">precedingOptionValues</span></a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">optionName<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-string/index.html">String</a></span></span><span class="token punctuation">)</span><span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin.collections/-list/index.html">List</a><span class="token operator">&lt;</span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-string/index.html">String</a><span class="token operator">&gt;</span></div><div class="brief "><p class="paragraph">Returns every completed value for a known option in input order, including repeats and empty values. <a href="preceding-option-values.html">optionName</a> may be any declared alias; matching follows command-spec lookup (trimmed and case-insensitive). Separate values and <code class="lang-kotlin">--name=value</code> use the same resolved option and decoded value semantics.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+    <div class="footer">
+        <div class="footer--container">
+            <a href="#content" id="go-to-top-link" class="footer--button footer--button_go-to-top"></a>
+            <div class="footer--content">
+                <div>
+                    <span>Generated by </span>
+                    <a class="footer--link footer--link_external" href="https://github.com/Kotlin/dokka">
+                        Dokka
+                    </a>
+                    <div>© 2026 Copyright</div>
+                </div>
+            </div>
+        </div>
+    </div>
+        </div>
+    </div>
+</div>
+</body>
+</html>

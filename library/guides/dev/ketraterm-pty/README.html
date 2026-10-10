@@ -1,0 +1,130 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="description" content="A modular Kotlin/JVM terminal emulator library for Swing and headless applications.">
+  <meta name="color-scheme" content="light dark">
+  <title>KetraTerm PTY (:ketraterm-pty) · KetraTerm Library</title>
+  <link rel="icon" href="../../../assets/logo.svg" type="image/svg+xml">
+  <link rel="preload" href="../../../assets/fonts/manrope-variable.ttf" as="font" type="font/ttf" crossorigin>
+  <link rel="stylesheet" href="../../../assets/styles.css">
+  <script type="importmap">{"imports":{"mermaid":"../../../assets/mermaid/mermaid.esm.min.mjs"}}</script>
+  <script type="module" src="../../../assets/site.js"></script>
+</head>
+<body data-product="library" data-version="Development">
+  <a class="skip" href="#main">Skip to content</a>
+  <header class="site-header">
+    <div class="site-identity">
+      <a class="brand" href="../../../index.html" aria-label="KetraTerm Library home"><img class="brand-mark" src="../../../assets/logo.svg" alt="" width="34" height="34">KetraTerm</a>
+      <nav class="product-navigation" aria-label="KetraTerm products"><a href="https://ketraterm.github.io/KetraTerm/">App</a><a href="../../../index.html" aria-current="true">Library</a></nav>
+    </div>
+    <details class="site-navigation" open><summary>Menu</summary><nav aria-label="Library navigation"><a   href="../docs/README.html">Guides</a><a aria-current="true"  href="../modules.html">Modules</a><a   href="../../../versions.html">API & versions</a><a   href="../CHANGELOG.html">Changelog</a><a  class="nav-primary" href="../README.html">Get started</a></nav></details>
+    <button class="theme-toggle" type="button" aria-label="Switch to light theme">Light</button>
+  </header>
+  <div class="docs-shell"><aside class="sidebar" aria-label="Documentation navigation"><details class="nav-disclosure" open><summary class="mobile-nav-toggle">Browse library guides</summary><div><label class="search-label">Find a library guide<input type="search" data-doc-search placeholder="Search library docs" autocomplete="off" data-index="../search.json"></label><div class="search-results" aria-live="polite"></div><details open><summary>Start here</summary><a  href="../docs/README.html">Documentation</a><a  href="../README.html">Installation</a><a  href="../modules.html">Module guides</a><a  href="../CHANGELOG.html">Changelog</a></details><details open><summary>Capabilities</summary><a  href="../docs/terminal-feature-map.html">Feature map</a><a  href="../docs/features/terminal.html">Terminal</a><a  href="../docs/features/shells.html">Shell integration</a><a  href="../docs/features/desktop.html">Swing view & hosts</a><a  href="../docs/features/completion.html">Completion</a><a  href="../docs/features/embedding.html">Embedding</a><a  href="../docs/terminal-feature-gap-map.html">Known limits</a></details><details open><summary>Embedding guides</summary><a  href="../docs/library/configuration.html">Configuration</a><a  href="../docs/library/compatibility.html">Compatibility</a><a  href="../docs/library/render-ownership.html">Render ownership</a></details><details open><summary>Reference</summary><a  href="../docs/reference/protocol.html">Protocols</a><a  href="../docs/reference/notifications.html">Notifications</a><a  href="../docs/reference/storage.html">Storage & privacy</a></details><details open><summary>Development</summary><a  href="../ARCHITECTURE.html">Architecture</a><a  href="../CONTRIBUTING.html">Contributing</a><a  href="../docs/development/conformance-testing.html">Conformance testing</a></details></div></details></aside><main id="main" tabindex="-1" class="article article-with-outline"><div class="article-top"><nav class="breadcrumb" aria-label="Breadcrumb"><ol><li><a href="../../../index.html">Library</a></li><li><a href="../modules.html">Modules</a></li><li><span aria-current="page">KetraTerm PTY (:ketraterm-pty)</span></li></ol></nav><div class="doc-version"><span>Development</span><a href="../../../versions.html">All versions</a></div></div><details class="page-outline" open><summary>On this page</summary><nav aria-label="On this page"><a class="depth-2" href="#how-to-use">How to Use</a><a class="depth-2" href="#launch-options">Launch options</a><a class="depth-2" href="#host-events">Host events</a><a class="depth-2" href="#clipboard-reads">Clipboard reads</a><a class="depth-2" href="#shell-integration-selection">Shell integration selection</a><a class="depth-2" href="#direct-connectors">Direct connectors</a><a class="depth-2" href="#sub-documentation">Sub-Documentation</a></nav></details><div class="article-content"><div class="prose"><h1 id="ketraterm-pty-ketraterm-pty">KetraTerm PTY (<code>:ketraterm-pty</code>)</h1>
+<p>Local pseudo-terminal process lifecycle, raw byte transport, and convenience
+session construction, backed by JetBrains <a href="https://github.com/JetBrains/pty4j">Pty4J</a>.
+The returned runtime is the transport-neutral <code>TerminalSession</code>.</p>
+<p>Add <code>io.github.ketraterm:ketraterm-pty</code> alongside the library entry point you use;
+see the <a href="../README.html">repository setup</a>. For a custom remote transport, use the
+<a href="../ketraterm-session/README.html">session module</a> directly.</p>
+<h2 id="how-to-use">How to Use</h2>
+<p><code>TerminalSessions.createLocalPty(options)</code> launches the child process immediately
+and returns a session in <code>Created</code> state. Output delivery starts only when you
+call <code>session.start(columns, rows)</code>. This lets a host register the session and
+bind its view before startup output can trigger callbacks.</p>
+<p>Use <code>TerminalSessions.localPty(options)</code> when output need not wait for view
+registration. Both factories clean up if their own assembly or startup fails.</p>
+<p>The host owns the returned session and must close it, including when it abandons
+startup. If registration installs host resources, the host must also release
+those resources on failure. Process creation, resizing, and disposal can block;
+schedule them outside the UI thread. Register Swing views on the EDT.</p>
+<p>Send input through the session, resize through its viewport APIs, and observe
+<code>session.state</code> for completed closure. Local close discards pending outbound
+work and does not manufacture a process exit code. See the
+<a href="../ketraterm-session/README.html#input-and-lifecycle">session lifecycle and input contract</a>
+and the <a href="../ketraterm-ui-swing/README.html#how-to-use">Swing view example</a>.</p>
+<p><a id="how-to-extend-custom-key-mappings-or-shells"></a></p>
+<h2 id="launch-options">Launch options</h2>
+<p><code>PtyOptions.create</code> builds an immutable configuration; <code>copy</code> and <code>toBuilder</code>
+support changes.</p>
+<p>Pass the executable and each argument as separate command elements. Shell
+operators such as pipes are interpreted only if the chosen executable is a
+shell and its arguments request command evaluation.</p>
+<pre><code class="language-kotlin">import io.github.ketraterm.pty.PtyOptions
+import java.nio.file.Path
+
+fun localOptions(command: List&lt;String&gt;, directory: Path): PtyOptions =
+    PtyOptions.create { draft -&gt;
+        draft.command = command
+        draft.workingDirectory = directory
+        draft.environment = PtyOptions.defaultEnvironment() + (&quot;GIT_EDITOR&quot; to &quot;vim&quot;)
+        draft.columns = 100
+        draft.rows = 30
+        draft.maxHistory = 2_000
+    }
+</code></pre>
+<p>Defaults select <code>COMSPEC</code> or <code>cmd.exe</code> on Windows; elsewhere, <code>SHELL</code> or
+<code>/bin/sh</code> with <code>-l</code>. The default working directory is the user&#39;s home.
+<code>defaultEnvironment()</code> copies the current process environment and sets the
+shared <code>TERM</code> and <code>COLORTERM</code> identity. Replacing <code>environment</code> supplies the
+complete child environment; missing variables are not added afterward.</p>
+<p>Configure <code>inputPolicy</code> for encoding choices; product key bindings belong in
+the consuming UI.</p>
+<h2 id="host-events">Host events</h2>
+<p><code>PtyEventListener</code> receives titles, bells, palette changes, and host requests.
+Delegate to <code>PtyEventListener.NONE</code> to override only the callbacks you need.
+Post UI updates to the EDT and return promptly.</p>
+<p>Metadata callbacks run during session mutation, usually on the PTY reader thread; host theme changes can invoke
+them on the calling thread. Do not reenter session mutation or wait for the UI
+thread. There is no initial event replay. Callback exceptions reach
+<code>listenerFailed(session, exception: Exception)</code>; exceptions from that callback
+are ignored.</p>
+<p><code>hostPolicy</code> controls terminal-triggered host actions. The listener implements
+the permitted action; selecting a callback does not override policy. Advertise
+only implemented host actions through <code>modeReportCapabilities</code>. See
+<a href="../ketraterm-host/README.html#host-policy">host policy</a>.</p>
+<h2 id="clipboard-reads">Clipboard reads</h2>
+<p>Implement the suspending <code>PtyEventListener.readClipboard(session, request)</code> to
+supply permitted OSC 52 reads. The default reports unavailable data. The bridge
+attaches the requesting session before output starts.</p>
+<p>Reads run on the session I/O dispatcher without parser/input locks. Follow the
+<code>TerminalClipboardReader</code> consent, selection, and cancellation contract; await
+host readiness and earlier posted writes before native access. Provider failures
+use the content-free session read audit rather than <code>listenerFailed</code>. See
+<a href="../ketraterm-session/docs/session-concurrency-locks.html#clipboard-read-lifetime-and-output-commitment">clipboard lifetime</a>.</p>
+<h2 id="shell-integration-selection">Shell integration selection</h2>
+<p><code>PtyOptions.shellIntegration</code> defaults to <code>null</code>. PTY creation does not install
+shell scripts. Select the optional <code>OscShellIntegration</code> producer for compatible
+shell hooks, or supply a host model through <code>TerminalShellIntegrationFactory.host</code>.
+A <code>startupCommand</code> requires a selected integration and waits for its prompt
+readiness. The caller installs the required shell hooks before launch and owns
+any host-supplied producer.</p>
+<p>See the <a href="../ketraterm-session/README.html#host-owned-shell-integration">session composition guide</a>
+and <a href="../ketraterm-shell-integration/README.html">optional OSC integration</a>.</p>
+<h2 id="direct-connectors">Direct connectors</h2>
+<p><code>PtyConnectors.create(command, env, workingDirectory, columns, rows)</code> launches a
+process and returns an unstarted <code>TerminalConnector</code>. Its environment default is
+<code>System.getenv()</code>; pass <code>PtyOptions.defaultEnvironment()</code> when you want KetraTerm&#39;s
+terminal identity. Start or transfer the connector to a session, and close it
+if assembly is abandoned.</p>
+<p><code>PtyConnector</code> can also wrap an existing Pty4J process. The connector then owns
+its process and streams. Prefer the transport interface for composition;
+PTY-specific <code>waitFor()</code> waits for process exit, not completion of output
+delivery. Foreground-process names are best-effort metadata; Windows uses a
+descendant heuristic and does not inspect applications inside SSH or WSL.</p>
+<h2 id="sub-documentation">Sub-Documentation</h2>
+<ul>
+<li><a href="docs/pty4j-process-lifecycle.html">Process lifecycle</a>: output ordering, worker
+threads, failure, shutdown, resizing, and native test requirements.</li>
+<li><a href="Module.html">Module ownership</a>: implementation components and dependencies.</li>
+</ul>
+</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/e3c7f9c626934093d35a67ca97afbbf1b343f28d/ketraterm-pty/README.md">View source on GitHub ↗</a></div></div></main></div>
+  <footer>
+    <a class="brand" href="../../../index.html"><img class="brand-mark" src="../../../assets/logo.svg" alt="" width="34" height="34">KetraTerm Library</a>
+    <p>Open source · Apache 2.0</p>
+    <div><a href="https://github.com/ketraterm/KetraTerm">GitHub ↗</a><a href="https://github.com/ketraterm/KetraTerm/issues">Issues ↗</a><a class="product-switch" href="https://ketraterm.github.io/KetraTerm/">Desktop app ↗</a></div>
+  </footer>
+</body>
+</html>

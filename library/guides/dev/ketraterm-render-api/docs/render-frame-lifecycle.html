@@ -1,0 +1,155 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="description" content="A modular Kotlin/JVM terminal emulator library for Swing and headless applications.">
+  <meta name="color-scheme" content="light dark">
+  <title>Render Frame Lifecycle &amp; Concurrency Invariants · KetraTerm Library</title>
+  <link rel="icon" href="../../../../assets/logo.svg" type="image/svg+xml">
+  <link rel="preload" href="../../../../assets/fonts/manrope-variable.ttf" as="font" type="font/ttf" crossorigin>
+  <link rel="stylesheet" href="../../../../assets/styles.css">
+  <script type="importmap">{"imports":{"mermaid":"../../../../assets/mermaid/mermaid.esm.min.mjs"}}</script>
+  <script type="module" src="../../../../assets/site.js"></script>
+</head>
+<body data-product="library" data-version="Development">
+  <a class="skip" href="#main">Skip to content</a>
+  <header class="site-header">
+    <div class="site-identity">
+      <a class="brand" href="../../../../index.html" aria-label="KetraTerm Library home"><img class="brand-mark" src="../../../../assets/logo.svg" alt="" width="34" height="34">KetraTerm</a>
+      <nav class="product-navigation" aria-label="KetraTerm products"><a href="https://ketraterm.github.io/KetraTerm/">App</a><a href="../../../../index.html" aria-current="true">Library</a></nav>
+    </div>
+    <details class="site-navigation" open><summary>Menu</summary><nav aria-label="Library navigation"><a   href="../../docs/README.html">Guides</a><a aria-current="true"  href="../../modules.html">Modules</a><a   href="../../../../versions.html">API & versions</a><a   href="../../CHANGELOG.html">Changelog</a><a  class="nav-primary" href="../../README.html">Get started</a></nav></details>
+    <button class="theme-toggle" type="button" aria-label="Switch to light theme">Light</button>
+  </header>
+  <div class="docs-shell"><aside class="sidebar" aria-label="Documentation navigation"><details class="nav-disclosure" open><summary class="mobile-nav-toggle">Browse library guides</summary><div><label class="search-label">Find a library guide<input type="search" data-doc-search placeholder="Search library docs" autocomplete="off" data-index="../../search.json"></label><div class="search-results" aria-live="polite"></div><details open><summary>Start here</summary><a  href="../../docs/README.html">Documentation</a><a  href="../../README.html">Installation</a><a  href="../../modules.html">Module guides</a><a  href="../../CHANGELOG.html">Changelog</a></details><details open><summary>Capabilities</summary><a  href="../../docs/terminal-feature-map.html">Feature map</a><a  href="../../docs/features/terminal.html">Terminal</a><a  href="../../docs/features/shells.html">Shell integration</a><a  href="../../docs/features/desktop.html">Swing view & hosts</a><a  href="../../docs/features/completion.html">Completion</a><a  href="../../docs/features/embedding.html">Embedding</a><a  href="../../docs/terminal-feature-gap-map.html">Known limits</a></details><details open><summary>Embedding guides</summary><a  href="../../docs/library/configuration.html">Configuration</a><a  href="../../docs/library/compatibility.html">Compatibility</a><a  href="../../docs/library/render-ownership.html">Render ownership</a></details><details open><summary>Reference</summary><a  href="../../docs/reference/protocol.html">Protocols</a><a  href="../../docs/reference/notifications.html">Notifications</a><a  href="../../docs/reference/storage.html">Storage & privacy</a></details><details open><summary>Development</summary><a  href="../../ARCHITECTURE.html">Architecture</a><a  href="../../CONTRIBUTING.html">Contributing</a><a  href="../../docs/development/conformance-testing.html">Conformance testing</a></details></div></details></aside><main id="main" tabindex="-1" class="article article-with-outline"><div class="article-top"><nav class="breadcrumb" aria-label="Breadcrumb"><ol><li><a href="../../../../index.html">Library</a></li><li><a href="../../modules.html">Modules</a></li><li><a href="../README.html">ketraterm-render-api</a></li><li><span aria-current="page">Render Frame Lifecycle &amp; Concurrency Invariants</span></li></ol></nav><div class="doc-version"><span>Development</span><a href="../../../../versions.html">All versions</a></div></div><details class="page-outline" open><summary>On this page</summary><nav aria-label="On this page"><a class="depth-2" href="#1-frame-reader--consumer-synchronization">1. Frame Reader &amp; Consumer Synchronization</a><a class="depth-3" href="#critical-lifespan-rule">Critical Lifespan Rule</a><a class="depth-2" href="#2-generation-counters">2. Generation counters</a><a class="depth-2" href="#3-primitive-copy-contracts">3. Primitive Copy Contracts</a><a class="depth-2" href="#viewports-and-absolute-ranges">Viewports and absolute ranges</a></nav></details><div class="article-content"><div class="prose"><h1 id="render-frame-lifecycle--concurrency-invariants">Render Frame Lifecycle &amp; Concurrency Invariants</h1>
+<p>A render read supplies a consistent borrowed view of one viewport. The API is
+synchronous and supports copying primitive data without requiring per-cell
+objects. Allocation and synchronization depend on the reader and consumer
+implementations.</p>
+<h2 id="1-frame-reader--consumer-synchronization">1. Frame Reader &amp; Consumer Synchronization</h2>
+<p><code>TerminalRenderFrameReader.readRenderFrame</code> invokes
+<code>TerminalRenderFrameConsumer.accept</code> before returning. An implementation may hold
+a mutation lock while invoking the callback. Keep callbacks short: copy rows,
+clusters, and metadata, then paint or analyze the copied data after the read.</p>
+<h3 id="critical-lifespan-rule">Critical Lifespan Rule</h3>
+<p>The <code>TerminalRenderFrame</code> is valid only during its callback. Do not cache it or
+send it to another thread. Readers may reuse a frame instance across calls.
+Caller-owned destination arrays retain the copied values after the read returns;
+the consumer owns their subsequent synchronization.</p>
+<p>Nested reads on the same reader need not be supported. An unsupported nested read
+must throw <code>IllegalStateException</code> without disturbing the enclosing frame. A
+consumer should finish its current read before requesting another viewport.</p>
+<p><code>copyCursor</code> passes primitive cursor fields to a <code>TerminalRenderCursorSink</code>.
+Its default implementation adapts the immutable <code>cursor</code> value; providers can
+override it to avoid creating a cursor object. Blink mode is terminal state;
+current blink phase and timing belong to the UI.</p>
+<p><a id="2-monotonic-generation-counters"></a></p>
+<h2 id="2-generation-counters">2. Generation counters</h2>
+<p>Compare generations for equality or inequality, never for ordering: counters can
+wrap and are local to one reader&#39;s content source. Include reader identity in
+cache keys, and reset caches when unrelated content replaces that source.</p>
+<div class="table-scroll"><table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Meaning and invalidation</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>frameGeneration</code></td>
+<td>Any visually relevant mutation, including cursor changes. A caller-selected viewport still needs its own cache key.</td>
+</tr>
+<tr>
+<td><code>contentGeneration</code></td>
+<td>Retained cell content and terminal-owned row mapping, including off-screen history. Cursor-only changes need not advance it. Defaults to <code>frameGeneration</code>.</td>
+</tr>
+<tr>
+<td><code>historyContentGeneration</code></td>
+<td>Retained-history identity/layout in the active buffer. Replacement, clearing, and resize/reflow advance it; ordinary live edits, history admission, and eviction do not. Defaults to <code>contentGeneration</code>.</td>
+</tr>
+<tr>
+<td><code>structureGeneration</code></td>
+<td>Terminal-owned row mapping/shape changes, including scrolling, resize, reset, buffer switches, and reflow.</td>
+</tr>
+<tr>
+<td><code>lineGeneration(row)</code></td>
+<td>Visual cell content, attributes, hyperlinks, cluster text, or wrap status for that visible row.</td>
+</tr>
+<tr>
+<td><code>lineId(row)</code></td>
+<td>Stable line identity moving with content. <code>0</code> means unavailable.</td>
+</tr>
+</tbody></table></div>
+<p>Include <code>activeBuffer</code> alongside <code>historyContentGeneration</code>; a non-clearing buffer
+switch preserves each buffer&#39;s own history counter. Use line identities, line
+generations, and <code>discardedCount</code> to detect edits and eviction. A history counter
+alone does not describe those changes.</p>
+<p>Global presentation changes can preserve <code>contentGeneration</code>, but must change
+<code>lineGeneration</code> for rows whose rendered attributes change. Palette, cursor, and
+viewport metadata must also participate in the consumer&#39;s invalidation strategy.</p>
+<p><code>outputEndAbsoluteRow</code> is the exclusive boundary of authored output, independent
+of the requested viewport. It includes explicitly authored blank lines and
+excludes an untouched live tail. It can retreat after row replacement and is
+scoped to <code>historyContentGeneration</code>. It does not promise that the last logical
+line is complete or immutable. <code>Long.MAX_VALUE</code> means the provider does not expose
+this boundary.</p>
+<p><a id="3-allocation-free-copy-contracts"></a></p>
+<h2 id="3-primitive-copy-contracts">3. Primitive Copy Contracts</h2>
+<p><code>copyLine</code> copies one row in logical terminal-column order. Required destination
+arrays are <code>codeWords</code>, <code>attrWords</code>, and <code>flags</code>; optional channels are
+<code>extraAttrWords</code> and <code>hyperlinkIds</code>. Each supplied array needs <code>columns</code> entries
+from its corresponding nonnegative offset. The row is in <code>0 until rows</code>.
+Core&#39;s frame implementation rejects invalid rows or capacities with
+<code>IllegalArgumentException</code>.</p>
+<p>Use <a href="attribute-packing.html#cell-flags">public cell flags</a> to distinguish scalar,
+cluster, empty, wide-leading, and wide-trailing cells. <code>codeWords</code> is zero for
+clusters, empty cells, and wide trailing cells. Attribute words remain available
+for every cell, including cells with no glyph. A hyperlink ID of zero means no
+hyperlink; resolving a nonzero ID belongs to the host/session integration.</p>
+<p>Cluster receivers run synchronously during <code>copyLine</code>:</p>
+<ul>
+<li><code>TerminalRenderClusterDataSink</code> receives a borrowed code-point array slice.
+Copy that slice before the sink callback returns; a provider may reuse it for
+the next cluster.</li>
+<li><code>TerminalRenderClusterSink</code> receives full grapheme text. Its advertised lifetime
+is the enclosing frame callback unless the provider promises more.</li>
+<li>The <code>column</code> argument identifies the logical cluster-leading column in the
+copied row, independent of the destination-array offsets.</li>
+</ul>
+<p>Prefer the primitive cluster sink when maintaining a cache. Requesting the text
+sink may create strings; providing primitive arrays does not make all reads
+allocation-free. Optional channels can be omitted when the consumer does not need
+them.</p>
+<h2 id="viewports-and-absolute-ranges">Viewports and absolute ranges</h2>
+<p>A scrollback offset is measured in rows above the live bottom viewport. Providers
+clamp it to available history and report the resolved value in
+<code>frame.scrollbackOffset</code>. Requesting a viewport does not mutate terminal state.
+The overload with <code>viewportRows</code> supports render-only overscan and must not resize
+the terminal or change host-visible dimensions.</p>
+<p>The default scrollback overload delegates to the bottom-pinned read; the default
+overscan overload delegates to the scrollback read. Consumers must use the
+returned metadata rather than assume every provider implements these options.</p>
+<p><code>readRenderFrameForAbsoluteRange(start, end, consumer)</code> accepts an inclusive range
+with <code>0 &lt;= start &lt;= end</code>. It exposes a clamped retained frame that can start
+before the requested row when the range begins inside the live grid. Intersect
+the requested range with the returned frame before extracting text, including
+when the entire requested range has been discarded.</p>
+<p>For a returned frame, its top absolute row is
+<code>discardedCount + historySize - scrollbackOffset</code>; visible row <code>r</code> is that value
+plus <code>r</code>. Absolute coordinates continue across history eviction but need source,
+buffer, and history-generation context after replacement or reset.</p>
+<p>The default range method reads metadata and then makes a relative viewport read.
+A stateful caller must serialize the whole operation against mutation, or the
+provider must override it to resolve the range and expose the frame atomically.
+<code>TerminalSession</code> provides that serialization for its readers. For bounded copied
+range data, see
+<a href="../../ketraterm-render-cache/README.html"><code>TerminalRenderRangeCopy</code></a>.</p>
+</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/e3c7f9c626934093d35a67ca97afbbf1b343f28d/ketraterm-render-api/docs/render-frame-lifecycle.md">View source on GitHub ↗</a></div></div></main></div>
+  <footer>
+    <a class="brand" href="../../../../index.html"><img class="brand-mark" src="../../../../assets/logo.svg" alt="" width="34" height="34">KetraTerm Library</a>
+    <p>Open source · Apache 2.0</p>
+    <div><a href="https://github.com/ketraterm/KetraTerm">GitHub ↗</a><a href="https://github.com/ketraterm/KetraTerm/issues">Issues ↗</a><a class="product-switch" href="https://ketraterm.github.io/KetraTerm/">Desktop app ↗</a></div>
+  </footer>
+</body>
+</html>

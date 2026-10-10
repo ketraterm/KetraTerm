@@ -1,0 +1,112 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="description" content="A modular Kotlin/JVM terminal emulator library for Swing and headless applications.">
+  <meta name="color-scheme" content="light dark">
+  <title>Persistent storage · KetraTerm Library</title>
+  <link rel="icon" href="../../../../assets/logo.svg" type="image/svg+xml">
+  <link rel="preload" href="../../../../assets/fonts/manrope-variable.ttf" as="font" type="font/ttf" crossorigin>
+  <link rel="stylesheet" href="../../../../assets/styles.css">
+  <script type="importmap">{"imports":{"mermaid":"../../../../assets/mermaid/mermaid.esm.min.mjs"}}</script>
+  <script type="module" src="../../../../assets/site.js"></script>
+</head>
+<body data-product="library" data-version="Development">
+  <a class="skip" href="#main">Skip to content</a>
+  <header class="site-header">
+    <div class="site-identity">
+      <a class="brand" href="../../../../index.html" aria-label="KetraTerm Library home"><img class="brand-mark" src="../../../../assets/logo.svg" alt="" width="34" height="34">KetraTerm</a>
+      <nav class="product-navigation" aria-label="KetraTerm products"><a href="https://ketraterm.github.io/KetraTerm/">App</a><a href="../../../../index.html" aria-current="true">Library</a></nav>
+    </div>
+    <details class="site-navigation" open><summary>Menu</summary><nav aria-label="Library navigation"><a aria-current="true"  href="../README.html">Guides</a><a   href="../../modules.html">Modules</a><a   href="../../../../versions.html">API & versions</a><a   href="../../CHANGELOG.html">Changelog</a><a  class="nav-primary" href="../../README.html">Get started</a></nav></details>
+    <button class="theme-toggle" type="button" aria-label="Switch to light theme">Light</button>
+  </header>
+  <div class="docs-shell"><aside class="sidebar" aria-label="Documentation navigation"><details class="nav-disclosure" open><summary class="mobile-nav-toggle">Browse library guides</summary><div><label class="search-label">Find a library guide<input type="search" data-doc-search placeholder="Search library docs" autocomplete="off" data-index="../../search.json"></label><div class="search-results" aria-live="polite"></div><details open><summary>Start here</summary><a  href="../README.html">Documentation</a><a  href="../../README.html">Installation</a><a  href="../../modules.html">Module guides</a><a  href="../../CHANGELOG.html">Changelog</a></details><details open><summary>Capabilities</summary><a  href="../terminal-feature-map.html">Feature map</a><a  href="../features/terminal.html">Terminal</a><a  href="../features/shells.html">Shell integration</a><a  href="../features/desktop.html">Swing view & hosts</a><a  href="../features/completion.html">Completion</a><a  href="../features/embedding.html">Embedding</a><a  href="../terminal-feature-gap-map.html">Known limits</a></details><details open><summary>Embedding guides</summary><a  href="../library/configuration.html">Configuration</a><a  href="../library/compatibility.html">Compatibility</a><a  href="../library/render-ownership.html">Render ownership</a></details><details open><summary>Reference</summary><a  href="protocol.html">Protocols</a><a  href="notifications.html">Notifications</a><a aria-current="page" href="storage.html">Storage & privacy</a></details><details open><summary>Development</summary><a  href="../../ARCHITECTURE.html">Architecture</a><a  href="../../CONTRIBUTING.html">Contributing</a><a  href="../development/conformance-testing.html">Conformance testing</a></details></div></details></aside><main id="main" tabindex="-1" class="article article-with-outline"><div class="article-top"><nav class="breadcrumb" aria-label="Breadcrumb"><ol><li><a href="../../../../index.html">Library</a></li><li><span>Reference</span></li><li><span aria-current="page">Persistent storage</span></li></ol></nav><div class="doc-version"><span>Development</span><a href="../../../../versions.html">All versions</a></div></div><details class="page-outline" open><summary>On this page</summary><nav aria-label="On this page"><a class="depth-2" href="#locations">Locations</a><a class="depth-2" href="#completion-learning">Completion learning</a><a class="depth-2" href="#file-format">File format</a><a class="depth-2" href="#privacy">Privacy</a></nav></details><div class="article-content"><div class="prose"><h1 id="persistent-storage">Persistent storage</h1>
+<p>The standalone app owns its configuration files. IntelliJ uses IDE-managed
+application/project settings. Library embedders choose their own persistence.</p>
+<h2 id="locations">Locations</h2>
+<div class="table-scroll"><table>
+<thead>
+<tr>
+<th>Data</th>
+<th>Location</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Standalone preferences</td>
+<td>Resolved <code>config.toml</code>; see <a href="https://ketraterm.github.io/KetraTerm/settings.html#2-directory-resolution-hierarchy">path resolution</a>.</td>
+</tr>
+<tr>
+<td>Malformed standalone configuration backup</td>
+<td><code>&lt;config filename&gt;.broken</code> beside the configuration; see <a href="https://ketraterm.github.io/KetraTerm/settings.html#3-configuration-backup--fallback-lifecycle">recovery behavior</a>.</td>
+</tr>
+<tr>
+<td>Standalone completion learning</td>
+<td><code>command-completion-learning-v3.tsv</code> beside the configuration.</td>
+</tr>
+<tr>
+<td>IntelliJ completion learning</td>
+<td><code>ketraterm/command-completion-learning-v3.tsv</code> under the IDE system directory.</td>
+</tr>
+<tr>
+<td>IntelliJ tab state</td>
+<td>Project workspace storage; see <a href="../features/desktop.html#product-integration">tab restoration</a>.</td>
+</tr>
+</tbody></table></div>
+<p>Raw terminal output is not saved automatically. Explicit output export is a
+separate user action.</p>
+<h2 id="completion-learning">Completion learning</h2>
+<p>Persistence is opt-in and requires completion to be enabled. Standalone uses
+<code>suggestion_learning_persistence_enabled</code> under <code>[behavior]</code>. Product settings
+controls are currently hidden; see <a href="../features/completion.html#availability">completion availability</a>.</p>
+<p>A product starting with persistence disabled neither loads nor writes the
+learning file. Enabling hydrates the fixed file once. Disabling prevents new
+writes but does not clear in-memory learning or cancel a file operation already
+in progress. An unreadable/rejected file blocks ordinary writes until an explicit
+learning reset or a new coordinator lifecycle.</p>
+<p>Dirty state is checkpointed every 30 seconds and on shutdown. Products allow up
+to 500 ms for final persistence, so shutdown is not an unconditional durability
+guarantee. Files are bounded; replacement is atomic where the filesystem supports
+it, with ordinary replacement as a fallback. The
+<a href="../../ketraterm-completion-persistence/README.html">persistence module</a> defines worker,
+failure, and lifecycle contracts.</p>
+<h2 id="file-format">File format</h2>
+<p>Version 3 starts with <code>KetraTerm_COMMAND_COMPLETION_LEARNING&lt;TAB&gt;3</code>.
+Ranking rows precede replay rows:</p>
+<div class="table-scroll"><table>
+<thead>
+<tr>
+<th>Row</th>
+<th>Stored fields</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>R</code></td>
+<td>Command digest, profile, working directory, usage/success/failure/acceptance/dismissal counters, and last-used time.</td>
+</tr>
+<tr>
+<td><code>H</code></td>
+<td>Matching digest and context plus policy-approved successful command text.</td>
+</tr>
+</tbody></table></div>
+<p>Text fields use unpadded Base64URL. Unsupported versions, malformed rows, and
+inconsistent ranking/replay pairs reject the whole file. Derived matching data
+is recomputed, not persisted.</p>
+<h2 id="privacy">Privacy</h2>
+<p>Replay filtering excludes leading-whitespace commands, multiline/control-bearing
+or oversized text, malformed UTF-16, and recognized credential patterns. A host
+can further restrict replay with a predicate. Commands rejected for replay may
+still contribute opaque ranking evidence; malformed UTF-16 is not learned.</p>
+<p>Approved replay contains command text. Base64URL is encoding, not encryption;
+deterministic digests can be guessed from candidate commands. Filtering is
+best-effort and cannot identify every secret. Treat the learning file as
+sensitive local command-derived data.</p>
+</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/e3c7f9c626934093d35a67ca97afbbf1b343f28d/docs/reference/storage.md">View source on GitHub ↗</a></div></div></main></div>
+  <footer>
+    <a class="brand" href="../../../../index.html"><img class="brand-mark" src="../../../../assets/logo.svg" alt="" width="34" height="34">KetraTerm Library</a>
+    <p>Open source · Apache 2.0</p>
+    <div><a href="https://github.com/ketraterm/KetraTerm">GitHub ↗</a><a href="https://github.com/ketraterm/KetraTerm/issues">Issues ↗</a><a class="product-switch" href="https://ketraterm.github.io/KetraTerm/">Desktop app ↗</a></div>
+  </footer>
+</body>
+</html>

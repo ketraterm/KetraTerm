@@ -1,0 +1,262 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="description" content="A modular Kotlin/JVM terminal emulator library for Swing and headless applications.">
+  <meta name="color-scheme" content="light dark">
+  <title>KetraTerm UI Swing (:ketraterm-ui-swing) · KetraTerm Library</title>
+  <link rel="icon" href="../../../assets/logo.svg" type="image/svg+xml">
+  <link rel="preload" href="../../../assets/fonts/manrope-variable.ttf" as="font" type="font/ttf" crossorigin>
+  <link rel="stylesheet" href="../../../assets/styles.css">
+  <script type="importmap">{"imports":{"mermaid":"../../../assets/mermaid/mermaid.esm.min.mjs"}}</script>
+  <script type="module" src="../../../assets/site.js"></script>
+</head>
+<body data-product="library" data-version="Development">
+  <a class="skip" href="#main">Skip to content</a>
+  <header class="site-header">
+    <div class="site-identity">
+      <a class="brand" href="../../../index.html" aria-label="KetraTerm Library home"><img class="brand-mark" src="../../../assets/logo.svg" alt="" width="34" height="34">KetraTerm</a>
+      <nav class="product-navigation" aria-label="KetraTerm products"><a href="https://ketraterm.github.io/KetraTerm/">App</a><a href="../../../index.html" aria-current="true">Library</a></nav>
+    </div>
+    <details class="site-navigation" open><summary>Menu</summary><nav aria-label="Library navigation"><a   href="../docs/README.html">Guides</a><a aria-current="true"  href="../modules.html">Modules</a><a   href="../../../versions.html">API & versions</a><a   href="../CHANGELOG.html">Changelog</a><a  class="nav-primary" href="../README.html">Get started</a></nav></details>
+    <button class="theme-toggle" type="button" aria-label="Switch to light theme">Light</button>
+  </header>
+  <div class="docs-shell"><aside class="sidebar" aria-label="Documentation navigation"><details class="nav-disclosure" open><summary class="mobile-nav-toggle">Browse library guides</summary><div><label class="search-label">Find a library guide<input type="search" data-doc-search placeholder="Search library docs" autocomplete="off" data-index="../search.json"></label><div class="search-results" aria-live="polite"></div><details open><summary>Start here</summary><a  href="../docs/README.html">Documentation</a><a  href="../README.html">Installation</a><a  href="../modules.html">Module guides</a><a  href="../CHANGELOG.html">Changelog</a></details><details open><summary>Capabilities</summary><a  href="../docs/terminal-feature-map.html">Feature map</a><a  href="../docs/features/terminal.html">Terminal</a><a  href="../docs/features/shells.html">Shell integration</a><a  href="../docs/features/desktop.html">Swing view & hosts</a><a  href="../docs/features/completion.html">Completion</a><a  href="../docs/features/embedding.html">Embedding</a><a  href="../docs/terminal-feature-gap-map.html">Known limits</a></details><details open><summary>Embedding guides</summary><a  href="../docs/library/configuration.html">Configuration</a><a  href="../docs/library/compatibility.html">Compatibility</a><a  href="../docs/library/render-ownership.html">Render ownership</a></details><details open><summary>Reference</summary><a  href="../docs/reference/protocol.html">Protocols</a><a  href="../docs/reference/notifications.html">Notifications</a><a  href="../docs/reference/storage.html">Storage & privacy</a></details><details open><summary>Development</summary><a  href="../ARCHITECTURE.html">Architecture</a><a  href="../CONTRIBUTING.html">Contributing</a><a  href="../docs/development/conformance-testing.html">Conformance testing</a></details></div></details></aside><main id="main" tabindex="-1" class="article article-with-outline"><div class="article-top"><nav class="breadcrumb" aria-label="Breadcrumb"><ol><li><a href="../../../index.html">Library</a></li><li><a href="../modules.html">Modules</a></li><li><span aria-current="page">KetraTerm UI Swing (:ketraterm-ui-swing)</span></li></ol></nav><div class="doc-version"><span>Development</span><a href="../../../versions.html">All versions</a></div></div><details class="page-outline" open><summary>On this page</summary><nav aria-label="On this page"><a class="depth-2" href="#how-to-use">How to Use</a><a class="depth-3" href="#binding-and-configuration-ownership">Binding and configuration ownership</a><a class="depth-3" href="#manual-paste">Manual paste</a><a class="depth-3" href="#middle-button-paste">Middle-button paste</a><a class="depth-3" href="#selection-and-cell-coordinates">Selection and cell coordinates</a><a class="depth-3" href="#cursor-presentation">Cursor presentation</a><a class="depth-3" href="#suggestion-request-ownership">Suggestion request ownership</a><a class="depth-2" href="#how-to-extend-custom-host-services">How to Extend: Custom Host Services</a><a class="depth-2" href="#hyperlink-detection">Hyperlink detection</a><a class="depth-2" href="#sub-documentation">Sub-Documentation</a></nav></details><div class="article-content"><div class="prose"><h1 id="ketraterm-ui-swing-ketraterm-ui-swing">KetraTerm UI Swing (<code>:ketraterm-ui-swing</code>)</h1>
+<p><code>SwingTerminal</code> is a reusable Swing <code>JComponent</code> for a <code>TerminalSession</code>. It paints
+terminal frames and routes user input through the session. The host supplies the
+connection, session lifetime, and optional clipboard, font, hyperlink, and action
+services. This module requires JVM 25 and has no PTY or IntelliJ dependency.</p>
+<h2 id="how-to-use">How to Use</h2>
+<p>Create the view on the Swing Event Dispatch Thread (EDT), bind a session, and add
+the component to your layout. Bind before session startup when output must wait
+for host registration. Retain the <code>SwingTerminal</code> so the host can dispose it when
+the view closes. It can also be constructed before the session exists, then bound
+later.</p>
+<!-- compiled-example:terminal-view -->
+<pre><code class="language-kotlin">import io.github.ketraterm.session.TerminalSession
+import io.github.ketraterm.ui.swing.api.SwingTerminal
+import io.github.ketraterm.ui.swing.settings.SwingSettings
+import io.github.ketraterm.ui.swing.settings.TerminalTheme
+import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionProvider
+import java.awt.Font
+import javax.swing.SwingUtilities
+
+fun createTerminalView(session: TerminalSession): SwingTerminal {
+    return createUnboundTerminalView().apply { bind(session) }
+}
+
+fun createUnboundTerminalView(
+    provider: SwingShellSuggestionProvider? = null,
+): SwingTerminal {
+    check(SwingUtilities.isEventDispatchThread()) { &quot;Create terminal views on the EDT&quot; }
+
+    val settings = SwingSettings.create {
+        it.palette = TerminalTheme.ONE_DARK.createPalette()
+        it.font = Font(&quot;Cascadia Mono&quot;, Font.PLAIN, 15)
+        it.columns = 80
+        it.rows = 24
+    }
+
+    return SwingTerminal(settingsProvider = { settings }).apply {
+        setShellSuggestionProvider(provider)
+    }
+}
+</code></pre>
+<p>The font name is a host choice; use a font available in your environment.
+<code>columns</code> and <code>rows</code> set the preferred size. Once laid out, the visible cell
+dimensions determine the live session&#39;s grid and connector size.</p>
+<h3 id="binding-and-configuration-ownership">Binding and configuration ownership</h3>
+<p>The host owns the session. <code>unbind()</code> and <code>dispose()</code> cancel view work without
+closing the session or restoring earlier settings or dimensions. Rebinding clears
+view state and starts observation of the new session. Dispose the component when
+its host closes; close the session separately when its connection should end.</p>
+<p>Binding applies the view&#39;s ambiguous-width policy, palette, cursor shape, paste
+policy, and visible geometry to the session. Return a new immutable <code>SwingSettings</code>
+snapshot from <code>settingsProvider</code>, then call <code>reloadSettings()</code> to apply changes.
+Unchanged palette and cursor settings preserve application-controlled values.
+Builders are mutable construction drafts; <code>build</code>, <code>create</code>, and <code>copy</code> freeze
+detached snapshots.</p>
+<p>Access Swing state on the EDT unless a method explicitly documents another
+threading contract. <code>bind</code>, <code>unbind</code>, <code>dispose</code>, and <code>reloadSettings</code> execute
+immediately on the EDT and dispatch asynchronously when called elsewhere. An
+off-EDT call does not mean that the operation has completed.</p>
+<p>Use one controlling view per session. Settings, dimensions, and the published
+viewport belong to the session; multiple components cannot scroll or configure
+it independently. After session closure, the view retains the final grid and
+selection. Width changes clip rather than reflow it; height changes expose a
+bottom-anchored window over retained rows. Presentation changes do not restart
+the session.</p>
+<h3 id="manual-paste">Manual paste</h3>
+<p><code>pasteText(text)</code> accepts host-supplied text on the EDT without reading a
+clipboard. For asynchronous clipboard access, capture the intended binding,
+perform the read in host-owned work, and verify that binding on the EDT before
+calling <code>pasteText</code>. The host must discard results from an obsolete binding.</p>
+<p><code>pasteClipboardText()</code> reads the supplied clipboard handler synchronously on
+the EDT. Both paste methods use session policy and admission; <code>true</code> means
+admitted, not delivered. Empty text, an unavailable session, off-EDT calls,
+and rejected admission return <code>false</code>.</p>
+<p><code>copyOnSelection</code> copies a nonempty selection at local primary-button gesture
+completion. It defaults to <code>false</code> and uses the supplied clipboard handler.
+Application mouse reporting takes priority unless Shift forces local interaction.
+Clipboard callbacks run on the EDT.</p>
+<h3 id="middle-button-paste">Middle-button paste</h3>
+<p><code>middleClickPaste</code> defaults to <code>false</code>. When enabled, a local middle-button press
+uses <code>middleClickPasteSource</code>: <code>SwingPasteSource.CLIPBOARD</code> by default, or
+<code>PRIMARY_SELECTION</code> for native primary-selection text. The built-in path reads
+only that source synchronously on the EDT. An unavailable primary selection
+never falls back to the ordinary clipboard. Keyboard, menu, and programmatic
+clipboard paste still use the ordinary clipboard.</p>
+<p>For asynchronous or custom access, install
+<code>SwingHostServices.middleClickPasteHandler</code>. It receives the source and local
+press coordinates on the EDT. Finish once with <code>request.complete(text)</code> or
+<code>request.cancel()</code> on the EDT; there is no fallback after the handler returns.
+Completion rejects a closed or changed binding. The host owns cancellation and
+supersession of its work. See
+<a href="https://github.com/ketraterm/KetraTerm/blob/e3c7f9c626934093d35a67ca97afbbf1b343f28d/ketraterm-ui-swing/src/main/kotlin/io/github/ketraterm/ui/swing/api/SwingTerminalMiddleClickPasteRequest.kt"><code>SwingTerminalMiddleClickPasteRequest</code></a>
+for completion and lifetime details.</p>
+<h3 id="selection-and-cell-coordinates">Selection and cell coordinates</h3>
+<p><code>selectedText()</code> reads the complete retained selection on the EDT without
+clipboard access. It includes offscreen and closed-session content, joins soft
+wraps for linear selections, and preserves block-selection row breaks. It reads
+current content rather than frozen selection text. <code>null</code> means unavailable;
+an empty string can represent selected blanks removed by trimming. Clipboard
+copy uses the same extraction. Use <code>createSelectionRange</code>, <code>setSelection</code>, and
+<code>clearSelection</code> for host-controlled ranges; see the
+<a href="docs/swing-repaint-optimization.html#2-selection-drag-matrix--text-extraction">selection contract</a>.</p>
+<p><code>copyCellPositionAt(x, y, destination)</code> maps component-local pixels to a
+zero-based logical column and displayed-frame row on the EDT. Invalid hits
+return <code>false</code> and set the caller-owned <code>Point</code> to <code>(-1, -1)</code>. Use
+<code>copyCellBounds</code> for the reverse mapping. Both account for the displayed grid,
+including padding, bidi placement, and scrolling.</p>
+<h3 id="cursor-presentation">Cursor presentation</h3>
+<p>Focused cursors use the application&#39;s shape and blink state. Unfocused blocks
+become steady outlines; bars and underlines remain steady. Application-hidden
+cursors stay hidden.</p>
+<h3 id="suggestion-request-ownership">Suggestion request ownership</h3>
+<p>Call <code>setShellSuggestionProvider(provider)</code> on the EDT before or after binding.
+The provider survives rebinding; replacing it cancels current requests without
+closing the provider. Passing <code>null</code> disables configured provider requests.
+The host retains ownership of engines, sources, persistence, and their resources.</p>
+<p>The terminal coordinates automatic focus, eligibility, debounce, and session
+observation. <code>smartSuggestionsEnabled</code> gates all suggestions;
+<code>shellSuggestionsEnabled</code> gates automatic popups. An explicit
+<code>requestActiveShellSuggestions()</code> uses the bound session&#39;s command source and
+remains available when automatic popups are disabled. Use
+<code>refreshShellSuggestions()</code> to reconcile changes to external ranking context.</p>
+<p>For command text outside the session, call <code>requestShellSuggestions</code> with its
+text, UTF-16 cursor offset, and zero-based cell anchor. Its trigger defaults to
+<code>AUTOMATIC</code>; pass <code>EXPLICIT</code> for an explicit command. The host must replace or hide
+the request when that external context changes. Supply an explicit <code>editTarget</code>
+for a custom editor. Normal terminal completion captures editing authority from
+the bound session, which requires a synchronized revisioned command source such
+as <code>TerminalShellCommandLineState</code> or the optional OSC producer. A read-only
+StateFlow model alone cannot admit conditional edits. See the
+<a href="../ketraterm-session/docs/session-concurrency-locks.html#conditional-command-edits">conditional edit contract</a>.</p>
+<p>Provider <code>open</code> runs on the EDT before background collection; keep it cheap.
+Each interaction captures its source and feedback handler and accepts one provider
+collection. Lifecycle changes invalidate obsolete results and edits.</p>
+<div class="table-scroll"><table>
+<thead>
+<tr>
+<th>Integration</th>
+<th>Host responsibility</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Embedded popup</td>
+<td>Configure a provider; optionally replace the keymap or view factory</td>
+</tr>
+<tr>
+<td>Native or detached popup</td>
+<td>Install <code>SwingShellSuggestionTarget</code>; use its captured interaction and own popup resources</td>
+</tr>
+<tr>
+<td>Host-produced results</td>
+<td>Capture an interaction with <code>beginShellSuggestionInteraction</code> before starting work, then publish on the EDT</td>
+</tr>
+</tbody></table></div>
+<p><code>setShellSuggestionTarget(null)</code> restores embedded presentation. Use
+<code>copyCellBounds</code> to anchor a host popup and <code>setShellSuggestionFailureHandler</code>
+for view-owned diagnostics.</p>
+<h2 id="how-to-extend-custom-host-services">How to Extend: Custom Host Services</h2>
+<p><code>SwingHostServices</code> is an immutable snapshot of host-owned services, supplied at
+construction. <code>create</code>, <code>copy</code>, or <code>builder</code> configure selected services without
+starting or closing them. Use the public adapters rather than assembling internal
+painters or input controllers.</p>
+<div class="table-scroll"><table>
+<thead>
+<tr>
+<th>Service</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>clipboardHandler</code></td>
+<td>Synchronous text copy/read and optional primary-selection access</td>
+</tr>
+<tr>
+<td><code>middleClickPasteHandler</code></td>
+<td>Host-owned local paste gesture, including deferred clipboard access</td>
+</tr>
+<tr>
+<td><code>hyperlinkHandler</code> / <code>hyperlinkDetector</code></td>
+<td>OSC 8 navigation / discovery of links in retained text</td>
+</tr>
+<tr>
+<td><code>fontResolver</code></td>
+<td>Host font fallback policy</td>
+</tr>
+<tr>
+<td><code>hostKeyHandler</code> / <code>contextMenuHandler</code></td>
+<td>Host keyboard actions / local right-click menus</td>
+</tr>
+<tr>
+<td><code>viewportListener</code> / <code>scrollbarOverlayEnabled</code></td>
+<td>External scrollbar integration or the built-in overlay</td>
+</tr>
+<tr>
+<td><code>shellSuggestionKeymap</code> / <code>shellSuggestionViewFactory</code></td>
+<td>Suggestion action mapping and embedded presentation</td>
+</tr>
+<tr>
+<td><code>uiDispatcher</code></td>
+<td>UI scheduling; component work must still run on the EDT</td>
+</tr>
+</tbody></table></div>
+<p><code>mouseReportingEnabled</code> controls application mouse reporting.
+<code>alternateScreenWheelToArrowEnabled</code> independently controls wheel-to-arrow input
+in the alternate screen. Both default to <code>true</code>; Shift forces local mouse
+interaction.</p>
+<p><code>columnSpacing</code> adds signed logical pixels to each cell advance. Negative values
+condense the grid without scaling the font. Construction and reload reject
+resolved cell widths below one pixel or overflowing geometry; a rejected reload
+keeps the previous settings.</p>
+<p><a id="hyperlink-detector-contract-and-migration"></a></p>
+<h2 id="hyperlink-detection">Hyperlink detection</h2>
+<p><code>SwingHyperlinkDetector.detect</code> is suspending and returns completed, immutable
+results. Detectors run outside painting and Swing event handling. Choose
+independent-line or ordered-content context according to the detector&#39;s text
+dependencies. Actions and hover callbacks run on the EDT. OSC 8 links use
+<code>hyperlinkHandler</code>; detected links supply their own actions.</p>
+<p>The <a href="docs/hyperlink-detection.html">hyperlink integration contract</a> describes
+coordinates, cancellation, ordered replay, configuration changes, and activation.
+See <a href="Module.html">Module.md</a> for rendering architecture and maintainer guidance.</p>
+<h2 id="sub-documentation">Sub-Documentation</h2>
+<ul>
+<li><a href="docs/bifurcated-text-rendering.html">Text rendering and font fallback</a></li>
+<li><a href="docs/swing-repaint-optimization.html">Repainting, viewport geometry, and selection</a></li>
+<li><a href="docs/hyperlink-detection.html">Hyperlink detection</a></li>
+<li><a href="../docs/library/configuration.html">Configuration and construction</a></li>
+<li><a href="../docs/terminal-feature-map.html">Feature map</a> and <a href="../docs/terminal-feature-gap-map.html">gap map</a></li>
+</ul>
+<p><a id="consumer-and-abi-verification"></a></p>
+<p>See <a href="Module.html#consumer-and-abi-verification">Module.md</a> for source layout and verification.</p>
+</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/e3c7f9c626934093d35a67ca97afbbf1b343f28d/ketraterm-ui-swing/README.md">View source on GitHub ↗</a></div></div></main></div>
+  <footer>
+    <a class="brand" href="../../../index.html"><img class="brand-mark" src="../../../assets/logo.svg" alt="" width="34" height="34">KetraTerm Library</a>
+    <p>Open source · Apache 2.0</p>
+    <div><a href="https://github.com/ketraterm/KetraTerm">GitHub ↗</a><a href="https://github.com/ketraterm/KetraTerm/issues">Issues ↗</a><a class="product-switch" href="https://ketraterm.github.io/KetraTerm/">Desktop app ↗</a></div>
+  </footer>
+</body>
+</html>

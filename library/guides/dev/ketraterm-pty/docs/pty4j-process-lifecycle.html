@@ -1,0 +1,116 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="description" content="A modular Kotlin/JVM terminal emulator library for Swing and headless applications.">
+  <meta name="color-scheme" content="light dark">
+  <title>Pty4j Local Process Lifecycle &amp; Watcher Threads · KetraTerm Library</title>
+  <link rel="icon" href="../../../../assets/logo.svg" type="image/svg+xml">
+  <link rel="preload" href="../../../../assets/fonts/manrope-variable.ttf" as="font" type="font/ttf" crossorigin>
+  <link rel="stylesheet" href="../../../../assets/styles.css">
+  <script type="importmap">{"imports":{"mermaid":"../../../../assets/mermaid/mermaid.esm.min.mjs"}}</script>
+  <script type="module" src="../../../../assets/site.js"></script>
+</head>
+<body data-product="library" data-version="Development">
+  <a class="skip" href="#main">Skip to content</a>
+  <header class="site-header">
+    <div class="site-identity">
+      <a class="brand" href="../../../../index.html" aria-label="KetraTerm Library home"><img class="brand-mark" src="../../../../assets/logo.svg" alt="" width="34" height="34">KetraTerm</a>
+      <nav class="product-navigation" aria-label="KetraTerm products"><a href="https://ketraterm.github.io/KetraTerm/">App</a><a href="../../../../index.html" aria-current="true">Library</a></nav>
+    </div>
+    <details class="site-navigation" open><summary>Menu</summary><nav aria-label="Library navigation"><a   href="../../docs/README.html">Guides</a><a aria-current="true"  href="../../modules.html">Modules</a><a   href="../../../../versions.html">API & versions</a><a   href="../../CHANGELOG.html">Changelog</a><a  class="nav-primary" href="../../README.html">Get started</a></nav></details>
+    <button class="theme-toggle" type="button" aria-label="Switch to light theme">Light</button>
+  </header>
+  <div class="docs-shell"><aside class="sidebar" aria-label="Documentation navigation"><details class="nav-disclosure" open><summary class="mobile-nav-toggle">Browse library guides</summary><div><label class="search-label">Find a library guide<input type="search" data-doc-search placeholder="Search library docs" autocomplete="off" data-index="../../search.json"></label><div class="search-results" aria-live="polite"></div><details open><summary>Start here</summary><a  href="../../docs/README.html">Documentation</a><a  href="../../README.html">Installation</a><a  href="../../modules.html">Module guides</a><a  href="../../CHANGELOG.html">Changelog</a></details><details open><summary>Capabilities</summary><a  href="../../docs/terminal-feature-map.html">Feature map</a><a  href="../../docs/features/terminal.html">Terminal</a><a  href="../../docs/features/shells.html">Shell integration</a><a  href="../../docs/features/desktop.html">Swing view & hosts</a><a  href="../../docs/features/completion.html">Completion</a><a  href="../../docs/features/embedding.html">Embedding</a><a  href="../../docs/terminal-feature-gap-map.html">Known limits</a></details><details open><summary>Embedding guides</summary><a  href="../../docs/library/configuration.html">Configuration</a><a  href="../../docs/library/compatibility.html">Compatibility</a><a  href="../../docs/library/render-ownership.html">Render ownership</a></details><details open><summary>Reference</summary><a  href="../../docs/reference/protocol.html">Protocols</a><a  href="../../docs/reference/notifications.html">Notifications</a><a  href="../../docs/reference/storage.html">Storage & privacy</a></details><details open><summary>Development</summary><a  href="../../ARCHITECTURE.html">Architecture</a><a  href="../../CONTRIBUTING.html">Contributing</a><a  href="../../docs/development/conformance-testing.html">Conformance testing</a></details></div></details></aside><main id="main" tabindex="-1" class="article article-with-outline"><div class="article-top"><nav class="breadcrumb" aria-label="Breadcrumb"><ol><li><a href="../../../../index.html">Library</a></li><li><a href="../../modules.html">Modules</a></li><li><a href="../README.html">ketraterm-pty</a></li><li><span aria-current="page">Pty4j Local Process Lifecycle &amp; Watcher Threads</span></li></ol></nav><div class="doc-version"><span>Development</span><a href="../../../../versions.html">All versions</a></div></div><details class="page-outline" open><summary>On this page</summary><nav aria-label="On this page"><a class="depth-2" href="#1-threading-architecture">1. Threading Architecture</a><a class="depth-2" href="#failure-and-local-close">Failure and local close</a><a class="depth-2" href="#writes-and-resize">Writes and resize</a><a class="depth-2" href="#2-windows-conpty-considerations">2. Windows ConPTY Considerations</a><a class="depth-2" href="#native-validation">Native validation</a></nav></details><div class="article-content"><div class="prose"><h1 id="pty4j-local-process-lifecycle--watcher-threads">Pty4j Local Process Lifecycle &amp; Watcher Threads</h1>
+<p>The local PTY connector adapts a Pty4J process to the ordered raw-byte
+<code>TerminalConnector</code> contract. Session construction and consumer examples are in
+the <a href="../README.html">README</a>. This guide describes connector lifecycle and the
+native integration seam.</p>
+<h2 id="1-threading-architecture">1. Threading Architecture</h2>
+<p>Creating the connector launches its child process. Calling <code>start(listener)</code>
+starts two daemon threads; it permits one start and rejects a closed connector.</p>
+<div class="table-scroll"><table>
+<thead>
+<tr>
+<th>Worker</th>
+<th>Default name</th>
+<th>Work</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Reader</td>
+<td><code>terminal-pty-reader</code></td>
+<td>Read stdout and synchronously invoke <code>onBytes</code> in stream order.</td>
+</tr>
+<tr>
+<td>Watcher</td>
+<td><code>terminal-pty-watcher</code></td>
+<td>Wait for process exit, then wait for stdout delivery to finish before reporting normal closure.</td>
+</tr>
+</tbody></table></div>
+<p>The reader allocates one byte buffer at startup, by default 8,192 bytes, and
+reuses it. The listener borrows only the supplied range for the duration of
+<code>onBytes</code>; copy data that must outlive the callback. Chunks need not align with
+UTF-8 scalars, escape sequences, or terminal frames. The session processes them
+synchronously and owns parsing.</p>
+<p>The watcher can observe process exit before the final read. It waits for EOF and
+completed byte callbacks before <code>onClosed(exitCode)</code>. Reader EOF alone does not
+report closure while the process is still running. <code>PtyConnector.waitFor()</code>
+waits only for process exit; it is not an output-drain boundary.</p>
+<p>Daemon workers do not keep the JVM alive. Hosts must still close their sessions
+to release native resources.</p>
+<h2 id="failure-and-local-close">Failure and local close</h2>
+<p>A reader or byte-listener exception is retained in <code>PtyConnector.failure</code> and
+reported through <code>onError</code>. The connector closes the process and both streams,
+then invokes <code>onClosed(null)</code>. It does not retry the failed chunk or replace the
+original failure with a later process exit. Connector callbacks may close
+reentrantly.</p>
+<p>Local close cancels pending delivery rather than draining it. It does not emit a
+remote <code>onClosed</code> callback; the session records its own local termination.
+Exceptions arriving after local close are teardown and do not become remote
+failures.</p>
+<p>Cleanup requests process destruction and closes both streams. A call outside
+the connector workers makes bounded joins of the reader and watcher. A worker
+does not join itself or its peer, which may be waiting for the current callback.
+Close is idempotent, but native destruction and stream cleanup can block. Keep
+it off a UI thread.</p>
+<h2 id="writes-and-resize">Writes and resize</h2>
+<p>Direct connector writes validate the byte range, serialize access to stdin, and
+flush the supplied range before returning. Closed connectors ignore valid
+writes. The session&#39;s outbound writer orders user input and terminal replies;
+do not write through a retained connector after transferring it to a session.</p>
+<p>Resize requires positive dimensions and synchronously delegates to
+<code>WinSize(columns, rows)</code> while the connector is open. Use session resize APIs
+for a session-owned connector so grid reflow, transport dimensions, and viewport
+metadata are coordinated.</p>
+<h2 id="2-windows-conpty-considerations">2. Windows ConPTY Considerations</h2>
+<p>The factory enables Pty4J&#39;s ConPTY option. Platform process creation and native
+library loading are owned by Pty4J; startup may fail when the local native
+environment or requested executable is unavailable. Initial dimensions are
+supplied during process creation and propagated again before session delivery
+starts.</p>
+<p>Foreground-process lookup uses the Unix terminal&#39;s foreground process group
+when available. Windows selects the newest live descendant, which can be a
+background child. Missing permissions, unavailable metadata, closure, or an
+oversized descendant tree can yield no name. Applications inside SSH or WSL are
+not inspected. Treat this information as presentation metadata rather than a
+process-control guarantee.</p>
+<h2 id="native-validation">Native validation</h2>
+<p>Ordinary module tests use fake process streams and do not require a native shell.
+<code>PtyRealProcessTest</code> is skipped unless <code>terminal.pty.host=true</code>:</p>
+<pre><code class="language-text">./gradlew :ketraterm-pty:test --tests &quot;io.github.ketraterm.pty.PtyRealProcessTest&quot; &quot;-Dterminal.pty.host=true&quot;
+</code></pre>
+<p>The native suite requires working Pty4J support and a local shell: <code>/bin/sh</code> on
+Unix, or <code>cmd.exe</code> and <code>powershell.exe</code> on Windows. Its OSC 52 byte harness also
+requires <code>node</code> on PATH and the repository&#39;s <code>tools/osc52/osc52.mjs</code>.
+Tests use explicit output/readiness signals and deadlines; skipped native tests
+do not establish platform support for the current environment.</p>
+</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/e3c7f9c626934093d35a67ca97afbbf1b343f28d/ketraterm-pty/docs/pty4j-process-lifecycle.md">View source on GitHub ↗</a></div></div></main></div>
+  <footer>
+    <a class="brand" href="../../../../index.html"><img class="brand-mark" src="../../../../assets/logo.svg" alt="" width="34" height="34">KetraTerm Library</a>
+    <p>Open source · Apache 2.0</p>
+    <div><a href="https://github.com/ketraterm/KetraTerm">GitHub ↗</a><a href="https://github.com/ketraterm/KetraTerm/issues">Issues ↗</a><a class="product-switch" href="https://ketraterm.github.io/KetraTerm/">Desktop app ↗</a></div>
+  </footer>
+</body>
+</html>

@@ -1,0 +1,157 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="description" content="A modular Kotlin/JVM terminal emulator library for Swing and headless applications.">
+  <meta name="color-scheme" content="light dark">
+  <title>Library embedding features · KetraTerm Library</title>
+  <link rel="icon" href="../../../../assets/logo.svg" type="image/svg+xml">
+  <link rel="preload" href="../../../../assets/fonts/manrope-variable.ttf" as="font" type="font/ttf" crossorigin>
+  <link rel="stylesheet" href="../../../../assets/styles.css">
+  <script type="importmap">{"imports":{"mermaid":"../../../../assets/mermaid/mermaid.esm.min.mjs"}}</script>
+  <script type="module" src="../../../../assets/site.js"></script>
+</head>
+<body data-product="library" data-version="Development">
+  <a class="skip" href="#main">Skip to content</a>
+  <header class="site-header">
+    <div class="site-identity">
+      <a class="brand" href="../../../../index.html" aria-label="KetraTerm Library home"><img class="brand-mark" src="../../../../assets/logo.svg" alt="" width="34" height="34">KetraTerm</a>
+      <nav class="product-navigation" aria-label="KetraTerm products"><a href="https://ketraterm.github.io/KetraTerm/">App</a><a href="../../../../index.html" aria-current="true">Library</a></nav>
+    </div>
+    <details class="site-navigation" open><summary>Menu</summary><nav aria-label="Library navigation"><a aria-current="true"  href="../README.html">Guides</a><a   href="../../modules.html">Modules</a><a   href="../../../../versions.html">API & versions</a><a   href="../../CHANGELOG.html">Changelog</a><a  class="nav-primary" href="../../README.html">Get started</a></nav></details>
+    <button class="theme-toggle" type="button" aria-label="Switch to light theme">Light</button>
+  </header>
+  <div class="docs-shell"><aside class="sidebar" aria-label="Documentation navigation"><details class="nav-disclosure" open><summary class="mobile-nav-toggle">Browse library guides</summary><div><label class="search-label">Find a library guide<input type="search" data-doc-search placeholder="Search library docs" autocomplete="off" data-index="../../search.json"></label><div class="search-results" aria-live="polite"></div><details open><summary>Start here</summary><a  href="../README.html">Documentation</a><a  href="../../README.html">Installation</a><a  href="../../modules.html">Module guides</a><a  href="../../CHANGELOG.html">Changelog</a></details><details open><summary>Capabilities</summary><a  href="../terminal-feature-map.html">Feature map</a><a  href="terminal.html">Terminal</a><a  href="shells.html">Shell integration</a><a  href="desktop.html">Swing view & hosts</a><a  href="completion.html">Completion</a><a aria-current="page" href="embedding.html">Embedding</a><a  href="../terminal-feature-gap-map.html">Known limits</a></details><details open><summary>Embedding guides</summary><a  href="../library/configuration.html">Configuration</a><a  href="../library/compatibility.html">Compatibility</a><a  href="../library/render-ownership.html">Render ownership</a></details><details open><summary>Reference</summary><a  href="../reference/protocol.html">Protocols</a><a  href="../reference/notifications.html">Notifications</a><a  href="../reference/storage.html">Storage & privacy</a></details><details open><summary>Development</summary><a  href="../../ARCHITECTURE.html">Architecture</a><a  href="../../CONTRIBUTING.html">Contributing</a><a  href="../development/conformance-testing.html">Conformance testing</a></details></div></details></aside><main id="main" tabindex="-1" class="article article-with-outline"><div class="article-top"><nav class="breadcrumb" aria-label="Breadcrumb"><ol><li><a href="../../../../index.html">Library</a></li><li><span>Capabilities</span></li><li><span aria-current="page">Library embedding features</span></li></ol></nav><div class="doc-version"><span>Development</span><a href="../../../../versions.html">All versions</a></div></div><details class="page-outline" open><summary>On this page</summary><nav aria-label="On this page"><a class="depth-2" href="#view-customization">View customization</a></nav></details><div class="article-content"><div class="prose"><h1 id="library-embedding-features">Library embedding features</h1>
+<p>KetraTerm exposes Kotlin and Java APIs for headless pipelines and Swing hosts.
+Optional modules can be selected independently through the <a href="../../ketraterm-bom/README.html">BOM</a>.</p>
+<div class="table-scroll"><table>
+<thead>
+<tr>
+<th>Capability</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Headless operation</td>
+<td>Parse output, maintain grid/history, encode input, and run sessions without Swing.</td>
+</tr>
+<tr>
+<td>Custom transports</td>
+<td>Supply an ordered byte connector; local PTY hosting is optional.</td>
+</tr>
+<tr>
+<td>Pipeline composition</td>
+<td>Use standard assembly or supply compatible core, parser, and input-encoder implementations.</td>
+</tr>
+<tr>
+<td>Serialized input</td>
+<td>Semantic events, exact bytes, paste, and compound edits share bounded session admission and ordering.</td>
+</tr>
+<tr>
+<td>Lifecycle</td>
+<td>Explicit startup, state observation, failure reporting, close, and retained final-frame reads.</td>
+</tr>
+<tr>
+<td>Rendering</td>
+<td>Primitive frame readers, reusable copied caches, and leased publication for independent renderers.</td>
+</tr>
+<tr>
+<td>Direct core access</td>
+<td>Grid mutation, semantic reads, coherent packed input modes, and cluster-capacity queries.</td>
+</tr>
+<tr>
+<td>Host services</td>
+<td>Clipboard, deferred middle-button paste, fonts, links, notifications, and window policy.</td>
+</tr>
+<tr>
+<td>Metadata observation</td>
+<td>Titles, palette changes, hyperlink registry changes, and shell state through host/session contracts.</td>
+</tr>
+<tr>
+<td>Shell metadata</td>
+<td>Optional built-in OSC producer or a host-owned metadata and editing-context model.</td>
+</tr>
+<tr>
+<td>Completion</td>
+<td>Independent engine, custom catalogs/sources, context resolution, ranking, and replay-retention policy.</td>
+</tr>
+<tr>
+<td>Completion UI</td>
+<td>Custom provider, custom presentation, or both, with request-scoped editing and feedback.</td>
+</tr>
+<tr>
+<td>Swing interaction</td>
+<td>Selection read/write/listeners, selected text without clipboard access, foreground-program clear requests, and pixel/cell geometry queries.</td>
+</tr>
+<tr>
+<td>Host shortcuts</td>
+<td>Configurable shortcut maps, action dispatch, and key-press interception for Swing hosts.</td>
+</tr>
+<tr>
+<td>Configuration</td>
+<td>Immutable settings with Kotlin update callbacks and Java builders.</td>
+</tr>
+<tr>
+<td>Localization</td>
+<td>Resource-bundle overrides for terminal chrome and completion descriptions.</td>
+</tr>
+<tr>
+<td>Distribution</td>
+<td>Dependency-only headless/Swing entry points, version alignment, API documentation, and isolated-consumer verification.</td>
+</tr>
+</tbody></table></div>
+<h2 id="view-customization">View customization</h2>
+<p>These are library controls; individual products expose a subset in their settings.</p>
+<div class="table-scroll"><table>
+<thead>
+<tr>
+<th>Area</th>
+<th>Available controls</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Fonts</td>
+<td>Primary and ordered fallback fonts, optional system fallback, a host font resolver, antialiasing, and fractional metrics.</td>
+</tr>
+<tr>
+<td>Geometry</td>
+<td>Line height, signed integer column spacing, and separate primary/alternate-screen padding.</td>
+</tr>
+<tr>
+<td>Colors and decorations</td>
+<td>Palette, cursor shape/blink, selection/search colors, prompt dots/dividers, failed-command rails, and visual-bell styling.</td>
+</tr>
+<tr>
+<td>Links and menus</td>
+<td>Custom link detection, presentation and activation, plus host-owned context menus.</td>
+</tr>
+<tr>
+<td>Scrolling</td>
+<td>Output-follow policy, viewport observation/control, and optional built-in scrollbar overlay or external host scrollbars.</td>
+</tr>
+<tr>
+<td>Mouse and clipboard</td>
+<td>Independent mouse-reporting/wheel policies, copy on selection, clipboard/primary middle-button paste, and deferred host paste handling.</td>
+</tr>
+<tr>
+<td>Search UI</td>
+<td>Programmatic search, case sensitivity, result navigation/state, and separately styled host search chrome.</td>
+</tr>
+</tbody></table></div>
+<p>For completion providers, views, keymaps, and editing targets, see
+<a href="completion.html#library-customization">completion customization</a>.</p>
+<p>Hosts own their sessions, services, preferences, and persistence. A Swing view
+controls one session viewport; independent scrolling views of one process are
+not supported. Disposing a view does not close its session.</p>
+<p>Start with the <a href="../../README.html#using-the-libraries">library setup</a>,
+<a href="../library/configuration.html">configuration guide</a>, and
+<a href="../library/compatibility.html">compatibility contract</a>.</p>
+</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/e3c7f9c626934093d35a67ca97afbbf1b343f28d/docs/features/embedding.md">View source on GitHub ↗</a></div></div></main></div>
+  <footer>
+    <a class="brand" href="../../../../index.html"><img class="brand-mark" src="../../../../assets/logo.svg" alt="" width="34" height="34">KetraTerm Library</a>
+    <p>Open source · Apache 2.0</p>
+    <div><a href="https://github.com/ketraterm/KetraTerm">GitHub ↗</a><a href="https://github.com/ketraterm/KetraTerm/issues">Issues ↗</a><a class="product-switch" href="https://ketraterm.github.io/KetraTerm/">Desktop app ↗</a></div>
+  </footer>
+</body>
+</html>
