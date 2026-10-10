@@ -25,8 +25,7 @@ cases in four seed-range shards.
 The resize campaign constructs mixed-width Unicode state and repeatedly changes
 the viewport width and height. It verifies exact grapheme preservation, cursor
 bounds, dimensions, render-cell flags, and wide-cell adjacency. This is an
-invariant campaign rather than an xterm.js comparison because KetraTerm reflows
-logical lines while headless xterm.js retains physical rows.
+invariant campaign focused on KetraTerm's own resize and reflow policy.
 
 ```bash
 ./gradlew :ketraterm-testkit:resizeReflowInvariantSmokeTest
@@ -73,12 +72,22 @@ Failures are automatically minimized and written beneath the relevant
 `ketraterm-testkit/build/reports` campaign directory. CI uploads manifests for
 all runs and retains minimized operation streams plus JUnit reports on failure.
 
-## Wide-span mutation contract
+## Streaming placement
 
-Horizontal-margin IL and DL operate on rectangular slices, but a width-two
-occupant remains indivisible. Before copying or clearing a destination slice,
-core annihilates any occupant crossing either boundary. A source slice never
-copies a leader without its trailing cell or a trailing cell without its
-leader. This rule prevents orphaned wide cells even when margins change between
-writing the glyph and performing the line mutation.
+The [streaming placement contract](../reference/protocol.md#streaming-grapheme-placement)
+commits published grid effects. `HostGraphemePolicyTest` verifies that policy.
+Four retained `HostGraphemeTest` oracles test the stronger, unsupported requirement
+that every byte split produces identical placement:
 
+- Narrowing does not restore an overwritten neighbor.
+- Widening at a margin can differ from an initially wide write.
+- Late narrowing does not undo history eviction on a one-cell grid.
+- Late narrowing does not move an already wrapped cluster back.
+
+The `knownR06Failure` helper reports only recorded assertion failures as
+skipped/aborted. Additional failures, changed messages, or unexpected passes fail
+the test and require review. A skip does not establish that later iterations of
+an oracle passed. Ordinary grapheme and byte-stream tests remain active.
+
+`./gradlew :ketraterm-host:test --tests '*HostGrapheme*' --tests '*KnownR06FailureTest'`
+runs this focused verification.

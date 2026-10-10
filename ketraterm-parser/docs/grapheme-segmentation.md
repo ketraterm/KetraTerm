@@ -70,7 +70,7 @@ before clearing context. Reset discards pending context.
 Publication commits downstream grid effects. Retaining segmentation across calls
 does not guarantee identical placement for different chunkings of a grapheme
 whose width changes after publication. See the
-[streaming placement policy](../../docs/terminal-feature-map.md#streaming-grapheme-placement).
+[streaming placement policy](../../docs/reference/protocol.md#streaming-grapheme-placement).
 
 `writeCluster` and `updatePreviousCluster` borrow the reusable `IntArray` only for
 the synchronous call. The sink must consume or copy its valid prefix before

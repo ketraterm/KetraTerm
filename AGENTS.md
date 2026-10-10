@@ -91,7 +91,7 @@ Prefer the smallest design that satisfies current behavior:
 - Public APIs need useful KDoc. Remove stale compatibility surfaces and comments;
   do not add comments that merely restate code.
 
-Supported behavior lives in `docs/terminal-feature-map.md`; deferred and
+Supported behavior lives in the catalogs indexed by `docs/terminal-feature-map.md`; deferred and
 policy-gated behavior lives in `docs/terminal-feature-gap-map.md`.
 `AGENTS.md` files define stable ownership, invariants, and local workflow only.
 
@@ -110,9 +110,14 @@ Tests assert terminal semantics, not implementation quirks. For behavior changes
 - Leave no silent no-ops, unrelated formatting churn, or architecture drift.
 
 Useful entry points: `ketraterm-core/docs/terminal-core-contract.md`,
-`docs/agent-skills.md`, and the touched module's `AGENTS.md`.
+`.agents/skills/`, and the touched module's `AGENTS.md`.
 
 ## Documentation
+
+Use `docs/README.md` as the documentation index. Root `docs/features/` contains
+capability catalogs, `docs/library/` cross-module embedding guides,
+`docs/reference/` protocol and storage references, and `docs/development/`
+contributor guides. Keep module-specific contracts beside their owning module.
 
 Keep these document roles distinct:
 

@@ -52,7 +52,7 @@ Import the BOM in `dependencyManagement`, then add selected dependencies:
 The headless and Swing entry points have POM packaging and require `<type>pom</type>`
 in Maven dependencies. Individual JVM libraries use the default JAR type. Snapshot
 repository configuration is covered in the
-[compatibility guide](../docs/library-compatibility.md#supported-boundary).
+[compatibility guide](../docs/library/compatibility.md#supported-boundary).
 
 ## Managed artifacts
 

@@ -218,7 +218,7 @@ See [Module.md](Module.md) for rendering architecture and maintainer guidance.
 - [Text rendering and font fallback](docs/bifurcated-text-rendering.md)
 - [Repainting, viewport geometry, and selection](docs/swing-repaint-optimization.md)
 - [Hyperlink detection](docs/hyperlink-detection.md)
-- [Configuration and construction](../docs/library-configuration.md)
+- [Configuration and construction](../docs/library/configuration.md)
 - [Feature map](../docs/terminal-feature-map.md) and [gap map](../docs/terminal-feature-gap-map.md)
 
 <a id="consumer-and-abi-verification"></a>

@@ -60,4 +60,4 @@ The [README example](README.md#how-to-use) is compiled by the [consumer fixtures
 ./gradlew :ketraterm-testkit:publishedConsumerTest
 ```
 
-See the [compatibility contract](../docs/library-compatibility.md) before updating ABI baselines.
+See the [compatibility contract](../docs/library/compatibility.md) before updating ABI baselines.

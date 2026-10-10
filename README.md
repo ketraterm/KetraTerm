@@ -6,7 +6,7 @@ storage, input encoding, session management, and a reusable Swing component.
 Local PTY hosting, shell integration, and command completion are optional.
 
 The libraries target Java 25. Kotlin consumers need Kotlin 2.4 or newer; Java
-consumers can use the same public APIs. See [library compatibility](docs/library-compatibility.md)
+consumers can use the same public APIs. See [library compatibility](docs/library/compatibility.md)
 for the supported compiler, runtime, and publication contracts.
 
 ## Features
@@ -73,15 +73,10 @@ the [Swing example](ketraterm-ui-swing/README.md#how-to-use) for view setup.
 
 ## Documentation
 
-| Guide | Contents |
-| --- | --- |
-| [Architecture](ARCHITECTURE.md) | Module boundaries, data flow, synchronization, and ownership. |
-| [Library configuration](docs/library-configuration.md) | Host services and construction choices. |
-| [Library compatibility](docs/library-compatibility.md) | Publications, versions, ABI, and consumer verification. |
-| [Feature map](docs/terminal-feature-map.md) | Supported terminal behavior. |
-| [Gap map](docs/terminal-feature-gap-map.md) | Deferred behavior and policy decisions. |
-| [Conformance testing](docs/terminal-conformance-testing.md) | Differential and generated terminal campaigns. |
-| [Library changelog](CHANGELOG.md) | Consumer-visible changes and migrations. |
+Browse the [documentation](docs/README.md) for feature catalogs, embedding guides,
+protocol references, and contributor resources. The [feature map](docs/terminal-feature-map.md)
+describes supported capabilities; the [gap map](docs/terminal-feature-gap-map.md)
+tracks remaining work. Consumer-visible changes are in the [library changelog](CHANGELOG.md).
 
 ## Development
 

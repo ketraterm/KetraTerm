@@ -80,5 +80,5 @@ session's mode source and sink.
 - [Wire encoding reference](docs/keyboard-mouse-encoding.md): representative
   keyboard and mouse sequences.
 - [Module structure](Module.md): package responsibilities and verification.
-- [Feature map](../docs/terminal-feature-map.md#6-input-encoding--event-reporting):
+- [Feature map](../docs/features/terminal.md#keyboard-mouse-and-paste):
   supported protocols and host capability boundaries.

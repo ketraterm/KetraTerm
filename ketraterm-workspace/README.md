@@ -145,6 +145,6 @@ for reply and cancellation behavior.
 ## Sub-Documentation
 
 - [Module structure and maintenance](Module.md)
-- [Configuration construction and ownership](../docs/library-configuration.md)
+- [Configuration construction and ownership](../docs/library/configuration.md)
 - [Standalone profile persistence](../ketraterm-app/docs/profile-config-toml.md)
 - [Shell metadata API](../ketraterm-shell-integration/README.md)

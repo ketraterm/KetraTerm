@@ -135,7 +135,7 @@ retained binary inputs.
 The baseline has intentionally changed during development construction,
 configuration, reader-ownership, and suggestion-lifecycle migrations. Their
 review decisions and compatibility limits belong in the
-[compatibility guide](../../../docs/library-compatibility.md#verification-and-baseline-changes),
-[configuration guide](../../../docs/library-configuration.md), and
-[reader-ownership guide](../../../docs/render-reader-ownership.md). The retained
+[compatibility guide](../../../docs/library/compatibility.md#verification-and-baseline-changes),
+[configuration guide](../../../docs/library/configuration.md), and
+[reader-ownership guide](../../../docs/library/render-ownership.md). The retained
 jars and provenance define the current baseline; historical review counts do not.

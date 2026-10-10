@@ -55,7 +55,7 @@ the caller's responsibility.
 Unleased `current()` access is internal to quiescent module tests. Session keeps
 its publisher private and exposes `readPublishedFrame` with the same borrowing
 rules. For session-specific restrictions, see
-[render reader ownership](../../docs/render-reader-ownership.md).
+[render reader ownership](../../docs/library/render-ownership.md).
 
 ## 3. Source Lifetime
 

@@ -38,7 +38,7 @@ localize catalog descriptions and argument labels while preserving canonical
 tokens and metadata. Engine and path-source construction resolve static labels;
 parameterized descriptions, such as Gradle task fallback text, may be formatted
 during evaluation. Message providers must be thread-safe. See the shared
-[configuration contract](../../docs/library-configuration.md#optional-host-chrome-and-labels).
+[configuration contract](../../docs/library/configuration.md#optional-host-chrome-and-labels).
 
 ## Internal Implementation
 

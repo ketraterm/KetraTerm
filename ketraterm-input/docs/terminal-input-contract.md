@@ -2,7 +2,7 @@
 
 This contract describes the public behavior of `ketraterm-input`. It covers
 normalized events, mode-dependent encoding, policy, byte ownership, and failures.
-[Protocol support and host capability limits](../../docs/terminal-feature-map.md#6-input-encoding--event-reporting)
+[Protocol support and host capability limits](../../docs/features/terminal.md#keyboard-mouse-and-paste)
 and [deferred work](../../docs/terminal-feature-gap-map.md#input-module-gaps)
 remain in the canonical maps.
 

@@ -4,7 +4,7 @@
 supplies its own transport and presentation. It brings in the terminal pipeline
 and `TerminalSession` through dependency metadata; it contains no runtime code.
 
-The libraries require Java 25. See [library compatibility](../docs/library-compatibility.md)
+The libraries require Java 25. See [library compatibility](../docs/library/compatibility.md)
 for compiler and runtime requirements.
 
 ## Installation

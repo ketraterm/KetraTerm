@@ -72,7 +72,7 @@ Transport failures are reflected in session lifecycle state.
 [ketraterm-swing](ketraterm-swing/README.md) exposes Swing
 dependencies. Both publish dependency metadata without adding runtime code.
 [ketraterm-bom](ketraterm-bom/README.md) supplies version constraints for the published dependency set.
-See [library compatibility](docs/library-compatibility.md#supported-boundary)
+See [library compatibility](docs/library/compatibility.md#supported-boundary)
 for the publication boundary.
 
 ### Products and development modules
@@ -148,5 +148,5 @@ complete sessions without a local shell. Native PTY tests and external different
 campaigns have their own opt-in requirements.
 
 See [testkit](ketraterm-testkit/README.md),
-[conformance testing](docs/terminal-conformance-testing.md), and
+[conformance testing](docs/development/conformance-testing.md), and
 [Contributing](CONTRIBUTING.md) for the relevant commands and validation boundaries.
