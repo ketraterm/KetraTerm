@@ -1,95 +1,60 @@
 # Terminal IntelliJ Plugin Agent Guide
 
-`ketraterm-intellij-plugin` owns the IntelliJ Platform host integration for
-KetraTerm. It is an independent Gradle build nested in this repository, not a
-subproject of the root KetraTerm build.
-
-Before editing this build, read the repository root `AGENTS.md` for global
-architecture and quality rules, then follow this module guide.
+Read the repository [AGENTS.md](../AGENTS.md) before editing this module.
+`ketraterm-intellij-plugin` is an independent nested Gradle build. It owns
+IntelliJ-specific product integration and consumes shared KetraTerm libraries.
 
 ## Build Ownership
 
-Keep IntelliJ-specific Gradle configuration inside this directory:
+Keep IntelliJ Gradle plugins, repositories, platform dependencies, packaging, and
+sandbox configuration in this directory. Its settings include the parent build
+with `includeBuild("..")`; keep library dependencies expressed as normal
+coordinates with the repository-derived version. The root build must not depend
+on this build or acquire IntelliJ tooling.
 
-- `ketraterm-intellij-plugin/settings.gradle.kts`
-- `ketraterm-intellij-plugin/build.gradle.kts`
-- `ketraterm-intellij-plugin/gradle.properties`
-- `ketraterm-intellij-plugin/gradle/libs.versions.toml`
-
-Do not add IntelliJ Platform Gradle plugins, IntelliJ repositories, or
-IntelliJ dependency-resolution settings to the root `settings.gradle.kts` or
-root `build.gradle.kts`. The root build must remain focused on terminal
-libraries, the standalone app, tests, and benchmarks.
-
-When the plugin needs local KetraTerm sources, prefer a composite-build setup from
-this plugin build, for example `includeBuild("..")`, with dependencies declared
-using normal KetraTerm coordinates. Do not make the root build depend on the
-plugin build.
+Use the plugin's own wrapper. Root and plugin toolchains, wrappers, and platform
+versions are separate configurations even when they share the same source tree.
+The IDE owns the Kotlin/coroutine runtime and Pty4J/JNA native stack. Preserve
+runtime exclusions and the archive/ABI checks when changing dependencies.
 
 ## Responsibilities
 
-This build may:
+Own IDE extension registrations, tool windows, project-aware launch context,
+keymap actions, XML settings, clipboard-client context, navigation, notifications,
+and platform disposal. Delegate workspace/session ownership and reusable
+terminal behavior to the corresponding modules.
 
-- register IntelliJ Platform extensions, actions, services, and tool windows.
-- create and dispose IDE-hosted terminal views.
-- bind `SwingTerminal` to `TerminalSession`.
-- adapt IntelliJ clipboard, browser, notification, settings, and dispatcher
-  services to `ketraterm-ui-swing` host interfaces.
-- choose project-aware launch profiles and working directories.
-- coordinate IDE disposal with workspace/session shutdown.
-- provide project-aware suspending completion loaders and compose explicit source entries.
-- configure plugin verification, sandbox runs, signing, and publishing.
+Project terminal services own workspace tabs and sessions. Pane assembly and UI
+cleanup run on the EDT; PTY startup, path checks, and completion I/O run off it.
+Keep startup rollback and tab/project shutdown idempotent, including failures and
+cancellation. Pane disposal must release its own resources without taking
+ownership of a borrowed session.
+
+Capture the owning IDE client for clipboard operations. Preserve client identity,
+readiness, ordering, session deadlines, and disposal checks across asynchronous
+work. Never fall back to another client's clipboard or ambient parser-thread
+context. Apply terminal-output permission changes through the session policy.
 
 ## Boundary
 
-This build must not:
-
-- parse terminal output protocols.
-- mutate terminal core internals.
-- implement reusable Swing painting, selection, viewport, or input behavior.
-- encode host-bound terminal input bytes directly.
-- own PTY stream pumping or process primitives.
-- introduce IntelliJ Platform dependencies into reusable KetraTerm modules.
-- require the root KetraTerm Gradle build to apply IntelliJ Platform plugins.
-- duplicate standalone app chrome, settings, or tab-management behavior unless
-  the behavior is IDE-specific.
-- duplicate reusable completion, persistence, or Swing adapter logic.
-
-Reusable fixes discovered while building the plugin belong in the owning
-module: rendering and input in `ketraterm-ui-swing`, workspace state in
-`ketraterm-workspace`, session synchronization in `ketraterm-session`, and local PTY lifecycle in `ketraterm-pty`.
-Completion parsing/ranking belongs in
-`ketraterm-completion`, local-path and directory-scanning support in `ketraterm-completion-host`, persistence in
-`ketraterm-completion-persistence`, and Swing vocabulary adaptation in `ketraterm-ui-swing-host`.
-
-## Package Layout
-
-Use narrow packages that describe the IDE adapter boundary:
-
-- `io.github.ketraterm.intellij`: plugin entry points and extension classes.
-- `io.github.ketraterm.intellij.ui`: IntelliJ tool-window and Swing host assembly.
-- `io.github.ketraterm.intellij.settings`: IDE settings bridges.
-- `io.github.ketraterm.intellij.services`: project/application services and
-  disposal coordination.
+Do not parse terminal protocols, mutate core internals, implement reusable
+painting/selection/input behavior, encode terminal bytes, or own PTY pumping.
+Move reusable fixes to ui-swing, ui-swing-host, workspace, session, PTY,
+completion, completion-host, or completion-persistence as appropriate. Keep all
+IntelliJ imports out of those modules.
 
 Do not create parser, core, renderer, PTY, transport, or input implementation
-packages in this build.
+packages here. Read [Module.md](Module.md) for package and dependency context.
 
 ## Testing
 
-Prefer tests that validate host wiring and lifecycle decisions without starting
-a real PTY or requiring a visible IDE window. Use IntelliJ Platform test
-fixtures only for plugin-facing contracts that cannot be verified as plain JVM
-logic.
+Prefer plain JVM tests for independent policy and transformation logic. Use
+IntelliJ fixtures for platform registration, settings persistence, client identity,
+keymaps, and disposal contracts. Keep timing and lifecycle tests deterministic;
+avoid real PTYs or visible IDE windows unless the contract requires them.
 
-Run plugin checks from the repository root:
-
-```text
-./gradlew -p ketraterm-intellij-plugin test
-```
-
-Or from this directory:
-
-```text
-./gradlew test
-```
+From this directory, use `./gradlew spotlessApply`, then focused `test` tasks or
+`./gradlew test`. Use `./gradlew check` for archive validation and
+`./gradlew verifyPlugin` after platform or dependency changes. On Windows, use
+`./gradlew.bat`. Fixture tests may require a display server; see the
+[README](README.md#build). Root `test` does not run this independent build.

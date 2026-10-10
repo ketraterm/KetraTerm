@@ -1,64 +1,46 @@
 # Terminal Input Agent Guide
 
-`ketraterm-input` owns host-to-terminal input encoding. It converts UI-level key,
-paste, focus, and mouse events into bytes written to the terminal host input
-stream.
+Read the [root guide](../AGENTS.md) and the
+[input contract](docs/terminal-input-contract.md) before changing input behavior.
+This module owns normalized host-bound event vocabulary, encoding policy, and
+byte generation. Session owns outbound ordering and transport lifetime.
 
-Read `docs/terminal-input-contract.md` before changing public input behavior.
-Use the canonical feature and gap maps for current capability status; do not
-maintain a second inventory here.
+## Boundaries
 
-## Boundary
+- Use `TerminalHostOutput` from `ketraterm-protocol` for host-bound bytes.
+- Read only `TerminalInputState` for mode-dependent decisions. Capture one
+  coherent word per event and interpret it through core helpers.
+- Keep output parsing, grid mutation, pointer-coordinate conversion, toolkit
+  events, clipboard access, and transport I/O outside this module.
+- Do not depend on parser, host, session, or rendering modules. Protocol and
+  core are the production dependencies.
 
-Input owns:
+## Implementation
 
-- keyboard event vocabulary and encoding.
-- paste and focus report encoding.
-- mouse report encoding.
-- allocation-conscious scratch buffers for generated input sequences.
+- Keep specialized encoders stateless with respect to terminal modes; pass the
+  captured mode word into each call. A text replacement uses the same snapshot
+  for deletion and insertion.
+- Serialize calls and policy updates on each encoder instance. Custom encoder
+  factories must return independent instances for the session's admission and
+  bulk paths; construction must not read modes or emit bytes.
+- Reuse byte scratch for generated CSI/SS3, UTF-8 scalar, and mouse reports.
+  Avoid per-event arrays, formatted strings, regex, and slicing.
+- Sinks consume or copy borrowed ranges before returning. Do not retain sink
+  buffers or depend on asynchronous consumption of encoder scratch.
+- Validate events at construction and define suppression or fallback through
+  explicit policy. Never infer lifecycle or layout metadata that a host cannot
+  provide.
+- Preserve bracketed-paste protection independently of optional control
+  filtering. Reset buffered output on both success and failure.
+- Clipboard reply preparation validates bounds before allocation. Keep its
+  owned storage and cleanup separate from paste transformation and authorization.
 
-Input must not:
+## Verification
 
-- parse terminal output bytes or escape sequences.
-- mutate terminal grid, cursor, scrollback, or pen state.
-- depend on `ketraterm-parser` or `ketraterm-host`.
-- read renderer state, grid arrays, cursor internals, or parser state.
-- invent terminal mode semantics outside core/protocol vocabulary.
+Tests assert exact bytes and visible suppression, not internal call structure.
+Cover relevant validation, modifiers, mode changes, coordinate limits, paste
+framing, and failure recovery. Use real core mode state for integration coverage.
+Keep expected sequences readable in each test.
 
-The intended dependency shape is:
-
-```text
-UI adapter -> terminal actor -> ketraterm-input -> TerminalHostOutput -> PTY stdin
-parser/core responses -> same terminal actor -> TerminalHostOutput -> PTY stdin
-```
-
-UI adapters should not call the default encoder concurrently with parser/core
-response writers. The default encoder intentionally owns a reusable scratch
-buffer and is serialized-use only; the terminal actor owns host-bound byte
-ordering across keyboard, mouse, paste, focus, DSR/CPR/DA, and future OSC/DCS
-responses.
-
-For mode-dependent behavior, input should read packed mode bits once per event
-from core's input-readable API and then encode from that stable value.
-
-## Implementation Rules
-
-- Write host-bound bytes only through `TerminalHostOutput` from
-  `:ketraterm-protocol`.
-- Keep `KeyboardEncoder` stateless with respect to modes; pass packed mode bits
-  into each encode call.
-- Do not add a `TerminalInputModeSnapshot` data class.
-- Do not decode mode bit positions in `:ketraterm-input`; use core API helpers.
-- Do not allocate arrays or strings for generated CSI/SS3 sequences on the hot
-  path.
-- Keep new protocol work layered behind explicit event vocabulary, policy, and
-  core mode helpers.
-
-## Testing
-
-Input tests should assert exact bytes. Cover validation errors, modifier
-translation, printable UTF-8, Ctrl/Alt handling, special keys, keypad modes,
-bracketed paste, focus reporting, and a real core mode-bit host case.
-
-Do not hide expected byte sequences behind broad helpers. Fixtures may record
-bytes, but each test should make the terminal semantics obvious.
+Run formatting and `./gradlew :ketraterm-input:test` for behavior changes. Capability status
+and deferred work belong in the canonical feature and gap maps.

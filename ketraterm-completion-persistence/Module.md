@@ -1,30 +1,41 @@
 # Module ketraterm-completion-persistence
 
-## KetraTerm Completion Persistence (`:ketraterm-completion-persistence`)
+Shared product implementation for bounded local-file completion learning. This
+module depends on `ketraterm-completion` and coroutines; it has no dependency on
+session, workspace, Swing, PTY, or IntelliJ. It is outside the supported library
+publication and ABI boundary. [README.md](README.md) covers product integration,
+lifecycle, failures, and privacy.
 
-The `ketraterm-completion-persistence` module provides shared product implementation
-of local-file storage for compact exact-command completion-learning snapshots. Version 3
-stores opaque ranking counters separately from optional positive plaintext replay rows.
-The file boundary rechecks replay eligibility, enforces byte/line/row bounds,
-uses a strict versioned codec, and replaces files atomically when supported.
+## Components
 
-`TerminalCompletionLearningCoordinator` is the runtime owner shared by product
-hosts. It applies each bounded learning mutation synchronously and signals one
-conflated worker when clean state first becomes dirty. That worker hydrates the
-fixed file once, observes last-value enablement, and checkpoints the latest
-immutable snapshot every 30 seconds while dirty. Ranking observes in-memory
-learning without waiting for disk, sustained traffic cannot postpone a
-checkpoint, and shutdown forces and awaits the final dirty write.
+| Component | Responsibility |
+| --- | --- |
+| `TerminalCompletionLearningCoordinator` | Synchronous learning mutations and one lifecycle-bound persistence worker. |
+| `CompletionLearningFileStore` | Internal fixed-path, bounded, sanitized file reads and replacement. |
+| `CompletionLearningSnapshotCodec` | Internal strict versioned line encoding and decoding. |
 
-Each host supplies one fixed product path at construction and may only enable or
-disable persistence for that path. The module deliberately has no runtime path
-switching or cross-file import contract. It does not rank suggestions, parse
-command lines, inspect shell history, or depend on workspace and UI modules.
+The coordinator serializes recording, reset, and lifecycle transitions around
+one state lock. Its conflated wakeup carries no snapshots or per-event controls.
+The worker loads once, observes current enablement, and snapshots the latest
+state for a checkpoint. Revision tracking distinguishes dirty, attempted, and
+successfully persisted state, so sustained recording does not postpone a
+checkpoint and failed writes do not spin.
 
-The coordinator talks directly to one bounded file store. There is no
-repository, separate writer, control-command actor, arbitrary flush barrier,
-nullable path, or per-event persistence request. Hydration merges the fixed
-file with live rows in the supplied store; callers must not separately preload
-the same aggregate file. Legacy schemas are rejected rather than imported. A
-rejected or unreadable file blocks overwrite for that lifecycle and invokes one
-host-supplied diagnostic callback with the original read exception when one exists.
+Reset has a separate revision: it supersedes hydration and writes an empty
+snapshot promptly, including when ordinary persistence is disabled. A flushing
+close awaits the required final write; a non-flushing close cancels the worker.
+The caller owns the scope and any bounded shutdown wait.
+
+## File boundary
+
+Version 3 uses a header followed by ranking rows and then replay rows. Text
+fields use URL-safe Base64 with strict UTF-8 decoding. Base64 is an encoding,
+not encryption. Codec details are internal, not a snapshot interchange API.
+
+Bounds are defined by the codec and file store.
+
+Loading rejects unsupported schemas, malformed rows, invalid row ordering, and
+exceeded bounds. Saving retains rows within the storage bounds. Both directions
+recheck replay policy and successful evidence; hydration additionally passes
+through the learning store's host filter. The temporary file is created beside
+the target and cleaned after the replacement attempt.

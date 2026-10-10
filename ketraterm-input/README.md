@@ -1,103 +1,84 @@
-# KetraTerm Input (`:ketraterm-input`)
+# KetraTerm Input
 
-The `ketraterm-input` module is the platform-agnostic, host-bound input encoding engine for **KetraTerm Terminal**. It converts UI-level, platform-neutral events—such as keyboard presses, text paste, window focus transitions, and mouse pointer actions—into standardized ANSI/DEC/xterm byte sequences written to the terminal host's input stream.
+`ketraterm-input` converts platform-neutral keyboard, mouse, paste, focus, and
+text-replacement events into bytes for a terminal host. Encoding uses the current
+core input modes and an explicit `TerminalInputPolicy`.
 
-The module is engineered to be highly performant, allocation-minimal, and robust, with explicit support for modern shell and TUI protocols (e.g., bracketed paste, focus reporting, SGR mouse tracking, and xterm `modifyOtherKeys`).
+The module depends on `ketraterm-core` and `ketraterm-protocol`. It has no UI,
+transport, or clipboard dependency. For an application with a connector, use
+[TerminalSession](../ketraterm-session/README.md) to order input with terminal
+responses and transport writes.
 
----
+## Direct encoding
 
-## Upstream Dependencies
-- **`:ketraterm-protocol`** (for shared mouse, keyboard, and mode constants).
-- **`:ketraterm-core`** (for reading terminal input state and modes).
-
----
-
-## Architectural Scope & Flow
-
-To preserve a strict separation of concerns, `ketraterm-input` operates under clear design constraints:
-
-```text
-UI Adapter  --->  Terminal Event Loop Actor  --->  TerminalInputEncoder  --->  TerminalHostOutput  --->  PTY stdin
-                                                                                       ^
-Parser/Core Replies  ----------------------------------------------------------------+
-```
-
-### What the Module Owns
-- **Platform-Neutral Models**: Normalized representation of [TerminalKeyEvent](src/main/kotlin/io/github/ketraterm/input/event/TerminalKeyEvent.kt), [TerminalPasteEvent](src/main/kotlin/io/github/ketraterm/input/event/TerminalPasteEvent.kt), [TerminalFocusEvent](src/main/kotlin/io/github/ketraterm/input/event/TerminalFocusEvent.kt), and [TerminalMouseEvent](src/main/kotlin/io/github/ketraterm/input/event/TerminalMouseEvent.kt).
-- **ANSI/DEC Encoding**: Translating events into byte sequences based on the terminal's active modes.
-- **Clipboard Reply Encoding**: Validating and preparing owned OSC 52 replies, independently of paste policy; session owns authorization and lifetime.
-- **Input Policy**: Decision-making policies ([TerminalInputPolicy](src/main/kotlin/io/github/ketraterm/input/policy/TerminalInputPolicy.kt)) for handling backspace bytes, meta keys, and paste sanitization.
-
-### What the Module Does NOT Own
-- **Terminal Output Parsing**: The input module never parses byte streams or terminal replies.
-- **State Mutation**: It never directly mutates core screen buffers, cursors, or style attributes.
-
----
-
-## Sub-Documentation
-
-For specifications on the input API contract and wire formats:
-* [terminal-input-contract.md](docs/terminal-input-contract.md) - Input event definitions, validation criteria, modifiers, and thread-safety limits.
-* [keyboard-mouse-encoding.md](docs/keyboard-mouse-encoding.md) - Escape sequence specifications for cursor modes, modifyOtherKeys, CSI-u, and mouse coordinates (SGR/legacy/URXVT).
-
----
-
-## How to Use
-
-The following example shows how to instantiate the `DefaultTerminalInputEncoder` and encode a keyboard key press event:
+Use `TerminalInputEncoders.create` when you provide the serialization and output
+sink yourself. The following function demonstrates mode-dependent encoding; the
+caller supplies a `TerminalHostOutput` that consumes or copies bytes before each
+write returns.
 
 ```kotlin
-import io.github.ketraterm.input.api.TerminalInputEncoder
-import io.github.ketraterm.core.api.TerminalInputState
-import io.github.ketraterm.input.impl.DefaultTerminalInputEncoder
-import io.github.ketraterm.input.event.TerminalKeyEvent
+import io.github.ketraterm.core.TerminalBuffers
+import io.github.ketraterm.input.TerminalInputEncoders
 import io.github.ketraterm.input.event.TerminalKey
-import io.github.ketraterm.input.event.TerminalModifiers
+import io.github.ketraterm.input.event.TerminalKeyEvent
+import io.github.ketraterm.input.event.TerminalPasteEvent
 import io.github.ketraterm.input.policy.TerminalInputPolicy
 import io.github.ketraterm.protocol.host.TerminalHostOutput
 
-fun main() {
-    // 1. Create a read-only view of the terminal modes/state
-    val inputState = object : TerminalInputState {
-        override val applicationCursorKeys: Boolean get() = false
-        override val applicationKeypad: Boolean get() = false
-        override val bracketedPaste: Boolean get() = true
-        override val focusReporting: Boolean get() = false
-        override val mouseTrackingMode: Int get() = 0 // NONE
-        override val mouseEncodingMode: Int get() = 2 // SGR
-        override val modifyOtherKeysMode: Int get() = 0
-        override val formatOtherKeysMode: Int get() = 0
-    }
-
-    // 2. Define the output sink (where encoded bytes are sent)
-    val outputSink = object : TerminalHostOutput {
-        override fun writeByte(byte: Int) {
-            print(byte.toChar())
-        }
-        override fun writeBytes(bytes: ByteArray, offset: Int, length: Int) {
-            print(String(bytes, offset, length, Charsets.US_ASCII))
-        }
-        override fun writeAscii(text: String) {
-            print(text)
-        }
-        override fun writeUtf8(text: String) {
-            print(text)
-        }
-    }
-
-    // 3. Create the encoder
-    val encoder: TerminalInputEncoder = DefaultTerminalInputEncoder(
-        state = inputState,
-        output = outputSink,
-        policy = TerminalInputPolicy.DEFAULT
+fun encodeExample(output: TerminalHostOutput) {
+    val terminal = TerminalBuffers.create(width = 80, height = 24)
+    val encoder = TerminalInputEncoders.create(
+        inputState = terminal,
+        output = output,
+        policy = TerminalInputPolicy(),
     )
 
-    // 4. Encode a non-printable key press (e.g. Arrow Up)
-    val upEvent = TerminalKeyEvent(
-        key = TerminalKey.ARROW_UP,
-        codepoint = 0,
-        modifiers = TerminalModifiers.NONE
-    )
-    encoder.key(upEvent) // Sends "CSI A" to the output sink
+    encoder.encodeKey(TerminalKeyEvent.key(TerminalKey.UP)) // ESC [ A
+    terminal.setApplicationCursorKeys(true)
+    encoder.encodeKey(TerminalKeyEvent.key(TerminalKey.UP)) // ESC O A
+
+    encoder.encodeKey(TerminalKeyEvent.codepoint('é'.code)) // UTF-8
+    encoder.encodeKey(TerminalKeyEvent.text("e\u0301")) // Committed text
+    terminal.setBracketedPasteEnabled(true)
+    encoder.encodePaste(TerminalPasteEvent("hello")) // ESC [ 200 ~ hello ESC [ 201 ~
 }
 ```
+
+The encoder reads one coherent `TerminalInputState.getInputModeBits()` value per
+event. A custom mode source must implement that method; decode captured values
+with the `TerminalInputState` helpers rather than interpreting bit positions.
+Calls and `setInputPolicy` updates on the default encoder must be serialized.
+It reuses scratch arrays, so the sink must not retain borrowed byte ranges.
+Sink failures propagate and may leave a partially written operation. The encoder
+does not own or close the sink.
+
+## Events and policy
+
+- Use `TerminalKeyEvent.key` for special keys and `codepoint` for a printable
+  Unicode scalar. `text` represents committed text without physical-key identity;
+  it does not receive paste framing or modifier transformations in text modes.
+- Mouse cell coordinates are zero-based. Optional pixel coordinates are used
+  only by SGR-Pixels encoding. Coordinate conversion and gesture routing belong
+  to the UI adapter.
+- `TerminalTextReplacementEvent` emits Delete actions, Backspace actions, then
+  replacement text through paste policy. Counts describe editor actions, not
+  string indices.
+- `TerminalInputPolicy()` defaults to DEL Backspace, ESC-prefixed Meta/Alt,
+  suppression of unsupported modified keys and out-of-range legacy mouse
+  coordinates, and preserved paste controls and line endings. Bracketed paste
+  always protects its delimiters.
+
+The key-event factories and encoder factory expose Java static methods with
+default-argument overloads. For custom session encoding, supply a
+`TerminalInputEncoderFactory` that creates independent instances bound to the
+session's mode source and sink.
+
+## Further reading
+
+- [Input contract](docs/terminal-input-contract.md): validation, policies,
+  threading, and clipboard-reply ownership.
+- [Wire encoding reference](docs/keyboard-mouse-encoding.md): representative
+  keyboard and mouse sequences.
+- [Module structure](Module.md): package responsibilities and verification.
+- [Feature map](../docs/terminal-feature-map.md#6-input-encoding--event-reporting):
+  supported protocols and host capability boundaries.

@@ -1,59 +1,117 @@
 # Transport Connector Lifecycle & Thread Invariants
 
-This document details the lifecycle phases, thread safety rules, and memory consumption rules required by the [TerminalConnector](../src/main/kotlin/io/github/ketraterm/transport/TerminalConnector.kt) contract.
-
----
+This guide explains the
+[`TerminalConnector`](../src/main/kotlin/io/github/ketraterm/transport/TerminalConnector.kt)
+and
+[`TerminalConnectorListener`](../src/main/kotlin/io/github/ketraterm/transport/TerminalConnectorListener.kt)
+contracts. Their KDoc is authoritative. Transport implementations document their
+own blocking, timeout, and platform behavior.
 
 ## 1. Lifecycle Phases
 
-A transport connector progresses through three distinct states:
-
-```
-    [Created] ──► start(listener) ──► [Active / Running] ──► close() ──► [Closed]
-```
-
 ### A. Created
-* The connector is initialized and configures any native process handles or network connection sockets.
-* **Invariant**: No reading thread is active, and no events are dispatched.
+
+A connector may already own a process, socket, or other resources before
+`start(listener)` is called. The owner must close those resources even if startup
+never succeeds. Local `close()` may precede startup and prevents a later start.
 
 ### B. Active / Running
-* Toggled by calling `start(listener: TerminalConnectorListener)`.
-* The connector spawns its background reader/watcher threads and begins emitting events via `onBytes`, `onError`, and `onClosed`.
-* **Constraint**: `start()` is start-once. A repeated attempt, including after failure or closure, throws `IllegalStateException` without replacing the listener or starting more workers. Closing before startup also prevents startup. The public `TerminalConnector` KDoc is normative.
+
+A connector accepts at most one start attempt. A repeated attempt, including after
+failure or closure, throws `IllegalStateException` without replacing the first
+listener or starting more workers. There is no restart operation.
+
+Install the listener before workers can deliver bytes. Callbacks may occur before
+`start` returns, and the API does not promise a particular callback thread.
+Connectors own any reader, watcher, or writer workers; callers must not assume
+that `start` starts a specific number of threads.
 
 ### C. Closed
-* Toggled by calling `close()` (which implements `AutoCloseable`).
-* Native processes are terminated, sockets/streams are closed, and background threads are interrupted/joined.
-* Once closed, the connector transitions to a terminal state; it cannot be restarted.
 
----
+Remote closure and local shutdown are distinct:
+
+- `onClosed(exitCode)` reports remote closure. All final byte callbacks must finish
+  first, and no bytes may follow it. The exit code is `null` when unavailable or
+  when the transport has no process exit code.
+- `onError(error)` is terminal for the session. A listener may close the connector
+  from this callback to release resources.
+- `close()` requests local shutdown. It is idempotent and may be called before
+  startup or from a lifecycle callback. It does not promise a remote-close event
+  or delivery of bytes still buffered in the transport.
+
+Do not use observation of process exit as a substitute for output completion.
+For example, a PTY process can exit while its final output remains unread; the
+connector must finish delivery before reporting `onClosed`.
+
+The API does not promise that `onError` and `onClosed` are mutually exclusive.
+The [PTY connector](../../ketraterm-pty/src/main/kotlin/io/github/ketraterm/pty/PtyConnector.kt)
+reports a reader failure through `onError`, releases resources, and then reports
+`onClosed(null)`. A `TerminalSession` retains the first termination event.
 
 ## 2. Thread Safety Constraints
 
 ### Outbound Write Threading
-* The `write(bytes, offset, length)` method can be called concurrently from multiple threads (e.g. keyboard inputs from a Swing UI thread, pasted text from a system clipboard executor, or escape-sequence query responses from the session thread).
-* **Rule**: Implementation classes must serialize outbound writes using synchronized blocks, locks, or write queues to prevent data corruption.
+
+The session serializes host-bound writes and determines their order, including
+encoded user input and permitted terminal replies. UI callers submit intent
+through the session rather than writing directly to its connector.
+
+The connector interface does not define a universal concurrent-write policy.
+Direct users must establish ordering themselves or rely on an explicitly
+documented implementation guarantee. A lock can prevent interleaved writes, but
+it cannot infer the intended order of independently submitted terminal events.
+
+`write`, `resize`, `start`, and `close` are ordinary synchronous methods. Depending
+on the implementation, they can perform blocking I/O or wait for worker cleanup.
+Synchronous buffer consumption is a lifetime rule, not a nonblocking guarantee.
 
 ### Inbound Read Threading
-* The connector's reader loop typically runs on a dedicated background socket/process thread.
-* **Rule**: `onBytes` callbacks must be serialized and called sequentially. The connector must not dispatch overlapping `onBytes` events to a listener from separate threads concurrently.
 
----
+Invoke `onBytes` serially and in stream order for the started listener. Arbitrary
+chunk boundaries may split characters and control sequences; neither the
+connector nor its listener should treat a chunk as a complete terminal message.
+
+If `onBytes` throws, stop byte delivery and report the original exception through
+`onError`, including cancellation exceptions. Local closure may suppress that
+report. Never retry the failed range: the consumer may have already processed a
+prefix of it.
+
+Lifecycle listeners can close the connector reentrantly. Cleanup must not depend
+on the callback returning first. In particular, avoid joining a worker that is
+waiting for the current callback, or holding a lock while invoking a callback
+that needs the same lock for shutdown.
+
+### Foreground-process metadata
+
+`foregroundProcessName()` returns an executable basename, without arguments or a
+path, or `null` when unavailable, ambiguous, or idle. It is optional metadata and
+does not establish terminal state.
+
+Queries must be bounded, tolerate concurrent close, and never launch commands.
+Call them off UI and byte-processing threads because implementations may query
+the operating system. Platform detection limits belong in the connector's own
+documentation.
 
 ## 3. Synchronous Byte-Consumption Invariants
 
-To keep memory allocation at zero on hot I/O paths, both incoming and outgoing byte transfers are governed by synchronous consumption contracts:
-
 ### outbound: `TerminalConnector.write(...)`
-```kotlin
-fun write(bytes: ByteArray, offset: Int, length: Int)
-```
-* **Invariant**: The caller retains ownership of the `bytes` array and may mutate or reuse it immediately after `write` returns.
-* **Rule**: The connector **must synchronously consume** (e.g., write to OS buffers, network sockets) or make a defensive copy of the byte range before returning from the function.
+
+The caller owns the array and may overwrite it immediately after `write` returns.
+Consume the supplied range synchronously or copy it before returning. Queuing the
+caller's array for later I/O violates the contract. Completion does not guarantee
+that the remote process has read or acted on the data.
+
+The default range is the remaining suffix: `offset = 0` and
+`length = bytes.size - offset`. Implementations can use the public
+`ByteArray.checkBounds(offset, length)` extension to validate offsets and lengths
+without an overflowing addition. An empty range at the end of an array is valid.
 
 ### inbound: `TerminalConnectorListener.onBytes(...)`
-```kotlin
-fun onBytes(bytes: ByteArray, offset: Int, length: Int)
-```
-* **Invariant**: The connector retains ownership of the `bytes` array and may overwrite it on the next read cycle.
-* **Rule**: The listener **must synchronously process** (e.g., parse, store) the byte range before returning. It must not cache references to the raw `bytes` array or access it asynchronously.
+
+The connector owns the array and may reuse it as soon as the callback returns.
+The listener must process the range during the callback or copy it for later use.
+Retaining the array reference, including through a queued lambda, is unsafe.
+
+This borrowing contract allows buffer reuse. It does not guarantee that a
+connector or consumer performs no allocations: asynchronous handoff, transport
+libraries, and downstream processing can require copies or other storage.

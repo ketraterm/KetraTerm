@@ -1,36 +1,49 @@
 # Terminal PTY Agent Guide
 
-`ketraterm-pty` owns local pseudo-terminal process lifecycle and stream wiring.
-It exposes local PTY processes through `ketraterm-transport-api` connectors and
-convenience factories that return the shared `ketraterm-session` runtime.
+`ketraterm-pty` owns local pseudo-terminal process lifecycle and raw stream
+wiring. It exposes `TerminalConnector` implementations and convenience factories
+returning the shared `TerminalSession`.
 
 ## Boundary
 
-PTY owns:
+- Own process spawn, stdout delivery, stdin writes, native resize, and disposal.
+- Keep transport bytes opaque. Parsing, grid mutation, and input encoding belong
+  to their existing layers.
+- Convenience assembly may configure the core before transferring it to a
+  session, but runtime mutation remains session-owned.
+- Bind host metadata and clipboard callbacks to the requesting session before
+  starting output. PTY never implements platform UI or clipboard policy.
+- Shell integration is explicitly selected and host-owned; do not install hooks
+  or introduce a dependency on the optional OSC producer into production code.
 
-- spawning and closing PTY-backed terminal processes.
-- pumping raw process output bytes to `TerminalConnectorListener`.
-- writing host-bound byte ranges to PTY stdin.
-- resizing the PTY process.
-- reporting BEL and title metadata through `PtyEventListener` when the
-  convenience session factory wires host events.
+## Lifecycle invariants
 
-PTY must not:
-
-- parse escape sequences or inspect parser state.
-- mutate grid/cursor state directly.
-- encode keyboard, paste, focus, or mouse bytes itself.
-- duplicate `ketraterm-host` command mapping.
-- expose concurrent access to `DefaultTerminalInputEncoder`.
+- Distinguish launching a process from starting its output delivery. A returned
+  unstarted session still owns a live process and must be closed.
+- Close owned resources on assembly/startup failure and preserve the original
+  failure with cleanup failures suppressed.
+- Reuse borrowed read storage only after the synchronous callback returns.
+  Never retry a failed byte range.
+- Report normal remote closure after both process exit and stdout drain.
+  Local close cancels delivery and does not synthesize a remote exit code.
+- Permit close from reader/watcher callbacks without joining a worker that is
+  waiting for that callback. Teardown is idempotent.
+- Keep foreground-process detection best-effort and separate from parsing or
+  rendering.
 
 ## Testing
 
-Unit tests should use fake process streams for connector lifecycle and wiring
-behavior. Session-level behavior should go through `TerminalSession` plus a
-`PtyConnector`, not a PTY-specific session class.
+Use fake processes and controlled streams for lifecycle, ordering, failure, and
+cleanup tests. Session-level behavior goes through `TerminalSession` and the
+connector, not a PTY-specific runtime. Prefer explicit handshakes over sleeps.
 
-Native PTY smoke tests are opt-in because PTY4J startup is platform-sensitive:
+Run `./gradlew :ketraterm-pty:test` for ordinary tests. Native process tests are
+opt-in:
 
 ```text
 ./gradlew :ketraterm-pty:test --tests "io.github.ketraterm.pty.PtyRealProcessTest" "-Dterminal.pty.host=true"
 ```
+
+See [native prerequisites](docs/pty4j-process-lifecycle.md#native-validation).
+The [README](README.md) documents consumer ownership and
+[Module.md](Module.md) identifies implementation components.

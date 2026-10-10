@@ -1,186 +1,164 @@
-# KetraTerm Testkit (`:ketraterm-testkit`)
+# KetraTerm Testkit
 
-The `ketraterm-testkit` module is the dedicated test double and mock harness module for KetraTerm Terminal. It provides in-memory connectors and lifecycle simulation tools for testing terminal runtimes, transport layers, and host-bound input/output loops without spinning up physical shells, PTYs, or socket connections.
-
-By decoupling testing from physical operating system interfaces (like OS-level pseudo-terminals or SSH processes), `ketraterm-testkit` enables ultra-fast, deterministic, and platform-agnostic testing of terminal components. It also provides a production-pipeline conformance harness for replaying exact host byte chunks and resize events through parser, host, core, response, and render APIs.
-
----
-
-## Upstream Dependencies
-* **`:ketraterm-core`** (for public terminal state and render-frame contracts).
-* **`:ketraterm-host`** (for production parser-to-core mapping).
-* **`:ketraterm-parser`** (for production byte-stream parsing).
-* **`:ketraterm-transport-api`** (for standard connector and listener contracts).
-
----
-
-## Architectural Role
-
-The `MockConnector` serves as a bidirectional bridge in unit and integration tests. It allows tests to feed simulated host responses down to any connector listener while capturing and asserting on the exact bytes written back:
-
-```mermaid
-graph TD
-    Test["Unit / Integration Test"] -- "1. Feeds bytes / triggers lifecycle" --> MockConnector["MockConnector"]
-    MockConnector -- "2. Triggers listener callback" --> Listener["TerminalConnectorListener"]
-    Listener -- "3. Writes host-bound bytes" --> MockConnector
-    MockConnector -- "4. Captures bytes in memory" --> OutboundBytes["writtenBytes (ByteArray)"]
-    Test -- "5. Asserts exact byte sequences" --> OutboundBytes
-```
-
----
-
-## Public API Surface
-
-The module's public surface contains transport doubles and deterministic conformance replay APIs.
-
-### [`MockConnector`](src/main/kotlin/io/github/ketraterm/testkit/MockConnector.kt)
-
-#### Lifecycle Tracking Properties
-* `startCount: Int`: The number of times `start` was called. Tests can assert this is exactly `1` to verify the connector is not restarted incorrectly.
-* `closeCount: Int`: The number of times `close()` was called locally. Excellent for verifying that the local terminal cleanly initiates teardown.
-* `isClosed: Boolean`: Indicates whether local close has been requested. Any subsequent calls to `write` or `resize` are ignored after `isClosed` becomes `true`.
-* `resizeCalls: List<Pair<Int, Int>>`: An ordered log of columns-to-rows pairs sent via the `resize` function.
-* `writtenBytes: ByteArray`: A representation of all bytes written by the system under test to the connector during the test run.
-
-#### Remote Event Simulation APIs
-* `feedFromHost(bytes: ByteArray, offset: Int, length: Int)`: Feeds incoming host bytes to the session (triggers `onBytes` on the registered `TerminalConnectorListener`). This mimics raw stdout output from a shell or TUI application.
-* `simulateClosed(exitCode: Int? = null)`: Signals to the session listener that the remote process exited with the given exit code.
-* `simulateCrash(error: Throwable)`: Signals to the session listener that the transport crashed or failed with an exception.
-
-### Headless conformance replay
-
-[`TerminalConformanceHarness`](src/main/kotlin/io/github/ketraterm/testkit/TerminalConformanceHarness.kt) wires the production parser, host adapter, core buffer, terminal response channel, and public render-frame ABI without starting a PTY or UI.
-
-[`TerminalReplayTranscript`](src/main/kotlin/io/github/ketraterm/testkit/TerminalReplayTranscript.kt) preserves exact parser chunk boundaries, interleaved terminal resizes, and explicit end-of-input placement. [`TerminalConformanceSnapshot`](src/main/kotlin/io/github/ketraterm/testkit/TerminalConformanceSnapshot.kt) captures history plus the live grid, soft-wrap state, cells, grapheme clusters, attributes, hyperlinks, cursor, modes, titles, active hyperlink metadata, and cumulative terminal-to-host response bytes using content-based value semantics.
-
-[`TerminalReplayChunkings`](src/main/kotlin/io/github/ketraterm/testkit/TerminalReplayChunkings.kt) generates named single-chunk, every-two-way-split, bytewise, and fixed hostile partitions for bounded protocol fixtures. [`TerminalConformanceDiffer`](src/main/kotlin/io/github/ketraterm/testkit/TerminalConformanceDiff.kt) compares snapshots field by field and reports bounded structural paths with local row or response context.
-
-[`TerminalProcessOracle`](src/main/kotlin/io/github/ketraterm/testkit/TerminalDifferentialOracle.kt) runs one independent-emulator replay behind a bounded, versioned JSON process boundary. [`TerminalPersistentProcessOracle`](src/main/kotlin/io/github/ketraterm/testkit/TerminalDifferentialOracle.kt) keeps a JSON-lines worker resident for high-volume campaigns while preserving a fresh emulator per request. [`TerminalDifferentialComparator`](src/main/kotlin/io/github/ketraterm/testkit/TerminalDifferentialComparison.kt) compares only state explicitly exposed by both implementations; it never invents values for unavailable oracle fields. The first adapter uses the version-pinned [`@xterm/headless`](../tools/xterm-oracle/README.md) executable.
-
-The differential corpus covers controls, cursor movement, insert/delete/erase operations, margins and scrolling, pending wrap, wide and combining text, malformed UTF-8 recovery, durable SGR styles and colors, modes, alternate screen, reset, responses, OSC titles, resize policy, and exhaustive bounded chunk partitions. Intentional disagreements must declare both a rationale and the exact structural mismatch paths; an added, removed, or changed mismatch fails the suite.
-
-```kotlin
-val snapshot = TerminalConformanceHarness(columns = 80, rows = 24).replay(
-    TerminalReplayTranscript.of(
-        TerminalReplayEvent.Input.utf8("\u001B[2;3Hhello"),
-        TerminalReplayEvent.Resize(columns = 100, rows = 30),
-        TerminalReplayEvent.Input.utf8("\u001B[6n"),
-        TerminalReplayEvent.EndOfInput,
-    )
-)
-
-val diff = TerminalConformanceDiffer.compare(expectedSnapshot, snapshot)
-check(diff.isEmpty) { diff.format() }
-```
-
----
+Repository test support for connector simulation, deterministic terminal replay,
+and independent conformance checks. Testkit is used by KetraTerm's own modules;
+it is not a published Maven library.
 
 ## How to Use in Tests
 
-The following example shows how to write a unit test using `MockConnector` to assert on bidirectional byte flows:
+Add project dependencies to the test source set that needs the helpers. Declare
+production APIs that your tests import directly; testkit does not re-export its
+implementation dependencies. The connector example below needs transport API:
 
 ```kotlin
-import io.github.ketraterm.transport.TerminalConnectorListener
+// In a KetraTerm module's build.gradle.kts.
+dependencies {
+    testImplementation(project(":ketraterm-testkit"))
+    testImplementation(project(":ketraterm-transport-api"))
+}
+```
+
+### MockConnector
+
+[`MockConnector`](src/main/kotlin/io/github/ketraterm/testkit/MockConnector.kt)
+implements the raw-byte connector contract. `feedFromHost` calls the installed
+listener synchronously with the supplied array and slice; it does not copy or
+parse incoming bytes. The listener must consume or copy that slice before the
+callback returns. Outbound writes are copied, and `writtenBytes` returns a fresh
+array containing all captured writes.
+
+```kotlin
 import io.github.ketraterm.testkit.MockConnector
-import org.junit.jupiter.api.Assertions.assertEquals
-import org.junit.jupiter.api.Test
+import io.github.ketraterm.transport.TerminalConnectorListener
 
-class ConnectorTest {
+fun main() {
+    val connector = MockConnector()
+    var received = ""
+    var remoteExitCode: Int? = null
+    connector.start(object : TerminalConnectorListener {
+        override fun onBytes(bytes: ByteArray, offset: Int, length: Int) {
+            received = bytes.decodeToString(offset, offset + length)
+        }
 
-    @Test
-    fun `test raw write and feed simulation`() {
-        // 1. Create the MockConnector
-        val connector = MockConnector()
+        override fun onClosed(exitCode: Int?) {
+            remoteExitCode = exitCode
+        }
 
-        // 2. Wire up a simple listener callback to track incoming bytes
-        var receivedString = ""
-        connector.start(object : TerminalConnectorListener {
-            override fun onBytes(bytes: ByteArray, offset: Int, length: Int) {
-                receivedString = String(bytes, offset, length, Charsets.UTF_8)
-            }
-            override fun onClosed(exitCode: Int?) {}
-            override fun onError(error: Throwable) {}
-        })
+        override fun onError(error: Throwable) = throw error
+    })
 
-        // 3. Simulate host emitting data (stdin/stdout write)
-        val hostData = "Hello from Host".toByteArray(Charsets.UTF_8)
-        connector.feedFromHost(hostData, 0, hostData.size)
+    connector.feedFromHost("hello".encodeToByteArray())
+    val reply = "reply".encodeToByteArray()
+    connector.write(reply, 0, reply.size)
+    check(received == "hello")
+    check(connector.writtenBytes.contentEquals(reply))
 
-        // 4. Assert the listener received the fed bytes
-        assertEquals("Hello from Host", receivedString)
+    connector.simulateClosed(0)
+    check(remoteExitCode == 0)
+    connector.close()
+    check(connector.startCount == 1 && connector.closeCount == 1)
+}
+```
 
-        // 5. Test client write to the connector
-        val clientData = "Client Request".toByteArray(Charsets.UTF_8)
-        connector.write(clientData, 0, clientData.size)
+`start` accepts one listener and rejects restart or start after local closure.
+`close` records each call and prevents subsequent writes and resizes; it does not
+emit a remote exit callback. Trigger remote closure or failure explicitly with
+`simulateClosed` or `simulateCrash`. These helpers notify the listener without
+changing `isClosed`, which records local closure only. `resizeCalls` records
+ordered `(columns, rows)` pairs. Serialize access to the fake; it does not add
+concurrency control.
 
-        // 6. Assert the mock connector captured the client's output
-        val captured = String(connector.writtenBytes, Charsets.UTF_8)
-        assertEquals("Client Request", captured)
+### Headless conformance replay
+
+[`TerminalConformanceHarness`](src/main/kotlin/io/github/ketraterm/testkit/TerminalConformanceHarness.kt)
+wires the production parser, host adapter, core, response queue, and render reader
+without a session, PTY, or UI. A harness retains state between `apply`, `replay`,
+and `snapshot` calls. Create a fresh instance for each independent run.
+
+A [`TerminalReplayTranscript`](src/main/kotlin/io/github/ketraterm/testkit/TerminalReplayTranscript.kt)
+preserves input chunk boundaries, interleaved resizes, and explicit end-of-input
+placement. Input events copy their source bytes. `chunked` and `bytewise` do not
+append end-of-input automatically; `TerminalReplayChunkings.exhaustive` does so
+by default.
+
+```kotlin
+import io.github.ketraterm.testkit.TerminalConformanceDiffer
+import io.github.ketraterm.testkit.TerminalConformanceHarness
+import io.github.ketraterm.testkit.TerminalReplayChunkings
+
+fun assertChunkingInvariant(bytes: ByteArray) {
+    val variants = TerminalReplayChunkings.exhaustive(bytes)
+    val expected = TerminalConformanceHarness(80, 24).replay(variants.first().transcript)
+    for (variant in variants.drop(1)) {
+        val actual = TerminalConformanceHarness(80, 24).replay(variant.transcript)
+        val diff = TerminalConformanceDiffer.compare(expected, actual)
+        check(diff.isEmpty) { "${variant.name}: ${diff.format()}" }
     }
 }
 ```
 
----
-
-## Testing best practices
-
-1. **Assert Real Semantics**: In-memory mocks do not fake intermediate or half-finished behaviors. They provide raw, byte-level capture so that tests assert *real* wire protocols rather than mock method signals.
-2. **Explicit Captured Bytes**: The mock connector does not convert or interpret bytes itself. It acts as a passive sink and leaves the interpretation of bytes to assertions, ensuring tests remain explicit and readable.
-3. **Remote Events Must Be Explicit**: Local `close()` only records that the local application requested a shutdown. Remote exit/crashes must always be triggered via explicit simulation functions (`simulateClosed` / `simulateCrash`) rather than assuming remote side-effects.
-
----
+Snapshots copy retained history and the live grid, including cell attributes,
+clusters, hyperlinks, wraps, cursor, modes, host metadata, and cumulative response
+bytes. They omit internal storage handles and generation counters.
+`TerminalConformanceDiffer` returns bounded field-level differences.
+`exhaustive` covers every two-way split plus selected fragmented partitions; its
+quadratic byte copying is appropriate for small protocol fixtures.
 
 ## Running Testkit Tests
 
-To run the checks for this module:
-```bash
+Run commands from the repository root with JDK 25; use `gradlew.bat` on Windows.
+
+```text
 ./gradlew :ketraterm-testkit:test
-
-# Install, unit-test, and compare against the pinned xterm.js oracle
-./gradlew :ketraterm-testkit:xtermDifferentialTest
-
-# Fast CI and larger scheduled campaigns
-./gradlew :ketraterm-testkit:xtermDifferentialSmokeTest
-./gradlew :ketraterm-testkit:xtermDifferentialNightlyTest
-./gradlew :ketraterm-testkit:xtermDifferentialReleaseAudit
-
-# State-aware Unicode resize/reflow preservation campaigns
-./gradlew :ketraterm-testkit:resizeReflowInvariantSmokeTest
-./gradlew :ketraterm-testkit:resizeReflowInvariantNightlyTest
-
-# Independent model oracle for cursor movement, deferred wrap, and scrolling
-./gradlew :ketraterm-testkit:cursorWrapModelSmokeTest
-./gradlew :ketraterm-testkit:cursorWrapModelNightlyTest
+./gradlew :ketraterm-testkit:publishedConsumerTest
+./gradlew :ketraterm-testkit:publicationVerificationTest
 ```
 
-The default generated campaign has 2,000 deterministic scenarios. Override any
-profile with `-PxtermDifferentialCases=N`; select a deterministic shard with
-`-PxtermDifferentialStartIndex=N`. A mismatch is reduced by a delta-debugging
-shrinker and recorded with its seed, dimensions, chunk seed, original
-operations, minimized operations, structural differences, commit SHA, and
-comparison scope under `build/reports/xterm-differential/failures`.
+Ordinary `test` covers helper behavior, specification fixtures, model regressions,
+and Java compilation against exported project API variants. It skips opt-in
+oracle/generated campaigns and excludes the separate publication and retained
+client suites. `check` also runs `publishedConsumerTest`; packaging verification
+is separate and is included in the root `publicationChecks` aggregate. See the
+[published-consumer guide](src/consumerTest/README.md) for prerequisites,
+compiler/metadata combinations, and retained client baselines.
 
-Each run writes a campaign manifest named `campaign-<start>-<end>.json` beside
-the failure directory. CI runs 100 cases for every pull request and shards the
-scheduled 100,000-case campaign into four ranges of 25,000 cases. Campaign
-manifests are retained for all shards; minimized reproductions and JUnit reports
-are uploaded automatically for failed shards.
+### Generated campaigns
 
-The resize/reflow campaign constructs deterministic mixed-width Unicode state,
-then applies repeated width and height changes. It verifies exact grapheme order,
-dimensions, cursor bounds, render-cell flags, and wide-cell adjacency without
-using xterm.js as an oracle because KetraTerm deliberately reflows logical lines
-while headless xterm.js retains physical rows. Override its size and shard with
-`-PresizeReflowCases=N` and `-PresizeReflowStartIndex=N`. Passing runs write a
-metadata manifest under `build/reports/resize-reflow-invariant`; failures also
-record the original and resize-minimized replay event sequences.
+| Task | Default cases | Check |
+| --- | ---: | --- |
+| `xtermDifferentialTest` | 2,000 generated cases plus fixed corpus | Independent headless xterm.js comparison. |
+| `xtermDifferentialSmokeTest` | 100 | Generated xterm.js comparison. |
+| `xtermDifferentialNightlyTest` | 100,000 | Generated xterm.js comparison. |
+| `xtermDifferentialReleaseAudit` | 500,000 | Generated xterm.js comparison. |
+| `resizeReflowInvariantSmokeTest` | 100 | Mixed-width text and repeated resize invariants. |
+| `resizeReflowInvariantNightlyTest` | 10,000 | Mixed-width text and repeated resize invariants. |
+| `cursorWrapModelSmokeTest` | 100 | Independent grid model comparison. |
+| `cursorWrapModelNightlyTest` | 25,000 | Independent grid model comparison. |
 
-The grid-physics campaign executes generated ASCII, combining, CJK, and emoji
-writes together with CR, LF, BS, CUP, CUF, CUB, DECAWM, DECSTBM, DECSLRM,
-DECLRMM, DECOM, RI, IL, DL, SU, and SD against both the production
-parser-to-core pipeline and a small independent grid model. It compares cells,
-wide spans, clusters, cursor position, margins, origin mode, autowrap, soft-wrap
-markers, regional scrolling, line mutations, and retained history. Override and shard it with
-`-PcursorWrapCases=N` and `-PcursorWrapStartIndex=N`; failing streams are
-prefix-independent delta-minimized and stored under
-`build/reports/cursor-wrap-model/failures`.
+Invoke these tasks with the `:ketraterm-testkit:` prefix. xterm tasks require
+Node.js and npm on `PATH`; they install locked dependencies with
+`npm ci --ignore-scripts` and run the oracle's unit tests first. See the
+[oracle guide](../tools/xterm-oracle/README.md) for process protocol and setup.
+Resize/reflow and grid-model campaigns require no Node.js or native terminal.
+
+Override case counts and deterministic shards with the matching Gradle properties:
+
+| Campaign | Count | First index | Reports under module `build/reports/` |
+| --- | --- | --- | --- |
+| xterm differential | `xtermDifferentialCases` | `xtermDifferentialStartIndex` | `xterm-differential/` |
+| Resize/reflow | `resizeReflowCases` | `resizeReflowStartIndex` | `resize-reflow-invariant/` |
+| Grid model | `cursorWrapCases` | `cursorWrapStartIndex` | `cursor-wrap-model/` |
+
+For example:
+
+```text
+./gradlew :ketraterm-testkit:cursorWrapModelSmokeTest -PcursorWrapCases=250 -PcursorWrapStartIndex=500
+```
+
+Campaign reports retain deterministic replay metadata and manifests. Failures
+include reduced reproductions and structural differences. Differential tests
+compare the observable intersection with the oracle; intentional disagreements
+must name their rationale and exact mismatch paths. KetraTerm's resize/reflow
+policy is checked by its own invariants rather than treated as xterm parity.
+
+See [Module.md](Module.md) for helper structure and dependencies.

@@ -1,80 +1,124 @@
 # Render Frame Lifecycle & Concurrency Invariants
 
-The `ketraterm-render-api` defines a pull-based visual frame reading model designed for high concurrency safety, zero heap allocations on hot paths, and absolute isolation from internal terminal storage mutation.
-
----
+A render read supplies a consistent borrowed view of one viewport. The API is
+synchronous and supports copying primitive data without requiring per-cell
+objects. Allocation and synchronization depend on the reader and consumer
+implementations.
 
 ## 1. Frame Reader & Consumer Synchronization
 
-Render frame reading is orchestrated through the [TerminalRenderFrameReader](../src/main/kotlin/io/github/ketraterm/render/api/TerminalRenderFrameReader.kt) and [TerminalRenderFrameConsumer](../src/main/kotlin/io/github/ketraterm/render/api/TerminalRenderFrameConsumer.kt) contracts.
-
-```
-       TerminalSession Thread                UI/Render Thread
-                 │                                  │
-                 │ (Terminal Mutation)              │ readRenderFrame(consumer)
-                 │                                  ▼
-                 │                          [Lock Mutation Lock]
-                 │                                  │
-                 │                                  ├─► consumer.onFrame(frame)
-                 │                                  │     │
-                 │                                  │     ├─► copyLine(...)
-                 │                                  │     └─► copyCursor(...)
-                 │                                  │
-                 │                          [Unlock Mutation Lock]
-                 │                                  ▼
-```
+`TerminalRenderFrameReader.readRenderFrame` invokes
+`TerminalRenderFrameConsumer.accept` before returning. An implementation may hold
+a mutation lock while invoking the callback. Keep callbacks short: copy rows,
+clusters, and metadata, then paint or analyze the copied data after the read.
 
 ### Critical Lifespan Rule
-> [!IMPORTANT]
-> **Frame Reference Escape:**
-> The `TerminalRenderFrame` instance passed to the consumer callback is **short-lived and valid only during the enclosing read function**.
-> * Consumers **must not** cache or hold references to `TerminalRenderFrame` or any of its sub-objects (like `TerminalRenderCursor`) outside the callback.
-> * Implementations are allowed to reuse a single `TerminalRenderFrame` instance across read calls to prevent garbage collection pressure.
 
----
+The `TerminalRenderFrame` is valid only during its callback. Do not cache it or
+send it to another thread. Readers may reuse a frame instance across calls.
+Caller-owned destination arrays retain the copied values after the read returns;
+the consumer owns their subsequent synchronization.
 
-## 2. Monotonic Generation Counters
+Nested reads on the same reader need not be supported. An unsupported nested read
+must throw `IllegalStateException` without disturbing the enclosing frame. A
+consumer should finish its current read before requesting another viewport.
 
-Frame generations serve different invalidation needs. Compare them for equality;
-they belong to one reader's source and may wrap.
+`copyCursor` passes primitive cursor fields to a `TerminalRenderCursorSink`.
+Its default implementation adapts the immutable `cursor` value; providers can
+override it to avoid creating a cursor object. Blink mode is terminal state;
+current blink phase and timing belong to the UI.
 
-* **`frameGeneration` (Long)**: Incremented monotonically on any visually relevant change in the terminal (cursor movements, cell writes, scroll actions). Excellent for a cheap "does the UI need redrawing?" check.
-* **`contentGeneration` (Long)**: Changes for retained cell content and terminal-owned row mapping, including edits outside the viewport. Cursor-only and caller-requested scrollback changes may preserve it. External readers default to `frameGeneration`.
-* **`historyContentGeneration` (Long)**: Changes when retained storage is replaced, cleared or reflowed. Ordinary live edits, history admission and oldest-row eviction preserve it in core. It belongs to the active buffer: keys must include reader identity and `activeBuffer`. Non-clearing switches preserve each buffer's counter; resizing also invalidates the inactive buffer. External readers default conservatively to `contentGeneration`.
-* **`structureGeneration` (Long)**: Incremented only when the grid structure layout changes (such as resizes, terminal resets, buffer switching, or scrollback line reflowing). When this changes, previous row caches must be invalidated or resized.
-* **`lineGeneration(row)` (Long)**: Incremented per individual line when its text, attributes, or flags are updated. Allows UI paint engines to redraw only the specific modified rows.
+<a id="2-monotonic-generation-counters"></a>
 
-Retained analysis combines the history generation with absolute row anchors,
-`lineId(row)`, line generations and `discardedCount`. The history generation alone
-does not identify edited live rows or evicted records. Absolute range reads must
-resolve coordinates and expose borrowed frames under the same mutation lock.
-Copy bounded primitive rows inside that callback, then assemble logical strings
-and perform analysis after it returns. `TerminalRenderRangeCopy` in the cache
-module supplies this reusable copying boundary.
+## 2. Generation counters
 
----
+Compare generations for equality or inequality, never for ordering: counters can
+wrap and are local to one reader's content source. Include reader identity in
+cache keys, and reset caches when unrelated content replaces that source.
 
-## 3. Allocation-Free Copy Contracts
+| Field | Meaning and invalidation |
+| --- | --- |
+| `frameGeneration` | Any visually relevant mutation, including cursor changes. A caller-selected viewport still needs its own cache key. |
+| `contentGeneration` | Retained cell content and terminal-owned row mapping, including off-screen history. Cursor-only changes need not advance it. Defaults to `frameGeneration`. |
+| `historyContentGeneration` | Retained-history identity/layout in the active buffer. Replacement, clearing, and resize/reflow advance it; ordinary live edits, history admission, and eviction do not. Defaults to `contentGeneration`. |
+| `structureGeneration` | Terminal-owned row mapping/shape changes, including scrolling, resize, reset, buffer switches, and reflow. |
+| `lineGeneration(row)` | Visual cell content, attributes, hyperlinks, cluster text, or wrap status for that visible row. |
+| `lineId(row)` | Stable line identity moving with content. `0` means unavailable. |
 
-To paint or cache frame data, the frame provides primitive bulk array copy procedures:
+Include `activeBuffer` alongside `historyContentGeneration`; a non-clearing buffer
+switch preserves each buffer's own history counter. Use line identities, line
+generations, and `discardedCount` to detect edits and eviction. A history counter
+alone does not describe those changes.
 
-```kotlin
-fun copyLine(
-    row: Int,
-    codeWords: IntArray,
-    codeOffset: Int = 0,
-    attrWords: LongArray,
-    attrOffset: Int = 0,
-    flags: IntArray,
-    flagOffset: Int = 0,
-    extraAttrWords: LongArray? = null,
-    extraAttrOffset: Int = 0,
-    hyperlinkIds: IntArray? = null,
-    hyperlinkOffset: Int = 0,
-    clusterSink: TerminalRenderClusterSink? = null,
-    clusterDataSink: TerminalRenderClusterDataSink? = null,
-)
-```
+Global presentation changes can preserve `contentGeneration`, but must change
+`lineGeneration` for rows whose rendered attributes change. Palette, cursor, and
+viewport metadata must also participate in the consumer's invalidation strategy.
 
-By providing destination primitive arrays, callers perform bulk reads from backing grid storage without allocating temporary objects per cell or per row.
-* **`extraAttrWords`** and **`hyperlinkIds`** parameters are optional (`null` by default) so renderers that do not support hyperlinks or extended overlines can bypass those copy overheads entirely.
+`outputEndAbsoluteRow` is the exclusive boundary of authored output, independent
+of the requested viewport. It includes explicitly authored blank lines and
+excludes an untouched live tail. It can retreat after row replacement and is
+scoped to `historyContentGeneration`. It does not promise that the last logical
+line is complete or immutable. `Long.MAX_VALUE` means the provider does not expose
+this boundary.
+
+<a id="3-allocation-free-copy-contracts"></a>
+
+## 3. Primitive Copy Contracts
+
+`copyLine` copies one row in logical terminal-column order. Required destination
+arrays are `codeWords`, `attrWords`, and `flags`; optional channels are
+`extraAttrWords` and `hyperlinkIds`. Each supplied array needs `columns` entries
+from its corresponding nonnegative offset. The row is in `0 until rows`.
+Core's frame implementation rejects invalid rows or capacities with
+`IllegalArgumentException`.
+
+Use [public cell flags](attribute-packing.md#cell-flags) to distinguish scalar,
+cluster, empty, wide-leading, and wide-trailing cells. `codeWords` is zero for
+clusters, empty cells, and wide trailing cells. Attribute words remain available
+for every cell, including cells with no glyph. A hyperlink ID of zero means no
+hyperlink; resolving a nonzero ID belongs to the host/session integration.
+
+Cluster receivers run synchronously during `copyLine`:
+
+- `TerminalRenderClusterDataSink` receives a borrowed code-point array slice.
+  Copy that slice before the sink callback returns; a provider may reuse it for
+  the next cluster.
+- `TerminalRenderClusterSink` receives full grapheme text. Its advertised lifetime
+  is the enclosing frame callback unless the provider promises more.
+- The `column` argument identifies the logical cluster-leading column in the
+  copied row, independent of the destination-array offsets.
+
+Prefer the primitive cluster sink when maintaining a cache. Requesting the text
+sink may create strings; providing primitive arrays does not make all reads
+allocation-free. Optional channels can be omitted when the consumer does not need
+them.
+
+## Viewports and absolute ranges
+
+A scrollback offset is measured in rows above the live bottom viewport. Providers
+clamp it to available history and report the resolved value in
+`frame.scrollbackOffset`. Requesting a viewport does not mutate terminal state.
+The overload with `viewportRows` supports render-only overscan and must not resize
+the terminal or change host-visible dimensions.
+
+The default scrollback overload delegates to the bottom-pinned read; the default
+overscan overload delegates to the scrollback read. Consumers must use the
+returned metadata rather than assume every provider implements these options.
+
+`readRenderFrameForAbsoluteRange(start, end, consumer)` accepts an inclusive range
+with `0 <= start <= end`. It exposes a clamped retained frame that can start
+before the requested row when the range begins inside the live grid. Intersect
+the requested range with the returned frame before extracting text, including
+when the entire requested range has been discarded.
+
+For a returned frame, its top absolute row is
+`discardedCount + historySize - scrollbackOffset`; visible row `r` is that value
+plus `r`. Absolute coordinates continue across history eviction but need source,
+buffer, and history-generation context after replacement or reset.
+
+The default range method reads metadata and then makes a relative viewport read.
+A stateful caller must serialize the whole operation against mutation, or the
+provider must override it to resolve the range and expose the frame atomically.
+`TerminalSession` provides that serialization for its readers. For bounded copied
+range data, see
+[`TerminalRenderRangeCopy`](../../ketraterm-render-cache/README.md).

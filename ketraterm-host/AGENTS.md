@@ -1,53 +1,51 @@
 # Terminal Integration Agent Guide
 
-`ketraterm-host` is the bridge between `ketraterm-parser` and
-`ketraterm-core`.
+`ketraterm-host` maps parser command-sink calls to public core APIs and host
+events. Follow the [root guide](../AGENTS.md) for cross-module ownership.
 
-It maps `TerminalCommandSink` calls to `TerminalBuffer` calls and host-facing
-metadata. It must stay thin, explicit, and honest about unsupported behavior.
+## Integration boundary
 
-## Integration Boundary
+- Keep mapping explicit. Parser owns decoding and parameter recognition; core
+  owns bounds, cursor physics, width, storage, and durable modes.
+- Convert coordinates only where the contracts differ. Cursor coordinates are
+  zero-based in both APIs; scroll margins require conversion; rectangular
+  commands preserve DEC coordinates. See the [mapping contract](docs/command-adapter-mapping.md).
+- Keep authoritative titles and palette in core. The adapter owns title stacks,
+  the bounded hyperlink registry, and host callback delivery.
+- Do not add transport, UI, clipboard I/O, worker scheduling, or input encoding
+  here. Session and product hosts own execution and lifecycle.
+- Do not silently clamp a richer command into a weaker model or manufacture a
+  successful result for an unsupported command.
 
-Integration owns:
+## Serialization and policy
 
-- mapping parser semantic commands to core APIs.
-- converting parser coordinate conventions to core API conventions.
-- owning title stacks, hyperlink metadata, and host notifications; current title
-  values remain authoritative in core.
-- explicit TODOs for parser/core gaps.
+Command calls and mutable registry access are serialized with the supplied
+terminal. Synchronous callbacks must not reenter mutation. Preserve callback
+ordering and coherent registry indexes when a callback fails.
 
-Integration must not:
+Policy publication must not mutate registries or emit callbacks from the
+publishing thread. Enforce permissions before changing protected metadata,
+emitting host actions, or admitting replies. Keep palette permission distinct
+from terminal-response permission. Advertised mode and keyboard capabilities
+must match the host's implemented actions.
 
-- parse bytes or escape sequences.
-- duplicate CSI/OSC/SGR logic.
-- inspect or mutate core internals.
-- fake unsupported core features.
-- silently clamp richer parser data into weaker core models.
+Clipboard admission audits remain content-free. Platform access, consent,
+deadlines, and ordered read replies belong outside the adapter. Hyperlink IDs
+must never be reassigned during an adapter's lifetime, including after reset,
+eviction, or exhaustion.
 
-Example: if parser emits 256-color SGR and core only supports ANSI 16, the
-adapter must ignore or TODO the unsupported value. It must not clamp color 196
-to color 15 and pretend that is correct.
+Intentional mapping gaps belong in the canonical gap map with its existing
+ownership markers. Do not reproduce capability inventories or the TODO
+taxonomy here.
 
-## TODO Discipline
+## Validation
 
-Every intentionally unwired feature should say why and where the real work
-belongs. Use the exact ownership markers defined by the canonical gap map; do
-not reproduce or extend that taxonomy here.
+Read the public parser and core contracts for each changed mapping. Prefer
+real byte-stream tests using `TerminalParsers`, `HostCommandAdapter`, and public
+buffer state. Cover default/denied policy, invalid parameters, callback order,
+and relevant mode transitions; vary byte chunk boundaries when dispatch changes.
+Unsupported behavior tests must assert the documented outcome rather than a
+fabricated degraded result.
 
-## Testing
-
-Integration tests should prove real parser-to-core behavior, not just adapter
-method calls.
-
-Prefer tests that:
-
-- feed real bytes through `TerminalOutputParser`.
-- use `HostCommandAdapter`.
-- assert public `TerminalBuffer` state.
-- include mode-dependent behavior such as origin mode, auto-wrap, newline mode,
-  alternate screen, mouse/focus/bracketed paste flags, and SGR attributes once
-  core supports them.
-
-For adapter-only gaps, tests may assert honest no-op behavior when the feature is
-documented as unsupported. Never assert a fake degraded behavior as if it were
-correct terminal semantics.
+Run formatting and `./gradlew :ketraterm-host:test` from the root for behavior
+changes.

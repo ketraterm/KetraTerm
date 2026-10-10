@@ -1,128 +1,44 @@
 # Module ketraterm-pty
 
-## KetraTerm PTY (`:ketraterm-pty`)
-
-The `ketraterm-pty` module owns the lifecycle management, process stream pumping, and terminal size synchronizations of local, host-backed pseudo-terminal (PTY) processes.
-
-Using JetBrains [Pty4J](https://github.com/JetBrains/pty4j) as the underlying native transport layer, this module exposes system-bound shells (such as `cmd.exe` on Windows or `bash`/`zsh` on macOS/Linux) through standard `ketraterm-transport-api` abstractions. It also provides factory entry points to wire process byte-streams directly into the synchronized terminal session runtime (`ketraterm-session`).
-
----
-
-## Upstream Dependencies
-- **`:ketraterm-protocol`** (vocabulary, mode IDs, enums)
-- **`:ketraterm-transport-api`** (duplex connector contracts)
-- **`:ketraterm-core`** (headless terminal grid)
-- **`:ketraterm-host`** (command mapping and security policies)
-- **`:ketraterm-input`** (keyboard/mouse encoding and policies)
-- **`:ketraterm-session`** (session orchestration and lock loops)
-
----
+Local PTY process and connector lifecycle, with convenience construction of the
+shared session runtime. Public APIs live in `io.github.ketraterm.pty`; the
+[README](README.md) covers host assembly.
 
 ## Architectural Role & Data Flow
 
-The PTY transport orchestrates three asynchronous boundaries:
-1. **The Reader Thread** (`terminal-pty-reader`): Blocks on the native PTY process `InputStream`, pumping raw byte packets to the parser.
-2. **The Watcher Thread** (`terminal-pty-watcher`): Blocks on process termination (`Process.waitFor()`) to capture the native exit code.
-3. **The Outbound Writer**: Serializes input and terminal replies on the session I/O dispatcher; native writes run outside parser/input locks.
+| Component | Responsibility |
+|---|---|
+| `PtyOptions` | Validated launch/session snapshot with detached command and environment collections. |
+| `PtyConnectors` / `Pty4jProcessFactory` | Launch a local process and expose raw transport. |
+| `PtyConnector` | Ordered stdout delivery, synchronized stdin writes, process exit, resize, and disposal. |
+| `PtyForegroundProcessDetector` | Best-effort native foreground-group lookup or Windows descendant heuristic. |
+| `TerminalSessions` / `PtySessions` | Assemble a session, attach host callbacks, and optionally start delivery. |
+| `SessionHostEventBridge` | Bind metadata and clipboard operations to the owning session. |
 
-```mermaid
-flowchart TD
-    UI([User Interaction / Input])
-    Loop[TerminalSession Event Loop]
-    PtyConn[PtyConnector]
-    ReaderThread[terminal-pty-reader Thread]
-    WatcherThread[terminal-pty-watcher Thread]
-    PtyProc[PtyProcess]
+The connector owns daemon reader/watcher threads. Session owns parser/core
+serialization and the outbound writer. Host callbacks are forwarded from session
+processing; PTY transport itself does not interpret output or encode input.
 
-    UI -->|Key / Mouse / Paste| Loop
-    Loop -->|write bytes| PtyConn
-    PtyConn -->|synchronized stdin write| PtyProc
+Creating a local session launches the process but leaves delivery unstarted.
+Assembly failure closes the connector; immediate-start failure closes the
+session. A successfully returned session belongs to its caller. Supplied shell
+producers remain host-owned.
 
-    PtyProc -->|stdout raw bytes| ReaderThread
-    ReaderThread -->|onBytes| Loop
+## Upstream Dependencies
 
-    PtyProc -->|process exit| WatcherThread
-    WatcherThread -->|onClosed exitCode| PtyConn
-    PtyConn -->|notify terminal termination| Loop
-```
+The Gradle API surface exposes session and Pty4J. Core, host, input, protocol,
+transport, and JNA are implementation dependencies. Optional OSC shell integration
+is selected by consumers; this module uses it only in tests. Swing and product
+policy remain outside PTY.
 
----
+<a id="maintenance"></a>
 
-## Sub-Documentation
+## Lifecycle testing
 
-For deep-dive details on daemon threading and ConPTY integration:
-* [pty4j-process-lifecycle.md](docs/pty4j-process-lifecycle.md) - PTY reader and watcher loops, exit-code capture, and Windows sizing adjustments.
+The internal process seam isolates native process access. Lifecycle tests use
+controlled streams to exercise output draining, failure notification, and
+reentrant close from connector callbacks.
 
----
-
-## Clipboard reads
-
-Implement the suspending `PtyEventListener.readClipboard(session, request)` operation to supply clipboard data. The existing host bridge binds it to the requesting session before PTY startup. Follow the `TerminalClipboardReader` contract for consent, target selection, cancellation, and earlier posted writes. The default returns unavailable data. Provider exceptions go through the content-free session read audit, rather than the generic listener error callback.
-
-For hosts that must register a session before handling startup output, use `TerminalSessions.createLocalPty(options)`, publish the returned session, then call `session.start(options.columns, options.rows)`. The PTY process already exists, but output delivery has not started. Close the session if publication fails or startup is abandoned. `TerminalSessions.localPty(options)` remains the immediate-start convenience API.
-
-## Shell integration selection
-
-`PtyOptions.shellIntegration` accepts the session's neutral factory contract and
-defaults to `null`. PTY creation does not install shell scripts or add a dependency
-on KetraTerm's OSC producer. Select `OscShellIntegration` from
-`ketraterm-shell-integration` for compatible shell hooks, or supply a host model
-using `TerminalShellIntegrationFactory.host`. A configured startup command
-requires a selected integration and uses its prompt readiness. See the
-[session composition guide](../ketraterm-session/README.md#host-owned-shell-integration).
-
-## How to Use
-
-The following example shows how to launch a local shell session (e.g. `/bin/bash` or `cmd.exe`) using the `TerminalSessions` factory:
-
-```kotlin
-import io.github.ketraterm.pty.TerminalSessions
-import io.github.ketraterm.pty.PtyOptions
-import io.github.ketraterm.pty.PtyEventListener
-import io.github.ketraterm.session.TerminalSession
-
-fun main() {
-    // 1. Define custom event listeners for terminal title changes or bells
-    val listener = object : PtyEventListener {
-        override fun bell(session: TerminalSession) {
-            println("OS Bell Triggered!")
-        }
-        override fun windowTitleChanged(session: TerminalSession, title: String) {}
-        override fun iconTitleChanged(session: TerminalSession, title: String) {}
-        override fun listenerFailed(session: TerminalSession, exception: Throwable) {}
-    }
-
-    // 2. Configure PTY Options
-    val options = PtyOptions.create {
-        it.columns = 80
-        it.rows = 24
-        it.maxHistory = 1000
-        it.eventListener = listener
-    }
-
-    // 3. Start the local PTY session
-    val session: TerminalSession = TerminalSessions.localPty(options)
-
-    // 4. Send typing events
-    session.encodePaste(io.github.ketraterm.input.event.TerminalPasteEvent("echo 'Hello KetraTerm'\n"))
-}
-```
-
----
-
-## How to Extend: Custom Key Mappings or Shells
-
-You can customize the command array, working directory, and custom environment variables directly via `PtyOptions`:
-
-```kotlin
-import io.github.ketraterm.pty.PtyOptions
-import io.github.ketraterm.pty.TerminalSessions
-import java.nio.file.Path
-
-val options = PtyOptions.create {
-    it.command = listOf("/usr/bin/git", "status")
-    it.workingDirectory = Path.of("/my/repo/path")
-    it.environment = PtyOptions.defaultEnvironment() + ("GIT_EDITOR" to "vim")
-}
-val gitSession = TerminalSessions.localPty(options)
-```
+[Process lifecycle](docs/pty4j-process-lifecycle.md) defines worker, teardown, and
+native-test contracts. The repository feature and gap maps remain authoritative
+for capability scope.

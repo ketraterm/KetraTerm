@@ -1,27 +1,40 @@
 # Terminal Completion Host Support Agent Guide
 
-`ketraterm-completion-host` owns host-neutral suspending filesystem support shared by standalone and IDE products.
+Read the [root guide](../AGENTS.md) first. This module owns host-neutral local
+path resolution and suspending directory access for completion sources.
 
 ## Boundary
 
-This module may:
+- Keep command parsing, quoting, specifications, source priorities, and ranking
+  in `ketraterm-completion` or its host.
+- Depend only on the completion API, coroutines, and JVM filesystem facilities;
+  keep Swing, IntelliJ, workspace, session, and product types outside this module.
+- Resolve only proven-local working-directory URI authorities. Never reinterpret
+  an unsupported remote URI as a local path.
+- Scanner implementations own dispatcher changes for blocking access. Request
+  jobs, replacement, and cancellation remain host-owned; source parallelism
+  belongs to the merged engine.
 
-- expose direct suspending providers.
-- resolve explicitly local filesystem completion paths.
-- perform bounded local directory scans outside UI threads.
+## Scan invariants
 
-This module must not:
+- Bound raw directory visits independently of matching and candidate limits.
+  Treat the monotonic time budget as best-effort, not a hard I/O deadline.
+- Preserve deterministic ordering of retained entries and case-insensitive
+  prefix matching. Missing and non-directory paths are normal empty results;
+  propagate operational failures and cancellation.
+- Scan each request. Do not cache directory contents using file keys or
+  last-modified timestamps as a content version: those values cannot prove
+  that the entries are unchanged.
+- Close directory streams on every exit path and skip children that disappear
+  during enumeration without hiding unrelated filesystem failures.
 
-- parse command lines or terminal protocols.
-- choose completion source priorities or command specifications.
-- depend on Swing, IntelliJ Platform, workspace, session, or application modules.
-- cache merged or prefix-filtered request results or own completion jobs.
+## Validation
 
-Direct NIO scanners must not cache directory snapshots from heuristic metadata
-such as file keys and last-modified timestamps. Filesystem timestamp granularity
-is not an authoritative directory-content version; scan each request within the
-configured time, visit, and result bounds.
+For behavior changes, test URI authority and lexical path handling, visit/time
+bounds, ordering and prefix matching, cancellation, disappearing entries, and
+operational failures as applicable. Use temporary directories and injected
+clocks or dispatchers rather than wall-clock timing assertions.
 
-Hosts remain responsible for invoking environment-specific APIs. The Swing terminal owns request replacement and
-cancellation; the merged engine owns source parallelism.
-
+Run formatting and `./gradlew :ketraterm-completion-host:test` from the repository
+root. Update [README.md](README.md) when consumer usage changes and
+[Module.md](Module.md) when dependencies or component responsibilities change.

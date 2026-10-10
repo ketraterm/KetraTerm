@@ -1,116 +1,107 @@
-# Swing Repaint Optimization & Selection Layout
+# Swing repainting, viewport geometry, and selection
 
-The Swing renderer combines terminal and overlay damage before requesting
-repaints, using the same viewport geometry as painting.
-
----
+Painting, damage planning, and pointer hit testing use the same installed
+viewport geometry. The following types are internal implementation details;
+public viewport and selection APIs are on `SwingTerminal`.
 
 ## 1. Minimal Repaint Planning (`SwingRepaintPlanner`)
 
-The EDT-owned [SwingRepaintPlanner](../src/main/kotlin/io/github/ketraterm/ui/swing/viewport/SwingRepaintPlanner.kt)
-remembers the state for which it last **scheduled** a repaint. That state includes
-terminal row metadata, cursor state, and a copied viewport search projection.
-The copy uses reusable primitive storage, so rebuilding the current projection
-cannot overwrite the previous comparison state. Swing may coalesce pending
-repaint requests before painting.
+The EDT-owned planner remembers the state for which it last scheduled a repaint,
+including row metadata, cursor state, and a copied search projection. This is
+a scheduled state, not a guarantee that Swing has painted it; Swing may coalesce
+pending requests. Reusable primitive storage preserves the previous comparison
+state when the next projection is built.
 
-Row metadata storage follows the render cache's retained capacity, independently
-of the active row count. Overscan transitions still invalidate the viewport, but
-do not replace the metadata arrays. Reset invalidates the previous frame while
-retaining that storage. `TerminalBidiLayout` follows the same rule: active height
-does not invalidate unchanged row permutations or replace column scratch.
+- A generation, wrapping, or search-segment change damages the affected row.
+  Adjacent damaged rows are combined into one region. Search comparisons inspect
+  visible segments rather than traversing all history.
+- Cursor changes damage old and new visual cell bounds, except where row damage
+  already covers them. Focus changes damage the current cursor; inactive cursors
+  do not receive cursor-only blink damage. Text blink damage remains independent.
+- Grid shape, buffer, and viewport mapping changes require a full repaint.
+  Chrome or settings changes may force one explicitly.
 
-* **Rows:** A row is damaged when its generation or wrapping changes, or its
-  search segment ranges, count, or active-result styling changes. Adjacent
-  damaged rows are combined into one repaint region. Comparing search
-  projections examines viewport segments, without traversing retained history.
-* **Cursor:** Cursor changes repaint both old and new visual cell bounds, unless
-  those rows are already covered by row damage. Focus changes repaint only the
-  current visual cursor bounds. Inactive blocks become thin hollow outlines;
-  bars and underlines keep their shape. Inactive cursors skip cursor-only blink
-  damage; the shared timer continues to invalidate SGR blinking text.
-* **Full surface:** Shape, buffer, and viewport mapping changes require a full
-  repaint. Callers may also force one for changes such as terminal chrome.
+Search refresh precedes frame damage planning. Query changes and result navigation
+also advance the planner's scheduled state between frame publications. For
+example, a wrapped match in `abc` / `def` for `cde` damages both rows if the second
+row becomes `xef`, because the first row loses its highlight too.
 
-[SwingRenderFrameController](../src/main/kotlin/io/github/ketraterm/ui/swing/render/SwingRenderFrameController.kt)
-refreshes search projection before planning each published frame. Query changes,
-clearing search, and result navigation use the same planner between publications;
-they must also advance its scheduled-state snapshot. For example, a match across
-wrapped rows `abc` / `def` for query `cde` highlights both rows. Changing only the
-second row to `xef` damages both rows because the first row loses its search
-segment even though its terminal generation remains unchanged.
+Row metadata capacity is retained across overscan transitions and resets.
+`TerminalBidiLayout` likewise retains row permutations and scratch capacity for
+unchanged content.
 
 ### Smooth viewport ownership
 
-`SwingScrollModel` owns the precise row position, history baseline and active
-animation. The integer render anchor is its ceiling; overscan and fractional
-translation are derived from that position. Output anchoring translates the
-position and animation destination together without restarting the completion
-deadline. Following output cancels motion and returns live. History shrink or
-reset cancels the old timeline and settles an active viewport on a surviving row.
+`SwingScrollModel` owns the precise row position, history baseline, and animation.
+The integer render anchor is its ceiling; overscan and fractional translation
+follow that position. Output anchoring moves the position and destination
+without restarting the animation deadline. Following output returns to live
+content and cancels motion. History shrink/reset settles on surviving rows.
 
 `SwingViewportController` owns precise-input accumulation and the Swing timer.
-It reports changes through one callback: a changed anchor or overscan requirement
-needs a render request, while movement inside the same render window only needs
-updated geometry. Direct scrollbar dragging applies a row immediately. Reset
-stops the timer and discards accumulated input; resize and metric changes finish
-an animation before installing new geometry.
+An anchor/overscan change requests a frame; movement within the installed window
+updates geometry. Scrollbar dragging applies an immediate position. Reset stops
+the timer and clears accumulated input; metric changes finish scrolling before
+new geometry is installed.
 
-Translation is bounded by the rows in the installed frame. While a new render
-window is pending, the current window moves only as far as its coverage allows;
-it does not reset to zero merely because its anchor differs from the request.
-The bound preserves the fractional bottom space below live output. Painting and
-hit testing continue to consume that same installed geometry.
+Translation is bounded by the installed frame's coverage while a replacement
+window is pending. Painting and hit testing continue to use that installed
+geometry. Resize reconciliation uses the session-captured anchor, history size,
+and discarded-row count, so reflow discards are not mistaken for new output.
+The alternate buffer has zero native history and offset, even when primary
+history reflows in the background.
 
-Published frame history is reconciled before grid resize can install a new
-anchor. The session captures that anchor, history size and discarded-row count
-under the resize mutation lock, so reflow discards cannot masquerade as output
-when the next frame arrives. Updating cell height never rewrites the history
-baseline. Frame handling
-owns repainting and viewport publication for that transition, so reconciliation
-does not emit a second scroll callback.
-
-The resize result uses the active buffer's coordinates. Primary history still
-reflows while the alternate buffer is active, but the alternate viewport has
-zero history and offset. Core returns that coherent pair; session captures it
-with the discard baseline before notifying the connector and publishing.
-
-Viewport snapshots copy a completed EDT publication under a short monitor shared
-with primitive field publication. The EDT is the sole writer and captures model
-fields before entering the monitor; listener callbacks happen after it is
-released. An explicit snapshot read constructs its immutable result while holding
-the same monitor, without dispatching to the EDT. Animation publication and EDT
-paint getters allocate no snapshot objects. A concurrent read can briefly delay
-publication, so the synchronized sections contain only primitive stores or
-snapshot construction, with no callbacks or event-queue work.
-
-Scrollbar painting reads the published primitive metrics on the EDT, avoiding
-an intermediate viewport snapshot. Its geometry storage and palette-derived
-colors are retained. Painting and pointer interaction share the thumb geometry
-calculation, including tracks shorter than the normal minimum thumb height.
-
----
+Viewport snapshot reads copy a completed primitive publication under a short
+monitor, without EDT dispatch. The EDT is the sole writer and invokes listeners
+after releasing the monitor. Animation and scrollbar painting use primitive
+metrics rather than constructing public snapshots. Painting and interaction
+share scrollbar thumb geometry, including short tracks.
 
 ## 2. Selection Drag Matrix & Text Extraction
 
-Selection handles selection sweeps, word-level highlights, and block selections:
+Linear selections store logical text columns; bidi layout projects them to
+visual paint spans. Block selections retain visual column intervals per row,
+while copying visits the selected cells in logical text order. Wide cells and
+grapheme clusters are included whole. Alt changes during a drag preserve the
+original logical and visual anchors, including an offscreen anchor.
 
-* **Sweep Selection**: Uses logical text columns. Each row's bidi mapping projects
-  the selected logical cells into visual spans for painting.
-* **Block Selection**: Keeps horizontal bounds in visual columns, independently
-  of each row's text direction. Vertical viewport clipping changes only the row
-  bounds. Painting uses the visual interval directly; copying visits the selected
-  cells in logical order on each row and preserves row breaks. Intersected wide
-  cells and grapheme clusters are included whole. The drag retains both logical
-  and visual anchor columns so changing Alt while the anchor is offscreen does
-  not reinterpret its coordinate.
-* **Smart Word & Path Expansion**:
-  * **Standard Words**: Double-clicking a cell expands the selection left and right to contiguous letters, numbers, and underscores.
-  * **Paths / URIs**: If the clicked sequence contains directory slash markers (`/`, `\`), dot indicators (`.`), or colon signs (`:`), the text extractor expands the selection across path-safe characters, allowing users to easily select full file paths or URLs.
+Double-click expansion recognizes path/URI characters when the surrounding token
+contains `/`, `\`, `.`, or `:`; otherwise it expands by word-character category.
+Text extraction omits empty row padding and trailing spaces at hard line ends.
+Soft-wrap joining depends on the requested extraction mode; block selections
+preserve row breaks.
 
----
+`SwingTerminal.selectedText()` reads the complete retained selection's current
+content on the EDT without touching the clipboard. Linear selection joins soft
+wraps; block selection preserves row breaks. Missing selection returns `null`,
+while a nonempty range of trimmed blanks may return an empty string. It includes
+offscreen rows and closed-session output. Extraction may clip evicted rows or
+clear invalidated selection; resulting listener notifications occur outside the
+frame lease. Clipboard copying shares this extraction.
+
+`TerminalSelectionRange` uses absolute physical rows and half-open cell edges.
+It describes a region, not frozen text. Scrolling preserves it; reflow, history
+replacement, rebinding, and observed buffer changes invalidate its context.
+Evicted endpoints prevent restoration. Ordinary edits change the selected text.
+See the public range and extraction methods for EDT and snapshot contracts.
 
 ## 3. Clipboards & Key Mapping Services
 
-* **Clipboard Handlers**: Integrates with standard OS clipboards using [SwingHostServices](../src/main/kotlin/io/github/ketraterm/ui/swing/api/SwingHostServices.kt), sanitizing carriage returns during copy/paste based on policy options.
-* **Focus Mapping**: Converts window focus gain/loss into `TerminalFocusEvent` events, routing them to the active session to trigger bracketed focus reports (`CSI I` and `CSI O`).
+Clipboard access belongs to `TerminalClipboardHandler`. The view's copy actions
+extract selection text; paste is admitted through the session, which owns paste
+transformation, bracketed-paste encoding, and write ordering. The view does not
+sanitize protocol bytes itself. See the [manual paste contract](../README.md#manual-paste).
+
+Component focus events are encoded through session input. DEC 1004 determines
+whether `CSI I` / `CSI O` reports are emitted; these are focus reports rather than
+bracketed-paste sequences. Local cursor presentation does not change that mode.
+Mouse reporting takes priority over local interaction unless Shift is held.
+Without tracking, primary-wheel input scrolls history. When
+`alternateScreenWheelToArrowEnabled` is enabled, local alternate-screen input
+accumulates precise deltas and emits bounded arrow-key steps through the input
+encoder. It defaults to enabled and also applies when Shift bypasses reporting.
+When disabled, local viewport scrolling receives wheel input; unhandled events
+remain available to the host. Route/session changes and reloads of either
+wheel-routing setting clear partial alternate input. See the
+[middle-button paste contract](../README.md#middle-button-paste) for source-aware
+clipboard access and deferred host completion.

@@ -1,85 +1,58 @@
 # Terminal Parser Agent Guide
 
-`ketraterm-parser` turns a terminal host byte stream into semantic terminal
-commands. It is a parser and text segmenter, not a grid engine.
+Read the root `AGENTS.md` before working here. `ketraterm-parser` turns ordered
+host-output bytes into semantic sink calls; it does not own a terminal grid.
 
 ## Parser Boundary
 
-Parser owns:
-
-- UTF-8 decoding and malformed-byte recovery.
-- ANSI byte classification and finite-state transitions.
-- CSI, ESC, OSC, DCS, charset, and mode protocol recognition.
-- SGR, OSC, and command dispatch vocabulary.
-- grapheme cluster segmentation.
-- semantic calls into `TerminalCommandSink`.
-
-Parser must not own:
-
-- terminal width or height.
-- cursor clamping or grid bounds.
-- cell width calculation.
-- scrollback storage.
-- rendering state.
-- core mode persistence beyond parser-local sequence assembly.
-
-If a behavior needs grid state, expose a semantic sink method or defer it to
-core/host. Do not smuggle core decisions into parser code.
+- Own UTF-8 recovery, ANSI routing, sequence collection, charset mapping, and
+  grapheme assembly.
+- Send semantic intent through `TerminalCommandSink`. Cell width, cursor bounds,
+  wrapping, storage, mode persistence, and host permissions belong downstream.
+- Observe effective screen selection through `isAlternateScreenActive`; do not
+  maintain a second authoritative screen flag.
+- Keep public parser calls serialized and non-reentrant. Callbacks are synchronous;
+  borrowed arrays must not escape their documented call lifetime.
 
 ## FSM and Dispatch Rules
 
-- Keep byte classification, state transitions, and semantic actions separate.
-- The FSM matrix owns routing; `ActionEngine` performs actions; dispatchers map
-  completed sequences to terminal commands.
-- CSI dispatch should use structural signatures, not final-byte-only switches.
-- OSC/DCS payloads must be bounded. Overflow-sensitive commands should be
-  ignored unless a clear policy says otherwise.
-- Do not use global control execution inside string states when terminal
-  semantics require string-local handling.
-- Unsupported sequences are swallowed or ignored according to terminal
-  semantics; they must not accidentally print or dispatch as another sequence.
+- Preserve the split between byte classification, state transitions, collection,
+  and semantic dispatch described in [Module.md](Module.md).
+- Match CSI structural signatures, not final bytes alone. Preserve omitted fields,
+  colon subparameters, and overflow state until dispatch decides their meaning.
+- Bound collection before decoding. Unsupported strings must drain without
+  printing their bodies or being reclassified as another protocol.
+- Respect string-local control handling. Cancellation must discard partial
+  commands; ordinary C0 behavior differs between OSC, DCS, and ignored strings.
+- Host response and clipboard permissions are outside parser policy. Follow the
+  root security rule when introducing query semantics.
 
 ## Unicode and Text Rules
 
-- `TerminalParser` owns UTF-8 decoding. Do not add a second decoder inside
-  `PrintableProcessor`.
-- `PrintableProcessor` accepts already-decoded codepoints or ASCII fast-path
-  bytes and forwards text through charset mapping and grapheme assembly.
-- Grapheme segmentation belongs in parser/unicode.
-- Cell width belongs in core.
-- Use generated-table-shaped Unicode APIs even while seed data is curated:
-  `UnicodeClass.graphemeBreakClass`, `UnicodeClass.isExtendedPictographic`,
-  and future generated tables.
-
-## Protocol Security
-
-Parser recognizes and bounds protocols; it does not choose host-affecting or
-outbound-response policy. Route semantic intent to the owning layer and follow
-the root response-security rule. Current support, deferrals, and policy gates
-belong only in the canonical feature and gap maps.
+- `TerminalParser` owns printable UTF-8 decoding. `PrintableProcessor` accepts
+  decoded codepoints or the ASCII fast path, then applies charset mapping.
+- Keep segmentation and retained text in parser/unicode. Core owns width and
+  placement; never infer grid effects here.
+- Publish full retained prefixes through `updatePreviousCluster`. Read-boundary
+  publication preserves segmentation context; termination and reset clear it.
+- Overflow must advance segmentation context without creating extra writes or
+  splitting a cluster merely because storage filled.
+- Use packed properties through `UnicodeClass` and generated classification tables.
+  Regenerate tables with `tools/generate-unicode-tables.ps1`; update pinned Unicode
+  test resources deliberately, independently of the generator.
 
 ## Testing
 
-Parser tests must be semantic, exhaustive, and hostile-input aware. They should
-fail if parser logic disagrees with real terminal behavior.
+Use explicit semantic expectations with recording sinks. Test byte classes,
+matrix transitions, action/state invariants, dispatchers, UTF-8, charsets, and
+segmentation independently, then exercise the complete byte-stream parser.
 
-Cover these layers independently and together:
+Cover omitted/colon/overflowing parameters, malformed UTF-8 followed by controls,
+CAN/SUB, string termination, unsupported input, exact collection bounds, grapheme
+overflow, and splits around every relevant byte. A parser protocol change also
+requires real byte-stream tests in `ketraterm-host`.
 
-- `ByteClass`, `AnsiState`, `ParserState`, and generated dispatch tables.
-- `AnsiStateMachine` matrix transitions, including string termination.
-- `ActionEngine` side effects, parameter invariants, payload bounds, and
-  recovery.
-- `CommandDispatcher`, SGR, OSC, mode, charset, and Unicode components.
-- `TerminalParser` full byte-stream host.
-
-Required edge classes:
-
-- omitted, empty, colon, and overflowing parameters.
-- CAN/SUB abort behavior.
-- malformed UTF-8 followed by ASCII, ESC, CSI, and string terminators.
-- OSC/DCS termination by BEL/ST/CAN/SUB.
-- unsupported and malformed sequences.
-- chunk boundaries at every interesting byte.
-- maximum params, intermediates, payloads, and grapheme cluster length.
-
-Use recording sinks and harnesses, but keep expected events explicit.
+From the repository root, run `./gradlew spotlessApply` and
+`./gradlew :ketraterm-parser:test`, plus the affected host tests. Follow the root
+guide for feature-map updates. Do not copy capability or deferred-work inventories
+into this file.

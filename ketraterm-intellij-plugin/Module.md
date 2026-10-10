@@ -1,41 +1,71 @@
 # Module ketraterm-intellij-plugin
 
-## KetraTerm IntelliJ Plugin
-
-The `ketraterm-intellij-plugin` build is the IntelliJ Platform host for KetraTerm.
-It is a product integration build, not a terminal implementation module.
-
-This build stays independent from the root KetraTerm Gradle build so IntelliJ
-Platform plugin tooling, repositories, sandbox tasks, verification, signing,
-and publishing do not leak into the terminal library build.
+An independent IntelliJ Platform product build that consumes local KetraTerm
+libraries through a composite. See the [README](README.md) for installation,
+requirements, and build commands; this file describes host assembly.
 
 ## Role
 
-The plugin adapts reusable KetraTerm modules to IntelliJ IDE services:
+| Package | Responsibility |
+| --- | --- |
+| `io.github.ketraterm.intellij` | Resource bundle and shared plugin entry-point support. |
+| `.ui` | Tool-window assembly, terminal panes, keymap actions, completion presentation, hyperlinks, and IDE dialogs. |
+| `.settings` | Application settings snapshots, project startup commands, theme and font adaptation. |
+| `.services` | Project workspace ownership, tab persistence, IDE completion sources, clipboard-client ownership, and notifications. |
 
-- terminal rendering and input through `ketraterm-ui-swing`.
-- completion parsing and ranking through `ketraterm-completion`.
-- bounded completion snapshots through `ketraterm-completion-host`.
-- source-count-aware project-file, Git, and Gradle loaders that stop after the
-  shared engine's requested number of usable rows.
-- sanitized completion statistics through `ketraterm-completion-persistence`.
-- completion/Swing adaptation through `ketraterm-ui-swing-host`.
-- workspace and session state through `ketraterm-workspace` and
-  `ketraterm-session`.
-- local process lifecycle through `ketraterm-pty`.
-- IDE lifecycle, actions, settings, notifications, tool windows, and disposal
-  through IntelliJ Platform APIs.
+The tool-window factory delegates tab ownership to
+`KetraTermProjectTerminalService`. That project service creates local workspace
+tabs on a background thread, attaches panes on the EDT, and coordinates tab and
+project shutdown. Pane cleanup releases only its own listeners and UI adapters.
+Failed assembly rolls back resources while preserving the original failure.
+
+Saved tabs contain profile identities, custom titles, and local working-directory
+metadata. Restoration resolves current profiles and settings, checks saved paths
+off the EDT, and starts a new session when the tab is shown. No process handles,
+terminal output, command lines, or environment snapshots are restored.
+
+Application settings publish normalized state and notify every registered
+listener after publication. Open panes reload reusable Swing settings and the
+session host policy. Clipboard operations retain their owning IDE client context;
+reads wait for pane readiness, stay within the session deadline, and are retired
+when either owner closes.
+
+The application completion service creates providers for individual workspace
+tabs, owns shared learning, and delegates evaluation, filesystem access, and
+persistence to the corresponding KetraTerm modules. IDE sources supply project
+files, Git data, and Gradle tasks through bounded, request-owned loading.
 
 ## Boundary
 
-The plugin must not parse terminal protocols, mutate core terminal state,
-implement reusable renderer behavior, encode host-bound input bytes directly,
-or add IntelliJ dependencies to reusable KetraTerm modules.
+Parsing, grid state, input encoding, rendering, and PTY process mechanics remain
+in shared modules. IDE navigation, project APIs, client identity, settings XML,
+keymap integration, and platform disposal belong here. IntelliJ dependencies and
+plugin tooling must stay in this build.
+
+The plugin package uses IntelliJ's Kotlin/coroutine runtime and native PTY stack.
+The archive check and coroutine ABI test guard parts of that contract; IDE
+verification is still needed when changing platform or shared-library versions.
 
 ## Current Scope
 
-This build contains the IntelliJ host integration: a bottom KetraTerm tool
-window, local terminal tab startup, shell profile launch actions, settings
-bridges, IDE notifications, clipboard policy prompts, icons, and focused
-host-adapter tests. New runtime IDE features should still be added in small
-slices with focused tests and clear ownership boundaries.
+The actual registrations are defined in
+[plugin.xml](src/main/resources/META-INF/plugin.xml). Terminal capability and gap
+status remain in the repository's canonical [feature map](../docs/terminal-feature-map.md)
+and [gap map](../docs/terminal-feature-gap-map.md).
+
+## Dependencies and local build
+
+The plugin consumes completion, completion-host, completion-persistence,
+ui-swing, ui-swing-host, and workspace. IntelliJ supplies the platform APIs and
+the bundled Git and Gradle integrations declared in `plugin.xml`.
+
+[settings.gradle.kts](settings.gradle.kts) includes the parent repository through
+`includeBuild("..")`. Dependencies in [build.gradle.kts](build.gradle.kts) use
+`io.github.ketraterm` coordinates with the repository-derived version; the
+composite substitutes local projects. No Maven publication is needed for local
+plugin development, including the product-only workspace and persistence modules.
+
+The plugin relies on IntelliJ's Kotlin and coroutine runtime, and its Pty4J/JNA
+native stack. The build excludes duplicate runtime artifacts from the plugin
+package. Changes to shared dependencies or language/runtime API usage need
+verification against the IDE's runtime, as well as normal library checks.

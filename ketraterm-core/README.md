@@ -1,120 +1,79 @@
 # KetraTerm Core (`:ketraterm-core`)
 
-The `ketraterm-core` module is a high-performance, headless terminal grid engine. It implements the headless screen-state engine, coordinates all spatial grid mutations, manages cursor physics, scrollback margins, and controls alternate/primary screen switches.
-
-Designed under strict **Single Responsibility Principles (SRP)**, this module owns coordinates, margins, cell styling attributes, tab stops, and cluster-aware storage. It possesses no awareness of escape-sequence parsing, byte stream UTF-8 decoding, input event encoding, mouse tracking, or windowing/painting lifecycles.
-
----
-
-## Upstream Dependencies
-* **`:ketraterm-protocol`** (for shared control codes, modes, and primitive constants).
-* **`:ketraterm-render-api`** (for visual frames, color palette, and cell flags).
-
----
-
-## Architectural Role & Grid Storage
-
-The core operates as a headless coordinate and physics processor. Mutations are triggered via dedicated, role-specific public APIs, orchestrated by a thin facade, and translated into parallel primitive array mutations inside circular history rings.
-
-```mermaid
-graph TD
-    Facade[TerminalBufferFacade]
-    Writer[BufferWriter]
-    Cursor[CursorImpl]
-    ModeCtrl[TerminalModeControllerImpl]
-    State[TerminalState]
-    Prim[ScreenBuffer: Primary]
-    Alt[ScreenBuffer: Alternate]
-    MutEng[MutationEngine]
-    Ring[HistoryRing]
-    Store[ClusterStore]
-    Line[Line]
-
-    Facade -->|Implements| Writer
-    Facade -->|Implements| Cursor
-    Facade -->|Implements| ModeCtrl
-
-    Writer -->|Mutates| MutEng
-    ModeCtrl -->|Updates| State
-
-    State -->|Routes to Active| Prim
-    State -->|Routes to Active| Alt
-
-    Prim -->|Holds| Ring
-    Prim -->|Holds| Store
-    Alt -->|Holds| Ring
-    Alt -->|Holds| Store
-
-    Ring -->|Allocates| Line
-    Line -->|References| Store
-```
-
----
-
-## Sub-Documentation
-
-For detailed behavioral specifications and internal memory layout mapping:
-* [terminal-core-contract.md](docs/terminal-core-contract.md) - Headless write behaviors, erasure mechanics, tab stops, cursor save/restore, and buffer lifecycles.
-* [grid-storage-layout.md](docs/grid-storage-layout.md) - Parallel primitive arrays inside `Line`, `HistoryRing` line recycling, and the `ClusterStore` arena allocator.
-
----
+Headless terminal state for Kotlin/JVM 25. Core owns the grid, cursor, margins,
+scrollback, cell attributes, terminal modes, and Unicode cell-width policy. It
+accepts semantic operations; escape-sequence parsing belongs to
+[`ketraterm-parser`](../ketraterm-parser/README.md) and
+[`ketraterm-host`](../ketraterm-host/README.md).
 
 ## How to Use
 
-The following example shows how to create a `TerminalBuffer`, write text, move the cursor, and read cell content.
-
 ```kotlin
 import io.github.ketraterm.core.TerminalBuffers
-import io.github.ketraterm.core.api.TerminalBuffer
-import io.github.ketraterm.core.codec.AttributeCodec
+import io.github.ketraterm.core.model.CellColor
 
 fun main() {
-    // 1. Create a terminal buffer of size 80x24 with 1000 lines of scrollback history
-    val buffer: TerminalBuffer = TerminalBuffers.create(width = 80, height = 24, maxHistory = 1000)
-
-    // 2. Write simple text using current pen attributes
-    buffer.writeText("Hello, KetraTerm Core!")
-
-    // 3. Mutate pen attributes and write styled text
-    val styledPen = AttributeCodec.pack(
-        fgKind = AttributeCodec.COLOR_INDEXED, fgVal = 2, // ANSI Green
-        bgKind = AttributeCodec.COLOR_DEFAULT, bgVal = 0,
-        bold = true
+    val buffer = TerminalBuffers.create(width = 80, height = 24, maxHistory = 1000)
+    buffer.writeText("Hello, KetraTerm!")
+    buffer.carriageReturn()
+    buffer.newLine()
+    buffer.setPenColors(
+        foreground = CellColor.indexed(2),
+        background = CellColor.DEFAULT,
+        bold = true,
     )
-    buffer.setPenAttributes(styledPen)
-    buffer.writeText("\nThis is green bold text.")
+    buffer.writeText("Green, bold text")
+    buffer.positionCursor(col = 10, row = 5)
+    buffer.writeCodepoint('X'.code)
 
-    // 4. Move the cursor relatively or absolutely
-    buffer.cursorPosition(column = 10, row = 5)
-
-    // 5. Read back cell content
-    val line = buffer.getLine(row = 5)
-    val codepoint = line.getCodepoint(column = 10)
-    val attrs = line.getAttributes(column = 10)
-    
-    println("Read back codepoint: ${codepoint.toChar()} with attributes: $attrs")
+    check(buffer.getCodepointAt(col = 10, row = 5) == 'X'.code)
+    println(buffer.getScreenAsString())
 }
 ```
 
----
+`writeText` writes literal scalar values. It does not interpret `\n`, `\r`, `\t`,
+escape sequences, or grapheme boundaries. Use explicit control operations as
+above, or connect a parser through the host adapter for terminal output.
+`writeCluster` accepts a pre-segmented grapheme and copies its codepoints before
+returning.
 
-## How to Extend: Custom Response Channel
+Cursor and reader coordinates are zero-based. Margin and rectangle methods use
+the DEC coordinate conventions documented on those methods. Dimensions must be
+positive; `maxHistory` is nonnegative, and zero disables primary scrollback.
 
-To handle terminal queries (such as Device Status Report `DSR` or Device Attributes `DA`) generated by the parser and needing to be piped back to the host, implement the [TerminalResponseChannel](src/main/kotlin/io/github/ketraterm/core/api/TerminalResponseChannel.kt) interface:
+## Reading and synchronization
 
-```kotlin
-import io.github.ketraterm.core.api.TerminalResponseChannel
+`TerminalBuffers.create` returns a `TerminalRenderBuffer`: the complete
+`TerminalBuffer` API plus `TerminalRenderFrameReader`. The factory installs no
+lock. Serialize mutations, cursor/grid reads, response draining, and frame reads
+with each other. A borrowed `TerminalLine` or render frame must stay within that
+serialized read; copy data before releasing it. Frame callbacks cannot nest on
+the same buffer.
 
-class ConsoleResponseChannel : TerminalResponseChannel {
-    override fun writeResponseBytes(bytes: ByteArray, offset: Int, length: Int) {
-        // Pipe bytes directly back into PTY stdout or socket streams
-        System.out.write(bytes, offset, length)
-        System.out.flush()
-    }
+Mode snapshots from the standard buffer are atomic. Capture one packed snapshot
+when decoding several input fields; reading a mode snapshot does not make a
+separate cursor or grid read coherent.
 
-    override fun writeResponseString(response: String) {
-        val bytes = response.toByteArray(Charsets.US_ASCII)
-        writeResponseBytes(bytes, 0, bytes.size)
-    }
-}
-```
+`getScreenAsString` and `getAttrAt` are allocating inspection conveniences for
+tests and debugging. Renderers should copy the primitive render frame or use
+[`ketraterm-render-cache`](../ketraterm-render-cache/README.md). A
+[`TerminalSession`](../ketraterm-session/README.md) supplies the synchronization
+and outbound-write boundary when assembling a complete terminal pipeline.
+
+## Terminal responses
+
+`TerminalResponseChannel` is part of `TerminalBuffer`. Query methods enqueue
+terminal-to-host responses; `readResponseBytes` drains them into a caller-owned
+array. These bytes go to the process or connector's **input** side. A session
+performs this drain and serialized write automatically.
+
+The host adapter applies terminal-response security permission before invoking
+queries, and core limits responses to its capability allowlist. Direct embedders
+must enforce the same permission before issuing query operations.
+
+## Sub-Documentation
+
+- [Core contract](docs/terminal-core-contract.md): coordinates, writes, borrowed reads, reset, and resize semantics.
+- [Grid storage layout](docs/grid-storage-layout.md): internal arrays, row recycling, and cluster ownership.
+- [Module guide](Module.md): maintainer boundaries and data flow.
+- [Feature map](../docs/terminal-feature-map.md) and [gap map](../docs/terminal-feature-gap-map.md): supported behavior and deferred work.
