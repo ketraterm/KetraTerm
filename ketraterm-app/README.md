@@ -39,7 +39,7 @@ Native packaging support stages dependencies with
 ## Configure
 
 Use the application's settings dialog to change appearance, shell launch,
-suggestions, and terminal permissions. Settings are saved before publication to
+and terminal permissions. Settings are saved before publication to
 open panes. Initial process and buffer settings apply when a new terminal is
 created.
 
@@ -47,6 +47,9 @@ For manual edits, see the [configuration reference](docs/profile-config-toml.md)
 for file locations, recognized keys, defaults, and recovery behavior. Restart the
 application after editing the file directly. The IntelliJ plugin has its own
 settings and does not use this file.
+
+Completion controls are currently hidden; see [completion availability](../docs/features/completion.md)
+for enabling suggestions through the configuration file.
 
 Native local profiles receive a small `ketra` companion command:
 

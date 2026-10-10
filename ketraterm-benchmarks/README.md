@@ -106,6 +106,5 @@ Use additional forks and repeated runs when a difference is close to measurement
 noise.
 
 See [Module.md](Module.md) for source sets and harness dependencies. The
-[Swing rendering guide](../ketraterm-ui-swing/docs/bifurcated-text-rendering.md) and
-[historical outbound-writer report](../ketraterm-session/docs/outbound-writer-benchmarks.md)
-provide workload-specific context.
+[Swing rendering guide](../ketraterm-ui-swing/docs/bifurcated-text-rendering.md)
+provides rendering workload context.

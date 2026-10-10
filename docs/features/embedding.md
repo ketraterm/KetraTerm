@@ -17,10 +17,28 @@ Optional modules can be selected independently through the [BOM](../../ketraterm
 | Shell metadata | Optional built-in OSC producer or a host-owned metadata and editing-context model. |
 | Completion | Independent engine, custom catalogs/sources, context resolution, ranking, and replay-retention policy. |
 | Completion UI | Custom provider, custom presentation, or both, with request-scoped editing and feedback. |
-| Swing interaction | Selection read/write/listeners, selected text without clipboard access, local clear, and pixel/cell geometry queries. |
+| Swing interaction | Selection read/write/listeners, selected text without clipboard access, foreground-program clear requests, and pixel/cell geometry queries. |
+| Host shortcuts | Configurable shortcut maps, action dispatch, and key-press interception for Swing hosts. |
 | Configuration | Immutable settings with Kotlin update callbacks and Java builders. |
 | Localization | Resource-bundle overrides for terminal chrome and completion descriptions. |
 | Distribution | Dependency-only headless/Swing entry points, version alignment, API documentation, and isolated-consumer verification. |
+
+## View customization
+
+These are library controls; individual products expose a subset in their settings.
+
+| Area | Available controls |
+| --- | --- |
+| Fonts | Primary and ordered fallback fonts, optional system fallback, a host font resolver, antialiasing, and fractional metrics. |
+| Geometry | Line height, signed integer column spacing, and separate primary/alternate-screen padding. |
+| Colors and decorations | Palette, cursor shape/blink, selection/search colors, prompt dots/dividers, failed-command rails, and visual-bell styling. |
+| Links and menus | Custom link detection, presentation and activation, plus host-owned context menus. |
+| Scrolling | Output-follow policy, viewport observation/control, and optional built-in scrollbar overlay or external host scrollbars. |
+| Mouse and clipboard | Independent mouse-reporting/wheel policies, copy on selection, clipboard/primary middle-button paste, and deferred host paste handling. |
+| Search UI | Programmatic search, case sensitivity, result navigation/state, and separately styled host search chrome. |
+
+For completion providers, views, keymaps, and editing targets, see
+[completion customization](completion.md#library-customization).
 
 Hosts own their sessions, services, preferences, and persistence. A Swing view
 controls one session viewport; independent scrolling views of one process are

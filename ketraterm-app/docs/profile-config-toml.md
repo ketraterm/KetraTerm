@@ -85,9 +85,9 @@ and `normalize-line-endings` values load as `preserve`; saving writes the
 canonical value. See the [paste contract](../../ketraterm-input/docs/terminal-input-contract.md#paste-and-focus-contract)
 for control-character and framing rules.
 
-Persisted completion data is stored beside the configuration file and contains
-sanitized learning metadata. See the [persistence module](../../ketraterm-completion-persistence/Module.md)
-for its storage and lifecycle contract.
+Persisted completion data is stored beside the configuration file. See the
+[storage reference](../../docs/reference/storage.md) for retained ranking data,
+command replay, and privacy limits.
 
 ### Shell launch and startup command
 
@@ -171,4 +171,4 @@ WSL or Ubuntu launcher profiles.
   settings. Successful saves publish the snapshot to consumers on the EDT.
 
 See [README.md](../README.md) for application launch and
-[AGENTS.md](../AGENTS.md) for maintainer ownership and validation.
+[Module.md](../Module.md) for application structure and dependencies.

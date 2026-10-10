@@ -231,9 +231,6 @@ only its final grid; closure does not restore primary content. View changes use
 synchronized retained reads and do not advance publication generation. Disposal
 releases view work and binding without restarting or closing transport again.
 
-Historical projection measurements are recorded with their scope in
-[the checkpoint report](outbound-writer-benchmarks.md#retained-frame-projection-measurement).
-
 ## Selected shell integration
 
 Session selects one `TerminalShellIntegrationFactory` before output starts.

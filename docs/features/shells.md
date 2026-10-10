@@ -25,6 +25,8 @@ explicitly; recognition alone does not install shell hooks.
 ## Prompt hooks and completion dialects
 
 Hooks emit OSC 133 prompt/command markers and OSC 7 working-directory reports.
+The marker lifecycle is `A` (prompt start), `B` (input start), `C` (command
+start), and `D` (command finish, with optional exit status).
 They are installed for supported interactive launches when shell integration is
 enabled. Explicit script/command execution and incompatible startup flags can
 prevent installation.
@@ -50,6 +52,10 @@ Startup commands are single-line commands submitted once after a supported
 direct shell reports readiness. User input before readiness cancels submission.
 They require shell integration and are unavailable for WSL launchers.
 
+PowerShell command-start/finish tracking requires a `PSConsoleHostReadLine`
+function to wrap. Without it, the bootstrap still supplies prompt and directory
+reports. PowerShell directory reports cover filesystem locations only.
+
 ## Features supplied by shell metadata
 
 | Feature | Description |
@@ -60,10 +66,21 @@ They require shell integration and are unavailable for WSL launchers.
 | Output extraction | Copy or export retained command output with soft wraps reconstructed. |
 | Working directory | Directory-aware titles, local actions, and completion context. |
 | Command text | Bounded reconstruction of retained input for completion and learning; ambiguous text remains unavailable. |
+| Host observation | Running-command state, metadata revisions, and command-finished/directory-change listeners. |
+| Editing context | Prompt readiness, active command-line snapshots, and change signals for context-checked completion edits. |
 
 Markers can also come from a manually configured shell or a host-owned metadata
 producer. Startup hooks do not guarantee that every prompt customization will
 emit usable metadata. Remote directory reports are metadata, not local paths.
+
+## Launch integration
+
+Profiles carry an executable/argument list, working directory, and environment.
+Hosts can also select variables and a PATH prefix to reapply after supported
+interactive shell startup files; without hooks, these affect only the initial
+process environment. The IntelliJ product uses this for its optional project JDK.
+Native standalone profiles also receive the `ketra version`, `ketra info`, and
+`ketra config` companion commands. WSL/Ubuntu launchers do not receive that native helper.
 
 See [workspace launch configuration](../../ketraterm-workspace/README.md#profiles-and-launch-options)
 and [shell integration](../../ketraterm-shell-integration/README.md) for composition.

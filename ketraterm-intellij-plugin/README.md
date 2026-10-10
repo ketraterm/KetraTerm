@@ -31,6 +31,9 @@ permissions. A blank launch directory uses the project root, falling back to the
 user home when no project path is available. The project JDK can be added to the
 shell environment through the corresponding setting.
 
+Completion is disabled by default and its settings controls are hidden; see
+[completion availability](../docs/features/completion.md#availability).
+
 The **Project** settings page accepts a single startup command. The command is
 submitted once after shell readiness, including in restored tabs; typing before
 readiness cancels it. Shell support and readiness behavior follow the shared
@@ -100,7 +103,5 @@ See [build composition and dependencies](Module.md#dependencies-and-local-build)
 
 ## Documentation
 
-- [Module.md](Module.md): host assembly and lifecycle contracts for maintainers.
 - [CHANGELOG.md](CHANGELOG.md): plugin release history.
 - [plugin.xml](src/main/resources/META-INF/plugin.xml): registrations and required IDE plugins.
-- [Repository architecture](../ARCHITECTURE.md): shared module boundaries.

@@ -14,7 +14,7 @@ for the supported compiler, runtime, and publication contracts.
 - Unicode grapheme clusters, combining marks, wide characters, and emoji sequences
 - Scrollback with resize reflow and wrap-aware text selection
 - 256-color and 24-bit true color rendering
-- Synchronized output for flicker-free screen updates
+- Synchronized output for coordinated screen updates
 - Kitty keyboard encoding, bracketed paste, and pixel-coordinate mouse reporting
 - OSC 8 hyperlinks and asynchronous scrollback search
 - Shell integration with command navigation, exit status, and output extraction

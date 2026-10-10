@@ -42,7 +42,7 @@ module from outside it.
   lock order, closure, borrowed reads, and shell/clipboard callbacks.
 - [Render publication](docs/asynchronous-render-coalescing.md): conflation,
   interaction invalidation, and synchronized output.
-- [Historical writer measurements](docs/outbound-writer-benchmarks.md): checkpoint
-  data and reproduction scope, not current performance guarantees.
+- [Benchmark guide](../ketraterm-benchmarks/README.md): workloads and measurement
+  guidance.
 - [Core contract](../ketraterm-core/docs/terminal-core-contract.md) and
   [transport contract](../ketraterm-transport-api/README.md): collaborator behavior.

@@ -55,6 +55,7 @@ not an exhaustive schema for every version of these tools.
 | --- | --- |
 | Matching | Exact, prefix, CamelHump, word-boundary/acronym, and substring matching. |
 | Context | Active command segment, preceding arguments, option values, and end-of-options handling. |
+| Command specifications | Aliases, nested/repeatable subcommands, ordered/variadic arguments, literal values, path kinds, and mutually exclusive option groups. |
 | Shell syntax | POSIX and PowerShell subsets, plus conservative plain parsing; see the [shell matrix](shells.md). |
 | Paths | Directory traversal, shell-aware escaping, and hidden entries when explicitly requested. |
 | Ranking | Merged sources, deterministic ordering, contextual priority, and bounded learning boosts. |
@@ -66,6 +67,22 @@ With completion enabled, Ctrl+Space requests suggestions. The embedded view uses
 Tab to accept, arrows/Page Up/Page Down to navigate, and Escape to dismiss.
 Enter acceptance and automatic popups are preferences; IntelliJ also uses its
 active keymap. Shell-native Tab completion remains a separate facility.
+
+## Library customization
+
+| Extension | Host control |
+| --- | --- |
+| Catalog | Replace or extend command specifications and localize descriptions without changing command tokens. |
+| Sources | Register custom asynchronous sources with bounded priorities and a failure-reporting callback. |
+| Source adapters | Supply directory listings, query-aware fuzzy paths, imported Gradle tasks, or dynamic argument values. |
+| Learning | Supply a shared learning store and replay policy; enable ranking evidence independently of command replay. |
+| Presentation | Replace the provider, popup view, suggestion keymap, or entire presentation target; customize source labels. |
+| Editing and feedback | Supply request-scoped edit authority and observe acceptance/dismissal outcomes. |
+
+The engine performs no host I/O itself. Source adapters use host-supplied data;
+the Gradle adapter does not run Gradle to discover tasks. Ordinary source
+exceptions are reported while other sources continue; request cancellation
+cancels source work.
 
 ## Learning and privacy
 

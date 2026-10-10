@@ -19,7 +19,8 @@ The connector owns daemon reader/watcher threads. Session owns parser/core
 serialization and the outbound writer. Host callbacks are forwarded from session
 processing; PTY transport itself does not interpret output or encode input.
 
-Creating a local session launches the process but leaves delivery unstarted.
+`createLocalPty` launches the process but leaves output delivery unstarted;
+`localPty` also starts the session before returning.
 Assembly failure closes the connector; immediate-start failure closes the
 session. A successfully returned session belongs to its caller. Supplied shell
 producers remain host-owned.

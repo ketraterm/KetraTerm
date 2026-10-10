@@ -11,7 +11,7 @@ lifecycle, failures, and privacy.
 | Component | Responsibility |
 | --- | --- |
 | `TerminalCompletionLearningCoordinator` | Synchronous learning mutations and one lifecycle-bound persistence worker. |
-| `CompletionLearningFileStore` | Internal fixed-path, bounded, sanitized file reads and replacement. |
+| `CompletionLearningFileStore` | Internal fixed-path, bounded file reads and replacement, with replay-policy filtering. |
 | `CompletionLearningSnapshotCodec` | Internal strict versioned line encoding and decoding. |
 
 The coordinator serializes recording, reset, and lifecycle transitions around

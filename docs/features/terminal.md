@@ -7,9 +7,10 @@ headless and Swing hosts. Host actions and replies remain subject to session pol
 
 | Feature | Support |
 | --- | --- |
-| Cursor movement | Absolute/relative positioning, origin mode, save/restore, and configurable tab stops. |
+| Cursor movement | Absolute/relative positioning, origin mode, DEC and ANSI/SCO save/restore, and configurable forward/backward tab stops. |
 | Scrolling and margins | Vertical and horizontal regions, forward/reverse scrolling, line insertion/deletion. |
-| Cell editing | Insert, delete, erase, protected cells, and selective erase. |
+| Cell editing | Character and column insertion/deletion, erase, protected cells, and selective erase. |
+| Writing modes | Insert/replace, autowrap, and automatic newline modes. |
 | Rectangular operations | Erase, selective erase, fill, copy, attribute changes/reversal, and base VT420 checksum. Copy/checksum use the active page only. |
 | Alternate screen | Modes 47/1047/1049, screen-local saved cursor state, and primary scrollback preservation. |
 | Scrollback | Bounded history, incremental storage allocation, and logical-line resize reflow. |
@@ -18,6 +19,7 @@ headless and Swing hosts. Host actions and replies remain subject to session pol
 | Synchronized output | Mode 2026 delays frame publication until completion or timeout. |
 | Character sets | ASCII and DEC Special Graphics, G0–G3 designation, locking and single shifts. |
 | Unicode | UTF-8 decoding, Unicode 17 grapheme segmentation, combining marks, wide characters, and emoji sequences. |
+| Stream handling | Incremental decoding across byte chunks, malformed UTF-8 recovery, and bounded CSI/OSC/DCS collection with cancellation and overflow recovery. |
 | Width policy | Configurable ambiguous width and emoji presentation. |
 
 Streaming graphemes retain up to 32 codepoints. Later width changes update the
@@ -31,6 +33,7 @@ placement can depend on input chunk boundaries. See the
 | --- | --- |
 | Colors | ANSI/bright colors, 256-color palette, 24-bit RGB, and underline colors. |
 | Text attributes | Bold, faint, italic, blink, inverse, conceal, strikethrough, and overline. |
+| Reverse video | Screen-wide reverse-video mode, independent of per-cell inverse attributes. |
 | Underlines | Single, double, curly, dotted, and dashed. |
 | Cursor | Block, underline, and bar shapes; visibility and blinking controls. |
 | Dynamic colors | OSC 4/10/11/12 palette and foreground/background/cursor changes and queries. |
@@ -59,12 +62,13 @@ defines event and encoding behavior.
 | --- | --- |
 | Titles | Window/icon titles and title stack operations. |
 | Shell metadata | OSC 7 directories and OSC 133 prompt/command markers; see [shell support](shells.md). |
-| Clipboard | OSC 52 text writes to the clipboard; reads from clipboard and available primary selection. |
+| Clipboard | Selection-aware OSC 52 host callbacks. Built-in desktop providers write to the clipboard and read from the clipboard or available primary selection. |
 | Notifications | OSC 9 and OSC 777, including optional severity; [protocol](../reference/notifications.md). |
+| Bell | BEL events and retained urgency/pop-on-bell modes for host handling. |
 | Window actions | Minimize, restore, move, raise/lower, resize, and maximize requests where the host permits them. |
 | Status queries | Operating status, cursor position, primary/secondary device attributes, and supported mode status. |
 | Capability queries | DECRQSS and XTGETTCAP through explicit allowlists. |
-| Window reports | Supported size/state reports supplied by the host. |
+| Window reports | Minimized state, window pixel dimensions, grid dimensions, and screen-size reports. Pixel dimensions require host data; the current screen-size reply uses the terminal grid. |
 | Color scheme | One-shot light/dark query; no unsolicited mode 2031 notifications. |
 | Custom OSC | Ordered callbacks for unsupported numeric OSC commands. |
 | Host policy | Independent controls for clipboard, titles, links, notifications, window actions, colors, and terminal replies. |
