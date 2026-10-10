@@ -1,0 +1,27 @@
+{
+  "name": "ketraterm-website",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "backfill:api": "node scripts/backfill-api.mjs",
+    "test": "node --test test/*.test.mjs",
+    "check:links": "node scripts/check-links.mjs",
+    "format": "prettier --write src scripts assets test released-app package.json README.md",
+    "format:check": "prettier --check src scripts assets test released-app package.json README.md",
+    "preview": "node scripts/serve.mjs"
+  },
+  "dependencies": {
+    "entities": "8.1.0",
+    "github-slugger": "2.0.0",
+    "marked": "18.1.0",
+    "mermaid": "12.1.0"
+  },
+  "devDependencies": {
+    "linkedom": "0.18.13",
+    "prettier": "3.9.10"
+  }
+}

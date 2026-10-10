@@ -369,6 +369,6 @@ jobs:
           files: |
             release-artifacts/*
           draft: false
-          prerelease: contains(github.ref, '-alpha') || contains(github.ref, '-beta') || contains(github.ref, '-rc')
+          prerelease: ${{ contains(github.ref_name, '-') }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

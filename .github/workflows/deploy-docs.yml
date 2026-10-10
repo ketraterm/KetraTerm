@@ -1,147 +1,122 @@
-name: Deploy Dokka Docs to GitHub Pages
+name: Publish website and documentation
 
 on:
   push:
-    tags:
-      - "v*"
+    branches: [master]
+    tags: ['v*']
   workflow_dispatch:
+  release:
+    types: [published]
+  workflow_run:
+    workflows: ['Publish Binaries']
+    types: [completed]
 
-env:
-  ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION: "true"
-
-# Sets permissions of the GITHUB_TOKEN to allow deployment to GitHub Pages
 permissions:
   contents: read
-  pages: write
-  id-token: write
 
-# Allow only one concurrent deployment, skipping runs queued between the run in-progress and latest queued.
+# Serialize archive updates with deployment. Never cancel an active archive write.
 concurrency:
-  group: "pages"
+  group: pages
   cancel-in-progress: false
+  queue: max
 
 jobs:
   build:
+    if: github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pages: read
     steps:
-      - name: Checkout Repository
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
-      - name: Determine Release Mode
+      - name: Read documentation archive
         shell: bash
         run: |
-          if [[ "${GITHUB_REF}" == refs/tags/v* ]]; then
+          # Exit 2 means the branch is absent. Authentication/network failures must
+          # stop publication rather than silently discard the existing archive.
+          if git ls-remote --exit-code --heads origin gh-pages > /dev/null; then
+            git fetch --no-tags origin gh-pages
+            git worktree add --detach .site-archive FETCH_HEAD
+          else
+            status=$?
+            if [ "$status" -ne 2 ]; then exit "$status"; fi
+            git worktree add --detach .site-archive HEAD
+            git -C .site-archive checkout --orphan gh-pages
+            git -C .site-archive rm -rf .
+          fi
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: website/package-lock.json
+      - run: npm ci --ignore-scripts
+        working-directory: website
+      - run: npm test && npm run format:check
+        working-directory: website
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '25'
+      - uses: gradle/actions/setup-gradle@v4
+      - name: Backfill missing release APIs
+        run: npm run backfill:api
+        working-directory: website
+        env:
+          WEBSITE_ARCHIVE: ${{ github.workspace }}/.site-archive
+      - name: Select documentation channel
+        shell: bash
+        run: |
+          if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
             echo "RELEASE=true" >> "$GITHUB_ENV"
+            echo "WEBSITE_RELEASE=${GITHUB_REF_NAME#v}" >> "$GITHUB_ENV"
           else
             echo "RELEASE=false" >> "$GITHUB_ENV"
           fi
+      - run: ./gradlew :dokkaGenerate --no-daemon
+        if: env.RELEASE != 'true'
 
-      - name: Setup Java 25
-        uses: actions/setup-java@v4
-        with:
-          distribution: 'temurin'
-          java-version: '25'
+      - uses: actions/configure-pages@v5
+        id: pages
+      - name: Build website and retain documentation versions
+        run: npm run build && npm run check:links
+        working-directory: website
+        env:
+          WEBSITE_ARCHIVE: ${{ github.workspace }}/build/website-history
+          WEBSITE_SOURCE_REF: ${{ github.sha }}
+          WEBSITE_REQUIRE_API: 'true'
+          WEBSITE_URL: ${{ steps.pages.outputs.base_url }}
+          GITHUB_TOKEN: ${{ github.token }}
 
-      - name: Setup Gradle
-        uses: gradle/actions/setup-gradle@v4
-
-      - name: Generate Dokka Docs
-        run: ./gradlew dokkaGenerate
-
-      - name: Checkout gh-pages
-        uses: actions/checkout@v4
-        with:
-          ref: gh-pages
-          path: old-gh-pages
-        continue-on-error: true
-
-      - name: Prepare Website & Docs Bundle
+      - name: Persist archive
         shell: bash
         run: |
-          # Extract version from tag name if available (v0.1.1 -> 0.1.1), otherwise fall back to VERSION file
-          if [[ "${GITHUB_REF}" == refs/tags/* ]]; then
-            VERSION="${GITHUB_REF_NAME#v}"
-          else
-            VERSION=$(cat VERSION | tr -d '\r\n')
+          rsync -a --delete --exclude=.git build/website/ .site-archive/
+          git -C .site-archive config user.name 'github-actions[bot]'
+          git -C .site-archive config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git -C .site-archive add --all
+          if ! git -C .site-archive diff --cached --quiet; then
+            git -C .site-archive commit -m "Publish documentation for $GITHUB_SHA"
           fi
-          
-          # Check if the version is stable (does not contain pre-release tags like alpha, beta, rc, SNAPSHOT, etc.)
-          IS_STABLE=true
-          if [[ "$VERSION" =~ (alpha|beta|rc|SNAPSHOT|-) ]]; then
-            IS_STABLE=false
-          fi
-          
-          echo "Building docs for version: $VERSION (Stable: $IS_STABLE)"
-          
-          # 1. Create clean build directory
-          mkdir -p build/website
-          
-          # 2. Copy base landing pages and files
-          if [ "$IS_STABLE" = "true" ] || [ ! -d old-gh-pages ]; then
-            # Stable release (or first run): Update root pages to the new version
-            sed -i "s/@VERSION@/$VERSION/g" website/*.html
-            cp -R website/* build/website/
-          else
-            # Pre-release / Unstable: Preserve current stable landing pages from gh-pages
-            # Copy all files from old-gh-pages except the 'docs' folder
-            for file in old-gh-pages/*; do
-              basename=$(basename "$file")
-              if [ "$basename" != "docs" ] && [ "$basename" != "*" ]; then
-                cp -R "$file" build/website/
-              fi
-            done
-          fi
-          
-          # 3. Handle documentation folders
-          mkdir -p build/website/docs
-          
-          # Preserve existing versioned documentation directories
-          if [ -d old-gh-pages/docs ]; then
-            cp -R old-gh-pages/docs/* build/website/docs/
-          fi
-          
-          # Write the new version-specific documentation
-          mkdir -p build/website/docs/v$VERSION
-          cp -R build/dokka/html/* build/website/docs/v$VERSION/
-          
-          # If stable release, update the 'latest' alias folder
-          if [ "$IS_STABLE" = "true" ] || [ ! -d old-gh-pages ]; then
-            mkdir -p build/website/docs/latest
-            cp -R build/dokka/html/* build/website/docs/latest/
-          fi
-          
-          # 4. Generate the root redirect for docs/
-          cat <<'EOF' > build/website/docs/index.html
-          <!DOCTYPE html>
-          <html>
-          <head>
-            <meta http-equiv="refresh" content="0; url=latest/">
-            <script type="text/javascript">
-              window.location.href = "latest/"
-            </script>
-            <title>Redirecting...</title>
-          </head>
-          <body>
-            If you are not redirected, <a href="latest/">click here</a>.
-          </body>
-          </html>
-          EOF
+          git -C .site-archive push origin HEAD:gh-pages
 
-      - name: Setup Pages
-        uses: actions/configure-pages@v5
-
-      - name: Upload Artifact
-        uses: actions/upload-pages-artifact@v3
+      - uses: actions/upload-pages-artifact@v4
         with:
-          path: 'build/website'
+          path: build/website
 
   deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
-    needs: build
-    runs-on: ubuntu-latest
     steps:
-      - name: Deploy to GitHub Pages
+      - uses: actions/deploy-pages@v4
         id: deployment
-        uses: actions/deploy-pages@v4

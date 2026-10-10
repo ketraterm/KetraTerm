@@ -67,6 +67,7 @@ native configuration paths.
 
 ## Further reading
 
+- [Desktop user guide](docs/user-guide.md)
 - [Module structure and dependencies](Module.md)
 - [Application changelog](CHANGELOG.md)
 - [Library changelog](../CHANGELOG.md)
