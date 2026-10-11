@@ -38,6 +38,7 @@ internal class TerminalSearchModel {
     private var firstAbsoluteRow = 0L
     private var currentRow = 0
     private var query = ""
+    private var queryPrefixes: IntArray? = null
     private var ignoreCase = true
     private var checkCancelled: () -> Unit = {}
 
@@ -66,6 +67,7 @@ internal class TerminalSearchModel {
         highlights.clear()
         highlights.validatesRows = validateRows
         discardPendingLine()
+        prepareQuery()
     }
 
     fun discardPendingLine() {
@@ -135,8 +137,67 @@ internal class TerminalSearchModel {
         query: String,
         ignoreCase: Boolean,
     ) {
-        if (lineText.length < query.length) return
+        if (query.isEmpty() || lineText.length < query.length) return
+        val prefixes = queryPrefixes
+        if (prefixes == null) {
+            scanShortLine(query, ignoreCase)
+            return
+        }
 
+        var index = 0
+        var matched = 0
+        var untilCancellationCheck = 0
+        while (index < lineText.length) {
+            if (untilCancellationCheck-- == 0) {
+                checkCancelled()
+                untilCancellationCheck = 255
+            }
+            if (lineText[index].equals(query[matched], ignoreCase)) {
+                index++
+                matched++
+                if (matched == query.length) {
+                    appendMatch(firstAbsoluteRow, index - matched, index)
+                    // Search results are non-overlapping, even when the query has a repeated prefix.
+                    matched = 0
+                }
+            } else if (matched > 0) {
+                matched = prefixes[matched - 1]
+            } else {
+                index++
+            }
+        }
+    }
+
+    private fun prepareQuery() {
+        checkCancelled()
+        // A bounded direct comparison is cheaper for short queries and needs no table.
+        queryPrefixes = null
+        if (query.length <= SHORT_QUERY_LIMIT) return
+        val prefixes = IntArray(query.length)
+        var index = 1
+        var matched = 0
+        var untilCancellationCheck = 0
+        while (index < query.length) {
+            if (untilCancellationCheck-- == 0) {
+                checkCancelled()
+                untilCancellationCheck = 255
+            }
+            if (query[index].equals(query[matched], ignoreCase)) {
+                matched++
+                prefixes[index++] = matched
+            } else if (matched > 0) {
+                matched = prefixes[matched - 1]
+            } else {
+                index++
+            }
+        }
+        queryPrefixes = prefixes
+    }
+
+    private fun scanShortLine(
+        query: String,
+        ignoreCase: Boolean,
+    ) {
         var index = 0
         var untilCancellationCheck = 0
         val lastStart = lineText.length - query.length
@@ -145,31 +206,17 @@ internal class TerminalSearchModel {
                 checkCancelled()
                 untilCancellationCheck = 255
             }
-            if (matchesAt(index, query, ignoreCase)) {
+            var matched = 0
+            while (matched < query.length && lineText[index + matched].equals(query[matched], ignoreCase)) {
+                matched++
+            }
+            if (matched == query.length) {
                 appendMatch(firstAbsoluteRow, index, index + query.length)
-                index += maxOf(1, query.length)
+                index += query.length
             } else {
                 index++
             }
         }
-    }
-
-    private fun matchesAt(
-        startIndex: Int,
-        query: String,
-        ignoreCase: Boolean,
-    ): Boolean {
-        var index = 0
-        while (index < query.length) {
-            if (index > 0 && index and 255 == 0) checkCancelled()
-            val actual = lineText[startIndex + index]
-            val expected = query[index]
-            if (actual != expected) {
-                if (!ignoreCase || !actual.equals(expected, ignoreCase = true)) return false
-            }
-            index++
-        }
-        return true
     }
 
     private fun appendMatch(
@@ -275,6 +322,7 @@ internal class TerminalSearchModel {
 
     private companion object {
         private const val INITIAL_TEXT_CAPACITY = 256
+        private const val SHORT_QUERY_LIMIT = 8
 
         private fun nextCapacity(
             current: Int,

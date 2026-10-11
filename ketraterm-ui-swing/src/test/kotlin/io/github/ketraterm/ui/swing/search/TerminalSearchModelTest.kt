@@ -27,8 +27,105 @@ import org.junit.jupiter.params.ParameterizedTest
 import org.junit.jupiter.params.provider.CsvSource
 import org.junit.jupiter.params.provider.ValueSource
 import java.util.concurrent.CancellationException
+import kotlin.random.Random
 
 class TerminalSearchModelTest {
+    @ParameterizedTest
+    @ValueSource(booleans = [false, true])
+    fun `prefix matching agrees with literal non overlapping search`(ignoreCase: Boolean) {
+        val random = Random(719)
+        val alphabet = "abABiI\u0130\u0131kK\u212AsS\u017F\u03C3\u03C2\u03A3\u00DF\u1E9E"
+        val cases =
+            mutableListOf(
+                "aaaaa" to "aa",
+                "ababababca" to "abababca",
+                "aaaaabaaaaab" to "aaaab",
+                "ababababababca" to "ababababca",
+                "aaaaaaaaaaaaaaaaa" to "aaaaaaaaa",
+                "aaaaabaaaaabaaaaab" to "aaaaabaaaaab",
+                "Ii\u0130\u0131Ii\u0130\u0131Ii\u0130\u0131" to "iI\u0131\u0130iI\u0131\u0130i",
+                "\u03C3\u03C2\u03A3".repeat(5) to "\u03A3\u03C3\u03C2".repeat(3),
+                "Ii\u0130\u0131Ii\u0130\u0131" to "iI\u0131",
+                "\u03C3\u03C2\u03A3\u03C3\u03C2\u03A3" to "\u03A3\u03C3",
+                "K\u212AkK\u212A" to "kk",
+                "abc" to "",
+                "abc" to "abcdef",
+            )
+        repeat(200) {
+            val text = buildString { repeat(random.nextInt(1, 97)) { append(alphabet[random.nextInt(alphabet.length)]) } }
+            val query =
+                if (it % 2 == 0) {
+                    val start = random.nextInt(text.length)
+                    text.substring(start, minOf(text.length, start + random.nextInt(1, 13)))
+                } else {
+                    buildString { repeat(random.nextInt(1, 13)) { append(alphabet[random.nextInt(alphabet.length)]) } }
+                }
+            cases += text to query
+        }
+        val model = TerminalSearchModel()
+        for ((text, query) in cases) {
+            val expected = mutableListOf<Int>()
+            if (query.isNotEmpty()) {
+                var start = 0
+                while (start <= text.length - query.length) {
+                    if (query.indices.all { text[start + it].equals(query[it], ignoreCase) }) {
+                        expected += start
+                        start += query.length
+                    } else {
+                        start++
+                    }
+                }
+            }
+            val cache = renderCache(WrappedTextFrame(arrayOf(text)))
+            val matches = model.search(cache, query, ignoreCase)
+            val viewport = TerminalSearchViewportHighlights()
+            matches.buildViewportHighlights(cache, viewport)
+            val context = "text='$text', query='$query', ignoreCase=$ignoreCase"
+            assertEquals(expected.size, matches.resultCount, context)
+            assertEquals(expected.size, viewport.segmentCount, context)
+            for (index in expected.indices) {
+                assertEquals(expected[index], viewport.startColumn(index), context)
+                assertEquals(expected[index] + query.length, viewport.endColumn(index), context)
+            }
+        }
+    }
+
+    @Test
+    fun `prefix fallback preserves supplementary cluster spans across wrapping`() {
+        val terminal = TerminalBuffers.create(3, 3)
+        val emoji = intArrayOf(0x1F469, 0x200D, 0x1F4BB)
+        repeat(3) { terminal.writeCluster(emoji) }
+        terminal.writeText("x")
+        val cache = TerminalRenderCache(3, 3)
+        cache.updateFrom(terminal as TerminalRenderFrameReader)
+        val matches = TerminalSearchModel().search(cache, "\uD83D\uDC69\u200D\uD83D\uDCBB".repeat(2) + "x", false)
+        val viewport = TerminalSearchViewportHighlights()
+        matches.buildViewportHighlights(cache, viewport)
+        assertEquals(1, matches.resultCount)
+        assertEquals(2, viewport.segmentCount)
+        assertEquals(0, viewport.segmentCountForRow(0))
+        assertEquals(1, viewport.segmentCountForRow(1))
+        assertEquals(1, viewport.segmentCountForRow(2))
+        assertEquals(0, viewport.startColumn(0))
+        assertEquals(2, viewport.endColumn(0))
+        assertEquals(0, viewport.startColumn(1))
+        assertEquals(3, viewport.endColumn(1))
+    }
+
+    @Test
+    fun `query preprocessing can be cancelled and model can be reused`() {
+        val model = TerminalSearchModel()
+        val cancelled = CancellationException("stop preparing query")
+        var checks = 0
+        assertSame(
+            cancelled,
+            assertThrows(CancellationException::class.java) {
+                model.begin("a".repeat(8192) + "b", true, 0, { if (++checks == 3) throw cancelled })
+            },
+        )
+        assertEquals(1, model.search(renderCache(WrappedTextFrame(arrayOf("needle"))), "needle", false).resultCount)
+    }
+
     @ParameterizedTest
     @ValueSource(booleans = [false, true])
     fun `search preserves wrapped separators and trims only final spaces`(textOnly: Boolean) {

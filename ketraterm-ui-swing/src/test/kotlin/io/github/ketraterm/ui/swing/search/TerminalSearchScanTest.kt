@@ -222,12 +222,12 @@ class TerminalSearchScanTest {
             "a".repeat(4000) + "b",
             false,
             cache.discardedCount,
-            { if (cancel && ++checks == 1000) throw cancelled },
+            { if (cancel && ++checks == 3) throw cancelled },
         )
         cache.lineWrapped.fill(true)
         model.append(cache, cache.discardedCount)
         cancel = true
         assertSame(cancelled, assertThrows(java.util.concurrent.CancellationException::class.java) { model.finish() })
-        assertEquals(1000, checks)
+        assertEquals(3, checks)
     }
 }

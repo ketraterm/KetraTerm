@@ -43,9 +43,13 @@ open class TerminalSearchScanBenchmark {
     @Param("160")
     var columns = 0
 
-    @Param("sparse", "dense", "clusters", "wrapped")
+    @Param("sparse", "dense", "clusters", "wrapped", "repetitive")
     lateinit var workload: String
 
+    @Param("false", "true")
+    var ignoreCase = false
+
+    private var query = "needle"
     private lateinit var session: TerminalSession
     private val scanner = TerminalSearchScan()
     private val model = TerminalSearchModel()
@@ -58,10 +62,17 @@ open class TerminalSearchScanBenchmark {
         val clusterTail = "x".repeat(columns - 10)
         val combining = intArrayOf('e'.code, 0x301)
         val emoji = intArrayOf(0x1F469, 0x200D, 0x1F4BB)
+        val repetitive = workload == "repetitive"
+        query = if (repetitive) "a".repeat(128) + "b" else "needle"
         repeat(retainedRows) { row ->
-            if (row > 0 && workload != "wrapped") {
+            if (row > 0 && workload != "wrapped" && !repetitive) {
                 terminal.carriageReturn()
                 terminal.newLine()
+            }
+            if (repetitive) {
+                terminal.writeText("a".repeat(columns - if (row == retainedRows - 1) 1 else 0))
+                if (row == retainedRows - 1) terminal.writeText("b")
+                return@repeat
             }
             terminal.writeText("needle")
             when (workload) {
@@ -77,13 +88,13 @@ open class TerminalSearchScanBenchmark {
             }
         }
         session = benchmarkSession(terminal)
-        check(scanRetainedHistory() == retainedRows)
+        check(scanRetainedHistory() == if (repetitive) 1 else retainedRows)
     }
 
     @Benchmark
     open fun scanRetainedHistory(): Int =
         runBlocking {
-            requireNotNull(scanner.scan(session, model, "needle", ignoreCase = false)).highlights.resultCount
+            requireNotNull(scanner.scan(session, model, query, ignoreCase)).highlights.resultCount
         }
 
     @TearDown
