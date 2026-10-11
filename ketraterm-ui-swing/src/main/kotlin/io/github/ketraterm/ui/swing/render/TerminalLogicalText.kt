@@ -35,7 +35,7 @@ internal inline fun forEachLogicalTextCell(
         row,
         checkCancelled,
         endColumnExclusive,
-        append,
+        append = append,
     )
 }
 
@@ -48,9 +48,10 @@ internal inline fun forEachLogicalTextCell(
     row: Int,
     checkCancelled: () -> Unit,
     endColumnExclusive: Int = columns,
+    startColumnInclusive: Int = 0,
     append: (codePoint: Int, startColumn: Int, endColumn: Int) -> Unit,
 ) {
-    var column = 0
+    var column = startColumnInclusive
     // Count skipped cells and cluster payloads too, so every decoding path remains bounded.
     var untilCancellationCheck = 0
     while (column < endColumnExclusive) {

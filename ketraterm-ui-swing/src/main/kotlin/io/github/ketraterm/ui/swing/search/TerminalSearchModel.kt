@@ -29,6 +29,7 @@ import io.github.ketraterm.ui.swing.render.forEachLogicalTextCell
  */
 internal class TerminalSearchModel {
     private val lineText = StringBuilder(INITIAL_TEXT_CAPACITY)
+    private val textScratch = CharArray(256)
 
     // Each run stores UTF-16 start/end, row, column start and column end.
     // LINEAR_COLUMNS means consecutive UTF-16 units occupy consecutive cells;
@@ -84,23 +85,14 @@ internal class TerminalSearchModel {
         cache: TerminalRenderCache,
         firstRow: Long,
     ) {
-        appendRows(cache.rows, firstRow, cache.lineIds, cache.lineGenerations, cache.lineWrapped) { row -> appendRow(cache, row) }
+        appendRows(cache.rows, firstRow, cache.lineIds, cache.lineGenerations, cache.lineWrapped) { row ->
+            appendRow(cache.columns, cache.codeWords, cache.flags, cache.clusterRefs, cache.clusterCodepoints, row, cache.lineWrapped[row])
+        }
     }
 
     fun append(copy: TerminalTextRangeCopy) {
         appendRows(copy.rows, copy.firstAbsoluteRow, copy.lineIds, copy.lineGenerations, copy.lineWrapped) { row ->
-            forEachLogicalTextCell(
-                copy.columns,
-                copy.codeWords,
-                copy.flags,
-                copy.clusterRefs,
-                copy.clusterCodepoints,
-                row,
-                checkCancelled,
-                textEndColumn(copy.columns, copy.codeWords, copy.flags, row, copy.lineWrapped[row]),
-            ) { codePoint, startColumn, endColumn ->
-                appendMappedCodePoint(codePoint, startColumn, endColumn, copy.flags[row * copy.columns + startColumn])
-            }
+            appendRow(copy.columns, copy.codeWords, copy.flags, copy.clusterRefs, copy.clusterCodepoints, row, copy.lineWrapped[row])
         }
     }
 
@@ -277,12 +269,49 @@ internal class TerminalSearchModel {
         }
 
     private fun appendRow(
-        cache: TerminalRenderCache,
+        columns: Int,
+        codeWords: IntArray,
+        flags: IntArray,
+        clusterRefs: LongArray,
+        clusterCodepoints: IntArray,
         row: Int,
+        wrapped: Boolean,
     ) {
-        val end = textEndColumn(cache.columns, cache.codeWords, cache.flags, row, cache.lineWrapped[row])
-        forEachLogicalTextCell(cache, row, checkCancelled, end) { codePoint, startColumn, endColumn ->
-            appendMappedCodePoint(codePoint, startColumn, endColumn, cache.flags[row * cache.columns + startColumn])
+        val end = textEndColumn(columns, codeWords, flags, row, wrapped)
+        val offset = row * columns
+        var column = 0
+        while (column < end) {
+            checkCancelled()
+            val start = column
+            val limit = minOf(end, column + textScratch.size)
+            while (column < limit) {
+                val cellFlags = flags[offset + column]
+                val codePoint = if (cellFlags and TerminalRenderCellFlags.CODEPOINT != 0) codeWords[offset + column] else ' '.code
+                if (cellFlags and COMPLEX_CELL_FLAGS != 0 || codePoint !in 0..0xFFFF) break
+                textScratch[column - start] = codePoint.toChar()
+                column++
+            }
+            if (column > start) {
+                val charStart = lineText.length
+                lineText.appendRange(textScratch, 0, column - start)
+                appendRun(charStart, start, LINEAR_COLUMNS)
+                continue
+            }
+            // Keep complex-cell decoding shared with other logical-text consumers.
+            // Bound this lookahead too; cluster payload cancellation remains in the decoder.
+            do {
+                column = minOf(end, column + if (flags[offset + column] and TerminalRenderCellFlags.WIDE_LEADING != 0) 2 else 1)
+                if (column >= limit) break
+                val cellFlags = flags[offset + column]
+                val codePoint = if (cellFlags and TerminalRenderCellFlags.CODEPOINT != 0) codeWords[offset + column] else ' '.code
+            } while (cellFlags and COMPLEX_CELL_FLAGS != 0 || codePoint !in 0..0xFFFF)
+            forEachLogicalTextCell(columns, codeWords, flags, clusterRefs, clusterCodepoints, row, checkCancelled, column, start) {
+                    codePoint,
+                    startColumn,
+                    endColumn,
+                ->
+                appendMappedCodePoint(codePoint, startColumn, endColumn, flags[offset + startColumn])
+            }
         }
     }
 
@@ -324,22 +353,35 @@ internal class TerminalSearchModel {
         lineText.appendCodePoint(codePoint)
         val charEnd = lineText.length
         val linear = charEnd - charStart == 1 && endColumn - startColumn == 1 && flags and TerminalRenderCellFlags.CLUSTER == 0
+        appendRun(charStart, startColumn, if (linear) LINEAR_COLUMNS else endColumn)
+    }
+
+    private fun appendRun(
+        charStart: Int,
+        startColumn: Int,
+        endColumn: Int,
+    ) {
+        val linear = endColumn == LINEAR_COLUMNS
         val previous = runsSize - RUN_SIZE
         if (previous >= 0 && runs[previous + 2] == currentRow) {
             val previousEnd = runs[previous + 4]
-            if (linear && previousEnd == LINEAR_COLUMNS && runs[previous + 3] + charStart - runs[previous] == startColumn ||
-                !linear && previousEnd == endColumn && runs[previous + 3] == startColumn
+            if (linear &&
+                previousEnd == LINEAR_COLUMNS &&
+                runs[previous + 3] + charStart - runs[previous] == startColumn ||
+                !linear &&
+                previousEnd == endColumn &&
+                runs[previous + 3] == startColumn
             ) {
-                runs[previous + 1] = charEnd
+                runs[previous + 1] = lineText.length
                 return
             }
         }
         if (runsSize + RUN_SIZE > runs.size) runs = runs.copyOf(nextCapacity(runs.size, runsSize + RUN_SIZE))
         runs[runsSize] = charStart
-        runs[runsSize + 1] = charEnd
+        runs[runsSize + 1] = lineText.length
         runs[runsSize + 2] = currentRow
         runs[runsSize + 3] = startColumn
-        runs[runsSize + 4] = if (linear) LINEAR_COLUMNS else endColumn
+        runs[runsSize + 4] = endColumn
         runsSize += RUN_SIZE
     }
 
@@ -353,6 +395,9 @@ internal class TerminalSearchModel {
     }
 
     private companion object {
+        private const val COMPLEX_CELL_FLAGS =
+            TerminalRenderCellFlags.CLUSTER or TerminalRenderCellFlags.WIDE_LEADING or
+                TerminalRenderCellFlags.WIDE_TRAILING or TerminalRenderCellFlags.WRAP_PADDING
         private const val RUN_SIZE = 5
         private const val LINEAR_COLUMNS = -1
         private const val INITIAL_TEXT_CAPACITY = 256

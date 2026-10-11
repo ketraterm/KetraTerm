@@ -32,6 +32,68 @@ import kotlin.random.Random
 class TerminalSearchModelTest {
     @ParameterizedTest
     @ValueSource(booleans = [false, true])
+    fun `bulk text boundaries preserve mixed cell geometry`(textOnly: Boolean) {
+        val terminal = TerminalBuffers.create(1024, 1)
+        terminal.writeText("a".repeat(255) + "界é")
+        terminal.writeCluster(intArrayOf('e'.code, 0x301))
+        terminal.writeText("b".repeat(257) + "😀z")
+        val reader = terminal as TerminalRenderFrameReader
+        val cache = TerminalRenderCache(1024, 1)
+        cache.updateFrom(reader)
+        val model = TerminalSearchModel()
+        val copy = TerminalTextRangeCopy()
+        for ((query, start, end) in listOf(
+            Triple("a界é", 254, 258),
+            Triple("ée\u0301b", 257, 260),
+            Triple("b".repeat(257), 259, 516),
+            Triple("bb😀z", 514, 519),
+        )) {
+            val matches =
+                if (textOnly) {
+                    assertTrue(copy.read(reader, 0, 0))
+                    model.begin(query, false, 0)
+                    model.append(copy)
+                    model.finish()
+                } else {
+                    model.search(cache, query, false)
+                }
+            val viewport = TerminalSearchViewportHighlights()
+            matches.buildViewportHighlights(cache, viewport)
+            assertEquals(1, matches.resultCount, query)
+            assertEquals(1, viewport.segmentCount, query)
+            assertEquals(start, viewport.startColumn(0), query)
+            assertEquals(end, viewport.endColumn(0), query)
+        }
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = [false, true])
+    fun `bulk text preserves empty cells inside a wrapped logical line`(textOnly: Boolean) {
+        val frame = WrappedTextFrame(arrayOf("ab", "x".repeat(300)), booleanArrayOf(true, false))
+        val matches = searchFrame(frame, "b" + " ".repeat(298) + "x", textOnly)
+        val viewport = TerminalSearchViewportHighlights()
+        matches.buildViewportHighlights(renderCache(frame), viewport)
+        assertEquals(1, matches.resultCount)
+        assertEquals(2, viewport.segmentCount)
+        assertEquals(1, viewport.startColumn(0))
+        assertEquals(300, viewport.endColumn(0))
+        assertEquals(0, viewport.startColumn(1))
+        assertEquals(1, viewport.endColumn(1))
+    }
+
+    @Test
+    fun `bulk decoding can be cancelled within a long ordinary row`() {
+        val model = TerminalSearchModel()
+        val cache = renderCache(WrappedTextFrame(arrayOf("x".repeat(8192)), booleanArrayOf(true)))
+        val cancelled = CancellationException("stop bulk decoding")
+        var checks = 0
+        model.begin("needle", false, 0, { if (++checks == 4) throw cancelled })
+        assertSame(cancelled, assertThrows(CancellationException::class.java) { model.append(cache, 0) })
+        assertEquals(1, model.search(renderCache(WrappedTextFrame(arrayOf("needle"))), "needle", false).resultCount)
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = [false, true])
     fun `matches inside complex cells retain complete spans between ordinary runs`(textOnly: Boolean) {
         val terminal = TerminalBuffers.create(32, 1)
         terminal.writeText("ab")
