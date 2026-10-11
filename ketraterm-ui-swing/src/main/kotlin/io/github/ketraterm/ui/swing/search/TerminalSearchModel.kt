@@ -136,9 +136,13 @@ internal class TerminalSearchModel {
         if (lineText.length < query.length) return
 
         var index = 0
+        var untilCancellationCheck = 0
         val lastStart = lineText.length - query.length
         while (index <= lastStart) {
-            checkCancelled()
+            if (untilCancellationCheck-- == 0) {
+                checkCancelled()
+                untilCancellationCheck = 255
+            }
             if (matchesAt(index, query, ignoreCase)) {
                 appendMatch(firstAbsoluteRow, index, index + query.length)
                 index += maxOf(1, query.length)
@@ -155,7 +159,7 @@ internal class TerminalSearchModel {
     ): Boolean {
         var index = 0
         while (index < query.length) {
-            if (index and 255 == 0) checkCancelled()
+            if (index > 0 && index and 255 == 0) checkCancelled()
             val actual = lineText[startIndex + index]
             val expected = query[index]
             if (actual != expected) {
@@ -207,7 +211,6 @@ internal class TerminalSearchModel {
         startColumn: Int,
         endColumn: Int,
     ) {
-        checkCancelled()
         val charStart = lineText.length
         lineText.appendCodePoint(codePoint)
         val charEnd = lineText.length

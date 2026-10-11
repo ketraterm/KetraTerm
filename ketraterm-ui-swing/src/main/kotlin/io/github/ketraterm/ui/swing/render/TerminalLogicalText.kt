@@ -48,8 +48,13 @@ internal inline fun forEachLogicalTextCell(
     append: (codePoint: Int, startColumn: Int, endColumn: Int) -> Unit,
 ) {
     var column = 0
+    // Count skipped cells and cluster payloads too, so every decoding path remains bounded.
+    var untilCancellationCheck = 0
     while (column < columns) {
-        checkCancelled()
+        if (untilCancellationCheck-- == 0) {
+            checkCancelled()
+            untilCancellationCheck = 255
+        }
         val index = row * columns + column
         val flags = cellFlags[index]
         if (flags and (TerminalRenderCellFlags.WIDE_TRAILING or TerminalRenderCellFlags.WRAP_PADDING) != 0) {
@@ -62,7 +67,10 @@ internal inline fun forEachLogicalTextCell(
             val start = (ref ushr 32).toInt()
             val end = start + ref.toInt()
             for (offset in start until end) {
-                checkCancelled()
+                if (untilCancellationCheck-- == 0) {
+                    checkCancelled()
+                    untilCancellationCheck = 255
+                }
                 append(clusterCodepoints[offset], column, endColumn)
             }
         } else {

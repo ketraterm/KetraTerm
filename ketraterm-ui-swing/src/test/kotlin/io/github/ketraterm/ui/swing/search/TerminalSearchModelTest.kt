@@ -18,13 +18,82 @@ package io.github.ketraterm.ui.swing.search
 import io.github.ketraterm.core.TerminalBuffers
 import io.github.ketraterm.render.api.*
 import io.github.ketraterm.render.cache.TerminalRenderCache
+import io.github.ketraterm.ui.swing.render.forEachLogicalTextCell
 import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.function.Executable
 import org.junit.jupiter.params.ParameterizedTest
 import org.junit.jupiter.params.provider.CsvSource
+import org.junit.jupiter.params.provider.ValueSource
+import java.util.concurrent.CancellationException
 
 class TerminalSearchModelTest {
+    @ParameterizedTest
+    @ValueSource(booleans = [false, true])
+    fun `decoding checks cancellation within long rows and cluster payloads`(cluster: Boolean) {
+        val length = 2048
+        val flags = IntArray(length) { TerminalRenderCellFlags.CODEPOINT }
+        val refs = LongArray(length)
+        if (cluster) {
+            flags[0] = TerminalRenderCellFlags.CLUSTER
+            refs[0] = length.toLong()
+        }
+        val cancelled = CancellationException("stop decoding")
+        var decoded = 0
+        assertSame(
+            cancelled,
+            assertThrows(CancellationException::class.java) {
+                forEachLogicalTextCell(
+                    length,
+                    IntArray(length) { 'a'.code },
+                    flags,
+                    refs,
+                    IntArray(length) { 0x301 },
+                    0,
+                    { if (decoded >= 300) throw cancelled },
+                ) { _, _, _ -> decoded++ }
+            },
+        )
+        assertTrue(decoded in 300..556, "Cancellation must be observed within 256 more decoded codepoints: $decoded")
+    }
+
+    @Test
+    fun `decoding remains cancellable when every cell is skipped`() {
+        val cancelled = CancellationException("stop skipping")
+        var checks = 0
+        assertSame(
+            cancelled,
+            assertThrows(CancellationException::class.java) {
+                forEachLogicalTextCell(
+                    2048,
+                    IntArray(2048),
+                    IntArray(2048) {
+                        if (it % 2 == 0) TerminalRenderCellFlags.WIDE_TRAILING else TerminalRenderCellFlags.WRAP_PADDING
+                    },
+                    LongArray(2048),
+                    IntArray(0),
+                    0,
+                    { if (++checks == 2) throw cancelled },
+                ) { _, _, _ -> fail("Skipped cells must not emit text") }
+            },
+        )
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = ["b", "aa", "aaa"])
+    fun `short query matching remains cancellable after decoding`(query: String) {
+        val cache = renderCache(WrappedTextFrame(arrayOf("a".repeat(8192)), wrapped = booleanArrayOf(true)))
+        val model = TerminalSearchModel()
+        val cancelled = CancellationException("stop matching")
+        var cancel = false
+        var checks = 0
+        model.begin(query, false, 0, { if (cancel && ++checks == 2) throw cancelled })
+        model.append(cache, 0)
+        cancel = true
+        assertSame(cancelled, assertThrows(CancellationException::class.java) { model.finish() })
+        assertEquals(1, model.search(renderCache(WrappedTextFrame(arrayOf("needle"))), "needle", false).resultCount)
+    }
+
     @ParameterizedTest
     @CsvSource("false,abc", "false,'ab '", "true,abc", "true,'ab '")
     fun `search excludes wide wrap padding and retains written separators`(
