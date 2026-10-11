@@ -329,6 +329,105 @@ class TerminalSearchControllerTest {
     }
 
     @Test
+    fun `closing a large search releases working storage and query edits reuse it`() {
+        val reader = SearchFrameReader(historyLines = List(999) { "a".repeat(64) }, liveLines = listOf("a".repeat(64)))
+        val session = testSession(reader)
+        val host = RecordingSearchHost(session, reader.columns, reader.visibleRows)
+        val controller = TerminalSearchController(host, scope, dispatcher)
+        session.use {
+            SwingUtilities.invokeAndWait {
+                host.renderCache.updateFrom(session)
+                repeat(2) { reset ->
+                    controller.search("a")
+                    dispatcher.scheduler.runCurrent()
+                    assertEquals(64_000, controller.state().resultCount)
+                    val retained = workingStorage(controller)
+                    controller.search("aa")
+                    dispatcher.scheduler.runCurrent()
+                    assertEquals(32_000, controller.state().resultCount)
+                    assertEquals(retained.toSet(), workingStorage(controller).toSet(), "Query edits should reuse working objects")
+
+                    if (reset == 0) controller.clear() else controller.reset(reader.visibleRows)
+
+                    assertEquals(TerminalSearchState("", 0, -1), controller.state())
+                    assertEquals(0, controller.viewportHighlights.segmentCount)
+                    assertTrue(workingStorage(controller).none { it in retained }, "Closing must drop both models and the scanner")
+                }
+                controller.search("aaa")
+                dispatcher.scheduler.runCurrent()
+                assertEquals(TerminalSearchState("aaa", 21_000, 0), controller.state())
+            }
+        }
+    }
+
+    @Test
+    fun `closing before a queued coroutine starts releases storage and permits immediate reopening`() {
+        val reader = SearchFrameReader(liveLines = listOf("alpha bravo"))
+        val session = testSession(reader)
+        val host = RecordingSearchHost(session, reader.columns, reader.visibleRows)
+        val controller = TerminalSearchController(host, scope, dispatcher)
+        session.use {
+            SwingUtilities.invokeAndWait {
+                host.renderCache.updateFrom(session)
+                repeat(2) { reset ->
+                    val retained = workingStorage(controller)
+                    controller.search("alpha")
+                    // Do not dispatch the coroutine body: cancellation must not depend on its finally block.
+                    if (reset == 0) controller.clear() else controller.reset(reader.visibleRows)
+                    assertTrue(workingStorage(controller).none { it in retained })
+                    controller.search("bravo")
+                    dispatcher.scheduler.runCurrent()
+                    assertEquals(TerminalSearchState("bravo", 1, 0), controller.state())
+                }
+            }
+        }
+    }
+
+    @Test
+    fun `closing an in flight search defers storage release until cancellation and before reopening`() {
+        val worker = QueuedDispatcher()
+        val reader = SearchFrameReader(historyLines = List(99) { "a".repeat(64) }, liveLines = listOf("a".repeat(64)))
+        val session = testSession(reader)
+        val host = RecordingSearchHost(session, reader.columns, reader.visibleRows)
+        val controller = TerminalSearchController(host, scope, worker)
+        session.use {
+            SwingUtilities.invokeAndWait {
+                host.renderCache.updateFrom(session)
+                repeat(4) { scenario ->
+                    val reset = scenario % 2 == 1
+                    val reopen = scenario >= 2
+                    val retained = workingStorage(controller)
+                    controller.search("a")
+                    dispatcher.scheduler.runCurrent()
+                    worker.runCurrent()
+                    // The worker has produced its first batch and is awaiting EDT publication.
+                    assertTrue(controller.state().isSearching)
+                    if (reset) controller.reset(reader.visibleRows) else controller.clear()
+                    assertEquals(retained, workingStorage(controller), "An in-flight worker still owns the old buffers")
+                    if (reopen) controller.search("missing")
+                    assertEquals(retained, workingStorage(controller))
+                    dispatcher.scheduler.runCurrent()
+                    worker.runCurrent()
+                    dispatcher.scheduler.runCurrent()
+                    worker.runCurrent()
+                    dispatcher.scheduler.runCurrent()
+                    assertEquals(TerminalSearchState(if (reopen) "missing" else "", 0, -1), controller.state())
+                    assertTrue(workingStorage(controller).none { it in retained }, "Reopening must not preserve the previous search peak")
+                    assertEquals(0, controller.viewportHighlights.segmentCount)
+                }
+            }
+        }
+    }
+
+    private fun workingStorage(controller: TerminalSearchController): List<Any> =
+        listOf("model", "publishedModel", "scanner").map { name ->
+            TerminalSearchController::class.java
+                .getDeclaredField(name)
+                .apply { isAccessible = true }
+                .get(controller)
+        }
+
+    @Test
     fun `clear removes query results and viewport highlights`() {
         val reader = SearchFrameReader(liveLines = listOf("needle"))
         val session = testSession(reader)
@@ -517,14 +616,18 @@ class TerminalSearchControllerTest {
             )
         val controller = TerminalSearchController(host, uiScope)
         val completed = CompletableFuture<TerminalSearchState>()
+        var retained = emptyList<Any>()
         try {
             SwingUtilities.invokeAndWait {
                 uiScope.launch { completed.complete(controller.states.first { it.query == "missing" && !it.isSearching }) }
                 host.renderCache.updateFrom(session)
+                retained = workingStorage(controller)
                 controller.search("needle")
             }
             assertFalse(entered.get(10, TimeUnit.SECONDS), "History copying must run off the EDT")
             SwingUtilities.invokeAndWait {
+                controller.clear()
+                assertEquals(retained, workingStorage(controller), "Blocked worker buffers must remain owned until it exits")
                 controller.search("missing")
                 assertTrue(controller.state().isSearching)
                 assertEquals(0, controller.state().resultCount)
@@ -533,6 +636,9 @@ class TerminalSearchControllerTest {
             release.countDown()
             assertEquals(TerminalSearchState("missing", 0, -1), completed.get(10, TimeUnit.SECONDS))
             assertEquals(1, maximum.get())
+            SwingUtilities.invokeAndWait {
+                assertTrue(workingStorage(controller).none { it in retained })
+            }
         } finally {
             release.countDown()
             SwingUtilities.invokeAndWait {

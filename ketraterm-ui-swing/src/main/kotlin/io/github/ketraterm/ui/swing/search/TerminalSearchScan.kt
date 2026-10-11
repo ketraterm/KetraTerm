@@ -22,7 +22,7 @@ import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.yield
 
-/** Worker-owned bounded cell copy. Results and longest logical-line scratch grow with retained text. */
+/** Worker-owned bounded cell copy with a retained row index and streaming match state. */
 internal class TerminalSearchScan {
     private val copy = TerminalTextRangeCopy()
     private var cached: RowIndex? = null

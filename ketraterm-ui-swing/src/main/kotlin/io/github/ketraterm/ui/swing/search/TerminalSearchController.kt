@@ -35,6 +35,8 @@ internal class TerminalSearchController(
     private var publishedModel = TerminalSearchModel()
     private var scanner = TerminalSearchScan()
     private var job: Job? = null
+    private var analysisStarted = false
+    private var releaseStoragePending = false
     private var epoch = 0L
     private var pending = false
     private var revealFirstResult = false
@@ -52,14 +54,15 @@ internal class TerminalSearchController(
 
     fun reset(viewportRows: Int) {
         epoch++
-        job?.cancel()
-        scanner = TerminalSearchScan()
+        cancelAnalysis()
+        releaseStoragePending = true
         query = ""
         pending = false
         highlights = null
         failure = null
         searchedSession = null
         viewportHighlights.reset(viewportRows)
+        releaseWorkingStorageIfIdle()
         publishState()
     }
 
@@ -109,8 +112,9 @@ internal class TerminalSearchController(
 
     private fun applyQuery(nextQuery: String) {
         epoch++
-        job?.cancel()
+        cancelAnalysis()
         query = nextQuery
+        if (query.isEmpty()) releaseStoragePending = true
         highlights = null
         failure = null
         searchedSession = null
@@ -133,7 +137,22 @@ internal class TerminalSearchController(
             )
     }
 
+    private fun cancelAnalysis() {
+        job?.cancel()
+        // A cancelled queued coroutine never enters its body or its finally block.
+        if (!analysisStarted) job = null
+    }
+
+    private fun releaseWorkingStorageIfIdle() {
+        if (!releaseStoragePending || job != null) return
+        model = TerminalSearchModel()
+        publishedModel = TerminalSearchModel()
+        scanner = TerminalSearchScan()
+        releaseStoragePending = false
+    }
+
     private fun startAnalysis() {
+        releaseWorkingStorageIfIdle()
         if (job != null || !pending || !scope.isActive) return
         val session = host.session ?: return
         val requestEpoch = epoch
@@ -145,6 +164,7 @@ internal class TerminalSearchController(
         pending = false
         val task =
             scope.launch(start = CoroutineStart.LAZY) {
+                analysisStarted = true
                 try {
                     val publicationContext = currentCoroutineContext()
                     val result =
@@ -233,6 +253,7 @@ internal class TerminalSearchController(
                     }
                 } finally {
                     job = null
+                    analysisStarted = false
                     publishState()
                     startAnalysis()
                 }
