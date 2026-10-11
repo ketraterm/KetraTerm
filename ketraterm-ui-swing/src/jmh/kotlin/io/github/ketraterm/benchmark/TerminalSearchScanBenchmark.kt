@@ -16,6 +16,7 @@
 package io.github.ketraterm.benchmark
 
 import io.github.ketraterm.core.TerminalBuffers
+import io.github.ketraterm.core.api.TerminalRenderBuffer
 import io.github.ketraterm.session.TerminalSession
 import io.github.ketraterm.ui.swing.search.TerminalSearchModel
 import io.github.ketraterm.ui.swing.search.TerminalSearchScan
@@ -54,13 +55,15 @@ open class TerminalSearchScanBenchmark {
 
     private var query = "needle"
     private lateinit var session: TerminalSession
+    private lateinit var terminal: TerminalRenderBuffer
+    private var alternate = false
     private val scanner = TerminalSearchScan()
     private val model = TerminalSearchModel()
 
     @Setup
     open fun setup() {
         require(columns >= 10)
-        val terminal = TerminalBuffers.create(columns, 1, maxHistory = retainedRows - 1)
+        terminal = TerminalBuffers.create(columns, 1, maxHistory = retainedRows - 1)
         val denseTail = "x".repeat(columns - 6)
         val clusterTail = "x".repeat(columns - 10)
         val combining = intArrayOf('e'.code, 0x301)
@@ -110,6 +113,23 @@ open class TerminalSearchScanBenchmark {
     open fun scanRetainedHistory(): Int =
         runBlocking {
             requireNotNull(scanner.scan(session, model, query, ignoreCase)).highlights.resultCount
+        }
+
+    /** Content refresh with one edited live cell; wrapped fixtures invalidate their entire logical line. */
+    @Benchmark
+    open fun editLastCellAndSearch(): Int {
+        alternate = !alternate
+        terminal.positionCursor(columns - 2, 0)
+        terminal.writeCodepoint(if (alternate) 'y'.code else 'x'.code)
+        return scanRetainedHistory()
+    }
+
+    /** Changing the query forces a new pass while reusing scratch storage. */
+    @Benchmark
+    open fun searchNewQuery(): Int =
+        runBlocking {
+            alternate = !alternate
+            requireNotNull(scanner.scan(session, model, if (alternate) query else query + "!", ignoreCase)).highlights.resultCount
         }
 
     @TearDown

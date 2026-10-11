@@ -125,6 +125,16 @@ internal class TerminalSearchModel {
         return highlights
     }
 
+    fun reuseMatches(
+        source: TerminalSearchHighlights,
+        firstRow: Long,
+        lastRow: Long,
+    ) {
+        highlights.appendResults(source, source.firstResultAtOrAfter(firstRow), source.firstResultAtOrAfter(lastRow + 1), checkCancelled)
+    }
+
+    val completedResults: TerminalSearchHighlights get() = highlights
+
     private fun finishLine() {
         trimTrailingSpaces()
         scanLine(query, ignoreCase)

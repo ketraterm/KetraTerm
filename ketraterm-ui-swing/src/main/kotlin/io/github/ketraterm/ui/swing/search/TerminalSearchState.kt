@@ -19,8 +19,9 @@ package io.github.ketraterm.ui.swing.search
  * Public snapshot of terminal search results.
  *
  * @property query current literal search query.
- * @property resultCount matches in the last completed pass. While searching,
- * these may lag output; a new query starts with zero matches.
+ * @property resultCount matches found so far for a new query, or matches from
+ * the last completed pass during a content refresh. While searching, the count
+ * is provisional and may lag output; a new query starts with zero matches.
  * @property activeResultIndex zero-based active match, or `-1` when no match is
  * active.
  * @property isSearching whether a background pass is pending or running.

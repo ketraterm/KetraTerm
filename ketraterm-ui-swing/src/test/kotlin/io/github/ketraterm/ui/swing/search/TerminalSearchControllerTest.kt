@@ -568,7 +568,7 @@ class TerminalSearchControllerTest {
             SwingUtilities.invokeAndWait {
                 scope.launch {
                     controller.states.collect {
-                        if (it.resultCount > 0) {
+                        if (it.resultCount == 66) {
                             published = it
                             controller.clear()
                         }
@@ -581,6 +581,42 @@ class TerminalSearchControllerTest {
                 assertEquals(true, published?.isSearching, "Publication must precede catch-up work")
                 assertEquals(TerminalSearchState("", 0, -1), controller.state())
                 assertEquals(2, rangeReads, "A changed generation must not restart the same pass")
+            }
+        } finally {
+            session.close()
+        }
+    }
+
+    @Test
+    fun `partial results support navigation and query replacement before completion`() {
+        val reader = SearchFrameReader(historyLines = List(1000) { "needle" }, liveLines = listOf("needle"))
+        val session = testSession(reader)
+        val host = RecordingSearchHost(session, reader.columns, reader.visibleRows)
+        val controller = TerminalSearchController(host, scope, dispatcher)
+        var partialCount = 0
+        var replaced = false
+        try {
+            SwingUtilities.invokeAndWait {
+                scope.launch {
+                    controller.states.collect { state ->
+                        if (!replaced && state.query == "needle" && state.resultCount > 0) {
+                            assertTrue(state.isSearching)
+                            assertTrue(state.resultCount < 1001)
+                            partialCount = state.resultCount
+                            assertTrue(controller.findNext())
+                            assertEquals(1, controller.state().activeResultIndex)
+                            replaced = true
+                            controller.search("absent")
+                        } else if (replaced) {
+                            assertEquals("absent", state.query, "Obsolete progress must never replace the new query")
+                        }
+                    }
+                }
+                host.renderCache.updateFrom(session)
+                controller.search("needle")
+                dispatcher.scheduler.runCurrent()
+                assertTrue(partialCount > 0)
+                assertEquals(TerminalSearchState("absent", 0, -1), controller.state())
             }
         } finally {
             session.close()
