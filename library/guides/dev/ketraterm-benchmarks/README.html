@@ -47,7 +47,7 @@ byte, cell, or key.</p>
 <p>The full warmed suite is available through:</p>
 <pre><code class="language-text">./gradlew :ketraterm-benchmarks:jmh
 </code></pre>
-<p>The <a href="https://github.com/ketraterm/KetraTerm/blob/e3c7f9c626934093d35a67ca97afbbf1b343f28d/ketraterm-benchmarks/build.gradle.kts">Gradle configuration</a> defines suite defaults and excludes
+<p>The <a href="https://github.com/ketraterm/KetraTerm/blob/037bc14e51f9fba50651073e96a5d8acec4ef7ca/ketraterm-benchmarks/build.gradle.kts">Gradle configuration</a> defines suite defaults and excludes
 the first-input benchmark. Direct JAR runs use annotations unless overridden.</p>
 <h2 id="select-a-measurement-boundary">Select a measurement boundary</h2>
 <div class="table-scroll"><table>
@@ -79,7 +79,7 @@ the first-input benchmark. Direct JAR runs use annotations unless overridden.</p
 </tr>
 <tr>
 <td>Swing text, search, hyperlinks, and painting</td>
-<td><code>TerminalTextRenderingBenchmark</code>, <code>TerminalSearchRefreshBenchmark</code>, <code>TerminalHyperlinkDiscoveryBenchmark</code>, <code>SwingPaintBenchmark</code></td>
+<td><code>TerminalTextRenderingBenchmark</code>, <code>TerminalSearchScanBenchmark</code>, <code>TerminalSearchRefreshBenchmark</code>, <code>TerminalHyperlinkDiscoveryBenchmark</code>, <code>SwingPaintBenchmark</code></td>
 </tr>
 </tbody></table></div>
 <p>Read the selected fixture before interpreting a result. Isolated parsing uses a
@@ -88,7 +88,7 @@ use a temporary directory on the filesystem selected by the JVM. These workloads
 measure different boundaries and cannot substitute for an end-to-end terminal
 measurement.</p>
 <h3 id="first-parser-input">First parser input</h3>
-<p><a href="https://github.com/ketraterm/KetraTerm/blob/e3c7f9c626934093d35a67ca97afbbf1b343f28d/ketraterm-benchmarks/src/jmh/kotlin/io/github/ketraterm/benchmark/TerminalParserFirstInputBenchmark.kt">TerminalParserFirstInputBenchmark</a>
+<p><a href="https://github.com/ketraterm/KetraTerm/blob/037bc14e51f9fba50651073e96a5d8acec4ef7ca/ketraterm-benchmarks/src/jmh/kotlin/io/github/ketraterm/benchmark/TerminalParserFirstInputBenchmark.kt">TerminalParserFirstInputBenchmark</a>
 measures one parser input in each fresh JVM fork. Parser construction and payload
 encoding happen before timing; lazy initialization triggered by the first input
 is included. Its setup requires single-shot mode, one thread, no warmup, one
@@ -98,7 +98,7 @@ measurement iteration, and a batch size of one.</p>
 <p>GC-profiler results include harness activity and do not isolate Unicode table
 initialization allocation.</p>
 <h3 id="fresh-terminal-log-ingestion">Fresh-terminal log ingestion</h3>
-<p><a href="https://github.com/ketraterm/KetraTerm/blob/e3c7f9c626934093d35a67ca97afbbf1b343f28d/ketraterm-benchmarks/src/jmh/kotlin/io/github/ketraterm/benchmark/TerminalLogIngestionBenchmark.kt">TerminalLogIngestionBenchmark</a>
+<p><a href="https://github.com/ketraterm/KetraTerm/blob/037bc14e51f9fba50651073e96a5d8acec4ef7ca/ketraterm-benchmarks/src/jmh/kotlin/io/github/ketraterm/benchmark/TerminalLogIngestionBenchmark.kt">TerminalLogIngestionBenchmark</a>
 ingests a fixed 6,000-line ASCII log into a fresh fixture for each shot. Its
 <code>pipeline</code> parameter selects direct core writes, isolated parsing, or parser-to-core
 ingestion. Core and host variants verify retained cells, wrapping, history
@@ -122,7 +122,7 @@ noise.</p>
 <p>See <a href="Module.html">Module.md</a> for source sets and harness dependencies. The
 <a href="../ketraterm-ui-swing/docs/bifurcated-text-rendering.html">Swing rendering guide</a>
 provides rendering workload context.</p>
-</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/e3c7f9c626934093d35a67ca97afbbf1b343f28d/ketraterm-benchmarks/README.md">View source on GitHub ↗</a></div></div></main></div>
+</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/037bc14e51f9fba50651073e96a5d8acec4ef7ca/ketraterm-benchmarks/README.md">View source on GitHub ↗</a></div></div></main></div>
   <footer>
     <a class="brand" href="../../../index.html"><img class="brand-mark" src="../../../assets/logo.svg" alt="" width="34" height="34">KetraTerm Library</a>
     <p>Open source · Apache 2.0</p>

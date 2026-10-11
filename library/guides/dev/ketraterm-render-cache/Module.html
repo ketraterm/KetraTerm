@@ -35,6 +35,8 @@ generations. Reader identity qualifies incremental copies.</li>
 copied frame; readers borrow the latest cache through <code>readCurrent</code>.</li>
 <li><code>TerminalRenderRangeCopy</code> makes bounded retained-range copies for worker-side
 analysis, with explicit absolute bounds for the sliced origin.</li>
+<li><code>TerminalTextRangeCopy</code> copies bounded text and row metadata for search without
+rendering attributes, cursor state, or clearing spare array capacity.</li>
 </ul>
 <p>Backend-specific layout, glyph runs, selection, and painting belong to renderer
 modules. Arrays expose cache-owned storage for reading; capacity may exceed the
@@ -43,7 +45,7 @@ for construction, capacity growth, and shape changes.</p>
 <p>See the <a href="README.html">consumer guide</a> and
 <a href="docs/triple-buffering-concurrency.html">publication contract</a> for ownership,
 lifetime, failure, and concurrency rules.</p>
-</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/e3c7f9c626934093d35a67ca97afbbf1b343f28d/ketraterm-render-cache/Module.md">View source on GitHub ↗</a></div></div></main></div>
+</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/037bc14e51f9fba50651073e96a5d8acec4ef7ca/ketraterm-render-cache/Module.md">View source on GitHub ↗</a></div></div></main></div>
   <footer>
     <a class="brand" href="../../../index.html"><img class="brand-mark" src="../../../assets/logo.svg" alt="" width="34" height="34">KetraTerm Library</a>
     <p>Open source · Apache 2.0</p>

@@ -55,7 +55,7 @@ controls and platform integrations are listed separately below.</p>
 </tr>
 <tr>
 <td>Search</td>
-<td>Asynchronous text search across the viewport and retained history, including soft-wrapped lines, case sensitivity, match highlighting, and next/previous navigation.</td>
+<td>Asynchronous text search across the viewport and retained history, including soft-wrapped lines, case sensitivity, match highlighting, and next/previous navigation. New queries publish provisional results from completed logical lines while scanning; content refreshes reuse unchanged logical-line results when stable row identities are available. Resize/reflow, history clearing, source/buffer changes, and query changes invalidate reuse.</td>
 </tr>
 <tr>
 <td>Hyperlinks</td>
@@ -193,9 +193,9 @@ IntelliJ tabs start new processes and do not restore output or running commands.
 Project JDK injection excludes WSL launchers and WSL SDK paths.
 Close confirmation relies on shell command markers; it is not a general detector
 of every process running in a session.</p>
-<p>See the <a href="https://github.com/ketraterm/KetraTerm/blob/e3c7f9c626934093d35a67ca97afbbf1b343f28d/ketraterm-app/README.md">standalone README</a> and
-<a href="https://github.com/ketraterm/KetraTerm/blob/e3c7f9c626934093d35a67ca97afbbf1b343f28d/ketraterm-intellij-plugin/README.md">plugin README</a> for installation and use.</p>
-</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/e3c7f9c626934093d35a67ca97afbbf1b343f28d/docs/features/desktop.md">View source on GitHub ↗</a></div></div></main></div>
+<p>See the <a href="https://github.com/ketraterm/KetraTerm/blob/037bc14e51f9fba50651073e96a5d8acec4ef7ca/ketraterm-app/README.md">standalone README</a> and
+<a href="https://github.com/ketraterm/KetraTerm/blob/037bc14e51f9fba50651073e96a5d8acec4ef7ca/ketraterm-intellij-plugin/README.md">plugin README</a> for installation and use.</p>
+</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/037bc14e51f9fba50651073e96a5d8acec4ef7ca/docs/features/desktop.md">View source on GitHub ↗</a></div></div></main></div>
   <footer>
     <a class="brand" href="../../../../index.html"><img class="brand-mark" src="../../../../assets/logo.svg" alt="" width="34" height="34">KetraTerm Library</a>
     <p>Open source · Apache 2.0</p>

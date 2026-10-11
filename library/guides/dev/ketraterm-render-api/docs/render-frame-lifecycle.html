@@ -102,6 +102,11 @@ arrays are <code>codeWords</code>, <code>attrWords</code>, and <code>flags</code
 from its corresponding nonnegative offset. The row is in <code>0 until rows</code>.
 Core&#39;s frame implementation rejects invalid rows or capacities with
 <code>IllegalArgumentException</code>.</p>
+<p><code>copyTextLine</code> copies the same code words, cell flags and primitive cluster
+payloads without presentation channels. Core overrides it to avoid reading or
+translating attributes. Existing frame providers inherit a compatibility
+implementation using <code>copyLine</code> and a temporary attribute array; providers used
+for frequent text scans should override it to avoid that allocation.</p>
 <p>Use <a href="attribute-packing.html#cell-flags">public cell flags</a> to distinguish scalar,
 cluster, empty, wide-leading, and wide-trailing cells. <code>codeWords</code> is zero for
 clusters, empty cells, and wide trailing cells. Attribute words remain available
@@ -145,7 +150,7 @@ provider must override it to resolve the range and expose the frame atomically.
 <code>TerminalSession</code> provides that serialization for its readers. For bounded copied
 range data, see
 <a href="../../ketraterm-render-cache/README.html"><code>TerminalRenderRangeCopy</code></a>.</p>
-</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/e3c7f9c626934093d35a67ca97afbbf1b343f28d/ketraterm-render-api/docs/render-frame-lifecycle.md">View source on GitHub ↗</a></div></div></main></div>
+</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/037bc14e51f9fba50651073e96a5d8acec4ef7ca/ketraterm-render-api/docs/render-frame-lifecycle.md">View source on GitHub ↗</a></div></div></main></div>
   <footer>
     <a class="brand" href="../../../../index.html"><img class="brand-mark" src="../../../../assets/logo.svg" alt="" width="34" height="34">KetraTerm Library</a>
     <p>Open source · Apache 2.0</p>
