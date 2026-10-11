@@ -15,11 +15,57 @@
  */
 package io.github.ketraterm.render.api
 
-import org.junit.jupiter.api.Assertions.assertEquals
-import org.junit.jupiter.api.Assertions.assertSame
+import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.Test
 
 class TerminalRenderFrameReaderTest {
+    @Test
+    fun `default text copy supports frames implementing only full row copies`() {
+        val frame =
+            object : RecordingFrame(columns = 3, rows = 1) {
+                override fun copyLine(
+                    row: Int,
+                    codeWords: IntArray,
+                    codeOffset: Int,
+                    attrWords: LongArray,
+                    attrOffset: Int,
+                    flags: IntArray,
+                    flagOffset: Int,
+                    extraAttrWords: LongArray?,
+                    extraAttrOffset: Int,
+                    hyperlinkIds: IntArray?,
+                    hyperlinkOffset: Int,
+                    clusterSink: TerminalRenderClusterSink?,
+                    clusterDataSink: TerminalRenderClusterDataSink?,
+                ) {
+                    assertEquals(0, row)
+                    assertEquals(3, attrWords.size)
+                    assertNull(extraAttrWords)
+                    assertNull(hyperlinkIds)
+                    assertNull(clusterSink)
+                    intArrayOf('A'.code, 0, 0).copyInto(codeWords, codeOffset)
+                    intArrayOf(
+                        TerminalRenderCellFlags.CODEPOINT,
+                        TerminalRenderCellFlags.CLUSTER,
+                        TerminalRenderCellFlags.EMPTY,
+                    ).copyInto(flags, flagOffset)
+                    clusterDataSink?.onCluster(1, intArrayOf(99, 'e'.code, 0x301, 99), 1, 2)
+                }
+            }
+        val codes = IntArray(5) { -1 }
+        val flags = IntArray(7) { -1 }
+        val clusters = mutableMapOf<Int, List<Int>>()
+        frame.copyTextLine(0, codes, 1, flags, 2) { col, data, offset, length ->
+            clusters[col] = data.slice(offset until offset + length)
+        }
+        assertArrayEquals(intArrayOf(-1, 'A'.code, 0, 0, -1), codes)
+        assertArrayEquals(
+            intArrayOf(-1, -1, TerminalRenderCellFlags.CODEPOINT, TerminalRenderCellFlags.CLUSTER, TerminalRenderCellFlags.EMPTY, -1, -1),
+            flags,
+        )
+        assertEquals(mapOf(1 to listOf('e'.code, 0x301)), clusters)
+    }
+
     @Test
     fun `reader passes short lived frame to callback`() {
         val frame = RecordingFrame(columns = 80, rows = 24)
@@ -99,7 +145,7 @@ class TerminalRenderFrameReaderTest {
         assertSame(selectedFrame, observed)
     }
 
-    private class RecordingFrame(
+    private open class RecordingFrame(
         override val columns: Int,
         override val rows: Int,
         override val historySize: Int = 0,

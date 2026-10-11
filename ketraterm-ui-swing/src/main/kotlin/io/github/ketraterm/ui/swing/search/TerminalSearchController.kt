@@ -33,11 +33,11 @@ internal class TerminalSearchController(
     private var highlights: TerminalSearchHighlights? = null
     private var model = TerminalSearchModel()
     private var publishedModel = TerminalSearchModel()
-    private val scanner = TerminalSearchScan()
+    private var scanner = TerminalSearchScan()
     private var job: Job? = null
     private var epoch = 0L
     private var pending = false
-    private var scrollOnCompletion = false
+    private var revealFirstResult = false
     private var searchedSession: TerminalSession? = null
     private var searchedContentGeneration = 0L
     private var searchedHistoryContentGeneration = 0L
@@ -53,6 +53,7 @@ internal class TerminalSearchController(
     fun reset(viewportRows: Int) {
         epoch++
         job?.cancel()
+        scanner = TerminalSearchScan()
         query = ""
         pending = false
         highlights = null
@@ -114,7 +115,7 @@ internal class TerminalSearchController(
         failure = null
         searchedSession = null
         pending = query.isNotEmpty() && host.session != null
-        scrollOnCompletion = pending
+        revealFirstResult = pending
         updateViewportHighlights()
         startAnalysis()
         publishState()
@@ -138,12 +139,56 @@ internal class TerminalSearchController(
         val requestEpoch = epoch
         val requestQuery = query
         val requestIgnoreCase = ignoreCase
+        val requestScanner = scanner
         val requestHistoryContentGeneration = host.renderCache.historyContentGeneration
+        val showProgress = highlights == null
         pending = false
         val task =
             scope.launch(start = CoroutineStart.LAZY) {
                 try {
-                    val result = withContext(analysisDispatcher) { scanner.scan(session, model, requestQuery, requestIgnoreCase) }
+                    val publicationContext = currentCoroutineContext()
+                    val result =
+                        withContext(analysisDispatcher) {
+                            requestScanner.scan(
+                                session,
+                                model,
+                                requestQuery,
+                                requestIgnoreCase,
+                                onProgress =
+                                    if (!showProgress) {
+                                        null
+                                    } else {
+                                        { progress ->
+                                            withContext(publicationContext.minusKey(Job)) {
+                                                if (requestEpoch == epoch &&
+                                                    host.session === session &&
+                                                    progress.columns == host.renderCache.columns &&
+                                                    progress.buffer == host.renderCache.activeBuffer &&
+                                                    progress.historyContentGeneration == host.renderCache.historyContentGeneration
+                                                ) {
+                                                    val accumulated =
+                                                        highlights ?: TerminalSearchHighlights().also {
+                                                            it.validatesRows = true
+                                                            highlights = it
+                                                        }
+                                                    accumulated.appendResults(progress.highlights)
+                                                    if (!accumulated.hasActiveResult) accumulated.activate(0)
+                                                    searchedColumns = progress.columns
+                                                    searchedBuffer = progress.buffer
+                                                    searchedHistoryContentGeneration = progress.historyContentGeneration
+                                                    if (revealFirstResult) {
+                                                        revealFirstResult = false
+                                                        scrollToActiveResult()
+                                                    }
+                                                    updateViewportHighlights()
+                                                    publishState()
+                                                    host.repaint()
+                                                }
+                                            }
+                                        }
+                                    },
+                            )
+                        }
                     if (requestEpoch != epoch || host.session !== session) return@launch
                     if (result == null ||
                         result.columns != host.renderCache.columns ||
@@ -168,8 +213,8 @@ internal class TerminalSearchController(
                     searchedColumns = result.columns
                     // Output may continue throughout a pass. Publish completed work before catching up.
                     pending = result.changedDuringScan || (pending && host.renderCache.contentGeneration != result.generation)
-                    if (scrollOnCompletion) {
-                        scrollOnCompletion = false
+                    if (revealFirstResult) {
+                        revealFirstResult = false
                         scrollToActiveResult()
                     }
                     updateViewportHighlights()
@@ -180,6 +225,11 @@ internal class TerminalSearchController(
                     if (requestEpoch == epoch && host.session === session) {
                         failure = error
                         pending = false
+                        if (showProgress) {
+                            highlights = null
+                            updateViewportHighlights()
+                            host.repaint()
+                        }
                     }
                 } finally {
                     job = null

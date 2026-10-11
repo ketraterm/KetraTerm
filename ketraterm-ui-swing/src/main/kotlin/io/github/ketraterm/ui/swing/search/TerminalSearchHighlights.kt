@@ -79,6 +79,53 @@ internal class TerminalSearchHighlights {
         resultCount--
     }
 
+    /** Copies complete results; the destination never borrows source arrays. */
+    fun appendResults(
+        source: TerminalSearchHighlights,
+        first: Int = 0,
+        end: Int = source.resultCount,
+        checkCancelled: () -> Unit = {},
+    ) {
+        if (first == end) return
+        checkCancelled()
+        val startSegment = source.resultSegmentStarts[first]
+        val endSegment = source.resultSegmentStarts[end - 1] + source.resultSegmentCounts[end - 1]
+        val addedSegments = endSegment - startSegment
+        ensureResultCapacity(resultCount + end - first)
+        ensureSegmentCapacity(segmentCount + addedSegments)
+        source.segmentRows.copyInto(segmentRows, segmentCount, startSegment, endSegment)
+        source.segmentRanges.copyInto(segmentRanges, segmentCount, startSegment, endSegment)
+        source.segmentIds.copyInto(segmentIds, segmentCount, startSegment, endSegment)
+        source.segmentGenerations.copyInto(segmentGenerations, segmentCount, startSegment, endSegment)
+        source.resultSegmentCounts.copyInto(resultSegmentCounts, resultCount, first, end)
+        for (result in first until end) {
+            if (result and 255 == 0) checkCancelled()
+            resultSegmentStarts[resultCount + result - first] = segmentCount + source.resultSegmentStarts[result] - startSegment
+        }
+        resultCount += end - first
+        segmentCount += addedSegments
+    }
+
+    fun firstResultAtOrAfter(row: Long): Int {
+        var low = 0
+        var high = resultCount
+        while (low < high) {
+            val middle = low + (high - low) / 2
+            if (segmentRows[resultSegmentStarts[middle]] < row) low = middle + 1 else high = middle
+        }
+        return low
+    }
+
+    fun snapshot(
+        first: Int = 0,
+        checkCancelled: () -> Unit = {},
+    ): TerminalSearchHighlights =
+        TerminalSearchHighlights().also {
+            it.validatesRows = validatesRows
+            it.appendResults(this, first, checkCancelled = checkCancelled)
+            it.activate(if (it.resultCount == 0) -1 else 0)
+        }
+
     fun activate(index: Int) {
         activeResultIndex =
             if (index in 0 until resultCount) {

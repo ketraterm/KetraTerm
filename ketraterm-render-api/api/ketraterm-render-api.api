@@ -130,6 +130,8 @@ public abstract interface class io/github/ketraterm/render/api/TerminalRenderFra
 	public fun copyCursor (Lio/github/ketraterm/render/api/TerminalRenderCursorSink;)V
 	public abstract fun copyLine (I[II[JI[II[JI[IILio/github/ketraterm/render/api/TerminalRenderClusterSink;Lio/github/ketraterm/render/api/TerminalRenderClusterDataSink;)V
 	public static synthetic fun copyLine$default (Lio/github/ketraterm/render/api/TerminalRenderFrame;I[II[JI[II[JI[IILio/github/ketraterm/render/api/TerminalRenderClusterSink;Lio/github/ketraterm/render/api/TerminalRenderClusterDataSink;ILjava/lang/Object;)V
+	public fun copyTextLine (I[II[IILio/github/ketraterm/render/api/TerminalRenderClusterDataSink;)V
+	public static synthetic fun copyTextLine$default (Lio/github/ketraterm/render/api/TerminalRenderFrame;I[II[IILio/github/ketraterm/render/api/TerminalRenderClusterDataSink;ILjava/lang/Object;)V
 	public abstract fun getActiveBuffer ()Lio/github/ketraterm/render/api/TerminalRenderBufferKind;
 	public abstract fun getColumns ()I
 	public fun getContentGeneration ()J
@@ -151,6 +153,8 @@ public abstract interface class io/github/ketraterm/render/api/TerminalRenderFra
 public final class io/github/ketraterm/render/api/TerminalRenderFrame$DefaultImpls {
 	public static fun copyCursor (Lio/github/ketraterm/render/api/TerminalRenderFrame;Lio/github/ketraterm/render/api/TerminalRenderCursorSink;)V
 	public static synthetic fun copyLine$default (Lio/github/ketraterm/render/api/TerminalRenderFrame;I[II[JI[II[JI[IILio/github/ketraterm/render/api/TerminalRenderClusterSink;Lio/github/ketraterm/render/api/TerminalRenderClusterDataSink;ILjava/lang/Object;)V
+	public static fun copyTextLine (Lio/github/ketraterm/render/api/TerminalRenderFrame;I[II[IILio/github/ketraterm/render/api/TerminalRenderClusterDataSink;)V
+	public static synthetic fun copyTextLine$default (Lio/github/ketraterm/render/api/TerminalRenderFrame;I[II[IILio/github/ketraterm/render/api/TerminalRenderClusterDataSink;ILjava/lang/Object;)V
 	public static fun getContentGeneration (Lio/github/ketraterm/render/api/TerminalRenderFrame;)J
 	public static fun getDiscardedCount (Lio/github/ketraterm/render/api/TerminalRenderFrame;)J
 	public static fun getHistoryContentGeneration (Lio/github/ketraterm/render/api/TerminalRenderFrame;)J

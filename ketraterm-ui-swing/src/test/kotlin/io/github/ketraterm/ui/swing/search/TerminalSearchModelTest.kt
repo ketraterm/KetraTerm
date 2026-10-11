@@ -18,13 +18,377 @@ package io.github.ketraterm.ui.swing.search
 import io.github.ketraterm.core.TerminalBuffers
 import io.github.ketraterm.render.api.*
 import io.github.ketraterm.render.cache.TerminalRenderCache
+import io.github.ketraterm.render.cache.TerminalTextRangeCopy
+import io.github.ketraterm.ui.swing.render.forEachLogicalTextCell
 import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.function.Executable
 import org.junit.jupiter.params.ParameterizedTest
 import org.junit.jupiter.params.provider.CsvSource
+import org.junit.jupiter.params.provider.ValueSource
+import java.util.concurrent.CancellationException
+import kotlin.random.Random
 
 class TerminalSearchModelTest {
+    @ParameterizedTest
+    @ValueSource(booleans = [false, true])
+    fun `bulk text boundaries preserve mixed cell geometry`(textOnly: Boolean) {
+        val terminal = TerminalBuffers.create(1024, 1)
+        terminal.writeText("a".repeat(255) + "界é")
+        terminal.writeCluster(intArrayOf('e'.code, 0x301))
+        terminal.writeText("b".repeat(257) + "😀z")
+        val reader = terminal as TerminalRenderFrameReader
+        val cache = TerminalRenderCache(1024, 1)
+        cache.updateFrom(reader)
+        val model = TerminalSearchModel()
+        val copy = TerminalTextRangeCopy()
+        for ((query, start, end) in listOf(
+            Triple("a界é", 254, 258),
+            Triple("ée\u0301b", 257, 260),
+            Triple("b".repeat(257), 259, 516),
+            Triple("bb😀z", 514, 519),
+        )) {
+            val matches =
+                if (textOnly) {
+                    assertTrue(copy.read(reader, 0, 0))
+                    model.begin(query, false, 0)
+                    model.append(copy)
+                    model.finish()
+                } else {
+                    model.search(cache, query, false)
+                }
+            val viewport = TerminalSearchViewportHighlights()
+            matches.buildViewportHighlights(cache, viewport)
+            assertEquals(1, matches.resultCount, query)
+            assertEquals(1, viewport.segmentCount, query)
+            assertEquals(start, viewport.startColumn(0), query)
+            assertEquals(end, viewport.endColumn(0), query)
+        }
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = [false, true])
+    fun `bulk text preserves empty cells inside a wrapped logical line`(textOnly: Boolean) {
+        val frame = WrappedTextFrame(arrayOf("ab", "x".repeat(300)), booleanArrayOf(true, false))
+        val matches = searchFrame(frame, "b" + " ".repeat(298) + "x", textOnly)
+        val viewport = TerminalSearchViewportHighlights()
+        matches.buildViewportHighlights(renderCache(frame), viewport)
+        assertEquals(1, matches.resultCount)
+        assertEquals(2, viewport.segmentCount)
+        assertEquals(1, viewport.startColumn(0))
+        assertEquals(300, viewport.endColumn(0))
+        assertEquals(0, viewport.startColumn(1))
+        assertEquals(1, viewport.endColumn(1))
+    }
+
+    @Test
+    fun `bulk decoding can be cancelled within a long ordinary row`() {
+        val model = TerminalSearchModel()
+        val cache = renderCache(WrappedTextFrame(arrayOf("x".repeat(8192)), booleanArrayOf(true)))
+        val cancelled = CancellationException("stop bulk decoding")
+        var checks = 0
+        model.begin("needle", false, 0, { if (++checks == 4) throw cancelled })
+        assertSame(cancelled, assertThrows(CancellationException::class.java) { model.append(cache, 0) })
+        assertEquals(1, model.search(renderCache(WrappedTextFrame(arrayOf("needle"))), "needle", false).resultCount)
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = [false, true])
+    fun `matches inside complex cells retain complete spans between ordinary runs`(textOnly: Boolean) {
+        val terminal = TerminalBuffers.create(32, 1)
+        terminal.writeText("ab")
+        terminal.writeCluster(intArrayOf('e'.code, 'e'.code, 0x301))
+        terminal.writeText("界")
+        terminal.writeCluster(intArrayOf(0x1F469, 0x200D, 0x1F4BB))
+        terminal.writeText("cd😀z")
+        val reader = terminal as TerminalRenderFrameReader
+        val cache = TerminalRenderCache(32, 1)
+        cache.updateFrom(reader)
+        val cases =
+            listOf(
+                Triple("e", 2, 3),
+                Triple("\u0301", 2, 3),
+                Triple("\u0301界\uD83D", 2, 7),
+                Triple("\uDC69", 5, 7),
+                Triple("\u200D", 5, 7),
+                Triple("\uDCBBc", 5, 8),
+                Triple("d\uD83D", 8, 11),
+                Triple("\uDE00z", 9, 12),
+                Triple("ab", 0, 2),
+                Triple("cd", 7, 9),
+            )
+        val model = TerminalSearchModel()
+        val copy = TerminalTextRangeCopy()
+        for ((query, start, end) in cases) {
+            val matches =
+                if (textOnly) {
+                    assertTrue(copy.read(reader, 0, 0))
+                    model.begin(query, false, 0)
+                    model.append(copy)
+                    model.finish()
+                } else {
+                    model.search(cache, query, false)
+                }
+            val viewport = TerminalSearchViewportHighlights()
+            matches.buildViewportHighlights(cache, viewport)
+            val count = if (query == "e") 2 else 1
+            assertEquals(count, matches.resultCount, query)
+            assertEquals(count, viewport.segmentCount, query)
+            repeat(count) {
+                assertEquals(start, viewport.startColumn(it), query)
+                assertEquals(end, viewport.endColumn(it), query)
+            }
+        }
+    }
+
+    @Test
+    fun `discarded pending geometry cannot leak into a later row`() {
+        val model = TerminalSearchModel()
+        model.begin("needle", false, 0)
+        model.append(renderCache(WrappedTextFrame(arrayOf("need"), booleanArrayOf(true))), 0)
+        model.discardPendingLine()
+        model.append(renderCache(WrappedTextFrame(arrayOf("needle"))), 7)
+        val matches = model.finish()
+        assertEquals(1, matches.resultCount)
+        assertEquals(7L, matches.activeStartAbsoluteRow())
+        assertEquals(0, matches.activeStartColumn())
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = [false, true])
+    fun `prefix matching agrees with literal non overlapping search`(ignoreCase: Boolean) {
+        val random = Random(719)
+        val alphabet = "abABiI\u0130\u0131kK\u212AsS\u017F\u03C3\u03C2\u03A3\u00DF\u1E9E"
+        val cases =
+            mutableListOf(
+                "aaaaa" to "aa",
+                "ababababca" to "abababca",
+                "aaaaabaaaaab" to "aaaab",
+                "ababababababca" to "ababababca",
+                "aaaaaaaaaaaaaaaaa" to "aaaaaaaaa",
+                "aaaaabaaaaabaaaaab" to "aaaaabaaaaab",
+                "Ii\u0130\u0131Ii\u0130\u0131Ii\u0130\u0131" to "iI\u0131\u0130iI\u0131\u0130i",
+                "\u03C3\u03C2\u03A3".repeat(5) to "\u03A3\u03C3\u03C2".repeat(3),
+                "Ii\u0130\u0131Ii\u0130\u0131" to "iI\u0131",
+                "\u03C3\u03C2\u03A3\u03C3\u03C2\u03A3" to "\u03A3\u03C3",
+                "K\u212AkK\u212A" to "kk",
+                "abc" to "",
+                "abc" to "abcdef",
+            )
+        repeat(200) {
+            val text = buildString { repeat(random.nextInt(1, 97)) { append(alphabet[random.nextInt(alphabet.length)]) } }
+            val query =
+                if (it % 2 == 0) {
+                    val start = random.nextInt(text.length)
+                    text.substring(start, minOf(text.length, start + random.nextInt(1, 13)))
+                } else {
+                    buildString { repeat(random.nextInt(1, 13)) { append(alphabet[random.nextInt(alphabet.length)]) } }
+                }
+            cases += text to query
+        }
+        val model = TerminalSearchModel()
+        for ((text, query) in cases) {
+            val expected = mutableListOf<Int>()
+            if (query.isNotEmpty()) {
+                var start = 0
+                while (start <= text.length - query.length) {
+                    if (query.indices.all { text[start + it].equals(query[it], ignoreCase) }) {
+                        expected += start
+                        start += query.length
+                    } else {
+                        start++
+                    }
+                }
+            }
+            val cache = renderCache(WrappedTextFrame(arrayOf(text)))
+            val matches = model.search(cache, query, ignoreCase)
+            val viewport = TerminalSearchViewportHighlights()
+            matches.buildViewportHighlights(cache, viewport)
+            val context = "text='$text', query='$query', ignoreCase=$ignoreCase"
+            assertEquals(expected.size, matches.resultCount, context)
+            assertEquals(expected.size, viewport.segmentCount, context)
+            for (index in expected.indices) {
+                assertEquals(expected[index], viewport.startColumn(index), context)
+                assertEquals(expected[index] + query.length, viewport.endColumn(index), context)
+            }
+        }
+    }
+
+    @Test
+    fun `prefix fallback preserves supplementary cluster spans across wrapping`() {
+        val terminal = TerminalBuffers.create(3, 3)
+        val emoji = intArrayOf(0x1F469, 0x200D, 0x1F4BB)
+        repeat(3) { terminal.writeCluster(emoji) }
+        terminal.writeText("x")
+        val cache = TerminalRenderCache(3, 3)
+        cache.updateFrom(terminal as TerminalRenderFrameReader)
+        val matches = TerminalSearchModel().search(cache, "\uD83D\uDC69\u200D\uD83D\uDCBB".repeat(2) + "x", false)
+        val viewport = TerminalSearchViewportHighlights()
+        matches.buildViewportHighlights(cache, viewport)
+        assertEquals(1, matches.resultCount)
+        assertEquals(2, viewport.segmentCount)
+        assertEquals(0, viewport.segmentCountForRow(0))
+        assertEquals(1, viewport.segmentCountForRow(1))
+        assertEquals(1, viewport.segmentCountForRow(2))
+        assertEquals(0, viewport.startColumn(0))
+        assertEquals(2, viewport.endColumn(0))
+        assertEquals(0, viewport.startColumn(1))
+        assertEquals(3, viewport.endColumn(1))
+    }
+
+    @Test
+    fun `query preprocessing can be cancelled and model can be reused`() {
+        val model = TerminalSearchModel()
+        val cancelled = CancellationException("stop preparing query")
+        var checks = 0
+        assertSame(
+            cancelled,
+            assertThrows(CancellationException::class.java) {
+                model.begin("a".repeat(8192) + "b", true, 0, { if (++checks == 3) throw cancelled })
+            },
+        )
+        assertEquals(1, model.search(renderCache(WrappedTextFrame(arrayOf("needle"))), "needle", false).resultCount)
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = [false, true])
+    fun `search preserves wrapped separators and trims only final spaces`(textOnly: Boolean) {
+        val frame = WrappedTextFrame(arrayOf("ab  ", "cd  ", "    ", "xy  "), booleanArrayOf(true, false, false, false))
+        val cache = renderCache(frame)
+        val matches = searchFrame(frame, "ab  cd", textOnly)
+        val viewport = TerminalSearchViewportHighlights()
+        matches.buildViewportHighlights(cache, viewport)
+        assertEquals(1, matches.resultCount)
+        assertEquals(2, viewport.segmentCount)
+        assertEquals(0, viewport.startColumn(0))
+        assertEquals(4, viewport.endColumn(0))
+        assertEquals(0, viewport.startColumn(1))
+        assertEquals(2, viewport.endColumn(1))
+        assertEquals(0, searchFrame(frame, "abcd", textOnly).resultCount)
+        assertEquals(0, searchFrame(frame, "cd ", textOnly).resultCount)
+        assertEquals(0, searchFrame(frame, "cdxy", textOnly).resultCount)
+        assertEquals(1, searchFrame(frame, "xy", textOnly).resultCount)
+
+        val blankContinuation = WrappedTextFrame(arrayOf("ab  ", "    "), booleanArrayOf(true, false))
+        assertEquals(1, searchFrame(blankContinuation, "ab", textOnly).resultCount)
+        assertEquals(0, searchFrame(blankContinuation, "ab ", textOnly).resultCount)
+    }
+
+    @ParameterizedTest
+    @CsvSource("false,wide", "true,wide", "false,cluster", "true,cluster", "false,nbsp", "true,nbsp")
+    fun `sparse search retains wide clusters and non ASCII spaces`(
+        textOnly: Boolean,
+        suffix: String,
+    ) {
+        val terminal = TerminalBuffers.create(16, 3)
+        terminal.writeText("a ")
+        val query =
+            when (suffix) {
+                "wide" -> "界".also { terminal.writeText(it) }
+                "cluster" -> " \u0301".also { terminal.writeCluster(intArrayOf(' '.code, 0x301)) }
+                "nbsp" -> "\u00a0".also { terminal.writeText(it) }
+                else -> error("Unexpected suffix: $suffix")
+            }
+        terminal.writeText("  ")
+        val reader = terminal as TerminalRenderFrameReader
+        val cache = TerminalRenderCache(16, 3)
+        cache.updateFrom(reader)
+        val model = TerminalSearchModel()
+        val matches =
+            if (textOnly) {
+                val copy = TerminalTextRangeCopy()
+                assertTrue(copy.read(reader, 0, 2))
+                model.begin(query, false, 0)
+                model.append(copy)
+                model.finish()
+            } else {
+                model.search(cache, query, false)
+            }
+        val viewport = TerminalSearchViewportHighlights()
+        matches.buildViewportHighlights(cache, viewport)
+        assertEquals(1, matches.resultCount)
+        assertEquals(1, viewport.segmentCount)
+        assertEquals(2, viewport.startColumn(0))
+        assertEquals(if (suffix == "wide") 4 else 3, viewport.endColumn(0))
+    }
+
+    @Test
+    fun `search remains cancellable in a long blank tail`() {
+        val cache = renderCache(WrappedTextFrame(arrayOf("x" + " ".repeat(8192))))
+        val model = TerminalSearchModel()
+        val cancelled = CancellationException("stop blank tail")
+        var checks = 0
+        model.begin("x", false, 0, { if (++checks == 3) throw cancelled })
+        assertSame(cancelled, assertThrows(CancellationException::class.java) { model.append(cache, 0) })
+        assertEquals(1, model.search(cache, "x", false).resultCount)
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = [false, true])
+    fun `decoding checks cancellation within long rows and cluster payloads`(cluster: Boolean) {
+        val length = 2048
+        val flags = IntArray(length) { TerminalRenderCellFlags.CODEPOINT }
+        val refs = LongArray(length)
+        if (cluster) {
+            flags[0] = TerminalRenderCellFlags.CLUSTER
+            refs[0] = length.toLong()
+        }
+        val cancelled = CancellationException("stop decoding")
+        var decoded = 0
+        assertSame(
+            cancelled,
+            assertThrows(CancellationException::class.java) {
+                forEachLogicalTextCell(
+                    length,
+                    IntArray(length) { 'a'.code },
+                    flags,
+                    refs,
+                    IntArray(length) { 0x301 },
+                    0,
+                    { if (decoded >= 300) throw cancelled },
+                ) { _, _, _ -> decoded++ }
+            },
+        )
+        assertTrue(decoded in 300..556, "Cancellation must be observed within 256 more decoded codepoints: $decoded")
+    }
+
+    @Test
+    fun `decoding remains cancellable when every cell is skipped`() {
+        val cancelled = CancellationException("stop skipping")
+        var checks = 0
+        assertSame(
+            cancelled,
+            assertThrows(CancellationException::class.java) {
+                forEachLogicalTextCell(
+                    2048,
+                    IntArray(2048),
+                    IntArray(2048) {
+                        if (it % 2 == 0) TerminalRenderCellFlags.WIDE_TRAILING else TerminalRenderCellFlags.WRAP_PADDING
+                    },
+                    LongArray(2048),
+                    IntArray(0),
+                    0,
+                    { if (++checks == 2) throw cancelled },
+                ) { _, _, _ -> fail("Skipped cells must not emit text") }
+            },
+        )
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = ["b", "aa", "aaa"])
+    fun `short query matching remains cancellable after decoding`(query: String) {
+        val cache = renderCache(WrappedTextFrame(arrayOf("a".repeat(8192)), wrapped = booleanArrayOf(true)))
+        val model = TerminalSearchModel()
+        val cancelled = CancellationException("stop matching")
+        var cancel = false
+        var checks = 0
+        model.begin(query, false, 0, { if (cancel && ++checks == 2) throw cancelled })
+        model.append(cache, 0)
+        cancel = true
+        assertSame(cancelled, assertThrows(CancellationException::class.java) { model.finish() })
+        assertEquals(1, model.search(renderCache(WrappedTextFrame(arrayOf("needle"))), "needle", false).resultCount)
+    }
+
     @ParameterizedTest
     @CsvSource("false,abc", "false,'ab '", "true,abc", "true,'ab '")
     fun `search excludes wide wrap padding and retains written separators`(
@@ -157,6 +521,24 @@ class TerminalSearchModelTest {
 
         assertEquals(3L, model.search(beforeEviction, "needle", ignoreCase = true).activeStartAbsoluteRow())
         assertEquals(6L, model.search(afterEviction, "needle", ignoreCase = true).activeStartAbsoluteRow())
+    }
+
+    private fun searchFrame(
+        frame: TerminalRenderFrame,
+        query: String,
+        textOnly: Boolean,
+    ): TerminalSearchHighlights {
+        val model = TerminalSearchModel()
+        if (!textOnly) return model.search(renderCache(frame), query, false)
+        val copy = TerminalTextRangeCopy()
+        val reader =
+            object : TerminalRenderFrameReader {
+                override fun readRenderFrame(consumer: TerminalRenderFrameConsumer) = consumer.accept(frame)
+            }
+        assertTrue(copy.read(reader, 0, frame.rows - 1L))
+        model.begin(query, false, 0)
+        model.append(copy)
+        return model.finish()
     }
 
     private fun renderCache(frame: TerminalRenderFrame): TerminalRenderCache {

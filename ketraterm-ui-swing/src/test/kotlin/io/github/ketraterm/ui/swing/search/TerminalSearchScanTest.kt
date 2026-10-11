@@ -16,13 +16,295 @@
 package io.github.ketraterm.ui.swing.search
 
 import io.github.ketraterm.core.TerminalBuffers
-import io.github.ketraterm.render.api.*
+import io.github.ketraterm.render.api.TerminalRenderClusterDataSink
+import io.github.ketraterm.render.api.TerminalRenderFrame
+import io.github.ketraterm.render.api.TerminalRenderFrameConsumer
+import io.github.ketraterm.render.api.TerminalRenderFrameReader
 import io.github.ketraterm.render.cache.TerminalRenderCache
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.Test
 
 class TerminalSearchScanTest {
+    @Test
+    fun `one edited cell copies only its logical line and reuses history matches`() =
+        runTest {
+            val terminal = TerminalBuffers.create(6, 1, maxHistory = 999)
+            repeat(1000) { row ->
+                if (row > 0) {
+                    terminal.carriageReturn()
+                    terminal.newLine()
+                }
+                terminal.writeText("needle")
+            }
+            val reader = CountingReader(terminal as TerminalRenderFrameReader)
+            val scanner = TerminalSearchScan()
+            val model = TerminalSearchModel()
+            assertEquals(1000, requireNotNull(scanner.scan(reader, model, "needle", false)).highlights.resultCount)
+            reader.copied.clear()
+            terminal.positionCursor(0, 0)
+            terminal.writeText("N")
+            assertEquals(999, requireNotNull(scanner.scan(reader, model, "needle", false)).highlights.resultCount)
+            assertEquals(listOf(999L), reader.copied)
+            reader.copied.clear()
+            assertEquals(999, requireNotNull(scanner.scan(reader, model, "needle", false)).highlights.resultCount)
+            assertTrue(reader.copied.isEmpty(), "An unchanged pass needs no text copying")
+            assertEquals(1000, requireNotNull(scanner.scan(reader, model, "needle", true)).highlights.resultCount)
+            assertEquals(1000, reader.copied.size, "Case policy changes invalidate reuse")
+        }
+
+    @Test
+    fun `wrapped edits and newly joined lines agree with a fresh scan`() =
+        runTest {
+            val terminal = TerminalBuffers.create(4, 3)
+            terminal.writeText("abcd")
+            terminal.carriageReturn()
+            terminal.newLine()
+            terminal.writeText("efgh")
+            val source = terminal as TerminalRenderFrameReader
+            val reader = CountingReader(source)
+            val scanner = TerminalSearchScan()
+            val model = TerminalSearchModel()
+            assertEquals(0, requireNotNull(scanner.scan(reader, model, "cdef", false)).highlights.resultCount)
+            terminal.positionCursor(3, 0)
+            terminal.writeText("de")
+            reader.copied.clear()
+            assertEquals(1, requireNotNull(scanner.scan(reader, model, "cdef", false)).highlights.resultCount)
+            assertEquals(listOf(0L, 1L), reader.copied)
+            terminal.positionCursor(0, 1)
+            terminal.eraseCurrentLine()
+            terminal.writeText("efgh")
+            reader.copied.clear()
+            assertEquals(0, requireNotNull(scanner.scan(reader, model, "cdef", false)).highlights.resultCount)
+            assertEquals(listOf(0L, 1L), reader.copied, "Splitting a logical line invalidates both pieces")
+            terminal.positionCursor(3, 0)
+            terminal.writeText("de")
+            assertEquals(1, requireNotNull(scanner.scan(reader, model, "cdef", false)).highlights.resultCount)
+            terminal.positionCursor(1, 1)
+            terminal.writeText("X")
+            reader.copied.clear()
+            val result = requireNotNull(scanner.scan(reader, model, "cdef", false))
+            assertEquals(0, result.highlights.resultCount)
+            assertEquals(listOf(0L, 1L), reader.copied, "An edit must re-evaluate both halves of a wrapped match")
+            assertEquals(
+                requireNotNull(TerminalSearchScan().scan(source, TerminalSearchModel(), "cdef", false)).highlights.resultCount,
+                result.highlights.resultCount,
+            )
+        }
+
+    @Test
+    fun `splitting a wrapped prefix rescans an untouched suffix for non overlapping matches`() =
+        runTest {
+            val terminal = TerminalBuffers.create(4, 2)
+            terminal.writeText("aaaaaaaa")
+            val reader = CountingReader(terminal as TerminalRenderFrameReader)
+            val scanner = TerminalSearchScan()
+            val model = TerminalSearchModel()
+            assertEquals(2, requireNotNull(scanner.scan(reader, model, "aaa", false)).highlights.resultCount)
+            terminal.positionCursor(0, 0)
+            terminal.eraseCurrentLine()
+            reader.copied.clear()
+            val matches = requireNotNull(scanner.scan(reader, model, "aaa", false)).highlights
+            assertEquals(1, matches.resultCount)
+            assertEquals(1L, matches.activeStartAbsoluteRow())
+            assertEquals(0, matches.activeStartColumn())
+            assertEquals(listOf(0L, 1L), reader.copied)
+        }
+
+    @Test
+    fun `eviction reuses intact lines but rescans a truncated wrapped prefix`() =
+        runTest {
+            for (wrapped in listOf(false, true)) {
+                val terminal = TerminalBuffers.create(4, 1, maxHistory = 4)
+                repeat(5) { row ->
+                    if (!wrapped && row > 0) {
+                        terminal.carriageReturn()
+                        terminal.newLine()
+                    }
+                    terminal.writeText("aaaa")
+                }
+                val source = terminal as TerminalRenderFrameReader
+                val reader = CountingReader(source)
+                val scanner = TerminalSearchScan()
+                val model = TerminalSearchModel()
+                scanner.scan(reader, model, "aaa", false)
+                if (!wrapped) {
+                    terminal.carriageReturn()
+                    terminal.newLine()
+                }
+                terminal.writeText("aaaa")
+                reader.copied.clear()
+                val result = requireNotNull(scanner.scan(reader, model, "aaa", false)).highlights
+                val expected = requireNotNull(TerminalSearchScan().scan(source, TerminalSearchModel(), "aaa", false)).highlights
+                assertEquals(expected.resultCount, result.resultCount)
+                repeat(expected.resultCount) {
+                    expected.activate(it)
+                    result.activate(it)
+                    assertEquals(expected.activeStartAbsoluteRow(), result.activeStartAbsoluteRow())
+                    assertEquals(expected.activeStartColumn(), result.activeStartColumn())
+                }
+                assertEquals(if (wrapped) listOf(1L, 2L, 3L, 4L, 5L) else listOf(5L), reader.copied)
+            }
+        }
+
+    @Test
+    fun `progress publishes detached complete results before the history pass ends`() =
+        runTest {
+            val terminal = TerminalBuffers.create(6, 1, maxHistory = 4999)
+            repeat(5000) { row ->
+                if (row > 0) {
+                    terminal.carriageReturn()
+                    terminal.newLine()
+                }
+                terminal.writeText("needle")
+            }
+            val reader = CountingReader(terminal as TerminalRenderFrameReader)
+            val batches = mutableListOf<TerminalSearchHighlights>()
+            var published = 0
+            val result =
+                requireNotNull(
+                    TerminalSearchScan().scan(reader, TerminalSearchModel(), "needle", false) { progress ->
+                        assertTrue(reader.copied.size < 5000, "Progress must precede completion")
+                        val batch = progress.highlights
+                        assertTrue(batch.resultCount > 0)
+                        repeat(batch.resultCount) {
+                            batch.activate(it)
+                            assertEquals((published + it).toLong(), batch.activeStartAbsoluteRow())
+                        }
+                        published += batch.resultCount
+                        batches += batch
+                    },
+                )
+            assertTrue(batches.size >= 2)
+            assertEquals(5000, result.highlights.resultCount)
+            assertEquals(published, batches.sumOf { it.resultCount }, "Later work must not mutate published batches")
+            batches.first().activate(0)
+            assertEquals(0L, batches.first().activeStartAbsoluteRow())
+        }
+
+    @Test
+    fun `resize and clear invalidate the reuse baseline`() =
+        runTest {
+            val terminal = TerminalBuffers.create(6, 1, maxHistory = 99)
+            repeat(100) { row ->
+                if (row > 0) {
+                    terminal.carriageReturn()
+                    terminal.newLine()
+                }
+                terminal.writeText("needle")
+            }
+            val source = terminal as TerminalRenderFrameReader
+            val reader = CountingReader(source)
+            val scanner = TerminalSearchScan()
+            val model = TerminalSearchModel()
+            scanner.scan(reader, model, "needle", false)
+            terminal.resize(12, 2)
+            reader.copied.clear()
+            assertEquals(100, requireNotNull(scanner.scan(reader, model, "needle", false)).highlights.resultCount)
+            var retained = 0
+            source.readRenderFrame { retained = it.historySize + it.rows }
+            assertEquals(retained, reader.copied.size)
+            terminal.eraseEntireScreen()
+            terminal.eraseScreenAndHistory()
+            assertEquals(0, requireNotNull(scanner.scan(reader, model, "needle", false)).highlights.resultCount)
+        }
+
+    private class CountingReader(
+        private val source: TerminalRenderFrameReader,
+    ) : TerminalRenderFrameReader by source {
+        val copied = mutableListOf<Long>()
+        var afterRead: (() -> Unit)? = null
+
+        override fun readRenderFrameForAbsoluteRange(
+            startAbsoluteRow: Long,
+            endAbsoluteRow: Long,
+            consumer: TerminalRenderFrameConsumer,
+        ) {
+            source.readRenderFrameForAbsoluteRange(startAbsoluteRow, endAbsoluteRow) { frame ->
+                val top = frame.discardedCount + frame.historySize - frame.scrollbackOffset
+                consumer.accept(
+                    object : TerminalRenderFrame by frame {
+                        override fun copyTextLine(
+                            row: Int,
+                            codeWords: IntArray,
+                            codeOffset: Int,
+                            flags: IntArray,
+                            flagOffset: Int,
+                            clusterDataSink: TerminalRenderClusterDataSink?,
+                        ) {
+                            copied += top + row
+                            frame.copyTextLine(row, codeWords, codeOffset, flags, flagOffset, clusterDataSink)
+                        }
+                    },
+                )
+            }
+            afterRead?.invoke()
+        }
+    }
+
+    @Test
+    fun `output during metadata collection preserves the stable reuse baseline`() =
+        runTest {
+            val terminal = TerminalBuffers.create(6, 1, maxHistory = 299)
+            repeat(300) { row ->
+                if (row > 0) {
+                    terminal.carriageReturn()
+                    terminal.newLine()
+                }
+                terminal.writeText("needle")
+            }
+            val reader = CountingReader(terminal as TerminalRenderFrameReader)
+            val scanner = TerminalSearchScan()
+            val model = TerminalSearchModel()
+            scanner.scan(reader, model, "needle", false)
+            reader.copied.clear()
+            reader.afterRead = {
+                reader.afterRead = null
+                terminal.positionCursor(0, 0)
+                terminal.writeText("absent")
+            }
+            val moving = requireNotNull(scanner.scan(reader, model, "needle", false))
+            assertTrue(moving.changedDuringScan)
+            assertEquals(299, moving.highlights.resultCount)
+            assertEquals(listOf(299L), reader.copied)
+            reader.copied.clear()
+            val settled = requireNotNull(scanner.scan(reader, model, "needle", false))
+            assertFalse(settled.changedDuringScan)
+            assertEquals(299, settled.highlights.resultCount)
+            assertEquals(listOf(299L), reader.copied, "Catch-up must retain reuse of unchanged history")
+        }
+
+    @Test
+    fun `repeated text scans preserve cluster payloads and discard erased matches`() =
+        runTest {
+            val terminal = TerminalBuffers.create(4, 1, maxHistory = 100)
+            repeat(64) {
+                terminal.writeText("old")
+                terminal.carriageReturn()
+                terminal.newLine()
+            }
+            terminal.writeText("abc")
+            terminal.writeCluster(intArrayOf(0x1F469, 0x200D, 0x1F4BB))
+            terminal.writeText("x")
+            val scanner = TerminalSearchScan()
+            val model = TerminalSearchModel()
+            val reader = terminal as TerminalRenderFrameReader
+            val query = "bc\uD83D\uDC69\u200D\uD83D\uDCBBx"
+            repeat(2) {
+                val result = requireNotNull(scanner.scan(reader, model, query, false))
+                assertEquals(1, result.highlights.resultCount)
+                assertEquals(64L, result.highlights.activeStartAbsoluteRow())
+                assertEquals(1, result.highlights.activeStartColumn())
+            }
+            terminal.eraseEntireScreen()
+            terminal.eraseScreenAndHistory()
+            assertEquals(0, requireNotNull(scanner.scan(reader, model, query, false)).highlights.resultCount)
+            terminal.positionCursor(0, 0)
+            terminal.writeCluster(intArrayOf('e'.code, 0x301))
+            assertEquals(1, requireNotNull(scanner.scan(reader, model, "e\u0301", false)).highlights.resultCount)
+            assertEquals(0, requireNotNull(scanner.scan(reader, model, query, false)).highlights.resultCount)
+        }
+
     @Test
     fun `clear during a scan rejects all results from the old history`() =
         runTest {
@@ -110,35 +392,21 @@ class TerminalSearchScanTest {
                         source.readRenderFrameForAbsoluteRange(startAbsoluteRow, endAbsoluteRow) { frame ->
                             consumer.accept(
                                 object : TerminalRenderFrame by frame {
-                                    override fun copyLine(
+                                    override fun copyTextLine(
                                         row: Int,
                                         codeWords: IntArray,
                                         codeOffset: Int,
-                                        attrWords: LongArray,
-                                        attrOffset: Int,
                                         flags: IntArray,
                                         flagOffset: Int,
-                                        extraAttrWords: LongArray?,
-                                        extraAttrOffset: Int,
-                                        hyperlinkIds: IntArray?,
-                                        hyperlinkOffset: Int,
-                                        clusterSink: TerminalRenderClusterSink?,
                                         clusterDataSink: TerminalRenderClusterDataSink?,
                                     ) {
                                         copied++
-                                        frame.copyLine(
+                                        frame.copyTextLine(
                                             row,
                                             codeWords,
                                             codeOffset,
-                                            attrWords,
-                                            attrOffset,
                                             flags,
                                             flagOffset,
-                                            extraAttrWords,
-                                            extraAttrOffset,
-                                            hyperlinkIds,
-                                            hyperlinkOffset,
-                                            clusterSink,
                                             clusterDataSink,
                                         )
                                     }
@@ -151,8 +419,8 @@ class TerminalSearchScanTest {
                 }
             val result = requireNotNull(TerminalSearchScan().scan(reader, TerminalSearchModel(), "needle", false))
             assertEquals(200, result.highlights.resultCount)
-            assertTrue(calls > 1)
-            assertTrue(maximum * 160 <= 4096, "No lock acquisition may copy the entire tall grid")
+            assertEquals(8, calls)
+            assertEquals(25, maximum, "Each batch must copy text through the bounded text-only path")
         }
 
     @Test
@@ -202,12 +470,12 @@ class TerminalSearchScanTest {
             "a".repeat(4000) + "b",
             false,
             cache.discardedCount,
-            { if (cancel && ++checks == 1000) throw cancelled },
+            { if (cancel && ++checks == 3) throw cancelled },
         )
         cache.lineWrapped.fill(true)
         model.append(cache, cache.discardedCount)
         cancel = true
         assertSame(cancelled, assertThrows(java.util.concurrent.CancellationException::class.java) { model.finish() })
-        assertEquals(1000, checks)
+        assertEquals(3, checks)
     }
 }

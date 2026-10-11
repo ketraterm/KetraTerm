@@ -52,7 +52,7 @@ the first-input benchmark. Direct JAR runs use annotations unless overridden.
 | Input encoding and session output through transport completion | `TerminalInputBenchmark`, `TerminalPasteBenchmark`, `TerminalSessionOutputBenchmark` |
 | Published-frame access and viewport projection | `TerminalRenderLeaseBenchmark`, `RetainedFrameViewportBenchmark` |
 | Completion evaluation and directory scanning | `TerminalCompletionBenchmark`, `TerminalDirectoryCompletionBenchmark`, `TerminalLearnedRankingBenchmark` |
-| Swing text, search, hyperlinks, and painting | `TerminalTextRenderingBenchmark`, `TerminalSearchRefreshBenchmark`, `TerminalHyperlinkDiscoveryBenchmark`, `SwingPaintBenchmark` |
+| Swing text, search, hyperlinks, and painting | `TerminalTextRenderingBenchmark`, `TerminalSearchScanBenchmark`, `TerminalSearchRefreshBenchmark`, `TerminalHyperlinkDiscoveryBenchmark`, `SwingPaintBenchmark` |
 
 Read the selected fixture before interpreting a result. Isolated parsing uses a
 no-op command sink; frame publication is separate from painting; directory scans

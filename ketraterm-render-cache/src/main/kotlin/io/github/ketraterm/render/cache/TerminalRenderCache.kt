@@ -17,6 +17,9 @@ package io.github.ketraterm.render.cache
 
 import io.github.ketraterm.render.api.*
 
+// Bound payloads from external frames; normal parser clusters are much smaller.
+internal const val MAX_COPIED_CLUSTER_CODEPOINTS = 256
+
 /**
  * Caller-owned primitive cache for render frames.
  *
@@ -810,7 +813,7 @@ public class TerminalRenderCache(
         require(length > 0) { "cluster length must be > 0, was $length" }
         require(offset >= 0) { "cluster offset must be >= 0, was $offset" }
 
-        val copiedLength = minOf(length, MAX_CLUSTER_CODEPOINTS)
+        val copiedLength = minOf(length, MAX_COPIED_CLUSTER_CODEPOINTS)
         require(codepoints.size - offset >= copiedLength) {
             "cluster source has insufficient capacity: size=${codepoints.size}, offset=$offset, length=$copiedLength"
         }
@@ -889,10 +892,6 @@ public class TerminalRenderCache(
         private const val NO_CLUSTER_SINK_ROW = -1
         private const val NO_CLUSTER_REF = 0L
         private const val INITIAL_CLUSTER_CODEPOINT_CAPACITY = 256
-
-        // Cache-side defense: parser/core normally cap clusters much lower, but
-        // render cache must not let a malformed frame dictate unbounded arrays.
-        private const val MAX_CLUSTER_CODEPOINTS = 256
 
         private val EMPTY_LONG_REFS = LongArray(0)
 

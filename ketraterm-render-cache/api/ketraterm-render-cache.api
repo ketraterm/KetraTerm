@@ -71,3 +71,27 @@ public final class io/github/ketraterm/render/cache/TerminalRenderRangeCopy {
 	public static synthetic fun read$default (Lio/github/ketraterm/render/cache/TerminalRenderRangeCopy;Lio/github/ketraterm/render/api/TerminalRenderFrameReader;JJLkotlin/jvm/functions/Function0;ILjava/lang/Object;)Z
 }
 
+public final class io/github/ketraterm/render/cache/TerminalTextRangeCopy {
+	public fun <init> ()V
+	public fun <init> (II)V
+	public synthetic fun <init> (IIILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun getActiveBuffer ()Lio/github/ketraterm/render/api/TerminalRenderBufferKind;
+	public final fun getClusterCodepoints ()[I
+	public final fun getClusterRefs ()[J
+	public final fun getCodeWords ()[I
+	public final fun getColumns ()I
+	public final fun getContentGeneration ()J
+	public final fun getFirstAbsoluteRow ()J
+	public final fun getFlags ()[I
+	public final fun getHistoryContentGeneration ()J
+	public final fun getLastAbsoluteRow ()J
+	public final fun getLineGenerations ()[J
+	public final fun getLineIds ()[J
+	public final fun getLineWrapped ()[Z
+	public final fun getMaxCells ()I
+	public final fun getMaxRows ()I
+	public final fun getRows ()I
+	public final fun read (Lio/github/ketraterm/render/api/TerminalRenderFrameReader;JJLkotlin/jvm/functions/Function0;)Z
+	public static synthetic fun read$default (Lio/github/ketraterm/render/cache/TerminalTextRangeCopy;Lio/github/ketraterm/render/api/TerminalRenderFrameReader;JJLkotlin/jvm/functions/Function0;ILjava/lang/Object;)Z
+}
+
