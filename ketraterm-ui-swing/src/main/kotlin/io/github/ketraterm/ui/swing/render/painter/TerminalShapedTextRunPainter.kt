@@ -70,6 +70,13 @@ internal class TerminalShapedTextRunPainter(
             if (length > MAX_RUN_CODEPOINTS || TerminalEmojiPresentation.usesEmojiPresentation(cache.clusterCodepoints, offset, length)) {
                 return false
             }
+            // VS15 symbols use the same proportional cell fit in either bidi
+            // direction. Script clusters still retain their neighboring context.
+            if (Character.isEmoji(cache.clusterCodepoints[offset]) &&
+                TerminalEmojiPresentation.requestsTextPresentation(cache.clusterCodepoints, offset, length)
+            ) {
+                return false
+            }
             if (rtl) return true
             var cp = offset
             val end = offset + length

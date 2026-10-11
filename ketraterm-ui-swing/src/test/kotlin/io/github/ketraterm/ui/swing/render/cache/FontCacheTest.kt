@@ -25,6 +25,84 @@ import java.awt.Font
 
 class FontCacheTest {
     @ParameterizedTest
+    @ValueSource(
+        strings = [
+            "\u2764\uFE0E",
+            "\u2615\uFE0E",
+            "\u2708\uFE0E",
+            "\u2620\uFE0E",
+            "\u2699\uFE0E",
+            "\u26A1\uFE0E",
+            "\u2B50\uFE0E",
+            "\uD83D\uDE00\uFE0E",
+        ],
+    )
+    fun `VS15 skips emoji fallback and accepts text coverage without selector coverage`(text: String) {
+        val primary = NativeCoverageFont("Primary", supportedCodePoint = 'A'.code)
+        val symbol = NativeCoverageFont("Symbols", supportsTextSelector = false)
+        val cache = FontCache()
+        cache.update(primary, listOf(NativeCoverageFont("Test Emoji"), symbol), useSystemFallbackFonts = false)
+
+        val resolved = cache.fontForText(text, Font.BOLD)
+        Assertions.assertEquals("Symbols", resolved.family)
+        Assertions.assertEquals(Font.BOLD, resolved.style)
+        Assertions.assertEquals(primary.size2D, resolved.size2D)
+        Assertions.assertSame(resolved, cache.fontForText(text, Font.BOLD))
+        Assertions.assertEquals("Test Emoji", cache.fontForText(text.replace('\uFE0E', '\uFE0F'), Font.BOLD).family)
+    }
+
+    @Test
+    fun `VS15 skips an emoji primary and emoji host fallback`() {
+        val resolver =
+            object : TerminalFontResolver {
+                override fun resolveFallbackFont(
+                    codePoint: Int,
+                    style: Int,
+                    size2D: Float,
+                ): Font? = null
+
+                override fun resolveFallbackFont(
+                    text: String,
+                    style: Int,
+                    size2D: Float,
+                ): Font = NativeCoverageFont("Host Emoji")
+            }
+        val cache = FontCache(fontResolver = resolver)
+        cache.update(NativeCoverageFont("Primary Emoji"), listOf(NativeCoverageFont("Symbols")), useSystemFallbackFonts = false)
+
+        Assertions.assertEquals("Symbols", cache.fontForText("\u2615\uFE0E", Font.ITALIC).family)
+    }
+
+    @Test
+    fun `VS15 retains primary missing glyph fallback when no text font covers the base`() {
+        val primary = NativeCoverageFont("Primary", supportedCodePoint = 'A'.code)
+        val cache = FontCache()
+        cache.update(primary, listOf(NativeCoverageFont("Test Emoji")), useSystemFallbackFonts = false)
+
+        Assertions.assertSame(primary, cache.fontForText("\u2615\uFE0E", Font.PLAIN))
+    }
+
+    @Test
+    fun `VS15 keeps a capable primary even when it does not cover the selector`() {
+        val primary = NativeCoverageFont("Primary", supportsTextSelector = false)
+        val cache = FontCache()
+        cache.update(primary, listOf(NativeCoverageFont("Test Emoji")), useSystemFallbackFonts = false)
+
+        Assertions.assertSame(primary, cache.fontForText("\u2615\uFE0E", Font.PLAIN))
+    }
+
+    @Test
+    fun `VS15 system fallback skips emoji families and accepts base coverage`() {
+        val primary = TerminalCacheTestFonts.primary(17f)
+        val family = TerminalCacheTestFonts.registerFallbackFamily()
+        val families = RecordingSystemFontFamilies(listOf("Test Emoji", family))
+        val cache = FontCache(systemFontFamilies = families)
+        cache.update(primary, emptyList(), useSystemFallbackFonts = true)
+
+        Assertions.assertEquals(family, cache.fontForText(TerminalCacheTestFonts.FALLBACK_ONLY_TEXT + "\uFE0E", Font.PLAIN).family)
+    }
+
+    @ParameterizedTest
     @ValueSource(strings = ["\u0628\u0628\u200D\u0628", "\u0628\uFE0F", "A\u200D", "\u2764", "\u2764\uFE0E", "\uD83D\uDE00\uFE0E"])
     fun `text presentation keeps primary font when emoji fallback advertises native substitutes`(text: String) {
         val primary = NativeCoverageFont("Text")
@@ -83,17 +161,30 @@ class FontCacheTest {
         private val reportedFamily: String,
         style: Int = PLAIN,
         size: Float = 18f,
+        private val supportedCodePoint: Int? = null,
+        private val supportsTextSelector: Boolean = true,
     ) : Font(DIALOG, style, size.toInt()) {
         override fun getFamily(): String = reportedFamily
 
-        override fun canDisplay(codePoint: Int): Boolean = true
+        override fun canDisplay(codePoint: Int): Boolean =
+            if (codePoint == 0xFE0E) supportsTextSelector else supportedCodePoint == null || codePoint == supportedCodePoint
 
-        override fun canDisplayUpTo(text: String): Int = -1
+        override fun canDisplayUpTo(text: String): Int {
+            var index = 0
+            while (index < text.length) {
+                val codePoint = text.codePointAt(index)
+                if (!canDisplay(codePoint)) return index
+                index += Character.charCount(codePoint)
+            }
+            return -1
+        }
 
         override fun deriveFont(
             style: Int,
             size: Float,
-        ): Font = NativeCoverageFont(reportedFamily, style, size)
+        ): Font = NativeCoverageFont(reportedFamily, style, size, supportedCodePoint, supportsTextSelector)
+
+        override fun deriveFont(style: Int): Font = deriveFont(style, size2D)
     }
 
     @Test

@@ -234,6 +234,7 @@ internal class FontCache(
 
         val primary = font(normalizedStyle)
         val isEmoji = TerminalEmojiPresentation.usesEmojiPresentation(text)
+        val textPresentation = TerminalEmojiPresentation.requestsTextPresentation(text)
 
         if (isEmoji && fontResolver != null) {
             val resolved = fontResolver.resolveFallbackFont(text, normalizedStyle, primary.size2D)
@@ -252,11 +253,11 @@ internal class FontCache(
             }
         }
 
-        if (primary.canDisplayUpTo(text) < 0) return primary
+        if (canDisplayText(primary, text, textPresentation)) return primary
 
         if (fontResolver != null) {
             val resolved = fontResolver.resolveFallbackFont(text, normalizedStyle, primary.size2D)
-            if (resolved != null) {
+            if (resolved != null && (!textPresentation || !isEmojiFontFamily(resolved.family))) {
                 val effectiveStyle = if (isEmojiFontFamily(resolved.family)) Font.PLAIN else normalizedStyle
                 val derived = resolved.deriveFont(effectiveStyle, primary.size2D)
                 styleResolvedTextFonts[text] = derived
@@ -267,7 +268,7 @@ internal class FontCache(
         var index = 0
         while (index < fallbackBaseFonts.size) {
             val fallback = fallbackFont(index, normalizedStyle)
-            if (fallback.canDisplayUpTo(text) < 0) {
+            if (canDisplayText(fallback, text, textPresentation)) {
                 styleResolvedTextFonts[text] = fallback
                 return fallback
             }
@@ -278,8 +279,12 @@ internal class FontCache(
             refreshSystemFallbackFonts()
             index = 0
             while (index < systemFallbackFamilies.size) {
+                if (textPresentation && isEmojiFontFamily(systemFallbackFamilies[index])) {
+                    index++
+                    continue
+                }
                 val fallback = systemFallbackFont(index, normalizedStyle)
-                if (fallback.canDisplayUpTo(text) < 0) {
+                if (canDisplayText(fallback, text, textPresentation)) {
                     styleResolvedTextFonts[text] = fallback
                     return fallback
                 }
@@ -289,6 +294,24 @@ internal class FontCache(
 
         styleResolvedTextFonts[text] = primary
         return primary
+    }
+
+    private fun canDisplayText(
+        font: Font,
+        text: String,
+        textPresentation: Boolean,
+    ): Boolean {
+        if (!textPresentation) return font.canDisplayUpTo(text) < 0
+        if (isEmojiFontFamily(font.family)) return false
+        // A variation selector has no standalone glyph. A text font may cover
+        // the base without advertising coverage of VS15; retain it for shaping.
+        var index = 0
+        while (index < text.length) {
+            val codePoint = text.codePointAt(index)
+            if (codePoint != 0xFE0E && !font.canDisplay(codePoint)) return false
+            index += Character.charCount(codePoint)
+        }
+        return true
     }
 
     private fun emojiFontForCodePoint(

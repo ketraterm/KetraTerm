@@ -14,6 +14,7 @@ are internal; hosts configure fonts through `SwingSettings` and `SwingHostServic
 | Contextual scripts / ordinary text in RTL runs | Contextually shaped vectors positioned by terminal-cell ownership |
 | Supported box, block, and geometric characters | Programmatic cell primitives |
 | Emoji presentation sequences | Available platform rasterizer, then Java2D fallback |
+| Emoji bases with VS15 | Text font selection and bounded `TextLayout` with proportional cell fitting, including in RTL runs |
 | Other scalars and clusters | Bounded cached `TextLayout` fallback |
 
 `columnSpacing` changes the cell advance rather than the font size. Negative
@@ -93,8 +94,15 @@ caches. System scanning is outside the ASCII path.
 Native dispatch and font preference share `TerminalEmojiPresentation` for
 scalars, cluster slices, and UTF-16 text. An emoji base is required; a joiner or
 variation selector alone does not classify ordinary script text as emoji. VS15
-retains text presentation. Platform font substitution must not give an emoji
-font precedence over a capable primary font for ordinary text.
+retains text presentation. Its font search skips recognized emoji families,
+including primary and host-resolved candidates. Text-font coverage checks ignore
+VS15 itself while retaining the selector in the shaping input; the base and other
+cluster code points still require coverage. Oversized fallback layouts scale
+equally in both dimensions around the text baseline and keep the owning cell clip.
+Contextual script groups retain their existing positioning and fitting policy.
+Platform font substitution must not give an emoji font precedence over a capable
+primary font for ordinary text. Actual glyph coverage and substitution within
+logical fonts remain dependent on the installed fonts and JVM text stack.
 
 ## Allocation measurement boundaries
 

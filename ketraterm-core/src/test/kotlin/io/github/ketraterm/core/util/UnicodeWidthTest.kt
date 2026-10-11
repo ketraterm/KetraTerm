@@ -18,6 +18,7 @@ package io.github.ketraterm.core.util
 import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Nested
+import org.junit.jupiter.api.Test
 import org.junit.jupiter.params.ParameterizedTest
 import org.junit.jupiter.params.provider.Arguments
 import org.junit.jupiter.params.provider.MethodSource
@@ -26,6 +27,43 @@ import java.util.stream.Stream
 
 @DisplayName("UnicodeWidth Test Suite")
 class UnicodeWidthTest {
+    @ParameterizedTest
+    @ValueSource(ints = [0x231A, 0x2615, 0x2620, 0x2699, 0x26A1, 0x2708, 0x2764, 0x2B50, 0x1F610])
+    fun `recognized emoji variation bases use the explicit presentation width`(base: Int) {
+        assertTrue(UnicodeWidth.isEmojiVariationBase(base))
+        for (ambiguousAsWide in listOf(false, true)) {
+            assertEquals(1, UnicodeWidth.calculateCluster(intArrayOf(base, 0xFE0E), 2, ambiguousAsWide))
+            assertEquals(2, UnicodeWidth.calculateCluster(intArrayOf(base, 0xFE0F), 2, ambiguousAsWide))
+            assertEquals(1, UnicodeWidth.calculateCluster(intArrayOf(base, 0xFE0F, 0xFE0E), 3, ambiguousAsWide))
+        }
+    }
+
+    @ParameterizedTest
+    @ValueSource(ints = [0x1100, 0x3042, 0x4E00, 0xAC00, 0xFF01, 0xFAFF, 0x1F600, 0x1FAEA, 0x20000])
+    fun `unsupported VS15 bases retain their wide cell allocation`(base: Int) {
+        assertFalse(UnicodeWidth.isEmojiVariationBase(base))
+        for (ambiguousAsWide in listOf(false, true)) {
+            assertEquals(2, UnicodeWidth.calculateCluster(intArrayOf(base, 0xFE0E), 2, ambiguousAsWide))
+            assertEquals(2, UnicodeWidth.calculateCluster(intArrayOf(base, 0x0301, 0xFE0E), 3, ambiguousAsWide))
+        }
+    }
+
+    @ParameterizedTest
+    @ValueSource(ints = [0x00A1, 0x0391, 0xE000, 0xF0000, 0xFFFD])
+    fun `unsupported VS15 bases retain ambiguous width policy`(base: Int) {
+        assertFalse(UnicodeWidth.isEmojiVariationBase(base))
+        assertEquals(1, UnicodeWidth.calculateCluster(intArrayOf(base, 0xFE0E), 2, false))
+        assertEquals(2, UnicodeWidth.calculateCluster(intArrayOf(base, 0xFE0E), 2, true))
+    }
+
+    @Test
+    fun `VS15 only affects a recognized leading base in the used cluster prefix`() {
+        assertEquals(2, UnicodeWidth.calculateCluster(intArrayOf(0x4E00, 0x2764, 0xFE0E), 3, false))
+        assertEquals(2, UnicodeWidth.calculateCluster(intArrayOf(0x2615, 0xFE0E), 1, false))
+        assertEquals(1, UnicodeWidth.calculateCluster(intArrayOf(0xFE0E), 1, false))
+        assertEquals(0, UnicodeWidth.calculate(0xFE0E, false))
+    }
+
     @ParameterizedTest
     @ValueSource(ints = [Int.MIN_VALUE, -2, -1, 0xD800, 0xDBFF, 0xDC00, 0xDFFF, 0x110000, Int.MAX_VALUE])
     fun `non scalars have no width and cannot hide behind presentation selectors`(cp: Int) {

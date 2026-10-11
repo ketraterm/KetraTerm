@@ -20,6 +20,7 @@ import io.github.ketraterm.render.cache.TerminalRenderCache
 import io.github.ketraterm.ui.swing.api.TerminalHyperlinkHover
 import io.github.ketraterm.ui.swing.render.*
 import io.github.ketraterm.ui.swing.render.cache.AwtColorCache
+import io.github.ketraterm.ui.swing.render.cache.TerminalCacheTestFonts
 import io.github.ketraterm.ui.swing.render.cache.TerminalShapedGlyphVectorCache
 import io.github.ketraterm.ui.swing.render.platform.TerminalPlatformEmojiRasterizer
 import io.github.ketraterm.ui.swing.render.primitives.TerminalPlatformEmojiPainter
@@ -34,6 +35,7 @@ import org.junit.jupiter.params.provider.ValueSource
 import java.awt.*
 import java.awt.font.FontRenderContext
 import java.awt.font.GlyphVector
+import java.awt.font.TextLayout
 import java.awt.geom.AffineTransform
 import java.awt.geom.Area
 import java.awt.geom.Ellipse2D
@@ -872,6 +874,100 @@ class TerminalTextPainterTest {
 
     @Nested
     inner class ComplexTextRendering {
+        @ParameterizedTest
+        @CsvSource(
+            "\u2764\uFE0E, false, 1.0",
+            "\u2615\uFE0E, false, 1.0",
+            "\u2708\uFE0E, false, 1.0",
+            "\u2620\uFE0E, false, 1.0",
+            "\u2699\uFE0E, false, 1.0",
+            "\u26A1\uFE0E, false, 1.0",
+            "\u2B50\uFE0E, false, 1.0",
+            "\u2764\uFE0E, true, 1.0",
+            "\u2615\uFE0E, true, 1.5",
+            "\u03A9, false, 1.5",
+        )
+        fun `oversized fallback glyphs preserve proportions in rows and cursor repaint`(
+            text: String,
+            rtl: Boolean,
+            deviceScale: Double,
+        ) {
+            val font = TerminalCacheTestFonts.fallback(18f)
+            val settings =
+                antialiasedSettings(true).copy { draft ->
+                    draft.font = font
+                    draft.fallbackFonts = emptyList()
+                    draft.useSystemFallbackFonts = false
+                }
+            val actual =
+                fixture(
+                    settings = settings,
+                    platformEmojiPainter = TerminalPlatformEmojiPainter { error("Text must not initialize emoji rasterization") },
+                )
+            val expected = fixture(settings = settings)
+            val metrics = actual.metrics.copy(cellWidth = 4, fontCellWidth = 4)
+            val symbol =
+                TestCell(
+                    codeWord = text.codePointAt(0),
+                    flags = if (text.length == 1) TerminalRenderCellFlags.CODEPOINT else TerminalRenderCellFlags.CLUSTER,
+                    cluster = if (text.length == 1) null else text,
+                )
+            val cells =
+                if (rtl) {
+                    arrayOf(
+                        TestCell(codeWord = 0x05D0, flags = TerminalRenderCellFlags.CODEPOINT),
+                        symbol,
+                    )
+                } else {
+                    arrayOf(symbol)
+                }
+            val cache = renderCache(TestRenderFrame(arrayOf(cells)))
+            try {
+                actual.g.scale(deviceScale, deviceScale)
+                expected.g.scale(deviceScale, deviceScale)
+                for (graphics in arrayOf(actual.g, expected.g)) {
+                    graphics.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, settings.textAntialiasing)
+                    graphics.setRenderingHint(RenderingHints.KEY_FRACTIONALMETRICS, settings.fractionalMetrics)
+                }
+                val transform = actual.g.transform
+                val layout = TextLayout(text, font, expected.g.fontRenderContext)
+                assertTrue(layout.advance > metrics.cellWidth, "The fixture must exercise a glyph wider than one cell")
+                val scale = metrics.cellWidth / layout.advance.toDouble()
+                expected.g.clipRect(0, 0, metrics.cellWidth, metrics.cellHeight)
+                expected.g.color = Color(settings.palette.defaultForeground, true)
+                expected.g.translate(0.0, metrics.baseline.toDouble())
+                expected.g.scale(scale, scale)
+                layout.draw(expected.g, 0f, 0f)
+
+                actual.painter.paintRow(actual.g, cache, settings.palette, metrics, 0, actual.g.fontRenderContext)
+                val pixelWidth = (metrics.cellWidth * deviceScale).toInt()
+                val pixelHeight = minOf(actual.image.height, (metrics.cellHeight * deviceScale).toInt())
+                val expectedPixels = expected.image.getRGB(0, 0, pixelWidth, pixelHeight, null, 0, pixelWidth)
+                assertTrue(expectedPixels.any { it != 0 }, "The fitted glyph must remain visible")
+                assertContentEquals(expectedPixels, actual.image.getRGB(0, 0, pixelWidth, pixelHeight, null, 0, pixelWidth))
+                assertEquals(transform, actual.g.transform)
+
+                actual.g.composite = AlphaComposite.Clear
+                actual.g.fillRect(0, 0, metrics.cellWidth, metrics.cellHeight)
+                actual.g.composite = AlphaComposite.SrcOver
+                actual.painter.paintCellForeground(
+                    actual.g,
+                    cache,
+                    metrics,
+                    column = if (rtl) 1 else 0,
+                    row = 0,
+                    foreground = settings.palette.defaultForeground,
+                    fontRenderContext = actual.g.fontRenderContext,
+                    visualColumn = 0,
+                )
+                assertContentEquals(expectedPixels, actual.image.getRGB(0, 0, pixelWidth, pixelHeight, null, 0, pixelWidth))
+                assertEquals(transform, actual.g.transform)
+            } finally {
+                actual.g.dispose()
+                expected.g.dispose()
+            }
+        }
+
         @ParameterizedTest
         @ValueSource(strings = ["uniform", "foreground", "underline", "conceal"])
         fun `Arabic run retains contextual forms across cell presentation changes`(presentation: String) {

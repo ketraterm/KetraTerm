@@ -70,6 +70,23 @@ internal object TerminalEmojiPresentation {
     /** Classifies UTF-16 text without materializing code points or substrings. */
     fun usesEmojiPresentation(text: String): Boolean = classify(text.length, utf16 = true) { text.codePointAt(it) }
 
+    /** Whether the text explicitly requests text glyphs, regardless of the base's default. */
+    fun requestsTextPresentation(text: String): Boolean = text.indexOf(VARIATION_SELECTOR_15.toChar()) >= 0
+
+    /** Checks a borrowed cluster slice without creating a text key. */
+    fun requestsTextPresentation(
+        codepoints: IntArray,
+        offset: Int,
+        length: Int,
+    ): Boolean {
+        var index = offset
+        val end = offset + length
+        while (index < end) {
+            if (codepoints[index++] == VARIATION_SELECTOR_15) return true
+        }
+        return false
+    }
+
     private inline fun classify(
         length: Int,
         utf16: Boolean,

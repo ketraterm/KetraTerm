@@ -102,18 +102,18 @@ class HostGraphemeTest {
 
     @Test
     fun `narrowing restores text overwritten by the provisional wide prefix`() {
-        knownR06Failure(listOf("expected: <a\uD83D\uDE00\uFE0Ecdef> but was: <a\uD83D\uDE00\uFE0E def>")) {
+        knownR06Failure(listOf("expected: <a\uD83D\uDE10\uFE0Ecdef> but was: <a\uD83D\uDE10\uFE0E def>")) {
             for (insert in listOf(false, true)) {
                 val terminal = TerminalBuffers.create(6, 2)
                 terminal.writeText("abcdef")
                 terminal.positionCursor(1, 0)
                 terminal.setInsertMode(insert)
                 val parser = TerminalParsers.create(HostCommandAdapter(terminal))
-                parser.accept("\uD83D\uDE00".encodeToByteArray())
-                assertEquals(0x1f600, terminal.getCodepointAt(1, 0), "prefix is immediately visible")
+                parser.accept("\uD83D\uDE10".encodeToByteArray())
+                assertEquals(0x1f610, terminal.getCodepointAt(1, 0), "prefix is immediately visible")
                 assertEquals(-1, terminal.getCodepointAt(2, 0))
                 parser.accept("\uFE0E".encodeToByteArray())
-                assertEquals(if (insert) "a\uD83D\uDE00\uFE0Ebcde" else "a\uD83D\uDE00\uFE0Ecdef", terminal.getLineAsString(0))
+                assertEquals(if (insert) "a\uD83D\uDE10\uFE0Ebcde" else "a\uD83D\uDE10\uFE0Ecdef", terminal.getLineAsString(0))
                 assertEquals(2, terminal.cursorCol)
             }
         }
@@ -137,7 +137,7 @@ class HostGraphemeTest {
             for (history in listOf(0, 1, 4)) {
                 for (insert in listOf(false, true)) {
                     for (wrap in listOf(false, true)) {
-                        for (cluster in listOf("\u2764\uFE0F", "\uD83D\uDE00\uFE0E", "\u2764\uFE0F\uFE0E")) {
+                        for (cluster in listOf("\u2764\uFE0F", "\uD83D\uDE10\uFE0E", "\u2764\uFE0F\uFE0E")) {
                             for (suffix in listOf("", "X", "\r\nY")) {
                                 val bytes = (cluster + suffix).encodeToByteArray()
 
@@ -248,13 +248,13 @@ class HostGraphemeTest {
 
     @Test
     fun `tiny grids and already pending wraps retain chunk equivalence`() {
-        val context = "size=1,1 history=0 prefix= text=\uD83D\uDE00\uFE0E suffix= split=4"
+        val context = "size=1,1 history=0 prefix= text=\uD83D\uDE10\uFE0E suffix= split=4"
         knownR06Failure(listOf("$context ==> expected: <0> but was: <1>")) {
             for (width in 1..3) {
                 for (height in 1..2) {
                     for (history in 0..1) {
                         for (prefix in listOf("", "A".repeat(width))) {
-                            for (text in listOf("\uD83D\uDE00\uFE0E", "\u2764\uFE0F\uFE0E", "\u4E00\uFE0E")) {
+                            for (text in listOf("\uD83D\uDE10\uFE0E", "\u2764\uFE0F\uFE0E", "\u4E00\uFE0E")) {
                                 for (suffix in listOf("", "X", "\u001B[32mY", "\u0018X")) {
                                     val bytes = (prefix + text + suffix).encodeToByteArray()
                                     val whole = TerminalBuffers.create(width, height, maxHistory = history)
@@ -300,7 +300,7 @@ class HostGraphemeTest {
         alternate: Boolean,
         bottomRow: Boolean,
     ) {
-        val cluster = if (shrink) "\uD83D\uDE00\uFE0E" else "\u2764\uFE0F"
+        val cluster = if (shrink) "\uD83D\uDE10\uFE0E" else "\u2764\uFE0F"
         val column = if (shrink) 3 else 2
         val bytes = (cluster + "X").encodeToByteArray()
 
@@ -350,15 +350,15 @@ class HostGraphemeTest {
         if (shrink) {
             val expected =
                 when {
-                    !bottomRow -> "KEE\uD83D\uDE00\uFE0E\nXID\n"
-                    alternate -> "MID\n   \uD83D\uDE00\uFE0E\nX"
-                    else -> "KEEP\nMID\n   \uD83D\uDE00\uFE0E\nX"
+                    !bottomRow -> "KEE\uD83D\uDE10\uFE0E\nXID\n"
+                    alternate -> "MID\n   \uD83D\uDE10\uFE0E\nX"
+                    else -> "KEEP\nMID\n   \uD83D\uDE10\uFE0E\nX"
                 }
             val actual =
                 when {
-                    !bottomRow -> "KEE\n\uD83D\uDE00\uFE0EXD\n"
-                    alternate -> "MID\n\n\uD83D\uDE00\uFE0EX"
-                    else -> "KEEP\nMID\n\n\uD83D\uDE00\uFE0EX"
+                    !bottomRow -> "KEE\n\uD83D\uDE10\uFE0EXD\n"
+                    alternate -> "MID\n\n\uD83D\uDE10\uFE0EX"
+                    else -> "KEEP\nMID\n\n\uD83D\uDE10\uFE0EX"
                 }
             knownR06Failure(
                 (4..6).map { split ->
@@ -440,7 +440,7 @@ class HostGraphemeTest {
     fun `retained variation selectors determine width across read boundaries within a row`() {
         for (startColumn in 0..1) {
             for (shrink in listOf(false, true)) {
-                val base = if (shrink) "\uD83D\uDE00" else "\u2764"
+                val base = if (shrink) "\uD83D\uDE10" else "\u2764"
                 val selector = if (shrink) "\uFE0E" else "\uFE0F"
                 val cluster = base + "\u0301".repeat(30) + selector
                 val bytes = (cluster + "X").encodeToByteArray()
