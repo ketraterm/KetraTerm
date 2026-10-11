@@ -23,6 +23,7 @@ internal inline fun forEachLogicalTextCell(
     cache: TerminalRenderCache,
     row: Int,
     checkCancelled: () -> Unit = {},
+    endColumnExclusive: Int = cache.columns,
     append: (codePoint: Int, startColumn: Int, endColumn: Int) -> Unit,
 ) {
     forEachLogicalTextCell(
@@ -33,6 +34,7 @@ internal inline fun forEachLogicalTextCell(
         cache.clusterCodepoints,
         row,
         checkCancelled,
+        endColumnExclusive,
         append,
     )
 }
@@ -45,12 +47,13 @@ internal inline fun forEachLogicalTextCell(
     clusterCodepoints: IntArray,
     row: Int,
     checkCancelled: () -> Unit,
+    endColumnExclusive: Int = columns,
     append: (codePoint: Int, startColumn: Int, endColumn: Int) -> Unit,
 ) {
     var column = 0
     // Count skipped cells and cluster payloads too, so every decoding path remains bounded.
     var untilCancellationCheck = 0
-    while (column < columns) {
+    while (column < endColumnExclusive) {
         if (untilCancellationCheck-- == 0) {
             checkCancelled()
             untilCancellationCheck = 255

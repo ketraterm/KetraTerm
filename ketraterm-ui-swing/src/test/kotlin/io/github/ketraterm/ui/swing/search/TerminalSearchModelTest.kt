@@ -18,6 +18,7 @@ package io.github.ketraterm.ui.swing.search
 import io.github.ketraterm.core.TerminalBuffers
 import io.github.ketraterm.render.api.*
 import io.github.ketraterm.render.cache.TerminalRenderCache
+import io.github.ketraterm.render.cache.TerminalTextRangeCopy
 import io.github.ketraterm.ui.swing.render.forEachLogicalTextCell
 import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.Test
@@ -28,6 +29,79 @@ import org.junit.jupiter.params.provider.ValueSource
 import java.util.concurrent.CancellationException
 
 class TerminalSearchModelTest {
+    @ParameterizedTest
+    @ValueSource(booleans = [false, true])
+    fun `search preserves wrapped separators and trims only final spaces`(textOnly: Boolean) {
+        val frame = WrappedTextFrame(arrayOf("ab  ", "cd  ", "    ", "xy  "), booleanArrayOf(true, false, false, false))
+        val cache = renderCache(frame)
+        val matches = searchFrame(frame, "ab  cd", textOnly)
+        val viewport = TerminalSearchViewportHighlights()
+        matches.buildViewportHighlights(cache, viewport)
+        assertEquals(1, matches.resultCount)
+        assertEquals(2, viewport.segmentCount)
+        assertEquals(0, viewport.startColumn(0))
+        assertEquals(4, viewport.endColumn(0))
+        assertEquals(0, viewport.startColumn(1))
+        assertEquals(2, viewport.endColumn(1))
+        assertEquals(0, searchFrame(frame, "abcd", textOnly).resultCount)
+        assertEquals(0, searchFrame(frame, "cd ", textOnly).resultCount)
+        assertEquals(0, searchFrame(frame, "cdxy", textOnly).resultCount)
+        assertEquals(1, searchFrame(frame, "xy", textOnly).resultCount)
+
+        val blankContinuation = WrappedTextFrame(arrayOf("ab  ", "    "), booleanArrayOf(true, false))
+        assertEquals(1, searchFrame(blankContinuation, "ab", textOnly).resultCount)
+        assertEquals(0, searchFrame(blankContinuation, "ab ", textOnly).resultCount)
+    }
+
+    @ParameterizedTest
+    @CsvSource("false,wide", "true,wide", "false,cluster", "true,cluster", "false,nbsp", "true,nbsp")
+    fun `sparse search retains wide clusters and non ASCII spaces`(
+        textOnly: Boolean,
+        suffix: String,
+    ) {
+        val terminal = TerminalBuffers.create(16, 3)
+        terminal.writeText("a ")
+        val query =
+            when (suffix) {
+                "wide" -> "界".also { terminal.writeText(it) }
+                "cluster" -> " \u0301".also { terminal.writeCluster(intArrayOf(' '.code, 0x301)) }
+                "nbsp" -> "\u00a0".also { terminal.writeText(it) }
+                else -> error("Unexpected suffix: $suffix")
+            }
+        terminal.writeText("  ")
+        val reader = terminal as TerminalRenderFrameReader
+        val cache = TerminalRenderCache(16, 3)
+        cache.updateFrom(reader)
+        val model = TerminalSearchModel()
+        val matches =
+            if (textOnly) {
+                val copy = TerminalTextRangeCopy()
+                assertTrue(copy.read(reader, 0, 2))
+                model.begin(query, false, 0)
+                model.append(copy)
+                model.finish()
+            } else {
+                model.search(cache, query, false)
+            }
+        val viewport = TerminalSearchViewportHighlights()
+        matches.buildViewportHighlights(cache, viewport)
+        assertEquals(1, matches.resultCount)
+        assertEquals(1, viewport.segmentCount)
+        assertEquals(2, viewport.startColumn(0))
+        assertEquals(if (suffix == "wide") 4 else 3, viewport.endColumn(0))
+    }
+
+    @Test
+    fun `search remains cancellable in a long blank tail`() {
+        val cache = renderCache(WrappedTextFrame(arrayOf("x" + " ".repeat(8192))))
+        val model = TerminalSearchModel()
+        val cancelled = CancellationException("stop blank tail")
+        var checks = 0
+        model.begin("x", false, 0, { if (++checks == 3) throw cancelled })
+        assertSame(cancelled, assertThrows(CancellationException::class.java) { model.append(cache, 0) })
+        assertEquals(1, model.search(cache, "x", false).resultCount)
+    }
+
     @ParameterizedTest
     @ValueSource(booleans = [false, true])
     fun `decoding checks cancellation within long rows and cluster payloads`(cluster: Boolean) {
@@ -226,6 +300,24 @@ class TerminalSearchModelTest {
 
         assertEquals(3L, model.search(beforeEviction, "needle", ignoreCase = true).activeStartAbsoluteRow())
         assertEquals(6L, model.search(afterEviction, "needle", ignoreCase = true).activeStartAbsoluteRow())
+    }
+
+    private fun searchFrame(
+        frame: TerminalRenderFrame,
+        query: String,
+        textOnly: Boolean,
+    ): TerminalSearchHighlights {
+        val model = TerminalSearchModel()
+        if (!textOnly) return model.search(renderCache(frame), query, false)
+        val copy = TerminalTextRangeCopy()
+        val reader =
+            object : TerminalRenderFrameReader {
+                override fun readRenderFrame(consumer: TerminalRenderFrameConsumer) = consumer.accept(frame)
+            }
+        assertTrue(copy.read(reader, 0, frame.rows - 1L))
+        model.begin(query, false, 0)
+        model.append(copy)
+        return model.finish()
     }
 
     private fun renderCache(frame: TerminalRenderFrame): TerminalRenderCache {

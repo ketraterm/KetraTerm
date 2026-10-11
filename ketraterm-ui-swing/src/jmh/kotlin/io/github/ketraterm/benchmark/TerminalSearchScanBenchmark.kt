@@ -43,7 +43,7 @@ open class TerminalSearchScanBenchmark {
     @Param("160")
     var columns = 0
 
-    @Param("sparse", "dense", "clusters")
+    @Param("sparse", "dense", "clusters", "wrapped")
     lateinit var workload: String
 
     private lateinit var session: TerminalSession
@@ -59,14 +59,14 @@ open class TerminalSearchScanBenchmark {
         val combining = intArrayOf('e'.code, 0x301)
         val emoji = intArrayOf(0x1F469, 0x200D, 0x1F4BB)
         repeat(retainedRows) { row ->
-            if (row > 0) {
+            if (row > 0 && workload != "wrapped") {
                 terminal.carriageReturn()
                 terminal.newLine()
             }
             terminal.writeText("needle")
             when (workload) {
                 "sparse" -> Unit
-                "dense" -> terminal.writeText(denseTail)
+                "dense", "wrapped" -> terminal.writeText(denseTail)
                 "clusters" -> {
                     terminal.writeText(" ")
                     terminal.writeCluster(combining)

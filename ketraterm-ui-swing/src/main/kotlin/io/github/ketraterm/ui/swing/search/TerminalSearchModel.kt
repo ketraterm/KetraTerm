@@ -15,6 +15,7 @@
  */
 package io.github.ketraterm.ui.swing.search
 
+import io.github.ketraterm.render.api.TerminalRenderCellFlags
 import io.github.ketraterm.render.cache.TerminalRenderCache
 import io.github.ketraterm.render.cache.TerminalTextRangeCopy
 import io.github.ketraterm.ui.swing.render.forEachLogicalTextCell
@@ -88,6 +89,7 @@ internal class TerminalSearchModel {
                 copy.clusterCodepoints,
                 row,
                 checkCancelled,
+                textEndColumn(copy.columns, copy.codeWords, copy.flags, row, copy.lineWrapped[row]),
             ) { codePoint, startColumn, endColumn ->
                 appendMappedCodePoint(codePoint, startColumn, endColumn)
             }
@@ -201,9 +203,38 @@ internal class TerminalSearchModel {
         cache: TerminalRenderCache,
         row: Int,
     ) {
-        forEachLogicalTextCell(cache, row, checkCancelled) { codePoint, startColumn, endColumn ->
+        val end = textEndColumn(cache.columns, cache.codeWords, cache.flags, row, cache.lineWrapped[row])
+        forEachLogicalTextCell(cache, row, checkCancelled, end) { codePoint, startColumn, endColumn ->
             appendMappedCodePoint(codePoint, startColumn, endColumn)
         }
+    }
+
+    private fun textEndColumn(
+        columns: Int,
+        codeWords: IntArray,
+        flags: IntArray,
+        row: Int,
+        wrapped: Boolean,
+    ): Int {
+        if (wrapped) return columns
+        val offset = row * columns
+        var end = columns
+        while (end > 0) {
+            if ((columns - end) and 255 == 255) checkCancelled()
+            val index = offset + end - 1
+            val cellFlags = flags[index]
+            // Leave multi-cell and cluster semantics to the logical-text decoder.
+            if (cellFlags and (
+                    TerminalRenderCellFlags.CLUSTER or TerminalRenderCellFlags.WIDE_LEADING or
+                        TerminalRenderCellFlags.WIDE_TRAILING or TerminalRenderCellFlags.WRAP_PADDING
+                ) != 0
+            ) {
+                break
+            }
+            if (cellFlags and TerminalRenderCellFlags.CODEPOINT != 0 && codeWords[index] != ' '.code) break
+            end--
+        }
+        return end
     }
 
     private fun appendMappedCodePoint(
