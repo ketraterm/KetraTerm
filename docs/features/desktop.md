@@ -8,6 +8,7 @@ controls and platform integrations are listed separately below.
 | Feature | Description |
 | --- | --- |
 | Text rendering | Java2D rendering, script-run shaping, bidirectional text, font fallback, and Windows color-emoji rasterization. |
+| Presentation selectors | VS15 requests text fonts; VS16 requests emoji rendering. Oversized isolated fallback glyphs scale proportionally within their cell span. Text glyph availability depends on installed fonts. |
 | Terminal glyphs | Programmatic drawing of supported box-drawing, block, and geometric characters for consistent cell alignment. |
 | Appearance | Themes, fonts, line height, signed integer column spacing, padding, cursor styling, and selection colors. |
 | Scrolling | Smooth row scrolling, precise wheel accumulation, keyboard paging, scrollbars, and selection autoscroll. |

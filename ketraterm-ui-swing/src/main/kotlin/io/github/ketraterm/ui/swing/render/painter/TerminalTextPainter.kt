@@ -505,10 +505,10 @@ internal class TerminalTextPainter(
 
         val oldTransform = g.transform
         try {
-            val scaleX = available / advance
-            g.translate(x.toDouble(), 0.0)
-            g.scale(scaleX.toDouble(), 1.0)
-            layout.draw(g, 0f, baselineY)
+            val scale = (available / advance).toDouble()
+            g.translate(x.toDouble(), baselineY.toDouble())
+            g.scale(scale, scale)
+            layout.draw(g, 0f, 0f)
         } finally {
             g.transform = oldTransform
         }

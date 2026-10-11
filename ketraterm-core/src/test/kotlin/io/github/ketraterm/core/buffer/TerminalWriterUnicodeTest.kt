@@ -21,8 +21,47 @@ import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.params.ParameterizedTest
 import org.junit.jupiter.params.provider.CsvSource
+import org.junit.jupiter.params.provider.ValueSource
 
 class TerminalWriterUnicodeTest {
+    @ParameterizedTest
+    @ValueSource(ints = [0x4E00, 0xFF01, 0x1F600])
+    fun `unsupported VS15 keeps the wide spacer and pending wrap`(base: Int) {
+        for (alternate in listOf(false, true)) {
+            for (horizontalMargins in listOf(false, true)) {
+                for (update in listOf(false, true)) {
+                    val buffer = TerminalBuffers.create(8, 2)
+                    if (alternate) buffer.enterAltBuffer()
+                    val left = if (horizontalMargins) 1 else 0
+                    val right = if (horizontalMargins) 6 else 7
+                    if (horizontalMargins) {
+                        buffer.setLeftRightMarginMode(true)
+                        buffer.setLeftRightMargins(left + 1, right + 1)
+                    }
+                    buffer.positionCursor(right - 1, 0)
+                    val cluster = intArrayOf(base, 0xFE0E)
+                    if (update) {
+                        buffer.writeCodepoint(base)
+                        buffer.updatePreviousCluster(cluster)
+                    } else {
+                        buffer.writeCluster(cluster)
+                    }
+                    val copied = IntArray(2)
+                    assertEquals(2, buffer.getLine(0).readCluster(right - 1, copied))
+                    assertArrayEquals(cluster, copied)
+                    assertEquals(-1, buffer.getCodepointAt(right, 0))
+                    assertEquals(right, buffer.cursorCol)
+                    assertEquals(0, buffer.cursorRow)
+                    buffer.writeCodepoint('X'.code)
+                    assertEquals('X'.code, buffer.getCodepointAt(left, 1))
+                    assertEquals(left + 1, buffer.cursorCol)
+                    assertEquals(1, buffer.cursorRow)
+                    assertEquals(-1, buffer.getCodepointAt(right, 0))
+                }
+            }
+        }
+    }
+
     @ParameterizedTest
     @CsvSource("1,false", "4,false", "6,true")
     fun `rejected printable writes clear the continuation target`(

@@ -20,7 +20,7 @@ headless and Swing hosts. Host actions and replies remain subject to session pol
 | Character sets | ASCII and DEC Special Graphics, G0–G3 designation, locking and single shifts. |
 | Unicode | UTF-8 decoding, Unicode 17 grapheme segmentation, combining marks, wide characters, and emoji sequences. |
 | Stream handling | Incremental decoding across byte chunks, malformed UTF-8 recovery, and bounded CSI/OSC/DCS collection with cancellation and overflow recovery. |
-| Width policy | Configurable ambiguous width and emoji presentation. |
+| Width policy | Pinned Unicode width tables, configurable ambiguous width, and base-specific VS15/VS16 cell allocation; unsupported presentation bases retain their ordinary width. See the [core contract](../../ketraterm-core/docs/terminal-core-contract.md#unicode-scalar-and-width-policy). |
 
 Streaming graphemes retain up to 32 codepoints. Later width changes update the
 published cell without undoing committed wraps, scrolling, or overwrites, so

@@ -92,9 +92,11 @@ internal object UnicodeWidth {
                 emojiPresentation = emojiPresentation || codepoint == EMOJI_PRESENTATION_SELECTOR
             }
         }
-        if (textPresentation) return 1
-
         val base = codepoints[0]
+        // Presentation widths are a terminal policy for the Unicode-pinned
+        // emoji variation bases, not a generic effect of a zero-width selector.
+        if (textPresentation && isEmojiVariationBase(base)) return 1
+
         val baseWidth =
             if (emojiPresentation && isEmojiVariationBase(base)) {
                 2

@@ -23,15 +23,42 @@ import org.junit.jupiter.api.Assertions.assertArrayEquals
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.params.ParameterizedTest
 import org.junit.jupiter.params.provider.CsvSource
+import org.junit.jupiter.params.provider.ValueSource
 
 class HostGraphemePolicyTest {
+    @ParameterizedTest
+    @ValueSource(strings = ["\u4E00", "\uFF01", "\uD83D\uDE00"])
+    fun `unsupported VS15 preserves wide allocation across every byte split`(base: String) {
+        val cluster = base + "\uFE0E"
+        val bytes = (cluster + "X").encodeToByteArray()
+        for (alternate in listOf(false, true)) {
+            for (atMargin in listOf(false, true)) {
+                assertAllByteSplits(bytes) { split ->
+                    val terminal = TerminalBuffers.create(6, 2)
+                    if (alternate) terminal.enterAltBuffer()
+                    val column = if (atMargin) 4 else 0
+                    terminal.positionCursor(column, 0)
+                    val parser = TerminalParsers.create(HostCommandAdapter(terminal))
+                    parser.accept(bytes, 0, split)
+                    parser.accept(bytes, split, bytes.size - split)
+                    parser.endOfInput()
+                    assertCluster(terminal, column, 0, cluster)
+                    assertEquals(-1, terminal.getCodepointAt(column + 1, 0))
+                    assertEquals('X'.code, terminal.getCodepointAt(if (atMargin) 0 else 2, if (atMargin) 1 else 0))
+                    assertEquals(if (atMargin) 1 else 3, terminal.cursorCol)
+                    assertEquals(if (atMargin) 1 else 0, terminal.cursorRow)
+                }
+            }
+        }
+    }
+
     @ParameterizedTest
     @CsvSource("false,false", "false,true", "true,false", "true,true")
     fun `continuations of a rejected prefix never replace an earlier character`(
         clusterPrefix: Boolean,
         shrink: Boolean,
     ) {
-        val prefix = "\uD83D\uDE00" + if (clusterPrefix) "\u0301" else ""
+        val prefix = "\uD83D\uDE10" + if (clusterPrefix) "\u0301" else ""
         val update = (if (shrink) "\uFE0E" else "\uFE0F").encodeToByteArray()
         assertAllByteSplits(update) { split ->
             val terminal = TerminalBuffers.create(4, 2)
@@ -55,7 +82,7 @@ class HostGraphemePolicyTest {
         shrink: Boolean,
         insert: Boolean,
     ) {
-        val base = if (shrink) "\uD83D\uDE00" else "\u2764"
+        val base = if (shrink) "\uD83D\uDE10" else "\u2764"
         val selector = if (shrink) "\uFE0E" else "\uFE0F"
         val update = selector.encodeToByteArray()
         assertAllByteSplits(update) { split ->
@@ -107,7 +134,7 @@ class HostGraphemePolicyTest {
                 terminal.writeText("MID")
                 terminal.positionCursor(3, if (bottomRow) 2 else 0)
                 val parser = TerminalParsers.create(HostCommandAdapter(terminal))
-                parser.accept("\uD83D\uDE00".encodeToByteArray())
+                parser.accept("\uD83D\uDE10".encodeToByteArray())
                 val row = if (bottomRow) 2 else 1
                 val retainedRows = (0..2).map { terminal.getLineAsString(it) }
                 val historySize = terminal.historySize
@@ -115,7 +142,7 @@ class HostGraphemePolicyTest {
                 parser.accept(update, 0, split)
                 parser.accept(update, split, update.size - split)
                 parser.endOfInput()
-                assertCluster(terminal, 0, row, "\uD83D\uDE00\uFE0E")
+                assertCluster(terminal, 0, row, "\uD83D\uDE10\uFE0E")
                 assertEquals('X'.code, terminal.getCodepointAt(1, row), "following text uses the released cell")
                 assertEquals(2, terminal.cursorCol)
                 assertEquals(row, terminal.cursorRow)
@@ -182,13 +209,13 @@ class HostGraphemePolicyTest {
                     val terminal = TerminalBuffers.create(width, height, maxHistory = history)
                     val parser = TerminalParsers.create(HostCommandAdapter(terminal))
                     if (pendingWrap) parser.accept("A".repeat(width).encodeToByteArray())
-                    parser.accept("\uD83D\uDE00".encodeToByteArray())
+                    parser.accept("\uD83D\uDE10".encodeToByteArray())
                     val row = terminal.cursorRow
                     val historySize = terminal.historySize
                     val discarded = discardedCount(terminal)
                     parser.accept(update, 0, split)
                     parser.accept(update, split, update.size - split)
-                    assertCluster(terminal, 0, row, "\uD83D\uDE00\uFE0E")
+                    assertCluster(terminal, 0, row, "\uD83D\uDE10\uFE0E")
                     assertEquals(minOf(1, width - 1), terminal.cursorCol)
                     assertEquals(row, terminal.cursorRow)
                     assertEquals(historySize, terminal.historySize)

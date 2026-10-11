@@ -232,6 +232,15 @@ locale, and available fonts:
 - Zero-width classification, terminal cell-graphics overrides, and cluster
   variation-selector presentation rules retain precedence.
 
+Presentation selectors do not universally specify a terminal cell count. For a
+cluster whose leading scalar is a recognized base in the pinned Unicode emoji
+variation table, retained VS15 selects one cell and retained VS16 selects two.
+VS15 takes precedence if both selectors are retained. This is KetraTerm's
+terminal compatibility policy; the selector itself has zero scalar width.
+Selectors on unsupported bases leave the ordinary width policy intact, including
+wide/fullwidth allocation and the ambiguous-width mode. Font metrics do not
+participate in cell allocation.
+
 Reserved defaults follow the pinned
 [Unicode East Asian Width data](https://www.unicode.org/Public/17.0.0/ucd/EastAsianWidth.txt).
 These are cell-width rules, not host security permissions. They do not add

@@ -31,6 +31,41 @@ import org.junit.jupiter.params.ParameterizedTest
 import org.junit.jupiter.params.provider.ValueSource
 
 class CoreTerminalRenderFrameTest {
+    @ParameterizedTest
+    @ValueSource(ints = [0, 1, 2, 3, 4, 5, 6])
+    fun `text copy keeps source neighbor geometry at every prefix boundary`(width: Int) {
+        val state = TerminalState(initialWidth = 6, initialHeight = 1, maxHistory = 0)
+        val line = state.ring[0]
+        line.setCell(0, '界'.code, 0, 0)
+        line.setCell(1, TerminalConstants.WIDE_CHAR_SPACER, 0, 0)
+        line.setCluster(2, intArrayOf(0x1F469, 0x200D, 0x1F4BB), 3, 0, 0)
+        line.setCell(3, TerminalConstants.WIDE_CHAR_SPACER, 0, 0)
+        line.setCell(5, 'Z'.code, 0, 0)
+        val expectedCodes = intArrayOf('界'.code, 0, 0, 0, 0, 'Z'.code)
+        val expectedFlags =
+            intArrayOf(
+                TerminalRenderCellFlags.CODEPOINT or TerminalRenderCellFlags.WIDE_LEADING,
+                TerminalRenderCellFlags.WIDE_TRAILING,
+                TerminalRenderCellFlags.CLUSTER or TerminalRenderCellFlags.WIDE_LEADING,
+                TerminalRenderCellFlags.WIDE_TRAILING,
+                TerminalRenderCellFlags.EMPTY,
+                TerminalRenderCellFlags.CODEPOINT,
+            )
+        val codes = IntArray(8) { -99 }
+        val flags = IntArray(9) { -99 }
+        val clusters = mutableListOf<List<Int>>()
+        line.copyTextToRenderAbi(width, codes, 1, flags, 2, { col, data, offset, length ->
+            assertEquals(2, col)
+            clusters.add(data.slice(offset until offset + length))
+        }, RenderClusterScratch())
+        assertArrayEquals(IntArray(8) { if (it in 1..width) expectedCodes[it - 1] else -99 }, codes)
+        assertArrayEquals(IntArray(9) { if (it in 2 until 2 + width) expectedFlags[it - 2] else -99 }, flags)
+        assertEquals(if (width > 2) listOf(listOf(0x1F469, 0x200D, 0x1F4BB)) else emptyList<List<Int>>(), clusters)
+        // Omitting the payload sink must not change cluster geometry.
+        line.copyTextToRenderAbi(width, codes, 1, flags, 2, null, RenderClusterScratch())
+        assertArrayEquals(IntArray(9) { if (it in 2 until 2 + width) expectedFlags[it - 2] else -99 }, flags)
+    }
+
     @Test
     fun `text copy preserves geometry clusters and offsets without presentation data`() {
         val state = TerminalState(initialWidth = 8, initialHeight = 1, maxHistory = 0)
