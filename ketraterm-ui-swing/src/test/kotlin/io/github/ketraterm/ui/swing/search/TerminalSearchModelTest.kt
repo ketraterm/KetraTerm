@@ -32,6 +32,68 @@ import kotlin.random.Random
 class TerminalSearchModelTest {
     @ParameterizedTest
     @ValueSource(booleans = [false, true])
+    fun `matches inside complex cells retain complete spans between ordinary runs`(textOnly: Boolean) {
+        val terminal = TerminalBuffers.create(32, 1)
+        terminal.writeText("ab")
+        terminal.writeCluster(intArrayOf('e'.code, 'e'.code, 0x301))
+        terminal.writeText("界")
+        terminal.writeCluster(intArrayOf(0x1F469, 0x200D, 0x1F4BB))
+        terminal.writeText("cd😀z")
+        val reader = terminal as TerminalRenderFrameReader
+        val cache = TerminalRenderCache(32, 1)
+        cache.updateFrom(reader)
+        val cases =
+            listOf(
+                Triple("e", 2, 3),
+                Triple("\u0301", 2, 3),
+                Triple("\u0301界\uD83D", 2, 7),
+                Triple("\uDC69", 5, 7),
+                Triple("\u200D", 5, 7),
+                Triple("\uDCBBc", 5, 8),
+                Triple("d\uD83D", 8, 11),
+                Triple("\uDE00z", 9, 12),
+                Triple("ab", 0, 2),
+                Triple("cd", 7, 9),
+            )
+        val model = TerminalSearchModel()
+        val copy = TerminalTextRangeCopy()
+        for ((query, start, end) in cases) {
+            val matches =
+                if (textOnly) {
+                    assertTrue(copy.read(reader, 0, 0))
+                    model.begin(query, false, 0)
+                    model.append(copy)
+                    model.finish()
+                } else {
+                    model.search(cache, query, false)
+                }
+            val viewport = TerminalSearchViewportHighlights()
+            matches.buildViewportHighlights(cache, viewport)
+            val count = if (query == "e") 2 else 1
+            assertEquals(count, matches.resultCount, query)
+            assertEquals(count, viewport.segmentCount, query)
+            repeat(count) {
+                assertEquals(start, viewport.startColumn(it), query)
+                assertEquals(end, viewport.endColumn(it), query)
+            }
+        }
+    }
+
+    @Test
+    fun `discarded pending geometry cannot leak into a later row`() {
+        val model = TerminalSearchModel()
+        model.begin("needle", false, 0)
+        model.append(renderCache(WrappedTextFrame(arrayOf("need"), booleanArrayOf(true))), 0)
+        model.discardPendingLine()
+        model.append(renderCache(WrappedTextFrame(arrayOf("needle"))), 7)
+        val matches = model.finish()
+        assertEquals(1, matches.resultCount)
+        assertEquals(7L, matches.activeStartAbsoluteRow())
+        assertEquals(0, matches.activeStartColumn())
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = [false, true])
     fun `prefix matching agrees with literal non overlapping search`(ignoreCase: Boolean) {
         val random = Random(719)
         val alphabet = "abABiI\u0130\u0131kK\u212AsS\u017F\u03C3\u03C2\u03A3\u00DF\u1E9E"

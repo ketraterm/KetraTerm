@@ -49,6 +49,9 @@ open class TerminalSearchScanBenchmark {
     @Param("false", "true")
     var ignoreCase = false
 
+    @Param("every-row", "rare", "none")
+    lateinit var matches: String
+
     private var query = "needle"
     private lateinit var session: TerminalSession
     private val scanner = TerminalSearchScan()
@@ -74,7 +77,8 @@ open class TerminalSearchScanBenchmark {
                 if (row == retainedRows - 1) terminal.writeText("b")
                 return@repeat
             }
-            terminal.writeText("needle")
+            val hasMatch = matches == "every-row" || (matches == "rare" && row % 100 == 0)
+            terminal.writeText(if (hasMatch) "needle" else "xxxxxx")
             when (workload) {
                 "sparse" -> Unit
                 "dense", "wrapped" -> terminal.writeText(denseTail)
@@ -88,7 +92,18 @@ open class TerminalSearchScanBenchmark {
             }
         }
         session = benchmarkSession(terminal)
-        check(scanRetainedHistory() == if (repetitive) 1 else retainedRows)
+        val expected =
+            if (repetitive) {
+                1
+            } else {
+                when (matches) {
+                    "every-row" -> retainedRows
+                    "rare" -> (retainedRows + 99) / 100
+                    "none" -> 0
+                    else -> error("Unknown match distribution: $matches")
+                }
+            }
+        check(scanRetainedHistory() == expected)
     }
 
     @Benchmark
