@@ -287,6 +287,14 @@ CJK values and planes 2 and 3 through <code>xFFFD</code>.</li>
 <li>Zero-width classification, terminal cell-graphics overrides, and cluster
 variation-selector presentation rules retain precedence.</li>
 </ul>
+<p>Presentation selectors do not universally specify a terminal cell count. For a
+cluster whose leading scalar is a recognized base in the pinned Unicode emoji
+variation table, retained VS15 selects one cell and retained VS16 selects two.
+VS15 takes precedence if both selectors are retained. This is KetraTerm&#39;s
+terminal compatibility policy; the selector itself has zero scalar width.
+Selectors on unsupported bases leave the ordinary width policy intact, including
+wide/fullwidth allocation and the ambiguous-width mode. Font metrics do not
+participate in cell allocation.</p>
 <p>Reserved defaults follow the pinned
 <a href="https://www.unicode.org/Public/17.0.0/ucd/EastAsianWidth.txt">Unicode East Asian Width data</a>.
 These are cell-width rules, not host security permissions. They do not add
@@ -413,7 +421,7 @@ per-screen arena isolation, tab-stop width, and accurate render invalidation.
 Horizontal slices never copy incomplete wide source spans and clear destination
 occupants crossing their boundaries. Pending wrap is cleared by cursor/structural
 operations that cancel it, and preserved by non-cursor mode changes.</p>
-</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/037bc14e51f9fba50651073e96a5d8acec4ef7ca/ketraterm-core/docs/terminal-core-contract.md">View source on GitHub ↗</a></div></div></main></div>
+</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/68101f5d9068ad746055bc4433e37484e1dcd132/ketraterm-core/docs/terminal-core-contract.md">View source on GitHub ↗</a></div></div></main></div>
   <footer>
     <a class="brand" href="../../../../index.html"><img class="brand-mark" src="../../../../assets/logo.svg" alt="" width="34" height="34">KetraTerm Library</a>
     <p>Open source · Apache 2.0</p>
