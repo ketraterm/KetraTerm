@@ -210,6 +210,8 @@ public abstract interface class io/github/ketraterm/core/api/TerminalModeControl
 	public abstract fun setPaletteColor (II)V
 	public abstract fun setPopOnBell (Z)V
 	public abstract fun setReverseVideo (Z)V
+	public abstract fun setReverseWrap (Z)V
+	public abstract fun setReverseWrapExtended (Z)V
 	public abstract fun setSynchronizedOutput (Z)V
 	public abstract fun setThemePalette (Lio/github/ketraterm/render/api/TerminalColorPalette;)V
 	public abstract fun setTreatAmbiguousAsWide (Z)V

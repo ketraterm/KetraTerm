@@ -27,8 +27,8 @@ import java.util.concurrent.atomic.AtomicLong
  *
  * The grid, cursor, and history remain single-writer core state. This packed
  * word exists so input/render decisions can take a coherent mode snapshot
- * without reading unrelated mutable core structures. Response-only subscriptions
- * remain ordinary single-writer state and are not part of those snapshots.
+ * without reading unrelated mutable core structures. Cursor-only modes and
+ * response subscriptions remain single-writer state outside those snapshots.
  */
 internal class TerminalModes : TerminalInputState {
     private val modeBits = AtomicLong(DEFAULT_MODE_BITS)
@@ -36,6 +36,10 @@ internal class TerminalModes : TerminalInputState {
     // Response-only subscriptions belong to serialized core state, not the input snapshot.
     var isColorSchemeReportingEnabled: Boolean = false
     var isInBandResizeReportingEnabled: Boolean = false
+
+    // Cursor physics is serialized with the grid and has no input/render encoding.
+    var isReverseWrap: Boolean = false
+    var isReverseWrapExtended: Boolean = false
 
     /** Last accepted DECCOLM selection; preserved by soft reset and ordinary resize. */
     var is132ColumnMode: Boolean
@@ -256,6 +260,7 @@ internal class TerminalModes : TerminalInputState {
     fun reset() {
         modeBits.set(DEFAULT_MODE_BITS)
         resetChangeReporting()
+        resetReverseWrap()
     }
 
     /**
@@ -268,6 +273,12 @@ internal class TerminalModes : TerminalInputState {
         val preserved = modeBits.get() and SOFT_RESET_PRESERVE_MASK
         modeBits.set(preserved or SOFT_RESET_MODE_BITS)
         resetChangeReporting()
+        resetReverseWrap()
+    }
+
+    private fun resetReverseWrap() {
+        isReverseWrap = false
+        isReverseWrapExtended = false
     }
 
     private fun resetChangeReporting() {

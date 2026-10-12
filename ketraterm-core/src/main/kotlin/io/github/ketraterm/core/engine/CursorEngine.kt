@@ -21,7 +21,7 @@ import io.github.ketraterm.core.state.TerminalState
  * Handles cursor and pen state operations that require no grid mutation.
  *
  * Owns: cursor positioning, pen save/restore (DECSC/DECRC), carriage return,
- * and tab navigation. Does NOT touch the ring, lines, or any physical grid memory.
+ * and tab navigation. Reads wrap provenance but never mutates grid storage.
  *
  * ## Pending-wrap invariant
  *
@@ -154,14 +154,72 @@ internal class CursorEngine(
         }
 
     /**
-     * Moves the cursor left by [n] columns, clamped to column 0 (CUB).
+     * Moves left (CUB/BS), applying reverse-wrap modes to the active viewport.
      */
     fun cursorLeft(n: Int): Unit =
         cursorMutation {
             if (n <= 0) return
+            val reverse = state.modes.isAutoWrap && (state.modes.isReverseWrap || state.modes.isReverseWrapExtended)
+            val count = n - if (reverse && state.cursor.pendingWrap) 1 else 0
             state.cancelPendingWrap()
-            state.cursor.col = (state.cursor.col - n).coerceAtLeast(leftMargin)
+            val left = if (state.cursor.col < leftMargin) 0 else leftMargin
+            if (!reverse) {
+                state.cursor.col -= minOf(count, state.cursor.col - left)
+                return@cursorMutation
+            }
+            if (count == 0) return@cursorMutation
+            if (state.modes.isReverseWrapExtended) {
+                cursorLeftExtended(count, left)
+                return@cursorMutation
+            }
+
+            // Match XTREVWRAP when already at the left boundary above the region.
+            if (state.cursor.col == left && state.cursor.row <= state.scrollTop) {
+                state.cursor.row = state.scrollTop
+                return@cursorMutation
+            }
+            var remaining = count
+            while (remaining > 0) {
+                val amount = minOf(remaining, state.cursor.col - left)
+                state.cursor.col -= amount
+                remaining -= amount
+                if (remaining == 0 || state.cursor.row == state.scrollTop || state.cursor.row == 0) return@cursorMutation
+                if (!state.ring[state.resolveRingIndex(state.cursor.row - 1)].wrapped) return@cursorMutation
+                state.cursor.row--
+                state.cursor.col = rightMargin
+                remaining--
+            }
         }
+
+    /** Uses a linear cell offset so an untrusted count cannot cause repeated cycles. */
+    private fun cursorLeftExtended(
+        count: Int,
+        left: Int,
+    ) {
+        val amount = minOf(count, state.cursor.col - left)
+        state.cursor.col -= amount
+        val remaining = count - amount
+        if (remaining == 0) return
+
+        val rowWidth = (rightMargin - left + 1).toLong()
+        val row = state.cursor.row
+        val top = state.scrollTop
+        val offset: Long
+        val firstRow: Int
+        if (row < top) {
+            // Outside the region above its top: stop at the viewport boundary.
+            firstRow = 0
+            offset = (row * rowWidth - remaining).coerceAtLeast(0)
+        } else {
+            firstRow = top
+            val position = (row - top) * rowWidth - remaining
+            val regionCells = (state.scrollBottom - top + 1) * rowWidth
+            // A cursor below the region enters it before cycling at its top.
+            offset = if (position >= 0) position else Math.floorMod(position, regionCells)
+        }
+        state.cursor.row = firstRow + (offset / rowWidth).toInt()
+        state.cursor.col = left + (offset % rowWidth).toInt()
+    }
 
     /**
      * Moves the cursor right by [n] columns, clamped to width - 1 (CUF).

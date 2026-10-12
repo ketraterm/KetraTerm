@@ -60,6 +60,19 @@ use a temporary directory on the filesystem selected by the JVM. These workloads
 measure different boundaries and cannot substitute for an end-to-end terminal
 measurement.
 
+### Reverse-wrap cursor motion
+
+[TerminalReverseWrapBenchmark](src/jmh/kotlin/io/github/ketraterm/benchmark/TerminalReverseWrapBenchmark.kt)
+measures direct core and parser/host CUB with `Int.MAX_VALUE` on a fixed 80×24
+soft-wrapped screen. `mode=0` measures ordinary clamping, `45` checks wrapped
+rows, and `1045` cycles using cell-offset arithmetic. Each operation includes
+cursor positioning and CUB; construction, seeding, and input encoding occur
+outside measurement. Trial teardown verifies the final cursor and history.
+
+```text
+java -jar <jmh-jar> ".*TerminalReverseWrapBenchmark.*" -p mode=0,45,1045 -wi 3 -i 3 -w 1s -r 1s -f 2 -t 1 -prof gc -rf json -rff reverse-wrap.json
+```
+
 ### First parser input
 
 [TerminalParserFirstInputBenchmark](src/jmh/kotlin/io/github/ketraterm/benchmark/TerminalParserFirstInputBenchmark.kt)

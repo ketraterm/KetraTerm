@@ -529,6 +529,8 @@ public class HostCommandAdapter
                 DecPrivateMode.REVERSE_VIDEO -> terminal.setReverseVideo(enable)
                 DecPrivateMode.ORIGIN -> terminal.setOriginMode(enable)
                 DecPrivateMode.AUTO_WRAP -> terminal.setAutoWrap(enable)
+                DecPrivateMode.REVERSE_WRAP -> terminal.setReverseWrap(enable)
+                DecPrivateMode.REVERSE_WRAP_EXTENDED -> terminal.setReverseWrapExtended(enable)
                 DecPrivateMode.CURSOR_BLINK -> terminal.setCursorBlinking(enable)
                 DecPrivateMode.CURSOR_VISIBLE -> terminal.setCursorVisible(enable)
                 DecPrivateMode.APPLICATION_KEYPAD -> terminal.setApplicationKeypad(enable)

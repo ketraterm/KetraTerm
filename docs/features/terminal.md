@@ -11,6 +11,7 @@ headless and Swing hosts. Host actions and replies remain subject to session pol
 | Scrolling and margins | Vertical and horizontal regions, forward/reverse scrolling, line insertion/deletion. |
 | Cell editing | Character and column insertion/deletion, erase, protected cells, and selective erase. |
 | Writing modes | Insert/replace, autowrap, and automatic newline modes. |
+| Reverse wrap | Modes 45/1045 apply to BS and CUB with autowrap enabled: soft-wrapped rows only (45), or hard breaks and top-to-bottom margin cycling (1045). |
 | Rectangular operations | Erase, selective erase, fill, copy, attribute changes/reversal, and base VT420 checksum. Copy/checksum use the active page only. |
 | Alternate screen | Modes 47/1047/1049, screen-local saved cursor state, and primary scrollback preservation. |
 | Scrollback | Bounded history, incremental storage allocation, and logical-line resize reflow. |

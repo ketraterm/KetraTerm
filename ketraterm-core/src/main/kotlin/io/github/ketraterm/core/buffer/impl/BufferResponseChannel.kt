@@ -85,6 +85,8 @@ internal class BufferResponseChannel(
             DecPrivateMode.REVERSE_VIDEO -> flagStatus(bits, TerminalModeBits.REVERSE_VIDEO)
             DecPrivateMode.ORIGIN -> flagStatus(bits, TerminalModeBits.ORIGIN_MODE)
             DecPrivateMode.AUTO_WRAP -> flagStatus(bits, TerminalModeBits.AUTO_WRAP)
+            DecPrivateMode.REVERSE_WRAP -> booleanStatus(state.modes.isReverseWrap)
+            DecPrivateMode.REVERSE_WRAP_EXTENDED -> booleanStatus(state.modes.isReverseWrapExtended)
             DecPrivateMode.CURSOR_BLINK -> flagStatus(bits, TerminalModeBits.CURSOR_BLINKING)
             DecPrivateMode.CURSOR_VISIBLE -> flagStatus(bits, TerminalModeBits.CURSOR_VISIBLE)
             DecPrivateMode.APPLICATION_KEYPAD -> flagStatus(bits, TerminalModeBits.APPLICATION_KEYPAD)

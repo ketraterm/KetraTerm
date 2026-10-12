@@ -177,6 +177,33 @@ restored only if the resulting column is the active right margin. Without a
 save, it homes to absolute `(0, 0)`, clears pending wrap and origin mode, and
 resets the pen.
 
+### Reverse wrap
+
+`cursorLeft` is shared by BS and CUB. With auto-wrap enabled, mode 45
+(XTREVWRAP) crosses the left boundary only when the preceding viewport row has
+soft-wrap provenance. It stops at a hard break or the top margin. Mode 1045
+(XTREVWRAP2) takes precedence, crosses hard breaks, and cycles from the top
+margin to the bottom margin. Neither operation scrolls, changes cell storage,
+or enters history. Extended cycles use constant-time cell-offset arithmetic;
+ordinary reverse wrap visits at most the preceding viewport rows.
+
+The left boundary is the active left margin, or column zero when starting to
+its left; crossing a row lands at the active right margin. A cursor below the
+vertical region can enter it while moving backward. Above the top margin,
+extended motion stops at viewport row zero. Ordinary motion already at the
+left boundary on or above the top margin homes to that margin, matching
+[Ghostty's XTREVWRAP behavior](https://ghostty.org/docs/vt/csi/cub).
+
+Positive motion always cancels pending wrap. In an active reverse-wrap mode,
+the phantom position consumes one step before physical motion; without reverse
+wrap it does not. Non-positive core counts remain no-ops; the parser normalizes
+omitted/zero CUB counts to one.
+
+Both flags default to disabled and are serialized cursor state outside the
+input/render mode snapshots. `requestModeStatus` reports each flag independently,
+including while auto-wrap is disabled. Cursor save/restore, screen switches,
+and ordinary resize preserve them; RIS and DECSTR disable both.
+
 ### Tabs
 
 `HT`, `CHT`, and `CBT` never wrap and stop at applicable horizontal boundaries.
@@ -213,8 +240,8 @@ preserve subscriptions; RIS and DECSTR disable both. Enabling color-scheme
 reporting emits no initial report, while every in-band resize enable request
 reports the current geometry when permitted.
 
-Mode setters that home the cursor or affect wrap/margin physics cancel pending
-wrap. Input reporting and presentation setters preserve it. `resetCursorStyle`
+Auto-wrap and mode setters that home the cursor cancel pending wrap.
+Reverse-wrap, input reporting, and presentation setters preserve it. `resetCursorStyle`
 restores the configured default shape and enables the blink flag without
 changing visibility, position, or pending wrap; the host owns blink animation.
 

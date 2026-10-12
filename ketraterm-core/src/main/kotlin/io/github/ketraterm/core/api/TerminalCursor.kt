@@ -65,8 +65,11 @@ public interface TerminalCursor {
     /**
      * Moves the cursor left by [n] columns (CUB, `CSI n D`).
      *
-     * Clamps to column 0 when DECLRMM is off, or to the active left margin when
-     * DECLRMM is on.
+     * Without reverse wrap, stops at the left margin (column 0 if DECLRMM is off).
+     * Starting left of that margin uses column 0 as the boundary. With auto-wrap,
+     * mode 45 crosses soft-wrapped rows; mode 1045 crosses all rows and cycles
+     * within vertical margins. Neither scrolls or accesses history. In either
+     * reverse-wrap mode, pending wrap consumes one step before cursor movement.
      *
      * @param n Number of columns. Non-positive values are no-ops.
      */
