@@ -113,6 +113,8 @@ public class SwingTerminal
         internal var cursorBlinkVisible: Boolean = true
         private var lastResizedColumns: Int = NO_RESIZE_DIMENSION
         private var lastResizedRows: Int = NO_RESIZE_DIMENSION
+        private var lastResizedPixelWidth: Int = NO_RESIZE_DIMENSION
+        private var lastResizedPixelHeight: Int = NO_RESIZE_DIMENSION
         private val unbindRunnable = Runnable { unbindOnEdt() }
         private val componentJob = SupervisorJob()
         private val uiCoroutineDispatcher =
@@ -1228,6 +1230,8 @@ public class SwingTerminal
                 visualBellController.stop()
                 lastResizedColumns = NO_RESIZE_DIMENSION
                 lastResizedRows = NO_RESIZE_DIMENSION
+                lastResizedPixelWidth = NO_RESIZE_DIMENSION
+                lastResizedPixelHeight = NO_RESIZE_DIMENSION
                 renderFrameController.reset()
                 clearPointerHover()
                 hyperlinkDiscoveryController.reset()
@@ -1323,6 +1327,8 @@ public class SwingTerminal
                     {
                         lastResizedColumns = NO_RESIZE_DIMENSION
                         lastResizedRows = NO_RESIZE_DIMENSION
+                        lastResizedPixelWidth = NO_RESIZE_DIMENSION
+                        lastResizedPixelHeight = NO_RESIZE_DIMENSION
                         renderFrameController.reset()
                     },
                     { clearPointerHover() },
@@ -2878,15 +2884,23 @@ public class SwingTerminal
 
             val columns = visibleGridSize.width
             val rows = visibleGridSize.height
-            if (columns == lastResizedColumns && rows == lastResizedRows) {
+            val pixelWidth = gridPixelExtent(columns, metrics.cellWidth, 0)
+            val pixelHeight = gridPixelExtent(rows, metrics.cellHeight, 0)
+            val gridChanged = columns != lastResizedColumns || rows != lastResizedRows
+            if (!gridChanged && pixelWidth == lastResizedPixelWidth && pixelHeight == lastResizedPixelHeight) {
+                if (publishWhenUnchanged) publishViewportState(renderCache.historySize)
+                return false
+            }
+
+            if (!gridChanged && boundSession.tryUpdateViewportPixels(columns, rows, pixelWidth, pixelHeight)) {
+                lastResizedPixelWidth = pixelWidth
+                lastResizedPixelHeight = pixelHeight
                 if (publishWhenUnchanged) publishViewportState(renderCache.historySize)
                 return false
             }
 
             viewportController.finishScroll()
             publishViewportState(renderCache.historySize)
-            lastResizedColumns = columns
-            lastResizedRows = rows
             // Animation is finished above, so resize anchoring is always row-exact.
             val oldOffset = viewportController.requestedOffset
             val anchorRow = visualGeometry.firstFullyVisibleRow()
@@ -2899,7 +2913,11 @@ public class SwingTerminal
                     0L
                 }
 
-            val resizedViewport = boundSession.tryResizeViewport(columns, rows, oldOffset) ?: return true
+            val resizedViewport = boundSession.tryResizeViewport(columns, rows, oldOffset, pixelWidth, pixelHeight) ?: return true
+            lastResizedColumns = columns
+            lastResizedRows = rows
+            lastResizedPixelWidth = pixelWidth
+            lastResizedPixelHeight = pixelHeight
             selectionController.clearSelection(notify = false)
             viewportController.anchorAfterResize(
                 resizedViewport.scrollbackOffset,

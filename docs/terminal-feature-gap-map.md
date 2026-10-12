@@ -52,7 +52,6 @@ and the [changelog](../CHANGELOG.md). Entries here are not release commitments.
   and standalone reuse of the Swing renderer are outside the current API.
 - Column spacing uses integer logical pixels; fractional cell advances are unavailable.
 - Portable Swing exposes only the key metadata available through AWT.
-- Color-scheme reporting is query-only; mode 2031 notifications are unavailable.
 - Highlight mouse tracking (mode 1001) is unsupported.
 - Native color-emoji rasterization is Windows-specific. Other platforms use
   Java2D/font fallback; the library has no equivalent native color-emoji backend.

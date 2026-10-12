@@ -41,9 +41,9 @@ internal class DefaultTerminalBuffer private constructor(
     TerminalReader by TerminalReaderImpl(components.state),
     TerminalWriter by BufferWriter(components.state, components.mutationEngine, components.cursorEngine),
     TerminalCursor by TerminalCursorImpl(components.state, components.cursorEngine),
-    TerminalModeController by TerminalModeControllerImpl(components.state, components.cursorEngine),
+    TerminalModeController by TerminalModeControllerImpl(components.state, components.cursorEngine, components.responseChannel),
     TerminalModeReader by TerminalModeReaderImpl(components.state),
-    TerminalResponseChannel by BufferResponseChannel(components.state),
+    TerminalResponseChannel by components.responseChannel,
     TerminalInspector by BufferInspector(components.state) {
     private val state: TerminalState
         get() = components.state
@@ -97,8 +97,23 @@ internal class DefaultTerminalBuffer private constructor(
         newHeight: Int,
         oldScrollbackOffset: Int,
     ): Pair<Int, Int> {
+        if (newWidth == state.dimensions.width && newHeight == state.dimensions.height) {
+            return Pair(state.clampScrollbackOffset(oldScrollbackOffset), state.historySize)
+        }
+        return resize(newWidth, newHeight, oldScrollbackOffset, pixelWidth = 0, pixelHeight = 0)
+    }
+
+    override fun resize(
+        newWidth: Int,
+        newHeight: Int,
+        oldScrollbackOffset: Int,
+        pixelWidth: Int,
+        pixelHeight: Int,
+    ): Pair<Int, Int> {
         require(newWidth > 0) { "newWidth must be > 0, was $newWidth" }
         require(newHeight > 0) { "newHeight must be > 0, was $newHeight" }
+        require(pixelWidth >= 0) { "pixelWidth must be >= 0, was $pixelWidth" }
+        require(pixelHeight >= 0) { "pixelHeight must be >= 0, was $pixelHeight" }
         require(state.primaryBuffer.maxHistory <= Int.MAX_VALUE - newHeight) {
             "maxHistory + newHeight exceeds Int.MAX_VALUE: maxHistory=${state.primaryBuffer.maxHistory}, newHeight=$newHeight"
         }
@@ -109,6 +124,9 @@ internal class DefaultTerminalBuffer private constructor(
         val oldCursorRow = state.cursor.row
 
         if (newWidth == oldWidth && newHeight == oldHeight) {
+            if (components.responseChannel.updateWindowSizePixels(pixelWidth, pixelHeight)) {
+                components.responseChannel.notifySizeChanged()
+            }
             return Pair(state.clampScrollbackOffset(oldScrollbackOffset), state.historySize)
         }
 
@@ -142,6 +160,8 @@ internal class DefaultTerminalBuffer private constructor(
         if (state.cursor.col != oldCursorCol || state.cursor.row != oldCursorRow) {
             state.markCursorChanged()
         }
+        components.responseChannel.updateWindowSizePixels(pixelWidth, pixelHeight)
+        components.responseChannel.notifySizeChanged()
         return Pair(state.clampScrollbackOffset(newScrollbackOffset), state.historySize)
     }
 
@@ -220,6 +240,7 @@ internal class DefaultTerminalBuffer private constructor(
         val state: TerminalState,
         val mutationEngine: MutationEngine,
         val cursorEngine: CursorEngine,
+        val responseChannel: BufferResponseChannel,
     )
 
     private data class SavedCursorSnapshot(
@@ -266,6 +287,7 @@ internal class DefaultTerminalBuffer private constructor(
                 state = state,
                 mutationEngine = MutationEngine(state),
                 cursorEngine = CursorEngine(state),
+                responseChannel = BufferResponseChannel(state),
             )
         }
     }

@@ -356,12 +356,19 @@ internal class NoOpCommandSink : TerminalAsciiCommandSink {
 
     override fun queryPaletteColor(index: Int) {}
 
+    override fun resetPaletteColors(
+        indices: IntArray,
+        count: Int,
+    ) {}
+
     override fun setDynamicColor(
         target: Int,
         color: Int,
     ) {}
 
     override fun queryDynamicColor(target: Int) {}
+
+    override fun resetDynamicColor(target: Int) {}
 
     override fun queryStatusString(query: String) {}
 

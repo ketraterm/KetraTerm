@@ -51,6 +51,9 @@ internal class TerminalState(
     var palette = themePalette
     var windowPixelWidth: Int = 0
     var windowPixelHeight: Int = 0
+
+    @Volatile
+    var areChangeNotificationsAllowed: Boolean = true
     var isMinimized: Boolean = false
     var windowTitle: String = ""
         set(value) {

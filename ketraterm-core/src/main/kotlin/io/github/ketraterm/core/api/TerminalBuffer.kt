@@ -67,11 +67,37 @@ public interface TerminalBuffer :
      * @throws IllegalArgumentException if either dimension is <= 0, or adding
      * [newHeight] to the configured primary history capacity would overflow [Int].
      * Invalid dimensions are rejected before allocation or state mutation.
+     * An unchanged grid preserves known pixel dimensions. A changed grid makes
+     * them unknown; use the pixel-aware overload when the host can supply them.
      */
     public fun resize(
         newWidth: Int,
         newHeight: Int,
         oldScrollbackOffset: Int = 0,
+    ): Pair<Int, Int>
+
+    /**
+     * Resizes the grid and records text-area pixels as one completed operation.
+     *
+     * Grid semantics and the returned viewport anchor match the three-argument
+     * overload. Pixel-only changes preserve grid content, history, cursor,
+     * margins, tab stops, and render generations. A changed grid or pixel size
+     * emits one mode 2048 report when subscribed and permitted.
+     *
+     * @param newWidth positive width in cells.
+     * @param newHeight positive height in rows.
+     * @param oldScrollbackOffset active scrollback offset before the resize.
+     * @param pixelWidth text-area width excluding host padding; zero means unknown.
+     * @param pixelHeight text-area height excluding host padding; zero means unknown.
+     * If either pixel dimension is zero, both become unknown. Negative pixels
+     * are rejected before allocation or state mutation.
+     */
+    public fun resize(
+        newWidth: Int,
+        newHeight: Int,
+        oldScrollbackOffset: Int,
+        pixelWidth: Int,
+        pixelHeight: Int,
     ): Pair<Int, Int>
 
     /**

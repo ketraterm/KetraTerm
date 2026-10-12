@@ -34,6 +34,17 @@ public interface TerminalResponseChannel : TerminalHostResponseReader {
     public fun clearResponseBytes()
 
     /**
+     * Publishes host permission for automatic color-scheme and resize reports.
+     *
+     * This also governs the immediate mode 2048 enable report. It does not
+     * alter subscription state or already queued bytes, and it does not gate
+     * explicit query methods: callers must continue enforcing their response
+     * policy before queries. Unlike other mutations,
+     * this permission publication may be called concurrently with core use.
+     */
+    public fun setChangeNotificationsAllowed(allowed: Boolean)
+
+    /**
      * Enqueues one ANSI or DEC private DECRPM reply (`CSI [?] mode;status $ y`).
      * The explicit mode allowlist returns status 0 for unsupported queries.
      * Negative identifiers produce no response. Queries do not mutate modes or
@@ -141,7 +152,11 @@ public interface TerminalResponseChannel : TerminalHostResponseReader {
     )
 
     /**
-     * Updates the recorded window size in pixels.
+     * Updates the recorded text-area size in pixels, excluding host padding.
+     * A changed size emits a subscribed mode 2048 report when permitted. Use
+     * the pixel-aware [TerminalBuffer.resize] overload when both grid and pixel
+     * dimensions change so one report describes the completed resize.
+     * If either dimension is nonpositive, both are recorded as unknown zero.
      *
      * @param width Width in pixels.
      * @param height Height in pixels.
@@ -212,5 +227,12 @@ public interface TerminalResponseChannel : TerminalHostResponseReader {
         public const val WINDOW_REPORT_PIXELS: Int = 14
         public const val WINDOW_REPORT_GRID_CELLS: Int = 18
         public const val WINDOW_REPORT_SCREEN_SIZE: Int = 19
+
+        /**
+         * Requests the current mode 2048 report after a host completes a deferred resize.
+         * Unlike query reports, emission requires an enabled subscription and notification permission.
+         * This is a host-side selector, not an additional accepted CSI window query.
+         */
+        public const val WINDOW_REPORT_IN_BAND_SIZE: Int = 48
     }
 }

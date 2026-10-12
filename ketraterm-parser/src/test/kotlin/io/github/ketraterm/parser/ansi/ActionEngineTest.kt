@@ -735,6 +735,13 @@ class ActionEngineTest {
             sinkCalls += "queryPaletteColor:$index"
         }
 
+        override fun resetPaletteColors(
+            indices: IntArray,
+            count: Int,
+        ) {
+            sinkCalls += "resetPaletteColors:${indices.take(count).joinToString(",")}"
+        }
+
         override fun setDynamicColor(
             target: Int,
             color: Int,
@@ -744,6 +751,10 @@ class ActionEngineTest {
 
         override fun queryDynamicColor(target: Int) {
             sinkCalls += "queryDynamicColor:$target"
+        }
+
+        override fun resetDynamicColor(target: Int) {
+            sinkCalls += "resetDynamicColor:$target"
         }
 
         override fun queryStatusString(query: String) {

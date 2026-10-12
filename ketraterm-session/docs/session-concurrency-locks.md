@@ -143,6 +143,10 @@ but the writer has not started. `Running` is then published before writer startu
 reentrant observers can admit input behind already queued replies. Failure or
 closure during startup discards pending work and does not publish `Running`.
 
+Initial response denial, or denial while still `Created`, discards core replies
+queued before session ownership. Replies already admitted under an allowed
+runtime policy retain their ordinary output order.
+
 `ACCEPTED` and startup `SUBMITTED` mean admission, not write completion. A
 connector `write` synchronously consumes or copies its supplied range. Custom
 encoder factories create independent admission and bulk instances bound to
@@ -168,6 +172,28 @@ connector. It has no queue position and is not a flush barrier: accepted input
 may be written after a later resize returns. Connector resize and disposal share
 a separate lock, so an entered resize must finish before disposal proceeds.
 Resize never takes the startup lifecycle lock while holding mutation.
+
+The geometry overload records grid and text-area pixel dimensions together
+under mutation serialization. Grid-only resize preserves pixels for an unchanged
+grid and records unavailable pixels when the grid changes.
+Subscribed in-band resize replies are drained into the ordinary ordered writer
+after successful core and connector resize. Host theme updates likewise drain
+subscribed color-scheme replies before releasing mutation serialization. These
+reports do not make resize an input flush barrier. Host policy publication and
+automatic-report generation share session mutation serialization; denied
+reports are never queued for a later permission change. A failed metadata read
+or connector resize discards the resize's uncommitted report while preserving
+previously admitted replies and the original exception. The session remains
+running under the existing recoverable resize-failure contract.
+
+An unfinished resize retains primitive completion/report flags, not queued
+response bytes. A successful retry regenerates any missed report from current
+geometry only if no new resize report was produced, and rechecks subscription
+and permission. Retargeting a retry reports the final geometry once.
+`tryUpdateViewportPixels` checks the expected grid and resize completion under
+the same mutation lock before updating pixel metadata. A mismatch leaves state
+untouched so presentation owners can perform a full resize and adopt its
+viewport/history anchor; matching pixel-only updates do not resize the connector.
 
 Close claims termination, calls the connector before taking cleanup monitors,
 drops pending output, cancels session jobs, finalizes parser EOF, and attempts

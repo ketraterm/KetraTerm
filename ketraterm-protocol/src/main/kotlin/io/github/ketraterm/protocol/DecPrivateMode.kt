@@ -101,4 +101,10 @@ public object DecPrivateMode {
 
     /** Synchronized output mode, DECSET/DECRST `?2026`. */
     public const val SYNCHRONIZED_OUTPUT: Int = 2026
+
+    /** Host color-scheme change reporting, DECSET/DECRST `?2031`. */
+    public const val COLOR_SCHEME_REPORTING: Int = 2031
+
+    /** In-band text-area resize reporting, DECSET/DECRST `?2048`. */
+    public const val IN_BAND_RESIZE_REPORTING: Int = 2048
 }

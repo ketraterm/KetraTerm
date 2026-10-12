@@ -81,7 +81,7 @@ class TerminalModeControllerImplTest {
     @Test
     fun `updates mode flags in the shared state`() {
         val state = TerminalState(4, 3, 2)
-        val modeController = TerminalModeControllerImpl(state, CursorEngine(state))
+        val modeController = TerminalModeControllerImpl(state, CursorEngine(state), BufferResponseChannel(state))
 
         modeController.setInsertMode(true)
         modeController.setApplicationCursorKeys(true)
@@ -97,7 +97,7 @@ class TerminalModeControllerImplTest {
     @Test
     fun `cursor shape updates correctly and resets on full and soft reset`() {
         val state = TerminalState(4, 3, 2)
-        val modeController = TerminalModeControllerImpl(state, CursorEngine(state))
+        val modeController = TerminalModeControllerImpl(state, CursorEngine(state), BufferResponseChannel(state))
 
         assertEquals(TerminalRenderCursorShape.BLOCK, state.cursorShape)
 
@@ -156,7 +156,7 @@ class TerminalModeControllerImplTest {
     @Test
     fun `cursor style reset publishes blink-only changes and preserves visibility and position`() {
         val state = TerminalState(4, 3, 2)
-        val controller = TerminalModeControllerImpl(state, CursorEngine(state))
+        val controller = TerminalModeControllerImpl(state, CursorEngine(state), BufferResponseChannel(state))
         controller.setDefaultCursorShape(TerminalRenderCursorShape.BAR)
         controller.setCursorShape(TerminalRenderCursorShape.BAR)
         controller.setCursorBlinking(false)
@@ -216,7 +216,7 @@ class TerminalModeControllerImplTest {
     @Test
     fun `new fields round trip into shared state`() {
         val state = TerminalState(4, 3, 2)
-        val modeController = TerminalModeControllerImpl(state, CursorEngine(state))
+        val modeController = TerminalModeControllerImpl(state, CursorEngine(state), BufferResponseChannel(state))
 
         modeController.setNewLineMode(true)
         modeController.setApplicationKeypad(true)
@@ -250,7 +250,7 @@ class TerminalModeControllerImplTest {
     @Test
     fun `cursor-affecting mode setters cancel pending wrap`() {
         val state = TerminalState(8, 4, 2)
-        val modeController = TerminalModeControllerImpl(state, CursorEngine(state))
+        val modeController = TerminalModeControllerImpl(state, CursorEngine(state), BufferResponseChannel(state))
 
         assertCancelsPendingWrap(state) { modeController.setAutoWrap(true) }
         assertCancelsPendingWrap(state) { modeController.setAutoWrap(false) }
@@ -262,7 +262,7 @@ class TerminalModeControllerImplTest {
     @Test
     fun `non-cursor mode setters preserve pending wrap`() {
         val state = TerminalState(8, 4, 2)
-        val modeController = TerminalModeControllerImpl(state, CursorEngine(state))
+        val modeController = TerminalModeControllerImpl(state, CursorEngine(state), BufferResponseChannel(state))
 
         assertPreservesPendingWrap(state) { modeController.setInsertMode(true) }
         assertPreservesPendingWrap(state) { modeController.setApplicationCursorKeys(true) }
@@ -287,7 +287,7 @@ class TerminalModeControllerImplTest {
     fun `next printable after non-cursor mode setter consumes pending wrap`() {
         val state = TerminalState(4, 2, 1)
         val cursorEngine = CursorEngine(state)
-        val modeController = TerminalModeControllerImpl(state, cursorEngine)
+        val modeController = TerminalModeControllerImpl(state, cursorEngine, BufferResponseChannel(state))
         val writer = BufferWriter(state, MutationEngine(state), cursorEngine)
 
         writer.writeText("ABCD")
@@ -310,7 +310,7 @@ class TerminalModeControllerImplTest {
     @Test
     fun `auto wrap off clears pending wrap and origin mode homes to the scroll region`() {
         val state = TerminalState(5, 4, 2)
-        val modeController = TerminalModeControllerImpl(state, CursorEngine(state))
+        val modeController = TerminalModeControllerImpl(state, CursorEngine(state), BufferResponseChannel(state))
 
         state.cursor.pendingWrap = true
         state.activeBuffer.setScrollRegion(
@@ -334,7 +334,7 @@ class TerminalModeControllerImplTest {
     @Test
     fun `enterAltBufferWithoutCursorSave can reuse existing alt content and cursor`() {
         val state = TerminalState(6, 4, 2)
-        val modeController = TerminalModeControllerImpl(state, CursorEngine(state))
+        val modeController = TerminalModeControllerImpl(state, CursorEngine(state), BufferResponseChannel(state))
 
         state.primaryBuffer.cursor.col = 3
         state.primaryBuffer.cursor.row = 2
@@ -365,7 +365,7 @@ class TerminalModeControllerImplTest {
     @Test
     fun `enterAltBufferWithoutCursorSave can clear alt state before switching`() {
         val state = TerminalState(6, 4, 2)
-        val modeController = TerminalModeControllerImpl(state, CursorEngine(state))
+        val modeController = TerminalModeControllerImpl(state, CursorEngine(state), BufferResponseChannel(state))
 
         state.altBuffer.cursor.col = 4
         state.altBuffer.cursor.row = 2
@@ -388,7 +388,7 @@ class TerminalModeControllerImplTest {
     @Test
     fun `enterAltBuffer switches to alt screen and exit restores cursor and pen but NOT global modes`() {
         val state = TerminalState(6, 4, 2)
-        val modeController = TerminalModeControllerImpl(state, CursorEngine(state))
+        val modeController = TerminalModeControllerImpl(state, CursorEngine(state), BufferResponseChannel(state))
 
         // 1. Setup Primary State
         state.cursor.col = 5
@@ -449,7 +449,7 @@ class TerminalModeControllerImplTest {
     @Test
     fun `enterAltBuffer and exitAltBuffer are no-op when already in target buffer`() {
         val state = TerminalState(5, 3, 1)
-        val modeController = TerminalModeControllerImpl(state, CursorEngine(state))
+        val modeController = TerminalModeControllerImpl(state, CursorEngine(state), BufferResponseChannel(state))
 
         modeController.exitAltBuffer()
         assertFalse(state.isAltScreenActive)
@@ -467,7 +467,7 @@ class TerminalModeControllerImplTest {
     @Test
     fun `kitty keyboard push pop via controller updates modes and buffer`() {
         val state = TerminalState(6, 4, 2)
-        val modeController = TerminalModeControllerImpl(state, CursorEngine(state))
+        val modeController = TerminalModeControllerImpl(state, CursorEngine(state), BufferResponseChannel(state))
 
         // Initial state
         assertEquals(0, state.modes.kittyKeyboardFlags)
@@ -512,7 +512,7 @@ class TerminalModeControllerImplTest {
     @Test
     fun `sets theme palette and active colors correctly`() {
         val state = TerminalState(4, 3, 2)
-        val modeController = TerminalModeControllerImpl(state, CursorEngine(state))
+        val modeController = TerminalModeControllerImpl(state, CursorEngine(state), BufferResponseChannel(state))
 
         val themePalette =
             io.github.ketraterm.render.api.TerminalColorPalette(

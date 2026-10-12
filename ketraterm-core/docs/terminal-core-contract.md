@@ -81,6 +81,13 @@ reset baseline even when effective values are equal; only an effective change
 invalidates visible rows. Palette equality includes colors and presentation
 preferences, including dark/light classification.
 
+`resetPaletteColors` restores selected indexed entries, or all 256 entries for
+an empty selection, from the latest theme baseline. `resetDynamicColor` restores
+foreground, background, or cursor color from that same baseline. Other overrides
+remain intact. Effective resets publish one immutable palette and invalidate
+visible rows; unchanged resets preserve palette identity and generations.
+Application color updates and resets never emit mode 2031 reports.
+
 ## Writer contract
 
 ### Printable ingress
@@ -199,6 +206,13 @@ a new packed word, validate supported resources and values, and preserve all
 unrelated bits. The producer owns coherent publication; the helpers do not
 update a terminal or input state.
 
+Color-scheme and in-band resize subscriptions are serialized durable state
+outside the packed input word and typed mode snapshot. Their DECRQM status is
+available through `requestModeStatus`. Regular resize and screen switches
+preserve subscriptions; RIS and DECSTR disable both. Enabling color-scheme
+reporting emits no initial report, while every in-band resize enable request
+reports the current geometry when permitted.
+
 Mode setters that home the cursor or affect wrap/margin physics cancel pending
 wrap. Input reporting and presentation setters preserve it. `resetCursorStyle`
 restores the configured default shape and enables the blink flag without
@@ -297,8 +311,18 @@ restores configured default presentation.
 ### Resize
 
 `resize(newWidth, newHeight, oldScrollbackOffset)` validates positive dimensions
-and retained capacity before allocation or mutation. Identical dimensions are a
-no-op and return a clamped offset plus current history size.
+and retained capacity before allocation or mutation. Identical grid dimensions
+avoid reflow and return a clamped offset plus current history size.
+
+The five-argument overload accepts text-area pixel width and height together
+with the grid and viewport offset, validating nonnegative pixels before
+mutation. Either zero marks both pixel dimensions unavailable. The existing
+three-argument overload preserves known pixels for an unchanged grid and marks
+them unknown when the grid changes. Grid and pixel geometry commit together, so one
+subscribed mode 2048 report describes the complete resulting size. A pixel-only
+change reports without reflow or row-generation invalidation. Identical complete
+geometry produces no report. Direct `setWindowSizePixels` updates use the same
+pixel-change reporting rules.
 
 An effective resize:
 
@@ -325,7 +349,7 @@ pending wrap.
 
 Mode defaults restore autowrap, cursor visibility/blinking, normal video, and
 normal cursor/keypad/input behavior. Bracketed paste, focus reporting, mouse
-tracking, synchronized output, and Kitty keyboard state reset; both xterm
+tracking, synchronized output, color-scheme/resize reporting, and Kitty keyboard state reset; both xterm
 resource families return to defaults. Ambiguous-width policy, mouse encoding,
 and the DECCOLM selection survive. Palette and content are preserved.
 
@@ -359,7 +383,7 @@ protection, and reflow preserves it. Hard clears ignore it.
 
 ## Terminal responses
 
-Query methods enqueue replies in `TerminalResponseChannel`.
+Query methods and subscribed change reports enqueue bytes in `TerminalResponseChannel`.
 `readResponseBytes` synchronously copies queued bytes into a caller-owned range;
 invalid ranges are rejected without draining the queue or changing the array.
 Sessions drain replies after core mutation and send them through the same
@@ -370,6 +394,15 @@ methods. Core's explicit capability allowlists govern reply contents and
 protocol-specific failure behavior. Denying the response family suppresses
 failure replies as well as success replies; supported queries and identities
 remain defined by the canonical feature map and protocol module.
+
+`setChangeNotificationsAllowed` publishes the host's response permission for
+automatic color-scheme and resize reports, including immediate mode 2048 enable
+reports. This volatile permission may be published concurrently with core use;
+it changes neither modes nor queued bytes. Explicit queries still require
+permission checks by their caller. Session assembly applies its initial policy
+to replies queued before ownership transfers. A changed host theme palette emits mode 2031 reports
+independently of application palette overrides. See the
+[wire contract](../../docs/reference/protocol.md#change-reports).
 
 ## Invariants
 

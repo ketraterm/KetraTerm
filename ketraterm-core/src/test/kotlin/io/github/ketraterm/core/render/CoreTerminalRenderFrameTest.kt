@@ -17,6 +17,7 @@ package io.github.ketraterm.core.render
 
 import io.github.ketraterm.core.TerminalBuffers
 import io.github.ketraterm.core.buffer.DefaultTerminalBuffer
+import io.github.ketraterm.core.buffer.impl.BufferResponseChannel
 import io.github.ketraterm.core.buffer.impl.TerminalModeControllerImpl
 import io.github.ketraterm.core.codec.AttributeCodec
 import io.github.ketraterm.core.engine.CursorEngine
@@ -149,7 +150,7 @@ class CoreTerminalRenderFrameTest {
         expectedFlags[6] = TerminalRenderCellFlags.CLUSTER
         val translator = RenderAttrTranslator()
         val frame = CoreTerminalRenderFrame(state)
-        val modes = TerminalModeControllerImpl(state, CursorEngine(state))
+        val modes = TerminalModeControllerImpl(state, CursorEngine(state), BufferResponseChannel(state))
 
         for (reverseVideo in listOf(false, true, false)) {
             modes.setReverseVideo(reverseVideo)
@@ -1032,7 +1033,7 @@ class CoreTerminalRenderFrameTest {
     fun `global attribute invalidation changes row generations across signed overflow`() {
         val state = TerminalState(initialWidth = 2, initialHeight = 1, maxHistory = 0)
         state.ring[0].renderGeneration = Long.MAX_VALUE
-        val modes = TerminalModeControllerImpl(state, CursorEngine(state))
+        val modes = TerminalModeControllerImpl(state, CursorEngine(state), BufferResponseChannel(state))
         val frame = CoreTerminalRenderFrame(state)
         var generation = frame.use(scrollbackOffset = 0) { frame.lineGeneration(0) }
 

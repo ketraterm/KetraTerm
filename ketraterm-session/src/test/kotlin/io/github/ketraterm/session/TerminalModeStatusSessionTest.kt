@@ -102,7 +102,7 @@ class TerminalModeStatusSessionTest {
                     connector.feedFromHost("\u001B[?2031\$p".encodeToByteArray())
                     runCurrent()
                     assertEquals(
-                        "\u001B[?2026;1\$y\u001B[?2026;2\$y\u001B[?2031;0\$y",
+                        "\u001B[?2026;1\$y\u001B[?2026;2\$y\u001B[?2031;2\$y",
                         connector.writtenBytes.decodeToString(),
                     )
                 }

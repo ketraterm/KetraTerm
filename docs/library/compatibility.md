@@ -60,11 +60,36 @@ check that the upgrade harness detects missing symbols.
 repository without uploading. The [consumer fixture guide](../../ketraterm-testkit/src/consumerTest/README.md)
 explains individual checks and baseline refreshes. A deliberate development
 baseline refresh must record the break and migration; it cannot be presented as
-proof of compatibility with the removed API.
+proof of compatibility with the earlier API or retained clients.
 
 ABI checks do not establish threading, lifecycle, coordinate, or protocol
 correctness. Those require semantic tests and the module contracts. Product
 release verification remains separate; see the [gap map](../terminal-feature-gap-map.md#product-and-release-work).
+
+### Color-reset and change-report baseline decision
+
+The 0.x color-reset and mode 2031/2048 migration deliberately establishes a new
+retained-client baseline. Existing method signatures remain available, but the
+required additions to `TerminalCommandSink`, `TerminalModeController`,
+`TerminalResponseChannel`, and `TerminalBuffer` change their implementer
+contracts. Retained pre-feature Kotlin `by` delegates do not contain forwarding
+methods for these additions: the Swing consumer fails with `AbstractMethodError`
+when host assembly calls `setChangeNotificationsAllowed`.
+
+Recompile Kotlin delegates against the updated interfaces, even when their
+source is unchanged. Custom implementations must implement the new reset,
+subscription, notification-permission, and pixel-aware resize methods. These
+methods enforce terminal semantics and host authorization; they have no silent
+fallback defaults.
+
+The chosen development migration records clients compiled against the reviewed
+new interfaces, with fixture sources, jar hashes, compiler/toolchain details,
+and staged dependency hashes in their provenance. Review sources, artifacts,
+provenance, and ABI snapshots together, then run the source-consumer and retained
+client checks described in the [consumer guide](../../ketraterm-testkit/src/consumerTest/README.md#updating-a-retained-baseline).
+The refreshed baseline verifies subsequent upgrades of those recompiled clients;
+it does not establish binary compatibility with the pre-feature baseline or
+any earlier 0.x release.
 
 ## Development migrations
 
@@ -73,6 +98,7 @@ release history remains in the [changelog](../../CHANGELOG.md).
 
 | Earlier shape | Current integration |
 | --- | --- |
+| Custom terminal command/core implementations or compiled Kotlin delegates before color reset and change-report methods | Implement the new reset/subscription methods, `setChangeNotificationsAllowed`, and pixel-aware `TerminalBuffer.resize`; recompile implementations and delegates against the updated SPI. Existing resize overloads remain callable. See the [baseline decision](#color-reset-and-change-report-baseline-decision) and [core semantics](../../ketraterm-core/docs/terminal-core-contract.md#terminal-responses). |
 | Growing settings constructors, named-argument copies, destructuring | Immutable `create`/`copy` callbacks or Java builders; use getters. |
 | Swing history/window-permission settings | Core/PTY history configuration and session host policy. |
 | Session render-publisher access | `readPublishedFrame`; retain mutable producer references at assembly. |

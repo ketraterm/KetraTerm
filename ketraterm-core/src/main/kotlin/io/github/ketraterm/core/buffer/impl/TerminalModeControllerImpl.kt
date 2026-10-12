@@ -26,6 +26,7 @@ import io.github.ketraterm.render.api.TerminalRenderCursorShape
 internal class TerminalModeControllerImpl(
     private val state: TerminalState,
     private val cursorEngine: CursorEngine,
+    private val responseChannel: BufferResponseChannel,
 ) : TerminalModeController {
     private inline fun mutateMode(block: () -> Unit) {
         block()
@@ -187,6 +188,15 @@ internal class TerminalModeControllerImpl(
         mutateMode { state.modes.isSynchronizedOutput = enabled }
     }
 
+    override fun setColorSchemeReportingEnabled(enabled: Boolean) {
+        state.modes.isColorSchemeReportingEnabled = enabled
+    }
+
+    override fun setInBandResizeReportingEnabled(enabled: Boolean) {
+        state.modes.isInBandResizeReportingEnabled = enabled
+        if (enabled) responseChannel.notifySizeChanged()
+    }
+
     override fun setBellIsUrgent(enabled: Boolean) {
         mutateMode { state.modes.isBellIsUrgent = enabled }
     }
@@ -230,10 +240,13 @@ internal class TerminalModeControllerImpl(
 
     override fun setThemePalette(palette: TerminalColorPalette) {
         mutateMode {
+            val themeChanged = state.themePalette != palette
             state.themePalette = palette
-            if (state.palette == palette) return
-            state.palette = palette
-            state.markVisibleLinesChanged()
+            if (state.palette != palette) {
+                state.palette = palette
+                state.markVisibleLinesChanged()
+            }
+            if (themeChanged) responseChannel.notifyColorSchemeChanged()
         }
     }
 
@@ -272,5 +285,39 @@ internal class TerminalModeControllerImpl(
                 }
             state.markVisibleLinesChanged()
         }
+    }
+
+    override fun resetPaletteColors(
+        indices: IntArray,
+        count: Int,
+    ) {
+        require(count in 0..indices.size) { "count must be in 0..indices.size" }
+        val current = state.palette
+        val theme = state.themePalette
+        var indexed: IntArray? = null
+        val limit = if (count == 0) 256 else count
+        for (i in 0 until limit) {
+            val index = if (count == 0) i else indices[i]
+            if (index !in 0..255) continue
+            val color = theme.indexedColor(index)
+            if (current.indexedColor(index) == color) continue
+            val colors = indexed ?: current.toIndexedColorsArray().also { indexed = it }
+            colors[index] = color
+        }
+        val colors = indexed ?: return
+        state.palette = current.copy(indexedColors = colors)
+        state.markVisibleLinesChanged()
+    }
+
+    override fun resetDynamicColor(target: Int) {
+        val theme = state.themePalette
+        val color =
+            when (target) {
+                10 -> theme.defaultForeground
+                11 -> theme.defaultBackground
+                12 -> theme.cursorBackground
+                else -> return
+            }
+        setDynamicColor(target, color)
     }
 }

@@ -92,10 +92,12 @@ public abstract interface class io/github/ketraterm/parser/spi/TerminalCommandSi
 	public abstract fun requestRectangleChecksum (IIIIII)V
 	public abstract fun requestWindowReport (I)V
 	public abstract fun resetAttributes ()V
+	public abstract fun resetDynamicColor (I)V
 	public abstract fun resetKeyFormatOption (I)V
 	public abstract fun resetKeyFormatOptions ()V
 	public abstract fun resetKeyModifierOption (I)V
 	public abstract fun resetKeyModifierOptions ()V
+	public abstract fun resetPaletteColors ([II)V
 	public abstract fun resetTerminal ()V
 	public abstract fun resizeWindow (II)V
 	public abstract fun restoreCursor ()V

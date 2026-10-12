@@ -256,6 +256,27 @@ public interface TerminalModeController {
     public fun setSynchronizedOutput(enabled: Boolean)
 
     /**
+     * Subscribes to host color-scheme changes (DECSET/DECRST `?2031`).
+     *
+     * Enabling does not enqueue a report. A changed host palette enqueues the
+     * same `CSI ?997;Ps n` report as private DSR 996 when change notifications
+     * are permitted. Application color overrides and resets do not report.
+     * Both RIS and DECSTR disable this subscription.
+     */
+    public fun setColorSchemeReportingEnabled(enabled: Boolean)
+
+    /**
+     * Subscribes to text-area resize reports (DECSET/DECRST `?2048`).
+     *
+     * Every enable, including an already-enabled subscription, enqueues the
+     * current `CSI 48;rows;columns;heightPixels;widthPixels t` report when
+     * change notifications are permitted. Subsequent reports follow completed
+     * grid or pixel-size changes. Unknown pixel dimensions are zero. Both RIS
+     * and DECSTR disable this subscription.
+     */
+    public fun setInBandResizeReportingEnabled(enabled: Boolean)
+
+    /**
      * Switches to the alternate screen buffer without saving the primary
      * cursor state.
      *
@@ -304,7 +325,9 @@ public interface TerminalModeController {
      *
      * This updates both the default theme palette and the active palette. The
      * host palette's light/dark classification is also used by private DSR 996;
-     * application palette overrides do not change that host preference.
+     * application palette overrides do not change that host preference. A
+     * changed host palette emits a mode 2031 report when subscribed and allowed,
+     * including changes that retain the same light/dark classification.
      *
      * @param palette the theme color palette configuration.
      */
@@ -322,6 +345,23 @@ public interface TerminalModeController {
     )
 
     /**
+     * Restores indexed colors from the latest host-configured theme in one update.
+     *
+     * A zero [count] resets the complete indexed table. Otherwise the first [count]
+     * entries of [indices] select the colors to restore; invalid indices are ignored.
+     * The borrowed array is consumed synchronously and never retained. Dynamic color
+     * overrides and other palette settings are preserved. An unchanged reset leaves
+     * the effective palette and render generations unchanged.
+     *
+     * @param indices palette indices to restore in `0..255`.
+     * @param count used prefix length in `0..indices.size`, or zero for all indices.
+     */
+    public fun resetPaletteColors(
+        indices: IntArray,
+        count: Int = indices.size,
+    )
+
+    /**
      * Updates a dynamic target color (foreground, background, or cursor color).
      *
      * @param target the target code (10 for foreground, 11 for background, 12 for cursor).
@@ -331,6 +371,14 @@ public interface TerminalModeController {
         target: Int,
         color: Int,
     )
+
+    /**
+     * Restores one dynamic color from the latest host-configured theme.
+     * Other application overrides are preserved; unsupported targets are ignored.
+     *
+     * @param target 10 for foreground, 11 for background, or 12 for cursor color.
+     */
+    public fun resetDynamicColor(target: Int)
 
     /**
      * Toggles urgent bell mode (?1042).

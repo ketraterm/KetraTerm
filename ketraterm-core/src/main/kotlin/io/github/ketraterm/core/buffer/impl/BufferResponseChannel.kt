@@ -43,6 +43,10 @@ internal class BufferResponseChannel(
         state.hostResponses.clear()
     }
 
+    override fun setChangeNotificationsAllowed(allowed: Boolean) {
+        state.areChangeNotificationsAllowed = allowed
+    }
+
     override fun requestModeStatus(
         mode: Int,
         decPrivate: Boolean,
@@ -88,6 +92,8 @@ internal class BufferResponseChannel(
             DecPrivateMode.FOCUS_REPORTING -> flagStatus(bits, TerminalModeBits.FOCUS_REPORTING)
             DecPrivateMode.BRACKETED_PASTE -> flagStatus(bits, TerminalModeBits.BRACKETED_PASTE)
             DecPrivateMode.SYNCHRONIZED_OUTPUT -> flagStatus(bits, TerminalModeBits.SYNCHRONIZED_OUTPUT)
+            DecPrivateMode.COLOR_SCHEME_REPORTING -> booleanStatus(state.modes.isColorSchemeReportingEnabled)
+            DecPrivateMode.IN_BAND_RESIZE_REPORTING -> booleanStatus(state.modes.isInBandResizeReportingEnabled)
             DecPrivateMode.DECCOLM -> flagStatus(bits, TerminalModeBits.COLUMN_MODE_132)
             DecPrivateMode.BELL_IS_URGENT ->
                 hostFlagStatus(
@@ -234,14 +240,40 @@ internal class BufferResponseChannel(
         width: Int,
         height: Int,
     ) {
-        if (width <= 0 || height <= 0) {
-            state.windowPixelWidth = 0
-            state.windowPixelHeight = 0
-            return
-        }
+        if (updateWindowSizePixels(width, height)) notifySizeChanged()
+    }
 
-        state.windowPixelWidth = width
-        state.windowPixelHeight = height
+    /** Records pixels without reporting an intermediate grid/pixel resize state. */
+    fun updateWindowSizePixels(
+        width: Int,
+        height: Int,
+    ): Boolean {
+        val known = width > 0 && height > 0
+        val newWidth = if (known) width else 0
+        val newHeight = if (known) height else 0
+        if (state.windowPixelWidth == newWidth && state.windowPixelHeight == newHeight) return false
+        state.windowPixelWidth = newWidth
+        state.windowPixelHeight = newHeight
+        return true
+    }
+
+    fun notifyColorSchemeChanged() {
+        if (state.modes.isColorSchemeReportingEnabled && state.areChangeNotificationsAllowed) enqueueColorSchemeReport()
+    }
+
+    fun notifySizeChanged() {
+        if (!state.modes.isInBandResizeReportingEnabled || !state.areChangeNotificationsAllowed) return
+        enqueueCsiPrefix()
+        state.hostResponses.enqueuePositiveDecimal(48)
+        state.hostResponses.enqueueByte(';'.code)
+        state.hostResponses.enqueuePositiveDecimal(state.dimensions.height)
+        state.hostResponses.enqueueByte(';'.code)
+        state.hostResponses.enqueuePositiveDecimal(state.dimensions.width)
+        state.hostResponses.enqueueByte(';'.code)
+        state.hostResponses.enqueuePositiveDecimal(state.windowPixelHeight)
+        state.hostResponses.enqueueByte(';'.code)
+        state.hostResponses.enqueuePositiveDecimal(state.windowPixelWidth)
+        state.hostResponses.enqueueByte('t'.code)
     }
 
     override fun setWindowMinimized(minimized: Boolean) {
@@ -269,6 +301,8 @@ internal class BufferResponseChannel(
                 )
             TerminalResponseChannel.WINDOW_REPORT_SCREEN_SIZE ->
                 enqueueScreenSizeReport(state.dimensions.height, state.dimensions.width)
+            TerminalResponseChannel.WINDOW_REPORT_IN_BAND_SIZE ->
+                notifySizeChanged()
         }
     }
 
