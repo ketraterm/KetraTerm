@@ -34,7 +34,8 @@ exposes the Swing UI, completion API, and coroutine dependencies. Filesystem
 completion and persistence are separate optional modules.</p>
 <h2 id="search-chrome">Search chrome</h2>
 <p><code>SwingTerminalSearchBar</code> delegates scanning, highlights, and result navigation
-to the terminal&#39;s search API. <code>SwingTerminalOverlayPane</code> places the bar over the
+to the terminal&#39;s search API. The bar includes independent match-case, whole-word,
+and regex toggles with explanatory tooltips, and shows invalid-pattern errors. <code>SwingTerminalOverlayPane</code> places the bar over the
 terminal content, so opening it does not reduce the grid&#39;s available space.</p>
 <p>Construct Swing components on the event dispatch thread (EDT). This example
 wraps an existing terminal; its owner still binds and disposes the terminal.</p>
@@ -63,6 +64,20 @@ Call <code>close</code> when removing the pane; it cancels search observation an
 active highlights. Removing the bar from a displayable hierarchy also cancels
 its observation. <code>open</code>, <code>close</code>, and <code>refreshColors</code> enqueue work when called
 off the EDT; read <code>isOpen</code> and manipulate <code>component</code> on the EDT.</p>
+<p>The bar installs no command shortcuts, including Enter, Shift+Enter, or Escape.
+Hosts invoke <code>performAction(SwingTerminalSearchAction)</code> on the EDT and bind those
+commands through their own action system. It returns <code>false</code> when search is closed.
+<code>setShortcutTextProvider</code> supplies plain-text labels from those same bindings;
+tooltips read the provider when requested, so a changed keymap is reflected immediately.
+Return <code>null</code> for an unbound action. Tab focus traversal and Space activation use
+normal Swing button behavior and remain available without command bindings.</p>
+<p>For a plain Swing host, map keystrokes on
+<code>searchBar.component.getInputMap(JComponent.WHEN_ANCESTOR_OF_FOCUSED_COMPONENT)</code>
+and install corresponding <code>AbstractAction</code>s in its <code>actionMap</code>, calling
+<code>searchBar.performAction(action)</code>. The standalone app owns its defaults; the
+IntelliJ plugin registers IDE actions so keymap remapping and multi-stroke shortcuts
+remain platform responsibilities. Keep search bindings scoped to the bar so they
+do not intercept terminal or unrelated editor input.</p>
 <p>Use <code>SwingTerminalSearchColors.create</code>, <code>copy</code>, or a builder to supply an immutable
 palette through <code>refreshColors(colors)</code>. Updating colors preserves the query and
 visibility. The palette is retained across close/open cycles.</p>
@@ -152,12 +167,12 @@ clipboard services and choose write-consent policy.</p>
 to integrate a host message framework. <code>forLocale(locale, bundle)</code> uses JDK
 resource bundles and <code>MessageFormat</code>, with missing keys falling back to the
 bundled English catalog. The selected locale is captured; static component
-labels are resolved at construction. The <a href="https://github.com/ketraterm/KetraTerm/blob/68101f5d9068ad746055bc4433e37484e1dcd132/ketraterm-ui-swing-host/src/main/resources/io/github/ketraterm/ui/swing/host/SwingHostMessages.properties">catalog</a>
+labels are resolved at construction. The <a href="https://github.com/ketraterm/KetraTerm/blob/6712fc6d403ebab13334b327303fff4df8f08550/ketraterm-ui-swing-host/src/main/resources/io/github/ketraterm/ui/swing/host/SwingHostMessages.properties">catalog</a>
 defines keys and arguments. Message arguments are plain text, not markup.</p>
 <p><code>SwingTerminalSettingsBounds</code> provides shared preference-control ranges for
 hosts. These limits do not define the core grid or renderer&#39;s valid configuration.</p>
 <p>For packages and dependencies, see <a href="Module.html">Module.md</a>.</p>
-</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/68101f5d9068ad746055bc4433e37484e1dcd132/ketraterm-ui-swing-host/README.md">View source on GitHub ↗</a></div></div></main></div>
+</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/6712fc6d403ebab13334b327303fff4df8f08550/ketraterm-ui-swing-host/README.md">View source on GitHub ↗</a></div></div></main></div>
   <footer>
     <a class="brand" href="../../../index.html"><img class="brand-mark" src="../../../assets/logo.svg" alt="" width="34" height="34">KetraTerm Library</a>
     <p>Open source · Apache 2.0</p>

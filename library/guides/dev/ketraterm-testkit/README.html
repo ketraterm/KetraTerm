@@ -37,7 +37,7 @@ dependencies {
 }
 </code></pre>
 <h3 id="mockconnector">MockConnector</h3>
-<p><a href="https://github.com/ketraterm/KetraTerm/blob/68101f5d9068ad746055bc4433e37484e1dcd132/ketraterm-testkit/src/main/kotlin/io/github/ketraterm/testkit/MockConnector.kt"><code>MockConnector</code></a>
+<p><a href="https://github.com/ketraterm/KetraTerm/blob/6712fc6d403ebab13334b327303fff4df8f08550/ketraterm-testkit/src/main/kotlin/io/github/ketraterm/testkit/MockConnector.kt"><code>MockConnector</code></a>
 implements the raw-byte connector contract. <code>feedFromHost</code> calls the installed
 listener synchronously with the supplied array and slice; it does not copy or
 parse incoming bytes. The listener must consume or copy that slice before the
@@ -82,11 +82,11 @@ changing <code>isClosed</code>, which records local closure only. <code>resizeCa
 ordered <code>(columns, rows)</code> pairs. Serialize access to the fake; it does not add
 concurrency control.</p>
 <h3 id="headless-conformance-replay">Headless conformance replay</h3>
-<p><a href="https://github.com/ketraterm/KetraTerm/blob/68101f5d9068ad746055bc4433e37484e1dcd132/ketraterm-testkit/src/main/kotlin/io/github/ketraterm/testkit/TerminalConformanceHarness.kt"><code>TerminalConformanceHarness</code></a>
+<p><a href="https://github.com/ketraterm/KetraTerm/blob/6712fc6d403ebab13334b327303fff4df8f08550/ketraterm-testkit/src/main/kotlin/io/github/ketraterm/testkit/TerminalConformanceHarness.kt"><code>TerminalConformanceHarness</code></a>
 wires the production parser, host adapter, core, response queue, and render reader
 without a session, PTY, or UI. A harness retains state between <code>apply</code>, <code>replay</code>,
 and <code>snapshot</code> calls. Create a fresh instance for each independent run.</p>
-<p>A <a href="https://github.com/ketraterm/KetraTerm/blob/68101f5d9068ad746055bc4433e37484e1dcd132/ketraterm-testkit/src/main/kotlin/io/github/ketraterm/testkit/TerminalReplayTranscript.kt"><code>TerminalReplayTranscript</code></a>
+<p>A <a href="https://github.com/ketraterm/KetraTerm/blob/6712fc6d403ebab13334b327303fff4df8f08550/ketraterm-testkit/src/main/kotlin/io/github/ketraterm/testkit/TerminalReplayTranscript.kt"><code>TerminalReplayTranscript</code></a>
 preserves input chunk boundaries, interleaved resizes, and explicit end-of-input
 placement. Input events copy their source bytes. <code>chunked</code> and <code>bytewise</code> do not
 append end-of-input automatically; <code>TerminalReplayChunkings.exhaustive</code> does so
@@ -122,7 +122,7 @@ and Java compilation against exported project API variants. It skips opt-in
 oracle/generated campaigns and excludes the separate publication and retained
 client suites. <code>check</code> also runs <code>publishedConsumerTest</code>; packaging verification
 is separate and is included in the root <code>publicationChecks</code> aggregate. See the
-<a href="https://github.com/ketraterm/KetraTerm/blob/68101f5d9068ad746055bc4433e37484e1dcd132/ketraterm-testkit/src/consumerTest/README.md">published-consumer guide</a> for prerequisites,
+<a href="https://github.com/ketraterm/KetraTerm/blob/6712fc6d403ebab13334b327303fff4df8f08550/ketraterm-testkit/src/consumerTest/README.md">published-consumer guide</a> for prerequisites,
 compiler/metadata combinations, and retained client baselines.</p>
 <h3 id="generated-campaigns">Generated campaigns</h3>
 <div class="table-scroll"><table>
@@ -177,7 +177,7 @@ compiler/metadata combinations, and retained client baselines.</p>
 <p>Invoke these tasks with the <code>:ketraterm-testkit:</code> prefix. xterm tasks require
 Node.js and npm on <code>PATH</code>; they install locked dependencies with
 <code>npm ci --ignore-scripts</code> and run the oracle&#39;s unit tests first. See the
-<a href="https://github.com/ketraterm/KetraTerm/blob/68101f5d9068ad746055bc4433e37484e1dcd132/tools/xterm-oracle/README.md">oracle guide</a> for process protocol and setup.
+<a href="https://github.com/ketraterm/KetraTerm/blob/6712fc6d403ebab13334b327303fff4df8f08550/tools/xterm-oracle/README.md">oracle guide</a> for process protocol and setup.
 Resize/reflow and grid-model campaigns require no Node.js or native terminal.</p>
 <p>Override case counts and deterministic shards with the matching Gradle properties:</p>
 <div class="table-scroll"><table>
@@ -217,7 +217,7 @@ compare the observable intersection with the oracle; intentional disagreements
 must name their rationale and exact mismatch paths. KetraTerm&#39;s resize/reflow
 policy is checked by its own invariants rather than treated as xterm parity.</p>
 <p>See <a href="Module.html">Module.md</a> for helper structure and dependencies.</p>
-</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/68101f5d9068ad746055bc4433e37484e1dcd132/ketraterm-testkit/README.md">View source on GitHub ↗</a></div></div></main></div>
+</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/6712fc6d403ebab13334b327303fff4df8f08550/ketraterm-testkit/README.md">View source on GitHub ↗</a></div></div></main></div>
   <footer>
     <a class="brand" href="../../../index.html"><img class="brand-mark" src="../../../assets/logo.svg" alt="" width="34" height="34">KetraTerm Library</a>
     <p>Open source · Apache 2.0</p>
