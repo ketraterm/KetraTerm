@@ -490,13 +490,46 @@ class SwingTerminalSearchBarTest {
 
     @Test
     fun preferredWidthStaysCompactAcrossLookAndFeels() {
-        val terminal = SwingTerminal()
-        val searchBar = SwingTerminalSearchBar(terminal)
-
         SwingUtilities.invokeAndWait {
-            val width = searchBar.component.preferredSize.width
+            val original = UIManager.getLookAndFeel()
+            try {
+                val lookAndFeels =
+                    listOf(
+                        original.javaClass.name,
+                        "javax.swing.plaf.metal.MetalLookAndFeel",
+                        "javax.swing.plaf.nimbus.NimbusLookAndFeel",
+                    ).distinct()
+                for (lookAndFeel in lookAndFeels) {
+                    UIManager.setLookAndFeel(lookAndFeel)
+                    val terminal = SwingTerminal()
+                    val searchBar = SwingTerminalSearchBar(terminal)
+                    try {
+                        val width = searchBar.component.preferredSize.width
+                        assertTrue(width in 420..620, "$lookAndFeel search bar preferred width was $width")
+                        searchBar.open()
+                        val overlay = SwingTerminalOverlayPane(terminal, searchBar.component)
+                        overlay.setSize(320, 200)
 
-            assertTrue(width in 420..620, "search bar preferred width was $width")
+                        fun layout(container: Container) {
+                            container.doLayout()
+                            for (child in container.components) {
+                                if (!child.isVisible) continue
+                                assertTrue(
+                                    child.x >= 0 && child.x + child.width <= container.width,
+                                    "$lookAndFeel ${child.javaClass.simpleName} clips: ${child.bounds}",
+                                )
+                                if (child is Container && child !== terminal) layout(child)
+                            }
+                        }
+                        layout(overlay)
+                    } finally {
+                        searchBar.close()
+                        terminal.dispose()
+                    }
+                }
+            } finally {
+                UIManager.setLookAndFeel(original)
+            }
         }
     }
 }
