@@ -222,6 +222,52 @@ class SwingTerminalSearchBarTest {
     }
 
     @Test
+    fun broadQueryUsesLocalizedLowerBoundCounter() {
+        val buffer = TerminalBuffers.create(80, 24, 3000)
+        repeat(2000) {
+            buffer.writeText("needle")
+            buffer.carriageReturn()
+            buffer.newLine()
+        }
+        val session = TerminalSession.create(buffer, MockConnector())
+        lateinit var terminal: SwingTerminal
+        lateinit var bar: SwingTerminalSearchBar
+        val messages = SwingHostMessages.forLocale(Locale.US)
+
+        fun descendants(component: Component): List<Component> =
+            listOf(component) + if (component is Container) component.components.flatMap(::descendants) else emptyList()
+        SwingUtilities.invokeAndWait {
+            terminal = SwingTerminal()
+            bar = SwingTerminalSearchBar(terminal, messages)
+            terminal.size = terminal.preferredSize
+            terminal.bind(session)
+            bar.open()
+            descendants(bar.component).filterIsInstance<JTextField>().single().text = "needle"
+        }
+        try {
+            val result =
+                runBlocking {
+                    withTimeout(10_000.milliseconds) { terminal.searchState.first { it.query == "needle" && !it.isSearching } }
+                }
+            assertTrue(result.isCountLimited)
+            assertEquals(1001, result.resultCount)
+            assertEquals(-1, result.activeResultIndex)
+            SwingUtilities.invokeAndWait {
+                assertEquals(
+                    messages.message("search.matchCounterLimited", 1000),
+                    descendants(bar.component).filterIsInstance<JLabel>().single().text,
+                )
+            }
+        } finally {
+            SwingUtilities.invokeAndWait {
+                bar.close()
+                terminal.dispose()
+            }
+            session.close()
+        }
+    }
+
+    @Test
     fun openAndCloseToggleHostSearchChrome() {
         val terminal = SwingTerminal()
         val searchBar = SwingTerminalSearchBar(terminal)

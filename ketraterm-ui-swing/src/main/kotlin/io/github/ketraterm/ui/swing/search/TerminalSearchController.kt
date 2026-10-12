@@ -28,6 +28,14 @@ internal class TerminalSearchController(
     private val scope: CoroutineScope,
     private val analysisDispatcher: CoroutineDispatcher = Dispatchers.Default,
 ) {
+    private var limited = false
+    private var activeMatch: TerminalSearchHighlights? = null
+    private var visibleMatches: TerminalSearchHighlights? = null
+    private var navigationJob: Job? = null
+    private var pendingNavigation = 0
+    private var viewportJob: Job? = null
+    private var viewportTop = Long.MIN_VALUE
+    private var viewportGeneration = Long.MIN_VALUE
     private var query = ""
     private var ignoreCase = true
     private var highlights: TerminalSearchHighlights? = null
@@ -54,6 +62,7 @@ internal class TerminalSearchController(
 
     fun reset(viewportRows: Int) {
         epoch++
+        cancelAuxiliarySearches()
         cancelAnalysis()
         releaseStoragePending = true
         query = ""
@@ -88,7 +97,11 @@ internal class TerminalSearchController(
                     searchedHistoryContentGeneration != host.renderCache.historyContentGeneration
             )
         ) {
+            epoch++
+            cancelAuxiliarySearches()
+            cancelAnalysis()
             highlights = null
+            pending = query.isNotEmpty()
             publishState()
         }
         if (query.isNotEmpty() && failure == null) {
@@ -102,7 +115,8 @@ internal class TerminalSearchController(
     }
 
     fun updateViewportHighlights() {
-        val current = highlights
+        if (limited) refreshViewportSearch()
+        val current = if (limited) visibleMatches else highlights
         if (current == null) {
             viewportHighlights.reset(host.renderCache.rows)
         } else {
@@ -112,6 +126,7 @@ internal class TerminalSearchController(
 
     private fun applyQuery(nextQuery: String) {
         epoch++
+        cancelAuxiliarySearches()
         cancelAnalysis()
         query = nextQuery
         if (query.isEmpty()) releaseStoragePending = true
@@ -130,9 +145,9 @@ internal class TerminalSearchController(
         mutableState.value =
             TerminalSearchState(
                 query,
-                highlights?.resultCount ?: 0,
-                highlights?.activeResultIndex ?: -1,
-                query.isNotEmpty() && (pending || job != null),
+                minOf(highlights?.resultCount ?: 0, SEARCH_RESULT_LIMIT + 1),
+                if (limited) -1 else highlights?.activeResultIndex ?: -1,
+                query.isNotEmpty() && (pending || job != null || navigationJob != null),
                 failure,
             )
     }
@@ -161,6 +176,8 @@ internal class TerminalSearchController(
         val requestScanner = scanner
         val requestHistoryContentGeneration = host.renderCache.historyContentGeneration
         val showProgress = highlights == null
+        val bounded = showProgress || limited
+        val origin = host.renderCache.discardedCount + host.renderCache.historySize - host.renderCache.scrollbackOffset
         pending = false
         val task =
             scope.launch(start = CoroutineStart.LAZY) {
@@ -169,45 +186,45 @@ internal class TerminalSearchController(
                     val publicationContext = currentCoroutineContext()
                     val result =
                         withContext(analysisDispatcher) {
-                            requestScanner.scan(
-                                session,
-                                model,
-                                requestQuery,
-                                requestIgnoreCase,
-                                onProgress =
-                                    if (!showProgress) {
-                                        null
-                                    } else {
-                                        { progress ->
-                                            withContext(publicationContext.minusKey(Job)) {
-                                                if (requestEpoch == epoch &&
-                                                    host.session === session &&
-                                                    progress.columns == host.renderCache.columns &&
-                                                    progress.buffer == host.renderCache.activeBuffer &&
-                                                    progress.historyContentGeneration == host.renderCache.historyContentGeneration
-                                                ) {
-                                                    val accumulated =
-                                                        highlights ?: TerminalSearchHighlights().also {
-                                                            it.validatesRows = true
-                                                            highlights = it
-                                                        }
-                                                    accumulated.appendResults(progress.highlights)
-                                                    if (!accumulated.hasActiveResult) accumulated.activate(0)
-                                                    searchedColumns = progress.columns
-                                                    searchedBuffer = progress.buffer
-                                                    searchedHistoryContentGeneration = progress.historyContentGeneration
-                                                    if (revealFirstResult) {
-                                                        revealFirstResult = false
-                                                        scrollToActiveResult()
+                            val progress: (suspend (TerminalSearchScan.Progress) -> Unit)? =
+                                if (!showProgress) {
+                                    null
+                                } else {
+                                    { progress ->
+                                        withContext(publicationContext.minusKey(Job)) {
+                                            if (requestEpoch == epoch &&
+                                                host.session === session &&
+                                                progress.columns == host.renderCache.columns &&
+                                                progress.buffer == host.renderCache.activeBuffer &&
+                                                progress.historyContentGeneration == host.renderCache.historyContentGeneration
+                                            ) {
+                                                val accumulated =
+                                                    highlights ?: TerminalSearchHighlights().also {
+                                                        it.validatesRows = true
+                                                        highlights = it
                                                     }
-                                                    updateViewportHighlights()
-                                                    publishState()
-                                                    host.repaint()
+                                                accumulated.appendResults(progress.highlights)
+                                                limited = accumulated.resultCount > SEARCH_RESULT_LIMIT
+                                                if (!accumulated.hasActiveResult) accumulated.activate(0)
+                                                searchedColumns = progress.columns
+                                                searchedBuffer = progress.buffer
+                                                searchedHistoryContentGeneration = progress.historyContentGeneration
+                                                if (revealFirstResult) {
+                                                    revealFirstResult = false
+                                                    scrollToActiveResult()
                                                 }
+                                                updateViewportHighlights()
+                                                publishState()
+                                                host.repaint()
                                             }
                                         }
-                                    },
-                            )
+                                    }
+                                }
+                            if (bounded) {
+                                TerminalSearchWindow(session, requestQuery, requestIgnoreCase).collect(origin, progress)
+                            } else {
+                                requestScanner.scan(session, model, requestQuery, requestIgnoreCase, SEARCH_RESULT_LIMIT + 1, progress)
+                            }
                         }
                     if (requestEpoch != epoch || host.session !== session) return@launch
                     if (result == null ||
@@ -219,13 +236,26 @@ internal class TerminalSearchController(
                         updateViewportHighlights()
                         return@launch
                     }
-                    val oldRow = highlights?.activeStartAbsoluteRow() ?: NO_ACTIVE_ROW
-                    val oldColumn = highlights?.activeStartColumn() ?: -1
-                    val previous = publishedModel
-                    publishedModel = model
-                    model = previous
+                    val oldActive = activeMatch ?: highlights
+                    val oldRow = oldActive?.activeStartAbsoluteRow() ?: NO_ACTIVE_ROW
+                    val oldColumn = oldActive?.activeStartColumn() ?: -1
+                    if (!bounded) {
+                        val previous = publishedModel
+                        publishedModel = model
+                        model = previous
+                    }
                     highlights = result.highlights
+                    limited = result.highlights.resultCount > SEARCH_RESULT_LIMIT
+                    if (!limited) activeMatch = null
                     if (oldRow != NO_ACTIVE_ROW) result.highlights.activateNearest(oldRow, oldColumn)
+                    if (limited && activeMatch == null && result.highlights.hasActiveResult) {
+                        val selected = result.highlights.activeResultIndex
+                        activeMatch =
+                            TerminalSearchHighlights().also {
+                                it.appendResults(result.highlights, selected, selected + 1)
+                                it.activate(0)
+                            }
+                    }
                     searchedSession = session
                     searchedContentGeneration = result.generation
                     searchedHistoryContentGeneration = result.historyContentGeneration
@@ -265,6 +295,7 @@ internal class TerminalSearchController(
 
     private fun activateRelativeResult(delta: Int): Boolean {
         val currentHighlights = highlights ?: return false
+        if (limited) return navigateLimited(delta < 0)
         if (currentHighlights.resultCount == 0) return false
         val current =
             if (currentHighlights.activeResultIndex in 0 until currentHighlights.resultCount) {
@@ -282,10 +313,124 @@ internal class TerminalSearchController(
     }
 
     private fun scrollToActiveResult() {
-        val currentHighlights = highlights ?: return
+        val currentHighlights = activeMatch ?: highlights ?: return
         val activeRow = currentHighlights.activeStartAbsoluteRow()
         if (activeRow == NO_ACTIVE_ROW) return
         host.scrollToAbsoluteRow(activeRow, center = true)
+    }
+
+    private fun cancelAuxiliarySearches() {
+        navigationJob?.cancel()
+        navigationJob = null
+        pendingNavigation = 0
+        viewportJob?.cancel()
+        viewportJob = null
+        limited = false
+        activeMatch = null
+        visibleMatches = null
+        viewportTop = Long.MIN_VALUE
+        viewportGeneration = Long.MIN_VALUE
+    }
+
+    private fun navigateLimited(backwards: Boolean): Boolean {
+        if (navigationJob != null) {
+            pendingNavigation += if (backwards) -1 else 1
+            return true
+        }
+        val session = host.session ?: return false
+        val active = activeMatch ?: highlights ?: return false
+        if (!active.hasActiveResult) return false
+        val row = active.activeStartAbsoluteRow()
+        val column = active.activeStartColumn()
+        val requestEpoch = epoch
+        val requestQuery = query
+        val requestIgnoreCase = ignoreCase
+        navigationJob?.cancel()
+        val task =
+            scope.launch(start = CoroutineStart.LAZY) {
+                try {
+                    val found =
+                        withContext(analysisDispatcher) {
+                            TerminalSearchWindow(session, requestQuery, requestIgnoreCase).find(row, column, backwards)
+                        }
+                    if (requestEpoch != epoch || host.session !== session) return@launch
+                    activeMatch = found
+                    scrollToActiveResult()
+                    viewportGeneration = Long.MIN_VALUE
+                    updateViewportHighlights()
+                    host.repaint()
+                } catch (cancelled: CancellationException) {
+                    throw cancelled
+                } catch (error: Exception) {
+                    if (requestEpoch == epoch) failure = error
+                } finally {
+                    if (navigationJob === currentCoroutineContext()[Job]) {
+                        navigationJob = null
+                        if (pendingNavigation != 0 && requestEpoch == epoch && failure == null) {
+                            val previous = pendingNavigation < 0
+                            pendingNavigation += if (previous) 1 else -1
+                            navigateLimited(previous)
+                        }
+                        publishState()
+                    }
+                }
+            }
+        navigationJob = task
+        task.start()
+        publishState()
+        return true
+    }
+
+    private fun refreshViewportSearch() {
+        val session = host.session ?: return
+        val cache = host.renderCache
+        val top = cache.discardedCount + cache.historySize - cache.scrollbackOffset
+        if (top == viewportTop && cache.contentGeneration == viewportGeneration) return
+        viewportTop = top
+        viewportGeneration = cache.contentGeneration
+        val generation = viewportGeneration
+        val bottom = top + cache.rows - 1
+        val requestEpoch = epoch
+        val requestQuery = query
+        val requestIgnoreCase = ignoreCase
+        viewportJob?.cancel()
+        visibleMatches = null
+        viewportJob =
+            scope.launch {
+                try {
+                    val found =
+                        withContext(analysisDispatcher) {
+                            TerminalSearchWindow(session, requestQuery, requestIgnoreCase).visible(top, bottom)
+                        }
+                    if (requestEpoch != epoch ||
+                        host.session !== session ||
+                        top != viewportTop ||
+                        generation != viewportGeneration
+                    ) {
+                        return@launch
+                    }
+                    val active = activeMatch ?: highlights
+                    found.activate(-1)
+                    if (active != null && active.hasActiveResult) {
+                        found.activateNearest(active.activeStartAbsoluteRow(), active.activeStartColumn())
+                        if (found.activeStartAbsoluteRow() != active.activeStartAbsoluteRow() ||
+                            found.activeStartColumn() != active.activeStartColumn()
+                        ) {
+                            found.activate(-1)
+                        }
+                    }
+                    visibleMatches = found
+                    found.buildViewportHighlights(cache, viewportHighlights)
+                    host.repaint()
+                } catch (cancelled: CancellationException) {
+                    throw cancelled
+                } catch (error: Exception) {
+                    if (requestEpoch == epoch) {
+                        failure = error
+                        publishState()
+                    }
+                }
+            }
     }
 
     private companion object {

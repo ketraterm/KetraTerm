@@ -33,6 +33,7 @@ internal class TerminalSearchScan {
         model: TerminalSearchModel,
         query: String,
         ignoreCase: Boolean,
+        maxResults: Int = Int.MAX_VALUE,
         onProgress: (suspend (Progress) -> Unit)? = null,
     ): Result? {
         val context = currentCoroutineContext()
@@ -61,7 +62,7 @@ internal class TerminalSearchScan {
             }
         val index = (spare ?: RowIndex()).also { spare = null }
         index.reset(reader, query, ignoreCase, first, (last - first + 1).toInt(), columns, buffer, historyContentGeneration)
-        model.begin(query, ignoreCase, first, { context.ensureActive() }, validateRows = true)
+        model.begin(query, ignoreCase, first, { context.ensureActive() }, validateRows = true, maxResults = maxResults)
         var lastGeneration = generation
         var published = 0
         var nextPublication = first
@@ -82,7 +83,7 @@ internal class TerminalSearchScan {
             verifyWrap: Boolean,
         ): Boolean {
             var next = start
-            while (next <= end) {
+            while (next <= end && !model.limitReached) {
                 context.ensureActive()
                 val copied = copy.read(reader, next, end) { context.ensureActive() }
                 val copiedFirst = copy.firstAbsoluteRow
@@ -143,7 +144,7 @@ internal class TerminalSearchScan {
                 yield()
             }
             var start = 0
-            while (start < index.count) {
+            while (start < index.count && !model.limitReached) {
                 context.ensureActive()
                 var end = start
                 var dirty = false
@@ -186,7 +187,7 @@ internal class TerminalSearchScan {
         highlights.discardBefore(retainedFirst) { context.ensureActive() }
         // Only a stable pass becomes the next reuse baseline. Publications may still
         // show validated results from a moving source while a follow-up catches up.
-        var reusable = generation == lastGeneration
+        var reusable = generation == lastGeneration && highlights.resultCount <= SEARCH_RESULT_LIMIT
         if (reusable) {
             for (row in 0 until index.count) {
                 if (row and 255 == 0) context.ensureActive()
@@ -208,6 +209,10 @@ internal class TerminalSearchScan {
             // Keep the last stable baseline during continuous output. Its rows are
             // still individually validated on the next pass.
             spare = index
+        }
+        if (highlights.resultCount > SEARCH_RESULT_LIMIT) {
+            cached = null
+            spare = null
         }
         return Result(highlights, columns, buffer, lastGeneration, historyContentGeneration, generation != lastGeneration)
     }

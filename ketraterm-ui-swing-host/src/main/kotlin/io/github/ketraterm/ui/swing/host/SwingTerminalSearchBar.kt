@@ -276,6 +276,7 @@ public class SwingTerminalSearchBar
                 when {
                     state.failure != null -> failedText
                     state.isSearching -> searchingText
+                    state.isCountLimited -> messages.message("search.matchCounterLimited", state.resultCount - 1)
                     else ->
                         messages.message(
                             "search.matchCounter",

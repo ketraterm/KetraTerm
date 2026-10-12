@@ -26,6 +26,11 @@ internal class TerminalSearchModel {
 
     // A partial logical line must remain discardable after history eviction.
     private val pending = TerminalSearchHighlights()
+    private val previousConfirmed = TerminalSearchHighlights()
+    private var maxResults = Int.MAX_VALUE
+    private var keepLast = false
+    private var acceptsMatch: (Long, Int, Long) -> Boolean = { _, _, _ -> true }
+    val limitReached: Boolean get() = !keepLast && highlights.resultCount + confirmedResults >= maxResults
     private var confirmedResults = 0
     private var query = ""
     private var prefixes = IntArray(0)
@@ -63,7 +68,13 @@ internal class TerminalSearchModel {
         firstAbsoluteRow: Long,
         checkCancelled: () -> Unit = {},
         validateRows: Boolean = false,
+        maxResults: Int = Int.MAX_VALUE,
+        keepLast: Boolean = false,
+        acceptsMatch: (Long, Int, Long) -> Boolean = { _, _, _ -> true },
     ) {
+        this.maxResults = maxResults
+        this.keepLast = keepLast
+        this.acceptsMatch = acceptsMatch
         this.query = query
         this.ignoreCase = ignoreCase
         this.checkCancelled = checkCancelled
@@ -111,6 +122,7 @@ internal class TerminalSearchModel {
         matched = 0
         nextPosition = 0
         pending.clear()
+        previousConfirmed.clear()
         confirmedResults = 0
     }
 
@@ -130,6 +142,7 @@ internal class TerminalSearchModel {
     fun append(copy: TerminalTextRangeCopy) {
         if (query.isEmpty()) return
         for (row in 0 until copy.rows) {
+            if (limitReached) break
             currentRow = copy.firstAbsoluteRow + row
             currentId = copy.lineIds[row]
             currentGeneration = copy.lineGenerations[row]
@@ -148,7 +161,13 @@ internal class TerminalSearchModel {
         firstRow: Long,
         lastRow: Long,
     ) {
-        highlights.appendResults(source, source.firstResultAtOrAfter(firstRow), source.firstResultAtOrAfter(lastRow + 1), checkCancelled)
+        val first = source.firstResultAtOrAfter(firstRow)
+        val end =
+            minOf(
+                source.firstResultAtOrAfter(lastRow + 1),
+                first + minOf(source.resultCount - first, maxResults - highlights.resultCount),
+            )
+        highlights.appendResults(source, first, end, checkCancelled)
     }
 
     val completedResults: TerminalSearchHighlights get() = highlights
@@ -156,7 +175,15 @@ internal class TerminalSearchModel {
     private fun finishLine() {
         checkCancelled()
         // Only matches ending before the trailing ASCII spaces survive trimming.
-        highlights.appendResults(pending, 0, confirmedResults, checkCancelled)
+        if (keepLast) {
+            val source = if (confirmedResults > 0) pending else previousConfirmed
+            if (source.resultCount > 0) {
+                highlights.clear()
+                highlights.appendResults(source, 0, 1, checkCancelled)
+            }
+        } else {
+            highlights.appendResults(pending, 0, confirmedResults, checkCancelled)
+        }
         discardPendingLine()
     }
 
@@ -269,15 +296,17 @@ internal class TerminalSearchModel {
                     index--
                 }
                 if (index < 0) {
-                    pending.beginResult()
-                    pending.addSegment(
-                        currentRow,
-                        startColumn + position,
-                        startColumn + position + query.length,
-                        currentId,
-                        currentGeneration,
-                    )
-                    pending.finishResult()
+                    if (prepareMatch(currentRow, startColumn + position, currentRow)) {
+                        pending.beginResult()
+                        pending.addSegment(
+                            currentRow,
+                            startColumn + position,
+                            startColumn + position + query.length,
+                            currentId,
+                            currentGeneration,
+                        )
+                        pending.finishResult()
+                    }
                     position += query.length
                     if (position - 1 <= lastNonSpace) confirmedResults = pending.resultCount
                     continue
@@ -329,7 +358,25 @@ internal class TerminalSearchModel {
         }
     }
 
+    private fun prepareMatch(
+        row: Long,
+        column: Int,
+        endRow: Long,
+    ): Boolean {
+        if (!acceptsMatch(row, column, endRow)) return false
+        if (keepLast) {
+            if (confirmedResults > 0) {
+                previousConfirmed.clear()
+                previousConfirmed.appendResults(pending, 0, 1)
+            }
+            pending.clear()
+            confirmedResults = 0
+        }
+        return highlights.resultCount + pending.resultCount < maxResults || keepLast
+    }
+
     private fun appendMatch() {
+        if (!prepareMatch(rows[nextPosition], (ranges[nextPosition] ushr 32).toInt(), currentRow)) return
         pending.beginResult()
         var position = nextPosition
         var segmentRow = rows[position]

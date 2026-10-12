@@ -504,6 +504,7 @@ public final class io/github/ketraterm/ui/swing/search/TerminalSearchState {
 	public final fun getQuery ()Ljava/lang/String;
 	public final fun getResultCount ()I
 	public fun hashCode ()I
+	public final fun isCountLimited ()Z
 	public final fun isSearching ()Z
 	public fun toString ()Ljava/lang/String;
 }
