@@ -121,6 +121,24 @@
                 class="io.github.ketraterm.intellij.ui.KetraTermScrollPageDownAction">
             <keyboard-shortcut keymap="$default" first-keystroke="shift PAGE_DOWN"/>
         </action>
+        <action id="KetraTerm.Search.NextMatch" class="io.github.ketraterm.intellij.ui.KetraTermNextSearchMatchAction">
+            <keyboard-shortcut keymap="$default" first-keystroke="ENTER"/>
+        </action>
+        <action id="KetraTerm.Search.PreviousMatch" class="io.github.ketraterm.intellij.ui.KetraTermPreviousSearchMatchAction">
+            <keyboard-shortcut keymap="$default" first-keystroke="shift ENTER"/>
+        </action>
+        <action id="KetraTerm.Search.Close" class="io.github.ketraterm.intellij.ui.KetraTermCloseSearchAction">
+            <keyboard-shortcut keymap="$default" first-keystroke="ESCAPE"/>
+        </action>
+        <action id="KetraTerm.Search.MatchCase" class="io.github.ketraterm.intellij.ui.KetraTermSearchMatchCaseAction">
+            <keyboard-shortcut keymap="$default" first-keystroke="alt C"/>
+        </action>
+        <action id="KetraTerm.Search.WholeWord" class="io.github.ketraterm.intellij.ui.KetraTermSearchWholeWordAction">
+            <keyboard-shortcut keymap="$default" first-keystroke="alt W"/>
+        </action>
+        <action id="KetraTerm.Search.Regex" class="io.github.ketraterm.intellij.ui.KetraTermSearchRegexAction">
+            <keyboard-shortcut keymap="$default" first-keystroke="alt R"/>
+        </action>
     </actions>
 
 </idea-plugin>

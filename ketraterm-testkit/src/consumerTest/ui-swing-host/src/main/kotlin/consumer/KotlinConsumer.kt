@@ -91,6 +91,11 @@ fun main() =
             SwingUtilities.invokeAndWait {
                 val terminal = SwingTerminal()
                 val searchBar = SwingTerminalSearchBar(terminal, JavaConsumer.hostMessages())
+                JavaConsumer.configureSearchHints(searchBar)
+                check(!searchBar.performAction(SwingTerminalSearchAction.CLOSE))
+                searchBar.open()
+                check(searchBar.performAction(SwingTerminalSearchAction.TOGGLE_REGEX))
+                check(searchBar.performAction(SwingTerminalSearchAction.CLOSE))
                 val target = JavaConsumer.NativeTarget()
                 try {
                     terminal.setShellSuggestionProvider(provider)

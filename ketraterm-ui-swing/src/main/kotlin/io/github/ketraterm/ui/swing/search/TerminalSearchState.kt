@@ -22,8 +22,12 @@ package io.github.ketraterm.ui.swing.search
  * @property resultCount matches found so far for a new query, or matches from
  * the last completed pass during a content refresh. While searching, the count
  * is provisional and may lag output; a new query starts with zero matches.
+ * A capped pass reports 1,001: 1,000 collected matches plus one overflow witness.
+ * Hosts should display `1,000+` when [isCountLimited] is true.
  * @property activeResultIndex zero-based active match, or `-1` when no match is
- * active.
+ * active or when a capped search has no known global match index.
+ * @property isCountLimited true when more than 1,000 matches exist. The count is a
+ * lower bound and the active global index is unavailable (`-1`); navigation remains unrestricted.
  * @property isSearching whether a background pass is pending or running.
  * @property failure failure of the last pass, or null. A failed pass is not
  * reported as a successful empty search; changing the query retries it.
@@ -36,4 +40,7 @@ public data class TerminalSearchState
         val activeResultIndex: Int,
         val isSearching: Boolean = false,
         val failure: Throwable? = null,
-    )
+    ) {
+        /** Whether [resultCount] is a lower bound rather than an exact completed total. */
+        public val isCountLimited: Boolean get() = resultCount > SEARCH_RESULT_LIMIT
+    }

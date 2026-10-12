@@ -19,42 +19,48 @@ import io.github.ketraterm.render.api.TerminalRenderCellFlags
 import io.github.ketraterm.render.cache.TerminalRenderCache
 import io.github.ketraterm.render.cache.TerminalTextRangeCopy
 import io.github.ketraterm.ui.swing.render.forEachLogicalTextCell
+import java.util.regex.Pattern
 
-/**
- * Scans primitive render-cache rows for literal text matches.
- *
- * Search is line-oriented over terminal logical lines: soft-wrapped visual rows
- * are joined before matching, and final trailing grid spaces are ignored. The
- * model allocates only during search updates, never from the frame paint loop.
- */
+/** Matches decoded UTF-16 as it arrives, retaining only query-sized candidate geometry. */
 internal class TerminalSearchModel {
-    private val lineText = StringBuilder(INITIAL_TEXT_CAPACITY)
-    private val textScratch = CharArray(256)
-
-    // Each run stores UTF-16 start/end, row, column start and column end.
-    // LINEAR_COLUMNS means consecutive UTF-16 units occupy consecutive cells;
-    // otherwise every unit in the run maps to the same complete cell span.
-    private var runs = IntArray(INITIAL_TEXT_CAPACITY)
-    private var runsSize = 0
-    private var matchRun = 0
+    private var patternModel: TerminalSearchPatternModel? = null
     private val highlights = TerminalSearchHighlights()
-    private var rowIds = LongArray(INITIAL_TEXT_CAPACITY)
-    private var rowGenerations = LongArray(INITIAL_TEXT_CAPACITY)
-    private var firstAbsoluteRow = 0L
-    private var currentRow = 0
+
+    // A partial logical line must remain discardable after history eviction.
+    private val pending = TerminalSearchHighlights()
+    private val previousConfirmed = TerminalSearchHighlights()
+    private var maxResults = Int.MAX_VALUE
+    private var keepLast = false
+    private var acceptsMatch: (Long, Int, Long) -> Boolean = { _, _, _ -> true }
+    val limitReached: Boolean get() = patternModel?.limitReached ?: (!keepLast && highlights.resultCount + confirmedResults >= maxResults)
+    private var confirmedResults = 0
     private var query = ""
-    private var queryPrefixes: IntArray? = null
-    private var ignoreCase = true
+    private var prefixes = IntArray(0)
+    private var skipOrdinaryRuns = false
+    private var shifts = IntArray(0)
+    private var textScratch = CharArray(0)
+    private var foldedLast = ' '
+    private var ignoreCase = false
+    private var matched = 0
+    private var nextPosition = 0
+    private var rows = LongArray(0)
+    private var ranges = LongArray(0)
+    private var ids = LongArray(0)
+    private var generations = LongArray(0)
+    private var currentRow = 0L
+    private var currentId = 0L
+    private var currentGeneration = 0L
     private var checkCancelled: () -> Unit = {}
+    private var untilCheck = 0
 
     fun search(
         cache: TerminalRenderCache,
         query: String,
         ignoreCase: Boolean,
     ): TerminalSearchHighlights {
-        begin(query, ignoreCase, cache.discardedCount + cache.historySize - cache.scrollbackOffset)
-        if (query.isEmpty()) return highlights
-        append(cache, firstAbsoluteRow)
+        val first = cache.discardedCount + cache.historySize - cache.scrollbackOffset
+        begin(query, ignoreCase, first)
+        append(cache, first)
         return finish()
     }
 
@@ -64,62 +70,102 @@ internal class TerminalSearchModel {
         firstAbsoluteRow: Long,
         checkCancelled: () -> Unit = {},
         validateRows: Boolean = false,
+        maxResults: Int = Int.MAX_VALUE,
+        keepLast: Boolean = false,
+        acceptsMatch: (Long, Int, Long) -> Boolean = { _, _, _ -> true },
+        pattern: Pattern? = null,
     ) {
         this.query = query
+        if (pattern != null) {
+            val matching = patternModel ?: TerminalSearchPatternModel(pattern).also { patternModel = it }
+            matching.begin(pattern, checkCancelled, validateRows, maxResults, keepLast, acceptsMatch)
+            return
+        }
+        patternModel = null
+        this.maxResults = maxResults
+        this.keepLast = keepLast
+        this.acceptsMatch = acceptsMatch
+        this.query = query
         this.ignoreCase = ignoreCase
-        this.firstAbsoluteRow = firstAbsoluteRow
         this.checkCancelled = checkCancelled
+        currentRow = firstAbsoluteRow
         highlights.clear()
         highlights.validatesRows = validateRows
         discardPendingLine()
-        prepareQuery()
+        untilCheck = 0
+        checkCancelled()
+        prefixes = IntArray(query.length)
+        var index = 1
+        var prefix = 0
+        while (index < query.length) {
+            checkStep()
+            if (query[index].equals(query[prefix], ignoreCase)) {
+                prefixes[index++] = ++prefix
+            } else if (prefix > 0) {
+                prefix = prefixes[prefix - 1]
+            } else {
+                index++
+            }
+        }
+        skipOrdinaryRuns = query.length in 4..64
+        if (skipOrdinaryRuns) {
+            if (shifts.isEmpty()) {
+                shifts = IntArray(128)
+                textScratch = CharArray(256)
+            }
+            shifts.fill(query.length)
+            // Later positions shorten the shift, including collisions in the folded-character table.
+            for (position in 0 until query.lastIndex) {
+                shifts[fold(query[position]).code and 127] = query.lastIndex - position
+            }
+            foldedLast = fold(query.last())
+        }
+        if (rows.size < query.length) {
+            rows = LongArray(query.length)
+            ranges = LongArray(query.length)
+            ids = LongArray(query.length)
+            generations = LongArray(query.length)
+        }
     }
 
     fun discardPendingLine() {
-        lineText.setLength(0)
-        runsSize = 0
-        matchRun = 0
+        patternModel?.let {
+            it.discardPendingLine()
+            return
+        }
+        matched = 0
+        nextPosition = 0
+        pending.clear()
+        previousConfirmed.clear()
+        confirmedResults = 0
     }
 
     fun append(
         cache: TerminalRenderCache,
         firstRow: Long,
     ) {
-        appendRows(cache.rows, firstRow, cache.lineIds, cache.lineGenerations, cache.lineWrapped) { row ->
+        if (query.isEmpty()) return
+        for (row in 0 until cache.rows) {
+            currentRow = firstRow + row
+            currentId = cache.lineIds[row]
+            currentGeneration = cache.lineGenerations[row]
             appendRow(cache.columns, cache.codeWords, cache.flags, cache.clusterRefs, cache.clusterCodepoints, row, cache.lineWrapped[row])
         }
     }
 
     fun append(copy: TerminalTextRangeCopy) {
-        appendRows(copy.rows, copy.firstAbsoluteRow, copy.lineIds, copy.lineGenerations, copy.lineWrapped) { row ->
+        if (query.isEmpty()) return
+        for (row in 0 until copy.rows) {
+            if (limitReached) break
+            currentRow = copy.firstAbsoluteRow + row
+            currentId = copy.lineIds[row]
+            currentGeneration = copy.lineGenerations[row]
             appendRow(copy.columns, copy.codeWords, copy.flags, copy.clusterRefs, copy.clusterCodepoints, row, copy.lineWrapped[row])
         }
     }
 
-    private inline fun appendRows(
-        rows: Int,
-        firstRow: Long,
-        ids: LongArray,
-        generations: LongArray,
-        wrapped: BooleanArray,
-        appendRow: (Int) -> Unit,
-    ) {
-        for (row in 0 until rows) {
-            checkCancelled()
-            currentRow = (firstRow + row - firstAbsoluteRow).toInt()
-            if (currentRow >= rowIds.size) {
-                val capacity = nextCapacity(rowIds.size, currentRow + 1)
-                rowIds = rowIds.copyOf(capacity)
-                rowGenerations = rowGenerations.copyOf(capacity)
-            }
-            rowIds[currentRow] = ids[row]
-            rowGenerations[currentRow] = generations[row]
-            appendRow(row)
-            if (!wrapped[row]) finishLine()
-        }
-    }
-
     fun finish(): TerminalSearchHighlights {
+        patternModel?.let { return it.finish() }
         finishLine()
         highlights.activate(if (highlights.resultCount == 0) -1 else 0)
         return highlights
@@ -130,298 +176,253 @@ internal class TerminalSearchModel {
         firstRow: Long,
         lastRow: Long,
     ) {
-        highlights.appendResults(source, source.firstResultAtOrAfter(firstRow), source.firstResultAtOrAfter(lastRow + 1), checkCancelled)
+        val first = source.firstResultAtOrAfter(firstRow)
+        val end =
+            minOf(
+                source.firstResultAtOrAfter(lastRow + 1),
+                first + minOf(source.resultCount - first, maxResults - highlights.resultCount),
+            )
+        highlights.appendResults(source, first, end, checkCancelled)
     }
 
-    val completedResults: TerminalSearchHighlights get() = highlights
+    val completedResults: TerminalSearchHighlights get() = patternModel?.highlights ?: highlights
 
     private fun finishLine() {
-        trimTrailingSpaces()
-        scanLine(query, ignoreCase)
+        checkCancelled()
+        // Only matches ending before the trailing ASCII spaces survive trimming.
+        if (keepLast) {
+            val source = if (confirmedResults > 0) pending else previousConfirmed
+            if (source.resultCount > 0) {
+                highlights.clear()
+                highlights.appendResults(source, 0, 1, checkCancelled)
+            }
+        } else {
+            highlights.appendResults(pending, 0, confirmedResults, checkCancelled)
+        }
         discardPendingLine()
     }
 
-    private fun scanLine(
-        query: String,
-        ignoreCase: Boolean,
-    ) {
-        if (query.isEmpty() || lineText.length < query.length) return
-        val prefixes = queryPrefixes
-        if (prefixes == null) {
-            scanShortLine(query, ignoreCase)
-            return
-        }
-
-        var index = 0
-        var matched = 0
-        var untilCancellationCheck = 0
-        while (index < lineText.length) {
-            if (untilCancellationCheck-- == 0) {
-                checkCancelled()
-                untilCancellationCheck = 255
-            }
-            if (lineText[index].equals(query[matched], ignoreCase)) {
-                index++
-                matched++
-                if (matched == query.length) {
-                    appendMatch(firstAbsoluteRow, index - matched, index)
-                    // Search results are non-overlapping, even when the query has a repeated prefix.
-                    matched = 0
-                }
-            } else if (matched > 0) {
-                matched = prefixes[matched - 1]
-            } else {
-                index++
-            }
-        }
-    }
-
-    private fun prepareQuery() {
-        checkCancelled()
-        // A bounded direct comparison is cheaper for short queries and needs no table.
-        queryPrefixes = null
-        if (query.length <= SHORT_QUERY_LIMIT) return
-        val prefixes = IntArray(query.length)
-        var index = 1
-        var matched = 0
-        var untilCancellationCheck = 0
-        while (index < query.length) {
-            if (untilCancellationCheck-- == 0) {
-                checkCancelled()
-                untilCancellationCheck = 255
-            }
-            if (query[index].equals(query[matched], ignoreCase)) {
-                matched++
-                prefixes[index++] = matched
-            } else if (matched > 0) {
-                matched = prefixes[matched - 1]
-            } else {
-                index++
-            }
-        }
-        queryPrefixes = prefixes
-    }
-
-    private fun scanShortLine(
-        query: String,
-        ignoreCase: Boolean,
-    ) {
-        var index = 0
-        var untilCancellationCheck = 0
-        val lastStart = lineText.length - query.length
-        while (index <= lastStart) {
-            if (untilCancellationCheck-- == 0) {
-                checkCancelled()
-                untilCancellationCheck = 255
-            }
-            var matched = 0
-            while (matched < query.length && lineText[index + matched].equals(query[matched], ignoreCase)) {
-                matched++
-            }
-            if (matched == query.length) {
-                appendMatch(firstAbsoluteRow, index, index + query.length)
-                index += query.length
-            } else {
-                index++
-            }
-        }
-    }
-
-    private fun appendMatch(
-        firstAbsoluteRow: Long,
-        startChar: Int,
-        endChar: Int,
-    ) {
-        highlights.beginResult()
-
-        var run = matchRun
-        var untilCancellationCheck = 0
-        while (runs[run + 1] <= startChar) {
-            if (untilCancellationCheck-- == 0) {
-                checkCancelled()
-                untilCancellationCheck = 255
-            }
-            run += RUN_SIZE
-        }
-        var segmentRow = runs[run + 2]
-        var startColumn = runColumn(run, startChar, false)
-        var endColumn = startColumn
-        while (true) {
-            if (untilCancellationCheck-- == 0) {
-                checkCancelled()
-                untilCancellationCheck = 255
-            }
-            val row = runs[run + 2]
-            if (row != segmentRow) {
-                highlights.addSegment(firstAbsoluteRow + segmentRow, startColumn, endColumn, rowIds[segmentRow], rowGenerations[segmentRow])
-                segmentRow = row
-                startColumn = runs[run + 3]
-            }
-            endColumn = runColumn(run, minOf(endChar, runs[run + 1]), true)
-            if (runs[run + 1] >= endChar) break
-            run += RUN_SIZE
-        }
-        // Subsequent non-overlapping matches never need to revisit earlier runs.
-        matchRun = run
-        highlights.addSegment(firstAbsoluteRow + segmentRow, startColumn, endColumn, rowIds[segmentRow], rowGenerations[segmentRow])
-        highlights.finishResult()
-    }
-
-    private fun runColumn(
-        run: Int,
-        charIndex: Int,
-        end: Boolean,
-    ): Int =
-        if (runs[run + 4] == LINEAR_COLUMNS) {
-            runs[run + 3] + charIndex - runs[run]
-        } else {
-            runs[run + if (end) 4 else 3]
-        }
-
     private fun appendRow(
         columns: Int,
-        codeWords: IntArray,
+        codes: IntArray,
         flags: IntArray,
-        clusterRefs: LongArray,
-        clusterCodepoints: IntArray,
+        refs: LongArray,
+        clusters: IntArray,
         row: Int,
         wrapped: Boolean,
     ) {
-        val end = textEndColumn(columns, codeWords, flags, row, wrapped)
+        patternModel?.let {
+            it.appendRow(columns, codes, flags, refs, clusters, row, wrapped, currentRow, currentId, currentGeneration)
+            return
+        }
+        checkCancelled()
+        var end = columns
         val offset = row * columns
+        if (!wrapped) {
+            while (end > 0) {
+                checkStep()
+                val index = offset + end - 1
+                val cellFlags = flags[index]
+                if (cellFlags and COMPLEX_FLAGS != 0 ||
+                    cellFlags and TerminalRenderCellFlags.CODEPOINT != 0 &&
+                    codes[index] != ' '.code
+                ) {
+                    break
+                }
+                end--
+            }
+        }
+        val firstCharacter = query[0]
         var column = 0
         while (column < end) {
             checkCancelled()
             val start = column
-            val limit = minOf(end, column + textScratch.size)
+            val limit = minOf(end, column + 256)
+            var lastNonSpace = -1
             while (column < limit) {
                 val cellFlags = flags[offset + column]
-                val codePoint = if (cellFlags and TerminalRenderCellFlags.CODEPOINT != 0) codeWords[offset + column] else ' '.code
-                if (cellFlags and COMPLEX_CELL_FLAGS != 0 || codePoint !in 0..0xFFFF) break
-                textScratch[column - start] = codePoint.toChar()
+                val cp = if (cellFlags and TerminalRenderCellFlags.CODEPOINT != 0) codes[offset + column] else ' '.code
+                if (cellFlags and COMPLEX_FLAGS != 0 || cp !in 0..0xFFFF) break
+                val character = cp.toChar()
+                if (skipOrdinaryRuns) {
+                    textScratch[column - start] = character
+                    if (character != ' ') lastNonSpace = column - start
+                } else {
+                    if (matched != 0 || character.equals(firstCharacter, ignoreCase)) accept(character, column, column + 1)
+                    if (character != ' ') confirmedResults = pending.resultCount
+                }
                 column++
             }
             if (column > start) {
-                val charStart = lineText.length
-                lineText.appendRange(textScratch, 0, column - start)
-                appendRun(charStart, start, LINEAR_COLUMNS)
+                if (skipOrdinaryRuns) appendOrdinaryRun(start, column - start, lastNonSpace)
                 continue
             }
-            // Keep complex-cell decoding shared with other logical-text consumers.
-            // Bound this lookahead too; cluster payload cancellation remains in the decoder.
             do {
                 column = minOf(end, column + if (flags[offset + column] and TerminalRenderCellFlags.WIDE_LEADING != 0) 2 else 1)
                 if (column >= limit) break
                 val cellFlags = flags[offset + column]
-                val codePoint = if (cellFlags and TerminalRenderCellFlags.CODEPOINT != 0) codeWords[offset + column] else ' '.code
-            } while (cellFlags and COMPLEX_CELL_FLAGS != 0 || codePoint !in 0..0xFFFF)
-            forEachLogicalTextCell(columns, codeWords, flags, clusterRefs, clusterCodepoints, row, checkCancelled, column, start) {
-                    codePoint,
-                    startColumn,
-                    endColumn,
-                ->
-                appendMappedCodePoint(codePoint, startColumn, endColumn, flags[offset + startColumn])
+                val cp = if (cellFlags and TerminalRenderCellFlags.CODEPOINT != 0) codes[offset + column] else ' '.code
+            } while (cellFlags and COMPLEX_FLAGS != 0 || cp !in 0..0xFFFF)
+            forEachLogicalTextCell(columns, codes, flags, refs, clusters, row, checkCancelled, column, start) { cp, from, to ->
+                require(Character.isValidCodePoint(cp))
+                if (cp <= 0xFFFF) {
+                    val character = cp.toChar()
+                    if (matched != 0 || character.equals(firstCharacter, ignoreCase)) accept(character, from, to)
+                } else {
+                    accept(Character.highSurrogate(cp), from, to)
+                    accept(Character.lowSurrogate(cp), from, to)
+                }
+                if (cp != ' '.code) confirmedResults = pending.resultCount
             }
         }
+        if (!wrapped) finishLine()
     }
 
-    private fun textEndColumn(
-        columns: Int,
-        codeWords: IntArray,
-        flags: IntArray,
-        row: Int,
-        wrapped: Boolean,
-    ): Int {
-        if (wrapped) return columns
-        val offset = row * columns
-        var end = columns
-        while (end > 0) {
-            if ((columns - end) and 255 == 255) checkCancelled()
-            val index = offset + end - 1
-            val cellFlags = flags[index]
-            // Leave multi-cell and cluster semantics to the logical-text decoder.
-            if (cellFlags and (
-                    TerminalRenderCellFlags.CLUSTER or TerminalRenderCellFlags.WIDE_LEADING or
-                        TerminalRenderCellFlags.WIDE_TRAILING or TerminalRenderCellFlags.WRAP_PADDING
-                ) != 0
-            ) {
-                break
-            }
-            if (cellFlags and TerminalRenderCellFlags.CODEPOINT != 0 && codeWords[index] != ' '.code) break
-            end--
+    private fun fold(character: Char): Char =
+        if (!ignoreCase) {
+            character
+        } else if (character < '\u0080') {
+            if (character in 'A'..'Z') character + 32 else character
+        } else {
+            character.uppercaseChar().lowercaseChar()
         }
-        return end
-    }
 
-    private fun appendMappedCodePoint(
-        codePoint: Int,
+    private fun appendOrdinaryRun(
         startColumn: Int,
-        endColumn: Int,
-        flags: Int,
+        count: Int,
+        lastNonSpace: Int,
     ) {
-        val charStart = lineText.length
-        lineText.appendCodePoint(codePoint)
-        val charEnd = lineText.length
-        val linear = charEnd - charStart == 1 && endColumn - startColumn == 1 && flags and TerminalRenderCellFlags.CLUSTER == 0
-        appendRun(charStart, startColumn, if (linear) LINEAR_COLUMNS else endColumn)
+        var position = 0
+        // Text later in this captured run confirms earlier matches ending in spaces.
+        if (lastNonSpace >= 0) confirmedResults = pending.resultCount
+        while (matched != 0 && position < count) {
+            accept(textScratch[position], startColumn + position, startColumn + position + 1)
+            if (position <= lastNonSpace) confirmedResults = pending.resultCount
+            position++
+        }
+        // Bound comparison work before falling back to the linear streaming matcher.
+        var remainingComparisons = count * 2
+        candidates@ while (position <= count - query.length) {
+            checkStep()
+            val last = fold(textScratch[position + query.lastIndex])
+            remainingComparisons--
+            if (last == foldedLast) {
+                var index = query.lastIndex - 1
+                while (index >= 0) {
+                    if (--remainingComparisons < 0) break@candidates
+                    checkStep()
+                    if (!textScratch[position + index].equals(query[index], ignoreCase)) break
+                    index--
+                }
+                if (index < 0) {
+                    if (prepareMatch(currentRow, startColumn + position, currentRow)) {
+                        pending.beginResult()
+                        pending.addSegment(
+                            currentRow,
+                            startColumn + position,
+                            startColumn + position + query.length,
+                            currentId,
+                            currentGeneration,
+                        )
+                        pending.finishResult()
+                    }
+                    position += query.length
+                    if (position - 1 <= lastNonSpace) confirmedResults = pending.resultCount
+                    continue
+                }
+            }
+            position += shifts[last.code and 127]
+        }
+        // Preserve every possible prefix that can continue into the next run or row.
+        while (position < count) {
+            val character = textScratch[position]
+            if (matched != 0 || character.equals(query[0], ignoreCase)) {
+                accept(character, startColumn + position, startColumn + position + 1)
+            }
+            if (position <= lastNonSpace) confirmedResults = pending.resultCount
+            position++
+            checkStep()
+        }
     }
 
-    private fun appendRun(
-        charStart: Int,
-        startColumn: Int,
-        endColumn: Int,
+    private fun checkStep() {
+        if (untilCheck-- == 0) {
+            checkCancelled()
+            untilCheck = 255
+        }
+    }
+
+    private fun accept(
+        character: Char,
+        start: Int,
+        end: Int,
     ) {
-        val linear = endColumn == LINEAR_COLUMNS
-        val previous = runsSize - RUN_SIZE
-        if (previous >= 0 && runs[previous + 2] == currentRow) {
-            val previousEnd = runs[previous + 4]
-            if (linear &&
-                previousEnd == LINEAR_COLUMNS &&
-                runs[previous + 3] + charStart - runs[previous] == startColumn ||
-                !linear &&
-                previousEnd == endColumn &&
-                runs[previous + 3] == startColumn
-            ) {
-                runs[previous + 1] = lineText.length
-                return
+        checkStep()
+        while (matched > 0 && !character.equals(query[matched], ignoreCase)) {
+            matched = prefixes[matched - 1]
+            checkStep()
+        }
+        if (character.equals(query[matched], ignoreCase)) {
+            rows[nextPosition] = currentRow
+            ranges[nextPosition] = (start.toLong() shl 32) or end.toLong()
+            ids[nextPosition] = currentId
+            generations[nextPosition] = currentGeneration
+            nextPosition++
+            if (nextPosition == query.length) nextPosition = 0
+            matched++
+            if (matched == query.length) {
+                appendMatch()
+                matched = 0
             }
         }
-        if (runsSize + RUN_SIZE > runs.size) runs = runs.copyOf(nextCapacity(runs.size, runsSize + RUN_SIZE))
-        runs[runsSize] = charStart
-        runs[runsSize + 1] = lineText.length
-        runs[runsSize + 2] = currentRow
-        runs[runsSize + 3] = startColumn
-        runs[runsSize + 4] = endColumn
-        runsSize += RUN_SIZE
     }
 
-    private fun trimTrailingSpaces() {
-        var end = lineText.length
-        while (end > 0 && lineText[end - 1] == ' ') {
-            if (end and 255 == 0) checkCancelled()
-            end--
+    private fun prepareMatch(
+        row: Long,
+        column: Int,
+        endRow: Long,
+    ): Boolean {
+        if (!acceptsMatch(row, column, endRow)) return false
+        if (keepLast) {
+            if (confirmedResults > 0) {
+                previousConfirmed.clear()
+                previousConfirmed.appendResults(pending, 0, 1)
+            }
+            pending.clear()
+            confirmedResults = 0
         }
-        lineText.setLength(end)
+        return highlights.resultCount + pending.resultCount < maxResults || keepLast
+    }
+
+    private fun appendMatch() {
+        if (!prepareMatch(rows[nextPosition], (ranges[nextPosition] ushr 32).toInt(), currentRow)) return
+        pending.beginResult()
+        var position = nextPosition
+        var segmentRow = rows[position]
+        var start = (ranges[position] ushr 32).toInt()
+        var end = ranges[position].toInt()
+        var id = ids[position]
+        var generation = generations[position]
+        repeat(query.length) { index ->
+            if (index and 255 == 0) checkCancelled()
+            if (rows[position] != segmentRow) {
+                pending.addSegment(segmentRow, start, end, id, generation)
+                segmentRow = rows[position]
+                start = (ranges[position] ushr 32).toInt()
+                id = ids[position]
+                generation = generations[position]
+            }
+            end = ranges[position].toInt()
+            position++
+            if (position == query.length) position = 0
+        }
+        pending.addSegment(segmentRow, start, end, id, generation)
+        pending.finishResult()
     }
 
     private companion object {
-        private const val COMPLEX_CELL_FLAGS =
+        const val COMPLEX_FLAGS =
             TerminalRenderCellFlags.CLUSTER or TerminalRenderCellFlags.WIDE_LEADING or
                 TerminalRenderCellFlags.WIDE_TRAILING or TerminalRenderCellFlags.WRAP_PADDING
-        private const val RUN_SIZE = 5
-        private const val LINEAR_COLUMNS = -1
-        private const val INITIAL_TEXT_CAPACITY = 256
-        private const val SHORT_QUERY_LIMIT = 8
-
-        private fun nextCapacity(
-            current: Int,
-            required: Int,
-        ): Int {
-            var next = current
-            while (next < required) {
-                next *= 2
-            }
-            return next
-        }
     }
 }

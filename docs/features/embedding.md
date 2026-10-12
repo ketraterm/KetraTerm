@@ -35,7 +35,7 @@ These are library controls; individual products expose a subset in their setting
 | Links and menus | Custom link detection, presentation and activation, plus host-owned context menus. |
 | Scrolling | Output-follow policy, viewport observation/control, and optional built-in scrollbar overlay or external host scrollbars. |
 | Mouse and clipboard | Independent mouse-reporting/wheel policies, copy on selection, clipboard/primary middle-button paste, and deferred host paste handling. |
-| Search UI | Programmatic search, case sensitivity, result navigation/state, and separately styled host search chrome. |
+| Search UI | Programmatic literal, whole-word and regex search, case sensitivity, result navigation/state, and separately styled host search chrome with explanatory option tooltips and keyboard-focusable controls. Hosts own search command bindings and supply current shortcut hints; the shared bar installs no command shortcuts. |
 
 For completion providers, views, keymaps, and editing targets, see
 [completion customization](completion.md#library-customization).

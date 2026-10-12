@@ -19,6 +19,7 @@ import io.github.ketraterm.ui.swing.api.SwingTerminal
 import kotlinx.coroutines.*
 import java.awt.*
 import java.awt.event.*
+import java.util.regex.PatternSyntaxException
 import javax.swing.*
 import javax.swing.event.DocumentEvent
 import javax.swing.event.DocumentListener
@@ -30,7 +31,8 @@ import kotlin.coroutines.CoroutineContext
  * The bar owns visible search chrome only. Search scanning, highlight
  * projection, and result navigation stay in [SwingTerminal]. Hosts decide
  * whether to instantiate this class, where to mount [component], and which
- * shortcut opens it.
+ * shortcuts invoke its actions. The bar installs no command shortcuts; normal
+ * Swing focus traversal and button activation remain available.
  *
  * @param terminal terminal whose headless search API backs this bar.
  * @param messages host message bundle, read on the EDT outside painting. Static labels are captured at construction.
@@ -49,14 +51,36 @@ public class SwingTerminalSearchBar
         private val failedText = messages.message("search.failed")
 
         private var suppressDocumentEvents = false
-        private val queryField = SearchTextField(24)
+        private val queryField = SearchTextField(20)
         private val counterLabel = JLabel(messages.message("search.matchCounter", 0, 0))
-        private val previousButton = IconButton(ButtonIcon.PREVIOUS)
-        private val nextButton = IconButton(ButtonIcon.NEXT)
-        private val caseSensitiveToggle = FlatToggleButton(messages.message("search.matchCaseLabel"))
-        private val searchInputPanel = SearchInputPanel(queryField, caseSensitiveToggle)
-        private val closeButton = IconButton(ButtonIcon.CLOSE)
+        private val previousButton = IconButton(ButtonIcon.PREVIOUS, SwingTerminalSearchAction.PREVIOUS_MATCH)
+        private val nextButton = IconButton(ButtonIcon.NEXT, SwingTerminalSearchAction.NEXT_MATCH)
+        private val caseSensitiveToggle =
+            FlatToggleButton(messages.message("search.matchCaseLabel"), SwingTerminalSearchAction.TOGGLE_MATCH_CASE)
+        private val wholeWordToggle =
+            FlatToggleButton(messages.message("search.wholeWordLabel"), SwingTerminalSearchAction.TOGGLE_WHOLE_WORD)
+        private val regexToggle = FlatToggleButton(messages.message("search.regexLabel"), SwingTerminalSearchAction.TOGGLE_REGEX)
+        private val toggles = arrayOf(caseSensitiveToggle, wholeWordToggle, regexToggle)
+        private val searchInputPanel = SearchInputPanel(queryField, *toggles)
+        private val closeButton = IconButton(ButtonIcon.CLOSE, SwingTerminalSearchAction.CLOSE)
         private val searchPanel = SearchPanel()
+        private val actionButtons: Map<SwingTerminalSearchAction, AbstractButton> =
+            mapOf(
+                SwingTerminalSearchAction.NEXT_MATCH to nextButton,
+                SwingTerminalSearchAction.PREVIOUS_MATCH to previousButton,
+                SwingTerminalSearchAction.CLOSE to closeButton,
+                SwingTerminalSearchAction.TOGGLE_MATCH_CASE to caseSensitiveToggle,
+                SwingTerminalSearchAction.TOGGLE_WHOLE_WORD to wholeWordToggle,
+                SwingTerminalSearchAction.TOGGLE_REGEX to regexToggle,
+            )
+        private val optionDescriptions =
+            mapOf(
+                SwingTerminalSearchAction.TOGGLE_MATCH_CASE to messages.message("search.matchCaseDescription"),
+                SwingTerminalSearchAction.TOGGLE_WHOLE_WORD to messages.message("search.wholeWordDescription"),
+                SwingTerminalSearchAction.TOGGLE_REGEX to messages.message("search.regexDescription"),
+            )
+        private val keyboardHelp = messages.message("search.optionKeyboardHelp")
+        private var shortcutText: (SwingTerminalSearchAction) -> String? = { null }
         private var searchObservation: Job? = null
         private val searchScope =
             CoroutineScope(
@@ -74,11 +98,13 @@ public class SwingTerminalSearchBar
          * Swing component that hosts should mount as floating pane chrome.
          */
         public val component: JComponent =
-            JPanel(BorderLayout()).apply {
+            object : JPanel(BorderLayout()) {
+                override fun getPreferredSize(): Dimension = Dimension(480, super.getPreferredSize().height)
+            }.apply {
                 isVisible = false
                 isOpaque = false
                 border = BorderFactory.createEmptyBorder(6, 12, 6, 12)
-                add(searchPanel, BorderLayout.EAST)
+                add(searchPanel, BorderLayout.CENTER)
             }
 
         init {
@@ -94,12 +120,30 @@ public class SwingTerminalSearchBar
             }
             queryField.toolTipText = messages.message("search.queryToolTip")
             counterLabel.toolTipText = messages.message("search.counterToolTip")
-            previousButton.toolTipText = messages.message("search.previousToolTip")
-            nextButton.toolTipText = messages.message("search.nextToolTip")
-            closeButton.toolTipText = messages.message("search.closeToolTip")
-            caseSensitiveToggle.toolTipText = messages.message("search.matchCaseToolTip")
-            for (control in arrayOf<JComponent>(queryField, counterLabel, previousButton, nextButton, closeButton, caseSensitiveToggle)) {
-                control.accessibleContext.accessibleName = control.toolTipText
+            queryField.accessibleContext.accessibleName = queryField.toolTipText
+            counterLabel.accessibleContext.accessibleName = counterLabel.toolTipText
+            for ((action, button) in actionButtons) {
+                val titleKey =
+                    when (action) {
+                        SwingTerminalSearchAction.NEXT_MATCH -> "search.nextToolTip"
+                        SwingTerminalSearchAction.PREVIOUS_MATCH -> "search.previousToolTip"
+                        SwingTerminalSearchAction.CLOSE -> "search.closeToolTip"
+                        SwingTerminalSearchAction.TOGGLE_MATCH_CASE -> "search.matchCaseToolTip"
+                        SwingTerminalSearchAction.TOGGLE_WHOLE_WORD -> "search.wholeWordToolTip"
+                        SwingTerminalSearchAction.TOGGLE_REGEX -> "search.regexToolTip"
+                    }
+                val title = messages.message(titleKey)
+                button.toolTipText = title
+                button.accessibleContext.accessibleName = title
+                button.accessibleContext.accessibleDescription = optionDescriptions[action] ?: title
+                button.isRequestFocusEnabled = false
+                button.addFocusListener(
+                    object : FocusAdapter() {
+                        override fun focusGained(event: FocusEvent) = button.repaint()
+
+                        override fun focusLost(event: FocusEvent) = button.repaint()
+                    },
+                )
             }
             counterLabel.horizontalAlignment = SwingConstants.CENTER
             counterLabel.preferredSize =
@@ -123,27 +167,6 @@ public class SwingTerminalSearchBar
                     override fun changedUpdate(event: DocumentEvent) = queryChanged()
                 },
             )
-            queryField.registerKeyboardAction(
-                {
-                    terminal.selectNextSearchResult()
-                    refreshCounter()
-                },
-                KeyStroke.getKeyStroke(KeyEvent.VK_ENTER, 0),
-                JComponent.WHEN_FOCUSED,
-            )
-            queryField.registerKeyboardAction(
-                {
-                    terminal.selectPreviousSearchResult()
-                    refreshCounter()
-                },
-                KeyStroke.getKeyStroke(KeyEvent.VK_ENTER, InputEvent.SHIFT_DOWN_MASK),
-                JComponent.WHEN_FOCUSED,
-            )
-            queryField.registerKeyboardAction(
-                { close() },
-                KeyStroke.getKeyStroke(KeyEvent.VK_ESCAPE, 0),
-                JComponent.WHEN_FOCUSED,
-            )
             nextButton.addActionListener {
                 terminal.selectNextSearchResult()
                 refreshCounter()
@@ -154,6 +177,14 @@ public class SwingTerminalSearchBar
             }
             caseSensitiveToggle.addActionListener {
                 terminal.setSearchCaseSensitive(caseSensitiveToggle.isSelected)
+                refreshCounter()
+            }
+            wholeWordToggle.addActionListener {
+                terminal.setSearchWholeWord(wholeWordToggle.isSelected)
+                refreshCounter()
+            }
+            regexToggle.addActionListener {
+                terminal.setSearchRegex(regexToggle.isSelected)
                 refreshCounter()
             }
             closeButton.addActionListener { close() }
@@ -200,6 +231,7 @@ public class SwingTerminalSearchBar
                 return
             }
             component.isVisible = false
+            searchInputPanel.closePopup()
             searchObservation?.cancel()
             searchObservation = null
             setQueryText("")
@@ -215,6 +247,71 @@ public class SwingTerminalSearchBar
          * @return `true` when the bar is open.
          */
         public fun isOpen(): Boolean = component.isVisible
+
+        /**
+         * Performs a host-selected search action on the EDT, using the same behavior as its button.
+         * Returns `false` when the bar is closed and the host should leave the command unclaimed.
+         */
+        public fun performAction(action: SwingTerminalSearchAction): Boolean {
+            check(SwingUtilities.isEventDispatchThread()) { "Search actions require the EDT" }
+            if (!isOpen()) return false
+            actionButtons.getValue(action).doClick(0)
+            return true
+        }
+
+        /**
+         * Supplies plain-text shortcut hints from the host's actual bindings. Install on the EDT.
+         * [provider] is read on the EDT when a tooltip is requested, so keymap changes appear
+         * without rebuilding the bar. Return `null` or blank text for an unbound action.
+         * This does not install bindings or choose shortcuts.
+         */
+        public fun setShortcutTextProvider(provider: (SwingTerminalSearchAction) -> String?) {
+            check(SwingUtilities.isEventDispatchThread()) { "Shortcut hints require the EDT" }
+            shortcutText = provider
+        }
+
+        private fun searchToolTip(
+            action: SwingTerminalSearchAction,
+            title: String?,
+        ): String? {
+            if (title == null) return null
+            val foreground = UIManager.getColor("ToolTip.foreground") ?: colors.foreground
+            val background = UIManager.getColor("ToolTip.background") ?: colors.panelBackground
+            val secondary =
+                Color(
+                    (foreground.red * 4 + background.red) / 5,
+                    (foreground.green * 4 + background.green) / 5,
+                    (foreground.blue * 4 + background.blue) / 5,
+                )
+            val secondaryHex = "#" + (secondary.rgb and 0xffffff).toString(16).padStart(6, '0')
+            return buildString {
+                append("<html><b>")
+                append(escapeHtml(title))
+                append("</b>")
+                shortcutText(action)?.takeIf { it.isNotBlank() }?.let {
+                    append("&nbsp;&nbsp;&nbsp;<font color='$secondaryHex'>")
+                    append(escapeHtml(it))
+                    append("</font>")
+                }
+                optionDescriptions[action]?.let {
+                    append("<div style='margin-top:4px'>")
+                    append(escapeHtml(it))
+                    append("</div><div style='margin-top:4px'><font color='$secondaryHex'>")
+                    append(escapeHtml(keyboardHelp))
+                    append("</font></div>")
+                }
+                append("</html>")
+            }
+        }
+
+        private fun paintControlFocus(
+            graphics: Graphics2D,
+            button: AbstractButton,
+        ) {
+            if (!button.isFocusOwner) return
+            graphics.color = colors.textFieldFocusBorder
+            graphics.drawRoundRect(1, 1, button.width - 3, button.height - 3, 6, 6)
+        }
 
         /**
          * Reapplies the last supplied colors. Off-EDT calls enqueue work on the EDT.
@@ -245,12 +342,14 @@ public class SwingTerminalSearchBar
             queryField.isOpaque = false
             queryField.foreground = colors.foreground
             queryField.caretColor = colors.foreground
-            queryField.border = BorderFactory.createEmptyBorder(4, 34, 4, caseSensitiveToggle.preferredSize.width + 10)
+            queryField.border = BorderFactory.createEmptyBorder(4, 34, 4, toggles.sumOf { it.preferredSize.width } + 10)
             counterLabel.foreground = colors.counterForeground
             previousButton.foreground = colors.foreground
             nextButton.foreground = colors.foreground
             closeButton.foreground = colors.foreground
-            caseSensitiveToggle.foreground = if (caseSensitiveToggle.isSelected) colors.buttonSelectedForeground else colors.foreground
+            for (toggle in toggles) {
+                toggle.foreground = if (toggle.isSelected) colors.buttonSelectedForeground else colors.foreground
+            }
             component.repaint()
         }
 
@@ -274,8 +373,10 @@ public class SwingTerminalSearchBar
             val state = terminal.currentSearchState()
             counterLabel.text =
                 when {
+                    state.failure is PatternSyntaxException -> messages.message("search.invalidRegex")
                     state.failure != null -> failedText
                     state.isSearching -> searchingText
+                    state.isCountLimited -> messages.message("search.matchCounterLimited", state.resultCount - 1)
                     else ->
                         messages.message(
                             "search.matchCounter",
@@ -289,7 +390,9 @@ public class SwingTerminalSearchBar
                             state.resultCount,
                         )
                 }
-            counterLabel.accessibleContext.accessibleDescription = counterLabel.text
+            counterLabel.toolTipText = state.failure?.localizedMessage ?: messages.message("search.counterToolTip")
+            counterLabel.accessibleContext.accessibleDescription =
+                if (state.failure == null) counterLabel.text else "${counterLabel.text}: ${counterLabel.toolTipText}"
             val width =
                 maxOf(
                     counterLabel.minimumSize.width,
@@ -316,7 +419,7 @@ public class SwingTerminalSearchBar
             gridX: Int,
             weightX: Double = 0.0,
             fill: Int = GridBagConstraints.NONE,
-            leftInset: Int = 6,
+            leftInset: Int = 3,
         ): GridBagConstraints =
             GridBagConstraints().apply {
                 this.gridx = gridX
@@ -327,16 +430,43 @@ public class SwingTerminalSearchBar
                 this.anchor = GridBagConstraints.CENTER
             }
 
-        private class SearchInputPanel(
+        private inner class SearchInputPanel(
             private val queryField: JTextField,
-            private val caseSensitiveToggle: JToggleButton,
+            private vararg val toggles: JToggleButton,
         ) : JPanel(null) {
+            fun closePopup() {
+                optionsButton.componentPopupMenu?.isVisible = false
+            }
+
+            private val optionsButton =
+                JButton("⋯").apply {
+                    toolTipText = messages.message("search.optionsToolTip")
+                    accessibleContext.accessibleName = toolTipText
+                    isRequestFocusEnabled = false
+                    margin = Insets(0, 0, 0, 0)
+                    isVisible = false
+                    addActionListener {
+                        val popup = JPopupMenu()
+                        for (toggle in toggles) {
+                            val item = JCheckBoxMenuItem(toggle.accessibleContext.accessibleName, toggle.isSelected)
+                            item.toolTipText = toggle.toolTipText
+                            item.addActionListener { toggle.doClick(0) }
+                            popup.add(item)
+                        }
+                        componentPopupMenu = popup
+                        if (isShowing) popup.show(this, 0, height)
+                    }
+                }
+
             init {
                 isOpaque = false
+                add(optionsButton)
                 add(queryField)
-                add(caseSensitiveToggle)
-                setComponentZOrder(caseSensitiveToggle, 0)
-                setComponentZOrder(queryField, 1)
+                for (toggle in toggles) {
+                    add(toggle)
+                    setComponentZOrder(toggle, 0)
+                }
+                setComponentZOrder(queryField, toggles.size + 1)
             }
 
             override fun getPreferredSize(): Dimension = queryField.preferredSize
@@ -347,10 +477,25 @@ public class SwingTerminalSearchBar
 
             override fun doLayout() {
                 queryField.setBounds(0, 0, width, height)
-                val buttonSize = caseSensitiveToggle.preferredSize
-                val buttonX = width - buttonSize.width - 5
-                val buttonY = (height - buttonSize.height) / 2
-                caseSensitiveToggle.setBounds(buttonX, buttonY, buttonSize.width, buttonSize.height)
+                val compact = width < 34 + 90 + toggles.sumOf { it.preferredSize.width } + 10
+                optionsButton.isVisible = compact
+                if (!compact) optionsButton.componentPopupMenu?.isVisible = false
+                var buttonX = width - 5
+                for (toggle in toggles.reversed()) {
+                    if (compact && toggle.isFocusOwner) optionsButton.requestFocusInWindow()
+                    toggle.isVisible = !compact
+                    if (!compact) {
+                        val size = toggle.preferredSize
+                        buttonX -= size.width
+                        toggle.setBounds(buttonX, (height - size.height) / 2, size.width, size.height)
+                    }
+                }
+                val reserved = if (compact) 28 else width - 5 - buttonX
+                optionsButton.setBounds((width - 33).coerceAtLeast(0), 1, 28, (height - 2).coerceAtLeast(0))
+                val rightInset = reserved + 10
+                if (queryField.insets.right != rightInset) {
+                    queryField.border = BorderFactory.createEmptyBorder(4, 34, 4, rightInset)
+                }
             }
         }
 
@@ -362,19 +507,22 @@ public class SwingTerminalSearchBar
 
         private inner class IconButton(
             private val icon: ButtonIcon,
+            private val searchAction: SwingTerminalSearchAction,
         ) : JButton() {
             init {
                 isContentAreaFilled = false
                 isBorderPainted = false
                 isFocusPainted = false
                 isOpaque = false
-                isFocusable = false
+                isFocusable = true
                 isRolloverEnabled = true
                 cursor = Cursor.getPredefinedCursor(Cursor.HAND_CURSOR)
                 margin = Insets(0, 0, 0, 0)
                 foreground = colors.foreground
                 addMouseListener(RepaintOnHoverListener)
             }
+
+            override fun getToolTipText(): String? = searchToolTip(searchAction, super.getToolTipText())
 
             override fun getPreferredSize(): Dimension = Dimension(ICON_BUTTON_WIDTH, COMMAND_BUTTON_HEIGHT)
 
@@ -388,6 +536,7 @@ public class SwingTerminalSearchBar
                     g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON)
                     paintFlatButtonBackground(g, width, height, model, colors)
                     paintIcon(g, icon, width, height, foreground)
+                    paintControlFocus(g, this)
                 } finally {
                     g.dispose()
                 }
@@ -396,13 +545,14 @@ public class SwingTerminalSearchBar
 
         private inner class FlatToggleButton(
             text: String,
+            private val searchAction: SwingTerminalSearchAction,
         ) : JToggleButton(text) {
             init {
                 isContentAreaFilled = false
                 isBorderPainted = false
                 isFocusPainted = false
                 isOpaque = false
-                isFocusable = false
+                isFocusable = true
                 isRolloverEnabled = true
                 cursor = Cursor.getPredefinedCursor(Cursor.HAND_CURSOR)
                 margin = Insets(0, 0, 0, 0)
@@ -410,6 +560,8 @@ public class SwingTerminalSearchBar
                 font = font.deriveFont(Font.BOLD)
                 addMouseListener(RepaintOnHoverListener)
             }
+
+            override fun getToolTipText(): String? = searchToolTip(searchAction, super.getToolTipText())
 
             override fun getPreferredSize(): Dimension =
                 Dimension(maxOf(TOGGLE_BUTTON_WIDTH, getFontMetrics(font).stringWidth(text) + 12), COMMAND_BUTTON_HEIGHT)
@@ -423,6 +575,7 @@ public class SwingTerminalSearchBar
                 try {
                     g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON)
                     paintFlatButtonBackground(g, width, height, model, colors, isSelected)
+                    paintControlFocus(g, this)
                     foreground = if (isSelected) colors.buttonSelectedForeground else colors.foreground
                 } finally {
                     g.dispose()
@@ -477,7 +630,7 @@ public class SwingTerminalSearchBar
                 return Dimension(size.width, SEARCH_FIELD_HEIGHT)
             }
 
-            override fun getMinimumSize(): Dimension = Dimension(160, SEARCH_FIELD_HEIGHT)
+            override fun getMinimumSize(): Dimension = Dimension(72, SEARCH_FIELD_HEIGHT)
 
             override fun paintComponent(graphics: Graphics) {
                 val g = graphics.create() as Graphics2D
@@ -529,10 +682,17 @@ public class SwingTerminalSearchBar
         }
 
         private companion object {
+            private fun escapeHtml(text: String): String =
+                text
+                    .replace("&", "&amp;")
+                    .replace("<", "&lt;")
+                    .replace(">", "&gt;")
+                    .replace("\"", "&quot;")
+
             private const val SEARCH_FIELD_HEIGHT = 30
             private const val COMMAND_BUTTON_HEIGHT = 28
-            private const val ICON_BUTTON_WIDTH = 30
-            private const val TOGGLE_BUTTON_WIDTH = 38
+            private const val ICON_BUTTON_WIDTH = 26
+            private const val TOGGLE_BUTTON_WIDTH = 30
             private const val COUNTER_LABEL_WIDTH = 46
 
             private val RepaintOnHoverListener =

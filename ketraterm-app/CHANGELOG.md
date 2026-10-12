@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+- Made the search bar more compact and responsive in narrow windows and split panes, collapsing search options into a popup when needed.
+- Added whole-word and regular-expression search, including invalid-pattern feedback, alongside literal and case-sensitive matching.
+- Improved search responsiveness and reduced memory use for large scrollback. Results appear during scanning, unchanged text can reuse previous results, and obsolete searches are cancelled when the query changes.
+- Search now starts at the viewport and wraps through history. Frequent queries show `1,000+` instead of collecting every result; next/previous navigation still reaches matches throughout retained history, and visible matches remain highlighted.
+- Fixed a thin orange highlight remaining after changing a selected search result into a query with no matches.
+- Added explanatory search tooltips, shortcut hints, and keyboard focus indicators. Use Alt+C for match case, Alt+W for whole words, Alt+R for regex, Enter/Shift+Enter for next/previous match, and Escape to close search; Tab and Space navigate and toggle controls.
 - Fixed window geometry refresh throwing after prompt-style changes or window moves and resizes.
 - Added a Prompt style setting with Gutter, Divider, and None choices, applied to open terminals and saved across restarts.
 - Reserved prompt gutters before the first prompt for shells with configured integration, while shells without prompt support use the full available width.

@@ -32,6 +32,48 @@ import kotlin.random.Random
 class TerminalSearchModelTest {
     @ParameterizedTest
     @ValueSource(booleans = [false, true])
+    fun `ordinary run skipping preserves matches across chunk boundaries`(textOnly: Boolean) {
+        val text = "x".repeat(252) + "needle" + "x".repeat(251) + "needle" + "x".repeat(249) + "needle" + "xxxxx"
+        val frame = WrappedTextFrame(arrayOf(text))
+        val matches = searchFrame(frame, "needle", textOnly)
+        val viewport = TerminalSearchViewportHighlights()
+        matches.buildViewportHighlights(renderCache(frame), viewport)
+        assertEquals(3, matches.resultCount)
+        for ((index, start) in intArrayOf(252, 509, 764).withIndex()) {
+            assertEquals(start, viewport.startColumn(index))
+            assertEquals(start + 6, viewport.endColumn(index))
+        }
+    }
+
+    @Test
+    fun `ordinary run search preserves case folding and hash collisions`() {
+        val texts =
+            listOf(
+                "x".repeat(300) + "\u212A\u03C2\u0131\u017F" + "x".repeat(300),
+                "\u0201".repeat(300) + "\u0100abc" + "\u0201".repeat(300),
+                "a".repeat(600) + "b",
+                "a".repeat(600) + "b" + "a".repeat(32),
+            )
+        for ((text, query) in texts.zip(listOf("k\u03A3iS", "\u0100abc", "a".repeat(32) + "b", "b" + "a".repeat(32)))) {
+            val cache = renderCache(WrappedTextFrame(arrayOf(text)))
+            val results = TerminalSearchModel().search(cache, query, true)
+            assertEquals(1, results.resultCount, query)
+            assertEquals(text.indexOf(query, ignoreCase = true), results.activeStartColumn(), query)
+        }
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = [false, true])
+    fun `ordinary run matches respect logical trailing spaces`(textOnly: Boolean) {
+        for (tail in listOf(" ".repeat(16), "x" + " ".repeat(15))) {
+            val frame = WrappedTextFrame(arrayOf("abcd    abcd    ", tail), booleanArrayOf(true, false))
+            val results = searchFrame(frame, "abcd ", textOnly)
+            assertEquals(if (tail.startsWith('x')) 2 else 1, results.resultCount, tail)
+        }
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = [false, true])
     fun `bulk text boundaries preserve mixed cell geometry`(textOnly: Boolean) {
         val terminal = TerminalBuffers.create(1024, 1)
         terminal.writeText("a".repeat(255) + "界é")
@@ -376,17 +418,44 @@ class TerminalSearchModelTest {
 
     @ParameterizedTest
     @ValueSource(strings = ["b", "aa", "aaa"])
-    fun `short query matching remains cancellable after decoding`(query: String) {
+    fun `finishing pending results observes cancellation`(query: String) {
         val cache = renderCache(WrappedTextFrame(arrayOf("a".repeat(8192)), wrapped = booleanArrayOf(true)))
         val model = TerminalSearchModel()
         val cancelled = CancellationException("stop matching")
         var cancel = false
-        var checks = 0
-        model.begin(query, false, 0, { if (cancel && ++checks == 2) throw cancelled })
+        model.begin(query, false, 0, { if (cancel) throw cancelled })
         model.append(cache, 0)
         cancel = true
         assertSame(cancelled, assertThrows(CancellationException::class.java) { model.finish() })
         assertEquals(1, model.search(renderCache(WrappedTextFrame(arrayOf("needle"))), "needle", false).resultCount)
+    }
+
+    @Test
+    fun `streaming matches remain discardable until the logical line completes`() {
+        val model = TerminalSearchModel()
+        model.begin("ab", false, 0)
+        model.append(renderCache(WrappedTextFrame(arrayOf("ab"), booleanArrayOf(true))), 0)
+        assertEquals(0, model.completedResults.resultCount)
+        model.discardPendingLine()
+        model.append(renderCache(WrappedTextFrame(arrayOf("cd"))), 8)
+        assertEquals(0, model.finish().resultCount)
+    }
+
+    @Test
+    fun `streaming trailing-space matches commit only when later text arrives`() {
+        val model = TerminalSearchModel()
+        for (tail in listOf("    ", "   x")) {
+            model.begin("ab ", false, 0)
+            model.append(renderCache(WrappedTextFrame(arrayOf("ab  "), booleanArrayOf(true))), 0)
+            assertEquals(0, model.completedResults.resultCount)
+            model.append(renderCache(WrappedTextFrame(arrayOf(tail))), 1)
+            val results = model.finish()
+            assertEquals(if (tail.endsWith('x')) 1 else 0, results.resultCount)
+            if (results.resultCount != 0) {
+                assertEquals(0L, results.activeStartAbsoluteRow())
+                assertEquals(0, results.activeStartColumn())
+            }
+        }
     }
 
     @ParameterizedTest

@@ -473,9 +473,11 @@ class TerminalSearchScanTest {
             { if (cancel && ++checks == 3) throw cancelled },
         )
         cache.lineWrapped.fill(true)
-        model.append(cache, cache.discardedCount)
         cancel = true
-        assertSame(cancelled, assertThrows(java.util.concurrent.CancellationException::class.java) { model.finish() })
+        assertSame(
+            cancelled,
+            assertThrows(java.util.concurrent.CancellationException::class.java) { model.append(cache, cache.discardedCount) },
+        )
         assertEquals(3, checks)
     }
 }

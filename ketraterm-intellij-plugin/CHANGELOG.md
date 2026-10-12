@@ -2,10 +2,15 @@
 
 ## [Unreleased]
 
+- Made the search bar more compact and responsive in narrow tool windows and split panes, collapsing search options into a popup when needed.
+- Added whole-word and regular-expression search, including invalid-pattern feedback, alongside literal and case-sensitive matching.
+- Improved search responsiveness and reduced memory use for large scrollback. Results appear during scanning, unchanged text can reuse previous results, and obsolete searches are cancelled when the query changes.
+- Search now starts at the viewport and wraps through history. Frequent queries show `1,000+` instead of collecting every result; next/previous navigation still reaches matches throughout retained history, and visible matches remain highlighted.
+- Fixed a thin orange highlight remaining after changing a selected search result into a query with no matches.
+- Added explanatory search tooltips with current IDE shortcut hints, Tab/Space access, and visible keyboard focus. Search navigation, closing, and option toggles are IDE keymap actions that support remapping, unbinding, and multi-stroke shortcuts. Defaults are Enter/Shift+Enter, Escape, and Alt+C/W/R for match case, whole words, and regex.
 - Added a Prompt style setting with Gutter, Divider, and None choices, applied to open terminals and saved across restarts.
 - Reserved prompt gutters before the first prompt for shells with configured integration, while shells without prompt support use the full available width.
 - Centered full-screen terminal apps consistently across shell profiles, including spare pixels around the existing grid.
-
 - Improved responsiveness when displaying large text output, including logs, CJK text, and emoji.
 - Search controls follow the IDE theme.
 - Fixed typing or pasting during terminal startup causing premature writes or closing the terminal.

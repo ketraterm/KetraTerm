@@ -24,6 +24,7 @@ import io.github.ketraterm.ui.swing.search.TerminalSearchHost
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.first
 import org.openjdk.jmh.annotations.*
+import java.util.concurrent.CompletableFuture
 import java.util.concurrent.TimeUnit
 import javax.swing.SwingUtilities
 import kotlin.coroutines.CoroutineContext
@@ -66,8 +67,11 @@ open class TerminalSearchRefreshBenchmark {
             repeat(REFRESHES_PER_BATCH) { controller.refreshForFrame() }
             segmentCount = controller.viewportHighlights.segmentCount
         }
+    private var viewportReady = CompletableFuture<Unit>()
+
     private val changingRefreshBatch =
         Runnable {
+            viewportReady = CompletableFuture()
             uppercase = !uppercase
             terminal.positionCursor(0, 0)
             terminal.writeCodepoint(if (uppercase) 'N'.code else 'n'.code)
@@ -91,11 +95,14 @@ open class TerminalSearchRefreshBenchmark {
             host = SearchHost(session, columns)
             host.renderCache.updateFrom(session)
             controller = TerminalSearchController(host, scope)
+            host.onRepaint = {
+                if (controller.viewportHighlights.segmentCount == 1) viewportReady.complete(Unit)
+            }
             controller.search("needle")
         }
         awaitSearch()
         SwingUtilities.invokeAndWait {
-            check(controller.state().resultCount == historyRows + 1)
+            check(controller.state().resultCount == minOf(historyRows + 1, 1001))
             refreshBatch.run()
             check(segmentCount == 1)
         }
@@ -123,7 +130,9 @@ open class TerminalSearchRefreshBenchmark {
         runBlocking {
             val result = controller.states.first { !it.isSearching }
             check(result.failure == null) { "Search failed: ${result.failure}" }
-            check(result.resultCount == historyRows + 1)
+            check(result.resultCount == minOf(historyRows + 1, 1001))
+            check(result.isCountLimited == (historyRows + 1 > 1000))
+            viewportReady.get(30, TimeUnit.SECONDS)
         }
 
     @TearDown
@@ -151,7 +160,9 @@ open class TerminalSearchRefreshBenchmark {
             return true
         }
 
-        override fun repaint() = Unit
+        var onRepaint: () -> Unit = {}
+
+        override fun repaint() = onRepaint()
     }
 
     private companion object {
