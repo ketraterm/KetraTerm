@@ -124,7 +124,7 @@ placement can depend on input chunk boundaries. See the
 </tr>
 <tr>
 <td>Dynamic colors</td>
-<td>OSC 4/10/11/12 palette and foreground/background/cursor changes and queries.</td>
+<td>OSC 4/10/11/12 palette and foreground/background/cursor changes and queries; OSC 104 and 110/111/112 restore configured theme colors.</td>
 </tr>
 <tr>
 <td>Hyperlinks</td>
@@ -218,7 +218,11 @@ defines event and encoding behavior.</p>
 </tr>
 <tr>
 <td>Color scheme</td>
-<td>One-shot light/dark query; no unsolicited mode 2031 notifications.</td>
+<td>One-shot light/dark query and mode 2031 subscriptions to host theme changes, including palette changes within the same light/dark preference.</td>
+</tr>
+<tr>
+<td>In-band resize</td>
+<td>Mode 2048 reports text-area rows, columns, and pixel dimensions on enable and after size changes; unavailable pixel dimensions are zero.</td>
 </tr>
 <tr>
 <td>Custom OSC</td>
@@ -235,7 +239,7 @@ checks apply to all output in a session, including remote programs.</p>
 <p>See the <a href="../reference/protocol.html">protocol reference</a> for collection
 limits and query allowlists, and the <a href="../terminal-feature-gap-map.html">gap map</a>
 for unsupported protocols.</p>
-</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/6712fc6d403ebab13334b327303fff4df8f08550/docs/features/terminal.md">View source on GitHub ↗</a></div></div></main></div>
+</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/22e0fb05d65ccf2977fc0644cfe1af8c3a2869ff/docs/features/terminal.md">View source on GitHub ↗</a></div></div></main></div>
   <footer>
     <a class="brand" href="../../../../index.html"><img class="brand-mark" src="../../../../assets/logo.svg" alt="" width="34" height="34">KetraTerm Library</a>
     <p>Open source · Apache 2.0</p>

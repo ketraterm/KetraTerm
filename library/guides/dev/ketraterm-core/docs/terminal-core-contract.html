@@ -138,6 +138,12 @@ preserve palette identity and row generations. Host theme updates replace the
 reset baseline even when effective values are equal; only an effective change
 invalidates visible rows. Palette equality includes colors and presentation
 preferences, including dark/light classification.</p>
+<p><code>resetPaletteColors</code> restores selected indexed entries, or all 256 entries for
+an empty selection, from the latest theme baseline. <code>resetDynamicColor</code> restores
+foreground, background, or cursor color from that same baseline. Other overrides
+remain intact. Effective resets publish one immutable palette and invalidate
+visible rows; unchanged resets preserve palette identity and generations.
+Application color updates and resets never emit mode 2031 reports.</p>
 <h2 id="writer-contract">Writer contract</h2>
 <h3 id="printable-ingress">Printable ingress</h3>
 <ul>
@@ -258,6 +264,12 @@ with <code>withKeyModifierOption</code> and <code>withKeyFormatOption</code>. Th
 a new packed word, validate supported resources and values, and preserve all
 unrelated bits. The producer owns coherent publication; the helpers do not
 update a terminal or input state.</p>
+<p>Color-scheme and in-band resize subscriptions are serialized durable state
+outside the packed input word and typed mode snapshot. Their DECRQM status is
+available through <code>requestModeStatus</code>. Regular resize and screen switches
+preserve subscriptions; RIS and DECSTR disable both. Enabling color-scheme
+reporting emits no initial report, while every in-band resize enable request
+reports the current geometry when permitted.</p>
 <p>Mode setters that home the cursor or affect wrap/margin physics cancel pending
 wrap. Input reporting and presentation setters preserve it. <code>resetCursorStyle</code>
 restores the configured default shape and enables the blink flag without
@@ -357,8 +369,17 @@ reset while alternate is active preserve the primary presentation snapshot; RIS
 restores configured default presentation.</p>
 <h3 id="resize">Resize</h3>
 <p><code>resize(newWidth, newHeight, oldScrollbackOffset)</code> validates positive dimensions
-and retained capacity before allocation or mutation. Identical dimensions are a
-no-op and return a clamped offset plus current history size.</p>
+and retained capacity before allocation or mutation. Identical grid dimensions
+avoid reflow and return a clamped offset plus current history size.</p>
+<p>The five-argument overload accepts text-area pixel width and height together
+with the grid and viewport offset, validating nonnegative pixels before
+mutation. Either zero marks both pixel dimensions unavailable. The existing
+three-argument overload preserves known pixels for an unchanged grid and marks
+them unknown when the grid changes. Grid and pixel geometry commit together, so one
+subscribed mode 2048 report describes the complete resulting size. A pixel-only
+change reports without reflow or row-generation invalidation. Identical complete
+geometry produces no report. Direct <code>setWindowSizePixels</code> updates use the same
+pixel-change reporting rules.</p>
 <p>An effective resize:</p>
 <ul>
 <li>Reconstructs and rewraps primary logical lines when width changes, relocating
@@ -381,7 +402,7 @@ protection, margins on both screens, saved cursors to home/default state, and
 pending wrap.</p>
 <p>Mode defaults restore autowrap, cursor visibility/blinking, normal video, and
 normal cursor/keypad/input behavior. Bracketed paste, focus reporting, mouse
-tracking, synchronized output, and Kitty keyboard state reset; both xterm
+tracking, synchronized output, color-scheme/resize reporting, and Kitty keyboard state reset; both xterm
 resource families return to defaults. Ambiguous-width policy, mouse encoding,
 and the DECCOLM selection survive. Palette and content are preserved.</p>
 <h3 id="hard-reset">Hard reset</h3>
@@ -405,7 +426,7 @@ observe it without modifying state or render generations.</p>
 writes and normal erasure ignore protection. Wide spacers inherit the leader&#39;s
 protection, and reflow preserves it. Hard clears ignore it.</p>
 <h2 id="terminal-responses">Terminal responses</h2>
-<p>Query methods enqueue replies in <code>TerminalResponseChannel</code>.
+<p>Query methods and subscribed change reports enqueue bytes in <code>TerminalResponseChannel</code>.
 <code>readResponseBytes</code> synchronously copies queued bytes into a caller-owned range;
 invalid ranges are rejected without draining the queue or changing the array.
 Sessions drain replies after core mutation and send them through the same
@@ -415,13 +436,21 @@ methods. Core&#39;s explicit capability allowlists govern reply contents and
 protocol-specific failure behavior. Denying the response family suppresses
 failure replies as well as success replies; supported queries and identities
 remain defined by the canonical feature map and protocol module.</p>
+<p><code>setChangeNotificationsAllowed</code> publishes the host&#39;s response permission for
+automatic color-scheme and resize reports, including immediate mode 2048 enable
+reports. This volatile permission may be published concurrently with core use;
+it changes neither modes nor queued bytes. Explicit queries still require
+permission checks by their caller. Session assembly applies its initial policy
+to replies queued before ownership transfers. A changed host theme palette emits mode 2031 reports
+independently of application palette overrides. See the
+<a href="../../docs/reference/protocol.html#change-reports">wire contract</a>.</p>
 <h2 id="invariants">Invariants</h2>
 <p>Public mutation paths preserve complete wide spans, live cluster ownership,
 per-screen arena isolation, tab-stop width, and accurate render invalidation.
 Horizontal slices never copy incomplete wide source spans and clear destination
 occupants crossing their boundaries. Pending wrap is cleared by cursor/structural
 operations that cancel it, and preserved by non-cursor mode changes.</p>
-</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/6712fc6d403ebab13334b327303fff4df8f08550/ketraterm-core/docs/terminal-core-contract.md">View source on GitHub ↗</a></div></div></main></div>
+</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/22e0fb05d65ccf2977fc0644cfe1af8c3a2869ff/ketraterm-core/docs/terminal-core-contract.md">View source on GitHub ↗</a></div></div></main></div>
   <footer>
     <a class="brand" href="../../../../index.html"><img class="brand-mark" src="../../../../assets/logo.svg" alt="" width="34" height="34">KetraTerm Library</a>
     <p>Open source · Apache 2.0</p>

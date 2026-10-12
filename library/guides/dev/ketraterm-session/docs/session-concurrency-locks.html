@@ -191,6 +191,9 @@ returns successfully. Synchronous startup output is parsed and replies are queue
 but the writer has not started. <code>Running</code> is then published before writer startup;
 reentrant observers can admit input behind already queued replies. Failure or
 closure during startup discards pending work and does not publish <code>Running</code>.</p>
+<p>Initial response denial, or denial while still <code>Created</code>, discards core replies
+queued before session ownership. Replies already admitted under an allowed
+runtime policy retain their ordinary output order.</p>
 <p><code>ACCEPTED</code> and startup <code>SUBMITTED</code> mean admission, not write completion. A
 connector <code>write</code> synchronously consumes or copies its supplied range. Custom
 encoder factories create independent admission and bulk instances bound to
@@ -213,6 +216,26 @@ connector. It has no queue position and is not a flush barrier: accepted input
 may be written after a later resize returns. Connector resize and disposal share
 a separate lock, so an entered resize must finish before disposal proceeds.
 Resize never takes the startup lifecycle lock while holding mutation.</p>
+<p>The geometry overload records grid and text-area pixel dimensions together
+under mutation serialization. Grid-only resize preserves pixels for an unchanged
+grid and records unavailable pixels when the grid changes.
+Subscribed in-band resize replies are drained into the ordinary ordered writer
+after successful core and connector resize. Host theme updates likewise drain
+subscribed color-scheme replies before releasing mutation serialization. These
+reports do not make resize an input flush barrier. Host policy publication and
+automatic-report generation share session mutation serialization; denied
+reports are never queued for a later permission change. A failed metadata read
+or connector resize discards the resize&#39;s uncommitted report while preserving
+previously admitted replies and the original exception. The session remains
+running under the existing recoverable resize-failure contract.</p>
+<p>An unfinished resize retains primitive completion/report flags, not queued
+response bytes. A successful retry regenerates any missed report from current
+geometry only if no new resize report was produced, and rechecks subscription
+and permission. Retargeting a retry reports the final geometry once.
+<code>tryUpdateViewportPixels</code> checks the expected grid and resize completion under
+the same mutation lock before updating pixel metadata. A mismatch leaves state
+untouched so presentation owners can perform a full resize and adopt its
+viewport/history anchor; matching pixel-only updates do not resize the connector.</p>
 <p>Close claims termination, calls the connector before taking cleanup monitors,
 drops pending output, cancels session jobs, finalizes parser EOF, and attempts
 final publication. It does not join a writer blocked in a native call. Connectors
@@ -358,7 +381,7 @@ An eager I/O dispatcher is suitable for byte fixtures, but scheduling tests need
 one controlled scheduler or explicit entered/release/completed handshakes.
 Submission return and fake-process exit do not prove queued output was written.
 PTY reply tests must keep the child alive until expected output completes.</p>
-</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/6712fc6d403ebab13334b327303fff4df8f08550/ketraterm-session/docs/session-concurrency-locks.md">View source on GitHub ↗</a></div></div></main></div>
+</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/22e0fb05d65ccf2977fc0644cfe1af8c3a2869ff/ketraterm-session/docs/session-concurrency-locks.md">View source on GitHub ↗</a></div></div></main></div>
   <footer>
     <a class="brand" href="../../../../index.html"><img class="brand-mark" src="../../../../assets/logo.svg" alt="" width="34" height="34">KetraTerm Library</a>
     <p>Open source · Apache 2.0</p>

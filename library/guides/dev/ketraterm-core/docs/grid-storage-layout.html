@@ -27,7 +27,7 @@
 <code>TerminalReader</code>, <code>TerminalLine</code>, and render-frame copies; raw arrays and cluster
 handles remain private to core.</p>
 <h2 id="1-parallel-array-cell-storage-line">1. Parallel Array Cell Storage (<code>Line</code>)</h2>
-<p>Each physical <a href="https://github.com/ketraterm/KetraTerm/blob/6712fc6d403ebab13334b327303fff4df8f08550/ketraterm-core/src/main/kotlin/io/github/ketraterm/core/model/Line.kt">Line</a>
+<p>Each physical <a href="https://github.com/ketraterm/KetraTerm/blob/22e0fb05d65ccf2977fc0644cfe1af8c3a2869ff/ketraterm-core/src/main/kotlin/io/github/ketraterm/core/model/Line.kt">Line</a>
 holds parallel primitive arrays:</p>
 <div class="table-scroll"><table>
 <thead>
@@ -76,7 +76,7 @@ padding from logical text.</p>
 copies translate internal packed attributes and cluster references into the
 stable encodings in <code>ketraterm-render-api</code>.</p>
 <h2 id="2-off-screen-history-ring-historyring">2. Off-Screen History Ring (<code>HistoryRing</code>)</h2>
-<p>A screen&#39;s <a href="https://github.com/ketraterm/KetraTerm/blob/6712fc6d403ebab13334b327303fff4df8f08550/ketraterm-core/src/main/kotlin/io/github/ketraterm/core/buffer/HistoryRing.kt">HistoryRing</a>
+<p>A screen&#39;s <a href="https://github.com/ketraterm/KetraTerm/blob/22e0fb05d65ccf2977fc0644cfe1af8c3a2869ff/ketraterm-core/src/main/kotlin/io/github/ketraterm/core/buffer/HistoryRing.kt">HistoryRing</a>
 contains both retained history and live viewport rows, oldest first. Primary
 capacity is <code>maxHistory + height</code>; alternate capacity is <code>height</code>.</p>
 <p>The reference table is allocated at full capacity, while row objects are
@@ -94,7 +94,7 @@ row arrays and their store. A width change reconstructs logical lines into a new
 ring and store. See the <a href="terminal-core-contract.html#resize">resize contract</a>.</p>
 <h2 id="3-the-arena-allocator-clusterstore">3. The Arena Allocator (<code>ClusterStore</code>)</h2>
 <p>Each screen owns a separate
-<a href="https://github.com/ketraterm/KetraTerm/blob/6712fc6d403ebab13334b327303fff4df8f08550/ketraterm-core/src/main/kotlin/io/github/ketraterm/core/store/ClusterStore.kt">ClusterStore</a>.
+<a href="https://github.com/ketraterm/KetraTerm/blob/22e0fb05d65ccf2977fc0644cfe1af8c3a2869ff/ketraterm-core/src/main/kotlin/io/github/ketraterm/core/store/ClusterStore.kt">ClusterStore</a>.
 Its primitive arrays contain:</p>
 <ul>
 <li><code>clusterData</code>: the flat codepoint pool.</li>
@@ -117,7 +117,7 @@ resize preserves their existing handles. Rows and handles must never cross
 store boundaries without that copy.</p>
 <p>All row and store access requires serialization with terminal mutation. The
 assembled session supplies it; direct core callers provide their own boundary.</p>
-</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/6712fc6d403ebab13334b327303fff4df8f08550/ketraterm-core/docs/grid-storage-layout.md">View source on GitHub ↗</a></div></div></main></div>
+</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/22e0fb05d65ccf2977fc0644cfe1af8c3a2869ff/ketraterm-core/docs/grid-storage-layout.md">View source on GitHub ↗</a></div></div></main></div>
   <footer>
     <a class="brand" href="../../../../index.html"><img class="brand-mark" src="../../../../assets/logo.svg" alt="" width="34" height="34">KetraTerm Library</a>
     <p>Open source · Apache 2.0</p>

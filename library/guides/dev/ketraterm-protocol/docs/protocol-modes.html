@@ -236,11 +236,26 @@ every encoding is enabled by the encoder&#39;s policy.</p>
 <td align="left"><code>2026</code></td>
 <td align="left">Hold render publication while a group of updates is applied.</td>
 </tr>
+<tr>
+<td align="left"><code>COLOR_SCHEME_REPORTING</code></td>
+<td align="left"><code>2031</code></td>
+<td align="left">Subscribe to host color-scheme reports (<code>CSI ?997;Ps n</code>).</td>
+</tr>
+<tr>
+<td align="left"><code>IN_BAND_RESIZE_REPORTING</code></td>
+<td align="left"><code>2048</code></td>
+<td align="left">Subscribe to text-area size reports (<code>CSI 48;rows;columns;heightPixels;widthPixels t</code>).</td>
+</tr>
 </tbody></table></div>
 <p>Bracketed paste lets applications distinguish pasted text from typed input; the
 markers do not enforce application behavior or prevent execution. Synchronized
 output continues parsing and grid mutation; the session controls publication and
 releases a held frame on reset or timeout.</p>
+<p>Change-report subscriptions use terminal-response permission. Mode 2031 reports
+host palette changes rather than application OSC color changes. Every enable
+request for mode 2048 immediately reports the current size. See the
+<a href="../../docs/reference/protocol.html#change-reports">change-report contract</a> for
+ordering, reset, and pixel-dimension rules.</p>
 <h2 id="3-mode-status-and-host-capabilities">3. Mode Status and Host Capabilities</h2>
 <p><code>TerminalModeStatus</code> defines the DECRPM status parameter:</p>
 <div class="table-scroll"><table>
@@ -281,7 +296,7 @@ releases a held frame on reset or timeout.</p>
 host actions available to status reporting; <code>ALL</code> is their combined mask (<code>6</code>).
 A host can expose a capability while denying an individual request. These bits
 are neither DEC mode numbers nor policy permissions.</p>
-</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/6712fc6d403ebab13334b327303fff4df8f08550/ketraterm-protocol/docs/protocol-modes.md">View source on GitHub ↗</a></div></div></main></div>
+</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/22e0fb05d65ccf2977fc0644cfe1af8c3a2869ff/ketraterm-protocol/docs/protocol-modes.md">View source on GitHub ↗</a></div></div></main></div>
   <footer>
     <a class="brand" href="../../../../index.html"><img class="brand-mark" src="../../../../assets/logo.svg" alt="" width="34" height="34">KetraTerm Library</a>
     <p>Open source · Apache 2.0</p>
