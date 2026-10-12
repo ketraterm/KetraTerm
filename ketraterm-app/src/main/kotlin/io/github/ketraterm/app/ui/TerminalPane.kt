@@ -149,7 +149,11 @@ internal class TerminalPane private constructor(
                 terminal.setShellSuggestionProvider(completionProvider)
                 terminal.bind(tab.session)
 
-                val searchBar = SwingTerminalSearchBar(terminal).apply { refreshColors(Chrome.searchColors()) }
+                val searchBar =
+                    SwingTerminalSearchBar(terminal).apply {
+                        refreshColors(Chrome.searchColors())
+                        TerminalSearchShortcuts.install(this)
+                    }
                 ownedSearchBar = searchBar
                 val clipboardReadPrompt =
                     SwingClipboardReadPrompt { message, decide ->

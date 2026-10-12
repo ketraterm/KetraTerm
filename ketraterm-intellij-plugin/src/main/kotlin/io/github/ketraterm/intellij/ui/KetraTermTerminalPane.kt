@@ -392,7 +392,11 @@ internal class KetraTermTerminalPane private constructor(
             try {
                 scrollbarAdapter.attach(terminal)
                 terminal.bind(tab.session)
-                searchBar = SwingTerminalSearchBar(terminal, IntellijSwingHostMessages).apply { refreshColors(searchColors()) }
+                searchBar =
+                    SwingTerminalSearchBar(terminal, IntellijSwingHostMessages).apply {
+                        refreshColors(searchColors())
+                        KetraTermSearchActions.install(this)
+                    }
                 clipboardReadPrompt =
                     SwingClipboardReadPrompt(IntellijSwingHostMessages) { message, decide ->
                         IntellijMessageDialogs.showModeless(project, message, decide)

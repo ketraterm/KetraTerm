@@ -16,7 +16,7 @@ completion and persistence are separate optional modules.
 
 `SwingTerminalSearchBar` delegates scanning, highlights, and result navigation
 to the terminal's search API. The bar includes independent match-case, whole-word,
-and regex toggles, and shows invalid-pattern errors. `SwingTerminalOverlayPane` places the bar over the
+and regex toggles with explanatory tooltips, and shows invalid-pattern errors. `SwingTerminalOverlayPane` places the bar over the
 terminal content, so opening it does not reduce the grid's available space.
 
 Construct Swing components on the event dispatch thread (EDT). This example
@@ -49,6 +49,22 @@ Call `close` when removing the pane; it cancels search observation and clears
 active highlights. Removing the bar from a displayable hierarchy also cancels
 its observation. `open`, `close`, and `refreshColors` enqueue work when called
 off the EDT; read `isOpen` and manipulate `component` on the EDT.
+
+The bar installs no command shortcuts, including Enter, Shift+Enter, or Escape.
+Hosts invoke `performAction(SwingTerminalSearchAction)` on the EDT and bind those
+commands through their own action system. It returns `false` when search is closed.
+`setShortcutTextProvider` supplies plain-text labels from those same bindings;
+tooltips read the provider when requested, so a changed keymap is reflected immediately.
+Return `null` for an unbound action. Tab focus traversal and Space activation use
+normal Swing button behavior and remain available without command bindings.
+
+For a plain Swing host, map keystrokes on
+`searchBar.component.getInputMap(JComponent.WHEN_ANCESTOR_OF_FOCUSED_COMPONENT)`
+and install corresponding `AbstractAction`s in its `actionMap`, calling
+`searchBar.performAction(action)`. The standalone app owns its defaults; the
+IntelliJ plugin registers IDE actions so keymap remapping and multi-stroke shortcuts
+remain platform responsibilities. Keep search bindings scoped to the bar so they
+do not intercept terminal or unrelated editor input.
 
 Use `SwingTerminalSearchColors.create`, `copy`, or a builder to supply an immutable
 palette through `refreshColors(colors)`. Updating colors preserves the query and

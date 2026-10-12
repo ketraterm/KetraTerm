@@ -19,6 +19,8 @@ import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionInteraction;
 import io.github.ketraterm.ui.swing.host.SwingDialogRequest;
 import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionTarget;
 import io.github.ketraterm.ui.swing.host.SwingTerminalSearchColors;
+import io.github.ketraterm.ui.swing.host.SwingTerminalSearchAction;
+import io.github.ketraterm.ui.swing.host.SwingTerminalSearchBar;
 import io.github.ketraterm.ui.swing.host.SwingCompletionSuggestionProvider;
 import io.github.ketraterm.ui.swing.host.SwingCompletionContext;
 import io.github.ketraterm.ui.swing.host.SwingHostMessages;
@@ -30,6 +32,10 @@ import java.util.Locale;
 import java.util.ListResourceBundle;
 
 public final class JavaConsumer {
+    public static void configureSearchHints(SwingTerminalSearchBar bar) {
+        bar.setShortcutTextProvider(action -> action == SwingTerminalSearchAction.TOGGLE_REGEX ? "Ctrl+R" : null);
+    }
+
     public static SwingHostMessages hostMessages() {
         return SwingHostMessages.forLocale(Locale.FRENCH, new ListResourceBundle() {
             @Override protected Object[][] getContents() {

@@ -185,6 +185,18 @@ public final class io/github/ketraterm/ui/swing/host/SwingTerminalOverlayPane : 
 	public fun isOptimizedDrawingEnabled ()Z
 }
 
+public final class io/github/ketraterm/ui/swing/host/SwingTerminalSearchAction : java/lang/Enum {
+	public static final field CLOSE Lio/github/ketraterm/ui/swing/host/SwingTerminalSearchAction;
+	public static final field NEXT_MATCH Lio/github/ketraterm/ui/swing/host/SwingTerminalSearchAction;
+	public static final field PREVIOUS_MATCH Lio/github/ketraterm/ui/swing/host/SwingTerminalSearchAction;
+	public static final field TOGGLE_MATCH_CASE Lio/github/ketraterm/ui/swing/host/SwingTerminalSearchAction;
+	public static final field TOGGLE_REGEX Lio/github/ketraterm/ui/swing/host/SwingTerminalSearchAction;
+	public static final field TOGGLE_WHOLE_WORD Lio/github/ketraterm/ui/swing/host/SwingTerminalSearchAction;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public static fun valueOf (Ljava/lang/String;)Lio/github/ketraterm/ui/swing/host/SwingTerminalSearchAction;
+	public static fun values ()[Lio/github/ketraterm/ui/swing/host/SwingTerminalSearchAction;
+}
+
 public final class io/github/ketraterm/ui/swing/host/SwingTerminalSearchBar {
 	public fun <init> (Lio/github/ketraterm/ui/swing/api/SwingTerminal;)V
 	public fun <init> (Lio/github/ketraterm/ui/swing/api/SwingTerminal;Lio/github/ketraterm/ui/swing/host/SwingHostMessages;)V
@@ -192,8 +204,10 @@ public final class io/github/ketraterm/ui/swing/host/SwingTerminalSearchBar {
 	public final fun getComponent ()Ljavax/swing/JComponent;
 	public final fun isOpen ()Z
 	public final fun open ()V
+	public final fun performAction (Lio/github/ketraterm/ui/swing/host/SwingTerminalSearchAction;)Z
 	public final fun refreshColors ()V
 	public final fun refreshColors (Lio/github/ketraterm/ui/swing/host/SwingTerminalSearchColors;)V
+	public final fun setShortcutTextProvider (Lkotlin/jvm/functions/Function1;)V
 }
 
 public final class io/github/ketraterm/ui/swing/host/SwingTerminalSearchColors {

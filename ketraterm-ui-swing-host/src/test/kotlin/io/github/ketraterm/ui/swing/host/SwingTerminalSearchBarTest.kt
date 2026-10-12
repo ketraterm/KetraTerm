@@ -36,6 +36,85 @@ import kotlin.time.Duration.Companion.milliseconds
 
 class SwingTerminalSearchBarTest {
     @Test
+    fun tooltipsExplainOptionsAndReadLiveHostShortcutHintsAsPlainText() {
+        SwingUtilities.invokeAndWait {
+            val terminal = SwingTerminal()
+            val bar = SwingTerminalSearchBar(terminal)
+            val words = SwingHostMessages.forLocale(Locale.US)
+
+            fun descendants(c: Component): List<Component> =
+                listOf(c) + if (c is Container) c.components.flatMap(::descendants) else emptyList()
+            try {
+                val buttons = descendants(bar.component).filterIsInstance<AbstractButton>()
+                val descriptions =
+                    mapOf(
+                        "search.matchCaseToolTip" to "search.matchCaseDescription",
+                        "search.wholeWordToolTip" to "search.wholeWordDescription",
+                        "search.regexToolTip" to "search.regexDescription",
+                    )
+                for ((title, description) in descriptions) {
+                    val toggle = buttons.single { it.accessibleContext.accessibleName == words.message(title) }
+                    assertTrue(toggle.toolTipText.contains(words.message(description)))
+                    assertTrue(toggle.toolTipText.contains(words.message("search.optionKeyboardHelp")))
+                    assertEquals(words.message(description), toggle.accessibleContext.accessibleDescription)
+                    assertTrue(toggle.isFocusable)
+                    assertFalse(toggle.isRequestFocusEnabled, "Mouse clicks should preserve query-field focus")
+                    assertTrue(toggle.getInputMap(JComponent.WHEN_FOCUSED).get(KeyStroke.getKeyStroke("pressed SPACE")) != null)
+                }
+                val matchCase = buttons.single { it.accessibleContext.accessibleName == words.message("search.matchCaseToolTip") }
+                var hint: String? = "Ctrl+F8"
+                bar.setShortcutTextProvider { if (it == SwingTerminalSearchAction.TOGGLE_MATCH_CASE) hint else null }
+                assertTrue(matchCase.toolTipText.contains("Ctrl+F8"))
+                hint = "<Alt&F9>"
+                assertTrue(matchCase.toolTipText.contains("&lt;Alt&amp;F9&gt;"))
+                assertFalse(matchCase.toolTipText.contains("Ctrl+F8"))
+                hint = null
+                assertFalse(matchCase.toolTipText.contains("F9"))
+                assertFalse(bar.performAction(SwingTerminalSearchAction.TOGGLE_MATCH_CASE))
+                bar.open()
+                assertTrue(bar.performAction(SwingTerminalSearchAction.TOGGLE_MATCH_CASE))
+                assertTrue((matchCase as JToggleButton).isSelected)
+                assertTrue(bar.performAction(SwingTerminalSearchAction.TOGGLE_MATCH_CASE))
+                assertFalse(matchCase.isSelected)
+                assertTrue(bar.performAction(SwingTerminalSearchAction.CLOSE))
+                assertFalse(bar.isOpen())
+            } finally {
+                bar.close()
+                terminal.dispose()
+            }
+        }
+    }
+
+    @Test
+    fun sharedBarDoesNotReserveSearchCommandKeystrokes() {
+        SwingUtilities.invokeAndWait {
+            val terminal = SwingTerminal()
+            val bar = SwingTerminalSearchBar(terminal)
+
+            fun descendants(c: Component): List<Component> =
+                listOf(c) + if (c is Container) c.components.flatMap(::descendants) else emptyList()
+            try {
+                val field = descendants(bar.component).filterIsInstance<JTextField>().single()
+                val strokes = listOf("ENTER", "shift ENTER", "ESCAPE", "alt C", "alt W", "alt R").map(KeyStroke::getKeyStroke)
+                val fieldBindings =
+                    field
+                        .getInputMap(JComponent.WHEN_FOCUSED)
+                        .keys()
+                        .orEmpty()
+                        .toSet()
+                val barBindings = bar.component.getInputMap(JComponent.WHEN_ANCESTOR_OF_FOCUSED_COMPONENT)
+                for (stroke in strokes) {
+                    assertFalse(stroke in fieldBindings, "The bar must not override the text field's host bindings: $stroke")
+                    assertEquals(null, barBindings.get(stroke), "Command binding belongs to the host: $stroke")
+                }
+            } finally {
+                bar.close()
+                terminal.dispose()
+            }
+        }
+    }
+
+    @Test
     fun localizedChromeUsesHostLabelsAndFitsLongStatusAndToggleText() {
         val words =
             SwingHostMessages.forLocale(
@@ -71,7 +150,7 @@ class SwingTerminalSearchBarTest {
                         words.message("search.wholeWordToolTip"),
                         words.message("search.regexToolTip"),
                     ),
-                    controls.mapNotNull { it.toolTipText }.toSet(),
+                    controls.mapNotNull { it.accessibleContext?.accessibleName }.toSet(),
                 )
                 bar.open()
                 assertEquals("0 résultats ; actif 0", counter.text)
@@ -266,7 +345,7 @@ class SwingTerminalSearchBarTest {
 
         fun toggle(key: String) =
             SwingUtilities.invokeAndWait {
-                toggles.single { it.toolTipText == messages.message(key) }.doClick(0)
+                toggles.single { it.accessibleContext.accessibleName == messages.message(key) }.doClick(0)
             }
         try {
             assertEquals(3, completed().resultCount)
