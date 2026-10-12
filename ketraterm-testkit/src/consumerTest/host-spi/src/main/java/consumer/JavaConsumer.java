@@ -140,6 +140,8 @@ public final class JavaConsumer {
         @Override public void startHyperlink(java.lang.String p0, java.lang.String p1) { throw new AssertionError("Unexpected required command: startHyperlink"); }
         @Override public void endHyperlink() { throw new AssertionError("Unexpected required command: endHyperlink"); }
         @Override public void setPaletteColor(int p0, int p1) { throw new AssertionError("Unexpected required command: setPaletteColor"); }
+        @Override public void resetPaletteColors(int[] p0, int p1) { throw new AssertionError("Unexpected required command: resetPaletteColors"); }
+        @Override public void resetDynamicColor(int p0) { throw new AssertionError("Unexpected required command: resetDynamicColor"); }
         @Override public void queryPaletteColor(int p0) { throw new AssertionError("Unexpected required command: queryPaletteColor"); }
         @Override public void setDynamicColor(int p0, int p1) { throw new AssertionError("Unexpected required command: setDynamicColor"); }
         @Override public void queryDynamicColor(int p0) { throw new AssertionError("Unexpected required command: queryDynamicColor"); }

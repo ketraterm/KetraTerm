@@ -20,6 +20,7 @@ Built-in OSC commands use UTF-8. There is no locale encoding fallback or raw
 | --- | --- |
 | Titles (0/1/2), notifications (9/777) | Replacement decoding; repaired text still passes host policy and length checks. |
 | Directory (7), palette (4/10/11/12), shell markers (133) | Strict UTF-8; reject malformed commands without updating state. |
+| Color resets (104/110/111/112) | ASCII decimal indices or an empty payload; non-ASCII input rejects the complete reset. |
 | Hyperlinks (8) | Strict UTF-8; malformed or completed oversized commands end active link context without changing retained links. |
 | Clipboard (52) | ASCII envelope and strict Base64/UTF-8 text; invalid payloads are rejected before consent or access. |
 
@@ -36,8 +37,8 @@ introducers, terminators, and ignored control bytes.
 
 | Family | Collection limit |
 | --- | --- |
-| Titles, directory, hyperlinks, notifications, palette 4, shell markers | 4,096 bytes. |
-| Dynamic colors 10/11/12 | 256 bytes. |
+| Titles, directory, hyperlinks, notifications, palette 4/104, shell markers | 4,096 bytes. |
+| Dynamic colors 10/11/12/110/111/112 | 256 bytes. |
 | DECRQSS | 64 bytes. |
 | XTGETTCAP | 4,096 bytes. |
 | Custom OSC | 4,096 bytes by default; configurable full-envelope limit, with a separate 4,096-byte header limit. |
@@ -60,12 +61,51 @@ Permissions and decoded-size limits are checked again before execution.
 | XTGETTCAP | Terminal name (`TN`/`name`), color count (`Co`/`colors`), and true-color support (`RGB`/`Tc`). |
 | Device identity | `TERM=xterm-256color`, `COLORTERM=truecolor`, VT420-class primary DA, and secondary DA. No DA3 unique identity. |
 | Cursor position | One-based coordinates, relative to active origin/margins when origin mode is enabled. |
-| Color scheme | `CSI ?996n` reports dark/light host preference. Application color overrides do not change that preference. |
+| Color scheme | `CSI ?996n` reports dark/light host preference; mode 2031 permits automatic reports for host theme changes. Application color overrides and resets do not change that preference or emit change reports. |
+| In-band resize | Mode 2048 permits `CSI 48;rows;columns;heightPixels;widthPixels t` reports on enable and after text-area size changes. |
 | Rectangle checksum | Active page only, base VT420 16-bit algorithm; no xterm XTCHECKSUM extensions. |
 
 Denying terminal responses suppresses success and failure replies alike.
 Unsupported queries with defined failure responses use those responses rather
 than echoing request text.
+
+## Color resets
+
+OSC 104 restores the specified palette entries to the current host theme's
+configured values. Bare `OSC 104 ST` or `OSC 104; ST` restores all 256 entries;
+`OSC 104;1;255 ST` restores only entries 1 and 255. Decimal indices must be in
+`0..255`. Invalid and empty fields in a nonempty list are ignored individually,
+duplicates are coalesced, and a list without valid indices changes nothing.
+Non-ASCII bytes reject the complete list.
+
+OSC 110, 111, and 112 restore the theme's foreground, background, and cursor
+colors respectively. They accept no payload, with an optional trailing
+semicolon. These resets preserve other application overrides and host
+presentation preferences. They obey palette permission and emit no replies.
+See [xterm's color operations](https://invisible-island.net/xterm/ctlseqs/ctlseqs.html).
+
+## Change reports
+
+Both subscriptions are initially disabled, accept DECSET/DECRST, and are
+disabled by RIS or DECSTR. Terminal-response permission gates reports without
+changing subscription state; palette permission independently gates application
+color operations. Reports use the same ordered session output path as input
+and explicit replies.
+
+Mode 2031 (`CSI ?2031h` / `CSI ?2031l`) subscribes to host theme palette changes.
+Reports are `CSI ?997;1n` for dark or `CSI ?997;2n` for light, matching the
+one-shot `CSI ?996n` query. Changed host palette values report even if the
+light/dark preference is unchanged. Enabling alone emits nothing, and
+application OSC color changes or resets emit no change reports. See the
+[color-scheme protocol](https://github.com/contour-terminal/contour/blob/f3c3334aa5c861348c5bbe8ffe572c872eef2e08/docs/vt-extensions/color-palette-update-notifications.md).
+
+Mode 2048 (`CSI ?2048h` / `CSI ?2048l`) subscribes to text-area size changes.
+Every enable request, including repeated enable, immediately reports the
+current size as `CSI 48;rows;columns;heightPixels;widthPixels t`. Subsequent
+reports follow completed changes to grid dimensions or text-area pixels.
+Identical geometry emits nothing. Pixel dimensions exclude padding and are
+zero when unavailable. See the
+[in-band resize protocol](https://gist.github.com/rockorager/e695fb2924d36b2bcf1fff4a3704bd83).
 
 ## Mode status reports
 
@@ -76,6 +116,7 @@ are independent; no modes claim permanent-set/reset status.
 | --- | --- |
 | ANSI | 4, 20. |
 | DEC core | 1, 3, 5, 6, 7, 12, 25, 66, 69, 1004, 2004, 2026. |
+| DEC change reports | 2031, 2048. |
 | DEC mouse tracking | 9, 1000, 1002, 1003. |
 | DEC mouse encoding | 1005, 1006, 1015, 1016. |
 | DEC alternate screen | 47, 1047, 1049 report the active buffer. |

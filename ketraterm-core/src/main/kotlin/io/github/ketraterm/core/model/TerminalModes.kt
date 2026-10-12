@@ -23,14 +23,19 @@ import io.github.ketraterm.protocol.keyboard.XtermKeyResource
 import java.util.concurrent.atomic.AtomicLong
 
 /**
- * Atomic storage for durable terminal behavioral modes.
+ * Durable terminal behavioral modes, with atomic input/render snapshots.
  *
  * The grid, cursor, and history remain single-writer core state. This packed
  * word exists so input/render decisions can take a coherent mode snapshot
- * without reading unrelated mutable core structures.
+ * without reading unrelated mutable core structures. Response-only subscriptions
+ * remain ordinary single-writer state and are not part of those snapshots.
  */
 internal class TerminalModes : TerminalInputState {
     private val modeBits = AtomicLong(DEFAULT_MODE_BITS)
+
+    // Response-only subscriptions belong to serialized core state, not the input snapshot.
+    var isColorSchemeReportingEnabled: Boolean = false
+    var isInBandResizeReportingEnabled: Boolean = false
 
     /** Last accepted DECCOLM selection; preserved by soft reset and ordinary resize. */
     var is132ColumnMode: Boolean
@@ -250,6 +255,7 @@ internal class TerminalModes : TerminalInputState {
      */
     fun reset() {
         modeBits.set(DEFAULT_MODE_BITS)
+        resetChangeReporting()
     }
 
     /**
@@ -261,6 +267,12 @@ internal class TerminalModes : TerminalInputState {
     fun softReset() {
         val preserved = modeBits.get() and SOFT_RESET_PRESERVE_MASK
         modeBits.set(preserved or SOFT_RESET_MODE_BITS)
+        resetChangeReporting()
+    }
+
+    private fun resetChangeReporting() {
+        isColorSchemeReportingEnabled = false
+        isInBandResizeReportingEnabled = false
     }
 
     private fun setFlag(

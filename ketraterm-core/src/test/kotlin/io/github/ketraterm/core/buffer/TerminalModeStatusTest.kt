@@ -25,7 +25,7 @@ class TerminalModeStatusTest {
     @Test
     fun unsupportedNamespacesAndHostCapabilitiesReturnZero() {
         val buffer = TerminalBuffers.create(10, 3)
-        for (mode in listOf(0, 2, 4, 1048, 2031, Int.MAX_VALUE)) {
+        for (mode in listOf(0, 2, 4, 1048, Int.MAX_VALUE)) {
             buffer.requestModeStatus(mode, true)
             assertEquals("\u001B[?$mode;0\$y", drain(buffer))
         }

@@ -80,11 +80,19 @@ every encoding is enabled by the encoder's policy.
 | `BELL_IS_URGENT` | `1042` | Request host attention on BEL. |
 | `POP_ON_BELL` | `1043` | Request that the host raise its window on BEL. |
 | `SYNCHRONIZED_OUTPUT` | `2026` | Hold render publication while a group of updates is applied. |
+| `COLOR_SCHEME_REPORTING` | `2031` | Subscribe to host color-scheme reports (`CSI ?997;Ps n`). |
+| `IN_BAND_RESIZE_REPORTING` | `2048` | Subscribe to text-area size reports (`CSI 48;rows;columns;heightPixels;widthPixels t`). |
 
 Bracketed paste lets applications distinguish pasted text from typed input; the
 markers do not enforce application behavior or prevent execution. Synchronized
 output continues parsing and grid mutation; the session controls publication and
 releases a held frame on reset or timeout.
+
+Change-report subscriptions use terminal-response permission. Mode 2031 reports
+host palette changes rather than application OSC color changes. Every enable
+request for mode 2048 immediately reports the current size. See the
+[change-report contract](../../docs/reference/protocol.md#change-reports) for
+ordering, reset, and pixel-dimension rules.
 
 ## 3. Mode Status and Host Capabilities
 

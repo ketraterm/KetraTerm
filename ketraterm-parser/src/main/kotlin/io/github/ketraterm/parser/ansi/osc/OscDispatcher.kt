@@ -26,6 +26,8 @@ import io.github.ketraterm.protocol.ShellIntegrationMarker
 
 internal class OscDispatcher {
     private val utf8Decoder = Utf8Decoder()
+    private val resetColorIndices = IntArray(256)
+    private val resetColorSeen = BooleanArray(256)
 
     fun dispatch(
         sink: TerminalCommandSink,
@@ -40,12 +42,15 @@ internal class OscDispatcher {
             return
         }
 
-        val commandEnd = findByte(payload, length, startIndex = 0, byteValue = ';'.code)
+        val separator = findByte(payload, length, startIndex = 0, byteValue = ';'.code)
+        val commandEnd = if (separator >= 0) separator else length
         if (commandEnd <= 0) {
             return
         }
 
         val command = ControlStringPolicy.oscCommand(payload, commandEnd)
+        if (separator < 0 && command != 104 && command !in 110..112) return
+        val dataStart = if (separator >= 0) separator + 1 else length
         val limit =
             when (command) {
                 52 -> payloadLimit
@@ -69,6 +74,11 @@ internal class OscDispatcher {
                 // Selection and Base64/query syntax are ASCII. Decoded clipboard text
                 // is validated by the host before its permission decision is published.
                 for (i in commandEnd + 1 until length) {
+                    if (payload[i] < 0) return
+                }
+            }
+            104 -> {
+                for (i in dataStart until length) {
                     if (payload[i] < 0) return
                 }
             }
@@ -124,6 +134,8 @@ internal class OscDispatcher {
                     target++
                 }
             }
+            104 -> dispatchPaletteReset(sink, payload, dataStart, length)
+            110, 111, 112 -> if (dataStart == length) sink.resetDynamicColor(command - 100)
             133 -> dispatchShellIntegrationMarker(sink, payload, length, commandEnd + 1)
             777 -> {
                 val payloadStr = decodePayload(payload, commandEnd + 1, length)
@@ -153,6 +165,47 @@ internal class OscDispatcher {
             }
             else -> customOscHandler?.handle(command, payload, commandEnd + 1, length - commandEnd - 1)
         }
+    }
+
+    private fun dispatchPaletteReset(
+        sink: TerminalCommandSink,
+        payload: ByteArray,
+        start: Int,
+        end: Int,
+    ) {
+        if (start == end) {
+            sink.resetPaletteColors(resetColorIndices, 0)
+            return
+        }
+        resetColorSeen.fill(false)
+        var count = 0
+        var fieldStart = start
+        while (fieldStart < end) {
+            val separator = findByte(payload, end, fieldStart, ';'.code)
+            val fieldEnd = if (separator >= 0) separator else end
+            val index = parsePaletteIndex(payload, fieldStart, fieldEnd)
+            if (index >= 0 && !resetColorSeen[index]) {
+                resetColorSeen[index] = true
+                resetColorIndices[count++] = index
+            }
+            fieldStart = fieldEnd + 1
+        }
+        if (count > 0) sink.resetPaletteColors(resetColorIndices, count)
+    }
+
+    private fun parsePaletteIndex(
+        payload: ByteArray,
+        start: Int,
+        end: Int,
+    ): Int {
+        if (start == end) return -1
+        var value = 0
+        for (i in start until end) {
+            val digit = (payload[i].toInt() and 0xff) - '0'.code
+            if (digit !in 0..9 || value > (255 - digit) / 10) return -1
+            value = value * 10 + digit
+        }
+        return value
     }
 
     private fun dispatchClipboard(

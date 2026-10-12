@@ -36,7 +36,7 @@ placement can depend on input chunk boundaries. See the
 | Reverse video | Screen-wide reverse-video mode, independent of per-cell inverse attributes. |
 | Underlines | Single, double, curly, dotted, and dashed. |
 | Cursor | Block, underline, and bar shapes; visibility and blinking controls. |
-| Dynamic colors | OSC 4/10/11/12 palette and foreground/background/cursor changes and queries. |
+| Dynamic colors | OSC 4/10/11/12 palette and foreground/background/cursor changes and queries; OSC 104 and 110/111/112 restore configured theme colors. |
 | Hyperlinks | OSC 8 links with bounded retention. |
 
 ## Keyboard, mouse, and paste
@@ -69,7 +69,8 @@ defines event and encoding behavior.
 | Status queries | Operating status, cursor position, primary/secondary device attributes, and supported mode status. |
 | Capability queries | DECRQSS and XTGETTCAP through explicit allowlists. |
 | Window reports | Minimized state, window pixel dimensions, grid dimensions, and screen-size reports. Pixel dimensions require host data; the current screen-size reply uses the terminal grid. |
-| Color scheme | One-shot light/dark query; no unsolicited mode 2031 notifications. |
+| Color scheme | One-shot light/dark query and mode 2031 subscriptions to host theme changes, including palette changes within the same light/dark preference. |
+| In-band resize | Mode 2048 reports text-area rows, columns, and pixel dimensions on enable and after size changes; unavailable pixel dimensions are zero. |
 | Custom OSC | Ordered callbacks for unsupported numeric OSC commands. |
 | Host policy | Independent controls for clipboard, titles, links, notifications, window actions, colors, and terminal replies. |
 

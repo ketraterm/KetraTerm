@@ -201,6 +201,8 @@ public class TerminalSession private constructor(
 
     private val mutationLock: Any get() = runtime.mutationLock
     private var processingOutput = false
+    private var resizePending = false // Protected by mutationLock; core may precede connector completion.
+    private var resizeReportPending = false // A failed resize discarded a subscribed report.
     private val connectorLifecycleLock = Any()
     private val connectorResizeLock = Any()
     private var startAttempted = false
@@ -562,8 +564,10 @@ public class TerminalSession private constructor(
                 if (isSessionClosed()) return
                 resizeConnector(columns, rows)
                 if (!isSessionClosed()) {
+                    synchronized(mutationLock) { completeResizeReporting() }
                     connector.start(this)
                     if (!isSessionClosed()) {
+                        drainResponses()
                         mutableState.compareAndSet(TerminalSessionState.Created, TerminalSessionState.Running)
                     }
                 }
@@ -642,23 +646,84 @@ public class TerminalSession private constructor(
         columns: Int,
         rows: Int,
         oldScrollbackOffset: Int = 0,
+    ): TerminalViewportResizeResult? = tryResizeViewport(columns, rows, oldScrollbackOffset, 0, 0, pixelSizeSupplied = false)
+
+    /**
+     * Atomically resizes the grid and records its text-area pixel dimensions.
+     *
+     * [pixelWidth] and [pixelHeight] exclude host padding and chrome; zero in either
+     * dimension marks both as unknown. Mode 2048 reports are admitted to the ordered
+     * writer only after connector resize succeeds. Other admission, anchoring, and
+     * failure rules are those of the cell-only [tryResizeViewport] overload.
+     *
+     * @param columns positive terminal column count.
+     * @param rows positive terminal row count.
+     * @param oldScrollbackOffset whole-row offset above the live screen, or zero.
+     * @param pixelWidth nonnegative text-area width in pixels.
+     * @param pixelHeight nonnegative text-area height in pixels.
+     * @return the complete resize anchor, or null if closure has begun.
+     */
+    public fun tryResizeViewport(
+        columns: Int,
+        rows: Int,
+        oldScrollbackOffset: Int,
+        pixelWidth: Int,
+        pixelHeight: Int,
+    ): TerminalViewportResizeResult? =
+        tryResizeViewport(columns, rows, oldScrollbackOffset, pixelWidth, pixelHeight, pixelSizeSupplied = true)
+
+    private fun tryResizeViewport(
+        columns: Int,
+        rows: Int,
+        oldScrollbackOffset: Int,
+        pixelWidth: Int,
+        pixelHeight: Int,
+        pixelSizeSupplied: Boolean,
     ): TerminalViewportResizeResult? {
         require(columns > 0) { "columns must be positive, got $columns" }
         require(rows > 0) { "rows must be positive, got $rows" }
+        require(pixelWidth >= 0 && pixelHeight >= 0) { "pixel dimensions must be nonnegative" }
         if (isSessionClosed()) return null
 
         try {
             return synchronized(mutationLock) {
                 if (isSessionClosed()) return null
+                drainResponses()
                 outputRevision++
-                val (scrollbackOffset, historySize) = terminal.resize(columns, rows, oldScrollbackOffset)
-                var resizedViewport: TerminalViewportResizeResult? = null
-                renderReader.readRenderFrame { frame ->
-                    resizedViewport = TerminalViewportResizeResult(scrollbackOffset, historySize, frame.discardedCount)
+                var resizeCompleted = false
+                var coreResizeCompleted = false
+                try {
+                    val anchor =
+                        if (!pixelSizeSupplied) {
+                            terminal.resize(columns, rows, oldScrollbackOffset)
+                        } else {
+                            terminal.resize(columns, rows, oldScrollbackOffset, pixelWidth, pixelHeight)
+                        }
+                    val (scrollbackOffset, historySize) = anchor
+                    coreResizeCompleted = true
+                    var resizedViewport: TerminalViewportResizeResult? = null
+                    renderReader.readRenderFrame { frame ->
+                        resizedViewport = TerminalViewportResizeResult(scrollbackOffset, historySize, frame.discardedCount)
+                    }
+                    resizeConnector(columns, rows)
+                    val result = checkNotNull(resizedViewport) { "Render reader did not expose the resized terminal frame" }
+                    resizeCompleted = true
+                    completeResizeReporting()
+                    result
+                } finally {
+                    if (!resizeCompleted) {
+                        val reportQueued = terminal.pendingResponseBytes != 0
+                        if (coreResizeCompleted || reportQueued) resizePending = true
+                        resizeReportPending = resizeReportPending || reportQueued
+                        // Regenerate current geometry on completion, rather than retaining
+                        // stale bytes or bypassing later mode and permission changes.
+                        terminal.clearResponseBytes()
+                    }
                 }
-                resizeConnector(columns, rows)
-                checkNotNull(resizedViewport) { "Render reader did not expose the resized terminal frame" }
             }
+        } catch (failure: OutboundCapacityException) {
+            failWrite(failure)
+            throw failure
         } finally {
             invalidateRender()
         }
@@ -670,6 +735,53 @@ public class TerminalSession private constructor(
     ) {
         synchronized(connectorResizeLock) {
             if (!isSessionClosed()) connector.resize(columns, rows)
+        }
+    }
+
+    private fun completeResizeReporting() {
+        if (resizeReportPending && terminal.pendingResponseBytes == 0) {
+            terminal.requestWindowReport(TerminalResponseChannel.WINDOW_REPORT_IN_BAND_SIZE)
+        }
+        resizePending = false
+        resizeReportPending = false
+        drainResponses()
+    }
+
+    /**
+     * Updates text-area pixels only if the open session still has the expected grid.
+     *
+     * Grid validation and metadata mutation share session serialization. Returns false
+     * without mutation when closure has begun, the grid differs, or a previous resize
+     * has not completed; callers can then use [tryResizeViewport] for a full resize.
+     * A successful update preserves content, selection anchors, and render generations.
+     * Subscribed notifications enter the ordered writer before this call returns.
+     *
+     * @param columns expected positive terminal column count.
+     * @param rows expected positive terminal row count.
+     * @param pixelWidth nonnegative text-area width excluding padding; zero means unknown.
+     * @param pixelHeight nonnegative text-area height excluding padding; zero means unknown.
+     * @return true if pixel metadata was admitted for the matching grid.
+     */
+    public fun tryUpdateViewportPixels(
+        columns: Int,
+        rows: Int,
+        pixelWidth: Int,
+        pixelHeight: Int,
+    ): Boolean {
+        require(columns > 0 && rows > 0) { "grid dimensions must be positive" }
+        require(pixelWidth >= 0 && pixelHeight >= 0) { "pixel dimensions must be nonnegative" }
+        if (isSessionClosed()) return false
+        try {
+            return synchronized(mutationLock) {
+                if (isSessionClosed() || resizePending || terminal.width != columns || terminal.height != rows) return false
+                outputRevision++
+                terminal.setWindowSizePixels(pixelWidth, pixelHeight)
+                drainResponses()
+                true
+            }
+        } catch (failure: OutboundCapacityException) {
+            failWrite(failure)
+            throw failure
         }
     }
 
@@ -697,12 +809,33 @@ public class TerminalSession private constructor(
      * @param palette the theme color palette configuration.
      */
     public fun setThemePalette(palette: TerminalColorPalette) {
-        synchronized(mutationLock) {
-            if (isSessionClosed()) return
-            val adapter = hostCommandAdapter
-            if (adapter != null) adapter.setThemePalette(palette) else terminal.setThemePalette(palette)
+        var failedDrain: OutboundCapacityException? = null
+        try {
+            synchronized(mutationLock) {
+                if (isSessionClosed()) return
+                val adapter = hostCommandAdapter
+                try {
+                    if (adapter != null) adapter.setThemePalette(palette) else terminal.setThemePalette(palette)
+                } catch (failure: Throwable) {
+                    // Palette state is already committed when a host observer fails.
+                    // Preserve its report's order and the initiating callback failure.
+                    try {
+                        drainResponses()
+                    } catch (drainFailure: Throwable) {
+                        if (drainFailure is OutboundCapacityException) failedDrain = drainFailure
+                        failure.addSuppressed(drainFailure)
+                    }
+                    throw failure
+                }
+                drainResponses()
+            }
+        } catch (failure: OutboundCapacityException) {
+            failWrite(failure)
+            throw failure
+        } finally {
+            failedDrain?.let { failWrite(it) }
+            invalidateRender()
         }
-        invalidateRender()
     }
 
     /**
@@ -727,6 +860,9 @@ public class TerminalSession private constructor(
             synchronized(outboundWriteLock) {
                 if (isSessionClosed()) return
                 hostCommandAdapter?.setHostPolicy(policy)
+                if (mutableState.value == TerminalSessionState.Created && policy.terminalResponsePolicy == HostControlPolicy.DENY) {
+                    terminal.clearResponseBytes()
+                }
                 clipboardReads?.policyChanged()
             }
         }
@@ -1516,6 +1652,7 @@ public class TerminalSession private constructor(
             val parser =
                 parserFactory?.create(sink, sink::clipboardWriteLimitBytes)
                     ?: TerminalParsers.create(sink, clipboardWriteLimitBytes = sink::clipboardWriteLimitBytes)
+            if (hostPolicy.terminalResponsePolicy == HostControlPolicy.DENY) terminal.clearResponseBytes()
 
             val session =
                 TerminalSession(

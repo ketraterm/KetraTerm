@@ -35,6 +35,7 @@ import org.junit.jupiter.params.ParameterizedTest
 import org.junit.jupiter.params.provider.ValueSource
 import java.awt.Point
 import java.awt.Rectangle
+import java.awt.event.ComponentEvent
 import java.awt.event.InputEvent
 import java.awt.event.MouseEvent
 import java.awt.event.MouseWheelEvent
@@ -45,6 +46,167 @@ import java.util.concurrent.atomic.AtomicReference
 import javax.swing.SwingUtilities
 
 class SwingTerminalInteractionSettingsTest {
+    @Test
+    fun pixelChangeAfterExternalHeightResizeAdoptsTheReflowedHistoryBaseline() =
+        fixture {
+            val cell = Rectangle()
+            assertTrue(view.copyCellBounds(0, 0, cell))
+            settings = settings.copy { it.columnSpacing = 16 - cell.width }
+            view.reloadSettings()
+            val initialSize = view.preferredGridSize(10, 2)
+            view.setSize(initialSize.width + 10, initialSize.height)
+            resizeView()
+            dispatcher.scheduler.runCurrent()
+            view.bind(session)
+            assertEquals(0, view.viewportState().historySize)
+
+            session.resize(10, 5)
+            val output = "\u001b[2J\u001b[Hzero\r\none\r\ntwo\r\nthree\r\nfour".encodeToByteArray()
+            session.onBytes(output, 0, output.size)
+            settings = settings.copy { it.columnSpacing += 1 }
+            view.reloadSettings()
+
+            session.readRenderFrame {
+                assertEquals(10, it.columns)
+                assertEquals(2, it.rows)
+                assertEquals(3, it.historySize)
+            }
+            dispatcher.scheduler.runCurrent()
+            assertEquals(3, view.viewportState().historySize)
+            assertEquals(0.0, view.viewportState().scrollbackOffset)
+            assertEquals(0, view.viewportState().renderOffset)
+        }
+
+    @Test
+    fun settingsPixelChangeAfterExternalGridResizeUsesFullResizePath() =
+        fixture {
+            val cell = Rectangle()
+            assertTrue(view.copyCellBounds(0, 0, cell))
+            settings = settings.copy { it.columnSpacing = 16 - cell.width }
+            view.reloadSettings()
+            val initialSize = view.preferredGridSize(10, 2)
+            view.setSize(initialSize.width + 10, initialSize.height)
+            resizeView()
+            dispatcher.scheduler.runCurrent()
+            view.bind(session)
+            feed("\u001b[?2048h")
+            output.reset()
+
+            session.resize(20, 2)
+            assertTrue(view.selectAll())
+            assertNotNull(view.currentSelectionRange())
+            settings = settings.copy { it.columnSpacing += 1 }
+            view.reloadSettings()
+
+            assertEquals(10, view.visibleGridSize().width)
+            session.readRenderFrame { assertEquals(10, it.columns) }
+            assertNull(view.currentSelectionRange())
+            dispatcher.scheduler.runCurrent()
+            assertEquals(
+                "\u001b[48;2;20;0;0t\u001b[48;2;10;${initialSize.height};170t",
+                output.toString(Charsets.UTF_8),
+            )
+            view.bind(session)
+            assertTrue(view.selectAll())
+            assertEquals("hello", view.selectedText()?.trimEnd())
+        }
+
+    @Test
+    fun `in band resize reports grid and text area pixels excluding configured padding`() =
+        fixture {
+            settings = settings.copy { it.padding = SwingPadding(top = 3, left = 7, bottom = 2, right = 5) }
+            view.reloadSettings()
+            view.size = view.preferredGridSize(13, 4)
+            resizeView()
+            dispatcher.scheduler.runCurrent()
+            view.bind(session)
+            val textWidth = view.width - 12
+            val textHeight = view.height - 5
+
+            feed("\u001b[?2048h")
+
+            assertEquals("\u001b[48;4;13;$textHeight;${textWidth}t", output.toString(Charsets.UTF_8))
+            output.reset()
+            view.size = view.preferredGridSize(15, 5)
+            resizeView()
+            dispatcher.scheduler.runCurrent()
+
+            val resizedTextWidth = view.width - 12
+            val resizedTextHeight = view.height - 5
+            assertEquals("\u001b[48;5;15;$resizedTextHeight;${resizedTextWidth}t", output.toString(Charsets.UTF_8))
+            session.readRenderFrame {
+                assertEquals(15, it.columns)
+                assertEquals(5, it.rows)
+            }
+        }
+
+    @Test
+    fun `pixel only settings resize reports changed text pixels while preserving selection`() =
+        fixture {
+            val originalCell = Rectangle()
+            assertTrue(view.copyCellBounds(0, 0, originalCell))
+            settings = settings.copy { it.columnSpacing = 16 - originalCell.width }
+            view.reloadSettings()
+            val initialSize = view.preferredGridSize(10, 2)
+            view.setSize(initialSize.width + 10, initialSize.height)
+            resizeView()
+            dispatcher.scheduler.runCurrent()
+            view.bind(session)
+            feed("\u001b[?2048h")
+            assertEquals("\u001b[48;2;10;${initialSize.height};160t", output.toString(Charsets.UTF_8))
+            output.reset()
+            assertTrue(view.selectAll())
+            val selection = view.currentSelectionRange()
+            var selectionChanges = 0
+            view.addSelectionListener { _, _ -> selectionChanges++ }
+
+            settings = settings.copy { it.columnSpacing += 1 }
+            view.reloadSettings()
+            dispatcher.scheduler.runCurrent()
+
+            assertEquals(10, view.visibleGridSize().width)
+            assertEquals(2, view.visibleGridSize().height)
+            assertSame(selection, view.currentSelectionRange())
+            assertEquals("hello", view.selectedText()?.trimEnd())
+            assertEquals(0, selectionChanges)
+            assertEquals("\u001b[48;2;10;${initialSize.height};170t", output.toString(Charsets.UTF_8))
+            output.reset()
+
+            resizeView()
+            view.reloadSettings()
+            dispatcher.scheduler.runCurrent()
+
+            assertEquals(0, output.size())
+            assertSame(selection, view.currentSelectionRange())
+            assertEquals(0, selectionChanges)
+        }
+
+    @Test
+    fun `bounds changes retaining complete cells suppress resize reports and preserve selection`() =
+        fixture {
+            val originalSize = view.size
+            feed("\u001b[?2048h")
+            output.reset()
+            assertTrue(view.selectAll())
+            val selection = view.currentSelectionRange()
+            var selectionChanges = 0
+            view.addSelectionListener { _, _ -> selectionChanges++ }
+
+            view.setSize(originalSize.width + 1, originalSize.height + 1)
+            resizeView()
+            resizeView()
+            settings = settings.copy { it.mouseReportingEnabled = false }
+            view.reloadSettings()
+            dispatcher.scheduler.runCurrent()
+
+            assertEquals(10, view.visibleGridSize().width)
+            assertEquals(2, view.visibleGridSize().height)
+            assertEquals(0, output.size())
+            assertSame(selection, view.currentSelectionRange())
+            assertEquals("hello", view.selectedText()?.trimEnd())
+            assertEquals(0, selectionChanges)
+        }
+
     @ParameterizedTest
     @ValueSource(ints = [-3, 5])
     fun `live spacing resize clears selection and preserves output`(spacing: Int) =
@@ -1261,6 +1423,11 @@ class SwingTerminalInteractionSettingsTest {
             session.onBytes(bytes, 0, bytes.size)
             session.requestRender(0)
             dispatcher.scheduler.runCurrent()
+        }
+
+        fun resizeView() {
+            val event = ComponentEvent(view, ComponentEvent.COMPONENT_RESIZED)
+            view.componentListeners.forEach { it.componentResized(event) }
         }
 
         fun paste(suppliedText: Boolean): Boolean = if (suppliedText) view.pasteText(clipboardText) else view.pasteClipboardText()

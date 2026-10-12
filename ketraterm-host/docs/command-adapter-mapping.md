@@ -70,11 +70,21 @@ requests rather than writing transport bytes or performing platform work.
 
 `terminalResponsePolicy` gates status, device, mode, keyboard, window,
 rectangular-checksum, DECRQSS, and XTGETTCAP replies, including supported failure
-replies. OSC palette replies are independently gated by `palettePolicy`.
+replies and subscribed color-scheme/resize reports. Adapter construction and
+policy replacement publish the automatic-report permission to core without
+changing subscriptions or emitting callbacks. OSC color writes, queries, and
+resets are independently gated by `palettePolicy`.
 OSC 52 reads require a valid selector, clipboard-read permission, and terminal
 response permission; a valid denied read can still be admitted for an empty
 failure reply when response permission allows it. Response denial suppresses
 that path too.
+
+Host theme changes use `setThemePalette` and can enqueue subscribed color-scheme
+reports even when the light/dark preference stays the same. Application OSC
+color changes and resets only publish effective `paletteChanged` metadata;
+they do not trigger color-scheme reports. A direct embedder must drain
+theme-change reports just as it drains parser-generated replies. See the
+[protocol contract](../../docs/reference/protocol.md#change-reports).
 
 Permissions do not enlarge protocol allowlists. Unsupported selectors retain
 their protocol-defined failure or silence behavior. Detailed support status

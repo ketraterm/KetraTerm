@@ -1003,6 +1003,21 @@ public interface TerminalCommandSink {
     public fun queryPaletteColor(index: Int)
 
     /**
+     * Restores indexed colors to the host-configured theme defaults (OSC 104).
+     *
+     * The array is borrowed only for this call. Consume its first [count] indices
+     * synchronously or copy them before retention. A zero [count] resets the entire
+     * indexed table; dynamic foreground, background, and cursor colors are preserved.
+     *
+     * @param indices valid palette indices in `0..255`.
+     * @param count used prefix length, or zero for the complete indexed table.
+     */
+    public fun resetPaletteColors(
+        indices: IntArray,
+        count: Int,
+    )
+
+    /**
      * Sets a dynamic color (foreground, background, or cursor color).
      *
      * @param target Target color identifier (10 for foreground, 11 for background, 12 for cursor).
@@ -1019,6 +1034,13 @@ public interface TerminalCommandSink {
      * @param target Target color identifier to query (10 for foreground, 11 for background, 12 for cursor).
      */
     public fun queryDynamicColor(target: Int)
+
+    /**
+     * Restores one dynamic color to its host-configured theme default (OSC 110/111/112).
+     *
+     * @param target target identifier: 10 foreground, 11 background, or 12 cursor.
+     */
+    public fun resetDynamicColor(target: Int)
 
     /**
      * Queries a status string (DECRQSS).

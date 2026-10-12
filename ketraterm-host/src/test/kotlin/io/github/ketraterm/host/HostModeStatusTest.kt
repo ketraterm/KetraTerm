@@ -119,7 +119,7 @@ class HostModeStatusTest {
                 val expected =
                     if (permission == HostControlPolicy.ALLOW) {
                         "\u001B[4;2\$y\u001B[?4;0\$y\u001B[?2004;1\$y\u001B[?1048;0\$y" +
-                            "\u001B[?2031;0\$y\u001B[?2147483647;0\$y"
+                            "\u001B[?2031;2\$y\u001B[?2147483647;0\$y"
                     } else {
                         ""
                     }

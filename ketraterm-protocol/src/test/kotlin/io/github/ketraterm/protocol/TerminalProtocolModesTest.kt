@@ -76,6 +76,8 @@ class TerminalProtocolModesTest {
             { assertEquals(1015, DecPrivateMode.MOUSE_URXVT) },
             { assertEquals(2004, DecPrivateMode.BRACKETED_PASTE) },
             { assertEquals(2026, DecPrivateMode.SYNCHRONIZED_OUTPUT) },
+            { assertEquals(2031, DecPrivateMode.COLOR_SCHEME_REPORTING) },
+            { assertEquals(2048, DecPrivateMode.IN_BAND_RESIZE_REPORTING) },
         )
     }
 

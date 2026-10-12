@@ -121,6 +121,59 @@ class OscDispatcherTest {
     @DisplayName("colors")
     inner class Colors {
         @Test
+        fun `OSC 104 resets one many or all indexed colors`() {
+            assertEquals(listOf("resetPaletteColors:0"), dispatch("104;0").events)
+            assertEquals(listOf("resetPaletteColors:0,15,255"), dispatch("104;0;15;255;0").events)
+            assertEquals(listOf("resetPaletteColors:"), dispatch("104").events)
+            assertEquals(listOf("resetPaletteColors:"), dispatch("104;").events)
+        }
+
+        @Test
+        fun `OSC 104 ignores malformed indices without promoting invalid lists to reset all`() {
+            assertEquals(
+                listOf("resetPaletteColors:2,255"),
+                dispatch("104;-1;256;999999999999999999999;invalid;;2;255;+1; 1;1 ").events,
+            )
+            for (payload in listOf("104;invalid", "104;256", "104;-1", "104;;", "104;99999999999999999999")) {
+                assertTrue(dispatch(payload).events.isEmpty(), payload)
+            }
+        }
+
+        @Test
+        fun `OSC 104 bounds scratch space by distinct indices and borrows only the used prefix`() {
+            val indices = (0..255).joinToString(";")
+            val dispatcher = OscDispatcher()
+            val sink = RecordingTerminalCommandSink()
+            for (payload in listOf("104;$indices;$indices", "104;7", "104")) {
+                val bytes = payload.encodeToByteArray()
+                dispatcher.dispatch(sink, bytes, bytes.size, false)
+            }
+            assertEquals(
+                listOf("resetPaletteColors:${(0..255).joinToString(",")}", "resetPaletteColors:7", "resetPaletteColors:"),
+                sink.events,
+            )
+        }
+
+        @Test
+        fun `OSC 110 111 112 reset only their dynamic color with optional trailing separator`() {
+            for (command in 110..112) {
+                val expected = listOf("resetDynamicColor:${command - 100}")
+                assertEquals(expected, dispatch("$command").events)
+                assertEquals(expected, dispatch("$command;").events)
+                for (suffix in listOf(" ", "; ", ";?", ";1", ";;")) {
+                    assertTrue(dispatch("$command$suffix").events.isEmpty())
+                }
+            }
+        }
+
+        @Test
+        fun `overflowed color resets have no partial effects`() {
+            assertTrue(dispatch("104;0;1", overflowed = true).events.isEmpty())
+            assertTrue(dispatch("110", overflowed = true).events.isEmpty())
+            assertTrue(dispatch("104;0;1;".padEnd(4097, '0')).events.isEmpty())
+        }
+
+        @Test
         fun `OSC 4 updates palette color with standard hex`() {
             assertEquals(
                 listOf("setPaletteColor:1:-16776961"),

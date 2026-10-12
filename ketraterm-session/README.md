@@ -104,6 +104,20 @@ See [render scheduling](docs/asynchronous-render-coalescing.md).
 `resizeViewport` returns the new scrollback offset, history size, and discarded
 row baseline together; apply the complete result when preserving scroll position.
 Resize may block in the connector and is not a barrier for queued input.
+The five-argument `tryResizeViewport` overload accepts text-area pixel width and
+height along with the grid dimensions and viewport offset. Supply the measured
+cell area excluding padding; either zero means pixels are unavailable. The
+existing grid-only resize methods preserve pixels for an unchanged grid and
+report unknown pixels when the grid changes. Swing supplies its
+measured cell area automatically. Subscribed mode 2048 reports are admitted
+after successful core and connector resize, through the ordered writer.
+Failed resizes can be retried with the same geometry; completion reports the
+current size once if the subscription and policy still permit it.
+`tryUpdateViewportPixels` performs a pixel-only update only when its expected
+grid still matches core and no resize is unfinished. A false result leaves
+state untouched; use `tryResizeViewport` and adopt its complete anchor instead.
+`setThemePalette` similarly admits subscribed mode 2031 reports after host theme
+updates. See the [change-report contract](../docs/reference/protocol.md#change-reports).
 `clearBuffer` clears the active screen and history without sending connector input
 or resetting the parser. It returns false after shutdown begins. See the
 [clear contract](docs/session-concurrency-locks.md#local-buffer-clear) before

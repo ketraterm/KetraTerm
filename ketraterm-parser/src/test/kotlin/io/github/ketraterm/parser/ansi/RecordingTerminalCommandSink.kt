@@ -586,6 +586,13 @@ internal class RecordingTerminalCommandSink : TerminalAsciiCommandSink {
         events += "queryPaletteColor:$index"
     }
 
+    override fun resetPaletteColors(
+        indices: IntArray,
+        count: Int,
+    ) {
+        events += "resetPaletteColors:${indices.take(count).joinToString(",")}"
+    }
+
     override fun setDynamicColor(
         target: Int,
         color: Int,
@@ -595,6 +602,10 @@ internal class RecordingTerminalCommandSink : TerminalAsciiCommandSink {
 
     override fun queryDynamicColor(target: Int) {
         events += "queryDynamicColor:$target"
+    }
+
+    override fun resetDynamicColor(target: Int) {
+        events += "resetDynamicColor:$target"
     }
 
     override fun queryStatusString(query: String) {

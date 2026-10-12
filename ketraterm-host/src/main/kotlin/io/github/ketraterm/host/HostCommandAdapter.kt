@@ -85,18 +85,21 @@ public class HostCommandAdapter
             ) {
                 "invalid Kitty keyboard host capability mask: $kittyKeyboardSupportedFlags"
             }
+            terminal.setChangeNotificationsAllowed(hostPolicy.terminalResponsePolicy.isAllowed)
         }
 
         /**
          * Updates the active host security policy dynamically.
          *
-         * This only publishes the policy. A lowered hyperlink retention limit is
+         * Publishes the policy and change-notification permission without emitting
+         * callbacks. A lowered hyperlink retention limit is
          * reconciled by the serialized command owner on the next accepted open,
          * including reuse of an existing explicit key.
          *
          * @param policy new security policy.
          */
         public fun setHostPolicy(policy: HostPolicy) {
+            terminal.setChangeNotificationsAllowed(policy.terminalResponsePolicy.isAllowed)
             this.hostPolicy = policy
         }
 
@@ -574,6 +577,8 @@ public class HostCommandAdapter
                 }
                 DecPrivateMode.BRACKETED_PASTE -> terminal.setBracketedPasteEnabled(enable)
                 DecPrivateMode.SYNCHRONIZED_OUTPUT -> terminal.setSynchronizedOutput(enable)
+                DecPrivateMode.COLOR_SCHEME_REPORTING -> terminal.setColorSchemeReportingEnabled(enable)
+                DecPrivateMode.IN_BAND_RESIZE_REPORTING -> terminal.setInBandResizeReportingEnabled(enable)
                 DecPrivateMode.BELL_IS_URGENT -> terminal.setBellIsUrgent(enable)
                 DecPrivateMode.POP_ON_BELL -> terminal.setPopOnBell(enable)
             }
@@ -994,6 +999,16 @@ public class HostCommandAdapter
             terminal.queryPaletteColor(index)
         }
 
+        override fun resetPaletteColors(
+            indices: IntArray,
+            count: Int,
+        ) {
+            if (!hostPolicy.palettePolicy.isAllowed) return
+            val previous = terminal.palette
+            terminal.resetPaletteColors(indices, count)
+            publishPaletteChange(previous)
+        }
+
         override fun setDynamicColor(
             target: Int,
             color: Int,
@@ -1023,6 +1038,13 @@ public class HostCommandAdapter
         override fun queryDynamicColor(target: Int) {
             if (!hostPolicy.palettePolicy.isAllowed) return
             terminal.queryDynamicColor(target)
+        }
+
+        override fun resetDynamicColor(target: Int) {
+            if (!hostPolicy.palettePolicy.isAllowed) return
+            val previous = terminal.palette
+            terminal.resetDynamicColor(target)
+            publishPaletteChange(previous)
         }
 
         override fun queryStatusString(query: String) {

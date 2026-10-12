@@ -70,10 +70,12 @@ public final class io/github/ketraterm/host/HostCommandAdapter : io/github/ketra
 	public fun requestRectangleChecksum (IIIIII)V
 	public fun requestWindowReport (I)V
 	public fun resetAttributes ()V
+	public fun resetDynamicColor (I)V
 	public fun resetKeyFormatOption (I)V
 	public fun resetKeyFormatOptions ()V
 	public fun resetKeyModifierOption (I)V
 	public fun resetKeyModifierOptions ()V
+	public fun resetPaletteColors ([II)V
 	public fun resetTerminal ()V
 	public fun resizeWindow (II)V
 	public fun restoreCursor ()V
