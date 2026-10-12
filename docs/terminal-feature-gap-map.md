@@ -9,6 +9,12 @@ and the [changelog](../CHANGELOG.md). Entries here are not release commitments.
 | Owner | Remaining work |
 | --- | --- |
 | `TODO(host/profile)` | Restore completion settings controls and learning-reset actions in both products, with defaults, persistence, and tests updated together. The master switch remains off by default. |
+| `TODO(host/profile)` | Persist and restore standalone window, tab, split, profile, and working-directory layouts. IntelliJ already restores tab metadata; neither product restores running processes or historical output. |
+| `TODO(host/profile)` | User-configurable standalone key sequences, modal key tables, and chained actions. Library shortcut maps and IntelliJ keymap integration already exist; they do not provide this standalone configuration surface. |
+| `TODO(host/profile)` | A standalone command palette for discovering and invoking terminal and workspace actions. IntelliJ's action system is host-owned and already available there. |
+| `TODO(host/profile)` | A standalone quick/drop-down terminal with platform-appropriate activation and focus handling. Ordinary terminal windows do not provide this workflow. |
+| `TODO(host/profile)` | A product read-only session toggle that blocks outbound user input while retaining output, selection, and search. Read-only render frames and closed-session presentation are different capabilities. |
+| `TODO(host/profile)` | Rearrange existing standalone split panes without restarting their sessions, and provide bounded undo of pane closure with explicit process-lifetime semantics. Creating and resizing splits already works. |
 | `TODO(host/profile)` | Gate binary/plugin delivery on checks of the exact release revision: opt-in native PTY tests (`-Dterminal.pty.host=true`), package checks, supported-IDE Plugin Verifier runs, and installed-product smoke tests. Ordinary CI runs tests and ABI checks, and Maven publication runs publication checks; binary release jobs do not depend on the full verification set. |
 | `TODO(policy)` | Establish reproducible allocation and latency budgets for startup, warmed operation, changing content, history growth, and platform painting. Include retained heap and disposal; short local measurements are not a release baseline. |
 
@@ -17,8 +23,17 @@ and the [changelog](../CHANGELOG.md). Entries here are not release commitments.
 | Owner | Remaining work |
 | --- | --- |
 | `TODO(transport)` | A built-in SSH connector, remote-session lifecycle, permissions, and appropriate paste defaults. Running `ssh` inside a local shell does not provide this integration. |
+| `TODO(host/profile)` | Opt-in SSH shell helpers for terminal-environment forwarding and remote terminfo setup. These helpers are separate from a built-in SSH connector and must handle unavailable remote tools and rejected environment forwarding. |
 | `TODO(host/profile)` | WSL-aware directory, JDK, and startup-command mapping. Existing explicit-shell hooks do not provide guest filesystem completion or remote process metadata; see [shell support](features/shells.md). |
 | `TODO(host/profile)` | Dev Container launch contexts and container-aware host services; no built-in container-session integration exists. |
+
+## Shell integration
+
+| Owner | Remaining work |
+| --- | --- |
+| `TODO(host/profile)` | Automatic Nushell and Elvish integration for prompt/command markers and working-directory context. Nushell discovery and configurable shell executables do not install these hooks; see [shell support](features/shells.md). |
+| `TODO(parser/session/input/ui/host/profile)` | Click-to-move within an editable shell prompt using OSC 133 `cl=line` and compatible `click-events` metadata. Existing command markers and completion edit authority do not implement pointer-driven cursor placement. |
+| `TODO(host/profile)` | Configurable command-finished alerts based on shell metadata, duration, and focus state. Command-finished listeners and terminal-requested OSC notifications already exist; neither product turns completion of a long-running command into an automatic alert. |
 
 <a id="input-module-gaps"></a>
 <a id="deferred-kitty-keyboard-protocol-scope"></a>
@@ -29,12 +44,29 @@ and the [changelog](../CHANGELOG.md). Entries here are not release commitments.
 | --- | --- |
 | `TODO(host/profile)` | Native rich-input adapters with layout-aware key identity, IME text, and complete lifecycle metadata. Portable Swing must not advertise Kitty flags 2, 4, or 16 before these inputs are reliable. |
 | `TODO(parser/core/input)` | Layout-aware modifyOtherKeys modifier masks, including `CSI > 4 : 1 m`. The parser rejects colon subparameters for this command; no corresponding negotiated mask is stored or applied by the encoder. |
+| `TODO(parser/core/ui)` | Application-controlled alternate-screen scrolling (mode 1007) and Shift mouse capture (XTSHIFTESCAPE). The UI already supports host-configured wheel-to-arrow input and a local Shift override; applications cannot negotiate these behaviors. |
+
+## Rendering and interaction
+
+| Owner | Remaining work |
+| --- | --- |
+| `TODO(ui)` | Programming-font ligatures across compatible LTR ASCII cells. Contextual script and RTL shaping already handle natural ligatures, but the ASCII rendering path deliberately bypasses contextual shaping. |
+| `TODO(ui/host/profile)` | OpenType feature and variable-font axis controls. Existing primary/fallback font selection and host font resolution do not expose these settings. |
+| `TODO(ui/host/profile)` | Formatted clipboard copy and output export in HTML or terminal-escape form. Current built-in clipboard and export paths produce plain text; selection and command-output extraction already exist. |
+| `TODO(ui/host/profile)` | Optional background images, transparency/blur where the platform permits it, and custom visual effects. Current appearance controls cover colors, fonts, geometry, and decorations, without image backgrounds or shader effects. |
 
 ## Optional protocol work
 
 | Owner | Remaining work |
 | --- | --- |
 | `TODO(parser/core/render/ui/policy)` | Sixel and Kitty graphics: decoding, bounded transfer/decompression, retained-image budgets, render contracts, and painting. Kitty graphics requires APC dispatch. |
+| `TODO(parser/core/policy)` | Kitty color protocol (OSC 21), including bounded key/value parsing, color queries, and the color/reply security allowlists. OSC 4/10/11/12 and their implemented resets remain separate supported protocols. |
+| `TODO(parser/session/ui/policy)` | Application-requested pointer shapes (OSC 22), with supported-name validation and host permission. The built-in link-hover pointer does not implement this protocol. |
+| `TODO(parser/session/ui/host/profile/policy)` | ConEmu progress reports (OSC 9;4), retained progress state, and product presentation with bounded expiry. These subcommands are currently excluded from notification handling; OSC 9/777 notifications already work. |
+| `TODO(parser/core)` | Reverse-wrap modes 45/1045, including cursor movement across eligible wrapped rows and scrolling-margin boundaries. Forward autowrap and reverse scrolling are already supported and do not provide reverse wrapping. |
+| `TODO(parser/core/policy)` | Grapheme-width mode 2027 negotiation and status reporting, with an explicit policy for any legacy-width alternative. Unicode 17 segmentation and grapheme-aware width already work without this mode. |
+| `TODO(core/policy)` | Broader XTGETTCAP replies for concrete TUI capability discovery, backed by an authoritative capability table and explicit reply allowlist. Current replies cover terminal name, color count, and truecolor aliases only. |
+| `TODO(parser/core/policy)` | XTVERSION terminal-version queries with a bounded, policy-controlled identity reply. Primary/secondary device attributes already work; version queries are a separate protocol. |
 | `TODO(parser/core/policy)` | xterm XTCHECKSUM extensions beyond the implemented base VT420 checksum. |
 | `TODO(parser)` | Additional ISO 2022 national replacement sets: UK, Dutch, Finnish, French, German, Italian, Norwegian/Danish, Spanish, Swedish, Swiss, and Portuguese. |
 | `TODO(host/profile)` | Built-in desktop OSC 52 writes to primary/secondary selections and cut buffers, and reads from secondary selections and cut buffers. Library callbacks already expose selection-aware requests; custom hosts can implement these destinations. |
@@ -53,6 +85,8 @@ and the [changelog](../CHANGELOG.md). Entries here are not release commitments.
 - Column spacing uses integer logical pixels; fractional cell advances are unavailable.
 - Portable Swing exposes only the key metadata available through AWT.
 - Highlight mouse tracking (mode 1001) is unsupported.
+- Configurable ENQ answerback and ANSI keyboard-disable mode (KAM) are unsupported;
+  enabling either would require an explicit compatibility and security policy.
 - Native color-emoji rasterization is Windows-specific. Other platforms use
   Java2D/font fallback; the library has no equivalent native color-emoji backend.
 - The screen-size query reports terminal-grid dimensions, not the monitor's
