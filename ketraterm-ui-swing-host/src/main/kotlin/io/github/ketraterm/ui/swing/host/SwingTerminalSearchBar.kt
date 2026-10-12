@@ -272,22 +272,32 @@ public class SwingTerminalSearchBar
             title: String?,
         ): String? {
             if (title == null) return null
+            val foreground = UIManager.getColor("ToolTip.foreground") ?: colors.foreground
+            val background = UIManager.getColor("ToolTip.background") ?: colors.panelBackground
+            val secondary =
+                Color(
+                    (foreground.red * 4 + background.red) / 5,
+                    (foreground.green * 4 + background.green) / 5,
+                    (foreground.blue * 4 + background.blue) / 5,
+                )
+            val secondaryHex = "#" + (secondary.rgb and 0xffffff).toString(16).padStart(6, '0')
             return buildString {
-                append("<html><div style='padding:4px'><b>")
+                append("<html><b>")
                 append(escapeHtml(title))
                 append("</b>")
                 shortcutText(action)?.takeIf { it.isNotBlank() }?.let {
-                    append("&nbsp;&nbsp;")
+                    append("&nbsp;&nbsp;&nbsp;<font color='$secondaryHex'>")
                     append(escapeHtml(it))
+                    append("</font>")
                 }
                 optionDescriptions[action]?.let {
-                    append("<br><br>")
+                    append("<div style='margin-top:4px'>")
                     append(escapeHtml(it))
-                    append("<br><br><small>")
+                    append("</div><div style='margin-top:4px'><font color='$secondaryHex'>")
                     append(escapeHtml(keyboardHelp))
-                    append("</small>")
+                    append("</font></div>")
                 }
-                append("</div></html>")
+                append("</html>")
             }
         }
 
