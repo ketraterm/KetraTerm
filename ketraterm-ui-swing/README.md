@@ -75,6 +75,22 @@ selection. Width changes clip rather than reflow it; height changes expose a
 bottom-anchored window over retained rows. Presentation changes do not restart
 the session.
 
+### Search
+
+`search(query)` starts a background search; observe `searchState` for results or
+failure. Literal, case-insensitive search is the default. Use
+`setSearchCaseSensitive`, `setSearchWholeWord`, and `setSearchRegex` to change
+independent options. Each setter restarts a nonempty query; `clearSearch()` clears
+the query and highlights while retaining options. Calls execute on the EDT or
+enqueue there when called from another thread.
+
+Whole-word matching uses Unicode word boundaries. Regex uses Java `Pattern`
+syntax and matches one logical line at a time, including soft wraps; it does not
+cross hard line breaks. Trailing ASCII spaces are trimmed and empty matches are
+ignored. Invalid patterns appear in `searchState.failure`. Pattern matching
+buffers one logical line on the worker and checks cancellation during
+backtracking. Ordinary literal searches retain their streaming matcher.
+
 ### Manual paste
 
 `pasteText(text)` accepts host-supplied text on the EDT without reading a

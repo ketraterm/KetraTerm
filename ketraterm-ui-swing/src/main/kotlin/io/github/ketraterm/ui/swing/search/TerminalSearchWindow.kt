@@ -21,12 +21,14 @@ import io.github.ketraterm.render.cache.TerminalTextRangeCopy
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.yield
+import java.util.regex.Pattern
 
 /** Bounded collection and directional searches without a history-sized row index. */
 internal class TerminalSearchWindow(
     private val reader: TerminalRenderFrameReader,
     private val query: String,
     private val ignoreCase: Boolean,
+    private val pattern: Pattern? = null,
 ) {
     private val copy = TerminalTextRangeCopy()
     private val model = TerminalSearchModel()
@@ -124,7 +126,7 @@ internal class TerminalSearchWindow(
         onProgress: (suspend (TerminalSearchScan.Progress) -> Unit)? = null,
     ): TerminalSearchHighlights {
         val context = currentCoroutineContext()
-        model.begin(query, ignoreCase, start, { context.ensureActive() }, true, limit, keepLast, accepts)
+        model.begin(query, ignoreCase, start, { context.ensureActive() }, true, limit, keepLast, accepts, pattern)
         var next = start
         var published = 0
         while (next <= end && !model.limitReached) {

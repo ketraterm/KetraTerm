@@ -19,9 +19,11 @@ import io.github.ketraterm.render.api.TerminalRenderCellFlags
 import io.github.ketraterm.render.cache.TerminalRenderCache
 import io.github.ketraterm.render.cache.TerminalTextRangeCopy
 import io.github.ketraterm.ui.swing.render.forEachLogicalTextCell
+import java.util.regex.Pattern
 
 /** Matches decoded UTF-16 as it arrives, retaining only query-sized candidate geometry. */
 internal class TerminalSearchModel {
+    private var patternModel: TerminalSearchPatternModel? = null
     private val highlights = TerminalSearchHighlights()
 
     // A partial logical line must remain discardable after history eviction.
@@ -30,7 +32,7 @@ internal class TerminalSearchModel {
     private var maxResults = Int.MAX_VALUE
     private var keepLast = false
     private var acceptsMatch: (Long, Int, Long) -> Boolean = { _, _, _ -> true }
-    val limitReached: Boolean get() = !keepLast && highlights.resultCount + confirmedResults >= maxResults
+    val limitReached: Boolean get() = patternModel?.limitReached ?: (!keepLast && highlights.resultCount + confirmedResults >= maxResults)
     private var confirmedResults = 0
     private var query = ""
     private var prefixes = IntArray(0)
@@ -71,7 +73,15 @@ internal class TerminalSearchModel {
         maxResults: Int = Int.MAX_VALUE,
         keepLast: Boolean = false,
         acceptsMatch: (Long, Int, Long) -> Boolean = { _, _, _ -> true },
+        pattern: Pattern? = null,
     ) {
+        this.query = query
+        if (pattern != null) {
+            val matching = patternModel ?: TerminalSearchPatternModel(pattern).also { patternModel = it }
+            matching.begin(pattern, checkCancelled, validateRows, maxResults, keepLast, acceptsMatch)
+            return
+        }
+        patternModel = null
         this.maxResults = maxResults
         this.keepLast = keepLast
         this.acceptsMatch = acceptsMatch
@@ -119,6 +129,10 @@ internal class TerminalSearchModel {
     }
 
     fun discardPendingLine() {
+        patternModel?.let {
+            it.discardPendingLine()
+            return
+        }
         matched = 0
         nextPosition = 0
         pending.clear()
@@ -151,6 +165,7 @@ internal class TerminalSearchModel {
     }
 
     fun finish(): TerminalSearchHighlights {
+        patternModel?.let { return it.finish() }
         finishLine()
         highlights.activate(if (highlights.resultCount == 0) -1 else 0)
         return highlights
@@ -170,7 +185,7 @@ internal class TerminalSearchModel {
         highlights.appendResults(source, first, end, checkCancelled)
     }
 
-    val completedResults: TerminalSearchHighlights get() = highlights
+    val completedResults: TerminalSearchHighlights get() = patternModel?.highlights ?: highlights
 
     private fun finishLine() {
         checkCancelled()
@@ -196,6 +211,10 @@ internal class TerminalSearchModel {
         row: Int,
         wrapped: Boolean,
     ) {
+        patternModel?.let {
+            it.appendRow(columns, codes, flags, refs, clusters, row, wrapped, currentRow, currentId, currentGeneration)
+            return
+        }
         checkCancelled()
         var end = columns
         val offset = row * columns

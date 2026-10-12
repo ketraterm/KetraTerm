@@ -1723,7 +1723,7 @@ public class SwingTerminal
         }
 
         /**
-         * Schedules a cancellable background literal search. This does not wait for results.
+         * Schedules a cancellable background search (literal by default). This does not wait for results.
          *
          * The search covers retained scrollback plus the live grid snapshot exposed
          * through the bound session's render-frame reader. Hosts own any visible
@@ -1731,7 +1731,7 @@ public class SwingTerminal
          * Observe [searchState] for completion or failure. Results are refreshed in
          * completed passes while output continues, not an atomic snapshot of all history.
          *
-         * @param query literal text to find.
+         * @param query text to find, or a Java regular expression when [setSearchRegex] is enabled.
          */
         public fun search(query: String) {
             runOnEdt {
@@ -1778,6 +1778,25 @@ public class SwingTerminal
             runOnEdt {
                 searchController.setIgnoreCase(!caseSensitive)
             }
+        }
+
+        /**
+         * Requires word boundaries around matches. Disabled by default; changing it restarts the current search.
+         * Unicode letters, digits, combining marks, connector punctuation and join controls are word characters.
+         * Applies to both literal and regex searches; this setting survives [clearSearch].
+         */
+        public fun setSearchWholeWord(wholeWord: Boolean) {
+            runOnEdt { searchController.setWholeWord(wholeWord) }
+        }
+
+        /**
+         * Enables Java regular expressions. Disabled by default; changing it restarts the current search.
+         * Patterns match one logical line at a time, including soft wraps, with trailing ASCII spaces trimmed.
+         * Empty matches are ignored. Invalid patterns are reported through [searchState].
+         * Matching runs off the EDT and is cancellable. This setting survives [clearSearch].
+         */
+        public fun setSearchRegex(regex: Boolean) {
+            runOnEdt { searchController.setRegex(regex) }
         }
 
         /**

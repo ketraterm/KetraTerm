@@ -15,7 +15,8 @@ completion and persistence are separate optional modules.
 ## Search chrome
 
 `SwingTerminalSearchBar` delegates scanning, highlights, and result navigation
-to the terminal's search API. `SwingTerminalOverlayPane` places the bar over the
+to the terminal's search API. The bar includes independent match-case, whole-word,
+and regex toggles, and shows invalid-pattern errors. `SwingTerminalOverlayPane` places the bar over the
 terminal content, so opening it does not reduce the grid's available space.
 
 Construct Swing components on the event dispatch thread (EDT). This example

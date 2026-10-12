@@ -36,6 +36,8 @@ import kotlinx.coroutines.test.TestScope
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.Test
+import org.junit.jupiter.params.ParameterizedTest
+import org.junit.jupiter.params.provider.ValueSource
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
@@ -49,6 +51,110 @@ class TerminalSearchControllerTest {
 
     @AfterEach fun cleanupSearch() {
         scope.cancel()
+    }
+
+    @Test
+    fun `search options restart the same query and invalid regex recovers`() {
+        val reader = SearchFrameReader(liveLines = listOf("cat cats CAT a.b axb ["))
+        val session = testSession(reader)
+        val host = RecordingSearchHost(session, columns = reader.columns, rows = reader.visibleRows)
+        val controller = TerminalSearchController(host, scope, dispatcher)
+        session.use {
+            SwingUtilities.invokeAndWait {
+                host.renderCache.updateFrom(session)
+                controller.search("cat")
+                dispatcher.scheduler.runCurrent()
+                assertEquals(3, controller.state().resultCount)
+                controller.setWholeWord(true)
+                assertTrue(controller.state().isSearching)
+                dispatcher.scheduler.runCurrent()
+                assertEquals(2, controller.state().resultCount)
+                controller.setIgnoreCase(false)
+                dispatcher.scheduler.runCurrent()
+                assertEquals(1, controller.state().resultCount)
+                controller.search("a.b")
+                dispatcher.scheduler.runCurrent()
+                assertEquals(1, controller.state().resultCount)
+                controller.setRegex(true)
+                dispatcher.scheduler.runCurrent()
+                assertEquals(2, controller.state().resultCount)
+                controller.search("[")
+                dispatcher.scheduler.runCurrent()
+                assertInstanceOf(java.util.regex.PatternSyntaxException::class.java, controller.state().failure)
+                assertFalse(controller.state().isSearching)
+                assertEquals(0, controller.state().resultCount)
+                controller.setRegex(false)
+                dispatcher.scheduler.runCurrent()
+                assertNull(controller.state().failure)
+                assertEquals(1, controller.state().resultCount)
+                controller.setRegex(true)
+                controller.search("cat|cats")
+                dispatcher.scheduler.runCurrent()
+                assertEquals(2, controller.state().resultCount)
+                controller.setWholeWord(false)
+                controller.setRegex(false)
+                controller.search("a.b")
+                dispatcher.scheduler.runCurrent()
+                assertEquals(1, controller.state().resultCount)
+                assertNull(controller.state().failure)
+            }
+        }
+    }
+
+    @Test
+    fun `queued pattern work cannot publish after option replacement or clear`() {
+        val reader = SearchFrameReader(liveLines = listOf("a.b axb"))
+        val session = testSession(reader)
+        val host = RecordingSearchHost(session, columns = reader.columns, rows = reader.visibleRows)
+        val controller = TerminalSearchController(host, scope, dispatcher)
+        session.use {
+            SwingUtilities.invokeAndWait {
+                host.renderCache.updateFrom(session)
+                controller.setRegex(true)
+                controller.search("a.b")
+                controller.setRegex(false)
+                dispatcher.scheduler.runCurrent()
+                assertEquals(1, controller.state().resultCount)
+                controller.setWholeWord(true)
+                controller.setRegex(true)
+                controller.clear()
+                dispatcher.scheduler.runCurrent()
+                assertEquals("", controller.state().query)
+                assertEquals(0, controller.state().resultCount)
+                assertEquals(0, controller.viewportHighlights.segmentCount)
+                assertFalse(controller.state().isSearching)
+                controller.search("a.b")
+                dispatcher.scheduler.runCurrent()
+                assertEquals(2, controller.state().resultCount, "Clear retains search options")
+            }
+        }
+    }
+
+    @Test
+    fun `pattern refresh respects options after live output changes`() {
+        val reader = SearchFrameReader(liveLines = listOf("cat cats"))
+        val session = testSession(reader)
+        val host = RecordingSearchHost(session, columns = reader.columns, rows = reader.visibleRows)
+        val controller = TerminalSearchController(host, scope, dispatcher)
+        session.use {
+            SwingUtilities.invokeAndWait {
+                host.renderCache.updateFrom(session)
+                controller.setWholeWord(true)
+                controller.setRegex(true)
+                controller.search("c.t")
+                dispatcher.scheduler.runCurrent()
+                assertEquals(1, controller.state().resultCount)
+                reader.liveLines = listOf("cat cat ")
+                reader.contentGeneration++
+                reader.frameGeneration++
+                host.renderCache.updateFrom(session)
+                controller.refreshForFrame()
+                dispatcher.scheduler.runCurrent()
+                assertEquals(2, controller.state().resultCount)
+                controller.findNext()
+                assertEquals(1, controller.state().activeResultIndex)
+            }
+        }
     }
 
     @Test
@@ -731,8 +837,9 @@ class TerminalSearchControllerTest {
         }
     }
 
-    @Test
-    fun `limited navigation leaves collected window and queued steps are preserved`() {
+    @ParameterizedTest
+    @ValueSource(booleans = [false, true])
+    fun `limited navigation leaves collected window and queued steps are preserved`(regex: Boolean) {
         val reader = SearchFrameReader(historyLines = List(2499) { "needle" }, liveLines = listOf("needle"))
         val session = testSession(reader)
         val host = RecordingSearchHost(session, reader.columns, reader.visibleRows)
@@ -740,7 +847,9 @@ class TerminalSearchControllerTest {
         try {
             SwingUtilities.invokeAndWait {
                 host.renderCache.updateFrom(session, scrollbackOffset = 499)
-                controller.search("needle")
+                controller.setRegex(regex)
+                controller.setWholeWord(regex)
+                controller.search(if (regex) "n.+e" else "needle")
                 dispatcher.scheduler.runCurrent()
                 assertTrue(controller.state().isCountLimited)
                 assertEquals(1001, controller.state().resultCount)

@@ -21,6 +21,7 @@ import io.github.ketraterm.session.TerminalSession
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import java.util.regex.Pattern
 
 /** EDT-owned search lifecycle and navigation. One worker owns copying/matching; completed buffers transfer on the EDT. */
 internal class TerminalSearchController(
@@ -38,6 +39,9 @@ internal class TerminalSearchController(
     private var viewportGeneration = Long.MIN_VALUE
     private var query = ""
     private var ignoreCase = true
+    private var wholeWord = false
+    private var regex = false
+    private var preparedPattern: Pattern? = null
     private var highlights: TerminalSearchHighlights? = null
     private var model = TerminalSearchModel()
     private var publishedModel = TerminalSearchModel()
@@ -66,6 +70,7 @@ internal class TerminalSearchController(
         cancelAnalysis()
         releaseStoragePending = true
         query = ""
+        preparedPattern = null
         pending = false
         highlights = null
         failure = null
@@ -82,6 +87,18 @@ internal class TerminalSearchController(
     fun setIgnoreCase(ignoreCase: Boolean) {
         if (this.ignoreCase == ignoreCase) return
         this.ignoreCase = ignoreCase
+        if (query.isNotEmpty()) applyQuery(query)
+    }
+
+    fun setWholeWord(wholeWord: Boolean) {
+        if (this.wholeWord == wholeWord) return
+        this.wholeWord = wholeWord
+        if (query.isNotEmpty()) applyQuery(query)
+    }
+
+    fun setRegex(regex: Boolean) {
+        if (this.regex == regex) return
+        this.regex = regex
         if (query.isNotEmpty()) applyQuery(query)
     }
 
@@ -129,6 +146,7 @@ internal class TerminalSearchController(
         cancelAuxiliarySearches()
         cancelAnalysis()
         query = nextQuery
+        preparedPattern = null
         if (query.isEmpty()) releaseStoragePending = true
         highlights = null
         failure = null
@@ -173,16 +191,28 @@ internal class TerminalSearchController(
         val requestEpoch = epoch
         val requestQuery = query
         val requestIgnoreCase = ignoreCase
+        val requestWholeWord = wholeWord
+        val requestRegex = regex
         val requestScanner = scanner
         val requestHistoryContentGeneration = host.renderCache.historyContentGeneration
         val showProgress = highlights == null
-        val bounded = showProgress || limited
+        val bounded = showProgress || limited || requestWholeWord || requestRegex
         val origin = host.renderCache.discardedCount + host.renderCache.historySize - host.renderCache.scrollbackOffset
         pending = false
         val task =
             scope.launch(start = CoroutineStart.LAZY) {
                 analysisStarted = true
                 try {
+                    val pattern =
+                        if (requestWholeWord || requestRegex) {
+                            preparedPattern ?: withContext(analysisDispatcher) {
+                                compileSearchPattern(requestQuery, requestIgnoreCase, requestWholeWord, requestRegex)
+                            }
+                        } else {
+                            null
+                        }
+                    if (requestEpoch != epoch || host.session !== session) return@launch
+                    preparedPattern = pattern
                     val publicationContext = currentCoroutineContext()
                     val result =
                         withContext(analysisDispatcher) {
@@ -221,7 +251,7 @@ internal class TerminalSearchController(
                                     }
                                 }
                             if (bounded) {
-                                TerminalSearchWindow(session, requestQuery, requestIgnoreCase).collect(origin, progress)
+                                TerminalSearchWindow(session, requestQuery, requestIgnoreCase, pattern).collect(origin, progress)
                             } else {
                                 requestScanner.scan(session, model, requestQuery, requestIgnoreCase, SEARCH_RESULT_LIMIT + 1, progress)
                             }
@@ -345,13 +375,14 @@ internal class TerminalSearchController(
         val requestEpoch = epoch
         val requestQuery = query
         val requestIgnoreCase = ignoreCase
+        val requestPattern = preparedPattern
         navigationJob?.cancel()
         val task =
             scope.launch(start = CoroutineStart.LAZY) {
                 try {
                     val found =
                         withContext(analysisDispatcher) {
-                            TerminalSearchWindow(session, requestQuery, requestIgnoreCase).find(row, column, backwards)
+                            TerminalSearchWindow(session, requestQuery, requestIgnoreCase, requestPattern).find(row, column, backwards)
                         }
                     if (requestEpoch != epoch || host.session !== session) return@launch
                     activeMatch = found
@@ -393,6 +424,7 @@ internal class TerminalSearchController(
         val requestEpoch = epoch
         val requestQuery = query
         val requestIgnoreCase = ignoreCase
+        val requestPattern = preparedPattern
         viewportJob?.cancel()
         visibleMatches = null
         viewportJob =
@@ -400,7 +432,7 @@ internal class TerminalSearchController(
                 try {
                     val found =
                         withContext(analysisDispatcher) {
-                            TerminalSearchWindow(session, requestQuery, requestIgnoreCase).visible(top, bottom)
+                            TerminalSearchWindow(session, requestQuery, requestIgnoreCase, requestPattern).visible(top, bottom)
                         }
                     if (requestEpoch != epoch ||
                         host.session !== session ||

@@ -52,7 +52,7 @@ class SwingTerminalSearchBarTest {
                 val controls = descendants(bar.component).filterIsInstance<JComponent>()
                 val field = controls.filterIsInstance<JTextField>().single()
                 val counter = controls.filterIsInstance<JLabel>().single()
-                val toggle = controls.filterIsInstance<JToggleButton>().single()
+                val toggle = controls.filterIsInstance<JToggleButton>().single { it.text == words.message("search.matchCaseLabel") }
                 assertEquals("Rechercher dans le terminal", field.toolTipText)
                 assertEquals("Rechercher dans le terminal", field.accessibleContext.accessibleName)
                 assertEquals("Majuscules", toggle.text)
@@ -68,6 +68,8 @@ class SwingTerminalSearchBarTest {
                         "Résultat suivant",
                         "Fermer la recherche",
                         "Respecter la casse",
+                        words.message("search.wholeWordToolTip"),
+                        words.message("search.regexToolTip"),
                     ),
                     controls.mapNotNull { it.toolTipText }.toSet(),
                 )
@@ -211,6 +213,81 @@ class SwingTerminalSearchBarTest {
                 assertTrue(descendants(bar.component).filterIsInstance<JLabel>().any { it.text == "1/1" })
                 bar.close()
                 assertEquals("", terminal.currentSearchState().query)
+            }
+        } finally {
+            SwingUtilities.invokeAndWait {
+                bar.close()
+                terminal.dispose()
+            }
+            session.close()
+        }
+    }
+
+    @Test
+    fun modeTogglesUpdateSearchAndInvalidRegexIsVisible() {
+        val buffer = TerminalBuffers.create(80, 24)
+        buffer.writeText("cat cats CAT a.b axb")
+        val session = TerminalSession.create(buffer, MockConnector())
+        val messages = SwingHostMessages.forLocale(Locale.US)
+        lateinit var terminal: SwingTerminal
+        lateinit var bar: SwingTerminalSearchBar
+        lateinit var field: JTextField
+        lateinit var counter: JLabel
+        lateinit var toggles: List<JToggleButton>
+
+        fun descendants(component: Component): List<Component> =
+            listOf(component) + if (component is Container) component.components.flatMap(::descendants) else emptyList()
+        SwingUtilities.invokeAndWait {
+            terminal = SwingTerminal()
+            bar = SwingTerminalSearchBar(terminal, messages)
+            terminal.size = terminal.preferredSize
+            terminal.bind(session)
+            bar.open()
+            val controls = descendants(bar.component)
+            field = controls.filterIsInstance<JTextField>().single()
+            counter = controls.filterIsInstance<JLabel>().single()
+            toggles = controls.filterIsInstance<JToggleButton>()
+            assertEquals(3, toggles.size)
+            field.text = "cat"
+            // All buttons fit inside the field without overlapping the editable text.
+            val panel = field.parent
+            panel.size = panel.preferredSize
+            panel.doLayout()
+            val ordered = toggles.sortedBy { it.x }
+            assertTrue(field.width - field.insets.right <= ordered.first().x)
+            for ((left, right) in ordered.zipWithNext()) assertTrue(left.x + left.width <= right.x)
+            assertTrue(ordered.last().x + ordered.last().width <= panel.width)
+        }
+
+        fun completed() =
+            runBlocking {
+                withTimeout(10_000.milliseconds) { terminal.searchState.first { !it.isSearching } }
+            }
+
+        fun toggle(key: String) =
+            SwingUtilities.invokeAndWait {
+                toggles.single { it.toolTipText == messages.message(key) }.doClick(0)
+            }
+        try {
+            assertEquals(3, completed().resultCount)
+            toggle("search.wholeWordToolTip")
+            assertEquals(2, completed().resultCount)
+            toggle("search.matchCaseToolTip")
+            assertEquals(1, completed().resultCount)
+            SwingUtilities.invokeAndWait { field.text = "a.b" }
+            assertEquals(1, completed().resultCount)
+            toggle("search.regexToolTip")
+            assertEquals(2, completed().resultCount)
+            SwingUtilities.invokeAndWait { field.text = "[" }
+            assertTrue(completed().failure is java.util.regex.PatternSyntaxException)
+            SwingUtilities.invokeAndWait {
+                assertEquals(messages.message("search.invalidRegex"), counter.text)
+                assertTrue(counter.toolTipText.isNotBlank())
+                field.text = "cat|cats"
+            }
+            assertEquals(2, completed().resultCount)
+            SwingUtilities.invokeAndWait {
+                assertEquals(messages.message("search.counterToolTip"), counter.toolTipText)
             }
         } finally {
             SwingUtilities.invokeAndWait {
