@@ -18,14 +18,130 @@ package io.github.ketraterm.ui.swing.viewport
 import io.github.ketraterm.render.api.*
 import io.github.ketraterm.render.cache.TerminalRenderCache
 import io.github.ketraterm.session.TerminalShellIntegrationState
+import io.github.ketraterm.ui.swing.render.GridPainter
 import io.github.ketraterm.ui.swing.render.TerminalShellIntegrationViewportDecorations
 import io.github.ketraterm.ui.swing.render.TerminalVisualViewportGeometry
 import io.github.ketraterm.ui.swing.search.TerminalSearchViewportHighlights
 import io.github.ketraterm.ui.swing.settings.SwingMetrics
+import io.github.ketraterm.ui.swing.settings.SwingPadding
+import io.github.ketraterm.ui.swing.settings.SwingSettings
+import org.junit.jupiter.params.ParameterizedTest
+import org.junit.jupiter.params.provider.ValueSource
+import java.awt.Rectangle
+import java.awt.image.BufferedImage
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
 class SwingRepaintPlannerTest {
+    @ParameterizedTest
+    @ValueSource(doubles = [1.0, 1.25, 1.5, 1.75, 2.0])
+    fun `clearing search leaves no stale pixels at fractional display scales`(scale: Double) {
+        val frame = MutableFrame(4, 4)
+        val cache = TerminalRenderCache(4, 4).also { it.updateFrom(frame.reader) }
+        val settings =
+            SwingSettings.create {
+                it.padding = SwingPadding(3, 3, 3, 3)
+                it.shellIntegrationDecorationGutterWidth = 0
+                it.searchActiveMatchBackground = 0xAAFF8C00.toInt()
+            }
+        val padding = java.awt.Insets(3, 3, 3, 3)
+        val metrics = METRICS.copy(cellHeight = 17)
+        val painter = GridPainter()
+        for (origin in listOf(0.0, -0.1, -0.25, -0.5, -0.75, -0.9)) {
+            for (translation in listOf(0.0, 0.25, 0.5, 0.75)) {
+                val geometry =
+                    TerminalVisualViewportGeometry().also {
+                        it.updateLayout(metrics, 4, HEIGHT - 6)
+                        it.updateContentOrigin(origin)
+                    }
+                val image = BufferedImage((WIDTH * scale).toInt(), (HEIGHT * scale).toInt(), BufferedImage.TYPE_INT_ARGB)
+                val expected = BufferedImage(image.width, image.height, image.type)
+                val highlights =
+                    TerminalSearchViewportHighlights().also {
+                        it.reset(4)
+                        it.add(2, 1, 3, active = true)
+                        it.finish()
+                    }
+
+                fun paint(
+                    target: BufferedImage,
+                    clip: Rectangle? = null,
+                ) {
+                    // Reproduce RepaintManager.paintDoubleBufferedFPScales: rounded device
+                    // damage, translated offscreen paint, then a device-pixel copy.
+                    val damage = clip ?: Rectangle(0, 0, WIDTH, HEIGHT)
+
+                    fun edge(value: Int) = kotlin.math.ceil(value * scale + translation - 0.5).toInt()
+                    val x = edge(damage.x)
+                    val y = edge(damage.y)
+                    val width = edge(damage.x + damage.width) - x
+                    val height = edge(damage.y + damage.height) - y
+                    val buffer = BufferedImage(width, height, BufferedImage.TYPE_INT_ARGB)
+                    val g = buffer.createGraphics()
+                    try {
+                        g.setClip(0, 0, width, height)
+                        g.translate(translation - x, translation - y)
+                        g.scale(scale, scale)
+                        painter.paint(
+                            g,
+                            cache,
+                            settings,
+                            metrics,
+                            WIDTH,
+                            HEIGHT,
+                            false,
+                            visualGeometry = geometry,
+                            searchHighlights = highlights,
+                        )
+                    } finally {
+                        g.dispose()
+                    }
+                    val destination = target.createGraphics()
+                    try {
+                        destination.drawImage(buffer, x, y, null)
+                    } finally {
+                        destination.dispose()
+                    }
+                }
+                val planner = SwingRepaintPlanner()
+                planner.requestFrameRepaint(
+                    cache,
+                    metrics,
+                    WIDTH,
+                    HEIGHT,
+                    padding,
+                    NoOpRepaintSink,
+                    visualGeometry = geometry,
+                    searchHighlights = highlights,
+                )
+                paint(image)
+                highlights.reset(4)
+                val sink = RecordingRepaintSink(failOnFullRepaint = true)
+                planner.requestFrameRepaint(
+                    cache,
+                    metrics,
+                    WIDTH,
+                    HEIGHT,
+                    padding,
+                    sink,
+                    visualGeometry = geometry,
+                    searchHighlights = highlights,
+                )
+                for (region in sink.regions) paint(image, Rectangle(region.x, region.y, region.width, region.height))
+                paint(expected)
+                for (y in 0 until image.height) {
+                    for (x in 0 until image.width) {
+                        assertEquals(
+                            expected.getRGB(x, y),
+                            image.getRGB(x, y),
+                            "scale=$scale origin=$origin translation=$translation pixel=($x,$y)",
+                        )
+                    }
+                }
+            }
+        }
+    }
+
     @Test
     fun `search replacement repaints old and new rows while retaining unchanged highlights`() {
         val frame = MutableFrame(columns = 4, rows = 4)

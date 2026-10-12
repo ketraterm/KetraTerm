@@ -41,6 +41,7 @@ internal class TerminalSearchPainter(
         val count = highlights.segmentCountForRow(row)
         if (count == 0) return
 
+        val originalClip = g.clip
         var segment = highlights.firstSegmentForRow(row)
         val end = segment + count
         while (segment < end) {
@@ -51,12 +52,17 @@ internal class TerminalSearchPainter(
                     if (highlights.isActive(segment)) activeMatchBackground else matchBackground,
                 )
             forEachVisualCellSpan(bidi, startColumn, endColumn) { visualStart, visualEnd ->
-                g.fillRect(
-                    visualStart * metrics.cellWidth,
-                    row * metrics.cellHeight,
-                    (visualEnd - visualStart) * metrics.cellWidth,
-                    metrics.cellHeight,
-                )
+                val x = visualStart * metrics.cellWidth
+                val y = row * metrics.cellHeight
+                val width = (visualEnd - visualStart) * metrics.cellWidth
+                // Translucent fills can rasterize outside Swing's rounded dirty-region
+                // edges at fractional scales. Clip to the cells that own the overlay.
+                g.clipRect(x, y, width, metrics.cellHeight)
+                try {
+                    g.fillRect(x, y, width, metrics.cellHeight)
+                } finally {
+                    g.clip = originalClip
+                }
             }
             segment++
         }
