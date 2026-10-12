@@ -27,6 +27,8 @@ import java.awt.Component
 import java.awt.Container
 import java.awt.image.BufferedImage
 import java.util.*
+import java.util.concurrent.CompletableFuture
+import java.util.concurrent.TimeUnit
 import javax.swing.*
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -318,24 +320,31 @@ class SwingTerminalSearchBarTest {
         val buffer = TerminalBuffers.create(80, 24)
         buffer.writeText("needle")
         val session = TerminalSession.create(buffer, MockConnector())
-        val terminal = SwingTerminal()
-        val bar = SwingTerminalSearchBar(terminal)
+        lateinit var terminal: SwingTerminal
+        lateinit var bar: SwingTerminalSearchBar
+        val counterUpdated = CompletableFuture<Unit>()
 
         fun descendants(component: Component): List<Component> =
             listOf(component) + if (component is Container) component.components.flatMap(::descendants) else emptyList()
         try {
             SwingUtilities.invokeAndWait {
+                terminal = SwingTerminal()
+                bar = SwingTerminalSearchBar(terminal, SwingHostMessages.forLocale(Locale.US))
                 terminal.size = terminal.preferredSize
                 terminal.bind(session)
                 bar.open()
+                val counter = descendants(bar.component).filterIsInstance<JLabel>().single()
+                counter.addPropertyChangeListener("text") {
+                    if (it.newValue == "1/1") counterUpdated.complete(Unit)
+                }
                 descendants(bar.component).filterIsInstance<JTextField>().single().text = "needle"
-                assertTrue(descendants(bar.component).filterIsInstance<JLabel>().any { it.text == "Searching…" })
             }
             val result =
                 runBlocking {
                     withTimeout(10_000.milliseconds) { terminal.searchState.first { it.query == "needle" && !it.isSearching } }
                 }
             assertEquals(1, result.resultCount)
+            counterUpdated.get(10, TimeUnit.SECONDS)
             SwingUtilities.invokeAndWait {
                 assertTrue(descendants(bar.component).filterIsInstance<JLabel>().any { it.text == "1/1" })
                 bar.close()

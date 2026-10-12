@@ -21,6 +21,7 @@ import io.github.ketraterm.ui.swing.host.SwingTerminalSearchBar
 import java.awt.Component
 import java.awt.Container
 import java.awt.event.ActionEvent
+import java.awt.event.InputEvent
 import javax.swing.JComponent
 import javax.swing.JToggleButton
 import javax.swing.KeyStroke
@@ -45,7 +46,8 @@ class TerminalSearchShortcutsTest {
                 val action = bar.component.actionMap.get(inputMap.get(stroke))
                 assertNotNull(action)
                 val regex = descendants(bar.component).filterIsInstance<JToggleButton>().single { it.text == ".*" }
-                assertTrue(regex.toolTipText.contains("Ctrl+F8"))
+                val controlLabel = InputEvent.getModifiersExText(InputEvent.CTRL_DOWN_MASK)
+                assertTrue(regex.toolTipText.contains("$controlLabel+F8"), regex.toolTipText)
                 assertFalse(regex.isSelected)
                 action.actionPerformed(ActionEvent(bar.component, ActionEvent.ACTION_PERFORMED, ""))
                 assertTrue(regex.isSelected)
