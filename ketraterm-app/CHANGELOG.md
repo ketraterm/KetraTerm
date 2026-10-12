@@ -2,6 +2,7 @@
 
 ## [Unreleased]
 
+- Made the search bar more compact and responsive in narrow windows and split panes, collapsing search options into a popup when needed.
 - Added whole-word and regular-expression search, including invalid-pattern feedback, alongside literal and case-sensitive matching.
 - Improved search responsiveness and reduced memory use for large scrollback. Results appear during scanning, unchanged text can reuse previous results, and obsolete searches are cancelled when the query changes.
 - Search now starts at the viewport and wraps through history. Frequent queries show `1,000+` instead of collecting every result; next/previous navigation still reaches matches throughout retained history, and visible matches remain highlighted.

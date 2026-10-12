@@ -98,11 +98,13 @@ public class SwingTerminalSearchBar
          * Swing component that hosts should mount as floating pane chrome.
          */
         public val component: JComponent =
-            JPanel(BorderLayout()).apply {
+            object : JPanel(BorderLayout()) {
+                override fun getPreferredSize(): Dimension = Dimension(480, super.getPreferredSize().height)
+            }.apply {
                 isVisible = false
                 isOpaque = false
                 border = BorderFactory.createEmptyBorder(6, 12, 6, 12)
-                add(searchPanel, BorderLayout.EAST)
+                add(searchPanel, BorderLayout.CENTER)
             }
 
         init {
@@ -229,6 +231,7 @@ public class SwingTerminalSearchBar
                 return
             }
             component.isVisible = false
+            searchInputPanel.closePopup()
             searchObservation?.cancel()
             searchObservation = null
             setQueryText("")
@@ -416,7 +419,7 @@ public class SwingTerminalSearchBar
             gridX: Int,
             weightX: Double = 0.0,
             fill: Int = GridBagConstraints.NONE,
-            leftInset: Int = 6,
+            leftInset: Int = 3,
         ): GridBagConstraints =
             GridBagConstraints().apply {
                 this.gridx = gridX
@@ -427,18 +430,43 @@ public class SwingTerminalSearchBar
                 this.anchor = GridBagConstraints.CENTER
             }
 
-        private class SearchInputPanel(
+        private inner class SearchInputPanel(
             private val queryField: JTextField,
             private vararg val toggles: JToggleButton,
         ) : JPanel(null) {
+            fun closePopup() {
+                optionsButton.componentPopupMenu?.isVisible = false
+            }
+
+            private val optionsButton =
+                JButton("⋯").apply {
+                    toolTipText = messages.message("search.optionsToolTip")
+                    accessibleContext.accessibleName = toolTipText
+                    isRequestFocusEnabled = false
+                    margin = Insets(0, 0, 0, 0)
+                    isVisible = false
+                    addActionListener {
+                        val popup = JPopupMenu()
+                        for (toggle in toggles) {
+                            val item = JCheckBoxMenuItem(toggle.accessibleContext.accessibleName, toggle.isSelected)
+                            item.toolTipText = toggle.toolTipText
+                            item.addActionListener { toggle.doClick(0) }
+                            popup.add(item)
+                        }
+                        componentPopupMenu = popup
+                        if (isShowing) popup.show(this, 0, height)
+                    }
+                }
+
             init {
                 isOpaque = false
+                add(optionsButton)
                 add(queryField)
                 for (toggle in toggles) {
                     add(toggle)
                     setComponentZOrder(toggle, 0)
                 }
-                setComponentZOrder(queryField, toggles.size)
+                setComponentZOrder(queryField, toggles.size + 1)
             }
 
             override fun getPreferredSize(): Dimension = queryField.preferredSize
@@ -449,11 +477,24 @@ public class SwingTerminalSearchBar
 
             override fun doLayout() {
                 queryField.setBounds(0, 0, width, height)
+                val compact = width < 34 + 90 + toggles.sumOf { it.preferredSize.width } + 10
+                optionsButton.isVisible = compact
+                if (!compact) optionsButton.componentPopupMenu?.isVisible = false
                 var buttonX = width - 5
                 for (toggle in toggles.reversed()) {
-                    val size = toggle.preferredSize
-                    buttonX -= size.width
-                    toggle.setBounds(buttonX, (height - size.height) / 2, size.width, size.height)
+                    if (compact && toggle.isFocusOwner) optionsButton.requestFocusInWindow()
+                    toggle.isVisible = !compact
+                    if (!compact) {
+                        val size = toggle.preferredSize
+                        buttonX -= size.width
+                        toggle.setBounds(buttonX, (height - size.height) / 2, size.width, size.height)
+                    }
+                }
+                val reserved = if (compact) 28 else width - 5 - buttonX
+                optionsButton.setBounds((width - 33).coerceAtLeast(0), 1, 28, (height - 2).coerceAtLeast(0))
+                val rightInset = reserved + 10
+                if (queryField.insets.right != rightInset) {
+                    queryField.border = BorderFactory.createEmptyBorder(4, 34, 4, rightInset)
                 }
             }
         }
@@ -589,7 +630,7 @@ public class SwingTerminalSearchBar
                 return Dimension(size.width, SEARCH_FIELD_HEIGHT)
             }
 
-            override fun getMinimumSize(): Dimension = Dimension(220, SEARCH_FIELD_HEIGHT)
+            override fun getMinimumSize(): Dimension = Dimension(72, SEARCH_FIELD_HEIGHT)
 
             override fun paintComponent(graphics: Graphics) {
                 val g = graphics.create() as Graphics2D
@@ -650,8 +691,8 @@ public class SwingTerminalSearchBar
 
             private const val SEARCH_FIELD_HEIGHT = 30
             private const val COMMAND_BUTTON_HEIGHT = 28
-            private const val ICON_BUTTON_WIDTH = 30
-            private const val TOGGLE_BUTTON_WIDTH = 38
+            private const val ICON_BUTTON_WIDTH = 26
+            private const val TOGGLE_BUTTON_WIDTH = 30
             private const val COUNTER_LABEL_WIDTH = 46
 
             private val RepaintOnHoverListener =

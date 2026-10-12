@@ -36,6 +36,53 @@ import kotlin.time.Duration.Companion.milliseconds
 
 class SwingTerminalSearchBarTest {
     @Test
+    fun searchFitsNarrowPanesAndCollapsedOptionsKeepTheirState() {
+        SwingUtilities.invokeAndWait {
+            val terminal = SwingTerminal()
+            val bar = SwingTerminalSearchBar(terminal)
+
+            fun descendants(c: Component): List<Component> =
+                listOf(c) + if (c is Container) c.components.flatMap(::descendants) else emptyList()
+
+            fun layout(c: Container) {
+                c.doLayout()
+                c.components.filterIsInstance<Container>().forEach(::layout)
+            }
+            try {
+                bar.open()
+                val overlay = SwingTerminalOverlayPane(terminal, bar.component)
+                val controls = descendants(bar.component)
+                val toggles = controls.filterIsInstance<JToggleButton>()
+                val options = controls.filterIsInstance<JButton>().single { it.text == "⋯" }
+                for (width in listOf(800, 480, 320, 280, 800)) {
+                    overlay.setSize(width, 400)
+                    layout(overlay)
+                    for (control in controls.filter { it.isVisible && it.parent != null }) {
+                        assertTrue(
+                            control.x >= 0 && control.x + control.width <= control.parent.width,
+                            "${control.javaClass.simpleName} clips at pane width $width: ${control.bounds}",
+                        )
+                    }
+                    assertEquals(width < 480, options.isVisible)
+                    assertEquals(!options.isVisible, toggles.all { it.isVisible })
+                    if (options.isVisible) {
+                        options.doClick(0)
+                        val item = options.componentPopupMenu.getComponent(0) as JCheckBoxMenuItem
+                        val toggle = toggles.single { it.accessibleContext.accessibleName == item.text }
+                        val before = toggle.isSelected
+                        assertEquals(before, item.isSelected)
+                        item.doClick(0)
+                        assertEquals(!before, toggle.isSelected)
+                    }
+                }
+            } finally {
+                bar.close()
+                terminal.dispose()
+            }
+        }
+    }
+
+    @Test
     fun tooltipsExplainOptionsAndReadLiveHostShortcutHintsAsPlainText() {
         SwingUtilities.invokeAndWait {
             val terminal = SwingTerminal()
@@ -149,6 +196,7 @@ class SwingTerminalSearchBarTest {
                         "Respecter la casse",
                         words.message("search.wholeWordToolTip"),
                         words.message("search.regexToolTip"),
+                        words.message("search.optionsToolTip"),
                     ),
                     controls.mapNotNull { it.accessibleContext?.accessibleName }.toSet(),
                 )

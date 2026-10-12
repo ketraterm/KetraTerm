@@ -6,6 +6,7 @@ Release notes for library consumers and embedders. Product-specific changes are 
 
 ### Improvements and fixes
 
+- Made search chrome shrink with its terminal pane, with a compact preferred width and an options popup on narrow panes, preventing search controls from extending outside the overlay.
 - Added whole-word and Java regular-expression search alongside literal and case-sensitive search. Whole-word matching uses Unicode word boundaries; regex searches span soft-wrapped logical lines, ignore empty matches, and report invalid patterns in the search bar. Literal searches retain their optimized streaming path.
 - Reduced scrollback search work and allocations with text-only frame copying, streaming literal matching, compact cell-position tracking, and reuse of unchanged logical-line results during plain literal content refreshes. Results can appear before the full scan finishes; superseded searches are cancelled, and clearing search releases working storage.
 - New searches start at the viewport and wrap through older history. Match collection stops after detecting more than 1,000 results and displays `1,000+`, while next/previous navigation still searches the entire retained history and visible matches remain highlighted independently.
