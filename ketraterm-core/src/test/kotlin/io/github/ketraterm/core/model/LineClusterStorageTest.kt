@@ -21,6 +21,46 @@ import kotlin.test.*
 
 class LineClusterStorageTest {
     @Test
+    fun `every supported cluster length owns its source payload independently`() {
+        val line = Line(32)
+        for (length in 1..32) {
+            val source = IntArray(length) { 1000 + length + it }
+            line.setCluster(length - 1, source, length, length.toLong())
+            source.fill(0)
+        }
+        val copied = IntArray(32)
+        for (length in 1..32) {
+            assertTrue(line.rawCodepoint(length - 1) <= TerminalConstants.CLUSTER_HANDLE_MAX)
+            assertEquals(length, line.readCluster(length - 1, copied))
+            assertContentEquals(IntArray(length) { 1000 + length + it }, copied.copyOf(length))
+            assertEquals(length.toLong(), line.getPackedAttr(length - 1))
+        }
+    }
+
+    @Test
+    fun `invalid source lengths leave existing payload attributes and wrap provenance intact`() {
+        val line = Line(2)
+        val payload = intArrayOf('e'.code, 0x0301)
+        line.setCluster(1, payload, 2, 7L, 9L)
+        line.wrapped = true
+        line.endsWithWrapPadding = true
+        for (length in intArrayOf(-1, 0, 3, 33)) {
+            if (length == 3) {
+                assertFailsWith<IndexOutOfBoundsException> { line.setCluster(1, payload, length, 11L, 13L) }
+            } else {
+                assertFailsWith<IllegalArgumentException> { line.setCluster(1, payload, length, 11L, 13L) }
+            }
+            val copied = IntArray(2)
+            assertEquals(2, line.readCluster(1, copied))
+            assertContentEquals(payload, copied)
+            assertEquals(7L, line.getPackedAttr(1))
+            assertEquals(9L, line.getPackedExtendedAttr(1))
+            assertTrue(line.wrapped)
+            assertTrue(line.endsWithWrapPadding)
+        }
+    }
+
+    @Test
     fun `scalar rows allocate no cluster arrays and full clears reuse warmed storage`() {
         val line = Line(8)
         line.fill('x'.code, 1L)

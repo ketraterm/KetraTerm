@@ -71,7 +71,9 @@ internal class SwingViewportController(
         dividersEnabled = enabled
         if (enabled) {
             dividerLayout.updateFrom(reader, state, visibleRows, retainedOutput, resizeAnchorLineId)
-            val outputAdvanced = oldLiveTop != null && dividerLayout.liveTop > oldLiveTop
+            // Reflow can advance the live top without new output. Apply the pending resize
+            // anchor before resuming ordinary output-following on subsequent updates.
+            val outputAdvanced = resizeAnchorRow == Long.MIN_VALUE && oldLiveTop != null && dividerLayout.liveTop > oldLiveTop
             scrollModel.clamp(dividerLayout.scrollRange, dividerLayout.visualDiscardedCount, scrollOnOutput && outputAdvanced)
             if (oldOffset == 0.0 || scrollOnOutput && outputAdvanced) {
                 scrollModel.reanchor(0.0)

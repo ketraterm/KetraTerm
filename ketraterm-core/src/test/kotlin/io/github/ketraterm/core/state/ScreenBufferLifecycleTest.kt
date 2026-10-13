@@ -165,5 +165,8 @@ class ScreenBufferLifecycleTest {
         buffer.ring[0].setCluster(0, intArrayOf('B'.code, 0x0301), 2, 0)
         backlogLine.clear(0)
         assertEquals('B'.code, buffer.ring[0].getCodepoint(0))
+        val copied = IntArray(2)
+        assertEquals(2, buffer.ring[0].readCluster(0, copied))
+        assertArrayEquals(intArrayOf('B'.code, 0x0301), copied)
     }
 }

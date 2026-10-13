@@ -202,13 +202,22 @@ class TerminalHistoryLifecycleTest {
         val mutation = MutationEngine(state)
 
         repeat(3) { state.ring.push().clear(state.pen.currentAttr) }
+        val ring = state.ring
+        val firstRow = ring[0]
         val leakedLine = state.ring[4]
         leakedLine.setCluster(0, intArrayOf('A'.code, 0x0301), 2, 0)
 
         mutation.clearAllHistory()
+        assertSame(ring, state.ring)
+        assertSame(firstRow, state.ring[0])
+        assertEquals(0, state.historySize)
+        assertEquals("", state.ring[0].toTextTrimmed())
         state.ring[0].setCluster(0, intArrayOf('B'.code, 0x0301), 2, 0)
 
         assertEquals('B'.code, state.ring[0].getCodepoint(0))
+        val copied = IntArray(2)
+        assertEquals(2, state.ring[0].readCluster(0, copied))
+        assertArrayEquals(intArrayOf('B'.code, 0x0301), copied)
     }
 
     @Test
@@ -222,9 +231,14 @@ class TerminalHistoryLifecycleTest {
         mutation.scrollUp()
 
         val newBottomLine = state.ring[state.ring.size - 1]
+        assertSame(oldestVisibleLine, newBottomLine)
+        assertEquals("", newBottomLine.toTextTrimmed())
         newBottomLine.setCluster(0, intArrayOf('B'.code, 0x0301), 2, 0)
 
         assertEquals('B'.code, newBottomLine.getCodepoint(0))
+        val copied = IntArray(2)
+        assertEquals(2, newBottomLine.readCluster(0, copied))
+        assertArrayEquals(intArrayOf('B'.code, 0x0301), copied)
     }
 
     @Test
@@ -247,10 +261,19 @@ class TerminalHistoryLifecycleTest {
         }
         val leakedLine = state.primaryBuffer.ring[4]
         leakedLine.setCluster(0, intArrayOf('C'.code, 0x0301), 2, 0)
+        val ring = state.primaryBuffer.ring
+        val firstRow = ring[0]
 
         buffer.reset()
+        assertSame(ring, state.primaryBuffer.ring)
+        assertSame(firstRow, state.primaryBuffer.ring[0])
+        assertEquals(0, buffer.historySize)
+        assertEquals("", state.primaryBuffer.ring[0].toTextTrimmed())
         state.primaryBuffer.ring[0].setCluster(0, intArrayOf('D'.code, 0x0301), 2, 0)
 
         assertEquals('D'.code, state.primaryBuffer.ring[0].getCodepoint(0))
+        val copied = IntArray(2)
+        assertEquals(2, state.primaryBuffer.ring[0].readCluster(0, copied))
+        assertArrayEquals(intArrayOf('D'.code, 0x0301), copied)
     }
 }
