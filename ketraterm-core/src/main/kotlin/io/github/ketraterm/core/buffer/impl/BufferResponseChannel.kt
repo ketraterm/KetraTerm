@@ -87,6 +87,7 @@ internal class BufferResponseChannel(
             DecPrivateMode.AUTO_WRAP -> flagStatus(bits, TerminalModeBits.AUTO_WRAP)
             DecPrivateMode.REVERSE_WRAP -> booleanStatus(state.modes.isReverseWrap)
             DecPrivateMode.REVERSE_WRAP_EXTENDED -> booleanStatus(state.modes.isReverseWrapExtended)
+            DecPrivateMode.ALTERNATE_SCROLL -> booleanStatus(TerminalInputState.isAlternateScrollEnabled(bits))
             DecPrivateMode.CURSOR_BLINK -> flagStatus(bits, TerminalModeBits.CURSOR_BLINKING)
             DecPrivateMode.CURSOR_VISIBLE -> flagStatus(bits, TerminalModeBits.CURSOR_VISIBLE)
             DecPrivateMode.APPLICATION_KEYPAD -> flagStatus(bits, TerminalModeBits.APPLICATION_KEYPAD)

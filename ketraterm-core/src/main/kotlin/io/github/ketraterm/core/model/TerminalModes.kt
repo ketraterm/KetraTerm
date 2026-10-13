@@ -124,6 +124,14 @@ internal class TerminalModes : TerminalInputState {
         get() = TerminalModeBits.hasFlag(currentBits, TerminalModeBits.FOCUS_REPORTING)
         set(value) = setFlag(TerminalModeBits.FOCUS_REPORTING, value)
 
+    var isAlternateScrollEnabled: Boolean
+        get() = TerminalInputState.isAlternateScrollEnabled(currentBits)
+        set(value) = setFlag(TerminalModeBits.ALTERNATE_SCROLL_DISABLED, !value)
+
+    var isShiftMouseCaptureEnabled: Boolean
+        get() = TerminalInputState.isShiftMouseCaptureEnabled(currentBits)
+        set(value) = setFlag(TerminalModeBits.SHIFT_MOUSE_CAPTURE, value)
+
     /**
      * Whether ambiguous-width Unicode characters are treated as wide (2-cell).
      * False = treat as narrow (default).
@@ -267,7 +275,7 @@ internal class TerminalModes : TerminalInputState {
      * Applies DECSTR soft-reset mode defaults.
      *
      * DECSTR is not a full terminal reset. It resets host-controlled soft modes
-     * and input-facing protocol flags while preserving the core width policy.
+     * and input-facing protocol flags while preserving width policy and mouse-routing preferences.
      */
     fun softReset() {
         val preserved = modeBits.get() and SOFT_RESET_PRESERVE_MASK
@@ -305,7 +313,8 @@ internal class TerminalModes : TerminalInputState {
         private const val DEFAULT_MODE_BITS: Long =
             TerminalModeBits.AUTO_WRAP or TerminalModeBits.CURSOR_VISIBLE or TerminalModeBits.CURSOR_BLINKING
         private const val SOFT_RESET_PRESERVE_MASK: Long =
-            TerminalModeBits.AMBIGUOUS_WIDE or TerminalModeBits.MOUSE_ENCODING_MASK or TerminalModeBits.COLUMN_MODE_132
+            TerminalModeBits.AMBIGUOUS_WIDE or TerminalModeBits.MOUSE_ENCODING_MASK or TerminalModeBits.COLUMN_MODE_132 or
+                TerminalModeBits.ALTERNATE_SCROLL_DISABLED or TerminalModeBits.SHIFT_MOUSE_CAPTURE
         private const val SOFT_RESET_MODE_BITS: Long = DEFAULT_MODE_BITS
 
         private fun decodeMouseTracking(bits: Long): io.github.ketraterm.protocol.MouseTrackingMode {

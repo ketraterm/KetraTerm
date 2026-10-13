@@ -219,6 +219,15 @@ Alt, and Ctrl; other modifier bits are ignored. An event represents one wheel
 report, not a fractional wheel delta. The UI adapter owns gesture interpretation,
 pixel-to-cell conversion, and any decision to handle a gesture locally.
 
+Mouse routing adapters read a coherent `TerminalInputState` word per event.
+`isAlternateScrollEnabled` exposes mode 1007 (enabled by default) for alternate
+wheel-to-cursor-key translation. `isShiftMouseCaptureEnabled` exposes
+XTSHIFTESCAPE's request to report Shift instead of using local interaction.
+These flags do not alter mouse byte framing; the adapter decides whether to
+submit a normalized mouse event, arrow-key event, or local gesture. Host
+reporting/wheel policy remains authoritative, and an admitted button gesture
+keeps its route until release.
+
 ## Paste And Focus Contract
 
 `PasteControlPolicy.PRESERVE` is the default.

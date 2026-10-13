@@ -484,6 +484,10 @@ class ActionEngineTest {
             sinkCalls += "setDecMode:$mode:$enable"
         }
 
+        override fun setShiftMouseCaptureEnabled(enabled: Boolean) {
+            sinkCalls += "setShiftMouseCaptureEnabled:$enabled"
+        }
+
         override fun setKeyModifierOption(
             resource: Int,
             value: Int,

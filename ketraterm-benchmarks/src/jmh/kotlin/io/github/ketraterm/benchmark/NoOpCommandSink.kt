@@ -211,6 +211,8 @@ internal class NoOpCommandSink : TerminalAsciiCommandSink {
         enable: Boolean,
     ) {}
 
+    override fun setShiftMouseCaptureEnabled(enabled: Boolean) {}
+
     override fun setKeyModifierOption(
         resource: Int,
         value: Int,

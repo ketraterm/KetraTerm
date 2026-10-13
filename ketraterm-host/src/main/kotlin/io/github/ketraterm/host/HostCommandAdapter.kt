@@ -529,6 +529,7 @@ public class HostCommandAdapter
                 DecPrivateMode.REVERSE_VIDEO -> terminal.setReverseVideo(enable)
                 DecPrivateMode.ORIGIN -> terminal.setOriginMode(enable)
                 DecPrivateMode.AUTO_WRAP -> terminal.setAutoWrap(enable)
+                DecPrivateMode.ALTERNATE_SCROLL -> terminal.setAlternateScrollEnabled(enable)
                 DecPrivateMode.REVERSE_WRAP -> terminal.setReverseWrap(enable)
                 DecPrivateMode.REVERSE_WRAP_EXTENDED -> terminal.setReverseWrapExtended(enable)
                 DecPrivateMode.CURSOR_BLINK -> terminal.setCursorBlinking(enable)
@@ -662,6 +663,10 @@ public class HostCommandAdapter
         ) {
             if (!hostPolicy.terminalResponsePolicy.isAllowed) return
             terminal.requestModeStatus(mode, decPrivate, modeReportCapabilities, defaultBackarrowSendsBackspace)
+        }
+
+        override fun setShiftMouseCaptureEnabled(enabled: Boolean) {
+            terminal.setShiftMouseCaptureEnabled(enabled)
         }
 
         override fun requestDeviceStatusReport(

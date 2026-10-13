@@ -105,7 +105,8 @@ and rejected admission return `false`.
 
 `copyOnSelection` copies a nonempty selection at local primary-button gesture
 completion. It defaults to `false` and uses the supplied clipboard handler.
-Application mouse reporting takes priority unless Shift forces local interaction.
+Application mouse reporting takes priority. Shift restores local interaction
+unless the application requests Shift capture through XTSHIFTESCAPE.
 Clipboard callbacks run on the EDT.
 
 ### Middle-button paste
@@ -207,8 +208,10 @@ painters or input controllers.
 
 `mouseReportingEnabled` controls application mouse reporting.
 `alternateScreenWheelToArrowEnabled` independently controls wheel-to-arrow input
-in the alternate screen. Both default to `true`; Shift forces local mouse
-interaction.
+in the alternate screen. Both default to `true`; mode 1007 must also be enabled
+for wheel-to-arrow input. Shift restores local interaction unless the
+application requests Shift capture. A started button gesture keeps its route
+until release.
 
 `columnSpacing` adds signed logical pixels to each cell advance. Negative values
 condense the grid without scaling the font. Construction and reload reject

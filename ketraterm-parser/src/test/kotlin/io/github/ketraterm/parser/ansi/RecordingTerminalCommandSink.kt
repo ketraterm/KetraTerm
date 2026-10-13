@@ -320,6 +320,10 @@ internal class RecordingTerminalCommandSink : TerminalAsciiCommandSink {
         events += "setAnsiMode:$mode:$enable"
     }
 
+    override fun setShiftMouseCaptureEnabled(enabled: Boolean) {
+        events += "setShiftMouseCaptureEnabled:$enabled"
+    }
+
     override fun setDecMode(
         mode: Int,
         enable: Boolean,

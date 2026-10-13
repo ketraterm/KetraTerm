@@ -28,7 +28,7 @@ package io.github.ketraterm.core.api
  * BUTTON_EVENT, ANY_EVENT; encoding values 0..4 mean DEFAULT, UTF8, SGR, URXVT,
  * SGR_PIXELS. Existing values must not be reordered or repurposed.
  * Bits 37..62 hold xterm resources decoded by [TerminalInputState] helpers;
- * only bits 19 and 63 are currently unassigned. Readers ignore unassigned bits.
+ * bits 19 and 63 hold application-controlled mouse routing.
  * This finite published subset is not an extensible inventory of all terminal state.
  */
 public object TerminalModeBits {
@@ -81,6 +81,12 @@ public object TerminalModeBits {
 
     /** Pop on bell mode flag (?1043). */
     public const val POP_ON_BELL: Long = 1L shl 15
+
+    /** Mode 1007 is disabled. A zero bit preserves the enabled alternate-scroll default. */
+    public const val ALTERNATE_SCROLL_DISABLED: Long = 1L shl 19
+
+    /** XTSHIFTESCAPE requests Shift as a mouse modifier instead of local interaction. */
+    public const val SHIFT_MOUSE_CAPTURE: Long = 1L shl 63
 
     /** Starting bit for the packed modify-other-keys mode field. */
     public const val MODIFY_OTHER_KEYS_SHIFT: Int = 16

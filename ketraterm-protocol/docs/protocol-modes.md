@@ -67,6 +67,7 @@ format. They are independent selections.
 | `FOCUS_REPORTING` | `1004` | Focus gain/loss reports. |
 | `MOUSE_UTF8` | `1005` | UTF-8 extended mouse coordinates. |
 | `MOUSE_SGR` | `1006` | SGR decimal reports with cell coordinates. |
+| `ALTERNATE_SCROLL` | `1007` | Alternate-screen wheel-to-cursor-key scrolling. |
 | `MOUSE_URXVT` | `1015` | urxvt decimal mouse reports. |
 | `MOUSE_SGR_PIXELS` | `1016` | SGR decimal reports with pixel coordinates. |
 

@@ -138,6 +138,7 @@ public abstract interface class io/github/ketraterm/parser/spi/TerminalCommandSi
 	public abstract fun setPaletteColor (II)V
 	public abstract fun setScrollRegion (II)V
 	public abstract fun setSelectiveEraseProtection (Z)V
+	public abstract fun setShiftMouseCaptureEnabled (Z)V
 	public abstract fun setStrikethrough (Z)V
 	public abstract fun setTabStop ()V
 	public abstract fun setUnderlineColorDefault ()V

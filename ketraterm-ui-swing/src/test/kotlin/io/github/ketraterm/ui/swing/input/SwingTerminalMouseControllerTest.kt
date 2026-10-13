@@ -15,6 +15,7 @@
  */
 package io.github.ketraterm.ui.swing.input
 
+import io.github.ketraterm.core.api.TerminalModeBits
 import io.github.ketraterm.input.api.TerminalInputEncoder
 import io.github.ketraterm.input.event.*
 import io.github.ketraterm.protocol.MouseTrackingMode
@@ -35,6 +36,105 @@ import java.awt.event.MouseWheelEvent
 
 class SwingTerminalMouseControllerTest {
     private val source = Canvas()
+
+    @Test
+    fun `press routing reads modes after the focus callback`() {
+        val host = RecordingMouseHost(mouseTrackingMode = MouseTrackingMode.NORMAL, session = RecordingInputEncoder())
+        val focusHost =
+            object : SwingTerminalMouseHost by host {
+                override fun requestFocusInWindow(): Boolean {
+                    host.shiftMouseCapture = true
+                    return true
+                }
+            }
+        val controller = SwingTerminalMouseController(focusHost)
+        controller.mouseListener.mousePressed(
+            mousePressed(MouseEvent.BUTTON1, InputEvent.BUTTON1_DOWN_MASK or InputEvent.SHIFT_DOWN_MASK),
+        )
+        assertEquals(TerminalMouseEventType.PRESS, host.mouseReports.single().type)
+        assertEquals(0, host.selectionPressCount)
+        assertEquals(1, host.modeSnapshotReads)
+    }
+
+    @Test
+    fun `application Shift capture routes mouse modifiers and preserves host reporting denial`() {
+        val host = RecordingMouseHost(mouseTrackingMode = MouseTrackingMode.NORMAL, session = RecordingInputEncoder())
+        host.shiftMouseCapture = true
+        val controller = SwingTerminalMouseController(host)
+        val modifiers = InputEvent.BUTTON2_DOWN_MASK or InputEvent.SHIFT_DOWN_MASK
+        controller.mouseListener.mousePressed(mousePressed(MouseEvent.BUTTON2, modifiers))
+        assertEquals(1, host.modeSnapshotReads)
+        assertEquals(TerminalModifiers.SHIFT, host.mouseReports.single().modifiers)
+        assertEquals(0, host.pasteCount)
+        controller.resetInput()
+        host.settings =
+            host.settings.copy {
+                it.mouseReportingEnabled = false
+                it.middleClickPaste = true
+            }
+        controller.mouseListener.mousePressed(mousePressed(MouseEvent.BUTTON2, modifiers))
+        assertEquals(1, host.mouseReports.size)
+        assertEquals(1, host.pasteCount)
+    }
+
+    @Test
+    fun `Shift capture changes take effect at the next gesture`() {
+        val host = RecordingMouseHost(mouseTrackingMode = MouseTrackingMode.NORMAL)
+        val controller = SwingTerminalMouseController(host)
+        val modifiers = InputEvent.BUTTON1_DOWN_MASK or InputEvent.SHIFT_DOWN_MASK
+        controller.mouseListener.mousePressed(mousePressed(MouseEvent.BUTTON1, modifiers))
+        host.shiftMouseCapture = true
+        controller.mouseMotionListener.mouseDragged(mouseDragged())
+        controller.mouseListener.mouseReleased(mouseReleased())
+        assertEquals(0, host.mouseReports.size)
+        assertEquals(1, host.selectionPressCount)
+        assertEquals(1, host.selectionDragCount)
+        assertEquals(1, host.selectionReleaseCount)
+        controller.mouseListener.mousePressed(mousePressed(MouseEvent.BUTTON1, modifiers))
+        host.shiftMouseCapture = false
+        controller.mouseListener.mouseReleased(mouseReleased())
+        assertEquals(listOf(TerminalMouseEventType.PRESS, TerminalMouseEventType.RELEASE), host.mouseReports.map { it.type })
+    }
+
+    @Test
+    fun `application alternate scroll changes discard fractions and respect host policy`() {
+        val encoder = RecordingInputEncoder()
+        val host = RecordingMouseHost(session = encoder)
+        host.renderCache.updateFrom(
+            FakeFrameReader(FakeFrame(historySize = 0, rows = 24, activeBuffer = TerminalRenderBufferKind.ALTERNATE)),
+        )
+        val controller = SwingTerminalMouseController(host)
+        val quarterRow = -1.0 / 12.0 // The event fixture scrolls three rows per wheel rotation.
+        controller.wheelListener.mouseWheelMoved(mouseWheel(quarterRow))
+        host.alternateScrollEnabled = false
+        controller.wheelListener.mouseWheelMoved(mouseWheel(quarterRow))
+        assertEquals(1, host.scrollCount)
+        host.alternateScrollEnabled = true
+        controller.wheelListener.mouseWheelMoved(mouseWheel(quarterRow))
+        assertTrue(encoder.encodedKeys.isEmpty())
+        repeat(3) { controller.wheelListener.mouseWheelMoved(mouseWheel(quarterRow)) }
+        assertEquals(1, encoder.encodedKeys.size)
+        host.settings = host.settings.copy { it.alternateScreenWheelToArrowEnabled = false }
+        controller.wheelListener.mouseWheelMoved(mouseWheel(-1.0))
+        assertEquals(1, encoder.encodedKeys.size)
+        assertEquals(2, host.scrollCount)
+    }
+
+    @Test
+    fun `Shift capture keeps wheel reports ahead of alternate scrolling`() {
+        val encoder = RecordingInputEncoder()
+        val host = RecordingMouseHost(mouseTrackingMode = MouseTrackingMode.NORMAL, session = encoder)
+        host.shiftMouseCapture = true
+        host.renderCache.updateFrom(
+            FakeFrameReader(FakeFrame(historySize = 0, rows = 24, activeBuffer = TerminalRenderBufferKind.ALTERNATE)),
+        )
+        val controller = SwingTerminalMouseController(host)
+        controller.wheelListener.mouseWheelMoved(mouseWheel(-1.0, InputEvent.SHIFT_DOWN_MASK))
+        assertEquals(TerminalMouseEventType.WHEEL, host.mouseReports.single().type)
+        assertEquals(TerminalModifiers.SHIFT, host.mouseReports.single().modifiers)
+        assertTrue(encoder.encodedKeys.isEmpty())
+        assertEquals(1, host.modeSnapshotReads)
+    }
 
     @Test
     fun `reporting changes take effect after a complete gesture`() {
@@ -745,7 +845,16 @@ class SwingTerminalMouseControllerTest {
         var finishWheelAnimationCount = 0
         val mouseReports = ArrayList<TerminalMouseEvent>()
 
-        override fun mouseTrackingMode(): MouseTrackingMode = mouseTrackingMode
+        var shiftMouseCapture = false
+        var alternateScrollEnabled = true
+        var modeSnapshotReads = 0
+
+        override fun getInputModeBits(): Long {
+            modeSnapshotReads++
+            return (mouseTrackingMode.ordinal.toLong() shl TerminalModeBits.MOUSE_TRACKING_SHIFT) or
+                (if (shiftMouseCapture) TerminalModeBits.SHIFT_MOUSE_CAPTURE else 0L) or
+                (if (alternateScrollEnabled) 0L else TerminalModeBits.ALTERNATE_SCROLL_DISABLED)
+        }
 
         override fun encodeMouse(event: TerminalMouseEvent) {
             mouseReports += event

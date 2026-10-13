@@ -73,6 +73,19 @@ outside measurement. Trial teardown verifies the final cursor and history.
 java -jar <jmh-jar> ".*TerminalReverseWrapBenchmark.*" -p mode=0,45,1045 -wi 3 -i 3 -w 1s -r 1s -f 2 -t 1 -prof gc -rf json -rff reverse-wrap.json
 ```
 
+### Application mouse behavior
+
+[TerminalMouseBehaviorBenchmark](src/jmh/kotlin/io/github/ketraterm/benchmark/TerminalMouseBehaviorBenchmark.kt)
+measures one packed routing-state read or four parser/host preference changes.
+The terminal, parser, and bytes are constructed before measurement. Trial
+teardown verifies the resulting flags and untouched cursor/history. The GC
+profile covers these primitive state/protocol paths, rather than Swing event
+construction or an entire painted frame.
+
+```text
+java -jar <jmh-jar> ".*TerminalMouseBehaviorBenchmark.*" -wi 3 -i 3 -w 1s -r 1s -f 2 -t 1 -prof gc -rf json -rff mouse-behavior.json
+```
+
 ### First parser input
 
 [TerminalParserFirstInputBenchmark](src/jmh/kotlin/io/github/ketraterm/benchmark/TerminalParserFirstInputBenchmark.kt)

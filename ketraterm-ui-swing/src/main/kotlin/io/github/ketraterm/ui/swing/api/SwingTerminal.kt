@@ -15,13 +15,11 @@
  */
 package io.github.ketraterm.ui.swing.api
 
-import io.github.ketraterm.core.api.TerminalInputState
 import io.github.ketraterm.input.api.TerminalInputEncoder
 import io.github.ketraterm.input.event.TerminalKeyEvent
 import io.github.ketraterm.input.event.TerminalModifiers
 import io.github.ketraterm.input.event.TerminalMouseEvent
 import io.github.ketraterm.input.event.TerminalPasteEvent
-import io.github.ketraterm.protocol.MouseTrackingMode
 import io.github.ketraterm.render.api.TerminalRenderBufferKind
 import io.github.ketraterm.render.cache.TerminalRenderCache
 import io.github.ketraterm.session.TerminalInputAdmission
@@ -461,12 +459,7 @@ public class SwingTerminal
                     override val renderCache: TerminalRenderCache get() = this@SwingTerminal.renderCache
                     override val session: TerminalInputEncoder? get() = this@SwingTerminal.session?.takeUnless { it.isClosed }
 
-                    override fun mouseTrackingMode(): MouseTrackingMode =
-                        MouseTrackingMode.entries[
-                            TerminalInputState.mouseTrackingMode(
-                                this@SwingTerminal.session?.takeUnless { it.isClosed }?.getInputModeBits() ?: 0L,
-                            ),
-                        ]
+                    override fun getInputModeBits(): Long = this@SwingTerminal.session?.takeUnless { it.isClosed }?.getInputModeBits() ?: 0L
 
                     override fun handleMiddleClickPaste(event: MouseEvent) {
                         handleMiddleClickPasteOnEdt(event)

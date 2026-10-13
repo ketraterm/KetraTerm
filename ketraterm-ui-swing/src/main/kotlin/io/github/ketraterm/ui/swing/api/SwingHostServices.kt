@@ -109,7 +109,7 @@ public fun interface SwingTerminalHostKeyHandler {
  * terminal input encoding.
  * @property contextMenuHandler host-owned right-click popup policy. The
  * reusable terminal invokes it only when terminal UI owns the right-click
- * gesture; application mouse reporting takes precedence unless Shift is held.
+ * gesture; Shift temporarily overrides reporting unless XTSHIFTESCAPE requests capture.
  * @property middleClickPasteHandler optional host-owned local middle-button paste hook.
  * A supplied hook owns clipboard access and deferred completion; null uses the configured
  * clipboard handler synchronously. Other paste actions are unaffected.

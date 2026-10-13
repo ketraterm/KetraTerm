@@ -545,6 +545,9 @@ public interface TerminalCommandSink {
         enable: Boolean,
     )
 
+    /** Requests Shift as a mouse-report modifier when enabled (XTSHIFTESCAPE); false restores local Shift override. */
+    public fun setShiftMouseCaptureEnabled(enabled: Boolean)
+
     /**
      * Xterm key modifier option set, `CSI > Pp ; Pv m`.
      *

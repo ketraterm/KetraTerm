@@ -37,6 +37,15 @@ public interface TerminalInputState {
      * Helper methods for constructing and decoding packed input mode snapshots.
      */
     public companion object {
+        /** Whether mode 1007 permits alternate-screen wheel-to-cursor-key input. Defaults to true. */
+        @JvmStatic
+        public fun isAlternateScrollEnabled(bits: Long): Boolean =
+            !TerminalModeBits.hasFlag(bits, TerminalModeBits.ALTERNATE_SCROLL_DISABLED)
+
+        /** Whether XTSHIFTESCAPE requests Shift in mouse reports. Defaults to false. */
+        @JvmStatic
+        public fun isShiftMouseCaptureEnabled(bits: Long): Boolean = TerminalModeBits.hasFlag(bits, TerminalModeBits.SHIFT_MOUSE_CAPTURE)
+
         /**
          * Reads an XTMODKEYS resource from the same snapshot as all other input modes.
          * Returns -1 for explicit disable and -2 for an unsupported resource identifier.

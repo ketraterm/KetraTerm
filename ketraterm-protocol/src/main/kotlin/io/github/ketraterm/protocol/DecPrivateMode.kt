@@ -90,6 +90,9 @@ public object DecPrivateMode {
     /** SGR decimal mouse tracking encoding. */
     public const val MOUSE_SGR: Int = 1006
 
+    /** Alternate-screen wheel-to-cursor-key scrolling. */
+    public const val ALTERNATE_SCROLL: Int = 1007
+
     /** urxvt mouse tracking encoding. */
     public const val MOUSE_URXVT: Int = 1015
 
