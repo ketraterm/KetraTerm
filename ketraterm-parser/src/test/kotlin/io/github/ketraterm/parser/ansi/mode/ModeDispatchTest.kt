@@ -28,9 +28,30 @@ import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
+import org.junit.jupiter.params.ParameterizedTest
+import org.junit.jupiter.params.provider.ValueSource
 
 @DisplayName("Mode dispatcher")
 class ModeDispatchTest {
+    @ParameterizedTest
+    @ValueSource(strings = ["?45:1h", "?45;1045:1h", "?45;999999999999h", "?45:0l", "4:1h", "4;999999999999l"])
+    fun `malformed mode lists are rejected atomically and recover at every split`(sequence: String) {
+        val bytes = ("\u001B[" + sequence + "\u001B[?45;1045h").encodeToByteArray()
+        for (split in 0..bytes.size) {
+            val fixture = TerminalParserFixture()
+            fixture.parser.accept(bytes, 0, split)
+            fixture.parser.accept(bytes, split, bytes.size - split)
+            assertEquals(listOf(decEvent(45, true), decEvent(1045, true)), fixture.sink.events, "split=$split sequence=$sequence")
+        }
+    }
+
+    @Test
+    fun `reverse wrap mode lists dispatch set and reset in source order`() {
+        val modes = intArrayOf(DecPrivateMode.REVERSE_WRAP, DecPrivateMode.REVERSE_WRAP_EXTENDED)
+        assertEquals(listOf(decEvent(45, true), decEvent(1045, true)), setDec(*modes).events)
+        assertEquals(listOf(decEvent(45, false), decEvent(1045, false)), resetDec(*modes).events)
+    }
+
     private fun dispatchMode(
         finalByte: Int,
         vararg params: Int,

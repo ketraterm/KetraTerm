@@ -102,6 +102,8 @@ public final class io/github/ketraterm/protocol/DecPrivateMode {
 	public static final field ORIGIN I
 	public static final field POP_ON_BELL I
 	public static final field REVERSE_VIDEO I
+	public static final field REVERSE_WRAP I
+	public static final field REVERSE_WRAP_EXTENDED I
 	public static final field SAVE_RESTORE_CURSOR I
 	public static final field SYNCHRONIZED_OUTPUT I
 }

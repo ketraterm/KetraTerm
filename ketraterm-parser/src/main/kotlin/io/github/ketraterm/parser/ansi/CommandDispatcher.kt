@@ -631,6 +631,7 @@ internal object AnsiCommandDispatcher : CommandDispatcher {
         state: ParserState,
         block: (Int) -> Unit,
     ) {
+        if (state.subParameterMask != 0 || state.parameterValueSaturated) return
         var i = 0
         while (i < state.paramCount) {
             val mode = state.params[i]

@@ -115,7 +115,7 @@ are independent; no modes claim permanent-set/reset status.
 | Namespace | Queryable modes |
 | --- | --- |
 | ANSI | 4, 20. |
-| DEC core | 1, 3, 5, 6, 7, 12, 25, 66, 69, 1004, 2004, 2026. |
+| DEC core | 1, 3, 5, 6, 7, 12, 25, 45, 66, 69, 1004, 1045, 2004, 2026. |
 | DEC change reports | 2031, 2048. |
 | DEC mouse tracking | 9, 1000, 1002, 1003. |
 | DEC mouse encoding | 1005, 1006, 1015, 1016. |

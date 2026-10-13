@@ -42,6 +42,12 @@ public object DecPrivateMode {
     /** Cursor visible mode (DECTCEM). */
     public const val CURSOR_VISIBLE: Int = 25
 
+    /** Reverse-wraparound across soft-wrapped rows (XTREVWRAP). */
+    public const val REVERSE_WRAP: Int = 45
+
+    /** Extended reverse-wraparound across hard breaks and the top margin (XTREVWRAP2). */
+    public const val REVERSE_WRAP_EXTENDED: Int = 1045
+
     /** Application keypad mode (DECKPAM). */
     public const val APPLICATION_KEYPAD: Int = 66
 

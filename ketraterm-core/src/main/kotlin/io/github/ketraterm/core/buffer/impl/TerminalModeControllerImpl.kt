@@ -41,6 +41,14 @@ internal class TerminalModeControllerImpl(
         state.modes.isAutoWrap = enabled
     }
 
+    override fun setReverseWrap(enabled: Boolean) {
+        state.modes.isReverseWrap = enabled
+    }
+
+    override fun setReverseWrapExtended(enabled: Boolean) {
+        state.modes.isReverseWrapExtended = enabled
+    }
+
     override fun setOriginMode(enabled: Boolean) {
         mutateMode {
             state.modes.isOriginMode = enabled

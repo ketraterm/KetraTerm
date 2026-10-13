@@ -59,6 +59,8 @@ class TerminalProtocolModesTest {
             { assertEquals(7, DecPrivateMode.AUTO_WRAP) },
             { assertEquals(12, DecPrivateMode.CURSOR_BLINK) },
             { assertEquals(25, DecPrivateMode.CURSOR_VISIBLE) },
+            { assertEquals(45, DecPrivateMode.REVERSE_WRAP) },
+            { assertEquals(1045, DecPrivateMode.REVERSE_WRAP_EXTENDED) },
             { assertEquals(66, DecPrivateMode.APPLICATION_KEYPAD) },
             { assertEquals(67, DecPrivateMode.BACKARROW_KEY) },
             { assertEquals(69, DecPrivateMode.LEFT_RIGHT_MARGIN) },

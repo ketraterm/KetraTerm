@@ -37,6 +37,21 @@ public interface TerminalModeController {
     public fun setAutoWrap(enabled: Boolean)
 
     /**
+     * Enables reverse wrap across soft-wrapped rows (DEC private mode 45).
+     * Requires auto-wrap. Stops at hard line breaks and the top margin.
+     * Changing this mode preserves the cursor and pending wrap.
+     */
+    public fun setReverseWrap(enabled: Boolean)
+
+    /**
+     * Enables extended reverse wrap (DEC private mode 1045).
+     * Requires auto-wrap and takes precedence over mode 45. Crosses hard line
+     * breaks and cycles from the top margin to the bottom margin.
+     * Changing this mode preserves the cursor and pending wrap.
+     */
+    public fun setReverseWrapExtended(enabled: Boolean)
+
+    /**
      * Enables or disables Origin Mode (DECOM, `CSI ? 6 h` / `CSI ? 6 l`).
      *
      * When enabled, cursor-home semantics become relative to the active scroll

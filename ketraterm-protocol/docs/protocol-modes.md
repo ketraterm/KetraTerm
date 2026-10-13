@@ -33,6 +33,8 @@ for state semantics, and the
 | `AUTO_WRAP` | `7` | Enable automatic line wrapping at the right margin. |
 | `CURSOR_BLINK` | `12` | Request a blinking cursor. |
 | `CURSOR_VISIBLE` | `25` | Show the cursor. |
+| `REVERSE_WRAP` | `45` | With auto-wrap, move left across soft-wrapped rows. |
+| `REVERSE_WRAP_EXTENDED` | `1045` | With auto-wrap, move left across hard breaks and cycle at the top margin. |
 | `APPLICATION_KEYPAD` | `66` | Select application numeric-keypad sequences. |
 | `BACKARROW_KEY` | `67` | Backspace sends BS when set and DEL when reset. |
 

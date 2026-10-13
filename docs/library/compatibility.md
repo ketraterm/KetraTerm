@@ -98,6 +98,7 @@ release history remains in the [changelog](../../CHANGELOG.md).
 
 | Earlier shape | Current integration |
 | --- | --- |
+| Custom `TerminalModeController` implementations or compiled Kotlin delegates before reverse wrap | Implement `setReverseWrap` and `setReverseWrapExtended` and recompile against the updated SPI to handle modes 45/1045. Existing caller methods retain their signatures; cursor-only flags are queried through DECRQM. See the [cursor contract](../../ketraterm-core/docs/terminal-core-contract.md#reverse-wrap). |
 | Custom terminal command/core implementations or compiled Kotlin delegates before color reset and change-report methods | Implement the new reset/subscription methods, `setChangeNotificationsAllowed`, and pixel-aware `TerminalBuffer.resize`; recompile implementations and delegates against the updated SPI. Existing resize overloads remain callable. See the [baseline decision](#color-reset-and-change-report-baseline-decision) and [core semantics](../../ketraterm-core/docs/terminal-core-contract.md#terminal-responses). |
 | Growing settings constructors, named-argument copies, destructuring | Immutable `create`/`copy` callbacks or Java builders; use getters. |
 | Swing history/window-permission settings | Core/PTY history configuration and session host policy. |
