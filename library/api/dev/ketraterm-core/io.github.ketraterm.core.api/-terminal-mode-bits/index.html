@@ -102,14 +102,29 @@
   <div class="breadcrumbs"><a href="../../index.html">ketraterm-core</a><span class="delimiter">/</span><a href="../index.html">io.github.ketraterm.core.api</a><span class="delimiter">/</span><span class="current">TerminalModeBits</span></div>
   <div class="cover ">
     <h1 class="cover"><span>Terminal</span><wbr><span>Mode</span><wbr><span><span>Bits</span></span></h1>
-    <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-core/main"><div class="symbol monospace"><span class="token keyword">object </span><a href="index.html">TerminalModeBits</a></div><p class="paragraph">Public contract for the packed terminal mode bit layout.</p><p class="paragraph">The constants in this object define the bits inside snapshots returned by <a href="../-terminal-input-state/get-input-mode-bits.html">TerminalInputState.getInputModeBits</a>. Core owns the values, while input and rendering code may read them through the helper methods without depending on core internals.</p><p class="paragraph">Existing bit positions, field widths, sentinel values, and mouse ordinals are compatibility commitments. Mouse tracking values 0..4 mean OFF, X10, NORMAL, BUTTON_EVENT, ANY_EVENT; encoding values 0..4 mean DEFAULT, UTF8, SGR, URXVT, SGR_PIXELS. Existing values must not be reordered or repurposed. Bits 37..62 hold xterm resources decoded by <a href="../-terminal-input-state/index.html">TerminalInputState</a> helpers; only bits 19 and 63 are currently unassigned. Readers ignore unassigned bits. This finite published subset is not an extensible inventory of all terminal state.</p></div></div>
+    <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-core/main"><div class="symbol monospace"><span class="token keyword">object </span><a href="index.html">TerminalModeBits</a></div><p class="paragraph">Public contract for the packed terminal mode bit layout.</p><p class="paragraph">The constants in this object define the bits inside snapshots returned by <a href="../-terminal-input-state/get-input-mode-bits.html">TerminalInputState.getInputModeBits</a>. Core owns the values, while input and rendering code may read them through the helper methods without depending on core internals.</p><p class="paragraph">Existing bit positions, field widths, sentinel values, and mouse ordinals are compatibility commitments. Mouse tracking values 0..4 mean OFF, X10, NORMAL, BUTTON_EVENT, ANY_EVENT; encoding values 0..4 mean DEFAULT, UTF8, SGR, URXVT, SGR_PIXELS. Existing values must not be reordered or repurposed. Bits 37..62 hold xterm resources decoded by <a href="../-terminal-input-state/index.html">TerminalInputState</a> helpers; bits 19 and 63 hold application-controlled mouse routing. This finite published subset is not an extensible inventory of all terminal state.</p></div></div>
   </div>
   <div class="tabbedcontent">
     <div class="tabs-section" tabs-section="tabs-section"><button class="section-tab" data-active="" data-togglable="CONSTRUCTOR,TYPE,PROPERTY,FUNCTION">Members</button></div>
     <div class="tabs-section-body">
       <div data-togglable="PROPERTY">
         <h2 class="tableheader">Properties</h2>
-        <div class="table"><a data-name="1688664565%2FProperties%2F-1402815689" anchor-label="AMBIGUOUS_WIDE" id="1688664565%2FProperties%2F-1402815689" data-filterable-set=":ketraterm-core/main"></a>
+        <div class="table"><a data-name="1090364054%2FProperties%2F-1402815689" anchor-label="ALTERNATE_SCROLL_DISABLED" id="1090364054%2FProperties%2F-1402815689" data-filterable-set=":ketraterm-core/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-core/main" data-filterable-set=":ketraterm-core/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-a-l-t-e-r-n-a-t-e_-s-c-r-o-l-l_-d-i-s-a-b-l-e-d.html"><span>ALTERNATE_</span><wbr><span>SCROLL_</span><wbr><span>DISABLED</span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="1090364054%2FProperties%2F-1402815689"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-core/main"><div class="symbol monospace"><span class="token keyword">const </span><span class="token keyword">val </span><a href="-a-l-t-e-r-n-a-t-e_-s-c-r-o-l-l_-d-i-s-a-b-l-e-d.html">ALTERNATE_SCROLL_DISABLED</a><span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-long/index.html">Long</a></div><div class="brief "><p class="paragraph">Mode 1007 is disabled. A zero bit preserves the enabled alternate-scroll default.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="1688664565%2FProperties%2F-1402815689" anchor-label="AMBIGUOUS_WIDE" id="1688664565%2FProperties%2F-1402815689" data-filterable-set=":ketraterm-core/main"></a>
           <div class="table-row table-row_content" data-filterable-current=":ketraterm-core/main" data-filterable-set=":ketraterm-core/main">
             <div class="main-subrow keyValue ">
               <div class=""><span class="inline-flex">
@@ -615,6 +630,21 @@
               <div>
                 <div class="title">
                   <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-core/main"><div class="symbol monospace"><span class="token keyword">const </span><span class="token keyword">val </span><a href="-r-e-v-e-r-s-e_-v-i-d-e-o.html">REVERSE_VIDEO</a><span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-long/index.html">Long</a></div><div class="brief "><p class="paragraph">Reverse-video presentation flag (DECSCNM).</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="316906576%2FProperties%2F-1402815689" anchor-label="SHIFT_MOUSE_CAPTURE" id="316906576%2FProperties%2F-1402815689" data-filterable-set=":ketraterm-core/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-core/main" data-filterable-set=":ketraterm-core/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-s-h-i-f-t_-m-o-u-s-e_-c-a-p-t-u-r-e.html"><span>SHIFT_</span><wbr><span>MOUSE_</span><wbr><span>CAPTURE</span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="316906576%2FProperties%2F-1402815689"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-core/main"><div class="symbol monospace"><span class="token keyword">const </span><span class="token keyword">val </span><a href="-s-h-i-f-t_-m-o-u-s-e_-c-a-p-t-u-r-e.html">SHIFT_MOUSE_CAPTURE</a><span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-long/index.html">Long</a></div><div class="brief "><p class="paragraph">XTSHIFTESCAPE requests Shift as a mouse modifier instead of local interaction.</p></div></div></div>
                 </div>
               </div>
             </div>
