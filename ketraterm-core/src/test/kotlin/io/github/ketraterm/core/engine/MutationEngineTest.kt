@@ -44,7 +44,7 @@ class MutationEngineTest {
                                 val line = state.ring[row]
                                 line.setCell(0, 'A'.code + row % 26, 17L, 23L)
                                 line.setCell(1, '界'.code, 17L, 23L)
-                                line.setRawCell(2, TerminalConstants.WIDE_CHAR_SPACER, 17L, 23L)
+                                line.setCell(2, TerminalConstants.WIDE_CHAR_SPACER, 17L, 23L)
                                 line.setCluster(3, intArrayOf('e'.code, 0x0301), 2, 17L, 23L)
                                 line.wrapped = true
                                 line.endsWithWrapPadding = true
@@ -1641,7 +1641,7 @@ class MutationEngineTest {
 
         @Test
         fun `top anchored scroll region remains bounded while repeatedly preserving rows below region`() {
-            val state = createState(width = 1, height = 4, history = 2)
+            val state = createState(width = 2, height = 4, history = 2)
             val writer = MutationEngine(state)
             setScrollRegion(state, top = 0, bottom = 2)
             seedLine(state, 0, "A")

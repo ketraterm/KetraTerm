@@ -176,10 +176,11 @@ class PtyConnectorTest {
         val connector = createConnector(process)
 
         connector.resize(80, 24)
+        connector.resize(1, 1)
         connector.close()
         connector.resize(100, 40)
 
-        assertEquals(listOf(80 to 24), process.sizes)
+        assertEquals(listOf(80 to 24, 1 to 1), process.sizes)
     }
 
     @Test

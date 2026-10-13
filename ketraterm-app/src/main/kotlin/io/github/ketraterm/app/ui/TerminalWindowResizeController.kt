@@ -15,6 +15,7 @@
  */
 package io.github.ketraterm.app.ui
 
+import io.github.ketraterm.core.TerminalBuffers
 import io.github.ketraterm.render.api.TerminalRenderBufferKind
 import io.github.ketraterm.session.TerminalSession
 import io.github.ketraterm.ui.swing.api.SwingTerminal
@@ -147,7 +148,7 @@ internal data class WindowResizeGeometry(
         rows: Int,
         alternate: Boolean,
     ): Rectangle? {
-        if (columns <= 0 || rows <= 0 || cellWidth <= 0 || cellHeight <= 0) return null
+        if (columns < TerminalBuffers.MIN_WIDTH || rows <= 0 || cellWidth <= 0 || cellHeight <= 0) return null
         val width = columns.toLong() * cellWidth + windowExtraWidth + if (alternate) alternateInsetWidth else primaryInsetWidth
         val height = rows.toLong() * cellHeight + windowExtraHeight + if (alternate) alternateInsetHeight else primaryInsetHeight
         if (width !in minimumWidth.coerceAtLeast(1).toLong()..availableWidth.toLong() ||

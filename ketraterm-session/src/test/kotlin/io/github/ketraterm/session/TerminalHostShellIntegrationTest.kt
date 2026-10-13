@@ -120,14 +120,14 @@ class TerminalHostShellIntegrationTest {
             val connector = MockConnector()
             val session =
                 TerminalSession.create(
-                    TerminalBuffers.create(1, 1),
+                    TerminalBuffers.create(TerminalBuffers.MIN_WIDTH, 1),
                     connector,
                     workerDispatcher = dispatcher,
                     ioDispatcher = dispatcher,
                 )
             session.use {
                 assertNull(session.readPublishedFrame<Unit> { fail("No frame yet") })
-                session.start(1, 1)
+                session.start(TerminalBuffers.MIN_WIDTH, 1)
 
                 fun firstCell(): Int {
                     session.readPublishedFrame { return it.codeWords[0] }

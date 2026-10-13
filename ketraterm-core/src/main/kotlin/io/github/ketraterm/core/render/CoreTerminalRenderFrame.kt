@@ -16,6 +16,7 @@
 package io.github.ketraterm.core.render
 
 import io.github.ketraterm.core.state.TerminalState
+import io.github.ketraterm.protocol.TerminalTextLimits.MAX_CLUSTER_CODEPOINTS
 
 /**
  * Adapter from core state to the stable public render frame ABI.
@@ -24,7 +25,7 @@ internal class CoreTerminalRenderFrame(
     @PublishedApi internal val state: TerminalState,
 ) : io.github.ketraterm.render.api.TerminalRenderFrame {
     private val attrTranslator = RenderAttrTranslator()
-    private val clusterScratch = RenderClusterScratch()
+    private val clusterScratch = IntArray(MAX_CLUSTER_CODEPOINTS)
 
     @PublishedApi internal var isValid: Boolean = false
 

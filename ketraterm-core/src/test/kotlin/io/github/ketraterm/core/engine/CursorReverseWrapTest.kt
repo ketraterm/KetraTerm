@@ -221,11 +221,11 @@ class CursorReverseWrapTest {
     }
 
     @Test
-    fun `single cell extended wrap remains bounded for maximum count`() {
-        val state = TerminalState(1, 1, maxHistory = 0)
+    fun `minimum grid extended wrap remains bounded for maximum count`() {
+        val state = TerminalState(2, 1, maxHistory = 0)
         state.modes.isReverseWrapExtended = true
         CursorEngine(state).cursorLeft(Int.MAX_VALUE)
-        assertPosition(state, 0, 0)
+        assertPosition(state, 1, 0)
     }
 
     private fun assertPosition(

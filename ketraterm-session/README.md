@@ -104,6 +104,9 @@ See [render scheduling](docs/asynchronous-render-coalescing.md).
 `resizeViewport` returns the new scrollback offset, history size, and discarded
 row baseline together; apply the complete result when preserving scroll position.
 Resize may block in the connector and is not a barrier for queued input.
+Session construction, start, resize, and expected-grid pixel updates require at
+least `TerminalBuffers.MIN_WIDTH` (2) columns and one row. Invalid geometry is
+rejected before session mutation or connector operations.
 The five-argument `tryResizeViewport` overload accepts text-area pixel width and
 height along with the grid dimensions and viewport offset. Supply the measured
 cell area excluding padding; either zero means pixels are unavailable. The

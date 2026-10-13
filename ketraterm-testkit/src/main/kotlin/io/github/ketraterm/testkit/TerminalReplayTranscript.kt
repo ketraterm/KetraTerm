@@ -15,6 +15,7 @@
  */
 package io.github.ketraterm.testkit
 
+import io.github.ketraterm.core.TerminalBuffers
 import io.github.ketraterm.parser.api.TerminalOutputParser
 
 /**
@@ -75,7 +76,7 @@ sealed interface TerminalReplayEvent {
     /**
      * Resizes the headless terminal between input chunks.
      *
-     * @property columns new grid width in cells.
+     * @property columns new grid width in cells, at least [TerminalBuffers.MIN_WIDTH].
      * @property rows new grid height in rows.
      */
     data class Resize(
@@ -83,7 +84,7 @@ sealed interface TerminalReplayEvent {
         val rows: Int,
     ) : TerminalReplayEvent {
         init {
-            require(columns > 0) { "columns must be > 0, was $columns" }
+            require(columns >= TerminalBuffers.MIN_WIDTH) { "columns must be >= ${TerminalBuffers.MIN_WIDTH}, was $columns" }
             require(rows > 0) { "rows must be > 0, was $rows" }
         }
     }

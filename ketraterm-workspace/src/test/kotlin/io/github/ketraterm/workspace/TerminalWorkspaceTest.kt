@@ -52,6 +52,26 @@ import kotlin.time.Duration.Companion.milliseconds
 @OptIn(ExperimentalCoroutinesApi::class)
 class TerminalWorkspaceTest {
     @Test
+    fun `workspace geometry rejects widths below the terminal minimum at every construction boundary`() {
+        val original = TerminalWorkspaceOpenOptions()
+        for (columns in intArrayOf(Int.MIN_VALUE, -1, 0, 1)) {
+            assertFailsWith<IllegalArgumentException> { TerminalWorkspaceOpenOptions.create { it.columns = columns } }
+            assertFailsWith<IllegalArgumentException> { original.copy { it.columns = columns } }
+            val draft = original.toBuilder()
+            draft.columns = columns
+            assertFailsWith<IllegalArgumentException> { draft.build() }
+        }
+        val minimum =
+            original.copy { draft ->
+                draft.columns = TerminalBuffers.MIN_WIDTH
+                draft.rows = 1
+            }
+        assertEquals(TerminalBuffers.MIN_WIDTH, minimum.columns)
+        assertEquals(1, minimum.rows)
+        assertEquals(TerminalWorkspaceOpenOptions(), original)
+    }
+
+    @Test
     fun `workspace options reject negative mode capabilities at every construction boundary`() = assertInvalidModeCapabilities(-1)
 
     @Test

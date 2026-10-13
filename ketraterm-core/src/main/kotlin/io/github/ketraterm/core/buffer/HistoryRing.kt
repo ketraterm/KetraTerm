@@ -22,7 +22,7 @@ import io.github.ketraterm.core.model.Line
  * The reference table has full [capacity], but only [initialRows] plus the first
  * batch of spare rows are constructed upfront. Existing rows are reused on clear
  * and on capacity wrapping. All access, including [lineFactory], is caller-serialized.
- * The factory must keep the same width and cluster store throughout the ring's lifetime.
+ * The factory must keep the same width throughout the ring's lifetime.
  */
 internal class HistoryRing(
     capacity: Int,
@@ -72,6 +72,7 @@ internal class HistoryRing(
     /**
      * Pushes a new line into the ring.
      * If full, the oldest line is recycled and returned for reuse.
+     * The caller must fully initialize the returned row before exposing it as live content.
      */
     fun push(): Line =
         if (size < capacity) {
@@ -157,7 +158,7 @@ internal class HistoryRing(
     /**
      * Keeps the newest [count] logical rows and resets eviction accounting.
      * Removed rows remain allocated for reuse, in unspecified order. The caller
-     * must clear their contents first to release any cluster handles.
+     * must fully initialize them on reuse. Row-owned payloads need no external release.
      */
     fun retainLast(count: Int) {
         require(count in 0..size) { "count must be in 0..size, was $count" }
@@ -179,7 +180,7 @@ internal class HistoryRing(
 
     /**
      * Clears the ring buffer by resetting head and size.
-     * The Line objects themselves are not modified, but they will be overwritten by future pushes.
+     * Row storage is retained. The caller must fully initialize rows returned by future pushes.
      */
     fun clear() {
         head = 0
@@ -189,8 +190,8 @@ internal class HistoryRing(
 
     /**
      * Resizes the reference table, retaining [fromLogical, untilLogical) as live rows.
-     * Other allocated rows become spares, up to [newCapacity]; the caller must clear
-     * removed live rows first. Cell arrays and the factory's cluster store are reused.
+     * Other allocated rows become spares, up to [newCapacity]; the caller must fully
+     * initialize spares on reuse. Cell arrays and row-owned cluster storage are reused.
      * Eviction accounting starts a new resize epoch with [fromLogical] discarded rows.
      */
     fun resizeCapacity(

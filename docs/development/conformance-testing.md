@@ -76,12 +76,11 @@ all runs and retains minimized operation streams plus JUnit reports on failure.
 
 The [streaming placement contract](../reference/protocol.md#streaming-grapheme-placement)
 commits published grid effects. `HostGraphemePolicyTest` verifies that policy.
-Four retained `HostGraphemeTest` oracles test the stronger, unsupported requirement
+Three retained `HostGraphemeTest` oracles test the stronger, unsupported requirement
 that every byte split produces identical placement:
 
 - Narrowing does not restore an overwritten neighbor.
 - Widening at a margin can differ from an initially wide write.
-- Late narrowing does not undo history eviction on a one-cell grid.
 - Late narrowing does not move an already wrapped cluster back.
 
 The `knownR06Failure` helper reports only recorded assertion failures as

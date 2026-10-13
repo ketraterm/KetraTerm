@@ -21,11 +21,12 @@ import org.junit.jupiter.api.assertThrows
 
 class GridDimensionsTest {
     @Test
-    fun `rejects non-positive dimensions`() {
+    fun `rejects widths below two and non-positive heights`() {
         assertThrows<IllegalArgumentException> { GridDimensions(0, 1) }
-        assertThrows<IllegalArgumentException> { GridDimensions(1, 0) }
+        assertThrows<IllegalArgumentException> { GridDimensions(1, 1) }
+        assertThrows<IllegalArgumentException> { GridDimensions(2, 0) }
         assertThrows<IllegalArgumentException> { GridDimensions(-1, 1) }
-        assertThrows<IllegalArgumentException> { GridDimensions(1, -1) }
+        assertThrows<IllegalArgumentException> { GridDimensions(2, -1) }
     }
 
     @Test

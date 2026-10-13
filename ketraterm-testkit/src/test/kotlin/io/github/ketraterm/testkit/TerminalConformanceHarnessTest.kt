@@ -15,6 +15,7 @@
  */
 package io.github.ketraterm.testkit
 
+import io.github.ketraterm.core.TerminalBuffers
 import io.github.ketraterm.render.api.TerminalRenderCellFlags
 import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.Test
@@ -89,6 +90,26 @@ class TerminalConformanceHarnessTest {
                 .flatMap { it.cells }
                 .any { it.cluster == "e\u0301" && it.flags and TerminalRenderCellFlags.CLUSTER != 0 },
         )
+    }
+
+    @Test
+    fun `resize replay accepts the terminal minimum width and rejects smaller events`() {
+        assertThrows(IllegalArgumentException::class.java) {
+            TerminalReplayEvent.Resize(columns = TerminalBuffers.MIN_WIDTH - 1, rows = 2)
+        }
+        val snapshot =
+            TerminalConformanceHarness(columns = 4, rows = 2, maxHistory = 0)
+                .replay(
+                    TerminalReplayTranscript.of(
+                        TerminalReplayEvent.Input.utf8("AB😀"),
+                        TerminalReplayEvent.Resize(columns = TerminalBuffers.MIN_WIDTH, rows = 2),
+                        TerminalReplayEvent.EndOfInput,
+                    ),
+                )
+
+        assertEquals(TerminalBuffers.MIN_WIDTH, snapshot.columns)
+        assertEquals(listOf("AB", "😀"), snapshot.retainedRows.map { it.text() })
+        assertEquals(0, snapshot.historyRows)
     }
 
     @Test

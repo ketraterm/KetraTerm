@@ -35,7 +35,7 @@ internal fun Line.copyToRenderAbi(
     clusterSink: io.github.ketraterm.render.api.TerminalRenderClusterSink?,
     clusterDataSink: io.github.ketraterm.render.api.TerminalRenderClusterDataSink?,
     attrTranslator: RenderAttrTranslator,
-    clusterScratch: RenderClusterScratch,
+    clusterScratch: IntArray,
     reverseVideo: Boolean,
 ) {
     // Reuse translations within this copy only; reverseVideo is constant for the whole row.
@@ -76,9 +76,9 @@ internal fun Line.copyToRenderAbi(
             }
             raw <= TerminalConstants.CLUSTER_HANDLE_MAX -> {
                 if (clusterDataSink != null || clusterSink != null) {
-                    val length = clusterScratch.readCluster(this, col)
-                    clusterDataSink?.onCluster(col, clusterScratch.codepoints, 0, length)
-                    clusterSink?.onCluster(col, String(clusterScratch.codepoints, 0, length))
+                    val length = readCluster(col, clusterScratch)
+                    clusterDataSink?.onCluster(col, clusterScratch, 0, length)
+                    clusterSink?.onCluster(col, String(clusterScratch, 0, length))
                 }
             }
             else -> {
@@ -99,7 +99,7 @@ internal fun Line.copyTextToRenderAbi(
     flags: IntArray,
     flagOffset: Int,
     clusterDataSink: io.github.ketraterm.render.api.TerminalRenderClusterDataSink?,
-    clusterScratch: RenderClusterScratch,
+    clusterScratch: IntArray,
 ) {
     var col = 0
     while (col < width) {
@@ -107,8 +107,8 @@ internal fun Line.copyTextToRenderAbi(
         codeWords[codeOffset + col] = if (raw > 0) raw else 0
         flags[flagOffset + col] = cellFlags(col, raw)
         if (raw <= TerminalConstants.CLUSTER_HANDLE_MAX && clusterDataSink != null) {
-            val length = clusterScratch.readCluster(this, col)
-            clusterDataSink.onCluster(col, clusterScratch.codepoints, 0, length)
+            val length = readCluster(col, clusterScratch)
+            clusterDataSink.onCluster(col, clusterScratch, 0, length)
         }
         col++
     }
@@ -141,20 +141,3 @@ private fun Line.cellFlags(
     }
 
 private fun Line.isWideLeading(col: Int): Boolean = col + 1 < width && rawCodepoint(col + 1) == TerminalConstants.WIDE_CHAR_SPACER
-
-internal class RenderClusterScratch {
-    var codepoints = IntArray(16)
-        private set
-
-    fun readCluster(
-        line: Line,
-        col: Int,
-    ): Int {
-        val length = line.getClusterLength(col)
-        if (codepoints.size < length) {
-            codepoints = IntArray(length)
-        }
-        line.readCluster(col, codepoints)
-        return length
-    }
-}

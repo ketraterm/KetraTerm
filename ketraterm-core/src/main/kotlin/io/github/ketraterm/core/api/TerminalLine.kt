@@ -88,7 +88,7 @@ public interface TerminalLine {
      * The copy itself does not allocate. The caller owns capacity and may reuse
      * [dest] while it remains large enough. Use [getClusterLength] to discover
      * required capacity before copying, under the same uninterrupted serialization;
-     * directly written clusters have no fixed public length bound. Alternatively, use
+     * core-owned lines retain at most 32 codepoints per cluster. Alternatively, use
      * [io.github.ketraterm.render.api.TerminalRenderFrame.copyLine] with a
      * [io.github.ketraterm.render.api.TerminalRenderClusterDataSink]. Its callback
      * supplies the full length and a borrowed primitive range to copy before returning.
@@ -100,7 +100,7 @@ public interface TerminalLine {
      *
      * @param col  Column index (0-based).
      * @param dest Destination array. Must have capacity >= actual cluster length;
-     * there is no fixed public upper bound guaranteed by this API.
+     * core-owned lines are bounded by [io.github.ketraterm.protocol.TerminalTextLimits.MAX_CLUSTER_CODEPOINTS].
      * @return Number of codepoints written, or 0 if the cell is not a cluster.
      * @throws IndexOutOfBoundsException when a core-owned cluster exceeds [dest]'s capacity.
      */

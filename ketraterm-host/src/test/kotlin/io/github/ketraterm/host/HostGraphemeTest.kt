@@ -248,33 +248,30 @@ class HostGraphemeTest {
 
     @Test
     fun `tiny grids and already pending wraps retain chunk equivalence`() {
-        val context = "size=1,1 history=0 prefix= text=\uD83D\uDE10\uFE0E suffix= split=4"
-        knownR06Failure(listOf("$context ==> expected: <0> but was: <1>")) {
-            for (width in 1..3) {
-                for (height in 1..2) {
-                    for (history in 0..1) {
-                        for (prefix in listOf("", "A".repeat(width))) {
-                            for (text in listOf("\uD83D\uDE10\uFE0E", "\u2764\uFE0F\uFE0E", "\u4E00\uFE0E")) {
-                                for (suffix in listOf("", "X", "\u001B[32mY", "\u0018X")) {
-                                    val bytes = (prefix + text + suffix).encodeToByteArray()
-                                    val whole = TerminalBuffers.create(width, height, maxHistory = history)
-                                    TerminalParsers.create(HostCommandAdapter(whole)).apply {
-                                        accept(bytes)
+        for (width in TerminalBuffers.MIN_WIDTH..3) {
+            for (height in 1..2) {
+                for (history in 0..1) {
+                    for (prefix in listOf("", "A".repeat(width))) {
+                        for (text in listOf("\uD83D\uDE10\uFE0E", "\u2764\uFE0F\uFE0E", "\u4E00\uFE0E")) {
+                            for (suffix in listOf("", "X", "\u001B[32mY", "\u0018X")) {
+                                val bytes = (prefix + text + suffix).encodeToByteArray()
+                                val whole = TerminalBuffers.create(width, height, maxHistory = history)
+                                TerminalParsers.create(HostCommandAdapter(whole)).apply {
+                                    accept(bytes)
+                                    endOfInput()
+                                }
+                                for (split in 0..bytes.size) {
+                                    val actual = TerminalBuffers.create(width, height, maxHistory = history)
+                                    TerminalParsers.create(HostCommandAdapter(actual)).apply {
+                                        accept(bytes, 0, split)
+                                        accept(bytes, split, bytes.size - split)
                                         endOfInput()
                                     }
-                                    for (split in 0..bytes.size) {
-                                        val actual = TerminalBuffers.create(width, height, maxHistory = history)
-                                        TerminalParsers.create(HostCommandAdapter(actual)).apply {
-                                            accept(bytes, 0, split)
-                                            accept(bytes, split, bytes.size - split)
-                                            endOfInput()
-                                        }
-                                        assertSameGrid(
-                                            whole,
-                                            actual,
-                                            "size=$width,$height history=$history prefix=$prefix text=$text suffix=$suffix split=$split",
-                                        )
-                                    }
+                                    assertSameGrid(
+                                        whole,
+                                        actual,
+                                        "size=$width,$height history=$history prefix=$prefix text=$text suffix=$suffix split=$split",
+                                    )
                                 }
                             }
                         }

@@ -16,10 +16,14 @@
 package io.github.ketraterm.core.buffer
 
 import io.github.ketraterm.core.TerminalBuffers
+import io.github.ketraterm.core.model.CellColor
 import io.github.ketraterm.core.model.TerminalConstants
+import io.github.ketraterm.core.model.UnderlineStyle
 import io.github.ketraterm.protocol.DecRectangleAttribute
 import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.Test
+import org.junit.jupiter.params.ParameterizedTest
+import org.junit.jupiter.params.provider.CsvSource
 
 class TerminalRectangleOperationTest {
     @Test
@@ -106,6 +110,99 @@ class TerminalRectangleOperationTest {
         )
 
         assertEquals("AABCDF", buffer.getLineAsString(0))
+    }
+
+    @ParameterizedTest
+    @CsvSource("1, 2", "2, 1")
+    fun `DECCRA overlapping copies retain bounded clusters wide spans and both attribute words`(
+        destinationTop: Int,
+        destinationLeft: Int,
+    ) {
+        val buffer = TerminalBuffers.create(width = 6, height = 4)
+        val longClusters = List(2) { row -> IntArray(32) { index -> if (index == 0) 'a'.code + row else 0x0301 } }
+        val wideClusters = listOf(intArrayOf(0x2764, 0xFE0F), intArrayOf(0x1F469, 0x200D, 0x1F4BB))
+        val tailClusters = List(2) { row -> intArrayOf('k'.code + row, 0x0301) }
+
+        fun writeSourceRows() {
+            for (row in 0..1) {
+                buffer.positionCursor(col = 0, row = row)
+                buffer.setPenColors(
+                    foreground = CellColor.rgb(0x112233 + row),
+                    background = CellColor.indexed(4 + row),
+                    underlineColor = CellColor.rgb(0x334455 + row),
+                    bold = true,
+                    underlineStyle = UnderlineStyle.CURLY,
+                )
+                buffer.setHyperlinkId(17 + row)
+                buffer.writeCluster(longClusters[row])
+                buffer.setPenColors(
+                    foreground = CellColor.indexed(9 + row),
+                    background = CellColor.rgb(0x556677 + row),
+                    underlineColor = CellColor.indexed(12 + row),
+                    italic = true,
+                    underlineStyle = UnderlineStyle.DOUBLE,
+                )
+                buffer.setHyperlinkId(31 + row)
+                buffer.writeCluster(wideClusters[row])
+                buffer.setPenColors(
+                    foreground = CellColor.rgb(0x778899 + row),
+                    background = CellColor.DEFAULT,
+                    strikethrough = true,
+                )
+                buffer.setHyperlinkId(47 + row)
+                buffer.writeCluster(tailClusters[row])
+            }
+        }
+        writeSourceRows()
+        val sourceAttributes = List(2) { row -> List(4) { column -> buffer.getAttrAt(column, row) } }
+        val scratch = IntArray(32)
+
+        fun assertCopiedCells() {
+            for (rowOffset in 0..1) {
+                val row = destinationTop - 1 + rowOffset
+                val left = destinationLeft - 1
+                val line = buffer.getLine(row)
+                assertEquals(32, line.readCluster(left, scratch))
+                assertArrayEquals(longClusters[rowOffset], scratch)
+                val wide = wideClusters[rowOffset]
+                assertEquals(wide.size, line.readCluster(left + 1, scratch))
+                assertArrayEquals(wide, scratch.copyOf(wide.size))
+                assertEquals(TerminalConstants.WIDE_CHAR_SPACER, line.getCodepoint(left + 2))
+                assertEquals(0, line.getClusterLength(left + 2))
+                assertEquals(2, line.readCluster(left + 3, scratch))
+                assertArrayEquals(tailClusters[rowOffset], scratch.copyOf(2))
+                for (columnOffset in 0..3) {
+                    assertEquals(sourceAttributes[rowOffset][columnOffset], buffer.getAttrAt(left + columnOffset, row))
+                }
+            }
+        }
+
+        // The first snapshot grows several times; the next reuses its complete warmed capacity.
+        repeat(2) { iteration ->
+            if (iteration > 0) writeSourceRows()
+            buffer.copyRectangle(
+                sourceTop = 1,
+                sourceLeft = 1,
+                sourceBottom = 2,
+                sourceRight = 4,
+                sourcePage = 1,
+                destinationTop = destinationTop,
+                destinationLeft = destinationLeft,
+                destinationPage = 1,
+            )
+            assertCopiedCells()
+
+            // Mutate the portion of the original source outside the overlapping destination.
+            if (destinationTop == 1) {
+                buffer.eraseRectangle(top = 1, left = 1, bottom = 2, right = 1, selective = false)
+            } else {
+                buffer.eraseRectangle(top = 1, left = 1, bottom = 1, right = 4, selective = false)
+            }
+            buffer.resetPen()
+            buffer.positionCursor(col = 0, row = 0)
+            buffer.writeCluster(IntArray(32) { if (it == 0) 'Z'.code else 0x0308 })
+            assertCopiedCells()
+        }
     }
 
     @Test

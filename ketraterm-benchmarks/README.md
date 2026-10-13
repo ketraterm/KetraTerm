@@ -49,6 +49,7 @@ the first-input benchmark. Direct JAR runs use annotations unless overridden.
 | --- | --- |
 | Parsing without core mutation | `TerminalParserBenchmark`, `TerminalGraphemeBenchmark` with `pipeline=parser` |
 | Core writes, scrolling, erasure, and frame copying | `TerminalCoreWriteBenchmark`, `TerminalCoreScrollBenchmark`, `TerminalCoreEraseBenchmark`, `TerminalBufferBenchmark` |
+| History disposal and reuse after extended attributes are cleared | `TerminalStorageLifecycleBenchmark` |
 | Input encoding and session output through transport completion | `TerminalInputBenchmark`, `TerminalPasteBenchmark`, `TerminalSessionOutputBenchmark` |
 | Published-frame access and viewport projection | `TerminalRenderLeaseBenchmark`, `RetainedFrameViewportBenchmark` |
 | Completion evaluation and directory scanning | `TerminalCompletionBenchmark`, `TerminalDirectoryCompletionBenchmark`, `TerminalLearnedRankingBenchmark` |
@@ -101,6 +102,41 @@ java -jar <jmh-jar> ".*TerminalParserFirstInputBenchmark.*" -wi 0 -i 1 -f 15 -t 
 GC-profiler results include harness activity and do not isolate Unicode table
 initialization allocation.
 
+### Storage lifecycle
+
+[TerminalStorageLifecycleBenchmark](src/jmh/kotlin/io/github/ketraterm/benchmark/TerminalStorageLifecycleBenchmark.kt)
+uses public core operations on a 120×24 terminal. `discardHistory` measures ED 3
+while preserving visible content and the cursor; `clearAll` also clears the
+viewport and homes the cursor. Both are single-shot measurements with 10,000
+history rows. `content=ascii` fills 119 cells; `cluster` replaces the first cell
+with a two-codepoint combining cluster. `clusterEnd` fills the first 119 cells
+with ASCII and puts a cluster in the final column; `denseClusters` fills all
+120 columns with clusters. The latter two cases exercise disposal when cluster
+handles extend to the row's end and when every cell owns a handle.
+Each iteration repopulates the same buffer with preallocated payloads outside
+timing. Iteration teardown checks history disposal, visible cells, clusters,
+and cursor semantics.
+
+```text
+java -jar <jmh-jar> ".*TerminalStorageLifecycleBenchmark.(discardHistory|clearAll)" -bm ss -wi 15 -i 15 -f 2 -t 1 -prof gc -rf json -rff storage-history.json
+```
+
+Keep single-shot mode and a batch size of one for those two methods. GC-profiler
+totals include history repopulation and semantic teardown; they do not isolate
+allocation in history disposal.
+
+`writeShiftErase` writes an ASCII row, inserts/deletes a cell at its midpoint,
+and erases its trailing half for all 24 rows. `clearScreen` repeatedly clears an
+already blank viewport. `extendedHistory=never` uses rows that have never held
+extended attributes; `cleared` first writes every cell with a hyperlink and
+clears the viewport with a zero hyperlink pen. These warmed methods retain the
+same rows and have no invocation or iteration setup. One operation covers one
+viewport; trial teardown verifies default attributes and the resulting cells.
+
+```text
+java -jar <jmh-jar> ".*TerminalStorageLifecycleBenchmark.(writeShiftErase|clearScreen)" -wi 3 -i 5 -w 1s -r 1s -f 2 -t 1 -prof gc -rf json -rff storage-steady.json
+```
+
 ### Fresh-terminal log ingestion
 
 [TerminalLogIngestionBenchmark](src/jmh/kotlin/io/github/ketraterm/benchmark/TerminalLogIngestionBenchmark.kt)
@@ -134,3 +170,11 @@ noise.
 See [Module.md](Module.md) for source sets and harness dependencies. The
 [Swing rendering guide](../ketraterm-ui-swing/docs/bifurcated-text-rendering.md)
 provides rendering workload context.
+
+`TerminalStorageLifecycleBenchmark.rewriteClusters` rewrites all 120 × 24 cells
+with prebuilt clusters of 2 or 32 codepoints. The buffer and payload are created
+once per trial; allocation profiling measures sustained writes and payload reuse
+after JMH warmup. Trial teardown verifies every payload and cursor placement.
+`resizeClusters -p length=32` alternates 2- and 32-codepoint payloads across that
+viewport to force dead regions and compaction. Its payloads are also prebuilt;
+the final retained prefix is verified outside the measured loop.

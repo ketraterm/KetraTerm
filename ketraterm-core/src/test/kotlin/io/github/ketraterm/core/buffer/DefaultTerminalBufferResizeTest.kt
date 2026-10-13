@@ -24,6 +24,98 @@ import org.junit.jupiter.params.provider.CsvSource
 import org.junit.jupiter.params.provider.ValueSource
 
 class DefaultTerminalBufferResizeTest {
+    @ParameterizedTest
+    @ValueSource(booleans = [false, true])
+    fun `width reflow cancels primary pending wrap while alternate screen is active`(alternate: Boolean) {
+        val buffer = DefaultTerminalBuffer(2, 2, 0)
+        buffer.writeText("ab")
+        if (alternate) buffer.enterAltBufferWithoutCursorSave(clearBeforeEnter = false)
+
+        buffer.resize(4, 2)
+
+        if (alternate) buffer.exitAltBufferWithoutCursorRestore()
+        assertEquals(0, buffer.cursorRow)
+        assertEquals(1, buffer.cursorCol)
+        buffer.writeCodepoint('X'.code)
+        assertEquals("aX\n", buffer.getScreenAsString())
+        assertEquals(0, buffer.cursorRow)
+        assertEquals(2, buffer.cursorCol)
+    }
+
+    @ParameterizedTest
+    @CsvSource("false, 0", "false, 1", "true, 0", "true, 1")
+    fun `minimum width reflow preserves both wide cells through a round trip`(
+        clustered: Boolean,
+        cursorColumn: Int,
+    ) {
+        val buffer = DefaultTerminalBuffer(4, 2, 0)
+        val payload = intArrayOf(0x2764, 0xFE0F)
+        if (clustered) buffer.writeCluster(payload) else buffer.writeCodepoint(0x4E2D)
+        buffer.writeCodepoint('X'.code)
+        buffer.positionCursor(cursorColumn, 0)
+
+        assertEquals(0 to 0, buffer.resize(2, 2))
+
+        val leader = buffer.getLine(0)
+        assertEquals(if (clustered) payload[0] else 0x4E2D, leader.getCodepoint(0))
+        assertEquals(TerminalConstants.WIDE_CHAR_SPACER, leader.getCodepoint(1))
+        assertEquals(clustered, leader.isCluster(0))
+        if (clustered) {
+            val actual = IntArray(payload.size)
+            assertEquals(payload.size, leader.readCluster(0, actual))
+            assertArrayEquals(payload, actual)
+        }
+        assertEquals('X'.code, buffer.getLine(1).getCodepoint(0))
+        assertEquals(0, buffer.cursorRow)
+        assertEquals(cursorColumn, buffer.cursorCol)
+
+        buffer.resize(4, 2)
+        assertEquals(if (clustered) "\u2764\uFE0FX" else "\u4E2DX", buffer.getAllAsString().trimEnd())
+        assertEquals(TerminalConstants.WIDE_CHAR_SPACER, buffer.getLine(0).getCodepoint(1))
+        assertEquals('X'.code, buffer.getLine(0).getCodepoint(2))
+        assertEquals(0, buffer.cursorRow)
+        assertEquals(cursorColumn, buffer.cursorCol)
+    }
+
+    @ParameterizedTest
+    @CsvSource("false, false", "false, true", "true, false", "true, true")
+    fun `subminimum resize rejects before changing either screen or geometry`(
+        alternate: Boolean,
+        withPixels: Boolean,
+    ) {
+        val buffer = DefaultTerminalBuffer(4, 2, 2)
+        writeRows(buffer, "old", "main", "tail")
+        if (alternate) buffer.enterAltBufferWithoutCursorSave(clearBeforeEnter = true)
+        buffer.positionCursor(2, 1)
+        buffer.writeCluster(intArrayOf(0x2764, 0xFE0F))
+        buffer.resize(4, 2, 0, 40, 20)
+        val state = stateOf(buffer)
+        val primaryRing = state.primaryBuffer.ring
+        val alternateRing = state.altBuffer.ring
+        val before = buffer.getAllAsString()
+        val modes = buffer.getModeBitsSnapshot()
+        val frameGeneration = state.frameGeneration
+
+        for (width in intArrayOf(Int.MIN_VALUE, -1, 0, 1)) {
+            assertThrows(IllegalArgumentException::class.java) {
+                if (withPixels) buffer.resize(width, 3, 0, 100, 100) else buffer.resize(width, 3)
+            }
+            assertEquals(4, buffer.width)
+            assertEquals(2, buffer.height)
+            assertEquals(40, state.windowPixelWidth)
+            assertEquals(20, state.windowPixelHeight)
+            assertSame(primaryRing, state.primaryBuffer.ring)
+            assertSame(alternateRing, state.altBuffer.ring)
+            assertEquals(before, buffer.getAllAsString())
+            assertEquals(alternate, buffer.isAlternateScreenActive)
+            assertEquals(modes, buffer.getModeBitsSnapshot())
+            assertEquals(frameGeneration, state.frameGeneration)
+            assertEquals(3, buffer.cursorCol)
+            assertEquals(1, buffer.cursorRow)
+            assertTrue(state.cursor.pendingWrap)
+        }
+    }
+
     @Test
     fun `height changes preserve edited wrap padding and attributes on blank cells`() {
         val buffer = DefaultTerminalBuffer(4, 2, 4)
@@ -64,7 +156,6 @@ class DefaultTerminalBufferResizeTest {
         }
         val state = stateOf(buffer)
         val ring = state.ring
-        val store = state.primaryBuffer.store
         for (height in intArrayOf(7, 3, 8, 1, 6, 4)) {
             val liveRows = (0 until ring.size).map { ring[it] }.filter { it.hasOutput }
             val ids = liveRows.map { it.lineId }
@@ -73,7 +164,6 @@ class DefaultTerminalBufferResizeTest {
             val oldGeneration = state.primaryBuffer.historyContentGeneration
             buffer.resize(8, height)
             assertSame(ring, state.ring)
-            assertSame(store, state.primaryBuffer.store)
             assertEquals(maxHistory + height, ring.capacity)
             assertTrue(buffer.historySize <= maxHistory)
             assertNotEquals(oldGeneration, state.primaryBuffer.historyContentGeneration)
@@ -90,7 +180,7 @@ class DefaultTerminalBufferResizeTest {
         val content = buffer.getAllAsString().trimEnd()
         buffer.resize(10, 4)
         assertEquals(content, buffer.getAllAsString().trimEnd())
-        assertNotSame(store, state.primaryBuffer.store)
+        assertNotSame(ring, state.primaryBuffer.ring)
         buffer.eraseScreenAndHistory()
         buffer.clearAll()
         assertEquals(0, buffer.historySize)

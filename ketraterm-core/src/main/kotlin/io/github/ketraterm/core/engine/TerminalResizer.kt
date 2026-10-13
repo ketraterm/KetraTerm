@@ -15,11 +15,12 @@
  */
 package io.github.ketraterm.core.engine
 
+import io.github.ketraterm.core.TerminalBuffers.MIN_WIDTH
 import io.github.ketraterm.core.buffer.HistoryRing
 import io.github.ketraterm.core.model.Line
 import io.github.ketraterm.core.model.TerminalConstants
 import io.github.ketraterm.core.state.ScreenBuffer
-import io.github.ketraterm.core.store.ClusterStore
+import io.github.ketraterm.protocol.TerminalTextLimits.MAX_CLUSTER_CODEPOINTS
 
 /**
  * Stateless resize engine.
@@ -31,8 +32,8 @@ import io.github.ketraterm.core.store.ClusterStore
  * 3. Select the new live-screen boundary using ConPTY-compatible anchoring.
  * 4. Relocate the cursor and scrollback viewport into the reflowed result.
  *
- * Width changes create a new [ClusterStore] and [HistoryRing], deep-copying surviving
- * clusters. Height-only changes preserve physical rows and their existing arena.
+ * Width changes create a new [HistoryRing], copying surviving payloads between rows.
+ * Height-only changes preserve physical rows and their local storage.
  *
  * Important:
  *
@@ -73,9 +74,9 @@ internal object TerminalResizer {
         oldScrollbackOffset: Int = 0,
         lineIdProvider: () -> Long = ResizeFallbackLineIdProvider(),
     ): Int {
-        require(oldWidth > 0) { "oldWidth must be positive" }
+        require(oldWidth >= MIN_WIDTH) { "oldWidth must be at least $MIN_WIDTH" }
         require(oldHeight > 0) { "oldHeight must be positive" }
-        require(newWidth > 0) { "newWidth must be positive" }
+        require(newWidth >= MIN_WIDTH) { "newWidth must be at least $MIN_WIDTH" }
         require(newHeight > 0) { "newHeight must be positive" }
         require(buffer.maxHistory <= Int.MAX_VALUE - newHeight) { "maxHistory + newHeight exceeds Int.MAX_VALUE" }
         if (newWidth == oldWidth) {
@@ -83,13 +84,12 @@ internal object TerminalResizer {
             return resizeHeight(buffer, oldHeight, newHeight, oldScrollbackOffset, lineIdProvider)
         }
 
-        val newStore = ClusterStore()
         val newRing =
             HistoryRing(buffer.maxHistory + newHeight, newHeight) {
-                Line(newWidth, newStore)
+                Line(newWidth)
             }
 
-        var clusterBuf = IntArray(16)
+        val clusterBuf = IntArray(MAX_CLUSTER_CODEPOINTS)
         val builder = LogicalLineBuilder(initialLogicalLineCapacity(oldWidth))
 
         val oldLiveScreenTop =
@@ -232,7 +232,6 @@ internal object TerminalResizer {
                  */
                 if (
                     chunkLength == newWidth &&
-                    chunkLength > 1 &&
                     offset + chunkLength < builder.size &&
                     builder.codepoints[offset + chunkLength] ==
                     TerminalConstants.WIDE_CHAR_SPACER
@@ -240,8 +239,9 @@ internal object TerminalResizer {
                     chunkLength--
                 }
 
-                newLine.wrapped =
-                    offset + chunkLength < builder.size
+                val nextOffset = offset + chunkLength
+
+                newLine.wrapped = nextOffset < builder.size
 
                 for (i in 0 until chunkLength) {
                     val srcIndex = offset + i
@@ -249,14 +249,12 @@ internal object TerminalResizer {
                     val attr = builder.attrs[srcIndex]
                     val extendedAttr = builder.extendedAttrs[srcIndex]
 
-                    if (raw <= TerminalConstants.CLUSTER_HANDLE_MAX) {
-                        val cpLen = buffer.store.length(raw)
+                    val source = builder.clusterSources[srcIndex]
+                    if (source != null) {
+                        val sourceColumn = builder.clusterColumns[srcIndex]
+                        val cpLen = source.getClusterLength(sourceColumn)
 
-                        if (clusterBuf.size < cpLen) {
-                            clusterBuf = IntArray(cpLen)
-                        }
-
-                        buffer.store.readInto(raw, clusterBuf)
+                        source.readCluster(sourceColumn, clusterBuf)
                         newLine.setCluster(
                             i,
                             clusterBuf,
@@ -265,24 +263,24 @@ internal object TerminalResizer {
                             extendedAttr,
                         )
                     } else {
-                        newLine.setRawCell(
+                        newLine.setCell(
                             i,
                             raw,
                             attr,
                             extendedAttr,
                         )
                     }
+                }
 
-                    if (srcIndex == builder.cursorAbsoluteIndex) {
-                        newAbsoluteCursorRow = newRing.discardedCount + newRing.size - 1
-                        newCursorCol = i
-                        cursorPlaced = true
-                    }
+                if (builder.cursorAbsoluteIndex in offset until nextOffset) {
+                    newAbsoluteCursorRow = newRing.discardedCount + newRing.size - 1
+                    newCursorCol = builder.cursorAbsoluteIndex - offset
+                    cursorPlaced = true
+                }
 
-                    if (srcIndex == builder.viewportTopAbsoluteIndex) {
-                        newViewportTopRow = newRing.discardedCount + newRing.size - 1
-                        viewportTopPlaced = true
-                    }
+                if (builder.viewportTopAbsoluteIndex in offset until nextOffset) {
+                    newViewportTopRow = newRing.discardedCount + newRing.size - 1
+                    viewportTopPlaced = true
                 }
 
                 /*
@@ -291,12 +289,12 @@ internal object TerminalResizer {
                  */
                 if (
                     chunkLength < newWidth &&
-                    offset + chunkLength < builder.size
+                    nextOffset < builder.size
                 ) {
                     newLine.endsWithWrapPadding = true
                 }
 
-                offset += chunkLength
+                offset = nextOffset
             }
 
             builderContainsOldLiveScreenTop = false
@@ -408,7 +406,8 @@ internal object TerminalResizer {
                     hasViewportTop && col == 0
 
                 builder.append(
-                    raw = oldLine.rawCodepoint(col),
+                    source = oldLine,
+                    column = col,
                     attr = oldLine.getPackedAttr(col),
                     extendedAttr = oldLine.getPackedExtendedAttr(col),
                     isCursor = isCursor,
@@ -516,7 +515,6 @@ internal object TerminalResizer {
                     (newHeight - 1).toLong(),
                 ).toInt()
 
-        buffer.store = newStore
         buffer.ring = newRing
         buffer.cursor.col = newCursorCol
         buffer.cursor.row = newRelativeCursorRow
@@ -653,6 +651,10 @@ private class LogicalLineBuilder(
     var extendedAttrs =
         LongArray(initialCapacity.coerceAtLeast(1))
 
+    // Old rows remain immutable throughout reflow. Preserve provenance instead of sharing handles.
+    var clusterSources: Array<Line?> = arrayOfNulls(initialCapacity.coerceAtLeast(1))
+    var clusterColumns = IntArray(initialCapacity.coerceAtLeast(1))
+
     var size = 0
     var cursorAbsoluteIndex = -1
     var viewportTopAbsoluteIndex = -1
@@ -677,7 +679,8 @@ private class LogicalLineBuilder(
     }
 
     fun append(
-        raw: Int,
+        source: Line,
+        column: Int,
         attr: Long,
         extendedAttr: Long,
         isCursor: Boolean,
@@ -693,7 +696,10 @@ private class LogicalLineBuilder(
             viewportTopAbsoluteIndex = size
         }
 
+        val raw = source.rawCodepoint(column)
         codepoints[size] = raw
+        clusterSources[size] = if (source.isCluster(column)) source else null
+        clusterColumns[size] = column
         attrs[size] = attr
         extendedAttrs[size] = extendedAttr
         size++
@@ -701,6 +707,7 @@ private class LogicalLineBuilder(
 
     /** Resets the builder for the next logical line without releasing arrays. */
     fun clear() {
+        clusterSources.fill(null, 0, size)
         size = 0
         cursorAbsoluteIndex = -1
         viewportTopAbsoluteIndex = -1
@@ -713,6 +720,8 @@ private class LogicalLineBuilder(
 
         val newCapacity = TerminalResizer.expandedLogicalLineCapacity(codepoints.size, required)
 
+        clusterSources = clusterSources.copyOf(newCapacity)
+        clusterColumns = clusterColumns.copyOf(newCapacity)
         codepoints = codepoints.copyOf(newCapacity)
         attrs = attrs.copyOf(newCapacity)
         extendedAttrs = extendedAttrs.copyOf(newCapacity)

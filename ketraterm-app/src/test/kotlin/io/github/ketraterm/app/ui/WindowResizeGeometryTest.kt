@@ -101,4 +101,14 @@ class WindowResizeGeometryTest {
         assertNull(geometry.copy(availableWidth = 1087).targetBounds(132, 24, false))
         assertNotNull(geometry.copy(availableWidth = 1088).targetBounds(132, 24, false))
     }
+
+    @Test
+    fun `window resize rejects a one column grid even when its pixels fit`() {
+        val small = geometry.copy(minimumWidth = 1, minimumHeight = 1)
+
+        assertNull(small.targetBounds(1, 1, alternate = false))
+        assertNull(small.targetBounds(1, 1, alternate = true))
+        assertEquals(Rectangle(0, 0, 48, 60), small.targetBounds(2, 1, alternate = false))
+        assertEquals(Rectangle(0, 0, 36, 56), small.targetBounds(2, 1, alternate = true))
+    }
 }

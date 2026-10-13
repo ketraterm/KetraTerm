@@ -71,13 +71,15 @@ and the [changelog](../CHANGELOG.md). Entries here are not release commitments.
 
 ## Accepted limitations
 
+- Terminal grids require at least two columns so wide occupants remain intact.
+  Creation and resize reject smaller widths; pixel-based viewport layout clamps to two columns.
 - Streaming grapheme updates do not roll back published wraps, scrolling,
   overwrites, or insert shifts. Placement can depend on chunk boundaries; see the
   [placement contract](reference/protocol.md#streaming-grapheme-placement)
   and [verification disposition](development/conformance-testing.md#streaming-placement).
 - The streaming parser retains at most 32 codepoints per grapheme; further
   continuations affect segmentation but are not emitted. Direct core cluster
-  storage does not impose this parser limit.
+  calls reject prefixes longer than 32 codepoints before mutation.
 - One session has one viewport. Independently scrolling views of one process
   and standalone reuse of the Swing renderer are outside the current API.
 - Column spacing uses integer logical pixels; fractional cell advances are unavailable.

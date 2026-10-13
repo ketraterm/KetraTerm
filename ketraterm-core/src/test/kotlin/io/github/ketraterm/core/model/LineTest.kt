@@ -15,7 +15,6 @@
  */
 package io.github.ketraterm.core.model
 
-import io.github.ketraterm.core.store.ClusterStore
 import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Nested
@@ -29,13 +28,11 @@ import org.junit.jupiter.params.provider.ValueSource
 class LineTest {
     @ParameterizedTest
     @ValueSource(strings = ["scalar", "clear", "prefix", "suffix", "range", "insert", "delete", "fill"])
-    fun `cluster accounting follows erasure and shifting without leaking or freeing survivors`(operation: String) {
-        val store = store()
-        val line = Line(8, store)
+    fun `erasure and shifting preserve exactly the surviving cluster payloads`(operation: String) {
+        val line = Line(8)
         val payloads = mapOf(0 to intArrayOf('a'.code, 0x0301), 3 to intArrayOf('b'.code, 0x0301), 7 to intArrayOf('c'.code, 0x0301))
         assertEquals(0, clusterCount(line))
         payloads.forEach { (col, cps) -> line.setCluster(col, cps, cps.size, 0L) }
-        val handles = payloads.keys.map { line.rawCodepoint(it) }.toSet()
         assertEquals(3, clusterCount(line))
 
         val survivors =
@@ -87,11 +84,9 @@ class LineTest {
         line.clear(0L)
         assertEquals(0, clusterCount(line))
         assertEquals("", line.toTextTrimmed())
-        val reused = IntArray(3) { store.alloc(intArrayOf('z'.code, 0x0301)) }
-        assertEquals(handles, reused.toSet(), "Every discarded handle must be freed exactly once")
-        line.clear(0L)
-        assertEquals(0, clusterCount(line))
-        reused.forEach { assertEquals('z'.code, store.baseCodepoint(it)) }
+        line.setCluster(4, intArrayOf('z'.code, 0x0301), 2, 0L)
+        assertEquals('z'.code, line.getCodepoint(4))
+        assertEquals(1, clusterCount(line))
     }
 
     @Test
@@ -119,39 +114,40 @@ class LineTest {
     }
 
     @Test
-    fun `raw handle transfers update row accounting without freeing payloads`() {
-        val store = store()
-        val source = Line(4, store)
-        val target = Line(4, store)
-        source.setCluster(0, intArrayOf('a'.code, 0x0301), 2, 0L)
-        val handle = source.rawCodepoint(0)
-        target.setRawCell(3, handle, 0L)
-        source.setRawCell(0, TerminalConstants.EMPTY, 0L)
-        assertEquals(0, clusterCount(source))
-        assertEquals(1, clusterCount(target))
-        target.setRawCell(3, handle, 7L)
-        assertEquals(1, clusterCount(target))
+    fun `copied clusters remain independent of source row clearing`() {
+        val source = Line(4)
+        val target = Line(4)
+        val payload = intArrayOf('a'.code, 0x0301)
+        source.setCluster(0, payload, 2, 0L)
+        val copied = IntArray(2)
+        target.setCluster(3, copied, source.readCluster(0, copied), 7L)
         source.clear(0L)
-        assertEquals('a'.code, target.getCodepoint(3))
-
-        val replacement = store.alloc(intArrayOf('b'.code, 0x0301))
-        target.setRawCell(3, replacement, 0L)
-        store.free(handle) // Raw replacement leaves release of the old handle to the caller.
-        assertEquals(1, clusterCount(target))
-        target.clear(0L)
-        assertEquals(0, clusterCount(target))
-        assertEquals(setOf(handle, replacement), IntArray(2) { store.alloc(intArrayOf(1, 2)) }.toSet())
+        assertEquals(2, target.readCluster(3, copied))
+        assertArrayEquals(payload, copied)
+        assertEquals(7L, target.getPackedAttr(3))
     }
 
-    private fun clusterCount(line: Line): Int {
-        val field = Line::class.java.getDeclaredField("clusterCount")
-        field.isAccessible = true
-        return field.getInt(line)
+    private fun clusterCount(line: Line): Int = (0 until line.width).count { line.isCluster(it) }
+
+    @Test
+    fun `clearing and reusing a row cannot affect another row`() {
+        val line = Line(8)
+        val other = Line(8)
+        val payload = intArrayOf('e'.code, 0x0301)
+        line.setCluster(1, payload, 2, 11L, 13L)
+        other.setCluster(1, payload, 2, 17L, 19L)
+        repeat(2) { line.clear(0L) }
+        line.setCluster(5, intArrayOf('x'.code, 0x0301), 2, 23L, 29L)
+        val copied = IntArray(2)
+        assertEquals(2, other.readCluster(1, copied))
+        assertArrayEquals(payload, copied)
+        assertEquals(17L, other.getPackedAttr(1))
+        assertEquals(19L, other.getPackedExtendedAttr(1))
     }
 
     @ParameterizedTest
     @ValueSource(
-        strings = ["scalar", "raw", "attributes", "cluster", "ascii", "clear", "prefix", "suffix", "range", "insert", "delete", "fill"],
+        strings = ["scalar", "attributes", "cluster", "ascii", "clear", "prefix", "suffix", "range", "insert", "delete", "fill"],
     )
     fun `extended storage is allocated only for nonzero writes and reused after clearing`(operation: String) {
         val line = line(6)
@@ -163,10 +159,6 @@ class LineTest {
                 when (operation) {
                     "scalar" -> {
                         line.setCell(2, 'b'.code, 0L, value)
-                        2..2
-                    }
-                    "raw" -> {
-                        line.setRawCell(2, 'b'.code, 0L, value)
                         2..2
                     }
                     "attributes" -> {
@@ -267,6 +259,44 @@ class LineTest {
         return field.get(line) as LongArray?
     }
 
+    @ParameterizedTest
+    @ValueSource(strings = ["clear", "prefix", "suffix", "range", "ascii", "insert", "delete", "fill"])
+    fun `full zero extended overwrite preserves reusable storage through plain edits and reactivation`(operation: String) {
+        val line = line(6)
+        line.fill('a'.code, 7L, 9L)
+        val storage = extendedStorage(line)
+        when (operation) {
+            "clear" -> line.clear(0L)
+            "prefix" -> line.clearToColumn(5, 0L)
+            "suffix" -> line.clearFromColumn(0, 0L)
+            "range" -> line.clearRange(0, 6, 0L)
+            "ascii" -> assertEquals(6, line.writeAsciiIntoSimpleCells(0, "ABCDEF".toByteArray(), 0, 6, 0L, 0L))
+            "insert" -> line.insertCells(0, 6, 0L)
+            "delete" -> line.deleteCells(0, 6, 0L)
+            "fill" -> line.fill('b'.code, 0L)
+            else -> error(operation)
+        }
+        assertArrayEquals(LongArray(6), LongArray(6) { line.getPackedExtendedAttr(it) })
+
+        line.setCell(0, 'x'.code, 0L)
+        line.setCell(1, 'y'.code, 0L)
+        line.setCellAttributes(2, 0L, 0L)
+        line.setCluster(3, intArrayOf('e'.code, 0x0301), 2, 0L)
+        line.insertCells(0, 1, 0L)
+        line.deleteCells(0, 1, 0L)
+        line.clearRange(4, 6, 0L)
+        assertArrayEquals(LongArray(6), LongArray(6) { line.getPackedExtendedAttr(it) })
+
+        line.setCellAttributes(2, 3L, 11L)
+        assertArrayEquals(longArrayOf(0L, 0L, 11L, 0L, 0L, 0L), LongArray(6) { line.getPackedExtendedAttr(it) })
+        assertSame(storage, extendedStorage(line))
+        assertEquals('e'.code, line.getCodepoint(3))
+        line.clear(0L)
+        line.setCell(5, 'z'.code, 0L, 13L)
+        assertArrayEquals(longArrayOf(0L, 0L, 0L, 0L, 0L, 13L), LongArray(6) { line.getPackedExtendedAttr(it) })
+        assertSame(storage, extendedStorage(line))
+    }
+
     @Test
     fun `ASCII span overwrites narrow scalars and blanks with both attribute words`() {
         val line = line(5)
@@ -295,7 +325,7 @@ class LineTest {
         } else {
             line.setCluster(2, cluster, cluster.size, 1L, 2L)
         }
-        if (occupant != "cluster") line.setRawCell(3, TerminalConstants.WIDE_CHAR_SPACER, 1L, 2L)
+        if (occupant != "cluster") line.setCell(3, TerminalConstants.WIDE_CHAR_SPACER, 1L, 2L)
         val raw = line.rawCodepoint(2)
         val bytes = "XYZ".toByteArray()
 
@@ -327,7 +357,7 @@ class LineTest {
 
         line.setCell(0, 'a'.code, 0)
         line.setCluster(1, intArrayOf('e'.code, 0x0301), 2, 0)
-        line.setRawCell(2, 'c'.code, 0)
+        line.setCell(2, 'c'.code, 0)
         line.clearToColumn(1, 0)
         line.clearRange(1, 3, 0)
         line.insertCellsInRange(0, 1, 2, 0)
@@ -339,14 +369,14 @@ class LineTest {
     }
 
     @ParameterizedTest
-    @ValueSource(strings = ["raw write", "clear prefix", "clear suffix", "clear range", "fill", "clear", "unwrap"])
+    @ValueSource(strings = ["cell write", "clear prefix", "clear suffix", "clear range", "fill", "clear", "unwrap"])
     fun `replacing the final cell or removing its wrap clears padding provenance`(operation: String) {
         val line = line(4)
         line.wrapped = true
         line.endsWithWrapPadding = true
 
         when (operation) {
-            "raw write" -> line.setRawCell(3, 'x'.code, 0)
+            "cell write" -> line.setCell(3, 'x'.code, 0)
             "clear prefix" -> line.clearToColumn(3, 0)
             "clear suffix" -> line.clearFromColumn(3, 0)
             "clear range" -> line.clearRange(2, 4, 0)
@@ -358,14 +388,7 @@ class LineTest {
         assertFalse(line.endsWithWrapPadding)
     }
 
-    // Every test gets a fresh store. Lines within the same test share one store
-    // to reflect the real ownership model (all lines in a ring share one store).
-    private fun store() = ClusterStore()
-
-    private fun line(
-        width: Int,
-        store: ClusterStore = store(),
-    ) = Line(width, store)
+    private fun line(width: Int) = Line(width)
 
     // =========================================================================
     // Initialization
@@ -421,21 +444,15 @@ class LineTest {
         }
 
         @Test
-        fun `setCell on a cluster cell frees the old handle`() {
-            val store = store()
-            val l = Line(5, store)
+        fun `scalar overwrite replaces the cluster without changing neighboring cells`() {
+            val l = Line(5)
             l.setCluster(2, intArrayOf(0x1F468, 0x200D, 0x1F469), 3, 0)
-            assertTrue(l.isCluster(2))
-
-            // Overwrite with plain cell — cluster handle must be freed
             l.setCell(2, 'X'.code, 0)
-
             assertFalse(l.isCluster(2))
             assertEquals('X'.code, l.getCodepoint(2))
-
-            // The freed slot must be reused by the next alloc
-            val handle = store.alloc(intArrayOf(99))
-            assertEquals(-2, handle, "Freed cluster slot must be reused")
+            l.setCluster(3, intArrayOf(99, 100), 2, 0)
+            assertEquals(99, l.getCodepoint(3))
+            assertEquals('X'.code, l.getCodepoint(2))
         }
     }
 
@@ -508,9 +525,8 @@ class LineTest {
         }
 
         @Test
-        fun `overwriting cluster with cluster frees old handle before allocating new`() {
-            val store = store()
-            val l = Line(5, store)
+        fun `growing a cluster preserves its replacement and neighboring payloads`() {
+            val l = Line(5)
 
             l.setCluster(0, intArrayOf(0xAAAA, 0xBBBB), 2, 0)
             val firstHandle = l.rawCodepoint(0)
@@ -521,9 +537,8 @@ class LineTest {
 
             // The larger replacement needs a different region.
             val secondHandle = l.rawCodepoint(0)
-            assertNotEquals(firstHandle, secondHandle, "The smaller region must remain available")
+            assertNotEquals(firstHandle, secondHandle, "Length is encoded in the row reference")
             l.setCluster(1, intArrayOf(0x1111, 0x2222), 2, 0)
-            assertEquals(firstHandle, l.rawCodepoint(1), "Overwrite must free the old region for reuse")
 
             // New data must be visible
             val dest = IntArray(4)
@@ -559,16 +574,15 @@ class LineTest {
     }
 
     // =========================================================================
-    // rawCodepoint / setRawCell — internal accessors used by TerminalResizer
+    // rawCodepoint / setCell — internal accessors used by TerminalResizer
     // =========================================================================
 
     @Nested
-    @DisplayName("rawCodepoint / setRawCell (internal reflow contract)")
+    @DisplayName("rawCodepoint / setCell (internal reflow contract)")
     inner class RawAccessorTests {
         @Test
         fun `rawCodepoint returns stored Int without resolving cluster handle`() {
-            val store = store()
-            val l = Line(5, store)
+            val l = Line(5)
             l.setCluster(0, intArrayOf(0x1F468, 0x200D), 2, 0)
 
             val raw = l.rawCodepoint(0)
@@ -579,33 +593,23 @@ class LineTest {
         }
 
         @Test
-        fun `setRawCell transplants a handle without double-allocating`() {
-            val store = store()
-            val src = Line(5, store)
-            src.setCluster(0, intArrayOf(0x1F469, 0x200D, 0x1F680), 3, 7)
-
-            val raw = src.rawCodepoint(0)
-            val attr = src.getPackedAttr(0)
-
-            val dst = Line(5, store)
-            dst.setRawCell(0, raw, attr)
-
-            // dst must resolve the same cluster data via the shared store
-            val dest = IntArray(4)
-            val written = dst.readCluster(0, dest)
-            assertAll(
-                { assertEquals(3, written) },
-                { assertEquals(0x1F469, dest[0]) },
-                { assertEquals(0x200D, dest[1]) },
-                { assertEquals(0x1F680, dest[2]) },
-                { assertEquals(7L, dst.getPackedAttr(0)) },
-            )
+        fun `payload copies remain independent after source overwrite`() {
+            val src = Line(5)
+            val dst = Line(5)
+            val expected = intArrayOf(0x1F469, 0x200D, 0x1F680)
+            src.setCluster(0, expected, 3, 7)
+            val scratch = IntArray(32)
+            dst.setCluster(0, scratch, src.readCluster(0, scratch), src.getPackedAttr(0))
+            src.setCluster(0, intArrayOf('x'.code, 0x0301), 2, 0)
+            assertEquals(3, dst.readCluster(0, scratch))
+            assertArrayEquals(expected, scratch.copyOf(3))
+            assertEquals(7L, dst.getPackedAttr(0))
         }
 
         @Test
-        fun `setRawCell with plain codepoint works identically to setCell`() {
+        fun `plain cell writes preserve attributes without a cluster reference`() {
             val l = line(5)
-            l.setRawCell(3, 'Z'.code, 55)
+            l.setCell(3, 'Z'.code, 55)
 
             assertAll(
                 { assertEquals('Z'.code, l.getCodepoint(3)) },
@@ -623,22 +627,15 @@ class LineTest {
     @DisplayName("clear()")
     inner class ClearTests {
         @Test
-        fun `clear frees all cluster handles so store slots are reused`() {
-            val store = store()
-            val l = Line(3, store)
+        fun `clear resets all cluster cells for reuse`() {
+            val l = Line(3)
             l.setCluster(0, intArrayOf(0xAAAA, 0xBBBB), 2, 0)
             l.setCluster(1, intArrayOf(0xCCCC), 1, 0)
-
             l.clear(0)
-
-            // Both slots freed — next two allocs must reuse them
-            val h1 = store.alloc(intArrayOf(1))
-            val h2 = store.alloc(intArrayOf(2))
-            // Freelist is LIFO: slot 1 freed last → reused first
-            assertAll(
-                { assertEquals(-3, h1, "First freed-slot reuse") },
-                { assertEquals(-2, h2, "Second freed-slot reuse") },
-            )
+            assertEquals("", l.toTextTrimmed())
+            assertEquals(0, clusterCount(l))
+            l.setCluster(2, intArrayOf(1, 2), 2, 0)
+            assertEquals(1, l.getCodepoint(2))
         }
     }
 
@@ -695,15 +692,14 @@ class LineTest {
         }
 
         @Test
-        fun `frees cluster handles in the cleared range`() {
-            val store = store()
-            val l = Line(5, store)
+        fun `removes cluster cells in the cleared range`() {
+            val l = Line(5)
             l.setCluster(3, intArrayOf(0x1F600, 0x200D), 2, 0)
 
             l.clearFromColumn(3, 0)
 
-            val h = store.alloc(intArrayOf(1))
-            assertEquals(-2, h, "Cluster handle in cleared range must be freed")
+            assertEquals(0, clusterCount(l))
+            assertEquals("", l.toTextTrimmed())
         }
     }
 
@@ -760,15 +756,14 @@ class LineTest {
         }
 
         @Test
-        fun `frees cluster handles in the cleared range`() {
-            val store = store()
-            val l = Line(5, store)
+        fun `removes cluster cells in the cleared range`() {
+            val l = Line(5)
             l.setCluster(1, intArrayOf(0x1F600, 0x200D), 2, 0)
 
             l.clearToColumn(2, 0)
 
-            val h = store.alloc(intArrayOf(1))
-            assertEquals(-2, h, "Cluster handle in cleared range must be freed")
+            assertEquals(0, clusterCount(l))
+            assertEquals("", l.toTextTrimmed())
         }
     }
 
@@ -800,21 +795,13 @@ class LineTest {
         }
 
         @Test
-        fun `fill frees all cluster handles before overwriting`() {
-            val store = store()
-            val l = Line(4, store)
+        fun `fill removes all cluster cells`() {
+            val l = Line(4)
             l.setCluster(0, intArrayOf(0xAAAA, 0xBBBB), 2, 0)
             l.setCluster(2, intArrayOf(0xCCCC), 1, 0)
-
             l.fill('Z'.code, 0)
-
-            val h1 = store.alloc(intArrayOf(1))
-            val h2 = store.alloc(intArrayOf(2))
-            // Both cluster slots freed; new allocs reuse them
-            assertAll(
-                { assertEquals(-3, h1) },
-                { assertEquals(-2, h2) },
-            )
+            assertEquals("ZZZZ", l.toText())
+            assertEquals(0, clusterCount(l))
         }
     }
 
@@ -846,16 +833,15 @@ class LineTest {
         }
 
         @Test
-        fun `cells pushed off the right edge are freed if they are cluster handles`() {
-            val store = store()
-            val l = Line(3, store)
+        fun `insertion discards clusters pushed off the right edge`() {
+            val l = Line(3)
             l.setCluster(2, intArrayOf(0x1F600, 0x200D), 2, 0) // will fall off on insert at 0
 
             l.insertCells(col = 0, count = 1, defaultAttr = 0)
 
             // Cluster at col 2 was shifted off and freed
-            val h = store.alloc(intArrayOf(99))
-            assertEquals(-2, h, "Cluster shifted off the edge must be freed")
+            assertEquals(0, clusterCount(l))
+            assertEquals("", l.toTextTrimmed())
         }
 
         @Test
@@ -1022,30 +1008,26 @@ class LineTest {
         }
 
         @Test
-        fun `cluster handle in deleted range is freed`() {
-            val store = store()
-            val l = Line(5, store)
+        fun `deletion removes the cluster in its range`() {
+            val l = Line(5)
             l.setCell(0, 'A'.code, 0)
-            l.setCluster(1, intArrayOf(0x1F600, 0x200D), 2, 0) // handle -2
+            l.setCluster(1, intArrayOf(0x1F600, 0x200D), 2, 0)
 
             l.deleteCells(col = 1, count = 1, defaultAttr = 0)
 
-            val reused = store.alloc(intArrayOf(1234))
-            assertEquals(-2, reused, "Deleted cluster handle must be returned to free list")
+            assertEquals(0, clusterCount(l))
+            assertEquals("A", l.toTextTrimmed())
         }
 
         @Test
         fun `shifted cluster handle remains live after delete`() {
-            val store = store()
-            val l = Line(5, store)
-            l.setCluster(1, intArrayOf(0xAAAA), 1, 0) // handle -2 (to be deleted)
-            l.setCluster(3, intArrayOf(0xBBBB, 0x200D), 2, 0) // handle -3 (should shift left)
+            val l = Line(5)
+            l.setCluster(1, intArrayOf(0xAAAA), 1, 0) // Deleted occupant.
+            l.setCluster(3, intArrayOf(0xBBBB, 0x200D), 2, 0) // Surviving occupant shifts left.
 
             l.deleteCells(col = 1, count = 1, defaultAttr = 0)
 
-            // Deleted handle is reusable.
-            val first = store.alloc(intArrayOf(1))
-            assertEquals(-2, first)
+            assertEquals(1, clusterCount(l))
 
             // Shifted handle remains readable at its new column.
             val shiftedCol = 2

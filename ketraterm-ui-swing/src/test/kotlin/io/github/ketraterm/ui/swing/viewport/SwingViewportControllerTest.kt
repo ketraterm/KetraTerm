@@ -147,19 +147,27 @@ class SwingViewportControllerTest {
         }
 
         @Test
-        fun `visible grid size clamps tiny components to one cell`() {
+        fun `visible grid size clamps tiny components to two columns and one row`() {
             val controller = SwingViewportController(TerminalViewportListener.NONE) { _, _ -> }
+            assertEquals(2, controller.visibleGridSizeSnapshot().width)
+            assertEquals(1, controller.visibleGridSizeSnapshot().height)
 
-            val size =
-                controller.visibleGridSizeOnEdt(
-                    settings = settings,
-                    metrics = metrics,
-                    componentWidth = 1,
-                    componentHeight = 1,
-                )
-
-            assertEquals(1, size.width)
-            assertEquals(1, size.height)
+            for (activeBuffer in listOf(TerminalRenderBufferKind.PRIMARY, TerminalRenderBufferKind.ALTERNATE)) {
+                for (componentWidth in 0..36) {
+                    val size =
+                        controller.visibleGridSizeOnEdt(
+                            settings = settings,
+                            metrics = metrics,
+                            componentWidth = componentWidth,
+                            componentHeight = 1,
+                            activeBuffer = activeBuffer,
+                        )
+                    assertEquals(2, size.width, "componentWidth=$componentWidth activeBuffer=$activeBuffer")
+                    assertEquals(1, size.height)
+                    assertEquals(size, controller.visibleGridSizeSnapshot())
+                }
+                assertEquals(3, controller.visibleGridSizeOnEdt(settings, metrics, 46, 1, activeBuffer).width)
+            }
         }
     }
 

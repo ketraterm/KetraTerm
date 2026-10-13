@@ -15,23 +15,17 @@
  */
 package io.github.ketraterm.core.state
 
+import io.github.ketraterm.core.TerminalBuffers.MIN_WIDTH
 import io.github.ketraterm.core.buffer.HistoryRing
 import io.github.ketraterm.core.model.Cursor
 import io.github.ketraterm.core.model.Line
 import io.github.ketraterm.core.model.SavedCursorState
-import io.github.ketraterm.core.store.ClusterStore
 
 /**
  * Represents a single cohesive terminal screen (primary or alternate).
  *
- * Each [ScreenBuffer] owns its entire memory arena: the ring, the cluster
- * store, the cursor, the DECSC save slot, and the active scroll margins.
- *
- * Memory ownership:
- * [store] and [ring] are always co-owned. Every [Line] in the ring holds a
- * reference to [store]. A new store requires rows bound to that store.
- * Height-only resize reuses the arena through [resizeRows]; [replaceStorage]
- * replaces both storage components when row width changes or content is reset.
+ * Owns its row ring, cursor, DECSC save slot, and active scroll margins.
+ * Each row owns its own cluster payloads and can be retained or discarded independently.
  *
  * Resize lifecycle:
  * - `TerminalResizer` retains primary rows for height changes and reflows width changes
@@ -44,10 +38,11 @@ internal class ScreenBuffer(
     val maxHistory: Int,
     private val lineIdProvider: () -> Long = LocalLineIdProvider(),
 ) {
-    var store = ClusterStore()
-        internal set
+    init {
+        require(initialWidth >= MIN_WIDTH) { "Terminal width must be at least $MIN_WIDTH, got $initialWidth" }
+    }
 
-    var ring = store.let { arena -> HistoryRing(maxHistory + initialHeight, initialHeight) { Line(initialWidth, arena) } }
+    var ring = HistoryRing(maxHistory + initialHeight, initialHeight) { Line(initialWidth) }
         internal set(value) {
             if (field !== value) historyContentGeneration++
             field = value
@@ -147,14 +142,7 @@ internal class ScreenBuffer(
         savedCursor.pendingWrap = savedCursor.pendingWrap && savedCursor.col == newWidth - 1
     }
 
-    /**
-     * Clears every currently live line to release cluster handles, then rebuilds
-     * the visible viewport as blank lines while reusing the existing ring and store.
-     *
-     * This is the safe history-destroying path when the arena pair stays in
-     * place: every live line must be cleared before logical reachability is
-     * dropped, otherwise cluster payloads can leak in the shared [store].
-     */
+    /** Rebuilds the visible viewport, retaining spare row storage for initialization on reuse. */
     fun clearGrid(
         penAttr: Long,
         viewportHeight: Int,
@@ -167,56 +155,37 @@ internal class ScreenBuffer(
         penExtendedAttr: Long,
         viewportHeight: Int,
     ) {
-        for (i in 0 until ring.size) {
-            ring[i].clear(penAttr, penExtendedAttr)
-        }
         ring.clear()
         historyContentGeneration++
         repeat(viewportHeight) { clearLineAsNew(ring.push(), penAttr, penExtendedAttr) }
     }
 
-    /**
-     * Clears history while preserving the visible rows and reusing all allocated
-     * row and cluster storage. Freed cluster slots remain available for future output.
-     */
+    /** Keeps visible rows; discarded rows retain their local storage until reuse or collection. */
     fun clearHistory(viewportHeight: Int) {
         val visibleRows = minOf(viewportHeight, ring.size)
-        for (i in 0 until ring.size - visibleRows) {
-            ring[i].clear(0L, 0L)
-        }
         ring.retainLast(visibleRows)
         historyContentGeneration++
     }
 
-    /** Retains a physical row range for a height resize, releasing only discarded content. */
+    /** Retains a physical row range for a height resize, reusing available spare rows. */
     fun resizeRows(
         newHeight: Int,
         fromLogical: Int,
         untilLogical: Int,
     ) {
-        for (index in 0 until fromLogical) ring[index].clear(0L, 0L)
-        for (index in untilLogical until ring.size) ring[index].clear(0L, 0L)
         ring.resizeCapacity(maxHistory + newHeight, fromLogical, untilLogical)
         historyContentGeneration++
     }
 
-    /**
-     * Replaces the entire memory arena with a fresh store and ring sized to
-     * [newWidth] x [newHeight], then fills the new ring with blank lines.
-     *
-     * This is the only safe way to swap [ring] and [store]; callers must never
-     * replace them independently because every [Line] in the ring closes over
-     * the active store instance.
-     */
+    /** Replaces the ring with blank rows of the new dimensions. Old rows own their reclamation. */
     fun replaceStorage(
         newWidth: Int,
         newHeight: Int,
         penAttr: Long,
         penExtendedAttr: Long = 0L,
     ) {
-        val newStore = ClusterStore()
-        store = newStore
-        ring = HistoryRing(maxHistory + newHeight, newHeight) { Line(newWidth, newStore) }
+        require(newWidth >= MIN_WIDTH) { "Terminal width must be at least $MIN_WIDTH, got $newWidth" }
+        ring = HistoryRing(maxHistory + newHeight, newHeight) { Line(newWidth) }
         repeat(newHeight) { clearLineAsNew(ring.push(), penAttr, penExtendedAttr) }
         scrollTop = 0
         scrollBottom = newHeight - 1

@@ -145,20 +145,18 @@ class ScreenBufferTest {
     }
 
     @Test
-    fun `clearGrid reuses ring and store and fills viewport with blank lines`() {
+    fun `clearGrid reuses ring and row storage and fills viewport with blank lines`() {
         val buffer = newBuffer(width = 8, height = 3, maxHistory = 2)
         buffer.clearGrid(penAttr = 11, viewportHeight = 3)
         buffer.ring[0].setCell(0, 'A'.code, 11)
         repeat(2) { buffer.ring.push().clear(11) }
 
         val ringBefore = buffer.ring
-        val storeBefore = buffer.store
 
         buffer.clearGrid(penAttr = 37, viewportHeight = 3)
 
         assertAll(
             { assertSame(ringBefore, buffer.ring) },
-            { assertSame(storeBefore, buffer.store) },
             { assertEquals(3, buffer.ring.size) },
             { assertEquals("", buffer.ring[0].toTextTrimmed()) },
             { assertEquals("", buffer.ring[1].toTextTrimmed()) },
@@ -166,9 +164,6 @@ class ScreenBufferTest {
             { assertEquals(37L, buffer.ring[0].getPackedAttr(0)) },
             { assertEquals(37L, buffer.ring[1].getPackedAttr(0)) },
             { assertEquals(37L, buffer.ring[2].getPackedAttr(0)) },
-            { assertSame(storeBefore, buffer.ring[0].store) },
-            { assertSame(storeBefore, buffer.ring[1].store) },
-            { assertSame(storeBefore, buffer.ring[2].store) },
         )
     }
 
@@ -178,19 +173,17 @@ class ScreenBufferTest {
         buffer.clearGrid(penAttr = 19, viewportHeight = 3)
 
         val ringBefore = buffer.ring
-        val storeBefore = buffer.store
 
         buffer.clearGrid(penAttr = 23, viewportHeight = 0)
 
         assertAll(
             { assertSame(ringBefore, buffer.ring) },
-            { assertSame(storeBefore, buffer.store) },
             { assertEquals(0, buffer.ring.size) },
         )
     }
 
     @Test
-    fun `replaceStorage swaps ring and store, clamps cursor bounds, and rebuilds blank arena`() {
+    fun `replaceStorage replaces row storage, clamps cursor bounds, and rebuilds blank arena`() {
         val buffer = newBuffer(width = 8, height = 3, maxHistory = 2)
         buffer.clearGrid(penAttr = 5, viewportHeight = 3)
         buffer.ring[0].setCell(0, 'X'.code, 5)
@@ -206,13 +199,11 @@ class ScreenBufferTest {
         buffer.savedCursor.isSaved = true
 
         val ringBefore = buffer.ring
-        val storeBefore = buffer.store
 
         buffer.replaceStorage(newWidth = 12, newHeight = 5, penAttr = 29)
 
         assertAll(
             { assertNotSame(ringBefore, buffer.ring) },
-            { assertNotSame(storeBefore, buffer.store) },
             { assertEquals(7, buffer.ring.capacity) },
             { assertEquals(5, buffer.ring.size) },
             { assertEquals(0, buffer.scrollTop) },
@@ -223,8 +214,6 @@ class ScreenBufferTest {
             { assertEquals("", buffer.ring[4].toTextTrimmed()) },
             { assertEquals(29L, buffer.ring[0].getPackedAttr(0)) },
             { assertEquals(29L, buffer.ring[4].getPackedAttr(0)) },
-            { assertSame(buffer.store, buffer.ring[0].store) },
-            { assertSame(buffer.store, buffer.ring[4].store) },
             // Cursor is preserved because it is within new bounds
             { assertEquals(2, buffer.cursor.col) },
             { assertEquals(1, buffer.cursor.row) },
@@ -244,12 +233,12 @@ class ScreenBufferTest {
     fun `replaceStorage handles minimal alternate style configuration`() {
         val buffer = newBuffer(width = 4, height = 2, maxHistory = 0)
 
-        buffer.replaceStorage(newWidth = 1, newHeight = 1, penAttr = 41)
+        buffer.replaceStorage(newWidth = 2, newHeight = 1, penAttr = 41)
 
         assertAll(
             { assertEquals(1, buffer.ring.capacity) },
             { assertEquals(1, buffer.ring.size) },
-            { assertEquals(1, buffer.ring[0].width) },
+            { assertEquals(2, buffer.ring[0].width) },
             { assertEquals(0, buffer.scrollTop) },
             { assertEquals(0, buffer.scrollBottom) },
             { assertTrue(buffer.isFullViewportScroll(1)) },

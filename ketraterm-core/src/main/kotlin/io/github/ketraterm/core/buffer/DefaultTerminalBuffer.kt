@@ -15,6 +15,7 @@
  */
 package io.github.ketraterm.core.buffer
 
+import io.github.ketraterm.core.TerminalBuffers.MIN_WIDTH
 import io.github.ketraterm.core.api.*
 import io.github.ketraterm.core.buffer.impl.*
 import io.github.ketraterm.core.engine.CursorEngine
@@ -110,7 +111,7 @@ internal class DefaultTerminalBuffer private constructor(
         pixelWidth: Int,
         pixelHeight: Int,
     ): Pair<Int, Int> {
-        require(newWidth > 0) { "newWidth must be > 0, was $newWidth" }
+        require(newWidth >= MIN_WIDTH) { "newWidth must be at least $MIN_WIDTH, was $newWidth" }
         require(newHeight > 0) { "newHeight must be > 0, was $newHeight" }
         require(pixelWidth >= 0) { "pixelWidth must be >= 0, was $pixelWidth" }
         require(pixelHeight >= 0) { "pixelHeight must be >= 0, was $pixelHeight" }
@@ -152,6 +153,7 @@ internal class DefaultTerminalBuffer private constructor(
         state.altBuffer.resetLeftRightMargins(newWidth)
         state.primaryBuffer.clampSavedCursorToBounds(newWidth, newHeight)
         state.altBuffer.clampSavedCursorToBounds(newWidth, newHeight)
+        state.primaryBuffer.cursor.pendingWrap = false
         state.cancelPendingWrap()
         for (row in 0 until newHeight) {
             state.markLineChanged(state.ring[state.resolveRingIndex(row)])

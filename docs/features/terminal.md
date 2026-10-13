@@ -15,7 +15,7 @@ headless and Swing hosts. Host actions and replies remain subject to session pol
 | Rectangular operations | Erase, selective erase, fill, copy, attribute changes/reversal, and base VT420 checksum. Copy/checksum use the active page only. |
 | Alternate screen | Modes 47/1047/1049, screen-local saved cursor state, and primary scrollback preservation. |
 | Scrollback | Bounded history, incremental storage allocation, and logical-line resize reflow. |
-| Grid width | 80/132-column switching through DECCOLM. |
+| Grid width | Minimum two columns, with 80/132-column switching through DECCOLM. |
 | Resets | Hard reset, soft reset, screen/history erase, and DEC alignment test. |
 | Synchronized output | Mode 2026 delays frame publication until completion or timeout. |
 | Character sets | ASCII and DEC Special Graphics, G0–G3 designation, locking and single shifts. |
@@ -23,7 +23,8 @@ headless and Swing hosts. Host actions and replies remain subject to session pol
 | Stream handling | Incremental decoding across byte chunks, malformed UTF-8 recovery, and bounded CSI/OSC/DCS collection with cancellation and overflow recovery. |
 | Width policy | Pinned Unicode width tables, configurable ambiguous width, and base-specific VS15/VS16 cell allocation; unsupported presentation bases retain their ordinary width. See the [core contract](../../ketraterm-core/docs/terminal-core-contract.md#unicode-scalar-and-width-policy). |
 
-Streaming graphemes retain up to 32 codepoints. Later width changes update the
+Streaming graphemes retain up to 32 codepoints; direct core cluster writes reject
+longer prefixes before mutation. Later width changes update the
 published cell without undoing committed wraps, scrolling, or overwrites, so
 placement can depend on input chunk boundaries. See the
 [streaming contract](../reference/protocol.md#streaming-grapheme-placement).

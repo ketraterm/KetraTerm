@@ -63,7 +63,7 @@ class TerminalWriterUnicodeTest {
     }
 
     @ParameterizedTest
-    @CsvSource("1,false", "4,false", "6,true")
+    @CsvSource("2,false", "4,false", "6,true")
     fun `rejected printable writes clear the continuation target`(
         width: Int,
         horizontalMargins: Boolean,
@@ -161,10 +161,10 @@ class TerminalWriterUnicodeTest {
     }
 
     @Test
-    fun `full prefix updates preserve clusters beyond the parser retention limit`() {
+    fun `full prefix updates preserve clusters through the supported limit`() {
         val buffer = TerminalBuffers.create(width = 6, height = 2)
         buffer.writeCodepoint('a'.code)
-        val expected = IntArray(129) { if (it == 0) 'a'.code else 0x0301 }
+        val expected = IntArray(32) { if (it == 0) 'a'.code else 0x0301 }
         val actual = IntArray(expected.size)
         for (length in 2..expected.size) {
             buffer.updatePreviousCluster(expected, length)

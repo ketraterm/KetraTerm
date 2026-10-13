@@ -16,6 +16,7 @@
 package io.github.ketraterm.parser.runtime
 
 import io.github.ketraterm.parser.ansi.AnsiState
+import io.github.ketraterm.protocol.TerminalTextLimits.MAX_CLUSTER_CODEPOINTS
 import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Nested
@@ -122,7 +123,7 @@ class ParserStateTest {
 
     private fun assertRejectsConstruction(
         maxParams: Int = ParserState.DEFAULT_MAX_PARAMS,
-        maxCluster: Int = ParserState.DEFAULT_MAX_CLUSTER_CODEPOINTS,
+        maxCluster: Int = MAX_CLUSTER_CODEPOINTS,
         maxPayload: Int = ParserState.DEFAULT_MAX_PAYLOAD_BYTES,
         expectedMessage: String,
     ) {
@@ -145,7 +146,7 @@ class ParserStateTest {
             assertAll(
                 { assertEquals(AnsiState.GROUND, state.fsmState) },
                 { assertEquals(ParserState.DEFAULT_MAX_PARAMS, state.params.size) },
-                { assertEquals(ParserState.DEFAULT_MAX_CLUSTER_CODEPOINTS, state.clusterBuffer.size) },
+                { assertEquals(MAX_CLUSTER_CODEPOINTS, state.clusterBuffer.size) },
                 { assertEquals(ParserState.DEFAULT_MAX_PAYLOAD_BYTES, state.payloadBuffer.size) },
                 { assertDefaultSequenceState(state) },
                 { assertDefaultClusterState(state) },
@@ -211,20 +212,26 @@ class ParserStateTest {
             assertAll(
                 {
                     assertRejectsConstruction(
+                        maxCluster = 33,
+                        expectedMessage = "maxCluster must be in 1..32, got 33",
+                    )
+                },
+                {
+                    assertRejectsConstruction(
                         maxCluster = 0,
-                        expectedMessage = "maxCluster must be positive, got 0",
+                        expectedMessage = "maxCluster must be in 1..32, got 0",
                     )
                 },
                 {
                     assertRejectsConstruction(
                         maxCluster = -1,
-                        expectedMessage = "maxCluster must be positive, got -1",
+                        expectedMessage = "maxCluster must be in 1..32, got -1",
                     )
                 },
                 {
                     assertRejectsConstruction(
                         maxCluster = Int.MIN_VALUE,
-                        expectedMessage = "maxCluster must be positive, got ${Int.MIN_VALUE}",
+                        expectedMessage = "maxCluster must be in 1..32, got ${Int.MIN_VALUE}",
                     )
                 },
             )

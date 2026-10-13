@@ -25,7 +25,7 @@ and reflow. The facade coordinates resize, RIS, and DECSTR across both buffers.
 
 `TerminalState` holds shared modes, pen, palette, response queue, and generation
 counters, and selects the active `ScreenBuffer`. Each screen owns its cursor,
-margins, saved cursor, Kitty keyboard stack, `HistoryRing`, and `ClusterStore`.
+margins, saved cursor, Kitty keyboard stack, `HistoryRing`, and self-contained rows with lazy cluster payload storage.
 Rows hold primitive cell arrays and handles into their own screen's cluster
 store. The alternate screen has no history.
 

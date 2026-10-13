@@ -81,7 +81,8 @@ profile. Discovery and path validation are launch-time work.
 
 `TerminalWorkspaceOpenOptions` configures dimensions, history, shell hooks,
 input policy, and host capabilities for new sessions. Use `create`, `copy`, or
-`builder` to obtain an immutable snapshot.
+`builder` to obtain an immutable snapshot. Construction requires at least
+`TerminalBuffers.MIN_WIDTH` (2) columns and one row, before any session is created.
 
 `applySettings(palette, treatAmbiguousAsWide)` changes the palette and width policy
 for future writes in open sessions. Other launch options describe new sessions.

@@ -21,6 +21,7 @@ import io.github.ketraterm.core.model.Line
 import io.github.ketraterm.core.model.TerminalConstants
 import io.github.ketraterm.core.state.TerminalState
 import io.github.ketraterm.protocol.DecRectangleAttribute
+import io.github.ketraterm.protocol.TerminalTextLimits.MAX_CLUSTER_CODEPOINTS
 
 /**
  * Dedicated mutation engine for grid writes and line-level erase/edit operations.
@@ -51,7 +52,7 @@ internal class MutationEngine(
     private val rightMargin: Int get() = state.effectiveRightMargin
     private val blankAttr: Long get() = state.pen.blankAttr
     private val blankExtendedAttr: Long get() = state.pen.blankExtendedAttr
-    private var clusterCopyScratch = IntArray(16)
+    private val clusterCopyScratch = IntArray(MAX_CLUSTER_CODEPOINTS)
 
     // Reused by DECCRA. Rectangular copies are unusual but must not allocate per command.
     private var rectangleCodepoints = IntArray(0)
@@ -254,7 +255,7 @@ internal class MutationEngine(
      *
      * This helper is intentionally used only for rectangular LR-margin edits.
      * It preserves cluster ownership correctly by copying cluster payloads into
-     * fresh slots before the source cells are later cleared or overwritten.
+     * destination storage before source cells are cleared or overwritten.
      */
     private fun copySlice(
         src: Line,
@@ -287,9 +288,8 @@ internal class MutationEngine(
             }
 
             if (raw <= TerminalConstants.CLUSTER_HANDLE_MAX) {
-                val cpLen = src.store.length(raw)
-                ensureClusterCopyCapacity(cpLen)
-                src.store.readInto(raw, clusterCopyScratch, 0)
+                val cpLen = src.getClusterLength(col)
+                src.readCluster(col, clusterCopyScratch)
                 dest.setCluster(col, clusterCopyScratch, cpLen, attr, extendedAttr)
             } else {
                 dest.setCell(col, raw, attr, extendedAttr)
@@ -347,15 +347,6 @@ internal class MutationEngine(
         } else {
             start + 1
         }
-    }
-
-    private fun ensureClusterCopyCapacity(required: Int) {
-        if (clusterCopyScratch.size >= required) return
-        var nextSize = clusterCopyScratch.size
-        while (nextSize < required) {
-            nextSize *= 2
-        }
-        clusterCopyScratch = IntArray(nextSize)
     }
 
     private fun isProtectedOccupant(
@@ -495,8 +486,16 @@ internal class MutationEngine(
             state.markLineChanged(line)
         }
 
-        annihilateAt(cRow, cCol, state.pen.currentAttr, state.pen.currentExtendedAttr)
-        if (widthInCells == 2 && cCol + 1 <= rightMargin) {
+        // Keep the target leader until writeCell replaces it, allowing row-local payload reuse.
+        // Only occupants crossing the new span need separate cleanup.
+        if (line.rawCodepoint(cCol) == TerminalConstants.WIDE_CHAR_SPACER) {
+            annihilateAt(cRow, cCol, state.pen.currentAttr, state.pen.currentExtendedAttr)
+        }
+        if (cCol + 1 < width && line.rawCodepoint(cCol + 1) == TerminalConstants.WIDE_CHAR_SPACER) {
+            if (widthInCells == 1) {
+                line.setCell(cCol + 1, TerminalConstants.EMPTY, state.pen.currentAttr, state.pen.currentExtendedAttr)
+            }
+        } else if (widthInCells == 2 && cCol + 1 <= rightMargin) {
             annihilateAt(cRow, cCol + 1, state.pen.currentAttr, state.pen.currentExtendedAttr)
         }
 
@@ -1321,7 +1320,6 @@ internal class MutationEngine(
                     val extendedAttr = rectangleExtendedAttrs[index]
                     val clusterLength = rectangleClusterLengths[index]
                     if (clusterLength != 0) {
-                        ensureClusterCopyCapacity(clusterLength)
                         rectangleClusterData.copyInto(
                             clusterCopyScratch,
                             destinationOffset = 0,
@@ -1524,9 +1522,9 @@ internal class MutationEngine(
                 rectangleAttrs[index] = line.getPackedAttr(sourceCol)
                 rectangleExtendedAttrs[index] = line.getPackedExtendedAttr(sourceCol)
                 if (raw <= TerminalConstants.CLUSTER_HANDLE_MAX) {
-                    val clusterLength = line.store.length(raw)
+                    val clusterLength = line.getClusterLength(sourceCol)
                     ensureRectangleClusterDataCapacity(clusterDataSize + clusterLength)
-                    line.store.readInto(raw, rectangleClusterData, clusterDataSize)
+                    line.readCluster(sourceCol, rectangleClusterData, clusterDataSize)
                     rectangleClusterOffsets[index] = clusterDataSize
                     rectangleClusterLengths[index] = clusterLength
                     clusterDataSize += clusterLength
@@ -1574,7 +1572,7 @@ internal class MutationEngine(
         if (rectangleClusterData.size >= required) return
         var nextSize = rectangleClusterData.size.coerceAtLeast(16)
         while (nextSize < required) nextSize *= 2
-        rectangleClusterData = IntArray(nextSize)
+        rectangleClusterData = rectangleClusterData.copyOf(nextSize)
     }
 
     private inline fun withRectangle(

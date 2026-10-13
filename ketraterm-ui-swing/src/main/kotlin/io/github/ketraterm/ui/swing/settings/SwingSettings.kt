@@ -15,6 +15,7 @@
  */
 package io.github.ketraterm.ui.swing.settings
 
+import io.github.ketraterm.core.TerminalBuffers
 import io.github.ketraterm.input.policy.PasteControlPolicy
 import io.github.ketraterm.render.api.TerminalColorPalette
 import io.github.ketraterm.render.api.TerminalRenderCursorShape
@@ -48,8 +49,8 @@ import java.util.*
  * installed system fonts after [fallbackFonts] fail (enabled by default). System font discovery is
  * asynchronous, keeping discovery work outside painting.
  * @property palette resolved terminal color palette.
- * @property columns initial preferred column count.
- * @property rows initial preferred row count.
+ * @property columns initial preferred column count, at least [TerminalBuffers.MIN_WIDTH].
+ * @property rows initial preferred row count, at least one.
  * @property treatAmbiguousAsWide whether future East Asian Ambiguous
  * codepoints should occupy two terminal cells in core width policy.
  * @property cursorBlinkMillis cursor blink period in milliseconds. A value of
@@ -519,7 +520,7 @@ public class SwingSettings private constructor(
         )
 
     init {
-        require(columns > 0) { "columns must be > 0, was $columns" }
+        require(columns >= TerminalBuffers.MIN_WIDTH) { "columns must be >= ${TerminalBuffers.MIN_WIDTH}, was $columns" }
         require(rows > 0) { "rows must be > 0, was $rows" }
         require(cursorBlinkMillis >= 0) {
             "cursorBlinkMillis must be >= 0, was $cursorBlinkMillis"
