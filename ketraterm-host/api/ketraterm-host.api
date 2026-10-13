@@ -118,6 +118,7 @@ public final class io/github/ketraterm/host/HostCommandAdapter : io/github/ketra
 	public fun setPaletteColor (II)V
 	public fun setScrollRegion (II)V
 	public fun setSelectiveEraseProtection (Z)V
+	public fun setShiftMouseCaptureEnabled (Z)V
 	public fun setStrikethrough (Z)V
 	public fun setTabStop ()V
 	public final fun setThemePalette (Lio/github/ketraterm/render/api/TerminalColorPalette;)V
