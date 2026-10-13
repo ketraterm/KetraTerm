@@ -52,7 +52,7 @@ fun main() {
     check(reader.getLine(Int.MAX_VALUE).width == 0 && reader.getLine(0).readCluster(0, IntArray(0)) == 0)
     check(reader.getLine(0).getClusterLength(0) == 0)
     val buffer = TerminalBuffers.create(2, 1, 0)
-    val expected = IntArray(4097) { if (it == 0) 'e'.code else 0x0301 }
+    val expected = IntArray(32) { if (it == 0) 'e'.code else 0x0301 }
     buffer.writeCluster(expected, expected.size)
     val line = buffer.getLine(0)
     val required = line.getClusterLength(0)
@@ -77,6 +77,20 @@ fun main() {
         })
     }
     check(checkNotNull(ownedCopy).contentEquals(expected))
+    val cursorColumn = buffer.cursorCol
+    val cursorRow = buffer.cursorRow
+    for (length in intArrayOf(33, 4097)) {
+        val oversized = IntArray(length) { if (it == 0) 'x'.code else 0x0308 }
+        for (update in listOf(false, true)) {
+            try {
+                if (update) buffer.updatePreviousCluster(oversized, length) else buffer.writeCluster(oversized, length)
+                error("Oversized cluster accepted: length=$length update=$update")
+            } catch (_: IllegalArgumentException) {
+                check(buffer.cursorCol == cursorColumn && buffer.cursorRow == cursorRow)
+                check(line.readCluster(0, directCopy) == expected.size && directCopy.contentEquals(expected))
+            }
+        }
+    }
     buffer.eraseBuffer()
     check(buffer.getCodepointAt(0, 0) == 0)
     JavaConsumer.erase(buffer)

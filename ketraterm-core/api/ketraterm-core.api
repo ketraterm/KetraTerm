@@ -1,5 +1,6 @@
 public final class io/github/ketraterm/core/TerminalBuffers {
 	public static final field INSTANCE Lio/github/ketraterm/core/TerminalBuffers;
+	public static final field MIN_WIDTH I
 	public static final fun create (II)Lio/github/ketraterm/core/api/TerminalRenderBuffer;
 	public static final fun create (III)Lio/github/ketraterm/core/api/TerminalRenderBuffer;
 	public static synthetic fun create$default (IIIILjava/lang/Object;)Lio/github/ketraterm/core/api/TerminalRenderBuffer;

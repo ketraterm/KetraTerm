@@ -233,6 +233,11 @@ public final class io/github/ketraterm/protocol/TerminalModeStatus {
 	public static final field UNRECOGNIZED I
 }
 
+public final class io/github/ketraterm/protocol/TerminalTextLimits {
+	public static final field INSTANCE Lio/github/ketraterm/protocol/TerminalTextLimits;
+	public static final field MAX_CLUSTER_CODEPOINTS I
+}
+
 public abstract interface class io/github/ketraterm/protocol/host/TerminalHostOutput {
 	public abstract fun writeAscii (Ljava/lang/String;)V
 	public abstract fun writeByte (I)V
