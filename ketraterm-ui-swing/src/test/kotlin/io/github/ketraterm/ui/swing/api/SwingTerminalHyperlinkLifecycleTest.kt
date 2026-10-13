@@ -123,6 +123,27 @@ class SwingTerminalHyperlinkLifecycleTest {
         }
     }
 
+    @Test
+    fun `application Shift capture reconciles stationary hyperlink hover`() {
+        SwingTerminalHyperlinkLifecycleFixture().use { fixture ->
+            fixture.awaitHyperlink()
+            fixture.setMouseReporting(true)
+            fixture.keyModifier(KeyEvent.VK_SHIFT, pressed = true, modifiers = InputEvent.SHIFT_DOWN_MASK)
+            fixture.movePointer(1, modifiers = InputEvent.SHIFT_DOWN_MASK)
+            assertEquals(Cursor.HAND_CURSOR, fixture.cursorType())
+            fixture.setShiftMouseCapture(true)
+            assertEquals(Cursor.DEFAULT_CURSOR, fixture.cursorType())
+            fixture.requestFrame()
+            fixture.settle()
+            assertEquals(Cursor.DEFAULT_CURSOR, fixture.cursorType())
+            fixture.setShiftMouseCapture(false)
+            assertEquals(Cursor.HAND_CURSOR, fixture.cursorType())
+            fixture.allowMouseReporting(false)
+            fixture.setShiftMouseCapture(true)
+            assertEquals(Cursor.HAND_CURSOR, fixture.cursorType())
+        }
+    }
+
     @ParameterizedTest
     @ValueSource(booleans = [false, true])
     fun `implicit link paints ordinary hover and modifier activation across its whole occurrence`(osc8: Boolean) {

@@ -224,6 +224,7 @@ internal object AnsiCommandDispatcher : CommandDispatcher {
                 )
             CsiCommand.SCOSC_OR_DECSLRM -> dispatchCursorSaveOrMargins(sink, state)
             CsiCommand.SCORC -> dispatchCursorRestore(sink, state)
+            CsiCommand.XTSHIFTESCAPE -> dispatchShiftEscape(sink, state)
             CsiCommand.DECSCA -> dispatchSelectiveEraseProtection(sink, state)
 
             CsiCommand.SM_ANSI -> dispatchAnsiMode(sink, state, enable = true)
@@ -237,6 +238,17 @@ internal object AnsiCommandDispatcher : CommandDispatcher {
             }
             CsiCommand.DECSCUSR -> sink.setCursorStyle(modeParam(state, 0))
             CsiCommand.SGR -> SgrDispatcher.dispatch(sink, state)
+        }
+    }
+
+    private fun dispatchShiftEscape(
+        sink: TerminalCommandSink,
+        state: ParserState,
+    ) {
+        if (state.paramCount > 1 || state.subParameterMask != 0 || state.parameterValueSaturated) return
+        when (modeParam(state, 0)) {
+            0 -> sink.setShiftMouseCaptureEnabled(false)
+            1 -> sink.setShiftMouseCaptureEnabled(true)
         }
     }
 

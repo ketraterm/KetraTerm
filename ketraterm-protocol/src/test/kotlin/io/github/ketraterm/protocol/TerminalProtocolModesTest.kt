@@ -57,6 +57,7 @@ class TerminalProtocolModesTest {
             { assertEquals(5, DecPrivateMode.REVERSE_VIDEO) },
             { assertEquals(6, DecPrivateMode.ORIGIN) },
             { assertEquals(7, DecPrivateMode.AUTO_WRAP) },
+            { assertEquals(1007, DecPrivateMode.ALTERNATE_SCROLL) },
             { assertEquals(12, DecPrivateMode.CURSOR_BLINK) },
             { assertEquals(25, DecPrivateMode.CURSOR_VISIBLE) },
             { assertEquals(45, DecPrivateMode.REVERSE_WRAP) },

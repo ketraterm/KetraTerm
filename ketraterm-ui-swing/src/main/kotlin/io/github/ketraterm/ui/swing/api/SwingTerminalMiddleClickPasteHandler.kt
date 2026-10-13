@@ -19,7 +19,8 @@ package io.github.ketraterm.ui.swing.api
  * Host-owned handling of an enabled local middle-button paste gesture.
  *
  * Installed through [SwingHostServices.middleClickPasteHandler]. Application mouse reporting
- * takes priority unless Shift forces local interaction. The hook runs once on the EDT at press,
+ * takes priority; Shift restores local interaction unless XTSHIFTESCAPE requests capture.
+ * The hook runs once on the EDT at press,
  * only on the component's local paste route with a displayed frame and a nonclosed bound session.
  * It replaces the built-in clipboard read for that gesture; returning never triggers fallback.
  * Keyboard, menu, and programmatic paste operations do not invoke this hook.

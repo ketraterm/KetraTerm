@@ -95,9 +95,10 @@ sanitize protocol bytes itself. See the [manual paste contract](../README.md#man
 Component focus events are encoded through session input. DEC 1004 determines
 whether `CSI I` / `CSI O` reports are emitted; these are focus reports rather than
 bracketed-paste sequences. Local cursor presentation does not change that mode.
-Mouse reporting takes priority over local interaction unless Shift is held.
+Mouse reporting takes priority over local interaction. Shift restores local
+interaction unless the application requests Shift capture through XTSHIFTESCAPE.
 Without tracking, primary-wheel input scrolls history. When
-`alternateScreenWheelToArrowEnabled` is enabled, local alternate-screen input
+`alternateScreenWheelToArrowEnabled` and application mode 1007 are enabled, local alternate-screen input
 accumulates precise deltas and emits bounded arrow-key steps through the input
 encoder. It defaults to enabled and also applies when Shift bypasses reporting.
 When disabled, local viewport scrolling receives wheel input; unhandled events

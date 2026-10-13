@@ -33,6 +33,43 @@ import org.junit.jupiter.params.provider.ValueSource
 
 @DisplayName("Mode dispatcher")
 class ModeDispatchTest {
+    @Test
+    fun `XTSHIFTESCAPE does not overwrite the saved cursor charset slot`() {
+        val fixture = TerminalParserFixture()
+        fixture.acceptAscii("\u001B(0\u001B7\u001B(B")
+        fixture.sink.events.clear()
+        fixture.acceptAscii("\u001B[>1sq\u001B[uq")
+        assertEquals(
+            listOf("setShiftMouseCaptureEnabled:true", "writeCodepoint:113", "restoreCursor", "writeCodepoint:9472"),
+            fixture.sink.events,
+        )
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = ["", "0", "1"])
+    fun `XTSHIFTESCAPE validates and dispatches across every byte split`(parameter: String) {
+        val bytes = ("\u001B[>" + parameter + "s").encodeToByteArray()
+        for (split in 0..bytes.size) {
+            val fixture = TerminalParserFixture()
+            fixture.parser.accept(bytes, 0, split)
+            fixture.parser.accept(bytes, split, bytes.size - split)
+            assertEquals(listOf("setShiftMouseCaptureEnabled:" + (parameter == "1")), fixture.sink.events)
+        }
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = ["2", "3", "2147483647", "999999999999", "1;0", "1:0", ";", "1\u0018"])
+    fun `invalid or cancelled XTSHIFTESCAPE preserves state and recovers`(parameter: String) {
+        val bytes = ("\u001B[>" + parameter + "s\u001B[>1s").encodeToByteArray()
+        for (split in 0..bytes.size) {
+            val fixture = TerminalParserFixture()
+            fixture.parser.accept(bytes, 0, split)
+            fixture.parser.accept(bytes, split, bytes.size - split)
+            val events = fixture.sink.events.filter { it.startsWith("setShiftMouseCaptureEnabled:") }
+            assertEquals(listOf("setShiftMouseCaptureEnabled:true"), events, "split=$split parameter=$parameter")
+        }
+    }
+
     @ParameterizedTest
     @ValueSource(strings = ["?45:1h", "?45;1045:1h", "?45;999999999999h", "?45:0l", "4:1h", "4;999999999999l"])
     fun `malformed mode lists are rejected atomically and recover at every split`(sequence: String) {

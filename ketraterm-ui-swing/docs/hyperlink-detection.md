@@ -84,7 +84,8 @@ OSC 8 links win overlap resolution, followed by visible links, narrower ranges,
 and stable provider order. `MODIFIER` activation uses Ctrl or Cmd on macOS;
 `DIRECT` uses an ordinary primary click. Activation occurs on release only when
 the pressed occurrence still matches and no drag occurred. Application mouse
-reporting takes priority unless Shift forces local interaction. Hover callbacks
+reporting takes priority; Shift restores local interaction unless the application
+requests Shift capture through XTSHIFTESCAPE. Hover callbacks
 are balanced per occurrence even if results share an action.
 
 Resolve colors and framework presentation before publication. Painting reads

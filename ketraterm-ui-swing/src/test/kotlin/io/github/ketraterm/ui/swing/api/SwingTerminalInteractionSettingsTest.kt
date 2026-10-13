@@ -998,6 +998,59 @@ class SwingTerminalInteractionSettingsTest {
             assertEquals(up + down, output.toString(Charsets.UTF_8))
         }
 
+    @Test
+    fun `XTSHIFTESCAPE controls Shift mouse bytes through a real session`() =
+        fixture {
+            feed("\u001b[?1000h\u001b[?1006h")
+            click(MouseEvent.BUTTON2)
+            dispatcher.scheduler.runCurrent()
+            val unmodified = output.toString(Charsets.UTF_8)
+            assertTrue(unmodified.startsWith("\u001b[<1;"))
+            output.reset()
+            feed("\u001b[>1s")
+            click(MouseEvent.BUTTON2, modifiers = InputEvent.SHIFT_DOWN_MASK)
+            dispatcher.scheduler.runCurrent()
+            assertEquals(unmodified.replace("[<1;", "[<5;"), output.toString(Charsets.UTF_8))
+            assertEquals(0, reads)
+            output.reset()
+            feed("\u001b[>s")
+            click(MouseEvent.BUTTON2, modifiers = InputEvent.SHIFT_DOWN_MASK)
+            dispatcher.scheduler.runCurrent()
+            assertEquals("clipboard", output.toString(Charsets.UTF_8))
+            assertEquals(1, reads)
+            output.reset()
+            feed("\u001b[>1s")
+            settings = settings.copy { it.mouseReportingEnabled = false }
+            view.reloadSettings()
+            click(MouseEvent.BUTTON2, modifiers = InputEvent.SHIFT_DOWN_MASK)
+            dispatcher.scheduler.runCurrent()
+            assertEquals("clipboard", output.toString(Charsets.UTF_8))
+            assertEquals(2, reads)
+        }
+
+    @Test
+    fun `mode 1007 controls alternate wheel bytes without overriding host disable`() =
+        fixture {
+            feed("\u001b[?1049h")
+            repeat(3) { wheel(-0.25) }
+            feed("\u001b[?1007l")
+            wheel(-0.25)
+            feed("\u001b[?1007h")
+            wheel(-0.25)
+            dispatcher.scheduler.runCurrent()
+            assertEquals(0, output.size())
+            repeat(3) { wheel(-0.25) }
+            dispatcher.scheduler.runCurrent()
+            assertEquals("\u001b[A", output.toString(Charsets.UTF_8))
+            output.reset()
+            settings = settings.copy { it.alternateScreenWheelToArrowEnabled = false }
+            view.reloadSettings()
+            feed("\u001b[?1007h")
+            wheel(-1.0)
+            dispatcher.scheduler.runCurrent()
+            assertEquals(0, output.size())
+        }
+
     @ParameterizedTest
     @ValueSource(booleans = [false, true])
     fun `disabled alternate wheel input leaves unhandled local motion available to the host`(shift: Boolean) =

@@ -107,6 +107,20 @@ public interface TerminalModeController {
     public fun setMouseTrackingMode(mode: io.github.ketraterm.protocol.MouseTrackingMode)
 
     /**
+     * Sets alternate-screen wheel scrolling (DEC private mode 1007).
+     * Enabled by default; host policy may suppress wheel-to-key translation.
+     * Preserves pending wrap and survives screen switches, resize, and DECSTR.
+     */
+    public fun setAlternateScrollEnabled(enabled: Boolean)
+
+    /**
+     * Requests Shift as a mouse reporting modifier (XTSHIFTESCAPE).
+     * Disabled by default so Shift restores local interaction. Hosts may deny reporting.
+     * Preserves pending wrap and survives screen switches, resize, and DECSTR.
+     */
+    public fun setShiftMouseCaptureEnabled(enabled: Boolean)
+
+    /**
      * Sets the active mouse report encoding mode used by terminal-to-host reporting.
      *
      * @param mode The mouse encoding mode to set.

@@ -49,6 +49,7 @@ class HostModeStatusTest {
         "true,1004,2",
         "true,1005,2",
         "true,1006,2",
+        "true,1007,1",
         "true,1015,2",
         "true,1016,2",
         "true,1042,2",

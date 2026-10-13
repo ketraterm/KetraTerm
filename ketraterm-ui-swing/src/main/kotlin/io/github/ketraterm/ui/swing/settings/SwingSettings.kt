@@ -187,14 +187,16 @@ public class SwingSettings private constructor(
     /**
      * Allows application mouse reports from this view. Defaults to true.
      * Disabling preserves terminal modes and permits local selection, links, and menus.
-     * Shift forces local interaction. A started button gesture retains its route until release.
+     * Shift restores local interaction unless XTSHIFTESCAPE requests capture.
+     * A started button gesture retains its route until release.
      * Alternate-buffer wheel input is controlled separately by [alternateScreenWheelToArrowEnabled].
      */
     public val mouseReportingEnabled: Boolean = builder.mouseReportingEnabled
 
     /**
      * Converts local wheel motion to arrow keys in the alternate buffer. Defaults to true.
-     * Application mouse reporting takes priority. Shift bypasses reporting and respects this setting.
+     * Requires application mode 1007 (enabled by default). Application mouse reporting takes priority.
+     * Shift bypasses reporting unless XTSHIFTESCAPE requests capture.
      * When false, wheel motion uses local viewport scrolling, allowing unhandled motion to reach the host.
      * Primary-buffer scrolling is unaffected. Reloading a changed value clears partial wheel-to-arrow input.
      */
@@ -210,7 +212,8 @@ public class SwingSettings private constructor(
 
     /**
      * Enables paste on a local middle-button press, using [middleClickPasteSource].
-     * Defaults to false. Application mouse tracking takes priority unless Shift forces local input.
+     * Defaults to false. Application mouse tracking takes priority; Shift restores local input
+     * unless XTSHIFTESCAPE requests capture.
      * Uses the normal paste policy and bracketed-paste handling. Closed sessions do not read the clipboard.
      * Without a [io.github.ketraterm.ui.swing.api.SwingHostServices.middleClickPasteHandler],
      * clipboard callbacks run on the EDT and propagate failures. A supplied hook owns clipboard access

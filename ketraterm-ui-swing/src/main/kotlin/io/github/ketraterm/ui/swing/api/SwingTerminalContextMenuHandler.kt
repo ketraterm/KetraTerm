@@ -22,8 +22,8 @@ import java.awt.event.MouseEvent
  *
  * The reusable Swing terminal invokes this hook only when terminal-level UI is
  * allowed to own the right-click gesture. Plain right-click is passed through
- * to the PTY while DEC mouse reporting is active; Shift-right-click forces
- * this hook so users can temporarily bypass application mouse handling.
+ * to the PTY while DEC mouse reporting is active; Shift-right-click invokes
+ * this hook unless the application requests Shift capture through XTSHIFTESCAPE.
  */
 public fun interface SwingTerminalContextMenuHandler {
     /**

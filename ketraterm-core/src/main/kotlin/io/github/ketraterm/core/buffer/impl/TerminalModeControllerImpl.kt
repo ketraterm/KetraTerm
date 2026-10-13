@@ -96,6 +96,14 @@ internal class TerminalModeControllerImpl(
         mutateMode { state.modes.isFocusReportingEnabled = enabled }
     }
 
+    override fun setAlternateScrollEnabled(enabled: Boolean) {
+        state.modes.isAlternateScrollEnabled = enabled
+    }
+
+    override fun setShiftMouseCaptureEnabled(enabled: Boolean) {
+        state.modes.isShiftMouseCaptureEnabled = enabled
+    }
+
     override fun setModifyOtherKeysMode(mode: Int) {
         mutateMode { state.modes.modifyOtherKeysMode = mode }
     }

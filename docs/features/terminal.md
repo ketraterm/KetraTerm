@@ -49,6 +49,7 @@ placement can depend on input chunk boundaries. See the
 | Kitty keyboard | Progressive flag negotiation and encoding; available flags depend on host input metadata. |
 | Paste | Bracketed paste, control-character protection, and configurable newline handling. |
 | Mouse tracking | X10, normal, button-event, and any-event tracking. |
+| Mouse behavior | Mode 1007 controls alternate-screen wheel-to-cursor-key input; XTSHIFTESCAPE (`CSI > Ps s`) requests Shift mouse capture. Hosts retain control over reporting and wheel translation. |
 | Mouse encoding | Legacy, UTF-8, SGR, URXVT, and SGR pixel coordinates. |
 | Focus | Mode-controlled focus-in/focus-out reports. |
 

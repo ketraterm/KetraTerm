@@ -44,7 +44,6 @@ and the [changelog](../CHANGELOG.md). Entries here are not release commitments.
 | --- | --- |
 | `TODO(host/profile)` | Native rich-input adapters with layout-aware key identity, IME text, and complete lifecycle metadata. Portable Swing must not advertise Kitty flags 2, 4, or 16 before these inputs are reliable. |
 | `TODO(parser/core/input)` | Layout-aware modifyOtherKeys modifier masks, including `CSI > 4 : 1 m`. The parser rejects colon subparameters for this command; no corresponding negotiated mask is stored or applied by the encoder. |
-| `TODO(parser/core/ui)` | Application-controlled alternate-screen scrolling (mode 1007) and Shift mouse capture (XTSHIFTESCAPE). The UI already supports host-configured wheel-to-arrow input and a local Shift override; applications cannot negotiate these behaviors. |
 
 ## Rendering and interaction
 

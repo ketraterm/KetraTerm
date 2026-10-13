@@ -15,6 +15,7 @@
  */
 package io.github.ketraterm.ui.swing.input
 
+import io.github.ketraterm.core.api.TerminalInputState
 import io.github.ketraterm.input.api.TerminalInputEncoder
 import io.github.ketraterm.input.event.*
 import io.github.ketraterm.protocol.MouseTrackingMode
@@ -60,11 +61,14 @@ internal class SwingTerminalMouseController(
         shiftDown = false
     }
 
-    private fun beginGesture(event: MouseEvent) {
+    private fun beginGesture(
+        event: MouseEvent,
+        modeBits: Long,
+    ) {
         val bit = buttonBit(event.button)
         if (bit == 0) return
         if (pressedButtons == 0) {
-            gestureTracked = isMouseTrackingIntercepted()
+            gestureTracked = isMouseTrackingIntercepted(modeBits)
             gestureSession = host.session
             decorationGesture = false
             hasTrackedPosition = false
@@ -94,15 +98,16 @@ internal class SwingTerminalMouseController(
             override fun mousePressed(event: MouseEvent) {
                 updatePointerModifiers(event.modifiersEx)
                 host.requestFocusInWindow()
-                beginGesture(event)
-                if (handleContextMenu(event)) return
+                val modeBits = host.getInputModeBits()
+                beginGesture(event, modeBits)
+                if (handleContextMenu(event, modeBits)) return
                 if (!host.renderCache.hasFrame) return
                 if (host.handlePromptMarkerMousePressed(event) || host.isPromptDividerAt(event.x, event.y)) {
                     decorationGesture = true
                     event.consume()
                     return
                 }
-                if (handleMouseTracking(event, TerminalMouseEventType.PRESS)) return
+                if (handleMouseTracking(event, TerminalMouseEventType.PRESS, modeBits)) return
                 if (SwingUtilities.isMiddleMouseButton(event) && host.settings.middleClickPaste) {
                     middlePaste = true
                     event.consume()
@@ -115,14 +120,15 @@ internal class SwingTerminalMouseController(
 
             override fun mouseReleased(event: MouseEvent) {
                 updatePointerModifiers(event.modifiersEx)
+                val modeBits = host.getInputModeBits()
                 try {
-                    if (handleContextMenu(event)) return
+                    if (handleContextMenu(event, modeBits)) return
                     if (!host.renderCache.hasFrame) return
                     if (decorationGesture) {
                         event.consume()
                         return
                     }
-                    if (handleMouseTracking(event, TerminalMouseEventType.RELEASE)) return
+                    if (handleMouseTracking(event, TerminalMouseEventType.RELEASE, modeBits)) return
                     if (SwingUtilities.isMiddleMouseButton(event) && middlePaste) {
                         event.consume()
                         return
@@ -144,41 +150,45 @@ internal class SwingTerminalMouseController(
         object : MouseMotionAdapter() {
             override fun mouseDragged(event: MouseEvent) {
                 updatePointerModifiers(event.modifiersEx)
+                val modeBits = host.getInputModeBits()
                 host.handleHyperlinkMouseDragged()
                 if (!host.renderCache.hasFrame) return
                 if (decorationGesture) {
                     event.consume()
                     return
                 }
-                if (handleMouseTracking(event, TerminalMouseEventType.MOTION)) return
+                if (handleMouseTracking(event, TerminalMouseEventType.MOTION, modeBits)) return
                 host.handleSelectionMouseDragged(event)
             }
 
             override fun mouseMoved(event: MouseEvent) {
                 updatePointerModifiers(event.modifiersEx)
+                val modeBits = host.getInputModeBits()
                 if (!host.renderCache.hasFrame) return
                 if (host.handlePromptMarkerMouseMoved(event)) {
                     return
                 }
-                val tracked = handleMouseTracking(event, TerminalMouseEventType.MOTION)
+                val tracked = handleMouseTracking(event, TerminalMouseEventType.MOTION, modeBits)
                 host.handleHyperlinkMouseMoved(event, enabled = !tracked)
             }
         }
 
     private fun handleMouseWheel(event: MouseWheelEvent) {
         updatePointerModifiers(event.modifiersEx)
+        val modeBits = host.getInputModeBits()
         if (!host.renderCache.hasFrame) {
             resetWheelInput()
             return
         }
-        if (isMouseTrackingIntercepted()) {
+        if (isMouseTrackingIntercepted(modeBits)) {
             selectWheelRoute(WheelRoute.TRACKED)
             host.finishViewportScroll()
-            handleMouseTracking(event, TerminalMouseEventType.WHEEL)
+            handleMouseTracking(event, TerminalMouseEventType.WHEEL, modeBits)
             return
         }
         val alternateWheelInput =
             host.settings.alternateScreenWheelToArrowEnabled &&
+                TerminalInputState.isAlternateScrollEnabled(modeBits) &&
                 host.renderCache.activeBuffer == TerminalRenderBufferKind.ALTERNATE &&
                 (host.session != null || host.renderCache.historySize == 0)
         selectWheelRoute(if (alternateWheelInput) WheelRoute.ALTERNATE else WheelRoute.VIEWPORT)
@@ -217,7 +227,7 @@ internal class SwingTerminalMouseController(
         wheelSession = session
     }
 
-    /** Remembers the same Shift override for stationary-pointer reconciliation as event routing. */
+    /** Remembers modifiers for stationary-pointer reconciliation and event routing. */
     fun updatePointerModifiers(modifiers: Int): Boolean {
         val next = modifiers and InputEvent.SHIFT_DOWN_MASK != 0
         val changed = shiftDown != next
@@ -225,16 +235,25 @@ internal class SwingTerminalMouseController(
         return changed
     }
 
-    fun isMouseTrackingIntercepted(): Boolean =
+    fun isMouseTrackingIntercepted(): Boolean = isMouseTrackingIntercepted(host.getInputModeBits())
+
+    private fun isMouseTrackingIntercepted(modeBits: Long): Boolean =
         if (pressedButtons != 0) {
-            gestureTracked && host.session === gestureSession && host.mouseTrackingMode() != MouseTrackingMode.OFF
+            gestureTracked &&
+                host.session === gestureSession &&
+                TerminalInputState.mouseTrackingMode(modeBits) != MouseTrackingMode.OFF.ordinal
         } else {
-            host.settings.mouseReportingEnabled && !shiftDown && host.mouseTrackingMode() != MouseTrackingMode.OFF
+            host.settings.mouseReportingEnabled &&
+                (!shiftDown || TerminalInputState.isShiftMouseCaptureEnabled(modeBits)) &&
+                TerminalInputState.mouseTrackingMode(modeBits) != MouseTrackingMode.OFF.ordinal
         }
 
-    private fun handleContextMenu(event: MouseEvent): Boolean {
+    private fun handleContextMenu(
+        event: MouseEvent,
+        modeBits: Long,
+    ): Boolean {
         if (!event.isPopupTrigger) return false
-        if (isMouseTrackingIntercepted()) return false
+        if (isMouseTrackingIntercepted(modeBits)) return false
         val handled = host.handleContextMenuMouseEvent(event, forcedByShift = event.isShiftDown)
         if (!handled) return false
         host.handleHyperlinkMouseDragged()
@@ -245,8 +264,9 @@ internal class SwingTerminalMouseController(
     private fun handleMouseTracking(
         event: MouseEvent,
         type: TerminalMouseEventType,
+        modeBits: Long,
     ): Boolean {
-        if (!isMouseTrackingIntercepted()) return false
+        if (!isMouseTrackingIntercepted(modeBits)) return false
         host.clearHyperlinkHover()
 
         val wheelRotation = if (event is MouseWheelEvent) event.wheelRotation else 0

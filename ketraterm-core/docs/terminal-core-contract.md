@@ -213,6 +213,20 @@ stops, drops truncated stops, and seeds newly exposed columns with the default
 
 ## Mode-state contract
 
+Mode 1007 defaults to enabled and controls alternate-screen wheel-to-cursor-key
+input. XTSHIFTESCAPE (`CSI > Ps s`) accepts omitted/zero for local Shift override
+and one for application Shift mouse capture; invalid values or malformed
+parameter lists leave state unchanged. Capture defaults to disabled.
+Both preferences are global, preserve pending wrap and render generations,
+survive cursor save/restore, screen switches, resize, and DECSTR, and return to
+defaults on RIS. Host mouse-reporting and alternate-wheel settings still apply.
+
+The packed input word stores alternate-scroll suppression in bit 19 and Shift
+capture in bit 63. A zero word preserves the enabled scrolling/local Shift
+defaults for existing readers. Consume these fields through `TerminalInputState`
+helpers; no new typed-snapshot constructor fields are required. DECRQM reports
+the stored mode 1007 flag; XTSHIFTESCAPE has no DEC mode-status alias.
+
 `TerminalModeController` changes durable modes. `getModeSnapshot` returns an
 immutable atomic snapshot of the typed fields declared by
 `TerminalModeSnapshot`, not an inventory of every mode. The packed snapshot
@@ -378,7 +392,8 @@ Mode defaults restore autowrap, cursor visibility/blinking, normal video, and
 normal cursor/keypad/input behavior. Bracketed paste, focus reporting, mouse
 tracking, synchronized output, color-scheme/resize reporting, and Kitty keyboard state reset; both xterm
 resource families return to defaults. Ambiguous-width policy, mouse encoding,
-and the DECCOLM selection survive. Palette and content are preserved.
+the DECCOLM selection, and alternate-scroll/Shift-capture preferences survive.
+Palette and content are preserved.
 
 ### Hard reset
 

@@ -88,6 +88,7 @@ public final class JavaConsumer {
         @Override public void clearAllTabStops() { throw new AssertionError("Unexpected required command: clearAllTabStops"); }
         @Override public void setAnsiMode(int p0, boolean p1) { throw new AssertionError("Unexpected required command: setAnsiMode"); }
         @Override public void setDecMode(int p0, boolean p1) { throw new AssertionError("Unexpected required command: setDecMode"); }
+        @Override public void setShiftMouseCaptureEnabled(boolean enabled) { throw new AssertionError("Unexpected required command: setShiftMouseCaptureEnabled"); }
         @Override public void setKeyModifierOption(int p0, int p1) { throw new AssertionError("Unexpected required command: setKeyModifierOption"); }
         @Override public void resetKeyModifierOption(int p0) { throw new AssertionError("Unexpected required command: resetKeyModifierOption"); }
         @Override public void resetKeyModifierOptions() { throw new AssertionError("Unexpected required command: resetKeyModifierOptions"); }

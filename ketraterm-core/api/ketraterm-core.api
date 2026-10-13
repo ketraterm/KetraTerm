@@ -67,6 +67,7 @@ public abstract interface class io/github/ketraterm/core/api/TerminalInputState 
 	public static fun backarrowSendsBackspace (JZ)Z
 	public static fun formatOtherKeysMode (J)I
 	public abstract fun getInputModeBits ()J
+	public static fun isAlternateScrollEnabled (J)Z
 	public static fun isApplicationCursorKeys (J)Z
 	public static fun isApplicationKeypad (J)Z
 	public static fun isBackarrowKeyModeExplicit (J)Z
@@ -74,6 +75,7 @@ public abstract interface class io/github/ketraterm/core/api/TerminalInputState 
 	public static fun isBracketedPasteEnabled (J)Z
 	public static fun isFocusReportingEnabled (J)Z
 	public static fun isNewLineMode (J)Z
+	public static fun isShiftMouseCaptureEnabled (J)Z
 	public static fun keyFormatOption (JI)I
 	public static fun keyModifierOption (JI)I
 	public static fun kittyKeyboardFlags (J)I
@@ -87,6 +89,7 @@ public abstract interface class io/github/ketraterm/core/api/TerminalInputState 
 public final class io/github/ketraterm/core/api/TerminalInputState$Companion {
 	public final fun backarrowSendsBackspace (JZ)Z
 	public final fun formatOtherKeysMode (J)I
+	public final fun isAlternateScrollEnabled (J)Z
 	public final fun isApplicationCursorKeys (J)Z
 	public final fun isApplicationKeypad (J)Z
 	public final fun isBackarrowKeyModeExplicit (J)Z
@@ -94,6 +97,7 @@ public final class io/github/ketraterm/core/api/TerminalInputState$Companion {
 	public final fun isBracketedPasteEnabled (J)Z
 	public final fun isFocusReportingEnabled (J)Z
 	public final fun isNewLineMode (J)Z
+	public final fun isShiftMouseCaptureEnabled (J)Z
 	public final fun keyFormatOption (JI)I
 	public final fun keyModifierOption (JI)I
 	public final fun kittyKeyboardFlags (J)I
@@ -126,6 +130,7 @@ public final class io/github/ketraterm/core/api/TerminalLine$DefaultImpls {
 }
 
 public final class io/github/ketraterm/core/api/TerminalModeBits {
+	public static final field ALTERNATE_SCROLL_DISABLED J
 	public static final field AMBIGUOUS_WIDE J
 	public static final field APPLICATION_CURSOR_KEYS J
 	public static final field APPLICATION_KEYPAD J
@@ -161,6 +166,7 @@ public final class io/github/ketraterm/core/api/TerminalModeBits {
 	public static final field ORIGIN_MODE J
 	public static final field POP_ON_BELL J
 	public static final field REVERSE_VIDEO J
+	public static final field SHIFT_MOUSE_CAPTURE J
 	public static final field SYNCHRONIZED_OUTPUT J
 	public static final fun hasFlag (JJ)Z
 	public static final fun packedValue (JJI)I
@@ -182,6 +188,7 @@ public abstract interface class io/github/ketraterm/core/api/TerminalModeControl
 	public abstract fun resetKeyModifierOptions ()V
 	public abstract fun resetPaletteColors ([II)V
 	public static synthetic fun resetPaletteColors$default (Lio/github/ketraterm/core/api/TerminalModeController;[IIILjava/lang/Object;)V
+	public abstract fun setAlternateScrollEnabled (Z)V
 	public abstract fun setApplicationCursorKeys (Z)V
 	public abstract fun setApplicationKeypad (Z)V
 	public abstract fun setAutoWrap (Z)V
@@ -212,6 +219,7 @@ public abstract interface class io/github/ketraterm/core/api/TerminalModeControl
 	public abstract fun setReverseVideo (Z)V
 	public abstract fun setReverseWrap (Z)V
 	public abstract fun setReverseWrapExtended (Z)V
+	public abstract fun setShiftMouseCaptureEnabled (Z)V
 	public abstract fun setSynchronizedOutput (Z)V
 	public abstract fun setThemePalette (Lio/github/ketraterm/render/api/TerminalColorPalette;)V
 	public abstract fun setTreatAmbiguousAsWide (Z)V

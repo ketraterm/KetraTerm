@@ -231,6 +231,8 @@ internal class SwingTerminalHyperlinkLifecycleFixture(
 
     fun setMouseReporting(enabled: Boolean) = writeOutput("\u001b[?1003" + if (enabled) "h" else "l")
 
+    fun setShiftMouseCapture(enabled: Boolean) = writeOutput("\u001b[>" + (if (enabled) "1" else "0") + "s")
+
     fun markFirstRowAsPrompt() {
         onEdt {
             session.readRenderFrame { frame -> shellState.recordPromptStart(frame.lineId(0)) }
