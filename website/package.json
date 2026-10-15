@@ -18,7 +18,7 @@
     "entities": "8.1.0",
     "github-slugger": "2.0.0",
     "marked": "18.1.0",
-    "mermaid": "12.1.0"
+    "mermaid": "12.2.0"
   },
   "devDependencies": {
     "linkedom": "0.18.13",
