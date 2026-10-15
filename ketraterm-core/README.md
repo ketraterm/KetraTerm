@@ -38,8 +38,9 @@ above, or connect a parser through the host adapter for terminal output.
 returning.
 
 Cursor and reader coordinates are zero-based. Margin and rectangle methods use
-the DEC coordinate conventions documented on those methods. Dimensions must be
-positive; `maxHistory` is nonnegative, and zero disables primary scrollback.
+the DEC coordinate conventions documented on those methods. Grid width must be at
+least `TerminalBuffers.MIN_WIDTH` (two cells), and height must be positive.
+`maxHistory` is nonnegative, and zero disables primary scrollback.
 
 ## Reading and synchronization
 

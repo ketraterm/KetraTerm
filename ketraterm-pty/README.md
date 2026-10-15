@@ -107,6 +107,10 @@ and [optional OSC integration](../ketraterm-shell-integration/README.md).
 
 ## Direct connectors
 
+Local session factories require at least `TerminalBuffers.MIN_WIDTH` (2) columns
+and reject smaller widths before launching a process. Raw connector options
+accept any positive column and row counts because they do not create an emulator.
+
 `PtyConnectors.create(command, env, workingDirectory, columns, rows)` launches a
 process and returns an unstarted `TerminalConnector`. Its environment default is
 `System.getenv()`; pass `PtyOptions.defaultEnvironment()` when you want KetraTerm's

@@ -15,6 +15,7 @@
  */
 package io.github.ketraterm.pty
 
+import io.github.ketraterm.core.TerminalBuffers
 import io.github.ketraterm.session.TerminalSession
 import java.io.IOException
 
@@ -31,6 +32,7 @@ public object TerminalSessions {
      * and must close it even if publication fails or it is never started.
      * Use [localPty] when no host registration is needed before output delivery.
      *
+     * @throws IllegalArgumentException if the terminal width is below [TerminalBuffers.MIN_WIDTH], before process creation.
      * @throws IOException if the process cannot be started.
      */
     @JvmStatic
@@ -43,6 +45,7 @@ public object TerminalSessions {
      *
      * @param options options configuration for the PTY session.
      * @return running terminal session.
+     * @throws IllegalArgumentException if the terminal width is below [TerminalBuffers.MIN_WIDTH], before process creation.
      * @throws IOException if the process cannot be started.
      */
     @JvmStatic

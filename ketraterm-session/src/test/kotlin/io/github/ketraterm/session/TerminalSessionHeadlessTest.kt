@@ -26,7 +26,9 @@ import io.github.ketraterm.input.policy.PasteLineEndingPolicy
 import io.github.ketraterm.input.policy.TerminalInputPolicy
 import io.github.ketraterm.protocol.mouse.MouseTrackingMode
 import io.github.ketraterm.testkit.MockConnector
+import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
+import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.Test
 import java.nio.charset.StandardCharsets
@@ -183,6 +185,30 @@ class TerminalSessionHeadlessTest {
     }
 
     @Test
+    fun `invalid start leaves geometry and transport untouched and permits a valid attempt`() =
+        runTest {
+            val dispatcher = StandardTestDispatcher(testScheduler)
+            val connector = MockConnector()
+            val terminal = TerminalBuffers.create(width = 10, height = 3)
+            TerminalSession.create(terminal, connector, workerDispatcher = dispatcher, ioDispatcher = dispatcher).use { session ->
+                for (columns in intArrayOf(Int.MIN_VALUE, -1, 0, 1)) {
+                    assertThrows(IllegalArgumentException::class.java) { session.start(columns, 1) }
+                }
+                assertEquals(10, terminal.width)
+                assertEquals(3, terminal.height)
+                assertEquals(0, connector.startCount)
+                assertTrue(connector.resizeCalls.isEmpty())
+                assertSame(TerminalSessionState.Created, session.state.value)
+                session.start(TerminalBuffers.MIN_WIDTH, 1)
+                assertEquals(TerminalBuffers.MIN_WIDTH, terminal.width)
+                assertEquals(1, terminal.height)
+                assertEquals(1, connector.startCount)
+                assertEquals(listOf(TerminalBuffers.MIN_WIDTH to 1), connector.resizeCalls)
+                assertSame(TerminalSessionState.Running, session.state.value)
+            }
+        }
+
+    @Test
     fun `invalid resize is rejected before connector resize`() {
         val connector = MockConnector()
         val terminal = TerminalBuffers.create(width = 10, height = 3)
@@ -190,6 +216,9 @@ class TerminalSessionHeadlessTest {
 
         assertThrows(IllegalArgumentException::class.java) {
             session.resize(columns = 0, rows = 3)
+        }
+        assertThrows(IllegalArgumentException::class.java) {
+            session.resize(columns = 1, rows = 3)
         }
         assertThrows(IllegalArgumentException::class.java) {
             session.resizeViewport(columns = 10, rows = 0)

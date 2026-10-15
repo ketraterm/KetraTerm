@@ -512,6 +512,38 @@ class SwingTerminalPromptDividerTest {
             }
         }
 
+    @ParameterizedTest
+    @EnumSource(SwingPromptDecoration::class)
+    fun `narrowing a scrolled viewport preserves the viewed line identity`(mode: SwingPromptDecoration) =
+        edt {
+            Fixture(mode).use { f ->
+                repeat(8) { index ->
+                    f.prompt(">$index abc")
+                    f.feed("\r\n")
+                }
+                f.component.scrollFromScrollbar(8, true)
+                f.flush()
+                val offset = f.component.viewportState().renderOffset
+                var lineId = 0L
+                f.session.readRenderFrame(offset, 3) { lineId = it.lineId(0) }
+                assertTrue(offset > 0)
+                for ((columns, rows) in listOf(4 to 3, 8 to 3, 5 to 2, 8 to 4)) {
+                    f.component.size = f.component.preferredGridSize(columns, rows)
+                    f.component.componentListeners.forEach {
+                        it.componentResized(java.awt.event.ComponentEvent(f.component, java.awt.event.ComponentEvent.COMPONENT_RESIZED))
+                    }
+                    f.flush()
+                    assertTrue(f.component.viewportState().renderOffset > 0, "mode=$mode grid=$columns,$rows")
+                    f.session.readRenderFrame(f.component.viewportState().renderOffset, rows) {
+                        assertEquals(lineId, it.lineId(0), "mode=$mode grid=$columns,$rows")
+                    }
+                }
+                // Real output after resize must still honor the default scroll-on-output policy.
+                f.feed("new output\r\nnext output\r\n")
+                assertEquals(0, f.component.viewportState().renderOffset)
+            }
+        }
+
     private class Fixture(
         mode: SwingPromptDecoration = SwingPromptDecoration.DIVIDER,
         shellIntegration: TerminalShellIntegrationFactory? = null,

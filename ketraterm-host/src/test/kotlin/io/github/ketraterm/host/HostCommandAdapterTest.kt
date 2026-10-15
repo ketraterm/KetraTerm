@@ -2404,7 +2404,7 @@ class HostCommandAdapterTest {
         fun `hyperlink policy can deny OSC hyperlink metadata`() {
             val f =
                 Fixture(
-                    terminal = TerminalBuffers.create(width = 1, height = 1),
+                    terminal = TerminalBuffers.create(width = TerminalBuffers.MIN_WIDTH, height = 1),
                     hostPolicy = HostPolicy(hyperlinkPolicy = HostControlPolicy.DENY),
                 )
 

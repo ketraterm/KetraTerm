@@ -47,7 +47,9 @@ fun createUnboundTerminalView(
 
 The font name is a host choice; use a font available in your environment.
 `columns` and `rows` set the preferred size. Once laid out, the visible cell
-dimensions determine the live session's grid and connector size.
+dimensions determine the live session's grid and connector size. Settings and
+session geometry require at least two columns and one row. A narrower component
+retains that minimum grid and clips painting to its bounds.
 
 ### Binding and configuration ownership
 

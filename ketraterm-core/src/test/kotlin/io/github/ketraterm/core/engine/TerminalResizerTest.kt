@@ -236,7 +236,7 @@ class TerminalResizerTest {
         }
 
         @ParameterizedTest(name = "Content survives resize to width={0}")
-        @CsvSource("1", "3", "7", "20", "80")
+        @CsvSource("2", "3", "7", "20", "80")
         fun `content is preserved across arbitrary width changes`(newWidth: Int) {
             val state = buildState(cols = 10, rows = 5)
             state.writeLine(4, "ABCDE")
@@ -255,12 +255,16 @@ class TerminalResizerTest {
         }
 
         @Test
-        fun `narrowing to width 1 spreads each character onto its own row`() {
+        fun `narrowing below minimum width rejects without replacing rows`() {
             val state = buildState(cols = 4, rows = 5)
             state.writeLine(4, "ABCD")
             state.cursor.row = 4
 
-            resizeState(state, 1, 5)
+            val originalRing = state.ring
+            assertThrows(IllegalArgumentException::class.java) { resizeState(state, 1, 5) }
+            assertSame(originalRing, state.ring)
+            assertEquals(4, state.dimensions.width)
+            assertEquals(4, state.cursor.row)
 
             val top = (state.ring.size - state.dimensions.height).coerceAtLeast(0)
             val allText =
@@ -557,22 +561,22 @@ class TerminalResizerTest {
         }
 
         @Test
-        fun `width change copies cluster handles into the new store`() {
+        fun `width change copies cluster handles into the new rows`() {
             val state = buildState(cols = 6, rows = 2)
             val top = (state.ring.size - 2).coerceAtLeast(0)
             state.ring[top + 1].setCluster(0, intArrayOf(0xAAAA, 0xBBBB), 2, 0)
-            val oldStore = state.primaryBuffer.store
+            val oldRing = state.primaryBuffer.ring
             state.cursor.row = 1
 
             resizeState(state, 7, 2)
 
             assertNotSame(
-                oldStore,
-                state.primaryBuffer.store,
-                "State must reference the new store after resize",
+                oldRing,
+                state.primaryBuffer.ring,
+                "State must reference the new rows after resize",
             )
 
-            // New store must serve the handle correctly
+            // New rows must contain independent cluster payloads
             val visTop = (state.ring.size - 2).coerceAtLeast(0)
             val dest = IntArray(4)
             val written = state.ring[visTop + 1].readCluster(0, dest)
@@ -934,8 +938,8 @@ class TerminalResizerTest {
         @CsvSource(
             "80, 24, 40, 12",
             "40, 12, 80, 24",
-            "10,  5,  1,  1",
-            " 1,  1, 80, 24",
+            "10,  5,  2,  1",
+            " 2,  1, 80, 24",
         )
         fun `dimensions are updated correctly`(
             oldW: Int,
@@ -954,16 +958,16 @@ class TerminalResizerTest {
         }
 
         @Test
-        fun `state clusterStore is replaced with a new instance after width change`() {
+        fun `state ring is replaced with a new instance after width change`() {
             val state = buildState(cols = 10, rows = 5)
-            val oldStore = state.primaryBuffer.store
+            val oldRing = state.primaryBuffer.ring
 
             resizeState(state, 11, 5)
 
             assertNotSame(
-                oldStore,
-                state.primaryBuffer.store,
-                "clusterStore must be a new instance after resize",
+                oldRing,
+                state.primaryBuffer.ring,
+                "ring must be a new instance after resize",
             )
         }
     }

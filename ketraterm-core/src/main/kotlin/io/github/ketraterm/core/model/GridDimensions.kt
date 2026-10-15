@@ -15,6 +15,8 @@
  */
 package io.github.ketraterm.core.model
 
+import io.github.ketraterm.core.TerminalBuffers.MIN_WIDTH
+
 /**
  * The strict mathematical boundary of the terminal.
  * Provides pure validation and clamping logic for the Engine.
@@ -24,7 +26,7 @@ internal class GridDimensions(
     var height: Int,
 ) {
     init {
-        require(width > 0) { "Terminal width must be strictly positive, got $width" }
+        require(width >= MIN_WIDTH) { "Terminal width must be at least $MIN_WIDTH, got $width" }
         require(height > 0) { "Terminal height must be strictly positive, got $height" }
     }
 

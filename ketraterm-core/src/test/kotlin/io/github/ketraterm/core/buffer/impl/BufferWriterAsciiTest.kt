@@ -72,7 +72,7 @@ class BufferWriterAsciiTest {
     }
 
     @ParameterizedTest
-    @CsvSource("1,0", "1,2", "4,0", "4,10", "80,2", "80,10")
+    @CsvSource("2,0", "2,2", "4,0", "4,10", "80,2", "80,10")
     fun `ASCII spans match scalar writes through wrapping history eviction and reflow`(
         width: Int,
         history: Int,

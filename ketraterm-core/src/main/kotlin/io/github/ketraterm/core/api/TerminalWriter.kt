@@ -96,11 +96,12 @@ public interface TerminalWriter {
      * The core computes the final display width from its active width policy,
      * including East Asian ambiguous-width mode.
      * The used prefix is copied into core-owned storage before returning; the caller
-     * may immediately reuse the array.
+     * may immediately reuse the array. At most 32 codepoints are accepted, as defined by
+     * [io.github.ketraterm.protocol.TerminalTextLimits.MAX_CLUSTER_CODEPOINTS].
      *
      * @param codepoints Codepoints that make up the grapheme cluster.
      * @param length Number of valid codepoints in [codepoints].
-     * @throws IllegalArgumentException if [length] is outside `1..codepoints.size`
+     * @throws IllegalArgumentException if [length] exceeds 32 or is outside `1..codepoints.size`
      * or any value in the used prefix is not a Unicode scalar. The entire prefix
      * is checked before mutation; unused array entries are ignored.
      */
@@ -126,11 +127,11 @@ public interface TerminalWriter {
      * compare the supplied prefix with stored text.
      *
      * The used prefix is copied into core-owned storage before returning; the caller may
-     * immediately reuse the array. No parser retention limit is imposed on direct callers.
+     * immediately reuse the array. The same 32-codepoint bound applies to direct callers.
      *
      * @param codepoints Complete retained codepoints of the same grapheme.
      * @param length Number of valid codepoints in [codepoints].
-     * @throws IllegalArgumentException if [length] is outside `1..codepoints.size` or any
+     * @throws IllegalArgumentException if [length] exceeds 32 or is outside `1..codepoints.size` or any
      * used entry is not a Unicode scalar, even without a target. Validation precedes mutation.
      */
     public fun updatePreviousCluster(

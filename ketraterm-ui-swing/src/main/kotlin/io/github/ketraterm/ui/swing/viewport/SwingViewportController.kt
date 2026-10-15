@@ -15,6 +15,7 @@
  */
 package io.github.ketraterm.ui.swing.viewport
 
+import io.github.ketraterm.core.TerminalBuffers
 import io.github.ketraterm.render.api.TerminalRenderBufferKind
 import io.github.ketraterm.render.api.TerminalRenderFrameReader
 import io.github.ketraterm.session.TerminalShellIntegrationView
@@ -70,7 +71,9 @@ internal class SwingViewportController(
         dividersEnabled = enabled
         if (enabled) {
             dividerLayout.updateFrom(reader, state, visibleRows, retainedOutput, resizeAnchorLineId)
-            val outputAdvanced = oldLiveTop != null && dividerLayout.liveTop > oldLiveTop
+            // Reflow can advance the live top without new output. Apply the pending resize
+            // anchor before resuming ordinary output-following on subsequent updates.
+            val outputAdvanced = resizeAnchorRow == Long.MIN_VALUE && oldLiveTop != null && dividerLayout.liveTop > oldLiveTop
             scrollModel.clamp(dividerLayout.scrollRange, dividerLayout.visualDiscardedCount, scrollOnOutput && outputAdvanced)
             if (oldOffset == 0.0 || scrollOnOutput && outputAdvanced) {
                 scrollModel.reanchor(0.0)
@@ -116,7 +119,7 @@ internal class SwingViewportController(
             isCoalesce = true
             initialDelay = 0
         }
-    private val visibleGridSizeSnapshot = AtomicLong(packVisibleGridSize(1, 1))
+    private val visibleGridSizeSnapshot = AtomicLong(packVisibleGridSize(TerminalBuffers.MIN_WIDTH, 1))
 
     // The EDT is the sole writer. Worker snapshots share this monitor with publication;
     // EDT paint getters read directly because no other thread can modify these fields.
@@ -457,7 +460,7 @@ internal class SwingViewportController(
         activeBuffer: TerminalRenderBufferKind,
     ): Int =
         maxOf(
-            1,
+            TerminalBuffers.MIN_WIDTH,
             (
                 componentWidth -
                     chrome.horizontalInset(

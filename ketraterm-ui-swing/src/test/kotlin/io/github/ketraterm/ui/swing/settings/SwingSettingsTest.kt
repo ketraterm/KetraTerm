@@ -475,9 +475,11 @@ class SwingSettingsTest {
 
     @Test
     fun settingsRejectInvalidGridSizes() {
-        assertFailsWith<IllegalArgumentException> {
-            SwingSettings.create { draft ->
-                draft.columns = 0
+        for (columns in intArrayOf(Int.MIN_VALUE, -1, 0, 1)) {
+            assertFailsWith<IllegalArgumentException> {
+                SwingSettings.create { draft ->
+                    draft.columns = columns
+                }
             }
         }
         assertFailsWith<IllegalArgumentException> {
@@ -485,6 +487,13 @@ class SwingSettingsTest {
                 draft.rows = 0
             }
         }
+        val minimum =
+            SwingSettings.create { draft ->
+                draft.columns = 2
+                draft.rows = 1
+            }
+        assertEquals(2, minimum.columns)
+        assertEquals(1, minimum.rows)
     }
 
     @Test

@@ -16,7 +16,8 @@
 package io.github.ketraterm.core.model
 
 import io.github.ketraterm.core.api.TerminalLine
-import io.github.ketraterm.core.store.ClusterStore
+import io.github.ketraterm.protocol.TerminalTextLimits.MAX_CLUSTER_CODEPOINTS
+import java.util.*
 
 /**
  * A mutable physical terminal line backed by primitive arrays.
@@ -33,22 +34,18 @@ import io.github.ketraterm.core.store.ClusterStore
  *
  * ## Ownership
  *
- * [store] is shared by all lines belonging to the same [io.github.ketraterm.core.buffer.HistoryRing].
- * Lines must never be transferred to a ring that uses a different store without
- * deep-copying their cluster payloads (see [io.github.ketraterm.core.engine.TerminalResizer]).
+ * Each row owns its cluster payloads. Raw cluster references never cross rows;
+ * copies read the source payload and write it into the destination row.
  *
  * ## Mutability
  *
- * All mutation methods are `internal` and called exclusively by
- * [io.github.ketraterm.core.engine.MutationEngine]. The [TerminalLine] surface exposed to
- * the renderer is strictly read-only.
+ * This type is internal to core. Writer, screen-lifecycle, and resize code own its mutation;
+ * the [TerminalLine] surface exposed to the renderer is strictly read-only.
  *
  * @param width The number of columns in this line. Immutable after construction.
- * @param store The [ClusterStore] that owns cluster payloads for this line's ring.
  */
 internal class Line(
     override val width: Int,
-    internal val store: ClusterStore,
 ) : TerminalLine {
     init {
         require(width > 0) { "Line width must be positive, got $width" }
@@ -57,14 +54,22 @@ internal class Line(
     /** Raw storage array. May contain codepoints, EMPTY, WIDE_CHAR_SPACER, or cluster handles. */
     private val codepoints = IntArray(width) { TerminalConstants.EMPTY }
 
-    /** Primary packed cell attributes, parallel to [codepoints]. */
+    /** Primary-packed cell attributes, parallel to [codepoints]. */
     private val attrs = LongArray(width)
 
     /** Allocated on the first nonzero extended write and retained through clears for reuse. */
     private var extendedAttrs: LongArray? = null
 
-    /** Number of cluster-bearing cells; zero lets range erases skip the handle scan. */
-    private var clusterCount: Int = 0
+    /** False only when every retained extended word is known to be zero. */
+    private var hasExtendedAttrs: Boolean = false
+
+    /** Lazy row-owned payload arena and reusable compaction destination. */
+    private var clusterData: IntArray? = null
+    private var clusterCompactionData: IntArray? = null
+    private var clusterDataSize = 0
+
+    /** Exact live payload size; zero resets the append cursor without scanning cells. */
+    private var liveClusterCodepoints = 0
 
     /**
      * True when this line's content continues on the next physical line.
@@ -138,34 +143,8 @@ internal class Line(
     fun rawCodepoint(col: Int): Int = codepoints[col]
 
     /**
-     * Writes [raw] and [attr] directly into [col] without allocating or freeing any
-     * cluster handle. Used by [io.github.ketraterm.core.engine.TerminalResizer] to transplant
-     * raw values (including live cluster handles) into a newly allocated line that
-     * shares the same [store].
-     *
-     * **Caller is responsible** for ensuring the handle is valid in [store] and
-     * releasing or transferring any replaced handle. Row-local cluster accounting
-     * is updated without changing store ownership.
-     *
-     * @param col Column index.
-     */
-    fun setRawCell(
-        col: Int,
-        raw: Int,
-        attr: Long,
-        extendedAttr: Long = 0L,
-    ) {
-        if (col == width - 1) endsWithWrapPadding = false
-        if (codepoints[col] <= TerminalConstants.CLUSTER_HANDLE_MAX) clusterCount--
-        if (raw <= TerminalConstants.CLUSTER_HANDLE_MAX) clusterCount++
-        codepoints[col] = raw
-        attrs[col] = attr
-        extendedAttrsForWrite(extendedAttr)?.set(col, extendedAttr)
-    }
-
-    /**
      * Replaces only the packed visual attributes at [col], retaining its raw cell value and any
-     * cluster-store ownership. This is the safe attribute-only mutation used by DEC rectangle
+     * row-owned cluster payload. This is the safe attribute-only mutation used by DEC rectangle
      * operations.
      */
     fun setCellAttributes(
@@ -189,7 +168,7 @@ internal class Line(
      */
     override fun getCodepoint(col: Int): Int {
         val raw = codepoints[col]
-        return if (raw <= TerminalConstants.CLUSTER_HANDLE_MAX) store.baseCodepoint(raw) else raw
+        return if (raw <= TerminalConstants.CLUSTER_HANDLE_MAX) checkNotNull(clusterData)[clusterOffset(raw)] else raw
     }
 
     /**
@@ -211,7 +190,7 @@ internal class Line(
 
     override fun getClusterLength(col: Int): Int {
         val raw = codepoints[col]
-        return if (raw <= TerminalConstants.CLUSTER_HANDLE_MAX) store.length(raw) else 0
+        return if (raw <= TerminalConstants.CLUSTER_HANDLE_MAX) clusterLength(raw) else 0
     }
 
     /**
@@ -226,13 +205,23 @@ internal class Line(
     override fun readCluster(
         col: Int,
         dest: IntArray,
+    ): Int = readCluster(col, dest, 0)
+
+    /** Copies a row-owned payload into reusable mutation or reflow scratch storage. */
+    fun readCluster(
+        col: Int,
+        dest: IntArray,
+        destOffset: Int,
     ): Int {
         val raw = codepoints[col]
         if (raw > TerminalConstants.CLUSTER_HANDLE_MAX) return 0
-        return store.readInto(raw, dest)
+        val length = clusterLength(raw)
+        Objects.checkFromIndexSize(destOffset, length, dest.size)
+        System.arraycopy(checkNotNull(clusterData), clusterOffset(raw), dest, destOffset, length)
+        return length
     }
 
-    // Internal mutation — called exclusively by GridWriter
+    // Internal mutation
 
     /**
      * Writes a single codepoint into [col], freeing any cluster handle previously
@@ -277,15 +266,14 @@ internal class Line(
             attrs[target] = attr
             written++
         }
-        if (written > 0) extendedAttrsForWrite(extendedAttr)?.fill(extendedAttr, col, col + written)
+        if (written > 0) fillExtendedAttrs(extendedAttr, col, col + written)
         if (written > 0 && col + written == width) endsWithWrapPadding = false
         return written
     }
 
     /**
-     * Writes a grapheme cluster into [col] by allocating a slot in [store] and
-     * storing the resulting handle. Any previous value (including another cluster
-     * handle) at [col] is freed first.
+     * Copies a bounded grapheme into this row's arena. Replacements reuse an existing
+     * payload region when it fits; other writes append, compacting dead regions as needed.
      *
      * @param col    Target column.
      * @param cps    Source array of codepoints. Not retained after this call.
@@ -299,10 +287,25 @@ internal class Line(
         attr: Long,
         extendedAttr: Long = 0L,
     ) {
+        require(cpLen in 1..MAX_CLUSTER_CODEPOINTS)
+        Objects.checkFromIndexSize(0, cpLen, cps.size)
+        val old = codepoints[col]
         if (col == width - 1) endsWithWrapPadding = false
-        freeHandleAt(col)
-        codepoints[col] = store.alloc(cps, 0, cpLen)
-        clusterCount++
+        if (old <= TerminalConstants.CLUSTER_HANDLE_MAX && clusterLength(old) >= cpLen) {
+            val offset = clusterOffset(old)
+            System.arraycopy(cps, 0, checkNotNull(clusterData), offset, cpLen)
+            liveClusterCodepoints += cpLen - clusterLength(old)
+            codepoints[col] = encodeCluster(offset, cpLen)
+        } else {
+            freeHandleAt(col)
+            // Compaction scans live cells, so remove the obsolete reference first.
+            codepoints[col] = TerminalConstants.EMPTY
+            val data = reserveClusterData(cpLen)
+            System.arraycopy(cps, 0, data, clusterDataSize, cpLen)
+            codepoints[col] = encodeCluster(clusterDataSize, cpLen)
+            clusterDataSize += cpLen
+            liveClusterCodepoints += cpLen
+        }
         attrs[col] = attr
         extendedAttrsForWrite(extendedAttr)?.set(col, extendedAttr)
     }
@@ -315,10 +318,11 @@ internal class Line(
         defaultAttr: Long,
         defaultExtendedAttr: Long = 0L,
     ) {
-        freeHandlesInRange(0, width)
+        liveClusterCodepoints = 0
+        clusterDataSize = 0
         codepoints.fill(TerminalConstants.EMPTY)
         attrs.fill(defaultAttr)
-        extendedAttrsForWrite(defaultExtendedAttr)?.fill(defaultExtendedAttr)
+        fillExtendedAttrs(defaultExtendedAttr)
         wrapped = false
     }
 
@@ -337,7 +341,7 @@ internal class Line(
         freeHandlesInRange(from, width)
         codepoints.fill(TerminalConstants.EMPTY, from, width)
         attrs.fill(attr, from, width)
-        extendedAttrsForWrite(extendedAttr)?.fill(extendedAttr, from, width)
+        fillExtendedAttrs(extendedAttr, from, width)
     }
 
     /**
@@ -355,7 +359,7 @@ internal class Line(
         freeHandlesInRange(0, to)
         codepoints.fill(TerminalConstants.EMPTY, 0, to)
         attrs.fill(attr, 0, to)
-        extendedAttrsForWrite(extendedAttr)?.fill(extendedAttr, 0, to)
+        fillExtendedAttrs(extendedAttr, 0, to)
     }
 
     /**
@@ -375,7 +379,7 @@ internal class Line(
         freeHandlesInRange(from, to)
         codepoints.fill(TerminalConstants.EMPTY, from, to)
         attrs.fill(attr, from, to)
-        extendedAttrsForWrite(extendedAttr)?.fill(extendedAttr, from, to)
+        fillExtendedAttrs(extendedAttr, from, to)
     }
 
     /**
@@ -417,11 +421,11 @@ internal class Line(
         if (shiftCount > 0) {
             System.arraycopy(codepoints, col, codepoints, col + safeCount, shiftCount)
             System.arraycopy(attrs, col, attrs, col + safeCount, shiftCount)
-            extendedAttrs?.let { System.arraycopy(it, col, it, col + safeCount, shiftCount) }
+            if (hasExtendedAttrs) extendedAttrs?.let { System.arraycopy(it, col, it, col + safeCount, shiftCount) }
         }
         codepoints.fill(TerminalConstants.EMPTY, col, col + safeCount)
         attrs.fill(defaultAttr, col, col + safeCount)
-        extendedAttrsForWrite(defaultExtendedAttr)?.fill(defaultExtendedAttr, col, col + safeCount)
+        fillExtendedAttrs(defaultExtendedAttr, col, col + safeCount)
     }
 
     /**
@@ -469,7 +473,7 @@ internal class Line(
         if (shiftCount > 0) {
             System.arraycopy(codepoints, col + safeCount, codepoints, col, shiftCount)
             System.arraycopy(attrs, col + safeCount, attrs, col, shiftCount)
-            extendedAttrs?.let { System.arraycopy(it, col + safeCount, it, col, shiftCount) }
+            if (hasExtendedAttrs) extendedAttrs?.let { System.arraycopy(it, col + safeCount, it, col, shiftCount) }
         }
 
         // Fill the vacated trailing cells with blanks.
@@ -478,7 +482,7 @@ internal class Line(
         val clearStart = rightInclusive - safeCount + 1
         codepoints.fill(TerminalConstants.EMPTY, clearStart, rightInclusive + 1)
         attrs.fill(defaultAttr, clearStart, rightInclusive + 1)
-        extendedAttrsForWrite(defaultExtendedAttr)?.fill(defaultExtendedAttr, clearStart, rightInclusive + 1)
+        fillExtendedAttrs(defaultExtendedAttr, clearStart, rightInclusive + 1)
     }
 
     /**
@@ -491,10 +495,11 @@ internal class Line(
         extendedAttr: Long = 0L,
     ) {
         endsWithWrapPadding = false
-        freeHandlesInRange(0, width)
+        liveClusterCodepoints = 0
+        clusterDataSize = 0
         codepoints.fill(codepoint)
         attrs.fill(attr)
-        extendedAttrsForWrite(extendedAttr)?.fill(extendedAttr)
+        fillExtendedAttrs(extendedAttr)
     }
 
     // -------------------------------------------------------------------------
@@ -531,9 +536,20 @@ internal class Line(
     // -------------------------------------------------------------------------
 
     private fun extendedAttrsForWrite(value: Long): LongArray? {
+        if (value == 0L && !hasExtendedAttrs) return null
+        if (value != 0L) hasExtendedAttrs = true
         val existing = extendedAttrs
-        if (existing != null || value == 0L) return existing
+        if (existing != null) return existing
         return LongArray(width).also { extendedAttrs = it }
+    }
+
+    private fun fillExtendedAttrs(
+        value: Long,
+        fromIndex: Int = 0,
+        toIndex: Int = width,
+    ) {
+        extendedAttrsForWrite(value)?.fill(value, fromIndex, toIndex)
+        if (fromIndex == 0 && toIndex == width) hasExtendedAttrs = value != 0L
     }
 
     /**
@@ -546,19 +562,21 @@ internal class Line(
             raw == TerminalConstants.EMPTY -> append(' ')
             raw == TerminalConstants.WIDE_CHAR_SPACER -> Unit // skip; leader already appended
             raw <= TerminalConstants.CLUSTER_HANDLE_MAX -> {
-                val len = store.length(raw)
-                for (i in 0 until len) appendCodePoint(store.codepointAt(raw, i))
+                val len = clusterLength(raw)
+                val data = checkNotNull(clusterData)
+                val offset = clusterOffset(raw)
+                for (i in 0 until len) appendCodePoint(data[offset + i])
             }
             else -> appendCodePoint(raw)
         }
     }
 
-    /** Frees the cluster handle at [col] if present; no-op otherwise. */
+    /** Marks a payload dead; row-local references need no shared allocator bookkeeping. */
     private fun freeHandleAt(col: Int) {
         val raw = codepoints[col]
         if (raw <= TerminalConstants.CLUSTER_HANDLE_MAX) {
-            store.free(raw)
-            clusterCount--
+            liveClusterCodepoints -= clusterLength(raw)
+            if (liveClusterCodepoints == 0) clusterDataSize = 0
         }
     }
 
@@ -566,8 +584,54 @@ internal class Line(
         fromIndex: Int,
         toIndex: Int,
     ) {
-        if (clusterCount == 0) return
-        clusterCount -= store.freeRange(codepoints, fromIndex, toIndex)
+        if (liveClusterCodepoints == 0) return
+        for (col in fromIndex until toIndex) freeHandleAt(col)
+    }
+
+    /**
+     * Compacts only on append exhaustion. Keeping at least half the destination free amortizes
+     * the row scan under repeated overwrites. Two retained arrays make compaction safe after
+     * arbitrary cell shifts and allocation-free once their capacities have warmed up.
+     */
+    private fun reserveClusterData(length: Int): IntArray {
+        val data = clusterData
+        if (data != null && length <= data.size - clusterDataSize) return data
+        val required = liveClusterCodepoints.toLong() + length
+        if (required > MAX_CLUSTER_DATA_CAPACITY) throw OutOfMemoryError("Row cluster storage exhausted")
+        val capacity = maxOf(16L, required * 2).coerceAtMost(MAX_CLUSTER_DATA_CAPACITY.toLong()).toInt()
+        val spare = clusterCompactionData
+        val target = if (spare != null && spare.size >= capacity) spare else IntArray(capacity)
+        var position = 0
+        if (liveClusterCodepoints != 0) {
+            val source = checkNotNull(data)
+            for (col in 0 until width) {
+                val raw = codepoints[col]
+                if (raw > TerminalConstants.CLUSTER_HANDLE_MAX) continue
+                val count = clusterLength(raw)
+                System.arraycopy(source, clusterOffset(raw), target, position, count)
+                codepoints[col] = encodeCluster(position, count)
+                position += count
+            }
+        }
+        clusterCompactionData = data
+        clusterData = target
+        clusterDataSize = position
+        return target
+    }
+
+    private companion object {
+        // Sign bit marks a cluster; bit 30 stays clear, excluding the -1 spacer sentinel.
+        // Five low bits encode length - 1; the remaining 25 bits encode a row-local offset.
+        const val MAX_CLUSTER_DATA_CAPACITY = 1 shl 25
+
+        fun clusterLength(raw: Int): Int = (raw and 31) + 1
+
+        fun clusterOffset(raw: Int): Int = (raw ushr 5) and (MAX_CLUSTER_DATA_CAPACITY - 1)
+
+        fun encodeCluster(
+            offset: Int,
+            length: Int,
+        ): Int = Int.MIN_VALUE or (offset shl 5) or (length - 1)
     }
 
     @Suppress("NOTHING_TO_INLINE")

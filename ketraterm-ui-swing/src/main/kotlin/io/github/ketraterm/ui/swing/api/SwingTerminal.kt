@@ -824,7 +824,8 @@ public class SwingTerminal
         }
 
         /**
-         * Returns the grid size that fits in this component's current bounds.
+         * Returns the session grid size for this component's current bounds.
+         * Narrow bounds retain at least two columns and one row; painting clips to the component.
          *
          * This method may be called from any thread. EDT callers refresh the
          * snapshot from live component state before reading it; off-EDT callers read

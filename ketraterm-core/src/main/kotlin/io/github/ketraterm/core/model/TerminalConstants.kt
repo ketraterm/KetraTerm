@@ -19,7 +19,7 @@ package io.github.ketraterm.core.model
  * Sentinel values stored directly in a Line's raw codepoint array.
  *
  * Cell value encoding contract (all values are Ints):
- * The gap between SPACER (-1) and the first valid cluster handle (-2) is intentional.
+ * Cluster references occupy a negative range distinct from SPACER (-1).
  * It lets any consumer distinguish the three cases with a single comparison:
  *   value > 0 → codepoint
  *   value == 0 → empty

@@ -30,6 +30,8 @@ import io.github.ketraterm.input.policy.TerminalInputPolicy
 import io.github.ketraterm.parser.api.TerminalOutputParser
 import io.github.ketraterm.parser.api.TerminalOutputParserFactory
 import io.github.ketraterm.parser.api.TerminalParsers
+import io.github.ketraterm.render.api.TerminalRenderFrameConsumer
+import io.github.ketraterm.render.api.TerminalRenderFrameReader
 import io.github.ketraterm.testkit.MockConnector
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -44,6 +46,43 @@ import java.util.*
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class TerminalSessionConstructionTest {
+    @ParameterizedTest
+    @ValueSource(ints = [Int.MIN_VALUE, -1, 0, 1])
+    fun `initial widths below the terminal minimum reject before collaborator reads or ownership transfer`(columns: Int) {
+        val backing = TerminalBuffers.create(TerminalBuffers.MIN_WIDTH, 1)
+        val terminal =
+            object : TerminalBuffer by backing {
+                override val width: Int = columns
+            }
+        val connector = MockConnector()
+        var frameRead = false
+        var parserCreated = false
+        val renderReader =
+            object : TerminalRenderFrameReader {
+                override fun readRenderFrame(consumer: TerminalRenderFrameConsumer) {
+                    frameRead = true
+                    backing.readRenderFrame(consumer)
+                }
+            }
+        assertThrows(IllegalArgumentException::class.java) {
+            TerminalSession.create(
+                terminal,
+                renderReader,
+                connector,
+                parserFactory =
+                    TerminalOutputParserFactory { _, _ ->
+                        parserCreated = true
+                        error("must not create parser")
+                    },
+            )
+        }
+        assertFalse(frameRead)
+        assertFalse(parserCreated)
+        assertFalse(connector.isClosed)
+        assertEquals(0, connector.startCount)
+        assertTrue(connector.resizeCalls.isEmpty())
+    }
+
     @Test
     fun `custom encoders share ordered output and retain bulk admission modes and policy`() =
         runTest {

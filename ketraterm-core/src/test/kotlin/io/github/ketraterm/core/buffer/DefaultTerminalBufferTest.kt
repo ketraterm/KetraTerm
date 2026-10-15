@@ -77,7 +77,7 @@ class DefaultTerminalBufferTest {
     @Test
     fun `constructor and factory reject invalid dimensions`() {
         assertThrows<IllegalArgumentException> { DefaultTerminalBuffer(0, 1) }
-        assertThrows<IllegalArgumentException> { TerminalBuffers.create(1, 0) }
+        assertThrows<IllegalArgumentException> { TerminalBuffers.create(2, 0) }
     }
 
     @Test

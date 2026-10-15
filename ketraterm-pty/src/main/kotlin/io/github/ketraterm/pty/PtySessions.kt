@@ -60,6 +60,9 @@ internal object PtySessions {
         options: PtyOptions,
         processFactory: PtyProcessFactory = Pty4jProcessFactory,
     ): TerminalSession {
+        require(options.columns >= TerminalBuffers.MIN_WIDTH) {
+            "terminal columns must be at least ${TerminalBuffers.MIN_WIDTH}, got ${options.columns}"
+        }
         val connector = PtyConnectors.create(options, processFactory)
         try {
             val terminal =

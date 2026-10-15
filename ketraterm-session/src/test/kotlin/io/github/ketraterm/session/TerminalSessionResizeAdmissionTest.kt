@@ -188,8 +188,12 @@ class TerminalSessionResizeAdmissionTest {
                     runCurrent()
                     val before = session.renderGeneration.value
 
-                    for ((columns, rows) in listOf(0 to 1, 1 to 0, Int.MIN_VALUE to 1, 1 to Int.MIN_VALUE)) {
+                    for ((columns, rows) in listOf(0 to 1, 1 to 1, 2 to 0, Int.MIN_VALUE to 1, 2 to Int.MIN_VALUE)) {
+                        assertThrows(IllegalArgumentException::class.java) { session.resize(columns, rows) }
+                        assertThrows(IllegalArgumentException::class.java) { session.resizeViewport(columns, rows) }
                         assertThrows(IllegalArgumentException::class.java) { session.tryResizeViewport(columns, rows) }
+                        assertThrows(IllegalArgumentException::class.java) { session.tryResizeViewport(columns, rows, 0, 20, 10) }
+                        assertThrows(IllegalArgumentException::class.java) { session.tryUpdateViewportPixels(columns, rows, 20, 10) }
                     }
                     runCurrent()
 

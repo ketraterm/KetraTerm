@@ -15,6 +15,7 @@
  */
 package io.github.ketraterm.session
 
+import io.github.ketraterm.core.TerminalBuffers
 import io.github.ketraterm.core.api.*
 import io.github.ketraterm.host.*
 import io.github.ketraterm.input.TerminalInputEncoders
@@ -541,14 +542,14 @@ public class TerminalSession private constructor(
      * Startup failure closes owned resources, retains the failure in [state],
      * and rethrows it with any cleanup failures suppressed.
      *
-     * @param columns initial terminal width count.
+     * @param columns initial terminal width; at least [TerminalBuffers.MIN_WIDTH].
      * @param rows initial terminal height count.
      */
     public fun start(
         columns: Int,
         rows: Int,
     ) {
-        require(columns > 0) { "columns must be positive, got $columns" }
+        require(columns >= TerminalBuffers.MIN_WIDTH) { "columns must be at least ${TerminalBuffers.MIN_WIDTH}, got $columns" }
         require(rows > 0) { "rows must be positive, got $rows" }
         synchronized(connectorLifecycleLock) {
             check(!isSessionClosed() && !startAttempted) {
@@ -587,7 +588,7 @@ public class TerminalSession private constructor(
     /**
      * Resizes core and the active connector, then requests a new published frame.
      *
-     * @param columns target terminal column width.
+     * @param columns target terminal column width; at least [TerminalBuffers.MIN_WIDTH].
      * @param rows target terminal row height.
      * @param oldScrollbackOffset The scrollback offset that was active in the UI before this resize.
      *   Pass 0 if the viewport was at the live screen (no scrollback).
@@ -613,7 +614,7 @@ public class TerminalSession private constructor(
      * Consumers that retain scrollback position must adopt the complete result
      * together, so later output is measured against the resized history.
      *
-     * @param columns target terminal column width; must be positive.
+     * @param columns target terminal column width; at least [TerminalBuffers.MIN_WIDTH].
      * @param rows target terminal row height; must be positive.
      * @param oldScrollbackOffset pre-resize whole-row offset, or zero for live output.
      * @return the resized viewport and history metadata from one synchronized state.
@@ -637,7 +638,7 @@ public class TerminalSession private constructor(
      * Connector resize and disposal share a separate lock. Closure prevents new connector resize calls.
      * This method is synchronous and can block in the connector.
      *
-     * @param columns positive terminal column count.
+     * @param columns terminal column count; at least [TerminalBuffers.MIN_WIDTH].
      * @param rows positive terminal row count.
      * @param oldScrollbackOffset whole-row offset above the live screen, or zero.
      * @return the complete resize anchor, or null if closure has begun.
@@ -656,7 +657,7 @@ public class TerminalSession private constructor(
      * writer only after connector resize succeeds. Other admission, anchoring, and
      * failure rules are those of the cell-only [tryResizeViewport] overload.
      *
-     * @param columns positive terminal column count.
+     * @param columns terminal column count; at least [TerminalBuffers.MIN_WIDTH].
      * @param rows positive terminal row count.
      * @param oldScrollbackOffset whole-row offset above the live screen, or zero.
      * @param pixelWidth nonnegative text-area width in pixels.
@@ -680,7 +681,7 @@ public class TerminalSession private constructor(
         pixelHeight: Int,
         pixelSizeSupplied: Boolean,
     ): TerminalViewportResizeResult? {
-        require(columns > 0) { "columns must be positive, got $columns" }
+        require(columns >= TerminalBuffers.MIN_WIDTH) { "columns must be at least ${TerminalBuffers.MIN_WIDTH}, got $columns" }
         require(rows > 0) { "rows must be positive, got $rows" }
         require(pixelWidth >= 0 && pixelHeight >= 0) { "pixel dimensions must be nonnegative" }
         if (isSessionClosed()) return null
@@ -756,7 +757,7 @@ public class TerminalSession private constructor(
      * A successful update preserves content, selection anchors, and render generations.
      * Subscribed notifications enter the ordered writer before this call returns.
      *
-     * @param columns expected positive terminal column count.
+     * @param columns expected terminal column count; at least [TerminalBuffers.MIN_WIDTH].
      * @param rows expected positive terminal row count.
      * @param pixelWidth nonnegative text-area width excluding padding; zero means unknown.
      * @param pixelHeight nonnegative text-area height excluding padding; zero means unknown.
@@ -768,7 +769,8 @@ public class TerminalSession private constructor(
         pixelWidth: Int,
         pixelHeight: Int,
     ): Boolean {
-        require(columns > 0 && rows > 0) { "grid dimensions must be positive" }
+        require(columns >= TerminalBuffers.MIN_WIDTH) { "columns must be at least ${TerminalBuffers.MIN_WIDTH}, got $columns" }
+        require(rows > 0) { "rows must be positive, got $rows" }
         require(pixelWidth >= 0 && pixelHeight >= 0) { "pixel dimensions must be nonnegative" }
         if (isSessionClosed()) return false
         try {
@@ -1567,6 +1569,7 @@ public class TerminalSession private constructor(
         /**
          * Assembles core and render collaborators with session-owned host services.
          *
+         * Width must be at least [TerminalBuffers.MIN_WIDTH] and height must be positive.
          * Dimensions are validated before factory calls or connector ownership
          * transfer. The collaborators must describe the same terminal state; equal
          * dimensions alone cannot establish that relationship. Factory failures
@@ -1597,7 +1600,7 @@ public class TerminalSession private constructor(
          * Its callback runs under mutation serialization and may read frames before later output.
          * It must not call mutating session APIs or close the session.
          * @throws IllegalArgumentException when [startupCommand] is supplied without [shellIntegration].
-         * @throws IllegalArgumentException when the initial render frame is absent or has incompatible dimensions,
+         * @throws IllegalArgumentException when terminal dimensions are invalid, the initial render frame is absent or has incompatible dimensions,
          * or the input factory reuses one encoder instance.
          * @return standard production terminal session.
          */
@@ -1621,6 +1624,10 @@ public class TerminalSession private constructor(
             inputEncoderFactory: TerminalInputEncoderFactory? = null,
             parserFactory: TerminalOutputParserFactory? = null,
         ): TerminalSession {
+            require(terminal.width >= TerminalBuffers.MIN_WIDTH) {
+                "terminal width must be at least ${TerminalBuffers.MIN_WIDTH}, got ${terminal.width}"
+            }
+            require(terminal.height > 0) { "terminal height must be positive, got ${terminal.height}" }
             require(startupCommand == null || shellIntegration != null) {
                 "startupCommand requires a shell integration that supplies prompt readiness"
             }

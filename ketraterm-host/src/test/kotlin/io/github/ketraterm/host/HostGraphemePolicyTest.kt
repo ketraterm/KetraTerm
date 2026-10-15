@@ -156,7 +156,7 @@ class HostGraphemePolicyTest {
     }
 
     @ParameterizedTest
-    @CsvSource("1,0,0", "2,0,1", "4,0,3", "6,1,4")
+    @CsvSource("2,0,1", "4,0,3", "6,1,4")
     fun `late widening at right margin stays in place and following text obeys autowrap`(
         width: Int,
         left: Int,
@@ -197,7 +197,7 @@ class HostGraphemePolicyTest {
     }
 
     @ParameterizedTest
-    @CsvSource("1,1", "1,2", "2,1", "2,2", "3,1", "3,2")
+    @CsvSource("2,1", "2,2", "3,1", "3,2")
     fun `narrowing on tiny grids does not undo eviction or a completed pending wrap`(
         width: Int,
         height: Int,
@@ -221,8 +221,7 @@ class HostGraphemePolicyTest {
                     assertEquals(historySize, terminal.historySize)
                     assertEquals(discarded, discardedCount(terminal))
                     parser.accept("X".encodeToByteArray())
-                    val xRow = if (width == 1) minOf(row + 1, height - 1) else row
-                    assertEquals('X'.code, terminal.getCodepointAt(minOf(1, width - 1), xRow))
+                    assertEquals('X'.code, terminal.getCodepointAt(1, row))
                 }
             }
         }

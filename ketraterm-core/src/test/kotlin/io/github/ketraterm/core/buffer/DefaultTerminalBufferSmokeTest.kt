@@ -39,18 +39,21 @@ class DefaultTerminalBufferSmokeTest {
     }
 
     @Test
-    fun `constructor and resize validation still reject non-positive dimensions`() {
-        assertThrows<IllegalArgumentException> { DefaultTerminalBuffer(0, 1) }
-        assertThrows<IllegalArgumentException> { TerminalBuffers.create(1, 0) }
+    fun `constructor and factory reject widths below two and non-positive heights`() {
+        for (width in intArrayOf(Int.MIN_VALUE, -1, 0, 1)) {
+            assertThrows<IllegalArgumentException> { DefaultTerminalBuffer(width, 1) }
+            assertThrows<IllegalArgumentException> { TerminalBuffers.create(width, 1) }
+        }
+        assertThrows<IllegalArgumentException> { TerminalBuffers.create(2, 0) }
     }
 
     @Test
     fun `factory rejects negative and overflowing retained line capacities before allocation`() {
         for (history in listOf(-1, Int.MIN_VALUE)) {
-            assertThrows<IllegalArgumentException> { TerminalBuffers.create(1, 4, history) }
+            assertThrows<IllegalArgumentException> { TerminalBuffers.create(2, 4, history) }
         }
         for ((height, history) in listOf(1 to Int.MAX_VALUE, Int.MAX_VALUE to 1, Int.MAX_VALUE to Int.MAX_VALUE)) {
-            assertThrows<IllegalArgumentException> { TerminalBuffers.create(1, height, history) }
+            assertThrows<IllegalArgumentException> { TerminalBuffers.create(2, height, history) }
         }
     }
 

@@ -32,7 +32,6 @@ class TerminalStateTest {
             { assertEquals(10, state.primaryBuffer.ring.capacity) },
             { assertEquals(3, state.altBuffer.ring.size) },
             { assertEquals(3, state.altBuffer.ring.capacity) },
-            { assertNotSame(state.primaryBuffer.store, state.altBuffer.store) },
             { assertSame(state.primaryBuffer.ring, state.ring) },
             { assertSame(state.primaryBuffer.cursor, state.cursor) },
             { assertSame(state.primaryBuffer.savedCursor, state.savedCursor) },

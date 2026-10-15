@@ -23,6 +23,9 @@ import io.github.ketraterm.core.buffer.DefaultTerminalBuffer
  * Factory for creating terminal buffer instances behind the public core API.
  */
 public object TerminalBuffers {
+    /** Minimum grid width, allowing every supported wide occupant to fit on one row. */
+    public const val MIN_WIDTH: Int = 2
+
     /**
      * Creates a terminal buffer with the requested visible dimensions and
      * scrollback capacity.
@@ -33,12 +36,12 @@ public object TerminalBuffers {
      * Atomic mode snapshots retain their narrower method-level concurrency
      * guarantees; the factory does not install a synchronization boundary.
      *
-     * @param width Visible width in cells. Must be > 0.
+     * @param width Visible width in cells. Must be at least [MIN_WIDTH].
      * @param height Visible height in rows. Must be > 0.
      * @param maxHistory Maximum history lines; non-negative and small enough that adding
      * [height] does not exceed [Int.MAX_VALUE]. Zero disables retained scrollback.
      * @return A new [TerminalBuffer] instance initialized with the given dimensions.
-     * @throws IllegalArgumentException if either visible dimension is non-positive,
+     * @throws IllegalArgumentException if [width] is below [MIN_WIDTH], [height] is non-positive,
      * [maxHistory] is negative, or the retained line capacity would overflow [Int].
      */
     @JvmStatic
@@ -48,7 +51,7 @@ public object TerminalBuffers {
         height: Int,
         maxHistory: Int = 1000,
     ): TerminalRenderBuffer {
-        require(width > 0) { "width must be positive, was $width" }
+        require(width >= MIN_WIDTH) { "width must be at least $MIN_WIDTH, was $width" }
         require(height > 0) { "height must be positive, was $height" }
         require(maxHistory >= 0) { "maxHistory must be non-negative, was $maxHistory" }
         require(maxHistory <= Int.MAX_VALUE - height) {

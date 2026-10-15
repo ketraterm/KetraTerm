@@ -24,6 +24,7 @@ import io.github.ketraterm.core.model.UnderlineStyle
 import io.github.ketraterm.core.state.TerminalState
 import io.github.ketraterm.core.util.UnicodeWidth
 import io.github.ketraterm.core.util.validateAsciiRange
+import io.github.ketraterm.protocol.TerminalTextLimits.MAX_CLUSTER_CODEPOINTS
 
 internal class BufferWriter(
     private val state: TerminalState,
@@ -58,7 +59,9 @@ internal class BufferWriter(
         codepoints: IntArray,
         length: Int,
     ) {
-        require(length in 1..codepoints.size) { "length must be in 1..${codepoints.size}, was $length" }
+        require(length in 1..minOf(codepoints.size, MAX_CLUSTER_CODEPOINTS)) {
+            "length must be in 1..${minOf(codepoints.size, MAX_CLUSTER_CODEPOINTS)}, was $length"
+        }
 
         val charWidth = UnicodeWidth.calculateCluster(codepoints, length, state.modes.treatAmbiguousAsWide)
 
@@ -73,7 +76,9 @@ internal class BufferWriter(
         codepoints: IntArray,
         length: Int,
     ) {
-        require(length in 1..codepoints.size) { "length must be in 1..${codepoints.size}, was $length" }
+        require(length in 1..minOf(codepoints.size, MAX_CLUSTER_CODEPOINTS)) {
+            "length must be in 1..${minOf(codepoints.size, MAX_CLUSTER_CODEPOINTS)}, was $length"
+        }
         val charWidth = UnicodeWidth.calculateCluster(codepoints, length, state.modes.treatAmbiguousAsWide)
         mutationEngine.updatePreviousCluster(codepoints, length, charWidth)
     }

@@ -15,6 +15,7 @@
  */
 package io.github.ketraterm.workspace
 
+import io.github.ketraterm.core.TerminalBuffers
 import io.github.ketraterm.host.HostPolicy
 import io.github.ketraterm.host.TerminalClipboardPromptEvent
 import io.github.ketraterm.host.TerminalClipboardReadRequest
@@ -514,7 +515,7 @@ private object LocalPtyWorkspaceSessionFactory : TerminalWorkspaceSessionFactory
  *
  * Construction rejects invalid values with [IllegalArgumentException].
  *
- * @property columns initial terminal width in cells.
+ * @property columns initial terminal width in cells; at least [TerminalBuffers.MIN_WIDTH].
  * @property rows initial terminal height in rows.
  * @property treatAmbiguousAsWide width policy for future writes.
  * @property maxHistory max scrollback lines retained by the core buffer.
@@ -615,7 +616,7 @@ class TerminalWorkspaceOpenOptions private constructor(
     }
 
     init {
-        require(columns > 0) { "columns must be > 0, was $columns" }
+        require(columns >= TerminalBuffers.MIN_WIDTH) { "columns must be at least ${TerminalBuffers.MIN_WIDTH}, was $columns" }
         require(rows > 0) { "rows must be > 0, was $rows" }
         require(maxHistory >= 0) { "maxHistory must be >= 0, was $maxHistory" }
         require(modeReportCapabilities and TerminalHostModeCapability.ALL.inv() == 0) {

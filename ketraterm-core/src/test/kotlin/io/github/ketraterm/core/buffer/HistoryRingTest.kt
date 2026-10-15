@@ -16,7 +16,6 @@
 package io.github.ketraterm.core.buffer
 
 import io.github.ketraterm.core.model.Line
-import io.github.ketraterm.core.store.ClusterStore
 import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Nested
@@ -31,9 +30,8 @@ class HistoryRingTest {
     @ValueSource(ints = [5, 129, 259])
     fun `capacity changes preserve live rows and reuse spare rows through further growth`(capacity: Int) {
         for (pushes in intArrayOf(capacity / 2, capacity + 3)) {
-            val store = ClusterStore()
             val created = mutableListOf<Line>()
-            val ring = HistoryRing(capacity) { Line(2, store).also { created.add(it) } }
+            val ring = HistoryRing(capacity) { Line(2).also { created.add(it) } }
             repeat(pushes) { ring.push() }
             val before = List(ring.size) { ring[it] }
             val allocated = created.size
@@ -56,7 +54,7 @@ class HistoryRingTest {
             val wrapped = List(3) { ring[it] }
             ring.resizeCapacity(9, 0, 3)
             wrapped.forEachIndexed { index, line -> assertSame(line, ring[index]) }
-            repeat(6) { assertSame(store, ring.push().store) }
+            repeat(6) { assertEquals(2, ring.push().width) }
             assertEquals(9, (0 until ring.size).map { ring[it] }.toSet().size)
             assertEquals(capacity + 13, created.size)
         }
@@ -65,12 +63,11 @@ class HistoryRingTest {
     @ParameterizedTest
     @ValueSource(ints = [1, 7, 129, 259])
     fun `counted rotations preserve reference order and storage across ring boundaries`(capacity: Int) {
-        val store = ClusterStore()
         var allocations = 0
         val ring =
             HistoryRing(capacity) {
                 allocations++
-                Line(2, store)
+                Line(2)
             }
         for (pushes in intArrayOf(maxOf(1, capacity / 2), capacity, capacity + 1, capacity * 2 - 1)) {
             ring.clear()
@@ -122,7 +119,7 @@ class HistoryRingTest {
     }
 
     // Helper factory to create distinct lines for identity testing
-    private fun createLineFactory(width: Int = 10): () -> Line = { Line(width, ClusterStore()) }
+    private fun createLineFactory(width: Int = 10): () -> Line = { Line(width) }
 
     @Nested
     @DisplayName("Initialization")
@@ -130,9 +127,8 @@ class HistoryRingTest {
         @ParameterizedTest
         @ValueSource(ints = [1, 127, 128, 129, 256, 259])
         fun `constructs rows in bounded batches and recycles only at capacity`(capacity: Int) {
-            val store = ClusterStore()
             val created = mutableListOf<Line>()
-            val ring = HistoryRing(capacity) { Line(10, store).also { created.add(it) } }
+            val ring = HistoryRing(capacity) { Line(10).also { created.add(it) } }
             assertEquals(minOf(128, capacity), created.size)
 
             repeat(capacity) { index ->
@@ -154,11 +150,10 @@ class HistoryRingTest {
         @Test
         fun `reserves visible rows plus 128 spare rows`() {
             var created = 0
-            val store = ClusterStore()
             val ring =
                 HistoryRing(capacity = 1000, initialRows = 200) {
                     created++
-                    Line(4, store)
+                    Line(4)
                 }
             assertEquals(328, created)
             assertEquals(0, ring.size)
@@ -171,11 +166,10 @@ class HistoryRingTest {
         @Test
         fun `visible rows can exhaust capacity without reserving history`() {
             var created = 0
-            val store = ClusterStore()
             val ring =
                 HistoryRing(capacity = 200, initialRows = 200) {
                     created++
-                    Line(4, store)
+                    Line(4)
                 }
             repeat(400) { ring.push() }
             assertEquals(200, created)
@@ -355,9 +349,8 @@ class HistoryRingTest {
             for (pushes in intArrayOf(minOf(capacity, 3), minOf(capacity, 130), capacity, capacity + 2)) {
                 val size = minOf(capacity, pushes)
                 for (keep in intArrayOf(0, 1, minOf(size, 2), size)) {
-                    val store = ClusterStore()
                     val created = mutableListOf<Line>()
-                    val ring = HistoryRing(capacity) { Line(4, store).also { created.add(it) } }
+                    val ring = HistoryRing(capacity) { Line(4).also { created.add(it) } }
                     repeat(pushes) { ring.push().setCell(0, it + 1, 0) }
                     val retained = List(keep) { ring[size - keep + it] }
                     val allocated = created.size
@@ -399,9 +392,8 @@ class HistoryRingTest {
         @Test
         fun `clear reuses allocated batches after partial growth and wrapping`() {
             for (pushes in intArrayOf(129, 600)) {
-                val store = ClusterStore()
                 val created = mutableListOf<Line>()
-                val ring = HistoryRing(259) { Line(4, store).also { created.add(it) } }
+                val ring = HistoryRing(259) { Line(4).also { created.add(it) } }
                 repeat(pushes) { ring.push() }
                 val allocated = created.size
                 ring.clear()

@@ -22,10 +22,10 @@ public interfaces.
 - Keep primitive cell storage and allocation-light scalar/ASCII writes; avoid
   object-per-cell models and new allocations in steady-state mutation paths.
 - Preserve lazy extended-attribute storage and batched history-row allocation.
-- A screen's ring and cluster store are co-owned. Transfer cluster handles only
-  within that arena; deep-copy payloads when moving to a new store.
-- Release cluster handles before dropping or recycling live rows. Preserve row
-  identities, wrap provenance, and generation invalidation when content moves.
+- Rows own their cluster payloads. Raw references never cross rows; copy payloads
+  through the source row. Compaction must reuse warmed primitive storage.
+- Fully initialize recycled rows before exposing them as live content. Preserve
+  row identities, wrap provenance, and generation invalidation when content moves.
 
 ## Cell Invariants
 

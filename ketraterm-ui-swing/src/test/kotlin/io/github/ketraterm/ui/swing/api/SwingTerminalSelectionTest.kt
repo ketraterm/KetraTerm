@@ -1220,6 +1220,7 @@ class SwingTerminalSelectionTest {
                             flags = TerminalRenderCellFlags.CODEPOINT,
                             hyperlinkId = 7,
                         ),
+                        TestCell(),
                     ),
                 ),
             )
@@ -1277,6 +1278,11 @@ class SwingTerminalSelectionTest {
     @Test
     fun `plain click on hyperlink keeps normal selection behavior`() {
         val opened = AtomicInteger(0)
+        val settings =
+            SwingSettings.create { draft ->
+                draft.padding = SwingPadding(0, 0, 0, 0)
+                draft.shellIntegrationDecorationGutterWidth = 0
+            }
         val frame =
             TestRenderFrame(
                 arrayOf(
@@ -1286,6 +1292,7 @@ class SwingTerminalSelectionTest {
                             flags = TerminalRenderCellFlags.CODEPOINT,
                             hyperlinkId = 7,
                         ),
+                        TestCell(),
                     ),
                 ),
             )
@@ -1296,11 +1303,7 @@ class SwingTerminalSelectionTest {
             )
         val component =
             createComponent(
-                settingsProvider = {
-                    SwingSettings.create { draft ->
-                        draft.padding = SwingPadding(0, 0, 0, 0)
-                    }
-                },
+                settingsProvider = { settings },
                 hostServices =
                     SwingHostServices.create { draft ->
                         draft.hyperlinkHandler = {
@@ -1314,11 +1317,12 @@ class SwingTerminalSelectionTest {
             component.setSize(80, 40)
             component.bind(session)
             session.requestRender(0)
+            val metrics = SwingMetrics.from(component.getFontMetrics(settings.font))
             component.mouseListeners.forEach {
-                it.mousePressed(mousePressed(component, x = 8, y = 8, clickCount = 1))
+                it.mousePressed(mousePressed(component, x = metrics.cellWidth / 2, y = metrics.cellHeight / 2, clickCount = 1))
             }
             component.mouseMotionListeners.forEach {
-                it.mouseDragged(mouseDragged(component, x = 20, y = 8))
+                it.mouseDragged(mouseDragged(component, x = metrics.cellWidth - 1, y = metrics.cellHeight / 2))
             }
         }
 

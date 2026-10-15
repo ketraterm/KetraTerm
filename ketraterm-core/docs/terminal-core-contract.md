@@ -24,8 +24,9 @@ state. Headless implementations may implement `TerminalBuffer` alone.
 | `TerminalReader` | Borrowed lines, palette, grid/cursor dimensions, and metadata |
 | `TerminalInspector` | Allocating text and attribute inspection |
 
-Depend on the narrowest role needed. The factory requires positive visible
-dimensions and nonnegative history capacity; `maxHistory + height` must fit in
+Depend on the narrowest role needed. The factory requires width at least
+`TerminalBuffers.MIN_WIDTH` (two cells), positive height, and nonnegative history
+capacity; `maxHistory + height` must fit in
 `Int`. Zero history capacity disables primary scrollback. Creation installs no
 lock: mutations, response access, cursor/grid/history reads, and borrowed frames
 require external serialization. Factory mode snapshots are atomic, but cannot
@@ -101,14 +102,15 @@ Application color updates and resets never emit mode 2031 reports.
 - `writeText` decodes UTF-16 as literal scalars. It does not interpret control
   characters or escape sequences. Use explicit control operations or a parser.
 - `writeCluster` accepts one pre-segmented sequence; core computes its width.
-  `length` must be in `1..codepoints.size`.
+  `length` must be in `1..minOf(codepoints.size, 32)`.
 - `updatePreviousCluster` replaces the complete retained sequence of the most
   recently written printable cell. The caller includes the previously published
   prefix; core neither compares prefixes nor validates grapheme boundaries.
 
 Both cluster operations validate and synchronously copy the used prefix, so the
-caller may immediately reuse its array. No parser retention limit applies to
-direct core callers. Invalid scalar input is rejected before mutation; see
+caller may immediately reuse its array. Both reject lengths above
+`TerminalTextLimits.MAX_CLUSTER_CODEPOINTS` (32) before any mutation, including
+updates without a remembered target. Invalid scalar input is also rejected; see
 [Unicode scalar and width policy](#unicode-scalar-and-width-policy).
 
 Cluster continuation preserves the target's attributes. Same-width updates
@@ -312,8 +314,8 @@ methods are not out-of-bounds probes.
 Blank cells read as `0`, wide spacers as `-1`, and cluster cells as their base
 codepoint. `isCluster` identifies cells whose full payload requires
 `readCluster`. Its destination must hold the complete sequence; insufficient
-capacity throws `IndexOutOfBoundsException`. Directly written clusters have no
-fixed public length bound.
+capacity throws `IndexOutOfBoundsException`. Core-owned lines retain at most
+32 codepoints per cluster.
 
 Use `getClusterLength(col)` to size a reusable destination before `readCluster`.
 It returns the exact codepoint count, or zero for a scalar, blank, or wide spacer.
@@ -332,7 +334,7 @@ Raw storage handles and internal arrays are not public APIs.
 
 ### Primary and alternate screens
 
-Each screen has its own cursor, margins, save slot, ring, and cluster store.
+Each screen has its own cursor, margins, save slot, ring, and row-owned cluster payloads.
 Alternate content has no scrollback.
 
 | DEC mode | Core operation |
@@ -351,8 +353,8 @@ restores configured default presentation.
 
 ### Resize
 
-`resize(newWidth, newHeight, oldScrollbackOffset)` validates positive dimensions
-and retained capacity before allocation or mutation. Identical grid dimensions
+`resize(newWidth, newHeight, oldScrollbackOffset)` validates the two-cell minimum
+width, positive height, and retained capacity before allocation or mutation. Identical grid dimensions
 avoid reflow and return a clamped offset plus current history size.
 
 The five-argument overload accepts text-area pixel width and height together
@@ -368,7 +370,7 @@ pixel-change reporting rules.
 An effective resize:
 
 - Reconstructs and rewraps primary logical lines when width changes, relocating
-  the cursor and deep-copying surviving clusters into a new store.
+  the cursor and copying surviving cluster payloads into new rows.
 - Preserves retained primary physical rows, attributes, wrap flags, identities,
   and cluster handles for height-only changes. Untouched trailing rows serve as
   layout capacity; cursor and viewport positions adjust to the new boundary.
@@ -376,7 +378,7 @@ An effective resize:
   retained anchor or clamps to the oldest surviving row if it is evicted.
 - Wipes and recreates the alternate grid at the new dimensions.
 - Resets vertical and horizontal margins on both screens, resizes tab stops,
-  clamps saved cursors, and clears active pending wrap.
+  clamps saved cursors, and clears pending wrap on both screens.
 
 The returned pair is `(newScrollbackOffset, newHistorySize)` for the active
 screen. Alternate returns `(0, 0)` while primary is resized in the background.

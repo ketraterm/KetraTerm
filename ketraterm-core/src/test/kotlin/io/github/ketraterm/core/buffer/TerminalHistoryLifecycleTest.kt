@@ -28,7 +28,7 @@ import org.junit.jupiter.params.provider.ValueSource
 class TerminalHistoryLifecycleTest {
     @ParameterizedTest
     @CsvSource("0, 0", "0, 20", "2, 3", "129, 1", "259, 520", "1000, 260")
-    fun `ED3 reuses its arena and visible rows while freeing only history clusters`(
+    fun `ED3 preserves visible rows and defers discarded row initialization`(
         maxHistory: Int,
         scrolls: Int,
     ) {
@@ -36,17 +36,18 @@ class TerminalHistoryLifecycleTest {
         val mutation = MutationEngine(state)
         repeat(scrolls) { mutation.scrollUp() }
         val ring = state.ring
-        val store = state.activeBuffer.store
         val historySize = state.historySize
         val history = List(historySize) { ring[it] }
         val visible = List(3) { ring[historySize + it] }
         val historyCluster = intArrayOf('A'.code, 0x0301)
-        for (line in history) line.setCluster(0, historyCluster, 2, 17L, 23L)
-        val reusableHandle = history.lastOrNull()?.rawCodepoint(0)
+        for (line in history) {
+            line.setCluster(0, historyCluster, 2, 17L, 23L)
+            line.setCell(4, 'Z'.code, 19L, 29L)
+        }
         val visibleCluster = intArrayOf('e'.code, 0x0301)
         for (line in visible) {
             line.setCell(0, '界'.code, 31L, 47L)
-            line.setRawCell(1, TerminalConstants.WIDE_CHAR_SPACER, 31L, 47L)
+            line.setCell(1, TerminalConstants.WIDE_CHAR_SPACER, 31L, 47L)
             line.setCluster(2, visibleCluster, 2, 31L, 47L)
             line.wrapped = true
             line.endsWithWrapPadding = true
@@ -63,7 +64,6 @@ class TerminalHistoryLifecycleTest {
             val structureGeneration = state.structureGeneration
             mutation.eraseScreenAndHistory()
             assertSame(ring, state.ring)
-            assertSame(store, state.activeBuffer.store)
             assertEquals(0, state.historySize)
             assertEquals(0L, ring.discardedCount)
             assertNotEquals(historyGeneration, state.activeBuffer.historyContentGeneration)
@@ -87,21 +87,27 @@ class TerminalHistoryLifecycleTest {
         }
 
         for (line in history) {
-            for (column in 0 until line.width) {
-                assertEquals(0, line.rawCodepoint(column))
-                assertEquals(0L, line.getPackedAttr(column))
-                assertEquals(0L, line.getPackedExtendedAttr(column))
-            }
-        }
-        if (reusableHandle != null) {
-            visible[0].setCluster(3, historyCluster, 2, 0L)
-            assertEquals(reusableHandle, visible[0].rawCodepoint(3))
+            assertEquals(2, line.readCluster(0, clusterCopy))
+            assertArrayEquals(historyCluster, clusterCopy)
+            assertEquals('Z'.code, line.getCodepoint(4))
         }
         // Refilling and then clearing exercises each reused row's cluster lifecycle again.
-        repeat(scrolls + 3) { mutation.scrollUp() }
+        val oldLineIds = (history + visible).map { it.lineId }.toSet()
+        repeat(scrolls + 3) {
+            mutation.scrollUp()
+            val bottom = ring[ring.size - 1]
+            repeat(bottom.width) { column ->
+                assertEquals(0, bottom.rawCodepoint(column))
+                assertEquals(state.pen.blankAttr, bottom.getPackedAttr(column))
+                assertEquals(state.pen.blankExtendedAttr, bottom.getPackedExtendedAttr(column))
+            }
+            assertFalse(bottom.wrapped)
+            assertFalse(bottom.endsWithWrapPadding)
+            assertFalse(bottom.hasOutput)
+            assertFalse(bottom.lineId in oldLineIds)
+        }
         mutation.clearAllHistory()
         assertSame(ring, state.ring)
-        assertSame(store, state.activeBuffer.store)
         assertEquals(0, state.historySize)
     }
 
@@ -175,42 +181,43 @@ class TerminalHistoryLifecycleTest {
     }
 
     @Test
-    fun `deferred rows keep their original arena after screen storage replacement`() {
+    fun `deferred rows retain their original dimensions after screen storage replacement`() {
         val screen = ScreenBuffer(initialWidth = 4, initialHeight = 2, maxHistory = 300)
         val oldRing = screen.ring
-        val oldStore = screen.store
         screen.replaceStorage(newWidth = 8, newHeight = 3, penAttr = 0L)
 
         repeat(259) {
             val oldLine = oldRing.push()
             assertEquals(4, oldLine.width)
-            assertSame(oldStore, oldLine.store)
         }
         repeat(259) {
             val newLine = screen.ring.push()
             assertEquals(8, newLine.width)
-            assertSame(screen.store, newLine.store)
         }
     }
 
     @Test
-    fun `clearAllHistory_releasesClusterStoreSlots`() {
+    fun `clearAllHistory_reusesRowsForNewClusters`() {
         val state = TerminalState(initialWidth = 4, initialHeight = 2, maxHistory = 3)
         val mutation = MutationEngine(state)
 
         repeat(3) { state.ring.push().clear(state.pen.currentAttr) }
+        val ring = state.ring
+        val firstRow = ring[0]
         val leakedLine = state.ring[4]
         leakedLine.setCluster(0, intArrayOf('A'.code, 0x0301), 2, 0)
-        val originalHandle = leakedLine.rawCodepoint(0)
 
         mutation.clearAllHistory()
+        assertSame(ring, state.ring)
+        assertSame(firstRow, state.ring[0])
+        assertEquals(0, state.historySize)
+        assertEquals("", state.ring[0].toTextTrimmed())
         state.ring[0].setCluster(0, intArrayOf('B'.code, 0x0301), 2, 0)
 
-        assertEquals(
-            originalHandle,
-            state.ring[0].rawCodepoint(0),
-            "Clearing history must release all cluster slots so the next allocation can reuse them",
-        )
+        assertEquals('B'.code, state.ring[0].getCodepoint(0))
+        val copied = IntArray(2)
+        assertEquals(2, state.ring[0].readCluster(0, copied))
+        assertArrayEquals(intArrayOf('B'.code, 0x0301), copied)
     }
 
     @Test
@@ -219,23 +226,23 @@ class TerminalHistoryLifecycleTest {
         val mutation = MutationEngine(state)
         val oldestVisibleLine = state.ring[0]
         oldestVisibleLine.setCluster(0, intArrayOf('A'.code, 0x0301), 2, 0)
-        val originalHandle = oldestVisibleLine.rawCodepoint(0)
 
         mutation.scrollUp()
         mutation.scrollUp()
 
         val newBottomLine = state.ring[state.ring.size - 1]
+        assertSame(oldestVisibleLine, newBottomLine)
+        assertEquals("", newBottomLine.toTextTrimmed())
         newBottomLine.setCluster(0, intArrayOf('B'.code, 0x0301), 2, 0)
 
-        assertEquals(
-            originalHandle,
-            newBottomLine.rawCodepoint(0),
-            "Evicting the oldest scrollback line must release its cluster slot for reuse",
-        )
+        assertEquals('B'.code, newBottomLine.getCodepoint(0))
+        val copied = IntArray(2)
+        assertEquals(2, newBottomLine.readCluster(0, copied))
+        assertArrayEquals(intArrayOf('B'.code, 0x0301), copied)
     }
 
     @Test
-    fun `reset_releasesAllPrimaryHistoryClusterSlots`() {
+    fun `reset_reusesPrimaryRowsForNewClusters`() {
         val buffer = DefaultTerminalBuffer(initialWidth = 4, initialHeight = 2, maxHistory = 3)
         val state =
             DefaultTerminalBufferResizeTest().run {
@@ -254,15 +261,19 @@ class TerminalHistoryLifecycleTest {
         }
         val leakedLine = state.primaryBuffer.ring[4]
         leakedLine.setCluster(0, intArrayOf('C'.code, 0x0301), 2, 0)
-        val originalHandle = leakedLine.rawCodepoint(0)
+        val ring = state.primaryBuffer.ring
+        val firstRow = ring[0]
 
         buffer.reset()
+        assertSame(ring, state.primaryBuffer.ring)
+        assertSame(firstRow, state.primaryBuffer.ring[0])
+        assertEquals(0, buffer.historySize)
+        assertEquals("", state.primaryBuffer.ring[0].toTextTrimmed())
         state.primaryBuffer.ring[0].setCluster(0, intArrayOf('D'.code, 0x0301), 2, 0)
 
-        assertEquals(
-            originalHandle,
-            state.primaryBuffer.ring[0].rawCodepoint(0),
-            "Reset must release cluster slots retained in primary scrollback",
-        )
+        assertEquals('D'.code, state.primaryBuffer.ring[0].getCodepoint(0))
+        val copied = IntArray(2)
+        assertEquals(2, state.primaryBuffer.ring[0].readCluster(0, copied))
+        assertArrayEquals(intArrayOf('D'.code, 0x0301), copied)
     }
 }

@@ -44,6 +44,29 @@ import java.util.concurrent.atomic.AtomicReference
 import kotlin.time.Duration.Companion.seconds
 
 class PtySessionTest {
+    @ParameterizedTest
+    @ValueSource(booleans = [false, true])
+    fun `session factories reject a one column terminal before spawning a process`(startImmediately: Boolean) {
+        val options =
+            PtyOptions.create { draft ->
+                draft.command = listOf("fake")
+                draft.columns = 1
+                draft.rows = 1
+            }
+        var spawnCalls = 0
+        val factory =
+            object : PtyProcessFactory {
+                override fun start(options: PtyOptions): PtyProcess {
+                    spawnCalls++
+                    error("must reject dimensions before spawning")
+                }
+            }
+        assertThrows(IllegalArgumentException::class.java) {
+            if (startImmediately) PtySessions.start(options, factory) else PtySessions.create(options, factory)
+        }
+        assertEquals(0, spawnCalls)
+    }
+
     @Test
     fun `option snapshots detach launch collections and immutable updates preserve the original`() {
         val command = mutableListOf("shell", "-l")

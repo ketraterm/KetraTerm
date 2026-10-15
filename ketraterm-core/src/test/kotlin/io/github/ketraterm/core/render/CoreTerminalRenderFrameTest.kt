@@ -58,12 +58,12 @@ class CoreTerminalRenderFrameTest {
         line.copyTextToRenderAbi(width, codes, 1, flags, 2, { col, data, offset, length ->
             assertEquals(2, col)
             clusters.add(data.slice(offset until offset + length))
-        }, RenderClusterScratch())
+        }, IntArray(32))
         assertArrayEquals(IntArray(8) { if (it in 1..width) expectedCodes[it - 1] else -99 }, codes)
         assertArrayEquals(IntArray(9) { if (it in 2 until 2 + width) expectedFlags[it - 2] else -99 }, flags)
         assertEquals(if (width > 2) listOf(listOf(0x1F469, 0x200D, 0x1F4BB)) else emptyList<List<Int>>(), clusters)
         // Omitting the payload sink must not change cluster geometry.
-        line.copyTextToRenderAbi(width, codes, 1, flags, 2, null, RenderClusterScratch())
+        line.copyTextToRenderAbi(width, codes, 1, flags, 2, null, IntArray(32))
         assertArrayEquals(IntArray(9) { if (it in 2 until 2 + width) expectedFlags[it - 2] else -99 }, flags)
     }
 

@@ -24,8 +24,7 @@ import io.github.ketraterm.render.api.TerminalRenderCursorShape
  * Owns the global mode flags, pen, dimensions, and tab stops, and routes all
  * read/write operations to the correct [ScreenBuffer] via [activeBuffer].
  *
- * [primaryBuffer] and [altBuffer] each own their own memory arenas
- * ([ScreenBuffer.store] + [ScreenBuffer.ring]) so a resize of one buffer
+ * [primaryBuffer] and [altBuffer] each own independent rings of self-contained rows so a resize of one buffer
  * can never corrupt the other.
  */
 internal class TerminalState(
@@ -37,10 +36,10 @@ internal class TerminalState(
 
     // Global hardware state.
 
+    val dimensions = GridDimensions(initialWidth, initialHeight)
     val modes = TerminalModes()
     val tabStops = TabStops(initialWidth)
     val pen = Pen()
-    val dimensions = GridDimensions(initialWidth, initialHeight)
     val hostResponses = HostResponseQueue()
 
     /** `false` for DECSACE stream extent (the terminal default), `true` for exact rectangle. */
