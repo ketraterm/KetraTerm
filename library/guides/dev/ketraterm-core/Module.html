@@ -42,7 +42,7 @@ through focused adapters. <code>MutationEngine</code> owns cell mutation;
 and reflow. The facade coordinates resize, RIS, and DECSTR across both buffers.</p>
 <p><code>TerminalState</code> holds shared modes, pen, palette, response queue, and generation
 counters, and selects the active <code>ScreenBuffer</code>. Each screen owns its cursor,
-margins, saved cursor, Kitty keyboard stack, <code>HistoryRing</code>, and <code>ClusterStore</code>.
+margins, saved cursor, Kitty keyboard stack, <code>HistoryRing</code>, and self-contained rows with lazy cluster payload storage.
 Rows hold primitive cell arrays and handles into their own screen&#39;s cluster
 store. The alternate screen has no history.</p>
 <p><code>CoreTerminalRenderFrame</code> translates this storage into public render encodings.
@@ -56,7 +56,7 @@ concurrency exception.</p>
 <li><a href="docs/terminal-core-contract.html">Core contract</a>: behavioral guarantees and integration rules.</li>
 <li><a href="docs/grid-storage-layout.html">Grid storage layout</a>: internal allocation and ownership rules.</li>
 </ul>
-</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/faffd6abc7412a9750ba4b51edc031af122b6d50/ketraterm-core/Module.md">View source on GitHub ↗</a></div></div></main></div>
+</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/37cdeaadf48f5309bb6e0ed2611ad04a3f9461a3/ketraterm-core/Module.md">View source on GitHub ↗</a></div></div></main></div>
   <footer>
     <a class="brand" href="../../../index.html"><img class="brand-mark" src="../../../assets/logo.svg" alt="" width="34" height="34">KetraTerm Library</a>
     <p>Open source · Apache 2.0</p>

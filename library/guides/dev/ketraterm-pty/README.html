@@ -104,6 +104,9 @@ any host-supplied producer.</p>
 <p>See the <a href="../ketraterm-session/README.html#host-owned-shell-integration">session composition guide</a>
 and <a href="../ketraterm-shell-integration/README.html">optional OSC integration</a>.</p>
 <h2 id="direct-connectors">Direct connectors</h2>
+<p>Local session factories require at least <code>TerminalBuffers.MIN_WIDTH</code> (2) columns
+and reject smaller widths before launching a process. Raw connector options
+accept any positive column and row counts because they do not create an emulator.</p>
 <p><code>PtyConnectors.create(command, env, workingDirectory, columns, rows)</code> launches a
 process and returns an unstarted <code>TerminalConnector</code>. Its environment default is
 <code>System.getenv()</code>; pass <code>PtyOptions.defaultEnvironment()</code> when you want KetraTerm&#39;s
@@ -120,7 +123,7 @@ descendant heuristic and does not inspect applications inside SSH or WSL.</p>
 threads, failure, shutdown, resizing, and native test requirements.</li>
 <li><a href="Module.html">Module ownership</a>: implementation components and dependencies.</li>
 </ul>
-</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/faffd6abc7412a9750ba4b51edc031af122b6d50/ketraterm-pty/README.md">View source on GitHub ↗</a></div></div></main></div>
+</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/37cdeaadf48f5309bb6e0ed2611ad04a3f9461a3/ketraterm-pty/README.md">View source on GitHub ↗</a></div></div></main></div>
   <footer>
     <a class="brand" href="../../../index.html"><img class="brand-mark" src="../../../assets/logo.svg" alt="" width="34" height="34">KetraTerm Library</a>
     <p>Open source · Apache 2.0</p>

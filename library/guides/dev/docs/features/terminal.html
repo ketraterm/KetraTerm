@@ -67,7 +67,7 @@ headless and Swing hosts. Host actions and replies remain subject to session pol
 </tr>
 <tr>
 <td>Grid width</td>
-<td>80/132-column switching through DECCOLM.</td>
+<td>Minimum two columns, with 80/132-column switching through DECCOLM.</td>
 </tr>
 <tr>
 <td>Resets</td>
@@ -94,7 +94,8 @@ headless and Swing hosts. Host actions and replies remain subject to session pol
 <td>Pinned Unicode width tables, configurable ambiguous width, and base-specific VS15/VS16 cell allocation; unsupported presentation bases retain their ordinary width. See the <a href="../../ketraterm-core/docs/terminal-core-contract.html#unicode-scalar-and-width-policy">core contract</a>.</td>
 </tr>
 </tbody></table></div>
-<p>Streaming graphemes retain up to 32 codepoints. Later width changes update the
+<p>Streaming graphemes retain up to 32 codepoints; direct core cluster writes reject
+longer prefixes before mutation. Later width changes update the
 published cell without undoing committed wraps, scrolling, or overwrites, so
 placement can depend on input chunk boundaries. See the
 <a href="../reference/protocol.html#streaming-grapheme-placement">streaming contract</a>.</p>
@@ -247,7 +248,7 @@ checks apply to all output in a session, including remote programs.</p>
 <p>See the <a href="../reference/protocol.html">protocol reference</a> for collection
 limits and query allowlists, and the <a href="../terminal-feature-gap-map.html">gap map</a>
 for unsupported protocols.</p>
-</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/faffd6abc7412a9750ba4b51edc031af122b6d50/docs/features/terminal.md">View source on GitHub ↗</a></div></div></main></div>
+</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/37cdeaadf48f5309bb6e0ed2611ad04a3f9461a3/docs/features/terminal.md">View source on GitHub ↗</a></div></div></main></div>
   <footer>
     <a class="brand" href="../../../../index.html"><img class="brand-mark" src="../../../../assets/logo.svg" alt="" width="34" height="34">KetraTerm Library</a>
     <p>Open source · Apache 2.0</p>

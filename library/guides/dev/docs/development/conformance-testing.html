@@ -78,12 +78,11 @@ all runs and retains minimized operation streams plus JUnit reports on failure.<
 <h2 id="streaming-placement">Streaming placement</h2>
 <p>The <a href="../reference/protocol.html#streaming-grapheme-placement">streaming placement contract</a>
 commits published grid effects. <code>HostGraphemePolicyTest</code> verifies that policy.
-Four retained <code>HostGraphemeTest</code> oracles test the stronger, unsupported requirement
+Three retained <code>HostGraphemeTest</code> oracles test the stronger, unsupported requirement
 that every byte split produces identical placement:</p>
 <ul>
 <li>Narrowing does not restore an overwritten neighbor.</li>
 <li>Widening at a margin can differ from an initially wide write.</li>
-<li>Late narrowing does not undo history eviction on a one-cell grid.</li>
 <li>Late narrowing does not move an already wrapped cluster back.</li>
 </ul>
 <p>The <code>knownR06Failure</code> helper reports only recorded assertion failures as
@@ -92,7 +91,7 @@ the test and require review. A skip does not establish that later iterations of
 an oracle passed. Ordinary grapheme and byte-stream tests remain active.</p>
 <p><code>./gradlew :ketraterm-host:test --tests &#39;*HostGrapheme*&#39; --tests &#39;*KnownR06FailureTest&#39;</code>
 runs this focused verification.</p>
-</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/faffd6abc7412a9750ba4b51edc031af122b6d50/docs/development/conformance-testing.md">View source on GitHub ↗</a></div></div></main></div>
+</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/37cdeaadf48f5309bb6e0ed2611ad04a3f9461a3/docs/development/conformance-testing.md">View source on GitHub ↗</a></div></div></main></div>
   <footer>
     <a class="brand" href="../../../../index.html"><img class="brand-mark" src="../../../../assets/logo.svg" alt="" width="34" height="34">KetraTerm Library</a>
     <p>Open source · Apache 2.0</p>

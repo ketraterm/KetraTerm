@@ -111,6 +111,9 @@ See <a href="docs/asynchronous-render-coalescing.html">render scheduling</a>.</p
 <p><code>resizeViewport</code> returns the new scrollback offset, history size, and discarded
 row baseline together; apply the complete result when preserving scroll position.
 Resize may block in the connector and is not a barrier for queued input.
+Session construction, start, resize, and expected-grid pixel updates require at
+least <code>TerminalBuffers.MIN_WIDTH</code> (2) columns and one row. Invalid geometry is
+rejected before session mutation or connector operations.
 The five-argument <code>tryResizeViewport</code> overload accepts text-area pixel width and
 height along with the grid dimensions and viewport offset. Supply the measured
 cell area excluding padding; either zero means pixels are unavailable. The
@@ -184,7 +187,7 @@ consent and native access; session owns permission checks, deadlines, and bounde
 reply commitment. A missing provider produces an empty reply when replies are
 permitted. See <a href="docs/session-concurrency-locks.html#clipboard-read-lifetime-and-output-commitment">clipboard lifetime</a>.</p>
 <p>For maintainer ownership and validation entry points, see <a href="Module.html">Module.md</a>.</p>
-</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/faffd6abc7412a9750ba4b51edc031af122b6d50/ketraterm-session/README.md">View source on GitHub ↗</a></div></div></main></div>
+</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/37cdeaadf48f5309bb6e0ed2611ad04a3f9461a3/ketraterm-session/README.md">View source on GitHub ↗</a></div></div></main></div>
   <footer>
     <a class="brand" href="../../../index.html"><img class="brand-mark" src="../../../assets/logo.svg" alt="" width="34" height="34">KetraTerm Library</a>
     <p>Open source · Apache 2.0</p>

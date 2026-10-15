@@ -56,8 +56,9 @@ above, or connect a parser through the host adapter for terminal output.
 <code>writeCluster</code> accepts a pre-segmented grapheme and copies its codepoints before
 returning.</p>
 <p>Cursor and reader coordinates are zero-based. Margin and rectangle methods use
-the DEC coordinate conventions documented on those methods. Dimensions must be
-positive; <code>maxHistory</code> is nonnegative, and zero disables primary scrollback.</p>
+the DEC coordinate conventions documented on those methods. Grid width must be at
+least <code>TerminalBuffers.MIN_WIDTH</code> (two cells), and height must be positive.
+<code>maxHistory</code> is nonnegative, and zero disables primary scrollback.</p>
 <h2 id="reading-and-synchronization">Reading and synchronization</h2>
 <p><code>TerminalBuffers.create</code> returns a <code>TerminalRenderBuffer</code>: the complete
 <code>TerminalBuffer</code> API plus <code>TerminalRenderFrameReader</code>. The factory installs no
@@ -88,7 +89,7 @@ must enforce the same permission before issuing query operations.</p>
 <li><a href="Module.html">Module guide</a>: maintainer boundaries and data flow.</li>
 <li><a href="../docs/terminal-feature-map.html">Feature map</a> and <a href="../docs/terminal-feature-gap-map.html">gap map</a>: supported behavior and deferred work.</li>
 </ul>
-</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/faffd6abc7412a9750ba4b51edc031af122b6d50/ketraterm-core/README.md">View source on GitHub ↗</a></div></div></main></div>
+</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/37cdeaadf48f5309bb6e0ed2611ad04a3f9461a3/ketraterm-core/README.md">View source on GitHub ↗</a></div></div></main></div>
   <footer>
     <a class="brand" href="../../../index.html"><img class="brand-mark" src="../../../assets/logo.svg" alt="" width="34" height="34">KetraTerm Library</a>
     <p>Open source · Apache 2.0</p>

@@ -69,8 +69,9 @@ state. Headless implementations may implement <code>TerminalBuffer</code> alone.
 <td>Allocating text and attribute inspection</td>
 </tr>
 </tbody></table></div>
-<p>Depend on the narrowest role needed. The factory requires positive visible
-dimensions and nonnegative history capacity; <code>maxHistory + height</code> must fit in
+<p>Depend on the narrowest role needed. The factory requires width at least
+<code>TerminalBuffers.MIN_WIDTH</code> (two cells), positive height, and nonnegative history
+capacity; <code>maxHistory + height</code> must fit in
 <code>Int</code>. Zero history capacity disables primary scrollback. Creation installs no
 lock: mutations, response access, cursor/grid/history reads, and borrowed frames
 require external serialization. Factory mode snapshots are atomic, but cannot
@@ -156,14 +157,15 @@ unchanged for an empty range.</li>
 <li><code>writeText</code> decodes UTF-16 as literal scalars. It does not interpret control
 characters or escape sequences. Use explicit control operations or a parser.</li>
 <li><code>writeCluster</code> accepts one pre-segmented sequence; core computes its width.
-<code>length</code> must be in <code>1..codepoints.size</code>.</li>
+<code>length</code> must be in <code>1..minOf(codepoints.size, 32)</code>.</li>
 <li><code>updatePreviousCluster</code> replaces the complete retained sequence of the most
 recently written printable cell. The caller includes the previously published
 prefix; core neither compares prefixes nor validates grapheme boundaries.</li>
 </ul>
 <p>Both cluster operations validate and synchronously copy the used prefix, so the
-caller may immediately reuse its array. No parser retention limit applies to
-direct core callers. Invalid scalar input is rejected before mutation; see
+caller may immediately reuse its array. Both reject lengths above
+<code>TerminalTextLimits.MAX_CLUSTER_CODEPOINTS</code> (32) before any mutation, including
+updates without a remembered target. Invalid scalar input is also rejected; see
 <a href="#unicode-scalar-and-width-policy">Unicode scalar and width policy</a>.</p>
 <p>Cluster continuation preserves the target&#39;s attributes. Same-width updates
 preserve cursor position; in-row width changes adjust the following cursor and
@@ -354,8 +356,8 @@ methods are not out-of-bounds probes.</p>
 <p>Blank cells read as <code>0</code>, wide spacers as <code>-1</code>, and cluster cells as their base
 codepoint. <code>isCluster</code> identifies cells whose full payload requires
 <code>readCluster</code>. Its destination must hold the complete sequence; insufficient
-capacity throws <code>IndexOutOfBoundsException</code>. Directly written clusters have no
-fixed public length bound.</p>
+capacity throws <code>IndexOutOfBoundsException</code>. Core-owned lines retain at most
+32 codepoints per cluster.</p>
 <p>Use <code>getClusterLength(col)</code> to size a reusable destination before <code>readCluster</code>.
 It returns the exact codepoint count, or zero for a scalar, blank, or wide spacer.
 Keep the borrowed line, sizing, and copying inside one uninterrupted
@@ -369,7 +371,7 @@ attributes and cell flags; <code>getAttrAt</code> offers allocating unpacked ins
 Raw storage handles and internal arrays are not public APIs.</p>
 <h2 id="buffer-lifecycle-contract">Buffer lifecycle contract</h2>
 <h3 id="primary-and-alternate-screens">Primary and alternate screens</h3>
-<p>Each screen has its own cursor, margins, save slot, ring, and cluster store.
+<p>Each screen has its own cursor, margins, save slot, ring, and row-owned cluster payloads.
 Alternate content has no scrollback.</p>
 <div class="table-scroll"><table>
 <thead>
@@ -402,8 +404,8 @@ switches until a clearing entry or effective resize discards it. Resize and soft
 reset while alternate is active preserve the primary presentation snapshot; RIS
 restores configured default presentation.</p>
 <h3 id="resize">Resize</h3>
-<p><code>resize(newWidth, newHeight, oldScrollbackOffset)</code> validates positive dimensions
-and retained capacity before allocation or mutation. Identical grid dimensions
+<p><code>resize(newWidth, newHeight, oldScrollbackOffset)</code> validates the two-cell minimum
+width, positive height, and retained capacity before allocation or mutation. Identical grid dimensions
 avoid reflow and return a clamped offset plus current history size.</p>
 <p>The five-argument overload accepts text-area pixel width and height together
 with the grid and viewport offset, validating nonnegative pixels before
@@ -417,7 +419,7 @@ pixel-change reporting rules.</p>
 <p>An effective resize:</p>
 <ul>
 <li>Reconstructs and rewraps primary logical lines when width changes, relocating
-the cursor and deep-copying surviving clusters into a new store.</li>
+the cursor and copying surviving cluster payloads into new rows.</li>
 <li>Preserves retained primary physical rows, attributes, wrap flags, identities,
 and cluster handles for height-only changes. Untouched trailing rows serve as
 layout capacity; cursor and viewport positions adjust to the new boundary.</li>
@@ -425,7 +427,7 @@ layout capacity; cursor and viewport positions adjust to the new boundary.</li>
 retained anchor or clamps to the oldest surviving row if it is evicted.</li>
 <li>Wipes and recreates the alternate grid at the new dimensions.</li>
 <li>Resets vertical and horizontal margins on both screens, resizes tab stops,
-clamps saved cursors, and clears active pending wrap.</li>
+clamps saved cursors, and clears pending wrap on both screens.</li>
 </ul>
 <p>The returned pair is <code>(newScrollbackOffset, newHistorySize)</code> for the active
 screen. Alternate returns <code>(0, 0)</code> while primary is resized in the background.</p>
@@ -485,7 +487,7 @@ per-screen arena isolation, tab-stop width, and accurate render invalidation.
 Horizontal slices never copy incomplete wide source spans and clear destination
 occupants crossing their boundaries. Pending wrap is cleared by cursor/structural
 operations that cancel it, and preserved by non-cursor mode changes.</p>
-</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/faffd6abc7412a9750ba4b51edc031af122b6d50/ketraterm-core/docs/terminal-core-contract.md">View source on GitHub ↗</a></div></div></main></div>
+</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/37cdeaadf48f5309bb6e0ed2611ad04a3f9461a3/ketraterm-core/docs/terminal-core-contract.md">View source on GitHub ↗</a></div></div></main></div>
   <footer>
     <a class="brand" href="../../../../index.html"><img class="brand-mark" src="../../../../assets/logo.svg" alt="" width="34" height="34">KetraTerm Library</a>
     <p>Open source · Apache 2.0</p>
