@@ -19,13 +19,16 @@ import io.github.ketraterm.core.TerminalBuffers
 import io.github.ketraterm.session.TerminalSession
 import io.github.ketraterm.testkit.MockConnector
 import io.github.ketraterm.ui.swing.api.SwingTerminal
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.withTimeout
 import java.awt.Color
 import java.awt.Component
 import java.awt.Container
 import java.awt.image.BufferedImage
+import java.beans.PropertyChangeListener
 import java.util.*
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.TimeUnit
@@ -36,6 +39,7 @@ import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 import kotlin.time.Duration.Companion.milliseconds
 
+@OptIn(ExperimentalCoroutinesApi::class)
 class SwingTerminalSearchBarTest {
     @Test
     fun searchFitsNarrowPanesAndCollapsedOptionsKeepTheirState() {
@@ -319,10 +323,11 @@ class SwingTerminalSearchBarTest {
     fun counterObservesBackgroundCompletionWithoutAnotherKeyPress() {
         val buffer = TerminalBuffers.create(80, 24)
         buffer.writeText("needle")
-        val session = TerminalSession.create(buffer, MockConnector())
+        val dispatcher = StandardTestDispatcher()
+        val session = TerminalSession.create(buffer, MockConnector(), workerDispatcher = dispatcher, ioDispatcher = dispatcher)
         lateinit var terminal: SwingTerminal
         lateinit var bar: SwingTerminalSearchBar
-        val counterUpdated = CompletableFuture<Unit>()
+        lateinit var counter: JLabel
 
         fun descendants(component: Component): List<Component> =
             listOf(component) + if (component is Container) component.components.flatMap(::descendants) else emptyList()
@@ -332,11 +337,9 @@ class SwingTerminalSearchBarTest {
                 bar = SwingTerminalSearchBar(terminal, SwingHostMessages.forLocale(Locale.US))
                 terminal.size = terminal.preferredSize
                 terminal.bind(session)
+                dispatcher.scheduler.runCurrent()
                 bar.open()
-                val counter = descendants(bar.component).filterIsInstance<JLabel>().single()
-                counter.addPropertyChangeListener("text") {
-                    if (it.newValue == "1/1") counterUpdated.complete(Unit)
-                }
+                counter = descendants(bar.component).filterIsInstance<JLabel>().single()
                 descendants(bar.component).filterIsInstance<JTextField>().single().text = "needle"
             }
             val result =
@@ -344,7 +347,7 @@ class SwingTerminalSearchBarTest {
                     withTimeout(10_000.milliseconds) { terminal.searchState.first { it.query == "needle" && !it.isSearching } }
                 }
             assertEquals(1, result.resultCount)
-            counterUpdated.get(10, TimeUnit.SECONDS)
+            awaitCounter(counter, "1/1")
             SwingUtilities.invokeAndWait {
                 assertTrue(descendants(bar.component).filterIsInstance<JLabel>().any { it.text == "1/1" })
                 bar.close()
@@ -356,14 +359,21 @@ class SwingTerminalSearchBarTest {
                 terminal.dispose()
             }
             session.close()
+            dispatcher.scheduler.runCurrent()
         }
     }
 
     @Test
-    fun modeTogglesUpdateSearchAndInvalidRegexIsVisible() {
+    fun modeTogglesUpdateSearchAndInvalidRegexIsVisible() = verifySearchModes(publishBeforeQuery = true)
+
+    @Test
+    fun queryBeforeFirstFrameRetainsSearchModesAndRegexRecovery() = verifySearchModes(publishBeforeQuery = false)
+
+    private fun verifySearchModes(publishBeforeQuery: Boolean) {
         val buffer = TerminalBuffers.create(80, 24)
         buffer.writeText("cat cats CAT a.b axb")
-        val session = TerminalSession.create(buffer, MockConnector())
+        val dispatcher = StandardTestDispatcher()
+        val session = TerminalSession.create(buffer, MockConnector(), workerDispatcher = dispatcher, ioDispatcher = dispatcher)
         val messages = SwingHostMessages.forLocale(Locale.US)
         lateinit var terminal: SwingTerminal
         lateinit var bar: SwingTerminalSearchBar
@@ -379,12 +389,14 @@ class SwingTerminalSearchBarTest {
             terminal.size = terminal.preferredSize
             terminal.bind(session)
             bar.open()
+            if (publishBeforeQuery) dispatcher.scheduler.runCurrent()
             val controls = descendants(bar.component)
             field = controls.filterIsInstance<JTextField>().single()
             counter = controls.filterIsInstance<JLabel>().single()
             toggles = controls.filterIsInstance<JToggleButton>()
             assertEquals(3, toggles.size)
             field.text = "cat"
+            if (!publishBeforeQuery) dispatcher.scheduler.runCurrent()
             // All buttons fit inside the field without overlapping the editable text.
             val panel = field.parent
             panel.size = panel.preferredSize
@@ -395,9 +407,9 @@ class SwingTerminalSearchBarTest {
             assertTrue(ordered.last().x + ordered.last().width <= panel.width)
         }
 
-        fun completed() =
+        fun completed(query: String) =
             runBlocking {
-                withTimeout(10_000.milliseconds) { terminal.searchState.first { !it.isSearching } }
+                withTimeout(10_000.milliseconds) { terminal.searchState.first { it.query == query && !it.isSearching } }
             }
 
         fun toggle(key: String) =
@@ -405,23 +417,25 @@ class SwingTerminalSearchBarTest {
                 toggles.single { it.accessibleContext.accessibleName == messages.message(key) }.doClick(0)
             }
         try {
-            assertEquals(3, completed().resultCount)
+            assertEquals(3, completed("cat").resultCount)
             toggle("search.wholeWordToolTip")
-            assertEquals(2, completed().resultCount)
+            assertEquals(2, completed("cat").resultCount)
             toggle("search.matchCaseToolTip")
-            assertEquals(1, completed().resultCount)
+            assertEquals(1, completed("cat").resultCount)
             SwingUtilities.invokeAndWait { field.text = "a.b" }
-            assertEquals(1, completed().resultCount)
+            assertEquals(1, completed("a.b").resultCount)
             toggle("search.regexToolTip")
-            assertEquals(2, completed().resultCount)
+            assertEquals(2, completed("a.b").resultCount)
             SwingUtilities.invokeAndWait { field.text = "[" }
-            assertTrue(completed().failure is java.util.regex.PatternSyntaxException)
+            assertTrue(completed("[").failure is java.util.regex.PatternSyntaxException)
+            awaitCounter(counter, messages.message("search.invalidRegex"))
             SwingUtilities.invokeAndWait {
                 assertEquals(messages.message("search.invalidRegex"), counter.text)
                 assertTrue(counter.toolTipText.isNotBlank())
                 field.text = "cat|cats"
             }
-            assertEquals(2, completed().resultCount)
+            assertEquals(2, completed("cat|cats").resultCount)
+            awaitCounter(counter, messages.message("search.matchCounter", 1, 2), messages.message("search.counterToolTip"))
             SwingUtilities.invokeAndWait {
                 assertEquals(messages.message("search.counterToolTip"), counter.toolTipText)
             }
@@ -431,6 +445,7 @@ class SwingTerminalSearchBarTest {
                 terminal.dispose()
             }
             session.close()
+            dispatcher.scheduler.runCurrent()
         }
     }
 
@@ -442,9 +457,11 @@ class SwingTerminalSearchBarTest {
             buffer.carriageReturn()
             buffer.newLine()
         }
-        val session = TerminalSession.create(buffer, MockConnector())
+        val dispatcher = StandardTestDispatcher()
+        val session = TerminalSession.create(buffer, MockConnector(), workerDispatcher = dispatcher, ioDispatcher = dispatcher)
         lateinit var terminal: SwingTerminal
         lateinit var bar: SwingTerminalSearchBar
+        lateinit var counter: JLabel
         val messages = SwingHostMessages.forLocale(Locale.US)
 
         fun descendants(component: Component): List<Component> =
@@ -454,7 +471,9 @@ class SwingTerminalSearchBarTest {
             bar = SwingTerminalSearchBar(terminal, messages)
             terminal.size = terminal.preferredSize
             terminal.bind(session)
+            dispatcher.scheduler.runCurrent()
             bar.open()
+            counter = descendants(bar.component).filterIsInstance<JLabel>().single()
             descendants(bar.component).filterIsInstance<JTextField>().single().text = "needle"
         }
         try {
@@ -465,6 +484,7 @@ class SwingTerminalSearchBarTest {
             assertTrue(result.isCountLimited)
             assertEquals(1001, result.resultCount)
             assertEquals(-1, result.activeResultIndex)
+            awaitCounter(counter, messages.message("search.matchCounterLimited", 1000))
             SwingUtilities.invokeAndWait {
                 assertEquals(
                     messages.message("search.matchCounterLimited", 1000),
@@ -477,6 +497,30 @@ class SwingTerminalSearchBarTest {
                 terminal.dispose()
             }
             session.close()
+            dispatcher.scheduler.runCurrent()
+        }
+    }
+
+    private fun awaitCounter(
+        counter: JLabel,
+        text: String,
+        toolTip: String? = null,
+    ) {
+        val updated = CompletableFuture<Unit>()
+
+        fun completeIfMatched() {
+            if (counter.text == text && (toolTip == null || counter.toolTipText == toolTip)) updated.complete(Unit)
+        }
+        val listener = PropertyChangeListener { completeIfMatched() }
+        try {
+            SwingUtilities.invokeAndWait {
+                counter.addPropertyChangeListener(listener)
+                completeIfMatched()
+            }
+            // The event establishes completion; the timeout only guards a hung test.
+            updated.get(10, TimeUnit.SECONDS)
+        } finally {
+            SwingUtilities.invokeAndWait { counter.removePropertyChangeListener(listener) }
         }
     }
 

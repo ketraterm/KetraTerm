@@ -53,6 +53,47 @@ class TerminalSearchControllerTest {
         scope.cancel()
     }
 
+    @ParameterizedTest
+    @ValueSource(ints = [12, 80])
+    fun `search stays pending until the first frame supplies viewport metadata`(initialColumns: Int) {
+        val reader = SearchFrameReader(liveLines = listOf("cat cats CAT"))
+        val session = testSession(reader)
+        val host = RecordingSearchHost(session, initialColumns, reader.visibleRows)
+        val controller = TerminalSearchController(host, scope, dispatcher)
+        session.use {
+            SwingUtilities.invokeAndWait {
+                assertFalse(host.renderCache.hasFrame)
+                controller.search("cat")
+                dispatcher.scheduler.runCurrent()
+                assertEquals(TerminalSearchState("cat", 0, -1, isSearching = true), controller.state())
+
+                host.renderCache.updateFrom(session)
+                controller.refreshForFrame()
+                dispatcher.scheduler.runCurrent()
+                assertEquals(TerminalSearchState("cat", 3, 0), controller.state())
+            }
+        }
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = [false, true])
+    fun `clear or reset cancels a query waiting for the first frame`(reset: Boolean) {
+        val reader = SearchFrameReader(liveLines = listOf("cat cats CAT"))
+        val session = testSession(reader)
+        val host = RecordingSearchHost(session, 80, reader.visibleRows)
+        val controller = TerminalSearchController(host, scope, dispatcher)
+        session.use {
+            SwingUtilities.invokeAndWait {
+                controller.search("cat")
+                if (reset) controller.reset(reader.visibleRows) else controller.clear()
+                host.renderCache.updateFrom(session)
+                controller.refreshForFrame()
+                dispatcher.scheduler.runCurrent()
+                assertEquals(TerminalSearchState("", 0, -1), controller.state())
+            }
+        }
+    }
+
     @Test
     fun `search options restart the same query and invalid regex recovers`() {
         val reader = SearchFrameReader(liveLines = listOf("cat cats CAT a.b axb ["))
