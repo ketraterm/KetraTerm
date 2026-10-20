@@ -26,6 +26,7 @@ import com.intellij.openapi.util.Disposer
 import com.intellij.testFramework.PlatformTestUtil
 import com.intellij.testFramework.fixtures.BasePlatformTestCase
 import com.intellij.ui.UiInterceptors
+import com.intellij.util.concurrency.AppExecutorUtil
 import io.github.ketraterm.core.TerminalBuffers
 import io.github.ketraterm.host.*
 import io.github.ketraterm.intellij.ui.IntellijMessageDialogs
@@ -39,19 +40,25 @@ import io.github.ketraterm.ui.swing.host.SwingClipboardReadPrompt
 import io.github.ketraterm.ui.swing.host.SwingClipboardReader
 import io.github.ketraterm.ui.swing.settings.TerminalClipboardHandler
 import kotlinx.coroutines.*
+import kotlinx.coroutines.test.StandardTestDispatcher
+import kotlinx.coroutines.test.TestCoroutineScheduler
 import java.awt.datatransfer.DataFlavor
 import java.awt.datatransfer.StringSelection
 import java.awt.datatransfer.Transferable
 import java.awt.datatransfer.UnsupportedFlavorException
 import java.util.concurrent.CancellationException
 import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicInteger
 import javax.swing.SwingUtilities
 
-/** Real IDE dispatch and session byte streams, with a fake native clipboard boundary. */
+/** Real IDE dispatch and session byte streams, with virtual deadlines and a fake native clipboard boundary. */
+@OptIn(ExperimentalCoroutinesApi::class)
 class IntellijClipboardSessionTest : BasePlatformTestCase() {
     private lateinit var lifetime: Disposable
+    private val scheduler = TestCoroutineScheduler()
+    private val dispatcher = StandardTestDispatcher(scheduler)
 
     override fun setUp() {
         super.setUp()
@@ -133,10 +140,38 @@ class IntellijClipboardSessionTest : BasePlatformTestCase() {
         assertEquals(client.id, client.writeClient)
         assertEquals(0, client.reads.get())
         assertFalse(f.completed.isCompleted)
+        advanceTimeBy(7_999)
         f.attach()
         await("read response", f.completed)
         assertEquals("\u001b]52;c;bmV3\u001b\\", f.output())
         assertEquals(1, client.reads.get())
+    }
+
+    fun testDeadlineCancelsReadBeforeAttachmentOrDuringConsent() {
+        for (attached in listOf(false, true)) {
+            val f = Fixture(Client("expired-$attached", "secret"), TerminalClipboardPermission.PROMPT)
+            if (attached) f.attach()
+            f.query()
+            await("read provider entry", f.entered)
+            if (attached) waitFor("consent") { f.promptVisible }
+
+            advanceTimeBy(8_000)
+            await("expired read response", f.completed)
+            await("expired provider", f.providerDone)
+            assertEquals(TerminalClipboardReadOutcome.TIMED_OUT, runBlocking { f.completed.await() })
+            assertEquals("\u001b]52;c;\u001b\\", f.output())
+            assertFalse(f.promptVisible)
+
+            if (attached) {
+                f.decide(SwingClipboardReadPrompt.Decision.ALLOW_ONCE.ordinal)
+            } else {
+                f.attach()
+            }
+            runCurrent()
+            assertFalse(f.promptVisible)
+            assertEquals(0, f.client.reads.get())
+            assertEquals("\u001b]52;c;\u001b\\", f.output())
+        }
     }
 
     fun testAttachedPaneReadCannotOvertakeAnEarlierPostedWrite() {
@@ -161,7 +196,7 @@ class IntellijClipboardSessionTest : BasePlatformTestCase() {
     }
 
     fun testAskIsBoundToItsClientAndAnotherPaneCannotReplaceConsent() {
-        val reader = SwingClipboardReader()
+        val reader = SwingClipboardReader(dispatcher)
         val first = Fixture(Client("first", "first-client"), TerminalClipboardPermission.PROMPT, reader)
         val second = Fixture(Client("second", "second-client"), TerminalClipboardPermission.PROMPT, reader)
         first.attach()
@@ -174,6 +209,7 @@ class IntellijClipboardSessionTest : BasePlatformTestCase() {
         assertEquals("\u001b]52;c;\u001b\\", second.output())
         assertFalse(second.promptVisible)
         assertTrue(first.promptVisible)
+        advanceTimeBy(7_999)
         first.decide(SwingClipboardReadPrompt.Decision.ALLOW_ONCE.ordinal)
         await("first query approval", first.completed)
         assertEquals("\u001b]52;c;Zmlyc3QtY2xpZW50\u001b\\", first.output())
@@ -235,7 +271,8 @@ class IntellijClipboardSessionTest : BasePlatformTestCase() {
             release.await()
             "late-secret"
         }
-        val f = Fixture(client)
+        // This test deliberately holds native access on a real worker while the EDT disposes its owner.
+        val f = Fixture(client, reader = SwingClipboardReader(Dispatchers.IO))
         f.attach()
         f.query()
         try {
@@ -377,7 +414,7 @@ class IntellijClipboardSessionTest : BasePlatformTestCase() {
     private inner class Fixture(
         val client: Client,
         permission: TerminalClipboardPermission = TerminalClipboardPermission.ALLOW,
-        reader: SwingClipboardReader = SwingClipboardReader(),
+        reader: SwingClipboardReader = SwingClipboardReader(dispatcher),
         applicationClient: Client = client,
         clipboard: TerminalClipboardHandler = applicationClient.clipboard,
         consent: SwingClipboardReadPrompt? = null,
@@ -416,6 +453,9 @@ class IntellijClipboardSessionTest : BasePlatformTestCase() {
                             completed.complete(event.outcome)
                         }
                     },
+                workerDispatcher = dispatcher,
+                ioDispatcher = dispatcher,
+                clipboardReadTimeSource = scheduler.timeSource,
                 clipboardReader =
                     TerminalClipboardReader { request ->
                         entered.complete(Unit)
@@ -432,6 +472,7 @@ class IntellijClipboardSessionTest : BasePlatformTestCase() {
             Disposer.register(lifetime) {
                 Disposer.dispose(binding)
                 prompt.close()
+                waitFor("clipboard provider cleanup") { !entered.isCompleted || providerDone.isCompleted }
             }
             session.start(10, 3)
         }
@@ -452,7 +493,7 @@ class IntellijClipboardSessionTest : BasePlatformTestCase() {
         initialText: String,
         val id: ClientId = ClientId("clipboard-test-$name"),
     ) {
-        private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+        private val scope = CoroutineScope(SupervisorJob() + dispatcher)
 
         @Volatile var current: IntellijClipboardClient? = null
         val owner = IntellijClipboardClient(scope, id) { current }.also { current = it }
@@ -505,6 +546,27 @@ class IntellijClipboardSessionTest : BasePlatformTestCase() {
         description: String,
         condition: () -> Boolean,
     ) {
-        PlatformTestUtil.waitWithEventsDispatching(description, condition, 10)
+        PlatformTestUtil.waitWithEventsDispatching(
+            description,
+            {
+                runCurrent()
+                condition()
+            },
+            10,
+        )
+    }
+
+    private fun runCurrent() {
+        // Session/native work stays off the EDT; platform waits dispatch the actual UI handoffs.
+        AppExecutorUtil.getAppExecutorService().submit { scheduler.runCurrent() }.get(10, TimeUnit.SECONDS)
+    }
+
+    private fun advanceTimeBy(milliseconds: Long) {
+        AppExecutorUtil
+            .getAppExecutorService()
+            .submit {
+                scheduler.advanceTimeBy(milliseconds)
+                scheduler.runCurrent()
+            }.get(10, TimeUnit.SECONDS)
     }
 }

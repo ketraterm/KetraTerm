@@ -21,11 +21,10 @@ import com.intellij.openapi.roots.ProjectRootManager
 import com.intellij.testFramework.fixtures.BasePlatformTestCase
 import com.intellij.util.concurrency.AppExecutorUtil
 import com.intellij.util.concurrency.annotations.RequiresBlockingContext
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.runBlocking
 import java.nio.file.Path
-import java.util.concurrent.Callable
-import java.util.concurrent.CountDownLatch
-import java.util.concurrent.TimeUnit
+import java.util.concurrent.*
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicInteger
 
@@ -69,17 +68,28 @@ class IntellijProjectFileLoaderTest : BasePlatformTestCase() {
                 while (!writeCompleted.get()) ProgressManager.checkCanceled()
                 projectDirectory.resolve(file.path.removePrefix("${virtualProjectDirectory.path}/"))
             }
+        val lifetime = Job()
         val loading =
             AppExecutorUtil.getAppExecutorService().submit(
-                Callable { runBlocking { loader.load(projectDirectoryUri(), "sgk") } },
+                Callable { runBlocking(lifetime) { loader.load(projectDirectoryUri(), "sgk") } },
             )
 
-        assertTrue("project-file read did not start", enteredRead.await(10, TimeUnit.SECONDS))
-        completeWriteAction(writeCompleted)
-        val entries = loading.get(10, TimeUnit.SECONDS)
+        try {
+            assertTrue("project-file read did not start", enteredRead.await(10, TimeUnit.SECONDS))
+            completeWriteAction(writeCompleted)
+            val entries = loading.get(10, TimeUnit.SECONDS)
 
-        assertTrue(entries.toString(), entries.any { it.path == "settings.gradle.kts" })
-        assertTrue("read action was not restarted", resolutions.get() >= 2)
+            assertTrue(entries.toString(), entries.any { it.path == "settings.gradle.kts" })
+            assertTrue("read action was not restarted", resolutions.get() >= 2)
+        } finally {
+            writeCompleted.set(true)
+            lifetime.cancel()
+            try {
+                loading.get(10, TimeUnit.SECONDS)
+            } catch (failure: ExecutionException) {
+                if (failure.cause !is CancellationException) throw failure
+            }
+        }
     }
 
     /** Verifies that the engine's 256-candidate cap does not truncate the host query. */

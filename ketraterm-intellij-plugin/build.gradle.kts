@@ -91,6 +91,11 @@ dependencies {
     runtimeOnly("org.slf4j:slf4j-nop:2.0.18")
 
     testImplementation(libs.junit)
+    testImplementation(libs.coroutines.test) {
+        // Test scheduling uses the IDE's coroutine runtime, just like the plugin.
+        exclude(group = "org.jetbrains.kotlinx", module = "kotlinx-coroutines-core")
+        exclude(group = "org.jetbrains.kotlinx", module = "kotlinx-coroutines-core-jvm")
+    }
     testImplementation("io.github.ketraterm:ketraterm-testkit:$ketratermVersion") {
         exclude(group = "org.jetbrains.kotlinx", module = "kotlinx-coroutines-core")
         exclude(group = "org.jetbrains.kotlinx", module = "kotlinx-coroutines-core-jvm")
