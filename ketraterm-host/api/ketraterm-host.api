@@ -40,6 +40,7 @@ public final class io/github/ketraterm/host/HostCommandAdapter : io/github/ketra
 	public final fun getActiveHyperlinkUri ()Ljava/lang/String;
 	public final fun getCurrentPolicy ()Lio/github/ketraterm/host/HostPolicy;
 	public final fun getIconTitle ()Ljava/lang/String;
+	public final fun getPointerShape ()Lio/github/ketraterm/protocol/TerminalPointerShape;
 	public final fun getWindowTitle ()Ljava/lang/String;
 	public final fun hyperlinkUri (I)Ljava/lang/String;
 	public fun insertCharacters (I)V
@@ -116,6 +117,7 @@ public final class io/github/ketraterm/host/HostCommandAdapter : io/github/ketra
 	public fun setMaximized (Z)V
 	public fun setOverline (Z)V
 	public fun setPaletteColor (II)V
+	public fun setPointerShape (Lio/github/ketraterm/protocol/TerminalPointerShape;)V
 	public fun setScrollRegion (II)V
 	public fun setSelectiveEraseProtection (Z)V
 	public fun setShiftMouseCaptureEnabled (Z)V

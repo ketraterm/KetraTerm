@@ -51,6 +51,7 @@ the first-input benchmark. Direct JAR runs use annotations unless overridden.
 | Core writes, scrolling, erasure, and frame copying | `TerminalCoreWriteBenchmark`, `TerminalCoreScrollBenchmark`, `TerminalCoreEraseBenchmark`, `TerminalBufferBenchmark` |
 | History disposal and reuse after extended attributes are cleared | `TerminalStorageLifecycleBenchmark` |
 | Input encoding and session output through transport completion | `TerminalInputBenchmark`, `TerminalPasteBenchmark`, `TerminalSessionOutputBenchmark` |
+| OSC 22 parsing and pointer metadata reads | `TerminalPointerShapeBenchmark`; parsing is per request, three per invocation. Excludes Swing/native cursor updates. |
 | Published-frame access and viewport projection | `TerminalRenderLeaseBenchmark`, `RetainedFrameViewportBenchmark` |
 | Completion evaluation and directory scanning | `TerminalCompletionBenchmark`, `TerminalDirectoryCompletionBenchmark`, `TerminalLearnedRankingBenchmark` |
 | Swing text, search, hyperlinks, and painting | `TerminalTextRenderingBenchmark`, `TerminalSearchScanBenchmark`, `TerminalSearchRefreshBenchmark`, `TerminalHyperlinkDiscoveryBenchmark`, `SwingPaintBenchmark` |

@@ -25,6 +25,7 @@ internal object ControlStringPolicy {
     const val MAX_PAYLOAD_BYTES: Int = 4096
     const val MAX_DYNAMIC_COLOR_BYTES: Int = 256
     const val MAX_STATUS_REQUEST_BYTES: Int = 64
+    const val MAX_POINTER_SHAPE_BYTES: Int = 32
 
     /** Includes actual envelope overhead; Long arithmetic prevents a host budget from wrapping. */
     fun clipboardLimit(
@@ -42,6 +43,7 @@ internal object ControlStringPolicy {
         customPayloadLimitBytes: Int = 0,
     ): Int =
         when (command) {
+            22 -> MAX_POINTER_SHAPE_BYTES
             0, 1, 2, 4, 7, 8, 9, 52, 104, 133, 777 -> MAX_PAYLOAD_BYTES
             // Three implemented dynamic-color targets, with room for color syntax and whitespace.
             10, 11, 12, 110, 111, 112 -> MAX_DYNAMIC_COLOR_BYTES

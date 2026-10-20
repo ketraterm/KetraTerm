@@ -17,6 +17,7 @@ controls and platform integrations are listed separately below.
 | Hyperlinks | OSC 8 and detected links, hover styling, activation policies, context actions, and custom detectors. |
 | Clipboard interaction | Copy/paste, optional copy on selection, and configurable clipboard/primary-selection middle-button paste. |
 | Mouse routing | Application reporting, application-requested Shift capture (XTSHIFTESCAPE), and mode 1007 alternate-screen wheel-to-arrow input, bounded by host reporting/wheel settings. Shift restores local interaction by default. |
+| Mouse pointer | Application OSC 22 requests for portable native shapes; activatable links and prompt actions retain pointer precedence. |
 | Prompt presentation | Gutter, divider, or hidden decorations; requires [shell metadata](shells.md). |
 | Bell | Configurable visual indicator; sound and desktop attention are product-owned. |
 | Clear screen | Sends Ctrl+L to request clearing/redrawing by the foreground program; clears local selection, search, and suggestions. |

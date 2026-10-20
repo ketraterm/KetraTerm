@@ -23,12 +23,32 @@ Built-in OSC commands use UTF-8. There is no locale encoding fallback or raw
 | Color resets (104/110/111/112) | ASCII decimal indices or an empty payload; non-ASCII input rejects the complete reset. |
 | Hyperlinks (8) | Strict UTF-8; malformed or completed oversized commands end active link context without changing retained links. |
 | Clipboard (52) | ASCII envelope and strict Base64/UTF-8 text; invalid payloads are rejected before consent or access. |
+| Pointer shape (22) | Exact ASCII CSS names from the supported subset, optionally prefixed with `=`; empty name restores host defaults. Unknown or malformed names leave state unchanged. |
 
 BEL or `ESC \` completes OSC. CAN/SUB, reset, and EOF discard unfinished commands.
 Other C0 controls and DEL are ignored inside OSC. Unknown numeric commands are
 ignored unless a custom handler is installed. Recovery preserves later commands.
 Host title/notification limits count UTF-16 code units and avoid splitting a valid
 surrogate pair; they do not guarantee grapheme-boundary truncation.
+
+## Pointer shapes
+
+`OSC 22 ; name ST` sets the mouse pointer; BEL also terminates the command.
+An optional `=` prefix is accepted. An empty name restores the host default.
+Supported CSS names are `default`, `crosshair`, `text`, `wait`, `pointer`,
+`move`, and `n-resize`, `ne-resize`, `e-resize`, `se-resize`, `s-resize`,
+`sw-resize`, `w-resize`, `nw-resize`.
+
+Names are exact, case-sensitive ASCII. Invalid, unsupported, or oversized
+requests preserve the previous shape and never reach a custom OSC handler.
+The override is session-wide: screen switches, cursor save/restore, resize,
+and DECSTR preserves it; RIS clears it.
+
+Pointer presentation is independent of mouse reporting and window-manipulation
+permission. Activatable links and prompt actions can override the application
+pointer. See [Ghostty's basic command](https://ghostty.org/docs/vt/osc/22), the
+[Kitty specification](https://sw.kovidgoyal.net/kitty/pointer-shapes/), and
+[remaining extensions](../terminal-feature-gap-map.md#optional-protocol-work).
 
 ## Payload limits
 
@@ -39,6 +59,7 @@ introducers, terminators, and ignored control bytes.
 | --- | --- |
 | Titles, directory, hyperlinks, notifications, palette 4/104, shell markers | 4,096 bytes. |
 | Dynamic colors 10/11/12/110/111/112 | 256 bytes. |
+| Pointer shape 22 | 32 bytes. |
 | DECRQSS | 64 bytes. |
 | XTGETTCAP | 4,096 bytes. |
 | Custom OSC | 4,096 bytes by default; configurable full-envelope limit, with a separate 4,096-byte header limit. |

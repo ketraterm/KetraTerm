@@ -320,6 +320,10 @@ internal class RecordingTerminalCommandSink : TerminalAsciiCommandSink {
         events += "setAnsiMode:$mode:$enable"
     }
 
+    override fun setPointerShape(shape: io.github.ketraterm.protocol.TerminalPointerShape?) {
+        events += "setPointerShape:$shape"
+    }
+
     override fun setShiftMouseCaptureEnabled(enabled: Boolean) {
         events += "setShiftMouseCaptureEnabled:$enabled"
     }

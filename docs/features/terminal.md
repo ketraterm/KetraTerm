@@ -40,6 +40,7 @@ placement can depend on input chunk boundaries. See the
 | Cursor | Block, underline, and bar shapes; visibility and blinking controls. |
 | Dynamic colors | OSC 4/10/11/12 palette and foreground/background/cursor changes and queries; OSC 104 and 110/111/112 restore configured theme colors. |
 | Hyperlinks | OSC 8 links with bounded retention. |
+| Mouse pointer | OSC 22 set/reset for 14 portable CSS shapes; [protocol details](../reference/protocol.md#pointer-shapes). |
 
 ## Keyboard, mouse, and paste
 

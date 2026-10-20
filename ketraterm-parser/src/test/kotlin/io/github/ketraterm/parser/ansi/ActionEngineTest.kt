@@ -484,6 +484,10 @@ class ActionEngineTest {
             sinkCalls += "setDecMode:$mode:$enable"
         }
 
+        override fun setPointerShape(shape: io.github.ketraterm.protocol.TerminalPointerShape?) {
+            sinkCalls += "setPointerShape:$shape"
+        }
+
         override fun setShiftMouseCaptureEnabled(enabled: Boolean) {
             sinkCalls += "setShiftMouseCaptureEnabled:$enabled"
         }
