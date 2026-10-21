@@ -169,6 +169,10 @@ Permissions and decoded-size limits are checked again before execution.</p>
 <td>One-based coordinates, relative to active origin/margins when origin mode is enabled.</td>
 </tr>
 <tr>
+<td>Mode status</td>
+<td>ANSI/DEC DECRQM replies for the <a href="#mode-status-reports">listed modes</a>, including permanently enabled grapheme mode 2027. Unknown modes report <code>0</code>.</td>
+</tr>
+<tr>
 <td>Color scheme</td>
 <td><code>CSI ?996n</code> reports dark/light host preference; mode 2031 permits automatic reports for host theme changes. Application color overrides and resets do not change that preference or emit change reports.</td>
 </tr>
@@ -244,8 +248,8 @@ Identical geometry emits nothing. Pixel dimensions exclude padding and are
 zero when unavailable. See the
 <a href="https://gist.github.com/rockorager/e695fb2924d36b2bcf1fff4a3704bd83">in-band resize protocol</a>.</p>
 <h2 id="mode-status-reports">Mode status reports</h2>
-<p>DECRQM returns set (<code>1</code>), reset (<code>2</code>), or unsupported (<code>0</code>). ANSI and DEC namespaces
-are independent; no modes claim permanent-set/reset status.</p>
+<p>DECRQM returns set (<code>1</code>), reset (<code>2</code>), permanently set (<code>3</code>), or unsupported (<code>0</code>).
+ANSI and DEC namespaces are independent.</p>
 <div class="table-scroll"><table>
 <thead>
 <tr>
@@ -260,6 +264,10 @@ are independent; no modes claim permanent-set/reset status.</p>
 <tr>
 <td>DEC core</td>
 <td>1, 3, 5, 6, 7, 12, 25, 45, 66, 69, 1004, 1007, 1045, 2004, 2026.</td>
+</tr>
+<tr>
+<td>DEC grapheme processing</td>
+<td>2027 always reports permanently set (<code>3</code>).</td>
 </tr>
 <tr>
 <td>DEC change reports</td>
@@ -291,6 +299,14 @@ is an action and reports unsupported. Standalone declares supported bell actions
 IntelliJ does not. Requests accept one mode parameter; malformed, overflowing,
 cancelled, or incomplete requests receive no reply. Queries do not mutate state.
 See the <a href="../../ketraterm-protocol/docs/protocol-modes.html">mode reference</a> for names.</p>
+<p><code>CSI ?2027$p</code> replies <code>CSI ?2027;3$y</code>: grapheme processing is always enabled.
+DECSET/DECRST 2027 leave that policy unchanged, including across RIS, DECSTR,
+screen switches, and resize. ANSI mode 2027 is unsupported. Replies use the
+normal terminal-response permission; no window permission is required.
+This advertises grapheme processing, not complete conformance to the original
+<a href="https://github.com/contour-terminal/terminal-unicode-core/blob/master/spec/terminal-unicode-core.tex">Unicode Core draft</a>:
+KetraTerm retains its documented <a href="../../ketraterm-core/docs/terminal-core-contract.html#unicode-scalar-and-width-policy">VS15/VS16 width policy</a>
+and <a href="#streaming-grapheme-placement">streaming placement</a>.</p>
 <h2 id="streaming-grapheme-placement">Streaming grapheme placement</h2>
 <p>Printable prefixes are published at each parser call boundary. Segmentation
 continues across calls; retained continuations update the same cell with its
@@ -304,7 +320,7 @@ A rejected initial write has no continuation target.</p>
 occupied cells, and on tiny grids. Retained text, cell integrity, and following
 text must still be preserved. See <a href="../../ketraterm-parser/docs/grapheme-segmentation.html#bounded-retention">grapheme retention</a>
 and <a href="../development/conformance-testing.html#streaming-placement">verification</a>.</p>
-</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/dc685a5c7cd7e4da1bf2381f8891dc9f6777b13b/docs/reference/protocol.md">View source on GitHub ↗</a></div></div></main></div>
+</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/461979b7271f15e3ba0358137b253b88c18c840a/docs/reference/protocol.md">View source on GitHub ↗</a></div></div></main></div>
   <footer>
     <a class="brand" href="../../../../index.html"><img class="brand-mark" src="../../../../assets/logo.svg" alt="" width="34" height="34">KetraTerm Library</a>
     <p>Open source · Apache 2.0</p>
