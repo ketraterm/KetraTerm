@@ -18,9 +18,25 @@ package io.github.ketraterm.render.api
 /**
  * Immutable, retainable image resource. Unlike borrowed frames, this object may
  * outlive a frame callback. Identity denotes a particular pixel version.
+ * Dimensions and pixels are immutable; source-retention metadata may change.
  * Pixels are unassociated 8-bit sRGB ARGB; implementations never expose mutable storage.
  */
 public interface TerminalRenderImage {
+    /**
+     * Whether the originating image store still retains this pixel version for
+     * future placements, including offscreen placements. Once false, it stays false;
+     * [copyArgb], dimensions and pixels remain valid for existing consumers.
+     *
+     * Renderers may discard a cached raster when this is false and the resource is
+     * absent from their installed frame. A frame can still reference a retired
+     * resource, so this property must not suppress its rendering. Implementations
+     * tracking retirement must make changes visible across threads. The default
+     * is true for providers without retirement tracking.
+     *
+     * @return true while the source retains the resource, or when retention is unknown.
+     */
+    public val isRetainedBySource: Boolean get() = true
+
     /** Positive width of the immutable pixel raster, in source pixels. */
     public val width: Int
 

@@ -54,7 +54,7 @@ class DecodedGraphicsAdmissionTest {
         assertEquals("\u001b_Gi=1;OK\u001b\\", replies(terminal))
         place(terminal, 2)
         assertEquals("\u001b_Gi=2;OK\u001b\\", replies(terminal))
-        assertEquals(listOf(first, second), snapshot(terminal).images.distinct())
+        assertEquals(before.images.distinct(), snapshot(terminal).images.distinct())
     }
 
     @Test
@@ -81,7 +81,7 @@ class DecodedGraphicsAdmissionTest {
         )
         assertEquals("\u001b_Gi=7;EINVAL:invalid graphics data\u001b\\", replies(terminal))
         assertEquals(before, snapshot(terminal))
-        assertSame(original, snapshot(terminal).images.first())
+        assertSame(before.images.first(), snapshot(terminal).images.first())
     }
 
     @Test
@@ -96,11 +96,12 @@ class DecodedGraphicsAdmissionTest {
             true,
         )
         assertEquals("\u001b_Gi=7;OK\u001b\\", replies(terminal))
+        val retained = snapshot(terminal).images.single()
         terminal.readRenderFrame(0) { frame ->
             var count = 0
             frame.copyImages { image, column, row, _, _, sourceX, sourceY, width, height, _, _, _ ->
                 count++
-                assertSame(decoded, image)
+                assertSame(retained, image)
                 assertEquals(1.0, column)
                 assertEquals(2.0, row)
                 assertEquals(0, sourceX)

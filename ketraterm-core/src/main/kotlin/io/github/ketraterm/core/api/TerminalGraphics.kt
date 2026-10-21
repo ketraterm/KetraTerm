@@ -68,7 +68,9 @@ public interface TerminalGraphics {
      *
      * @param command borrowed original controls for an upload, upload-and-display or query.
      * @param image immutable normalized pixels; retained without copying on successful
-     * upload. Must be non-null for [TerminalGraphicsResult.OK]; never retained for queries.
+     * upload. Published resources may wrap this object to track source retirement;
+     * their identity stays stable for the admitted pixel version. Must be non-null
+     * for [TerminalGraphicsResult.OK]; never retained for queries.
      * @param result completed decoder outcome; failure prevents mutation.
      * @param allowReplies whether eligible success and failure replies may be queued.
      */

@@ -36,6 +36,7 @@ class GraphicsCommandTest {
             val bytes = (apc("a=T,f=100,i=7,C=1", "AAEC") + "\u001b[cX").encodeToByteArray()
             val consumed = parser.acceptUntilGraphics(bytes, 0, bytes.size)
             assertEquals(0, terminal.pendingResponseBytes)
+            var pixelCopies = 0
             val decoded =
                 object : TerminalRenderImage {
                     override val width = 1
@@ -45,6 +46,7 @@ class GraphicsCommandTest {
                         destination: IntArray,
                         offset: Int,
                     ) {
+                        pixelCopies++
                         destination[offset] = 0xffff0000.toInt()
                     }
                 }
@@ -62,11 +64,15 @@ class GraphicsCommandTest {
             } else {
                 assertEquals(0, response.size)
             }
+            assertEquals(0, pixelCopies, "Admission must retain decoded pixels without copying")
             terminal.readRenderFrame { frame ->
                 var count = 0
                 frame.copyImages { image, _, _, _, _, _, _, _, _, _, _, _ ->
                     count++
-                    assertSame(decoded, image)
+                    assertTrue(image.isRetainedBySource)
+                    val pixel = IntArray(1)
+                    image.copyArgb(pixel)
+                    assertEquals(0xffff0000.toInt(), pixel[0])
                 }
                 assertEquals(1, count)
             }

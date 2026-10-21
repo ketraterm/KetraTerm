@@ -18,10 +18,7 @@ package io.github.ketraterm.core.graphics
 import io.github.ketraterm.protocol.TerminalGraphicsLimits
 import io.github.ketraterm.render.api.TerminalRenderImage
 import org.junit.jupiter.api.Test
-import kotlin.test.assertEquals
-import kotlin.test.assertFalse
-import kotlin.test.assertSame
-import kotlin.test.assertTrue
+import kotlin.test.*
 
 class GraphicsStoreTest {
     @Test
@@ -50,12 +47,131 @@ class GraphicsStoreTest {
                 ) = error("Budget accounting does not copy pixels")
             }
         store.retain(false, 1, 0, large)
-        store.retain(true, 2, 0, large)
+        val second = store.image(store.retain(true, 2, 0, large))
         assertTrue(store.find(false, 1, 0) >= 0)
         assertTrue(store.find(true, 2, 0) >= 0)
         store.retain(false, 3, 0, image())
         assertEquals(-1, store.find(false, 1, 0))
-        assertSame(large, store.image(store.find(true, 2, 0)))
+        assertSame(second, store.image(store.find(true, 2, 0)))
+    }
+
+    @Test
+    fun `removing the last anonymous placement releases its image record before further admission`() {
+        val removals =
+            listOf<Pair<String, (GraphicsStore) -> Unit>>(
+                "lowercase deletion" to { store -> store.delete(false, 'a', 0, 0, 0, 0, 0, 0, 0, 0) },
+                "viewport clear" to { store -> store.clear(false, history = false) },
+                "history clear" to { store ->
+                    store.scroll(false, 0, 5, 0, 9, -1, true, 1, wholeViewport = true)
+                    store.clear(false, viewport = false)
+                },
+                "history eviction" to { store ->
+                    repeat(2) { store.scroll(false, 0, 5, 0, 9, -1, true, 1, wholeViewport = true) }
+                },
+                "margin clipping" to { store -> store.scroll(false, 0, 3, 0, 9, -1, false, 0) },
+                "primary resize" to { store -> store.resizePrimary(1, 0) },
+            )
+        for ((operation, remove) in removals) {
+            val store = GraphicsStore().apply { geometryChanged(8, 16) }
+            val oldest = store.image(store.retain(false, 1, 0, image()))
+            for (id in 2L until TerminalGraphicsLimits.IMAGES.toLong()) store.retain(false, id, 0, image())
+            val anonymous = store.retain(false, 0, 0, image())
+            val resource = store.image(anonymous)
+            store.put(anonymous, 0, placement())
+
+            remove(store)
+            assertFalse(resource.isRetainedBySource, operation)
+            var visible = 0
+            store.copy(false, 0, 6, 8, 16) { _, _, _, _, _, _, _, _, _, _, _, _ -> visible++ }
+            assertEquals(0, visible, operation)
+            store.retain(false, TerminalGraphicsLimits.IMAGES + 1L, 0, image())
+
+            assertTrue(store.find(false, 1, 0) >= 0, "$operation must release the anonymous record without evicting a reusable image")
+            assertSame(oldest, store.image(store.find(false, 1, 0)), operation)
+        }
+    }
+
+    @Test
+    fun `anonymous resources survive until their final placement is removed on either screen`() {
+        for (alternate in listOf(false, true)) {
+            val store = GraphicsStore().apply { geometryChanged(8, 16) }
+            val slot = store.retain(alternate, 0, 0, image())
+            val resource = store.image(slot)
+            store.put(slot, 0, placement(row = 0))
+            store.put(slot, 0, placement(row = 1))
+
+            store.delete(alternate, 'y', 0, 0, 0, 0, 1, 0, 0, 0)
+            var remaining = 0
+            store.copy(alternate, 0, 6, 8, 16) { image, _, y, _, _, _, _, _, _, _, _, _ ->
+                remaining++
+                assertSame(resource, image)
+                assertEquals(1.0, y)
+            }
+            assertEquals(1, remaining)
+            assertTrue(resource.isRetainedBySource)
+
+            store.delete(alternate, 'y', 0, 0, 0, 0, 2, 0, 0, 0)
+            assertFalse(resource.isRetainedBySource)
+            store.put(store.retain(alternate, 1, 0, image()), 1, placement())
+            var replacement = 0
+            store.copy(alternate, 0, 6, 8, 16) { _, _, _, _, _, _, _, _, _, _, _, _ -> replacement++ }
+            assertEquals(1, replacement)
+        }
+    }
+
+    @Test
+    fun `removing the last named placement preserves its image for redisplay`() {
+        val store = GraphicsStore().apply { geometryChanged(8, 16) }
+        val slot = store.retain(false, 1, 0, image())
+        val resource = store.image(slot)
+        store.put(slot, 1, placement())
+
+        store.delete(false, 'a', 0, 0, 0, 0, 0, 0, 0, 0)
+
+        assertTrue(resource.isRetainedBySource)
+        assertSame(resource, store.image(store.find(false, 1, 0)))
+        store.put(store.find(false, 1, 0), 2, placement())
+        var visible = 0
+        store.copy(false, 0, 6, 8, 16) { image, _, _, _, _, _, _, _, _, _, _, _ ->
+            visible++
+            assertSame(resource, image)
+        }
+        assertEquals(1, visible)
+    }
+
+    @Test
+    fun `replacement retires only the prior source lifetime and preserves pinned pixels`() {
+        val store = GraphicsStore().apply { geometryChanged(8, 16) }
+        val input = image(0x12345678)
+        val original = store.image(store.retain(false, 1, 0, input))
+        assertTrue(original.isRetainedBySource)
+
+        val replacement = store.image(store.retain(false, 1, 0, input))
+
+        assertFalse(original.isRetainedBySource)
+        assertTrue(replacement.isRetainedBySource)
+        val pixels = IntArray(1)
+        original.copyArgb(pixels)
+        assertContentEquals(intArrayOf(0x12345678), pixels)
+        store.delete(false, 'I', 1, 0, 0, 0, 0, 0, 0, 0)
+        assertFalse(replacement.isRetainedBySource)
+        replacement.copyArgb(pixels)
+        assertContentEquals(intArrayOf(0x12345678), pixels)
+    }
+
+    @Test
+    fun `clearing one source screen retires its resources while preserving the other screen`() {
+        val store = GraphicsStore().apply { geometryChanged(8, 16) }
+        val primary = store.image(store.retain(false, 1, 0, image()))
+        val alternate = store.image(store.retain(true, 1, 0, image()))
+
+        store.clear(false, data = true)
+
+        assertFalse(primary.isRetainedBySource)
+        assertTrue(alternate.isRetainedBySource)
+        assertSame(alternate, store.image(store.find(true, 1, 0)))
+        store.resizePrimary(0, 0)
+        assertFalse(alternate.isRetainedBySource)
     }
 
     @Test
@@ -140,8 +256,8 @@ class GraphicsStoreTest {
 
     @Test fun `unplaced resources are evicted before displayed resources at the shared count limit`() {
         val store = GraphicsStore().apply { geometryChanged(8, 16) }
-        val retained = image()
-        val shown = store.retain(false, 1, 0, retained)
+        val shown = store.retain(false, 1, 0, image())
+        val retained = store.image(shown)
         store.put(shown, 1, placement())
         for (id in 2L..TerminalGraphicsLimits.IMAGES + 1L) store.retain(id % 2L == 0L, id, 0, image())
         assertSame(retained, store.image(store.find(false, 1, 0)))
@@ -176,10 +292,12 @@ class GraphicsStoreTest {
 
     @Test fun `equal z order uses immutable image creation then placement creation`() {
         val store = GraphicsStore().apply { geometryChanged(8, 16) }
-        val first = image(1)
-        val second = image(2)
-        store.put(store.retain(false, 99, 0, first), 9, placement())
-        store.put(store.retain(false, 1, 0, second), 1, placement())
+        val firstSlot = store.retain(false, 99, 0, image(1))
+        val secondSlot = store.retain(false, 1, 0, image(2))
+        val first = store.image(firstSlot)
+        val second = store.image(secondSlot)
+        store.put(firstSlot, 9, placement())
+        store.put(secondSlot, 1, placement())
         val resources = mutableListOf<TerminalRenderImage>()
         store.copy(false, 0, 6, 8, 16) { image, _, _, _, _, _, _, _, _, _, _, _ -> resources += image }
         assertEquals<List<TerminalRenderImage>>(listOf(first, second), resources)

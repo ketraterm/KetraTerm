@@ -28,8 +28,9 @@ import java.util.*
  * EDT-owned rasters keyed by immutable resource identity, shared by all placements
  * of that resource. Frame installation copies a new resource's pixels once; an
  * unchanged resource reuses its raster even when its placement metadata changes.
- * Offscreen resources stay cached until admission needs their pixel or record
- * capacity. Scrolling an unchanged image out of view and back therefore reuses
+ * Offscreen resources stay cached while their source retains them, until admission
+ * needs their pixel or record capacity. Retired resources are released when absent
+ * from the installed frame. Scrolling a retained image out of view and back reuses
  * its raster. Both source references and rasters remain bounded and clear on unbind.
  */
 internal class GraphicsRasterCache {
@@ -66,6 +67,10 @@ internal class GraphicsRasterCache {
         if (placements.size < images.size) placements = placements.copyOf(images.size)
         placementCount = images.size
         try {
+            for (i in resources.indices) {
+                val resource = resources[i] ?: continue
+                if (!live[i] && !resource.isRetainedBySource) release(i)
+            }
             for (i in 0 until images.size) {
                 val resource = images.image(i)
                 var slot = slots[resource]
@@ -107,13 +112,16 @@ internal class GraphicsRasterCache {
     private fun evictOffscreen(requiredBytes: Long) {
         for (i in resources.indices) {
             if (bytes + requiredBytes <= RETAINED_BYTES && slots.size < IMAGES) return
-            val resource = resources[i] ?: continue
-            if (live[i]) continue
-            slots.remove(resource)
-            bytes -= resource.width.toLong() * resource.height * 4
-            resources[i] = null
-            rasters[i] = null
+            if (resources[i] != null && !live[i]) release(i)
         }
+    }
+
+    private fun release(slot: Int) {
+        val resource = checkNotNull(resources[slot])
+        slots.remove(resource)
+        bytes -= resource.width.toLong() * resource.height * 4
+        resources[slot] = null
+        rasters[slot] = null
     }
 
     private fun prepareRaster(resource: TerminalRenderImage): BufferedImage {

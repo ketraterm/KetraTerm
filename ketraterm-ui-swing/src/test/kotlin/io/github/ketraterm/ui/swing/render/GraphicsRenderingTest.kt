@@ -38,6 +38,53 @@ import kotlin.test.*
 
 class GraphicsRenderingTest {
     @Test
+    fun `retired versions leave the raster cache without invalidating installed pinned frames`() =
+        onEdt {
+            val terminal = TerminalBuffers.create(10, 4)
+            terminal.resize(10, 4, 0, 80, 64)
+            val parser = TerminalParsers.create(HostCommandAdapter(terminal))
+
+            fun upload(payload: String) = parser.accept("\u001b_Ga=T,i=7,f=24,s=1,v=1,C=1;$payload\u001b\\".encodeToByteArray())
+
+            fun frame() = TerminalRenderCache(10, 4).apply { updateFrom(terminal as TerminalRenderFrameReader) }
+
+            upload("/wAA")
+            val oldFrame = frame()
+            val oldImage = oldFrame.images.image(0)
+            assertTrue(oldImage.isRetainedBySource)
+            val rasters = GraphicsRasterCache()
+            try {
+                rasters.prepare(oldFrame.images)
+                val oldRaster = rasters.image(0)
+                upload("AP8A")
+                val newFrame = frame()
+                assertFalse(oldImage.isRetainedBySource)
+
+                // Retirement is a cache hint; an installed old frame remains drawable.
+                rasters.prepare(oldFrame.images)
+                assertSame(oldRaster, rasters.image(0))
+                assertEquals(Color.RED.rgb, rasters.image(0).getRGB(0, 0))
+
+                rasters.prepare(newFrame.images)
+                val newRaster = rasters.image(0)
+                assertEquals(Color.GREEN.rgb, newRaster.getRGB(0, 0))
+                rasters.prepare(oldFrame.images)
+                assertNotSame(oldRaster, rasters.image(0))
+                rasters.prepare(newFrame.images)
+                assertSame(newRaster, rasters.image(0))
+
+                parser.accept("\u001b_Ga=d,d=I,i=7;\u001b\\".encodeToByteArray())
+                assertFalse(newFrame.images.image(0).isRetainedBySource)
+                rasters.prepare(frame().images)
+                rasters.prepare(newFrame.images)
+                assertNotSame(newRaster, rasters.image(0))
+                assertEquals(Color.GREEN.rgb, rasters.image(0).getRGB(0, 0))
+            } finally {
+                rasters.clear()
+            }
+        }
+
+    @Test
     fun `scrolling resources completely out of view and back reuses their rasters`() =
         onEdt {
             val red = image(1, 1, intArrayOf(Color.RED.rgb))

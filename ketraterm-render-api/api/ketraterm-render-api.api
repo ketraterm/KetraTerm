@@ -204,10 +204,12 @@ public abstract interface class io/github/ketraterm/render/api/TerminalRenderIma
 	public static synthetic fun copyArgb$default (Lio/github/ketraterm/render/api/TerminalRenderImage;[IIILjava/lang/Object;)V
 	public abstract fun getHeight ()I
 	public abstract fun getWidth ()I
+	public fun isRetainedBySource ()Z
 }
 
 public final class io/github/ketraterm/render/api/TerminalRenderImage$DefaultImpls {
 	public static synthetic fun copyArgb$default (Lio/github/ketraterm/render/api/TerminalRenderImage;[IIILjava/lang/Object;)V
+	public static fun isRetainedBySource (Lio/github/ketraterm/render/api/TerminalRenderImage;)Z
 }
 
 public abstract interface class io/github/ketraterm/render/api/TerminalRenderImageSink {

@@ -45,8 +45,9 @@ Image pixels are copied into EDT-owned rasters during frame installation, never
 during painting. Placements
 sharing an immutable resource share its raster. Fully opaque resources use an
 RGB view of the same pixel storage to enable Java2D's opaque scaling path.
-The view releases unused rasters on the next installation and all raster
-references on unbinding or disposal.
+The view keeps offscreen rasters while their source retains the image, subject to
+cache capacity. It releases retired resources absent from the next installed frame,
+and all raster references on unbinding or disposal.
 See the [render lifetime contract](../../ketraterm-render-api/docs/render-frame-lifecycle.md)
 for the distinction between borrowed placements and retainable image resources.
 

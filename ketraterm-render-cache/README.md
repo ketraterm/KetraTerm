@@ -68,6 +68,8 @@ Publisher leases make a published cache read-only for the duration of
 `readCurrent`. Do not retain a borrowed cache or its arrays, update it, or reenter
 the publisher from that callback. The publisher uses three caches and may wait
 for readers when no non-front buffer is available for writing.
+Retired publisher buffers release image references once their last reader leaves,
+while keeping primitive storage available for reuse.
 
 `hasFrame` is false initially, after `reset`, and after an incomplete copy. Reset
 clears source data and metadata while retaining dimensions and storage capacity.

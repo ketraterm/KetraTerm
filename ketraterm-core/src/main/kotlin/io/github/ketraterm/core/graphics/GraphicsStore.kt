@@ -49,7 +49,7 @@ internal class GraphicsStore {
     private var clock = 0L
     private var nextId = 1L
     private var retainedBytes = 0L
-    private var images = arrayOfNulls<TerminalRenderImage>(0)
+    private var images = arrayOfNulls<StoredImage>(0)
     private var ids = LongArray(0)
     private var numbers = LongArray(0)
     private var created = LongArray(0)
@@ -146,7 +146,7 @@ internal class GraphicsStore {
             removeImage(victim)
         }
         val slot = images.indexOfFirst { it == null }
-        images[slot] = image
+        images[slot] = StoredImage(image)
         ids[slot] = id
         numbers[slot] = number
         screens[slot] = screen
@@ -327,19 +327,49 @@ internal class GraphicsStore {
                 placementIndex.put((movedSlot.toLong() shl 32) or placementIds[index], index)
             }
         }
+        // Anonymous images cannot be addressed again once their final placement is gone.
+        if (references[slot] == 0 && ids[slot] == 0L && numbers[slot] == 0L) releaseImage(slot)
         changed()
     }
 
     private fun removeImage(slot: Int) {
-        val image = images[slot] ?: return
+        if (images[slot] == null) return
         var i = count - 1
         while (i >= 0) {
             if (records[i * STRIDE + SLOT] == slot) removePlacement(i)
             i--
         }
+        releaseImage(slot)
+    }
+
+    /** Releases source ownership after its placements have been removed. */
+    private fun releaseImage(slot: Int) {
+        val image = images[slot] ?: return
         retainedBytes -= image.width.toLong() * image.height * 4
+        image.release()
         images[slot] = null
         changed()
+    }
+
+    /** Owns source retirement independently of immutable pixels and external frame leases. */
+    private class StoredImage(
+        private val source: TerminalRenderImage,
+    ) : TerminalRenderImage {
+        override val width get() = source.width
+        override val height get() = source.height
+
+        @Volatile
+        override var isRetainedBySource = true
+            private set
+
+        fun release() {
+            isRetainedBySource = false
+        }
+
+        override fun copyArgb(
+            destination: IntArray,
+            offset: Int,
+        ) = source.copyArgb(destination, offset)
     }
 
     /**

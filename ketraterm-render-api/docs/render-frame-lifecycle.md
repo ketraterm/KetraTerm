@@ -28,6 +28,11 @@ callback; prepare backend rasters afterwards. Caches must release obsolete resou
 references on replacement, failed copying and reset. `graphicsGeneration`, source
 identity, viewport and structure qualify cached placement geometry.
 
+`isRetainedBySource` is a thread-visible, monotonic lifetime hint, independent of
+pixel validity. Renderers may release an absent resource's raster once its source
+retires it; an installed or pinned frame must still render that resource. Providers
+without retirement tracking inherit `true`, so caches must retain their own bounds.
+
 Nested reads on the same reader need not be supported. An unsupported nested read
 must throw `IllegalStateException` without disturbing the enclosing frame. A
 consumer should finish its current read before requesting another viewport.

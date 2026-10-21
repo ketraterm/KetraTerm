@@ -17,10 +17,9 @@ package io.github.ketraterm.ui.swing.api
 
 import io.github.ketraterm.core.TerminalBuffers
 import io.github.ketraterm.core.api.TerminalBuffer
-import io.github.ketraterm.render.api.TerminalRenderBufferKind
-import io.github.ketraterm.render.api.TerminalRenderFrameConsumer
-import io.github.ketraterm.render.api.TerminalRenderFrameReader
+import io.github.ketraterm.render.api.*
 import io.github.ketraterm.render.cache.TerminalRenderCache
+import io.github.ketraterm.render.cache.TerminalRenderRangeCopy
 import kotlinx.coroutines.*
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.runTest
@@ -34,6 +33,8 @@ import java.util.concurrent.ConcurrentLinkedQueue
 import java.util.concurrent.FutureTask
 import javax.swing.SwingUtilities
 import kotlin.coroutines.CoroutineContext
+import kotlin.test.assertFailsWith
+import kotlin.test.assertNotNull
 
 class TerminalHyperlinkRetentionTest {
     @ParameterizedTest
@@ -599,6 +600,69 @@ class TerminalHyperlinkRetentionTest {
         }
 
     @Test
+    fun `source scanning and validation release copied images and reuse primitive scratch`() =
+        runTest {
+            val fixture = SourceScanFixture()
+            val scanned = assertNotNull(fixture.scan())
+            assertEquals(listOf("https://example.invalid/source\n"), scanned.lines.map { it.text })
+            fixture.assertReleased()
+            val words = fixture.copy.cache.codeWords
+            val attributes = fixture.copy.cache.attrWords
+            val lineIds = fixture.copy.cache.lineIds
+
+            val validated = assertNotNull(fixture.scanner.validate(fixture.reader, scanned.lines, fixture.history))
+            assertTrue(validated.validLines.single())
+            fixture.assertReleased()
+            assertSame(words, fixture.copy.cache.codeWords)
+            assertSame(attributes, fixture.copy.cache.attrWords)
+            assertSame(lineIds, fixture.copy.cache.lineIds)
+
+            val rescanned = assertNotNull(fixture.scan())
+            assertEquals(scanned.lines.map { it.text }, rescanned.lines.map { it.text })
+            fixture.assertReleased()
+            assertSame(words, fixture.copy.cache.codeWords)
+        }
+
+    @ParameterizedTest
+    @ValueSource(booleans = [false, true])
+    fun `source scanning and validation release copied images after generation rejection`(validating: Boolean) =
+        runTest {
+            val fixture = SourceScanFixture()
+            val scanned = assertNotNull(fixture.scan())
+            fixture.mismatchedCopy = true
+            val result =
+                if (validating) {
+                    fixture.scanner.validate(fixture.reader, scanned.lines, fixture.history)
+                } else {
+                    fixture.scan()
+                }
+            assertNull(result)
+            fixture.assertReleased()
+        }
+
+    @ParameterizedTest
+    @ValueSource(booleans = [false, true])
+    fun `source scanning and validation release copied images on copy failure or cancellation`(validating: Boolean) =
+        runTest {
+            for (failure in listOf(IllegalStateException("copy failed"), CancellationException("copy cancelled"))) {
+                val fixture = SourceScanFixture()
+                val scanned = assertNotNull(fixture.scan())
+                fixture.afterCopy = { throw failure }
+                assertSame(
+                    failure,
+                    assertFailsWith<RuntimeException> {
+                        if (validating) {
+                            fixture.scanner.validate(fixture.reader, scanned.lines, fixture.history)
+                        } else {
+                            fixture.scan()
+                        }
+                    },
+                )
+                fixture.assertReleased()
+            }
+        }
+
+    @Test
     fun `cached action lookup retires only after its last segment and ignores unknown future identities`() {
         val actions = TerminalHyperlinkActions()
         val range = SwingHyperlinkTextRange(SwingHyperlinkTextPosition(0, 0), SwingHyperlinkTextPosition(0, 1))
@@ -644,6 +708,63 @@ class TerminalHyperlinkRetentionTest {
         }
         actions.release(retained)
         assertNull(actions.get(retained))
+    }
+
+    private class SourceScanFixture {
+        val copy = TerminalRenderRangeCopy()
+        val scanner = TerminalHyperlinkSourceScan(copy)
+        private val source =
+            TerminalBuffers.create(80, 3).apply { writeText("https://example.invalid/source") } as TerminalRenderFrameReader
+        private val image =
+            object : TerminalRenderImage {
+                override val width = 1
+                override val height = 1
+
+                override fun copyArgb(
+                    destination: IntArray,
+                    offset: Int,
+                ) = error("Text scanning must not copy image pixels")
+            }
+        var mismatchedCopy = false
+        var afterCopy: () -> Unit = {}
+        var history = 0L
+            private set
+        private var copiedImages = 0
+        val reader =
+            object : TerminalRenderFrameReader by source {
+                override fun readRenderFrameForAbsoluteRange(
+                    startAbsoluteRow: Long,
+                    endAbsoluteRow: Long,
+                    consumer: TerminalRenderFrameConsumer,
+                ) {
+                    source.readRenderFrameForAbsoluteRange(startAbsoluteRow, endAbsoluteRow) { frame ->
+                        consumer.accept(
+                            object : TerminalRenderFrame by frame {
+                                override val contentGeneration = frame.contentGeneration + if (mismatchedCopy) 1 else 0
+
+                                override fun copyImages(sink: TerminalRenderImageSink) {
+                                    sink.accept(image, 0.0, 0.0, 1.0, 1.0, 0, 0, 1, 1, 0.0, 1.0, 0)
+                                    copiedImages++
+                                }
+                            },
+                        )
+                    }
+                    assertEquals(1, copy.cache.images.size, "The range copy must actually acquire the image")
+                    afterCopy()
+                }
+            }
+
+        init {
+            source.readRenderFrame { history = it.historyContentGeneration }
+        }
+
+        suspend fun scan() = scanner.scan(reader, 0, TerminalRenderBufferKind.PRIMARY, 80, history)
+
+        fun assertReleased() {
+            assertTrue(copiedImages > 0)
+            assertFalse(copy.cache.hasFrame)
+            assertEquals(0, copy.cache.images.size)
+        }
     }
 
     private class Fixture(

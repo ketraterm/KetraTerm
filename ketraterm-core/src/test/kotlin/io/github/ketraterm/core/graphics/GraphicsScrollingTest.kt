@@ -39,7 +39,7 @@ class GraphicsScrollingTest {
             store.scroll(alternate, 0, 5, 0, 9, -1, !alternate, 2, wholeViewport = true)
 
             val after = visible(store, alternate).single()
-            assertSame(resource, after.image)
+            assertSame(before.image, after.image)
             assertEquals(before, after)
         }
     }
@@ -57,7 +57,7 @@ class GraphicsScrollingTest {
 
         assertTrue(visible(store).isEmpty())
         assertEquals(listOf(history), visible(store, offset = 1))
-        assertSame(historyImage, visible(store, offset = 1).single().image)
+        assertSame(history.image, visible(store, offset = 1).single().image)
     }
 
     @Test
@@ -87,9 +87,10 @@ class GraphicsScrollingTest {
         for (case in cases) {
             for (up in listOf(true, false)) {
                 val store = store()
-                val resource = image()
                 val startRow = if (up) 1 else 7 - case.effectiveRows
-                store.put(store.retain(false, 1, 0, resource), 1, placement(startRow, case.columns, case.rows, offsetX = 2, offsetY = 4))
+                val slot = store.retain(false, 1, 0, image())
+                val resource = store.image(slot)
+                store.put(slot, 1, placement(startRow, case.columns, case.rows, offsetX = 2, offsetY = 4))
                 store.scroll(false, 1, 6, 0, 9, if (up) -2 else 2, false, 0)
                 store.geometryChanged(12, 24)
 
@@ -165,8 +166,9 @@ class GraphicsScrollingTest {
         for (selector in listOf('i', 'I', 'r', 'R')) {
             for (lastId in listOf(0L, 1L, 4294967295L)) {
                 val store = store()
-                val anonymous = image()
-                store.put(store.retain(false, 0, 0, anonymous), 1, placement(0, 1, 1))
+                val slot = store.retain(false, 0, 0, image())
+                val anonymous = store.image(slot)
+                store.put(slot, 1, placement(0, 1, 1))
                 store.put(store.retain(false, 1, 0, image()), 1, placement(1, 1, 1))
                 store.delete(false, selector, 0, 0, 0, 0, lastId, 0, 0, 0)
 

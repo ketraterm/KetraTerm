@@ -61,6 +61,10 @@ placement. Failed replacement preserves the old image. This differs deliberately
 from Kitty's eager removal at the start of retransmission. Queries never evict
 retained images to obtain working space.
 
+Named resources remain reusable after their final placement is removed. Anonymous
+resources (`i=I=0`) retire when their last placement disappears, including through
+scrolling, clearing and lowercase deletion; they cannot be addressed for redisplay.
+
 Raw RGB/RGBA payloads must have exactly the expected byte count. `o=z` requires
 one complete zlib stream with bounded output and no trailing compressed data.
 For `f=100,o=z`, the specification requires positive `S` giving the exact expanded
@@ -220,9 +224,14 @@ constant-time branch in existing structural operations.
 
 Swing prepares a bounded `BufferedImage` cache outside painting. Copy each newly
 admitted resource into its raster and reuse it for every placement. Keep offscreen
-resources cached so scrolling out of view and back does not recreate rasters.
-Evict absent resources only when admitting another resource would exceed the pixel
-or record budget; never evict a resource used by the frame being installed. A
+resources cached while the source still retains them so scrolling out of view and
+back does not recreate rasters. `TerminalRenderImage.isRetainedBySource` reports
+source retirement without invalidating immutable pixels or existing snapshots.
+Release retired resources and their rasters at the next frame installation when
+absent from that frame. Retired publisher buffers release image references when
+their last reader leaves. Otherwise evict absent resources only when admitting
+another resource would exceed the pixel or record budget; never evict a resource
+used by the frame being installed. A
 resource readmitted after capacity eviction may allocate again. Painting performs no decoding, image construction or per-placement
 wrapper allocation. Draw contiguous geometry runs once, splitting at prompt
 dividers only where needed; do not redraw every image row. Opaque rasters may use
