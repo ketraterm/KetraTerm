@@ -1,0 +1,2 @@
+*.bin -text
+manifest.json text eol=lf

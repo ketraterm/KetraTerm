@@ -30,5 +30,6 @@ dependencies and structure; its `docs/` directory holds detailed contracts.
 - [Contributing](../CONTRIBUTING.md): local setup, checks, and contribution workflow.
 - [Architecture](../ARCHITECTURE.md): module boundaries and data flow.
 - [Conformance testing](development/conformance-testing.md): campaigns and failure reproduction.
+- [Kitty graphics design](development/kitty-graphics-contract.md): planned protocol, resource, decoder and render-lifetime contracts with pinned sender fixtures.
 - [Benchmarks](../ketraterm-benchmarks/README.md): workloads and measurement guidance.
 - [Library changelog](../CHANGELOG.md): consumer-visible changes.

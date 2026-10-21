@@ -133,6 +133,11 @@ Verify Markdown examples against current APIs, source, and tests. Use `{version}
 in dependency examples. Link shared contracts rather than repeating them, and
 preserve useful incoming links and released changelog history.
 
+Changelogs summarize completed consumer-visible changes since the previous release.
+Keep ongoing milestones in development documents and the gap map. Consolidate
+unreleased entries around the final behavior rather than accumulating implementation
+steps and fixes made during development of the same feature.
+
 Documentation-only changes need link checks and appropriate example compilation;
 they do not require new behavior tests or a graph rebuild.
 

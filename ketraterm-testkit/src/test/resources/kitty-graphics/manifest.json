@@ -1,0 +1,458 @@
+{
+  "schemaVersion": 1,
+  "captureMethod": "pinned upstream serializer bodies executed in isolated producer harnesses; not full application sessions",
+  "producers": {
+    "yazi": {
+      "revision": "7c45837d553b6cb8032bd7fec2106fdb628e4017",
+      "license": "MIT",
+      "licenseUrl": "https://github.com/sxyazi/yazi/blob/7c45837d553b6cb8032bd7fec2106fdb628e4017/LICENSE"
+    },
+    "kitty": {
+      "revision": "1c5a4829ae4dd472017f592b1424381d5ece7575",
+      "license": "GPL-3.0-only",
+      "licenseUrl": "https://github.com/kovidgoyal/kitty/blob/1c5a4829ae4dd472017f592b1424381d5ece7575/LICENSE"
+    }
+  },
+  "sources": [
+    {
+      "producer": "yazi",
+      "path": "Cargo.lock",
+      "url": "https://raw.githubusercontent.com/sxyazi/yazi/7c45837d553b6cb8032bd7fec2106fdb628e4017/Cargo.lock",
+      "sha256": "49a59068462ba7066a89ac29b26d9f7820301657bdebffaaeb1e3807c7d62fd7"
+    },
+    {
+      "producer": "yazi",
+      "path": "yazi-tty/src/sequence/query.rs",
+      "url": "https://raw.githubusercontent.com/sxyazi/yazi/7c45837d553b6cb8032bd7fec2106fdb628e4017/yazi-tty/src/sequence/query.rs",
+      "sha256": "f2bf5a8ceaeb00b2ab9e4c01ca659cdf0586129a79cc6bbe1e521b7993c37a7a"
+    },
+    {
+      "producer": "yazi",
+      "path": "yazi-tty/src/sequence/cursor.rs",
+      "url": "https://raw.githubusercontent.com/sxyazi/yazi/7c45837d553b6cb8032bd7fec2106fdb628e4017/yazi-tty/src/sequence/cursor.rs",
+      "sha256": "60fb4a50d0724a2c5dbed7a7065cbb71d398a2026ee7d578b266be44e0e06047"
+    },
+    {
+      "producer": "yazi",
+      "path": "yazi-adapter/src/drivers/kgp_old.rs",
+      "url": "https://raw.githubusercontent.com/sxyazi/yazi/7c45837d553b6cb8032bd7fec2106fdb628e4017/yazi-adapter/src/drivers/kgp_old.rs",
+      "sha256": "55bb377376b0d110b5a22e1015f0ff9010df689ad173cd2e174f61d6010b00fd"
+    },
+    {
+      "producer": "kitty",
+      "path": "tools/tui/graphics/command.go",
+      "url": "https://raw.githubusercontent.com/kovidgoyal/kitty/1c5a4829ae4dd472017f592b1424381d5ece7575/tools/tui/graphics/command.go",
+      "sha256": "bdd58a2559032472d48a433f87b604399736e9ed017ed1b176619ebe7d56faf2"
+    }
+  ],
+  "toolchains": {
+    "go": "1.27.3",
+    "rust": "1.94.0",
+    "rustTarget": "wasm32-wasip1",
+    "rustStdSha256": "acbacacdca3e0ec0d93ff46d5f3579ae8cd5133b86e31a893da22cd94e28d0bf",
+    "base64Crate": "0.23.1",
+    "base64CrateSha256": "ac07cdecf99051d9a5238b80f35af32cdeba5b336e55d957b318b50137e18da5"
+  },
+  "cases": [
+    {
+      "name": "yazi-probes",
+      "file": "yazi-probes.bin",
+      "sha256": "8ed6c94f6a706b2b209751390595c764da179354514f941f1933d8871c2f020b",
+      "producer": "yazi",
+      "kind": "query",
+      "expected": {
+        "commands": [
+          {
+            "controls": {
+              "i": "278941603",
+              "s": "1",
+              "v": "1",
+              "a": "q",
+              "t": "d",
+              "f": "24"
+            },
+            "payloadBytes": 4
+          },
+          {
+            "controls": {
+              "i": "916472805",
+              "s": "1",
+              "v": "1",
+              "a": "q",
+              "t": "s",
+              "f": "24",
+              "S": "3"
+            },
+            "payloadBytes": 32
+          }
+        ],
+        "shmName": "/ketraterm-fixture-shm"
+      }
+    },
+    {
+      "name": "yazi-rgb-upload",
+      "file": "yazi-rgb-upload.bin",
+      "sha256": "138a888ebfc7bbf4dcbadee4b2c44fff99f023add80b344b00aefa78d6f53a5a",
+      "producer": "yazi",
+      "kind": "upload",
+      "expected": {
+        "commands": [
+          {
+            "controls": {
+              "q": "2",
+              "a": "t",
+              "i": "73",
+              "f": "24",
+              "s": "73",
+              "v": "19",
+              "m": "1"
+            },
+            "payloadBytes": 4096
+          },
+          {
+            "controls": {
+              "m": "0"
+            },
+            "payloadBytes": 1452
+          }
+        ],
+        "image": {
+          "format": 24,
+          "width": 73,
+          "height": 19,
+          "pixelFormat": "RGB8",
+          "pixelSha256": "5365a1124bb09d8e19703b3e02d9675a2137a2636cdc10e1b363a943030d61e2"
+        }
+      }
+    },
+    {
+      "name": "yazi-rgba-upload",
+      "file": "yazi-rgba-upload.bin",
+      "sha256": "3b42dc0bd3938a56e430fceec28c71a2a5549dba359f6f3833244f6fa8a3861e",
+      "producer": "yazi",
+      "kind": "upload",
+      "expected": {
+        "commands": [
+          {
+            "controls": {
+              "q": "2",
+              "a": "t",
+              "i": "73",
+              "f": "32",
+              "s": "41",
+              "v": "29",
+              "m": "1"
+            },
+            "payloadBytes": 4096
+          },
+          {
+            "controls": {
+              "m": "0"
+            },
+            "payloadBytes": 2248
+          }
+        ],
+        "image": {
+          "format": 32,
+          "width": 41,
+          "height": 29,
+          "pixelFormat": "RGBA8",
+          "pixelSha256": "6725eacda35039243dd4fd5be2cfc393d6a4650235cbd54832bca5d6144d08f7"
+        }
+      }
+    },
+    {
+      "name": "yazi-placements",
+      "file": "yazi-placements.bin",
+      "sha256": "a98a4b480fa0b56cadf1b966a41a3b99e28373798d3a2070ccaf9424d090e1e9",
+      "producer": "yazi",
+      "kind": "placement",
+      "expected": {
+        "commands": [
+          {
+            "controls": {
+              "q": "2",
+              "a": "p",
+              "i": "73",
+              "p": "1",
+              "x": "0",
+              "y": "0",
+              "w": "24",
+              "h": "9",
+              "c": "1",
+              "r": "1",
+              "C": "1"
+            },
+            "payloadBytes": 0
+          },
+          {
+            "controls": {
+              "q": "2",
+              "a": "p",
+              "i": "73",
+              "p": "2",
+              "x": "24",
+              "y": "0",
+              "w": "24",
+              "h": "9",
+              "c": "1",
+              "r": "1",
+              "C": "1"
+            },
+            "payloadBytes": 0
+          },
+          {
+            "controls": {
+              "q": "2",
+              "a": "p",
+              "i": "73",
+              "p": "3",
+              "x": "48",
+              "y": "0",
+              "w": "25",
+              "h": "9",
+              "c": "1",
+              "r": "1",
+              "C": "1"
+            },
+            "payloadBytes": 0
+          },
+          {
+            "controls": {
+              "q": "2",
+              "a": "p",
+              "i": "73",
+              "p": "4",
+              "x": "0",
+              "y": "9",
+              "w": "24",
+              "h": "10",
+              "c": "1",
+              "r": "1",
+              "C": "1"
+            },
+            "payloadBytes": 0
+          },
+          {
+            "controls": {
+              "q": "2",
+              "a": "p",
+              "i": "73",
+              "p": "5",
+              "x": "24",
+              "y": "9",
+              "w": "24",
+              "h": "10",
+              "c": "1",
+              "r": "1",
+              "C": "1"
+            },
+            "payloadBytes": 0
+          },
+          {
+            "controls": {
+              "q": "2",
+              "a": "p",
+              "i": "73",
+              "p": "6",
+              "x": "48",
+              "y": "9",
+              "w": "25",
+              "h": "10",
+              "c": "1",
+              "r": "1",
+              "C": "1"
+            },
+            "payloadBytes": 0
+          }
+        ]
+      }
+    },
+    {
+      "name": "yazi-delete-placements",
+      "file": "yazi-delete-placements.bin",
+      "sha256": "4798d9b93d35ecb71f0aca57a4557439a5d919e586b666cb830953421f84ae86",
+      "producer": "yazi",
+      "kind": "delete",
+      "expected": {
+        "commands": [
+          {
+            "controls": {
+              "q": "2",
+              "a": "d",
+              "d": "i",
+              "i": "73",
+              "p": "1"
+            },
+            "payloadBytes": 0
+          },
+          {
+            "controls": {
+              "q": "2",
+              "a": "d",
+              "d": "i",
+              "i": "73",
+              "p": "2"
+            },
+            "payloadBytes": 0
+          },
+          {
+            "controls": {
+              "q": "2",
+              "a": "d",
+              "d": "i",
+              "i": "73",
+              "p": "3"
+            },
+            "payloadBytes": 0
+          },
+          {
+            "controls": {
+              "q": "2",
+              "a": "d",
+              "d": "i",
+              "i": "73",
+              "p": "4"
+            },
+            "payloadBytes": 0
+          },
+          {
+            "controls": {
+              "q": "2",
+              "a": "d",
+              "d": "i",
+              "i": "73",
+              "p": "5"
+            },
+            "payloadBytes": 0
+          },
+          {
+            "controls": {
+              "q": "2",
+              "a": "d",
+              "d": "i",
+              "i": "73",
+              "p": "6"
+            },
+            "payloadBytes": 0
+          }
+        ]
+      }
+    },
+    {
+      "name": "yazi-delete-image",
+      "file": "yazi-delete-image.bin",
+      "sha256": "1d68aeba74966a0a4710f841871e2d8fef94d8c4ff5993fab7bd17323f64fbc6",
+      "producer": "yazi",
+      "kind": "delete",
+      "expected": {
+        "commands": [
+          {
+            "controls": {
+              "q": "2",
+              "a": "d",
+              "d": "I",
+              "i": "73"
+            },
+            "payloadBytes": 0
+          }
+        ]
+      }
+    },
+    {
+      "name": "kitty-png",
+      "file": "kitty-png.bin",
+      "sha256": "3bc2d5d7d83365988a0090917d80ed742029f2abdb36ce389908d4fa2b0ca981",
+      "producer": "kitty",
+      "kind": "upload",
+      "expected": {
+        "commands": [
+          {
+            "controls": {
+              "a": "T",
+              "q": "2",
+              "f": "100",
+              "s": "2",
+              "v": "2",
+              "i": "101"
+            },
+            "payloadBytes": 103
+          }
+        ],
+        "image": {
+          "format": 100,
+          "width": 2,
+          "height": 2,
+          "pixelFormat": "RGBA8",
+          "pixelSha256": "0757689459b112eb2031dd659bf19a914213fa65abbb909929ac7cb67dc7f96e"
+        }
+      }
+    },
+    {
+      "name": "kitty-zlib-rgb",
+      "file": "kitty-zlib-rgb.bin",
+      "sha256": "3401f984e9e8c084b1c0d9bb893ad0d4f0472602f145f35ad5e9644c63a7f333",
+      "producer": "kitty",
+      "kind": "upload",
+      "expected": {
+        "commands": [
+          {
+            "controls": {
+              "a": "T",
+              "q": "2",
+              "f": "24",
+              "o": "z",
+              "s": "128",
+              "v": "64",
+              "i": "102"
+            },
+            "payloadBytes": 71
+          }
+        ],
+        "image": {
+          "format": 24,
+          "width": 128,
+          "height": 64,
+          "pixelFormat": "RGB8",
+          "pixelSha256": "e52c37f81d95c772cc4efc5b3f641915c100bdd0d8bc55ac6b247550525c6b1e"
+        }
+      }
+    },
+    {
+      "name": "kitty-large-rgba",
+      "file": "kitty-large-rgba.bin",
+      "sha256": "44e7c52d3260d0ef04dac3a3477878dd50ea92f018d5303b4f2afad71e9bfea6",
+      "producer": "kitty",
+      "kind": "upload",
+      "expected": {
+        "commands": [
+          {
+            "controls": {
+              "a": "T",
+              "q": "2",
+              "m": "1",
+              "s": "199",
+              "v": "181",
+              "i": "103"
+            },
+            "payloadBytes": 131072
+          },
+          {
+            "controls": {
+              "a": "T",
+              "q": "2"
+            },
+            "payloadBytes": 61030
+          }
+        ],
+        "image": {
+          "format": 32,
+          "width": 199,
+          "height": 181,
+          "pixelFormat": "RGBA8",
+          "pixelSha256": "9c54d31fd9b1cec574c4f73657848e7879d301d05c5781dbf8daa6315d3ce2d9"
+        }
+      }
+    }
+  ]
+}
