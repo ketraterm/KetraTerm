@@ -335,6 +335,7 @@ public abstract interface class io/github/ketraterm/core/api/TerminalResponseCha
 	public static final field DEVICE_ATTRIBUTES_PRIMARY I
 	public static final field DEVICE_ATTRIBUTES_SECONDARY I
 	public static final field DEVICE_ATTRIBUTES_TERTIARY I
+	public static final field WINDOW_REPORT_CELL_PIXELS I
 	public static final field WINDOW_REPORT_GRID_CELLS I
 	public static final field WINDOW_REPORT_IN_BAND_SIZE I
 	public static final field WINDOW_REPORT_PIXELS I
@@ -364,6 +365,7 @@ public final class io/github/ketraterm/core/api/TerminalResponseChannel$Companio
 	public static final field DEVICE_ATTRIBUTES_PRIMARY I
 	public static final field DEVICE_ATTRIBUTES_SECONDARY I
 	public static final field DEVICE_ATTRIBUTES_TERTIARY I
+	public static final field WINDOW_REPORT_CELL_PIXELS I
 	public static final field WINDOW_REPORT_GRID_CELLS I
 	public static final field WINDOW_REPORT_IN_BAND_SIZE I
 	public static final field WINDOW_REPORT_PIXELS I

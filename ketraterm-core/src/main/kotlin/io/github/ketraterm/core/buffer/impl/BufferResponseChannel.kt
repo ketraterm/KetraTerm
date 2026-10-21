@@ -305,6 +305,13 @@ internal class BufferResponseChannel(
                     )
                 }
             }
+            TerminalResponseChannel.WINDOW_REPORT_CELL_PIXELS -> {
+                val width = state.windowPixelWidth / state.dimensions.width
+                val height = state.windowPixelHeight / state.dimensions.height
+                if (width > 0 && height > 0) {
+                    enqueueWindowReport(reportType = 6, height = height, width = width)
+                }
+            }
             TerminalResponseChannel.WINDOW_REPORT_GRID_CELLS ->
                 enqueueWindowReport(
                     reportType = 8,

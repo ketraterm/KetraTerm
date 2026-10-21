@@ -2,6 +2,7 @@
 
 ## [Unreleased]
 
+- Added inline Kitty graphics for RGB/RGBA and PNG image previews, including compressed transfers, cropping and scaling, with bounded raster reuse while scrolling.
 - Terminal applications can change the mouse pointer shape (OSC 22).
 - Made the search bar more compact and responsive in narrow tool windows and split panes, collapsing search options into a popup when needed.
 - Added whole-word and regular-expression search, including invalid-pattern feedback, alongside literal and case-sensitive matching.

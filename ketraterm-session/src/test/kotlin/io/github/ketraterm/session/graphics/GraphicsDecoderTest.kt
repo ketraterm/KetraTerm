@@ -332,6 +332,24 @@ class GraphicsDecoderTest {
     }
 
     @Test
+    fun `PNG reads only the supplied prefix and owns pixels after staging reuse`() {
+        val payload = png(8, 6, bytes(1, 2, 3, 4))
+        val staging = payload + ByteArray(16_384) { 0x7f }
+        val result = decoder.decode(pngCommand, staging, payload.size)
+        assertEquals(TerminalGraphicsResult.OK, result.status)
+        val image = assertNotNull(result.image)
+        staging.fill(0)
+        assertPixels(image, 0x04010203)
+
+        // A complete PNG after the supplied range cannot repair a truncated input.
+        val truncated = decoder.decode(pngCommand, payload, payload.size - 1)
+        assertEquals(TerminalGraphicsResult.INVALID, truncated.status)
+        assertNull(truncated.image)
+        assertPixels(success(pngCommand, png(8, 6, bytes(9, 8, 7, 6))), 0x06090807)
+        assertPixels(image, 0x04010203)
+    }
+
+    @Test
     fun `PNG compacts metadata and thousands of IDAT chunks before invoking ImageIO`() {
         val metadata = chunk("zTXt", bytes(65, 0, 0) + zlib(ByteArray(1024 * 1024)))
         val stream = ByteArrayOutputStream()

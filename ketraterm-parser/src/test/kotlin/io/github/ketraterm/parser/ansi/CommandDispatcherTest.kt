@@ -546,6 +546,7 @@ class CommandDispatcherTest {
         fun `CSI t dispatches safe window reports, title stack, and window resize operations`() {
             assertEquals(listOf("requestWindowReport:11"), dispatchCsi('t', params = listOf(11)).events)
             assertEquals(listOf("requestWindowReport:14"), dispatchCsi('t', params = listOf(14)).events)
+            assertEquals(listOf("requestWindowReport:16"), dispatchCsi('t', params = listOf(16)).events)
             assertEquals(listOf("requestWindowReport:18"), dispatchCsi('t', params = listOf(18)).events)
             assertEquals(listOf("requestWindowReport:19"), dispatchCsi('t', params = listOf(19)).events)
             assertEquals(listOf("resizeWindow:40:120"), dispatchCsi('t', params = listOf(8, 40, 120)).events)

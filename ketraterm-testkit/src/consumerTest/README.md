@@ -48,6 +48,8 @@ Verification covers:
   completion results, shell metadata, and host composition.
 - Swing construction and binding on the EDT, detector discovery and refresh,
   provider cancellation on unbind, and host ownership of session/transport.
+- PNG decoding through the published session, placement copying, and immutable
+  image retention after deletion, without adding codec dependencies.
 - Product source labels and search presentation through Kotlin and Java APIs;
   provider and suggestion configuration across construction and unbinding.
 - Exported pty4j types, constructor defaults, resize forwarding, and connector

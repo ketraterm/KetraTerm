@@ -1,6 +1,6 @@
 # Kitty graphics implementation contract
 
-This document defines the graphics implementation contract, including later stages. The [gap map](../terminal-feature-gap-map.md#optional-protocol-work)
+This document defines graphics protocol, resource and lifecycle invariants. The [gap map](../terminal-feature-gap-map.md#optional-protocol-work)
 owns delivery scope and support status. Sender provenance, exact input bytes and
 regeneration instructions live with the [fixture corpus](../../tools/kitty-graphics/README.md).
 
@@ -14,10 +14,10 @@ not receiver behavior or complete application compatibility.
 
 ## Command and transfer semantics
 
-Recognize `ESC _ G ... ESC \` separately from ignored APC/SOS/PM strings. Keep
-header parsing primitive, preserve omitted fields, and validate signed values
-separately from unsigned 32-bit image IDs, image numbers and placement IDs.
-Header parsing, Base64 and chunk assembly must not build strings or maps.
+Recognize `ESC _ G ... ESC \` separately from ignored APC/SOS/PM strings. Preserve
+omitted fields and validate signed values separately from unsigned 32-bit image
+IDs, image numbers and placement IDs. Bound header and transfer storage; upload
+allocation policy is distinct from ordinary text parsing and repeated rendering.
 
 | Operation | Required behavior |
 | --- | --- |
@@ -81,8 +81,8 @@ identified commands retain their image/placement identifiers; `q` only suppresse
 otherwise eligible replies. `q=1` suppresses success, `q=2` suppresses all replies,
 and intermediate chunks have no success reply. Existing
 terminal-response denial suppresses every reply, including failure. Inline
-graphics has no window-manipulation permission dependency. Update the explicit
-reply allowlist when implementation lands; a probe must exercise the configured
+graphics has no window-manipulation permission dependency. The explicit
+reply allowlist includes these responses; a probe must exercise the configured
 decoder rather than return unconditional success.
 
 ## Placement and screen ownership
@@ -218,9 +218,12 @@ structure and cell geometry. Begin with conservative repaint on graphics changes
 add finer damage only if measurements justify it. Empty graphics state takes a
 constant-time branch in existing structural operations.
 
-Swing prepares a bounded `BufferedImage` cache outside painting. Copy each new
-resource once into its raster, premultiply there if needed, and reuse it for
-every placement. Painting performs no decoding, image construction or per-placement
+Swing prepares a bounded `BufferedImage` cache outside painting. Copy each newly
+admitted resource into its raster and reuse it for every placement. Keep offscreen
+resources cached so scrolling out of view and back does not recreate rasters.
+Evict absent resources only when admitting another resource would exceed the pixel
+or record budget; never evict a resource used by the frame being installed. A
+resource readmitted after capacity eviction may allocate again. Painting performs no decoding, image construction or per-placement
 wrapper allocation. Draw contiguous geometry runs once, splitting at prompt
 dividers only where needed; do not redraw every image row. Opaque rasters may use
 an RGB view sharing their pixel storage. Splitting background/text/image
@@ -234,9 +237,9 @@ JVM heap commitment.
 
 ## Resource limits
 
-These are initial KetraTerm defaults, not wire-protocol constants. Keep one
-authoritative runtime limits value when implementation begins; this table is
-its design baseline, not a second set of production constants. Use checked `Long`
+These are KetraTerm defaults, not wire-protocol constants.
+`TerminalGraphicsLimits` owns the runtime byte, pixel and record limits; this table
+documents their accounting rather than defining another set of production constants. Use checked `Long`
 arithmetic before converting to JVM array sizes. Allocate on demand; do not
 reserve maximum capacities for terminals that never receive images.
 
@@ -249,9 +252,9 @@ reserve maximum capacities for terminals that never receive images.
 | Image dimensions | Each edge at most 8192; at most 8,388,608 pixels / 32 MiB canonical ARGB |
 | Retained images | 64 MiB canonical pixels and 256 image records across both screens |
 | Placements | 65,536 records across both screens, including history; enough for Yazi's per-cell path |
-| Active transfer/decode | One operation; 192 MiB admission allowance for bounded staging/native/canonical data and estimated codec headroom; see qualification below |
+| Active transfer/decode | One operation; 225 MiB admission allowance for bounded staging/native/canonical data and estimated codec headroom; see qualification below |
 | Each render snapshot | At most 64 MiB unique referenced pixels and the placement count above |
-| Swing raster cache | 64 MiB pixel data per bound view; evict unused entries before admitting another raster |
+| Swing raster cache | 64 MiB raster pixels and at most 256 resources per bound view, plus at most 64 MiB referenced canonical pixels; retain offscreen entries until admission needs capacity |
 
 The image-size limit admits a 3840x2160 RGBA image. Enforce dimensions before
 decoder raster allocation, and byte/count limits before growth or publication.
@@ -266,12 +269,12 @@ reserve transient capacity without destroying the previous image on failure.
 
 With three publisher caches and one EDT cache, independent old versions can
 retain more memory than the core quota. A conservative built-in payload envelope
-is `64 + 3*64 + 64 + 64 + 192 = 576 MiB`: core, published snapshots, EDT snapshot,
-Swing rasters, and active decode. This is a conservative live payload estimate,
+is `64 + 3*64 + 64 + 64 + 64 + 225 = 673 MiB`: core, published snapshots, EDT snapshot,
+Swing rasters, their retained source resources, and active decode. This is a conservative live payload estimate,
 not a per-session reservation or total-process-memory promise. Primitive metadata,
 JVM object overhead, GC lag and platform graphics surfaces are additional; measure
 them separately. Reusing unchanged resources normally avoids this multiplier.
-ImageIO provides no allocator-budget API: the 192 MiB allowance is not an enforced
+ImageIO provides no allocator-budget API: the 225 MiB allowance is not an enforced
 cap on opaque codec allocations. Owned byte/pixel/count limits are hard bounds;
 adversarial heap profiling must validate codec headroom before PNG support ships.
 Do not advertise a total memory ceiling based on this estimate.
@@ -285,15 +288,17 @@ required. ImageIO provider initialization may run trusted classpath providers;
 do not describe this as a plugin-free discovery mechanism. Select the JDK PNG
 provider explicitly rather than decoding arbitrary detected formats.
 
-Use an owned, bounded byte-array-backed `ImageInputStream`; no file cache, global
-ImageIO settings or internal JDK exports. First validate signature, IHDR, chunk
+Use `MemoryCacheImageInputStream` over a `ByteArrayInputStream` restricted to the
+compacted prefix. These standard JDK streams replace custom read/seek bookkeeping;
+no file cache, global ImageIO settings or internal JDK exports are needed. First validate signature, IHDR, chunk
 lengths/order, CRCs, known critical chunks and final IEND; reject truncated/trailing
 streams. Then compact the exclusively owned staging array in place to
 `IHDR`/`PLTE`/`tRNS`/`IDAT`/`IEND`, merging consecutive IDAT payloads and recomputing
 their combined length/CRC. Enforce format-defined palette/transparency lengths.
-The reader receives this bounded logical length, without another image-sized copy.
+The reader receives this bounded logical length. Its memory cache may retain up
+to another 33 MiB of payload, included in the active-decode allowance above.
 This prevents compressed metadata and tiny-chunk object floods; `ignoreMetadata=true`
-alone does not. The stream byte limit bounds the allocation-free validation pass.
+alone does not. The stream byte limit bounds the validation pass.
 Validate remaining codec headroom with hostile-input tests and profiling. Close
 the input and dispose the reader on every exit. ImageIO does not validate all
 PNG CRCs itself.
@@ -403,10 +408,18 @@ policy revocation, stale-binding rejection and cleanup after disposal or capacit
 failure. Use controlled schedulers or explicit handshakes, never elapsed-time assertions.
 
 Replay the pinned senders through the complete pipeline and run real application
-smoke tests before declaring support. Benchmark text without graphics, unchanged
+smoke tests before declaring support. Include non-square images and a PTY with
+unknown pixel dimensions: senders such as Yazi must obtain actual cell geometry
+through `CSI 16 t` instead of stretching to a fallback rectangle. Check placement
+extent as well as decoded pixels. Benchmark text without graphics, unchanged
 image frames, dense Yazi placements, scrolling and replacement separately.
-Warmed KetraTerm frame copying and renderer bookkeeping must avoid new allocations;
-upload/decode allocation and retained heap have separate bounds. Java2D's internal
+Image reception, decoding, upload and replacement are allocation-permitted operations.
+Prefer standard library types and straightforward owned objects when they simplify
+these paths; do not introduce pooling or reusable scratch solely to avoid occasional
+upload allocations. Keep their memory bounded and preserve the ordinary text hot path.
+Once an image is installed and capacity is established, repeated frame copying,
+scrolling, mouse interaction and painting must reuse pixels, rasters and metadata
+buffers without new KetraTerm-owned allocations. Retained heap has separate bounds. Java2D's internal
 allocations are permitted and measured separately, including alpha scaling,
 clip changes and fractional translation. Passing frame-copy measurements alone
 does not establish allocation-free painting. Review any new public API and ABI

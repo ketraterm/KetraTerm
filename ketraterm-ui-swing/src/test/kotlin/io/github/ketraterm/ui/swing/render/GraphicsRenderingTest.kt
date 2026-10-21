@@ -18,6 +18,7 @@ package io.github.ketraterm.ui.swing.render
 import io.github.ketraterm.core.TerminalBuffers
 import io.github.ketraterm.host.HostCommandAdapter
 import io.github.ketraterm.parser.api.TerminalParsers
+import io.github.ketraterm.protocol.TerminalGraphicsLimits
 import io.github.ketraterm.render.api.TerminalRenderFrameReader
 import io.github.ketraterm.render.api.TerminalRenderImage
 import io.github.ketraterm.render.api.TerminalRenderImageSink
@@ -36,6 +37,96 @@ import javax.swing.SwingUtilities
 import kotlin.test.*
 
 class GraphicsRenderingTest {
+    @Test
+    fun `scrolling resources completely out of view and back reuses their rasters`() =
+        onEdt {
+            val red = image(1, 1, intArrayOf(Color.RED.rgb))
+            val blue = image(1, 1, intArrayOf(Color.BLUE.rgb))
+            val first = imageCache(red)
+            val second = imageCache(blue)
+            val empty = imageCache()
+            val rasters = GraphicsRasterCache()
+            try {
+                rasters.prepare(first.images)
+                val redRaster = rasters.image(0)
+                rasters.prepare(second.images)
+                val blueRaster = rasters.image(0)
+                repeat(3) {
+                    rasters.prepare(empty.images)
+                    rasters.prepare(first.images)
+                    assertSame(redRaster, rasters.image(0))
+                    rasters.prepare(second.images)
+                    assertSame(blueRaster, rasters.image(0))
+                }
+            } finally {
+                rasters.clear()
+            }
+        }
+
+    @Test
+    fun `raster byte pressure evicts offscreen resources without replacing visible ones`() =
+        onEdt {
+            fun large(color: Int) =
+                object : TerminalRenderImage {
+                    override val width = 4096
+                    override val height = 2048
+
+                    override fun copyArgb(
+                        destination: IntArray,
+                        offset: Int,
+                    ) {
+                        destination.fill(color, offset, offset + width * height)
+                    }
+                }
+            val first = large(Color.RED.rgb)
+            val visible = large(Color.BLUE.rgb)
+            val incoming = image(1, 1, intArrayOf(Color.GREEN.rgb))
+            val both = imageCache(first, visible)
+            val rasters = GraphicsRasterCache()
+            try {
+                rasters.prepare(both.images)
+                val firstRaster = rasters.image(0)
+                val visibleRaster = rasters.image(1)
+                rasters.prepare(imageCache(incoming, visible).images)
+                assertEquals(Color.GREEN.rgb, rasters.image(0).getRGB(0, 0))
+                assertSame(visibleRaster, rasters.image(1))
+                rasters.prepare(both.images)
+                assertNotSame(firstRaster, rasters.image(0))
+                assertEquals(Color.RED.rgb, rasters.image(0).getRGB(0, 0))
+                assertSame(visibleRaster, rasters.image(1))
+            } finally {
+                rasters.clear()
+            }
+        }
+
+    @Test
+    fun `raster record pressure is bounded and protects all current placements`() =
+        onEdt {
+            val resources = Array(TerminalGraphicsLimits.IMAGES) { image(1, 1, intArrayOf(Color.RED.rgb)) }
+            val rasters = GraphicsRasterCache()
+            try {
+                rasters.prepare(imageCache(*resources).images)
+                val firstRaster = rasters.image(0)
+                val lastRaster = rasters.image(resources.lastIndex)
+                val incoming = image(1, 1, intArrayOf(Color.BLUE.rgb))
+                rasters.prepare(imageCache(incoming, resources.last()).images)
+                assertEquals(Color.BLUE.rgb, rasters.image(0).getRGB(0, 0))
+                assertSame(lastRaster, rasters.image(1))
+                rasters.prepare(imageCache(resources.first(), resources.last()).images)
+                assertNotSame(firstRaster, rasters.image(0))
+                assertSame(lastRaster, rasters.image(1))
+
+                assertFailsWith<IllegalArgumentException> {
+                    rasters.prepare(imageCache(*resources, incoming).images)
+                }
+                // Failed preparation clears the partial cache and permits a valid retry.
+                rasters.prepare(imageCache(incoming).images)
+                assertEquals(Color.BLUE.rgb, rasters.image(0).getRGB(0, 0))
+            } finally {
+                rasters.clear()
+            }
+        }
+
     @Test
     fun `opaque raster views preserve samples and share storage across placements without losing alpha`() =
         onEdt {
@@ -345,6 +436,17 @@ class GraphicsRenderingTest {
                 pixels.copyInto(destination, offset)
             }
         }
+
+    private fun imageCache(vararg resources: TerminalRenderImage): TerminalRenderCache =
+        renderCache(
+            object : TestRenderFrame(Array(2) { Array(4) { TestCell() } }) {
+                override fun copyImages(sink: TerminalRenderImageSink) {
+                    for (resource in resources) {
+                        sink.accept(resource, 0.0, 0.0, 1.0, 1.0, 0, 0, resource.width, resource.height, 0.0, 2.0, 0)
+                    }
+                }
+            },
+        )
 
     private companion object {
         val IMAGE_METRICS = SwingMetrics(2, 4, 3, 3, 2, 0, 1)

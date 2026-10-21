@@ -1216,6 +1216,7 @@ class TerminalParserTest {
 
             f.acceptAscii("\u001B[11t")
             f.acceptAscii("\u001B[14t")
+            f.acceptAscii("\u001B[16t")
             f.acceptAscii("\u001B[18t")
             f.acceptAscii("\u001B[19t")
             f.acceptAscii("\u001B[22t")
@@ -1226,6 +1227,7 @@ class TerminalParserTest {
                 listOf(
                     "requestWindowReport:11",
                     "requestWindowReport:14",
+                    "requestWindowReport:16",
                     "requestWindowReport:18",
                     "requestWindowReport:19",
                     "pushTitleStack:0",

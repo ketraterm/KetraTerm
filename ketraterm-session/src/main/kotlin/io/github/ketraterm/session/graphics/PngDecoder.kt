@@ -18,13 +18,13 @@ package io.github.ketraterm.session.graphics
 import io.github.ketraterm.protocol.TerminalGraphicsResult
 import io.github.ketraterm.render.api.TerminalRenderImage
 import java.awt.image.BufferedImage
-import java.util.*
+import java.io.ByteArrayInputStream
 import java.util.zip.CRC32
 import java.util.zip.Inflater
 import javax.imageio.ImageReader
 import javax.imageio.spi.IIORegistry
 import javax.imageio.spi.ImageReaderSpi
-import javax.imageio.stream.ImageInputStreamImpl
+import javax.imageio.stream.MemoryCacheImageInputStream
 
 /** Validates and strips unneeded PNG chunks before invoking the JDK's bounded raster decoder. */
 internal object PngDecoder {
@@ -45,7 +45,7 @@ internal object PngDecoder {
         validateImageStream(bytes, png)
         val reader = provider.createReaderInstance()
         try {
-            ArrayImageInputStream(bytes, compactedLength).use { input ->
+            MemoryCacheImageInputStream(ByteArrayInputStream(bytes, 0, compactedLength)).use { input ->
                 reader.setInput(input, true, true)
                 // Keep native samples: an 8-bit destination changes 16-bit tRNS matching.
                 val image = reader.read(0, reader.defaultReadParam)
@@ -424,38 +424,5 @@ internal object PngDecoder {
     ) {
         var palette = IntArray(0)
         var transparentGray = -1
-    }
-
-    /** Reads only the compacted prefix; no caching, filesystem access, or global ImageIO changes. */
-    private class ArrayImageInputStream(
-        private val bytes: ByteArray,
-        private val size: Int,
-    ) : ImageInputStreamImpl() {
-        override fun read(): Int {
-            checkClosed()
-            bitOffset = 0
-            if (streamPos >= size) return -1
-            val position = streamPos.toInt()
-            streamPos++
-            return bytes[position].toInt() and 255
-        }
-
-        override fun read(
-            destination: ByteArray,
-            offset: Int,
-            length: Int,
-        ): Int {
-            checkClosed()
-            Objects.checkFromIndexSize(offset, length, destination.size)
-            bitOffset = 0
-            if (length == 0) return 0
-            if (streamPos >= size) return -1
-            val count = minOf(length.toLong(), size - streamPos).toInt()
-            bytes.copyInto(destination, offset, streamPos.toInt(), streamPos.toInt() + count)
-            streamPos += count
-            return count
-        }
-
-        override fun length(): Long = size.toLong()
     }
 }

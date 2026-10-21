@@ -300,6 +300,65 @@ class TerminalResponseChannelTest {
     }
 
     @Test
+    fun `cell pixel report returns current height before width independently of margins`() {
+        val buffer = TerminalBuffers.create(width = 10, height = 5)
+        buffer.setWindowSizePixels(width = 80, height = 90)
+        buffer.setScrollRegion(1, 3)
+        buffer.setLeftRightMarginMode(true)
+        buffer.setLeftRightMargins(2, 7)
+
+        buffer.requestWindowReport(TerminalResponseChannel.WINDOW_REPORT_CELL_PIXELS)
+
+        assertEquals("\u001B[6;18;8t", drain(buffer))
+    }
+
+    @ParameterizedTest
+    @CsvSource("0,0", "0,90", "80,0", "9,90", "80,4")
+    fun `cell pixel report is silent when either cell dimension is unavailable`(
+        pixelWidth: Int,
+        pixelHeight: Int,
+    ) {
+        val buffer = TerminalBuffers.create(width = 10, height = 5)
+        buffer.setWindowSizePixels(pixelWidth, pixelHeight)
+
+        buffer.requestWindowReport(TerminalResponseChannel.WINDOW_REPORT_CELL_PIXELS)
+
+        assertEquals(0, buffer.pendingResponseBytes)
+    }
+
+    @Test
+    fun `cell pixel report follows atomic viewport and same-grid font changes`() {
+        val buffer = TerminalBuffers.create(width = 10, height = 5)
+        buffer.resize(10, 5, 0, 80, 90)
+        buffer.requestWindowReport(TerminalResponseChannel.WINDOW_REPORT_CELL_PIXELS)
+        assertEquals("\u001B[6;18;8t", drain(buffer))
+
+        buffer.resize(10, 5, 0, 120, 125)
+        buffer.requestWindowReport(TerminalResponseChannel.WINDOW_REPORT_CELL_PIXELS)
+        assertEquals("\u001B[6;25;12t", drain(buffer))
+
+        buffer.resize(20, 8, 0, 240, 200)
+        buffer.requestWindowReport(TerminalResponseChannel.WINDOW_REPORT_CELL_PIXELS)
+        assertEquals("\u001B[6;25;12t", drain(buffer))
+
+        buffer.resize(20, 8, 0, 0, 0)
+        buffer.requestWindowReport(TerminalResponseChannel.WINDOW_REPORT_CELL_PIXELS)
+        assertEquals(0, buffer.pendingResponseBytes)
+    }
+
+    @Test
+    fun `cell pixel report floors partial pixels and handles maximum host dimensions`() {
+        val buffer = TerminalBuffers.create(width = 10, height = 5)
+        buffer.setWindowSizePixels(width = 89, height = 94)
+        buffer.requestWindowReport(TerminalResponseChannel.WINDOW_REPORT_CELL_PIXELS)
+        assertEquals("\u001B[6;18;8t", drain(buffer))
+
+        buffer.setWindowSizePixels(width = Int.MAX_VALUE, height = Int.MAX_VALUE)
+        buffer.requestWindowReport(TerminalResponseChannel.WINDOW_REPORT_CELL_PIXELS)
+        assertEquals("\u001B[6;429496729;214748364t", drain(buffer))
+    }
+
+    @Test
     fun `unsupported window reports stay silent`() {
         val buffer = TerminalBuffers.create(width = 10, height = 5)
 

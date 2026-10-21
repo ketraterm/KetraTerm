@@ -16,6 +16,7 @@
 package io.github.ketraterm.benchmark
 
 import io.github.ketraterm.core.TerminalBuffers
+import io.github.ketraterm.core.api.TerminalRenderBuffer
 import io.github.ketraterm.host.HostCommandAdapter
 import io.github.ketraterm.parser.api.TerminalParsers
 import io.github.ketraterm.render.cache.TerminalRenderCache
@@ -36,11 +37,14 @@ import java.util.concurrent.TimeUnit
  * Warmed image preparation and Java2D composition on one thread-owned software surface.
  * Upload, publication, raster construction and capacity growth happen in setup;
  * the measured operation includes reused-raster lookup, background clear and all three
- * image bands. It excludes Swing event dispatch and text/cursor painting. Java2D's
+ * image bands. The scroll workloads additionally copy alternating live/history
+ * viewports so the existing image leaves and reenters view on every invocation.
+ * It excludes Swing event dispatch and text/cursor painting. Java2D's
  * own scaling/clipping allocations remain visible to the GC profiler.
  *
  * @property workload opacity and geometry: one 60-row native/scaled image, two prompt
- * dividers within that image, or 4,096 scaled one-cell placements sharing one resource.
+ * dividers within that image, 4,096 scaled one-cell placements sharing one resource,
+ * or alternating empty/image scrollback viewports.
  * @property contentOriginY vertical translation in pixels, including fractional scrolling.
  */
 @State(Scope.Thread)
@@ -58,25 +62,31 @@ open class TerminalGraphicsPaintBenchmark {
         "translucent-dividers",
         "opaque-dense",
         "translucent-dense",
+        "opaque-scroll",
+        "translucent-scroll",
     )
     var workload: String = "empty"
 
     @Param("0.0", "-0.5")
     var contentOriginY: Double = 0.0
+    private lateinit var terminal: TerminalRenderBuffer
     private lateinit var cache: TerminalRenderCache
     private lateinit var painter: GraphicsPainter
     private lateinit var geometry: TerminalVisualViewportGeometry
     private lateinit var canvas: BufferedImage
     private lateinit var graphics: Graphics2D
     private lateinit var pixels: IntArray
+    private var scrolling = false
+    private var scrollbackOffset = 0
 
     /** Builds a stable placement set and prepares reusable Java2D rasters before measurement. */
     @Setup
     fun setup() {
-        val terminal = TerminalBuffers.create(COLUMNS, ROWS)
+        terminal = TerminalBuffers.create(COLUMNS, ROWS)
         terminal.resize(COLUMNS, ROWS, 0, COLUMNS * METRICS.cellWidth, ROWS * METRICS.cellHeight)
         val dense = workload.endsWith("dense")
-        val native = workload.endsWith("native") || workload.endsWith("dividers")
+        scrolling = workload.endsWith("scroll")
+        val native = workload.endsWith("native") || workload.endsWith("dividers") || scrolling
         val withDividers = workload.endsWith("dividers")
         val translucent = workload.startsWith("translucent")
         val placements =
@@ -132,10 +142,15 @@ open class TerminalGraphicsPaintBenchmark {
         pixels = (canvas.raster.dataBuffer as DataBufferInt).data
         graphics = canvas.createGraphics().apply { setClip(0, 0, canvas.width, canvas.height) }
         painter = GraphicsPainter()
+        if (scrolling) {
+            terminal.scrollUp(ROWS)
+            check(paint() == if (translucent) 0xff00807f.toInt() else Color.GREEN.rgb)
+            check(paint() == Color.BLUE.rgb)
+        }
         repeat(20) { paint() }
         check(
             pixels[0] ==
-                if (placements == 0) {
+                if (placements == 0 || scrolling) {
                     Color.BLUE.rgb
                 } else if (translucent) {
                     0xff00807f.toInt()
@@ -152,6 +167,10 @@ open class TerminalGraphicsPaintBenchmark {
      */
     @Benchmark
     fun paint(): Int {
+        if (scrolling) {
+            scrollbackOffset = ROWS - scrollbackOffset
+            cache.updateFrom(terminal, scrollbackOffset)
+        }
         painter.prepare(cache.images)
         graphics.color = Color.BLUE
         graphics.fillRect(0, 0, canvas.width, canvas.height)

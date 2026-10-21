@@ -26,6 +26,7 @@ import io.github.ketraterm.host.TerminalClipboardReadOutcome
 import io.github.ketraterm.host.TerminalClipboardReadRequest
 import io.github.ketraterm.protocol.TerminalClipboardSelection
 import io.github.ketraterm.render.api.TerminalRenderUnderline
+import io.github.ketraterm.render.cache.TerminalRenderCache
 import io.github.ketraterm.session.TerminalInputAdmission
 import io.github.ketraterm.session.TerminalSession
 import io.github.ketraterm.session.TerminalShellCommandLineSnapshot
@@ -97,6 +98,7 @@ fun main() =
                 SwingPasteSource.CLIPBOARD,
         )
         check(interactionSettings.middleClickPasteSource == SwingPasteSource.PRIMARY_SELECTION)
+        verifyGraphics()
         JavaConsumer.verify()
         JavaConsumer.verifySessionConstruction(ConsumerConnector())
         val selection = checkNotNull(TerminalClipboardSelection.parse("cp"))
@@ -296,6 +298,36 @@ fun main() =
         }
         check(connector.closed.get())
     }
+
+/** Exercises PNG decoding and retained image contracts using only published dependencies. */
+private fun verifyGraphics() {
+    val buffer = TerminalBuffers.create(COLUMNS, ROWS)
+    buffer.resize(COLUMNS, ROWS, 0, COLUMNS * 8, ROWS * 16)
+    val cache = TerminalRenderCache(COLUMNS, ROWS)
+    TerminalSession.create(buffer, ConsumerConnector()).use { session ->
+        session.start(COLUMNS, ROWS)
+        // A 1x1 RGBA PNG containing the exact unassociated sample 0x78123456.
+        val png = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGMQMgmrAAACDQEVqX6lxgAAAABJRU5ErkJggg=="
+        val upload = "\u001b[H\u001b_Ga=T,f=100,i=7,C=1,c=1,r=1,q=2;$png\u001b\\".encodeToByteArray()
+        session.onBytes(upload, 0, upload.size)
+        cache.updateFrom(session)
+        check(cache.images.size == 1)
+        check(cache.images.column(0) == 0.0 && cache.images.row(0) == 0.0)
+        val retained = cache.images.image(0)
+        check(retained.width == 1 && retained.height == 1)
+        val pixels = IntArray(1)
+        retained.copyArgb(pixels)
+        check(pixels[0] == 0x78123456)
+
+        val deletion = "\u001b_Ga=d,d=I,i=7;\u001b\\".encodeToByteArray()
+        session.onBytes(deletion, 0, deletion.size)
+        cache.updateFrom(session)
+        check(cache.images.size == 0)
+        pixels.fill(0)
+        retained.copyArgb(pixels)
+        check(pixels[0] == 0x78123456)
+    }
+}
 
 private class ConsumerHyperlinkDetector : SwingHyperlinkDetector {
     private val generation = AtomicLong()

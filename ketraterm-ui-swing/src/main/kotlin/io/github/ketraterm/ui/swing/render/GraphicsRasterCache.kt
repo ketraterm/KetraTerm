@@ -15,6 +15,7 @@
  */
 package io.github.ketraterm.ui.swing.render
 
+import io.github.ketraterm.protocol.TerminalGraphicsLimits.IMAGES
 import io.github.ketraterm.protocol.TerminalGraphicsLimits.RETAINED_BYTES
 import io.github.ketraterm.render.api.TerminalRenderImage
 import io.github.ketraterm.render.cache.TerminalRenderImages
@@ -27,7 +28,9 @@ import java.util.*
  * EDT-owned rasters keyed by immutable resource identity, shared by all placements
  * of that resource. Frame installation copies a new resource's pixels once; an
  * unchanged resource reuses its raster even when its placement metadata changes.
- * Unreferenced rasters are evicted before admission under the retained-pixel budget.
+ * Offscreen resources stay cached until admission needs their pixel or record
+ * capacity. Scrolling an unchanged image out of view and back therefore reuses
+ * its raster. Both source references and rasters remain bounded and clear on unbind.
  */
 internal class GraphicsRasterCache {
     private val slots = IdentityHashMap<TerminalRenderImage, Int>()
@@ -59,15 +62,6 @@ internal class GraphicsRasterCache {
             val slot = slots[images.image(i)]
             if (slot != null) live[slot] = true
         }
-        for (i in resources.indices) {
-            val resource = resources[i] ?: continue
-            if (!live[i]) {
-                slots.remove(resource)
-                bytes -= resource.width.toLong() * resource.height * 4
-                resources[i] = null
-                rasters[i] = null
-            }
-        }
         placements.fill(null, 0, placementCount)
         if (placements.size < images.size) placements = placements.copyOf(images.size)
         placementCount = images.size
@@ -78,12 +72,14 @@ internal class GraphicsRasterCache {
                 if (slot == null) {
                     val size = resource.width.toLong() * resource.height * 4
                     require(
-                        resource.width > 0 && resource.height > 0 && size > 0 && size <= RETAINED_BYTES && bytes + size <= RETAINED_BYTES,
+                        resource.width > 0 && resource.height > 0 && size > 0 && size <= RETAINED_BYTES,
                     ) { "Image raster budget exceeded" }
+                    evictOffscreen(size)
+                    require(bytes + size <= RETAINED_BYTES && slots.size < IMAGES) { "Image raster budget exceeded" }
                     var empty = resources.indexOfFirst { it == null }
                     if (empty < 0) {
                         empty = resources.size
-                        val capacity = resources.size.coerceAtLeast(8) * 2
+                        val capacity = (resources.size.coerceAtLeast(8) * 2).coerceAtMost(IMAGES)
                         resources = resources.copyOf(capacity)
                         rasters = rasters.copyOf(capacity)
                         live = live.copyOf(capacity)
@@ -92,6 +88,7 @@ internal class GraphicsRasterCache {
                     resources[empty] = resource
                     rasters[empty] = raster
                     slots[resource] = empty
+                    live[empty] = true
                     bytes += size
                     slot = empty
                 }
@@ -105,6 +102,19 @@ internal class GraphicsRasterCache {
 
     /** Returns the raster at a placement index from the most recent preparation. */
     fun image(index: Int): BufferedImage = checkNotNull(placements[index])
+
+    /** Reclaims only absent resources, and only enough to admit the new raster. */
+    private fun evictOffscreen(requiredBytes: Long) {
+        for (i in resources.indices) {
+            if (bytes + requiredBytes <= RETAINED_BYTES && slots.size < IMAGES) return
+            val resource = resources[i] ?: continue
+            if (live[i]) continue
+            slots.remove(resource)
+            bytes -= resource.width.toLong() * resource.height * 4
+            resources[i] = null
+            rasters[i] = null
+        }
+    }
 
     private fun prepareRaster(resource: TerminalRenderImage): BufferedImage {
         val image = BufferedImage(resource.width, resource.height, BufferedImage.TYPE_INT_ARGB)

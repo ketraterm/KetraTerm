@@ -174,9 +174,13 @@ public interface TerminalResponseChannel : TerminalHostResponseReader {
     public fun setWindowMinimized(minimized: Boolean)
 
     /**
-     * Enqueues a window report response.
+     * Enqueues an allowlisted window report response using current host geometry.
+     * Pixel-size query reports remain silent when the host has not supplied usable dimensions.
+     * Cell pixel dimensions use the integer text-area pixel size divided by the grid
+     * dimensions. Callers must enforce terminal-response permission for application queries.
      *
-     * @param mode The window report mode (e.g. [WINDOW_REPORT_PIXELS] or [WINDOW_REPORT_GRID_CELLS]).
+     * @param mode the report selector, such as [WINDOW_REPORT_PIXELS],
+     * [WINDOW_REPORT_CELL_PIXELS], or [WINDOW_REPORT_GRID_CELLS]; unsupported selectors are ignored.
      */
     public fun requestWindowReport(mode: Int)
 
@@ -225,6 +229,10 @@ public interface TerminalResponseChannel : TerminalHostResponseReader {
 
         public const val WINDOW_REPORT_STATE: Int = 11
         public const val WINDOW_REPORT_PIXELS: Int = 14
+
+        /** Requests character-cell pixel dimensions as `CSI 6 ; height ; width t`. */
+        public const val WINDOW_REPORT_CELL_PIXELS: Int = 16
+
         public const val WINDOW_REPORT_GRID_CELLS: Int = 18
         public const val WINDOW_REPORT_SCREEN_SIZE: Int = 19
 
