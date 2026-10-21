@@ -23,6 +23,7 @@ import org.junit.jupiter.params.ParameterizedTest
 import org.junit.jupiter.params.provider.CsvSource
 import org.junit.jupiter.params.provider.EnumSource
 import org.junit.jupiter.params.provider.ValueSource
+import java.awt.RenderingHints
 import java.awt.image.BufferedImage
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -97,32 +98,62 @@ class TerminalColorRenderingTest {
     }
 
     @ParameterizedTest
-    @CsvSource("false, false", "false, true", "true, false", "true, true")
+    @CsvSource(
+        "false, false, false",
+        "false, false, true",
+        "false, true, false",
+        "false, true, true",
+        "true, false, false",
+        "true, false, true",
+        "true, true, false",
+        "true, true, true",
+    )
     fun `selection text and fill share logical and block bidi geometry`(
         block: Boolean,
         dynamic: Boolean,
+        antialiased: Boolean,
     ) {
         val palette =
             basePalette.copyWithColorBehavior(
                 if (dynamic) dynamicSelection else fixedSelection,
                 selectionForeground = TEST_GREEN,
-                selectionBackground = TEST_RED,
+                selectionBackground = TEST_BLUE,
             )
-        val image = paint(textCells("אבג"), palette, selection = CellSelection(0, 0, 1, 0, isBlock = block))
+        val cells = textCells("אבג")
+        val image = paint(cells, palette, selection = CellSelection(0, 0, 1, 0, isBlock = block), antialiased = antialiased)
         val selectedColumn = if (block) 0 else 2
+        val selectedBackground = if (dynamic) TEST_WHITE else TEST_BLUE
+        val selectedForeground = if (dynamic) TEST_BLACK else TEST_GREEN
+
+        // Compare with explicit cell colors: platform glyphs need not contain a fully covered foreground pixel.
+        // Green on blue also keeps the reference text above the ordinary text contrast threshold.
+        val selectedLogicalColumn = if (block) 2 else 0
+        val expectedCells = cells.copyOf()
+        expectedCells[selectedLogicalColumn] =
+            cells[selectedLogicalColumn].copy(
+                attr =
+                    TerminalRenderAttrs.pack(
+                        foregroundKind = TerminalRenderColorKind.RGB,
+                        foregroundValue = selectedForeground and 0xffffff,
+                        backgroundKind = TerminalRenderColorKind.RGB,
+                        backgroundValue = selectedBackground and 0xffffff,
+                    ),
+            )
+        val expected = paint(expectedCells, basePalette, antialiased = antialiased)
 
         for (column in 0..2) {
             val selected = column == selectedColumn
-            val selectedBackground = if (dynamic) TEST_WHITE else TEST_RED
-            val selectedForeground = if (dynamic) TEST_BLACK else TEST_GREEN
-            assertEquals(if (selected) selectedBackground else TEST_BLACK, image.getRGB(column * metrics.cellWidth, 0))
-            assertTrue(
-                image.containsColorInRange(
-                    if (selected) selectedForeground else TEST_WHITE,
-                    column * metrics.cellWidth,
-                    (column + 1) * metrics.cellWidth,
-                ),
-            )
+            val background = if (selected) selectedBackground else TEST_BLACK
+            assertEquals(background, image.getRGB(column * metrics.cellWidth, 0), "Background at visual column $column")
+            var hasGlyphCoverage = false
+            for (y in 0 until image.height) {
+                for (x in column * metrics.cellWidth until (column + 1) * metrics.cellWidth) {
+                    val pixel = image.getRGB(x, y)
+                    assertEquals(expected.getRGB(x, y), pixel, "Pixel ($x, $y), visual column $column")
+                    if (pixel != background) hasGlyphCoverage = true
+                }
+            }
+            assertTrue(hasGlyphCoverage, "Visible glyph at visual column $column")
         }
     }
 
@@ -224,6 +255,7 @@ class TerminalColorRenderingTest {
         selection: CellSelection? = null,
         cursor: TerminalRenderCursor = TerminalRenderCursor(0, 0, false, false, TerminalRenderCursorShape.BLOCK, 1),
         focused: Boolean = true,
+        antialiased: Boolean = false,
     ): BufferedImage {
         val image = BufferedImage(cells.size * metrics.cellWidth, metrics.cellHeight, BufferedImage.TYPE_INT_ARGB)
         val frame =
@@ -235,6 +267,8 @@ class TerminalColorRenderingTest {
                 draft.palette = palette
                 draft.selectionBackground = TEST_GREEN
                 draft.shellIntegrationDecorationGutterWidth = 0
+                draft.textAntialiasing =
+                    if (antialiased) RenderingHints.VALUE_TEXT_ANTIALIAS_ON else RenderingHints.VALUE_TEXT_ANTIALIAS_OFF
             }
         val graphics = image.createGraphics()
         try {
