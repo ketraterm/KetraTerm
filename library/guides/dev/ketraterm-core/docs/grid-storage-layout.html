@@ -27,7 +27,7 @@
 <code>TerminalReader</code>, <code>TerminalLine</code>, and render-frame copies; raw arrays and cluster
 handles remain private to core.</p>
 <h2 id="1-parallel-array-cell-storage-line">1. Parallel Array Cell Storage (<code>Line</code>)</h2>
-<p>Each physical <a href="https://github.com/ketraterm/KetraTerm/blob/474d81db00ffd0b1670733d39389b5104a9f09a4/ketraterm-core/src/main/kotlin/io/github/ketraterm/core/model/Line.kt">Line</a>
+<p>Each physical <a href="https://github.com/ketraterm/KetraTerm/blob/e58b7d04f64054bb20c483f74b19b734da677b62/ketraterm-core/src/main/kotlin/io/github/ketraterm/core/model/Line.kt">Line</a>
 holds parallel primitive arrays:</p>
 <div class="table-scroll"><table>
 <thead>
@@ -82,7 +82,7 @@ padding from logical text.</p>
 copies translate internal packed attributes and cluster references into the
 stable encodings in <code>ketraterm-render-api</code>.</p>
 <h2 id="2-off-screen-history-ring-historyring">2. Off-Screen History Ring (<code>HistoryRing</code>)</h2>
-<p>A screen&#39;s <a href="https://github.com/ketraterm/KetraTerm/blob/474d81db00ffd0b1670733d39389b5104a9f09a4/ketraterm-core/src/main/kotlin/io/github/ketraterm/core/buffer/HistoryRing.kt">HistoryRing</a>
+<p>A screen&#39;s <a href="https://github.com/ketraterm/KetraTerm/blob/e58b7d04f64054bb20c483f74b19b734da677b62/ketraterm-core/src/main/kotlin/io/github/ketraterm/core/buffer/HistoryRing.kt">HistoryRing</a>
 contains both retained history and live viewport rows, oldest first. Primary
 capacity is <code>maxHistory + height</code>; alternate capacity is <code>height</code>.</p>
 <p>The reference table is allocated at full capacity, while row objects are
@@ -109,7 +109,7 @@ See the <a href="terminal-core-contract.html#resize">resize contract</a>.</p>
 reference packs the sign bit, a 25-bit codepoint offset, and five bits for
 <code>length - 1</code>. Bit 30 stays clear, so a reference cannot equal the <code>-1</code> spacer.
 Lengths therefore decode without a metadata-table lookup. The shared
-<a href="https://github.com/ketraterm/KetraTerm/blob/474d81db00ffd0b1670733d39389b5104a9f09a4/ketraterm-protocol/src/main/kotlin/io/github/ketraterm/protocol/TerminalTextLimits.kt"><code>TerminalTextLimits</code></a>
+<a href="https://github.com/ketraterm/KetraTerm/blob/e58b7d04f64054bb20c483f74b19b734da677b62/ketraterm-protocol/src/main/kotlin/io/github/ketraterm/protocol/TerminalTextLimits.kt"><code>TerminalTextLimits</code></a>
 defines the 32-codepoint bound; the <a href="terminal-core-contract.html">writer contract</a>
 defines validation and overflow behavior.</p>
 <p>Writes copy borrowed input synchronously. A replacement reuses its region when
@@ -131,7 +131,7 @@ retained for reuse. A row becomes collectible with all its payload storage when
 the ring stops retaining it. Scalar-only rows allocate neither payload array.</p>
 <p>All row access requires serialization with terminal mutation. The
 assembled session supplies it; direct core callers provide their own boundary.</p>
-</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/474d81db00ffd0b1670733d39389b5104a9f09a4/ketraterm-core/docs/grid-storage-layout.md">View source on GitHub ↗</a></div></div></main></div>
+</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/e58b7d04f64054bb20c483f74b19b734da677b62/ketraterm-core/docs/grid-storage-layout.md">View source on GitHub ↗</a></div></div></main></div>
   <footer>
     <a class="brand" href="../../../../index.html"><img class="brand-mark" src="../../../../assets/logo.svg" alt="" width="34" height="34">KetraTerm Library</a>
     <p>Open source · Apache 2.0</p>

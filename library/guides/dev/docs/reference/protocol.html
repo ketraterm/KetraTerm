@@ -22,7 +22,7 @@
     <details class="site-navigation" open><summary>Menu</summary><nav aria-label="Library navigation"><a aria-current="true"  href="../README.html">Guides</a><a   href="../../modules.html">Modules</a><a   href="../../../../versions.html">API & versions</a><a   href="../../CHANGELOG.html">Changelog</a><a  class="nav-primary" href="../../README.html">Get started</a></nav></details>
     <button class="theme-toggle" type="button" aria-label="Switch to light theme">Light</button>
   </header>
-  <div class="docs-shell"><aside class="sidebar" aria-label="Documentation navigation"><details class="nav-disclosure" open><summary class="mobile-nav-toggle">Browse library guides</summary><div><label class="search-label">Find a library guide<input type="search" data-doc-search placeholder="Search library docs" autocomplete="off" data-index="../../search.json"></label><div class="search-results" aria-live="polite"></div><details open><summary>Start here</summary><a  href="../README.html">Documentation</a><a  href="../../README.html">Installation</a><a  href="../../modules.html">Module guides</a><a  href="../../CHANGELOG.html">Changelog</a></details><details open><summary>Capabilities</summary><a  href="../terminal-feature-map.html">Feature map</a><a  href="../features/terminal.html">Terminal</a><a  href="../features/shells.html">Shell integration</a><a  href="../features/desktop.html">Swing view & hosts</a><a  href="../features/completion.html">Completion</a><a  href="../features/embedding.html">Embedding</a><a  href="../terminal-feature-gap-map.html">Known limits</a></details><details open><summary>Embedding guides</summary><a  href="../library/configuration.html">Configuration</a><a  href="../library/compatibility.html">Compatibility</a><a  href="../library/render-ownership.html">Render ownership</a></details><details open><summary>Reference</summary><a aria-current="page" href="protocol.html">Protocols</a><a  href="notifications.html">Notifications</a><a  href="storage.html">Storage & privacy</a></details><details open><summary>Development</summary><a  href="../../ARCHITECTURE.html">Architecture</a><a  href="../../CONTRIBUTING.html">Contributing</a><a  href="../development/conformance-testing.html">Conformance testing</a></details></div></details></aside><main id="main" tabindex="-1" class="article article-with-outline"><div class="article-top"><nav class="breadcrumb" aria-label="Breadcrumb"><ol><li><a href="../../../../index.html">Library</a></li><li><span>Reference</span></li><li><span aria-current="page">Protocol limits and replies</span></li></ol></nav><div class="doc-version"><span>Development</span><a href="../../../../versions.html">All versions</a></div></div><details class="page-outline" open><summary>On this page</summary><nav aria-label="On this page"><a class="depth-2" href="#csi-parameters">CSI parameters</a><a class="depth-2" href="#osc-encoding">OSC encoding</a><a class="depth-2" href="#payload-limits">Payload limits</a><a class="depth-2" href="#query-allowlists">Query allowlists</a><a class="depth-2" href="#color-resets">Color resets</a><a class="depth-2" href="#change-reports">Change reports</a><a class="depth-2" href="#mode-status-reports">Mode status reports</a><a class="depth-2" href="#streaming-grapheme-placement">Streaming grapheme placement</a></nav></details><div class="article-content"><div class="prose"><h1 id="protocol-limits-and-replies">Protocol limits and replies</h1>
+  <div class="docs-shell"><aside class="sidebar" aria-label="Documentation navigation"><details class="nav-disclosure" open><summary class="mobile-nav-toggle">Browse library guides</summary><div><label class="search-label">Find a library guide<input type="search" data-doc-search placeholder="Search library docs" autocomplete="off" data-index="../../search.json"></label><div class="search-results" aria-live="polite"></div><details open><summary>Start here</summary><a  href="../README.html">Documentation</a><a  href="../../README.html">Installation</a><a  href="../../modules.html">Module guides</a><a  href="../../CHANGELOG.html">Changelog</a></details><details open><summary>Capabilities</summary><a  href="../terminal-feature-map.html">Feature map</a><a  href="../features/terminal.html">Terminal</a><a  href="../features/shells.html">Shell integration</a><a  href="../features/desktop.html">Swing view & hosts</a><a  href="../features/completion.html">Completion</a><a  href="../features/embedding.html">Embedding</a><a  href="../terminal-feature-gap-map.html">Known limits</a></details><details open><summary>Embedding guides</summary><a  href="../library/configuration.html">Configuration</a><a  href="../library/compatibility.html">Compatibility</a><a  href="../library/render-ownership.html">Render ownership</a></details><details open><summary>Reference</summary><a aria-current="page" href="protocol.html">Protocols</a><a  href="notifications.html">Notifications</a><a  href="storage.html">Storage & privacy</a></details><details open><summary>Development</summary><a  href="../../ARCHITECTURE.html">Architecture</a><a  href="../../CONTRIBUTING.html">Contributing</a><a  href="../development/conformance-testing.html">Conformance testing</a></details></div></details></aside><main id="main" tabindex="-1" class="article article-with-outline"><div class="article-top"><nav class="breadcrumb" aria-label="Breadcrumb"><ol><li><a href="../../../../index.html">Library</a></li><li><span>Reference</span></li><li><span aria-current="page">Protocol limits and replies</span></li></ol></nav><div class="doc-version"><span>Development</span><a href="../../../../versions.html">All versions</a></div></div><details class="page-outline" open><summary>On this page</summary><nav aria-label="On this page"><a class="depth-2" href="#csi-parameters">CSI parameters</a><a class="depth-2" href="#osc-encoding">OSC encoding</a><a class="depth-2" href="#pointer-shapes">Pointer shapes</a><a class="depth-2" href="#payload-limits">Payload limits</a><a class="depth-2" href="#query-allowlists">Query allowlists</a><a class="depth-2" href="#color-resets">Color resets</a><a class="depth-2" href="#change-reports">Change reports</a><a class="depth-2" href="#mode-status-reports">Mode status reports</a><a class="depth-2" href="#streaming-grapheme-placement">Streaming grapheme placement</a></nav></details><div class="article-content"><div class="prose"><h1 id="protocol-limits-and-replies">Protocol limits and replies</h1>
 <p>This reference records boundary behavior for parser and host implementers.
 For a capability overview, see <a href="../features/terminal.html">terminal features</a>.</p>
 <h2 id="csi-parameters">CSI parameters</h2>
@@ -61,12 +61,31 @@ state. Ordinary C0 handling continues during rejection.</p>
 <td>Clipboard (52)</td>
 <td>ASCII envelope and strict Base64/UTF-8 text; invalid payloads are rejected before consent or access.</td>
 </tr>
+<tr>
+<td>Pointer shape (22)</td>
+<td>Exact ASCII CSS names from the supported subset, optionally prefixed with <code>=</code>; empty name restores host defaults. Unknown or malformed names leave state unchanged.</td>
+</tr>
 </tbody></table></div>
 <p>BEL or <code>ESC \</code> completes OSC. CAN/SUB, reset, and EOF discard unfinished commands.
 Other C0 controls and DEL are ignored inside OSC. Unknown numeric commands are
 ignored unless a custom handler is installed. Recovery preserves later commands.
 Host title/notification limits count UTF-16 code units and avoid splitting a valid
 surrogate pair; they do not guarantee grapheme-boundary truncation.</p>
+<h2 id="pointer-shapes">Pointer shapes</h2>
+<p><code>OSC 22 ; name ST</code> sets the mouse pointer; BEL also terminates the command.
+An optional <code>=</code> prefix is accepted. An empty name restores the host default.
+Supported CSS names are <code>default</code>, <code>crosshair</code>, <code>text</code>, <code>wait</code>, <code>pointer</code>,
+<code>move</code>, and <code>n-resize</code>, <code>ne-resize</code>, <code>e-resize</code>, <code>se-resize</code>, <code>s-resize</code>,
+<code>sw-resize</code>, <code>w-resize</code>, <code>nw-resize</code>.</p>
+<p>Names are exact, case-sensitive ASCII. Invalid, unsupported, or oversized
+requests preserve the previous shape and never reach a custom OSC handler.
+The override is session-wide: screen switches, cursor save/restore, resize,
+and DECSTR preserves it; RIS clears it.</p>
+<p>Pointer presentation is independent of mouse reporting and window-manipulation
+permission. Activatable links and prompt actions can override the application
+pointer. See <a href="https://ghostty.org/docs/vt/osc/22">Ghostty&#39;s basic command</a>, the
+<a href="https://sw.kovidgoyal.net/kitty/pointer-shapes/">Kitty specification</a>, and
+<a href="../terminal-feature-gap-map.html#optional-protocol-work">remaining extensions</a>.</p>
 <h2 id="payload-limits">Payload limits</h2>
 <p>Limits count collected bytes, including family headers/separators and excluding
 introducers, terminators, and ignored control bytes.</p>
@@ -84,6 +103,10 @@ introducers, terminators, and ignored control bytes.</p>
 <tr>
 <td>Dynamic colors 10/11/12/110/111/112</td>
 <td>256 bytes.</td>
+</tr>
+<tr>
+<td>Pointer shape 22</td>
+<td>32 bytes.</td>
 </tr>
 <tr>
 <td>DECRQSS</td>
@@ -241,7 +264,7 @@ A rejected initial write has no continuation target.</p>
 occupied cells, and on tiny grids. Retained text, cell integrity, and following
 text must still be preserved. See <a href="../../ketraterm-parser/docs/grapheme-segmentation.html#bounded-retention">grapheme retention</a>
 and <a href="../development/conformance-testing.html#streaming-placement">verification</a>.</p>
-</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/474d81db00ffd0b1670733d39389b5104a9f09a4/docs/reference/protocol.md">View source on GitHub ↗</a></div></div></main></div>
+</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/e58b7d04f64054bb20c483f74b19b734da677b62/docs/reference/protocol.md">View source on GitHub ↗</a></div></div></main></div>
   <footer>
     <a class="brand" href="../../../../index.html"><img class="brand-mark" src="../../../../assets/logo.svg" alt="" width="34" height="34">KetraTerm Library</a>
     <p>Open source · Apache 2.0</p>
