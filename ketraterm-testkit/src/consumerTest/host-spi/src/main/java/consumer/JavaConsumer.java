@@ -25,6 +25,7 @@ import io.github.ketraterm.input.event.TerminalKeyEventType;
 import io.github.ketraterm.input.event.TerminalModifiers;
 import io.github.ketraterm.parser.api.TerminalParsers;
 import io.github.ketraterm.parser.spi.TerminalCommandSink;
+import io.github.ketraterm.protocol.TerminalColorRequest;
 import java.nio.charset.StandardCharsets;
 
 public final class JavaConsumer {
@@ -33,6 +34,14 @@ public final class JavaConsumer {
     public static final class Sink implements TerminalCommandSink {
         public final StringBuilder text = new StringBuilder();
         public int bells;
+        public int colorRequests;
+        @Override public void applyColorRequest(TerminalColorRequest request) {
+            if (request.getCount() != 1 || request.target(0) != TerminalColorRequest.FOREGROUND
+                    || request.operation(0) != TerminalColorRequest.QUERY) {
+                throw new AssertionError("Unexpected color request");
+            }
+            colorRequests++;
+        }
         @Override public boolean isAlternateScreenActive() { return false; }
         @Override public void requestModeStatus(int p0, boolean p1) { throw new AssertionError("Unexpected required command: requestModeStatus"); }
         @Override public void writeCodepoint(int p0) { text.appendCodePoint(p0); }

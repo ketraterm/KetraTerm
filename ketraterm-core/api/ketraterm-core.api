@@ -175,6 +175,7 @@ public final class io/github/ketraterm/core/api/TerminalModeBits {
 }
 
 public abstract interface class io/github/ketraterm/core/api/TerminalModeController {
+	public abstract fun applyColorRequest (Lio/github/ketraterm/protocol/TerminalColorRequest;Z)V
 	public abstract fun enterAltBuffer ()V
 	public abstract fun enterAltBufferWithoutCursorSave (Z)V
 	public abstract fun exitAltBuffer ()V

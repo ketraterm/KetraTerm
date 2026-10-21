@@ -1002,6 +1002,13 @@ public interface TerminalCommandSink {
     )
 
     /**
+     * Applies one ordered OSC 21 batch. The request and its key bytes are borrowed
+     * only for this synchronous call. Queries observe preceding mutations and form
+     * one combined reply. Host palette and terminal-response permissions apply.
+     */
+    public fun applyColorRequest(request: TerminalColorRequest)
+
+    /**
      * Queries an individual color in the active 256-color palette.
      *
      * @param index Color index to query.

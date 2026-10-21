@@ -36,6 +36,7 @@ public final class io/github/ketraterm/parser/spi/TerminalAsciiCommandSink$Defau
 }
 
 public abstract interface class io/github/ketraterm/parser/spi/TerminalCommandSink {
+	public abstract fun applyColorRequest (Lio/github/ketraterm/protocol/TerminalColorRequest;)V
 	public abstract fun applyKittyKeyboardFlags (II)V
 	public abstract fun backspace ()V
 	public abstract fun bell ()V

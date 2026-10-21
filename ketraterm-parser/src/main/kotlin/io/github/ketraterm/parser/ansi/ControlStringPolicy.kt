@@ -44,7 +44,7 @@ internal object ControlStringPolicy {
     ): Int =
         when (command) {
             22 -> MAX_POINTER_SHAPE_BYTES
-            0, 1, 2, 4, 7, 8, 9, 52, 104, 133, 777 -> MAX_PAYLOAD_BYTES
+            0, 1, 2, 4, 7, 8, 9, 21, 52, 104, 133, 777 -> MAX_PAYLOAD_BYTES
             // Three implemented dynamic-color targets, with room for color syntax and whitespace.
             10, 11, 12, 110, 111, 112 -> MAX_DYNAMIC_COLOR_BYTES
             else -> if (command >= 0) customPayloadLimitBytes else 0

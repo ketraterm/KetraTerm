@@ -15,6 +15,7 @@
  */
 package io.github.ketraterm.ui.swing.render.painter
 
+import io.github.ketraterm.render.api.TerminalColorBehavior
 import io.github.ketraterm.render.api.TerminalColorPalette
 import io.github.ketraterm.render.cache.TerminalRenderCache
 import io.github.ketraterm.ui.swing.api.CellSelection
@@ -22,6 +23,7 @@ import io.github.ketraterm.ui.swing.render.SwingColors
 import io.github.ketraterm.ui.swing.render.TerminalBidiLayout
 import io.github.ketraterm.ui.swing.render.cache.AwtColorCache
 import io.github.ketraterm.ui.swing.render.forEachVisualCellSpan
+import io.github.ketraterm.ui.swing.render.visualCellRangeStart
 import io.github.ketraterm.ui.swing.settings.SwingMetrics
 import java.awt.Graphics2D
 
@@ -48,6 +50,40 @@ internal class TerminalSelectionPainter(
 
         val startColumn = CellSelection.rangeStart(range)
         val endColumn = CellSelection.rangeEnd(range)
+
+        if (palette.colorBehavior and TerminalColorBehavior.OVERRIDE_SELECTION_BACKGROUND != 0) {
+            val dynamic = palette.colorBehavior and TerminalColorBehavior.DYNAMIC_SELECTION_BACKGROUND != 0
+            val rowOffset = cache.rowOffset(row)
+            forEachVisualCellSpan(if (selection.isBlock) null else bidi, startColumn, endColumn) { visualStart, visualEnd ->
+                var column = visualStart
+                while (column < visualEnd) {
+                    val color =
+                        if (dynamic) {
+                            cellForeground(palette, cache, rowOffset, bidi?.logicalColumn(column) ?: column)
+                        } else {
+                            palette.selectionBackground
+                        }
+                    val first = column++
+                    if (dynamic) {
+                        while (column < visualEnd &&
+                            cellForeground(palette, cache, rowOffset, bidi?.logicalColumn(column) ?: column) == color
+                        ) {
+                            column++
+                        }
+                    } else {
+                        column = visualEnd
+                    }
+                    g.color = colorCache.color(color)
+                    g.fillRect(
+                        first * metrics.cellWidth,
+                        row * metrics.cellHeight,
+                        (column - first) * metrics.cellWidth,
+                        metrics.cellHeight,
+                    )
+                }
+            }
+            return
+        }
 
         val baseSelBg =
             if (selectionBackground == 0x66FFFFFF) {
@@ -84,5 +120,15 @@ internal class TerminalSelectionPainter(
                 metrics.cellHeight,
             )
         }
+    }
+
+    private fun cellForeground(
+        palette: TerminalColorPalette,
+        cache: TerminalRenderCache,
+        rowOffset: Int,
+        column: Int,
+    ): Int {
+        val leadingColumn = visualCellRangeStart(cache.flags[rowOffset + column], column)
+        return palette.foreground(cache.attrWords[rowOffset + leadingColumn])
     }
 }

@@ -1059,6 +1059,14 @@ public class HostCommandAdapter
             if (previous != current) hostEvents.paletteChanged(current)
         }
 
+        override fun applyColorRequest(request: TerminalColorRequest) {
+            val policy = hostPolicy
+            if (!policy.palettePolicy.isAllowed) return
+            val previous = terminal.palette
+            terminal.applyColorRequest(request, policy.terminalResponsePolicy.isAllowed)
+            publishPaletteChange(previous)
+        }
+
         override fun queryDynamicColor(target: Int) {
             if (!hostPolicy.palettePolicy.isAllowed) return
             terminal.queryDynamicColor(target)

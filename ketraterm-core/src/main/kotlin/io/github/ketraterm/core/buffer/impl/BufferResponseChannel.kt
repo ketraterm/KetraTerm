@@ -26,6 +26,7 @@ import io.github.ketraterm.core.model.UnderlineStyle
 import io.github.ketraterm.core.state.TerminalState
 import io.github.ketraterm.protocol.*
 import io.github.ketraterm.protocol.keyboard.XtermKeyResource
+import io.github.ketraterm.render.api.TerminalColorBehavior
 
 internal class BufferResponseChannel(
     private val state: TerminalState,
@@ -475,7 +476,12 @@ internal class BufferResponseChannel(
             when (target) {
                 10 -> state.palette.defaultForeground
                 11 -> state.palette.defaultBackground
-                12 -> state.palette.cursorBackground
+                12 ->
+                    if (state.palette.colorBehavior and TerminalColorBehavior.DYNAMIC_CURSOR_BACKGROUND != 0) {
+                        state.palette.defaultForeground
+                    } else {
+                        state.palette.cursorBackground
+                    }
                 else -> return
             }
         enqueueOscPrefix()
@@ -483,6 +489,116 @@ internal class BufferResponseChannel(
         state.hostResponses.enqueueByte(';'.code)
         enqueueColorResponse(color)
         enqueueStSuffix()
+    }
+
+    internal fun beginColorReply() {
+        enqueueOscPrefix()
+        enqueueAsciiString("21")
+    }
+
+    /** Appends only allowlisted color names or encoded unknown keys to the OSC 21 reply. */
+    internal fun appendColorReply(
+        request: TerminalColorRequest,
+        index: Int,
+    ) {
+        state.hostResponses.enqueueByte(';'.code)
+        val target = request.target(index)
+        when (target) {
+            in 0..255 -> {
+                if (numericColorKeyMatches(request, index, target)) {
+                    for (offset in 0 until request.keyLength(index)) {
+                        state.hostResponses.enqueueByte(request.keyByte(index, offset))
+                    }
+                } else {
+                    state.hostResponses.enqueuePositiveDecimal(target)
+                }
+            }
+            TerminalColorRequest.FOREGROUND -> enqueueAsciiString("foreground")
+            TerminalColorRequest.BACKGROUND -> enqueueAsciiString("background")
+            TerminalColorRequest.SELECTION_FOREGROUND -> enqueueAsciiString("selection_foreground")
+            TerminalColorRequest.SELECTION_BACKGROUND -> enqueueAsciiString("selection_background")
+            TerminalColorRequest.CURSOR -> enqueueAsciiString("cursor")
+            TerminalColorRequest.CURSOR_TEXT -> enqueueAsciiString("cursor_text")
+            else -> {
+                enqueueAsciiString("unknown=")
+                enqueueColorKeyBase64(request, index)
+                return
+            }
+        }
+        state.hostResponses.enqueueByte('='.code)
+        val palette = state.palette
+        val selectionOverrideFlag =
+            when (target) {
+                TerminalColorRequest.SELECTION_FOREGROUND -> TerminalColorBehavior.OVERRIDE_SELECTION_FOREGROUND
+                TerminalColorRequest.SELECTION_BACKGROUND -> TerminalColorBehavior.OVERRIDE_SELECTION_BACKGROUND
+                else -> 0
+            }
+        // Host selection presentation can blend or retain cell colors, so its
+        // fallback palette fields are not defined selection-color values.
+        if (selectionOverrideFlag != 0 && palette.colorBehavior and selectionOverrideFlag == 0) return
+        val dynamicFlag =
+            when (target) {
+                TerminalColorRequest.SELECTION_FOREGROUND -> TerminalColorBehavior.DYNAMIC_SELECTION_FOREGROUND
+                TerminalColorRequest.SELECTION_BACKGROUND -> TerminalColorBehavior.DYNAMIC_SELECTION_BACKGROUND
+                TerminalColorRequest.CURSOR -> TerminalColorBehavior.DYNAMIC_CURSOR_BACKGROUND
+                TerminalColorRequest.CURSOR_TEXT -> TerminalColorBehavior.DYNAMIC_CURSOR_FOREGROUND
+                else -> 0
+            }
+        if (palette.colorBehavior and dynamicFlag != 0) return
+        val color =
+            when (target) {
+                TerminalColorRequest.FOREGROUND -> palette.defaultForeground
+                TerminalColorRequest.BACKGROUND -> palette.defaultBackground
+                TerminalColorRequest.SELECTION_FOREGROUND -> palette.selectionForeground
+                TerminalColorRequest.SELECTION_BACKGROUND -> palette.selectionBackground
+                TerminalColorRequest.CURSOR -> palette.cursorBackground
+                TerminalColorRequest.CURSOR_TEXT -> palette.cursorForeground
+                else -> palette.indexedColor(target)
+            }
+        enqueueColorResponse(color)
+    }
+
+    internal fun endColorReply() {
+        enqueueStSuffix()
+    }
+
+    private fun numericColorKeyMatches(
+        request: TerminalColorRequest,
+        index: Int,
+        target: Int,
+    ): Boolean {
+        var value = 0
+        for (offset in 0 until request.keyLength(index)) {
+            val digit = request.keyByte(index, offset) - '0'.code
+            if (digit !in 0..9 || value > (255 - digit) / 10) return false
+            value = value * 10 + digit
+        }
+        return value == target
+    }
+
+    private fun enqueueColorKeyBase64(
+        request: TerminalColorRequest,
+        index: Int,
+    ) {
+        var offset = 0
+        val length = request.keyLength(index)
+        while (offset < length) {
+            val first = request.keyByte(index, offset++)
+            state.hostResponses.enqueueByte(BASE64_CHARS[first ushr 2].code)
+            if (offset == length) {
+                state.hostResponses.enqueueByte(BASE64_CHARS[(first and 3) shl 4].code)
+                break
+            }
+            val second = request.keyByte(index, offset++)
+            state.hostResponses.enqueueByte(BASE64_CHARS[((first and 3) shl 4) or (second ushr 4)].code)
+            if (offset == length) {
+                state.hostResponses.enqueueByte(BASE64_CHARS[(second and 15) shl 2].code)
+                break
+            }
+            val third = request.keyByte(index, offset++)
+            state.hostResponses.enqueueByte(BASE64_CHARS[((second and 15) shl 2) or (third ushr 6)].code)
+            state.hostResponses.enqueueByte(BASE64_CHARS[third and 63].code)
+        }
     }
 
     override fun queryStatusString(query: String) {
@@ -823,6 +939,7 @@ internal class BufferResponseChannel(
         private const val CHECKSUM_BLINK = 0x40
         private const val CHECKSUM_BOLD = 0x80
         private const val HEX_CHARS = "0123456789abcdef"
+        private const val BASE64_CHARS = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"
         private const val UPPERCASE_HEX_CHARS = "0123456789ABCDEF"
     }
 }

@@ -191,6 +191,10 @@ class ActionEngineTest {
     }
 
     private class RecordingTerminalCommandSink : TerminalCommandSink {
+        override fun applyColorRequest(request: io.github.ketraterm.protocol.TerminalColorRequest) {
+            sinkCalls += "applyColorRequest:${request.count}"
+        }
+
         override val isAlternateScreenActive: Boolean get() = false
 
         override fun requestModeStatus(

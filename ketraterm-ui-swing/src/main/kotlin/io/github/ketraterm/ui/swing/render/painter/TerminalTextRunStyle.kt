@@ -15,10 +15,12 @@
  */
 package io.github.ketraterm.ui.swing.render.painter
 
+import io.github.ketraterm.render.api.TerminalColorBehavior
 import io.github.ketraterm.render.api.TerminalColorPalette
 import io.github.ketraterm.render.api.TerminalRenderAttrs
 import io.github.ketraterm.render.api.TerminalRenderUnderline
 import io.github.ketraterm.render.cache.TerminalRenderCache
+import io.github.ketraterm.ui.swing.api.CellSelection
 import io.github.ketraterm.ui.swing.api.SwingHyperlinkPresentation
 import io.github.ketraterm.ui.swing.api.SwingHyperlinkStyle
 import io.github.ketraterm.ui.swing.api.TerminalHyperlinkHover
@@ -67,6 +69,9 @@ internal class TerminalTextRunStyle {
     private var hyperlinkPresentations: Array<SwingHyperlinkPresentation?>? = null
     private var followedHyperlinkId = 0
     private var hyperlinkStyle: SwingHyperlinkStyle? = null
+    private var selectionStart = 0
+    private var selectionEnd = 0
+    private var selectionBidi: TerminalBidiLayout.Row? = null
 
     fun configureRow(
         textBlinkVisible: Boolean,
@@ -76,6 +81,8 @@ internal class TerminalTextRunStyle {
         hyperlinkPresentations: Array<SwingHyperlinkPresentation?>? = null,
         followedHyperlinkId: Int = 0,
         row: Int = 0,
+        selectionRange: Long = CellSelection.NO_RANGE,
+        selectionBidi: TerminalBidiLayout.Row? = null,
     ) {
         this.textBlinkVisible = textBlinkVisible
         this.hyperlinkIds = hyperlinkIds
@@ -86,6 +93,9 @@ internal class TerminalTextRunStyle {
         osc8Presentation = settings.resolvedOsc8HyperlinkPresentation
         this.hyperlinkPresentations = hyperlinkPresentations
         this.followedHyperlinkId = followedHyperlinkId
+        selectionStart = if (selectionRange == CellSelection.NO_RANGE) 0 else CellSelection.rangeStart(selectionRange)
+        selectionEnd = if (selectionRange == CellSelection.NO_RANGE) 0 else CellSelection.rangeEnd(selectionRange)
+        this.selectionBidi = selectionBidi
     }
 
     fun begin(
@@ -108,7 +118,7 @@ internal class TerminalTextRunStyle {
                         ?: defaultPresentation.styleFor(hovered, activationHover, false)
                 else -> null
             }
-        foreground = effectiveForeground(palette, attr, cache.codeWords[index])
+        foreground = effectiveForeground(palette, attr, cache.codeWords[index], column)
         hyperlinkUnderline = hyperlinkStyle?.underlineStyle ?: TerminalRenderUnderline.NONE
         hyperlinkUnderlineColor = hyperlinkStyle?.underlineArgb ?: foreground
         fontStyle = terminalFontStyle(attr)
@@ -132,14 +142,27 @@ internal class TerminalTextRunStyle {
                 hyperlinkIdForCell(hyperlinkIds[index], cache.flags[index]) != hyperlinkId ||
                 (hyperlinkHover?.isHovered(hyperlinkId, row, column) == true) != hovered
         ) &&
-            effectiveForeground(palette, candidateAttr, cache.codeWords[index]) == foreground
+            effectiveForeground(palette, candidateAttr, cache.codeWords[index], column) == foreground
     }
 
     private fun effectiveForeground(
         palette: TerminalColorPalette,
         attr: Long,
         codePoint: Int,
-    ): Int = hyperlinkStyle?.foregroundArgb ?: SwingColors.foreground(palette, attr, codePoint)
+        column: Int,
+    ): Int {
+        if (palette.colorBehavior and TerminalColorBehavior.OVERRIDE_SELECTION_FOREGROUND != 0) {
+            val selectionColumn = selectionBidi?.visualColumn(column) ?: column
+            if (selectionColumn in selectionStart..<selectionEnd) {
+                return if (palette.colorBehavior and TerminalColorBehavior.DYNAMIC_SELECTION_FOREGROUND != 0) {
+                    palette.background(attr)
+                } else {
+                    palette.selectionForeground
+                }
+            }
+        }
+        return hyperlinkStyle?.foregroundArgb ?: SwingColors.foreground(palette, attr, codePoint)
+    }
 
     private fun decorationKey(
         attr: Long,

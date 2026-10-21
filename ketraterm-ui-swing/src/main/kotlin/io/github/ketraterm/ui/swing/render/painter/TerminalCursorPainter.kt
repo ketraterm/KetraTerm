@@ -15,6 +15,7 @@
  */
 package io.github.ketraterm.ui.swing.render.painter
 
+import io.github.ketraterm.render.api.TerminalColorBehavior
 import io.github.ketraterm.render.api.TerminalColorPalette
 import io.github.ketraterm.render.api.TerminalRenderCursorShape
 import io.github.ketraterm.render.cache.TerminalRenderCache
@@ -68,7 +69,14 @@ internal class TerminalCursorPainter(
         val x = visualColumn * metrics.cellWidth
         val y = cache.cursorRow * metrics.cellHeight
         val width = columnSpan * metrics.cellWidth
-        g.color = colorCache.color(palette.cursorBackground)
+        val cursorAttr = cache.attrWords[cache.rowOffset(cache.cursorRow) + startColumn]
+        val background =
+            if (palette.colorBehavior and TerminalColorBehavior.DYNAMIC_CURSOR_BACKGROUND != 0) {
+                palette.foreground(cursorAttr)
+            } else {
+                palette.cursorBackground
+            }
+        g.color = colorCache.color(background)
 
         if (!terminalFocused && cache.cursorShape == TerminalRenderCursorShape.BLOCK) {
             if (width == 1 || metrics.cellHeight == 1) {
@@ -133,7 +141,12 @@ internal class TerminalCursorPainter(
             row = cache.cursorRow,
             columnSpan = columnSpan,
             visualColumn = visualColumn,
-            foreground = palette.cursorForeground,
+            foreground =
+                if (palette.colorBehavior and TerminalColorBehavior.DYNAMIC_CURSOR_FOREGROUND != 0) {
+                    palette.background(cursorAttr)
+                } else {
+                    palette.cursorForeground
+                },
             fontRenderContext = fontRenderContext,
             textBlinkVisible = textBlinkVisible,
         )

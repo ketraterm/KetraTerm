@@ -39,6 +39,7 @@ placement can depend on input chunk boundaries. See the
 | Underlines | Single, double, curly, dotted, and dashed. |
 | Cursor | Block, underline, and bar shapes; visibility and blinking controls. |
 | Dynamic colors | OSC 4/10/11/12 palette and foreground/background/cursor changes and queries; OSC 104 and 110/111/112 restore configured theme colors. |
+| Kitty colors | OSC 21 ordered set/reset/query batches for indexed, foreground/background, cursor, and selection colors; dynamic cursor/selection colors. [Protocol details](../reference/protocol.md#kitty-colors). |
 | Hyperlinks | OSC 8 links with bounded retention. |
 | Mouse pointer | OSC 22 set/reset for 14 portable CSS shapes; [protocol details](../reference/protocol.md#pointer-shapes). |
 

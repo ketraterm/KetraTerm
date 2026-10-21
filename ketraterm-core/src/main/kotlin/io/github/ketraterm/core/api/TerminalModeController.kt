@@ -15,6 +15,8 @@
  */
 package io.github.ketraterm.core.api
 
+import io.github.ketraterm.protocol.TerminalColorRequest
+
 /**
  * Mode-control contract for the terminal buffer.
  *
@@ -408,6 +410,21 @@ public interface TerminalModeController {
      * @param target 10 for foreground, 11 for background, or 12 for cursor color.
      */
     public fun resetDynamicColor(target: Int)
+
+    /**
+     * Applies borrowed OSC 21 color operations in order, without retaining [request].
+     * Queries observe preceding operations and share one response in request order.
+     * Resets restore the latest theme; dynamic selection and cursor roles retain
+     * their dynamic behavior until changed or reset. Application changes do not
+     * emit color-scheme notifications.
+     *
+     * The caller enforces palette permission. [allowResponses] suppresses all
+     * query and unknown-key replies without suppressing permitted mutations.
+     */
+    public fun applyColorRequest(
+        request: TerminalColorRequest,
+        allowResponses: Boolean,
+    )
 
     /**
      * Toggles urgent bell mode (?1042).

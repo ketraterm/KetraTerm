@@ -194,6 +194,7 @@ internal class GridPainter(
                         hyperlinkHover = hyperlinkHover,
                         hyperlinkPresentations = hyperlinkPresentations,
                         followedHyperlinkId = followedHyperlinkId,
+                        selection = selection,
                     )
                 } finally {
                     if (rowOffset != 0) g.translate(0, -rowOffset)

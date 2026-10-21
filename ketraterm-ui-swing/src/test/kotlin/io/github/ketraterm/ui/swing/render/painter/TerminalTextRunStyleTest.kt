@@ -15,8 +15,11 @@
  */
 package io.github.ketraterm.ui.swing.render.painter
 
+import io.github.ketraterm.render.api.TerminalColorBehavior
+import io.github.ketraterm.render.api.TerminalRenderAttrs
 import io.github.ketraterm.render.api.TerminalRenderCellFlags
 import io.github.ketraterm.render.api.TerminalRenderUnderline
+import io.github.ketraterm.ui.swing.api.CellSelection
 import io.github.ketraterm.ui.swing.api.SwingHyperlinkPresentation
 import io.github.ketraterm.ui.swing.api.SwingHyperlinkStyle
 import io.github.ketraterm.ui.swing.render.TestRenderFrame
@@ -33,6 +36,44 @@ import kotlin.test.assertTrue
 
 class TerminalTextRunStyleTest {
     private val settings = SwingSettings()
+
+    @Test
+    fun `selection foreground override is independent of fill and does not leak between rows`() {
+        val cache = renderCache(TestRenderFrame.text("AAA"))
+        val palette =
+            cache.palette.copyWithColorBehavior(
+                TerminalColorBehavior.OVERRIDE_SELECTION_FOREGROUND,
+                selectionForeground = 0xff123456.toInt(),
+            )
+        val style = TerminalTextRunStyle()
+        style.configureRow(true, cache.hyperlinkIds, null, settings, selectionRange = CellSelection.packRange(1, 2))
+        style.begin(cache, palette, 0, 0)
+        assertEquals(palette.defaultForeground, style.foreground)
+        assertFalse(style.matches(cache, palette, 0, 1))
+        style.begin(cache, palette, 0, 1)
+        assertEquals(palette.selectionForeground, style.foreground)
+        assertFalse(style.matches(cache, palette, 0, 2))
+
+        style.configureRow(true, cache.hyperlinkIds, null, settings)
+        style.begin(cache, palette, 0, 1)
+        assertEquals(palette.defaultForeground, style.foreground)
+        assertTrue(style.matches(cache, palette, 0, 2))
+    }
+
+    @Test
+    fun `explicit selection foreground cannot reveal concealed text`() {
+        val cache = renderCache(TestRenderFrame.text("A", attrs = longArrayOf(TerminalRenderAttrs.pack(invisible = true))))
+        val palette =
+            cache.palette.copyWithColorBehavior(
+                TerminalColorBehavior.OVERRIDE_SELECTION_FOREGROUND,
+                selectionForeground = 0xff123456.toInt(),
+            )
+        val style = TerminalTextRunStyle()
+        style.configureRow(true, cache.hyperlinkIds, null, settings, selectionRange = CellSelection.packRange(0, 1))
+        style.begin(cache, palette, 0, 0)
+
+        assertTrue(style.textHidden)
+    }
 
     @ParameterizedTest
     @ValueSource(ints = [-1, 7])

@@ -35,20 +35,58 @@ package io.github.ketraterm.render.api
  * light or custom themes must supply their preference explicitly.
  * @param indexedColors 256-entry indexed palette in packed ARGB form.
  */
-public class TerminalColorPalette(
-    public val defaultForeground: Int = 0xFFFFFFFF.toInt(),
-    public val defaultBackground: Int = 0xFF000000.toInt(),
-    public val selectionForeground: Int = 0xFFFFFFFF.toInt(),
-    public val selectionBackground: Int = 0xFF000000.toInt(),
-    public val cursorForeground: Int = 0xFF000000.toInt(),
-    public val cursorBackground: Int = 0xFFFFFFFF.toInt(),
-    indexedColors: IntArray = defaultIndexedColors(),
-    public val boldAsBright: Boolean = true,
-    public val isDark: Boolean = true,
+public class TerminalColorPalette private constructor(
+    public val defaultForeground: Int,
+    public val defaultBackground: Int,
+    public val selectionForeground: Int,
+    public val selectionBackground: Int,
+    public val cursorForeground: Int,
+    public val cursorBackground: Int,
+    /** Rendering behavior flags from [TerminalColorBehavior], independent of fallback ARGB values. */
+    public val colorBehavior: Int,
+    // Keep colorBehavior before indexedColors to distinguish the public default-argument bridge in ABI tools.
+    indexedColors: IntArray,
+    public val boldAsBright: Boolean,
+    public val isDark: Boolean,
 ) {
+    public constructor(
+        defaultForeground: Int = 0xFFFFFFFF.toInt(),
+        defaultBackground: Int = 0xFF000000.toInt(),
+        selectionForeground: Int = 0xFFFFFFFF.toInt(),
+        selectionBackground: Int = 0xFF000000.toInt(),
+        cursorForeground: Int = 0xFF000000.toInt(),
+        cursorBackground: Int = 0xFFFFFFFF.toInt(),
+        indexedColors: IntArray = defaultIndexedColors(),
+        boldAsBright: Boolean = true,
+        isDark: Boolean = true,
+    ) : this(
+        defaultForeground,
+        defaultBackground,
+        selectionForeground,
+        selectionBackground,
+        cursorForeground,
+        cursorBackground,
+        0,
+        indexedColors,
+        boldAsBright,
+        isDark,
+    )
+
+    /** Creates the built-in dark palette with host-controlled selection presentation. */
+    public constructor() : this(isDark = true)
+
     private val indexedColorStorage: IntArray
 
     init {
+        require(colorBehavior and TerminalColorBehavior.ALL.inv() == 0) { "Unknown color behavior flags: $colorBehavior" }
+        require(
+            colorBehavior and TerminalColorBehavior.DYNAMIC_SELECTION_FOREGROUND == 0 ||
+                colorBehavior and TerminalColorBehavior.OVERRIDE_SELECTION_FOREGROUND != 0,
+        ) { "Dynamic selection foreground requires a selection foreground override" }
+        require(
+            colorBehavior and TerminalColorBehavior.DYNAMIC_SELECTION_BACKGROUND == 0 ||
+                colorBehavior and TerminalColorBehavior.OVERRIDE_SELECTION_BACKGROUND != 0,
+        ) { "Dynamic selection background requires a selection background override" }
         require(indexedColors.size == INDEXED_COLOR_COUNT) {
             "indexedColors must contain $INDEXED_COLOR_COUNT colors, got ${indexedColors.size}"
         }
@@ -159,6 +197,40 @@ public class TerminalColorPalette(
         boldAsBright: Boolean = this.boldAsBright,
         isDark: Boolean = this.isDark,
     ): TerminalColorPalette =
+        copyWithColorBehavior(
+            colorBehavior = colorBehavior,
+            defaultForeground = defaultForeground,
+            defaultBackground = defaultBackground,
+            selectionForeground = selectionForeground,
+            selectionBackground = selectionBackground,
+            cursorForeground = cursorForeground,
+            cursorBackground = cursorBackground,
+            indexedColors = indexedColors,
+            boldAsBright = boldAsBright,
+            isDark = isDark,
+        )
+
+    /**
+     * Creates a palette replacing [colorBehavior] and selected colors together.
+     *
+     * Dynamic cursor and selection colors resolve from the original cell colors;
+     * their stored ARGB values remain available as fallbacks. Selection override
+     * flags request exact palette colors instead of the renderer's host selection
+     * presentation. Dynamic selection requires the corresponding override flag.
+     * Unknown flags are rejected. Unspecified properties retain their values.
+     */
+    public fun copyWithColorBehavior(
+        colorBehavior: Int,
+        defaultForeground: Int = this.defaultForeground,
+        defaultBackground: Int = this.defaultBackground,
+        selectionForeground: Int = this.selectionForeground,
+        selectionBackground: Int = this.selectionBackground,
+        cursorForeground: Int = this.cursorForeground,
+        cursorBackground: Int = this.cursorBackground,
+        indexedColors: IntArray = indexedColorStorage,
+        boldAsBright: Boolean = this.boldAsBright,
+        isDark: Boolean = this.isDark,
+    ): TerminalColorPalette =
         TerminalColorPalette(
             defaultForeground = defaultForeground,
             defaultBackground = defaultBackground,
@@ -169,6 +241,7 @@ public class TerminalColorPalette(
             indexedColors = indexedColors,
             boldAsBright = boldAsBright,
             isDark = isDark,
+            colorBehavior = colorBehavior,
         )
 
     private fun foregroundWithoutInverse(attrWord: Long): Int {
@@ -226,6 +299,7 @@ public class TerminalColorPalette(
             cursorBackground == other.cursorBackground &&
             boldAsBright == other.boldAsBright &&
             isDark == other.isDark &&
+            colorBehavior == other.colorBehavior &&
             indexedColorStorage.contentEquals(other.indexedColorStorage)
     }
 
@@ -239,6 +313,7 @@ public class TerminalColorPalette(
         result = 31 * result + indexedColorStorage.contentHashCode()
         result = 31 * result + boldAsBright.hashCode()
         result = 31 * result + isDark.hashCode()
+        result = 31 * result + colorBehavior
         return result
     }
 
@@ -252,7 +327,8 @@ public class TerminalColorPalette(
             "cursorBackground=$cursorBackground, " +
             "indexedColors=${indexedColorStorage.contentToString()}, " +
             "boldAsBright=$boldAsBright, " +
-            "isDark=$isDark" +
+            "isDark=$isDark, " +
+            "colorBehavior=$colorBehavior" +
             ")"
 
     public companion object {
