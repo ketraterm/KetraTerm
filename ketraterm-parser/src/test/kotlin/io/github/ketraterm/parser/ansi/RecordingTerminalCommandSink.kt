@@ -29,6 +29,14 @@ internal class RecordingTerminalCommandSink : TerminalAsciiCommandSink {
         }
     }
 
+    override fun pushColors() {
+        events += "pushColors"
+    }
+
+    override fun popColors() {
+        events += "popColors"
+    }
+
     override fun requestModeStatus(
         mode: Int,
         decPrivate: Boolean,

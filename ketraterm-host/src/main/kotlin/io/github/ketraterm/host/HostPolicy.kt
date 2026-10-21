@@ -38,8 +38,8 @@ package io.github.ketraterm.host
  * @property windowManipulationPolicy whether terminal-triggered window movement,
  * resize, minimize, raise, lower, and maximize requests may be forwarded.
  * Logical DECCOLM column switches are independent of this policy.
- * @property palettePolicy whether OSC palette updates and palette query
- * responses may affect core palette state or enqueue terminal-to-host bytes.
+ * @property palettePolicy whether OSC palette updates, color-stack operations,
+ * and palette queries may affect core color state or enqueue terminal-to-host bytes.
  * @property terminalResponsePolicy whether DA, DSR/CPR (including light/dark
  * scheme queries), DECRQM mode reports, window reports, DECRQCRA,
  * DECRQSS, XTGETTCAP, OSC 21 colors, and OSC 52 reads may enqueue terminal-to-host response bytes.

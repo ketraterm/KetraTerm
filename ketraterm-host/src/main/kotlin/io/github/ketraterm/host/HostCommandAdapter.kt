@@ -1008,6 +1008,17 @@ public class HostCommandAdapter
             }
         }
 
+        override fun pushColors() {
+            if (hostPolicy.palettePolicy.isAllowed) terminal.pushColors()
+        }
+
+        override fun popColors() {
+            if (!hostPolicy.palettePolicy.isAllowed) return
+            val previous = terminal.palette
+            terminal.popColors()
+            publishPaletteChange(previous)
+        }
+
         override fun setPaletteColor(
             index: Int,
             color: Int,

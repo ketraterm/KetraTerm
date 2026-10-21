@@ -180,7 +180,9 @@ public abstract interface class io/github/ketraterm/core/api/TerminalModeControl
 	public abstract fun enterAltBufferWithoutCursorSave (Z)V
 	public abstract fun exitAltBuffer ()V
 	public abstract fun exitAltBufferWithoutCursorRestore ()V
+	public abstract fun popColors ()V
 	public abstract fun popKittyKeyboardFlags (I)V
+	public abstract fun pushColors ()V
 	public abstract fun pushKittyKeyboardFlags (I)V
 	public abstract fun resetCursorStyle ()V
 	public abstract fun resetDynamicColor (I)V

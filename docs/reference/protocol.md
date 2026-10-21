@@ -21,6 +21,7 @@ Built-in OSC commands use UTF-8. There is no locale encoding fallback or raw
 | Titles (0/1/2), notifications (9/777) | Replacement decoding; repaired text still passes host policy and length checks. |
 | Directory (7), palette (4/10/11/12/21), shell markers (133) | Strict UTF-8; reject malformed commands without updating state. |
 | Color resets (104/110/111/112) | ASCII decimal indices or an empty payload; non-ASCII input rejects the complete reset. |
+| Color stack (30001/30101) | Bare command or an empty semicolon; nonempty arguments reject the command. |
 | Hyperlinks (8) | Strict UTF-8; malformed or completed oversized commands end active link context without changing retained links. |
 | Clipboard (52) | ASCII envelope and strict Base64/UTF-8 text; invalid payloads are rejected before consent or access. |
 | Pointer shape (22) | Exact ASCII CSS names from the supported subset, optionally prefixed with `=`; empty name restores host defaults. Unknown or malformed names leave state unchanged. |
@@ -60,6 +61,7 @@ introducers, terminators, and ignored control bytes.
 | Titles, directory, hyperlinks, notifications, palette 4/21/104, shell markers | 4,096 bytes. |
 | Dynamic colors 10/11/12/110/111/112 | 256 bytes. |
 | Pointer shape 22 | 32 bytes. |
+| Color stack 30001/30101 | 6 bytes, including the command number and optional empty semicolon. |
 | DECRQSS | 64 bytes. |
 | XTGETTCAP | 4,096 bytes. |
 | Custom OSC | 4,096 bytes by default; configurable full-envelope limit, with a separate 4,096-byte header limit. |
@@ -112,6 +114,19 @@ Foreground, background, and indexed colors do not accept dynamic requests.
 Queries return `rgb:rrrr/gggg/bbbb`, or an empty value for dynamic colors and
 host-controlled selection styling without a fixed color override.
 See the [Kitty specification](https://sw.kovidgoyal.net/kitty/color-stack/).
+
+## Color stack
+
+Kitty `OSC 30001 ST` pushes effective indexed and named colors, including
+dynamic cursor/selection behavior; `OSC 30101 ST` restores and removes the last
+entry. An empty semicolon is also accepted. Both commands require palette
+permission and emit no replies or color-scheme notifications.
+
+The terminal-wide stack holds ten entries, dropping the oldest on overflow;
+an empty pop has no effect. Hard and soft reset clear it. Screen switches,
+resize, and host theme changes preserve snapshots. Pop restores saved effective
+color values while retaining the current host light/dark and bold-as-bright
+settings; subsequent color resets still use the latest host theme.
 
 ## Color resets
 

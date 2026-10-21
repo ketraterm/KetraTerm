@@ -27,6 +27,10 @@ import io.github.ketraterm.protocol.TerminalColorRequest
 internal class NoOpCommandSink : TerminalAsciiCommandSink {
     override fun applyColorRequest(request: TerminalColorRequest) = Unit
 
+    override fun pushColors() = Unit
+
+    override fun popColors() = Unit
+
     override val isAlternateScreenActive: Boolean get() = false
 
     override fun requestModeStatus(

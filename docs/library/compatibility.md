@@ -64,6 +64,10 @@ synchronously. Custom `TerminalModeController` implementations must implement
 permission-controlled replies. Recompile these implementations and Kotlin
 delegates. Existing palette constructor and `copy` signatures remain available.
 
+Color-stack support also requires `pushColors()` and `popColors()` on both
+interfaces. Recompile custom implementations and Kotlin delegates; the core
+methods follow the [color-stack contract](../reference/protocol.md#color-stack).
+
 ## Verification and baseline changes
 
 Supported modules use explicit API mode and checked-in ABI snapshots. Published

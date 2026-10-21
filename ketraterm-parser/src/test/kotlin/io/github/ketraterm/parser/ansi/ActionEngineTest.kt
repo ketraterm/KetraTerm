@@ -195,6 +195,14 @@ class ActionEngineTest {
             sinkCalls += "applyColorRequest:${request.count}"
         }
 
+        override fun pushColors() {
+            sinkCalls += "pushColors"
+        }
+
+        override fun popColors() {
+            sinkCalls += "popColors"
+        }
+
         override val isAlternateScreenActive: Boolean get() = false
 
         override fun requestModeStatus(

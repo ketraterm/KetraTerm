@@ -51,7 +51,7 @@ internal class OscDispatcher {
         }
 
         val command = ControlStringPolicy.oscCommand(payload, commandEnd)
-        if (separator < 0 && command != 104 && command !in 110..112) return
+        if (separator < 0 && command != 104 && command !in 110..112 && command != 30001 && command != 30101) return
         val dataStart = if (separator >= 0) separator + 1 else length
         val limit =
             when (command) {
@@ -140,6 +140,8 @@ internal class OscDispatcher {
             }
             104 -> dispatchPaletteReset(sink, payload, dataStart, length)
             110, 111, 112 -> if (dataStart == length) sink.resetDynamicColor(command - 100)
+            30001 -> if (dataStart == length) sink.pushColors()
+            30101 -> if (dataStart == length) sink.popColors()
             133 -> dispatchShellIntegrationMarker(sink, payload, length, commandEnd + 1)
             777 -> {
                 val payloadStr = decodePayload(payload, commandEnd + 1, length)

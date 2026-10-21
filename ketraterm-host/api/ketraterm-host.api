@@ -53,8 +53,10 @@ public final class io/github/ketraterm/host/HostCommandAdapter : io/github/ketra
 	public fun minimizeWindow ()V
 	public fun moveWindow (II)V
 	public fun nextLine ()V
+	public fun popColors ()V
 	public fun popKittyKeyboardFlags (I)V
 	public fun popTitleStack (I)V
+	public fun pushColors ()V
 	public fun pushKittyKeyboardFlags (I)V
 	public fun pushTitleStack (I)V
 	public fun queryDynamicColor (I)V

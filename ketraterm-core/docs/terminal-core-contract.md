@@ -96,6 +96,11 @@ the selected color and its rendering behavior from the latest theme. Setting a
 fixed cursor or selection color clears that role's dynamic behavior; unrelated
 roles remain unchanged.
 
+`pushColors` and `popColors` save and restore immutable effective color snapshots
+without replacing the theme reset baseline or host presentation preferences.
+The stack is shared across screens and cleared by both terminal resets; see
+the [color-stack contract](../../docs/reference/protocol.md#color-stack).
+
 ## Writer contract
 
 ### Printable ingress

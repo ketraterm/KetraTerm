@@ -35,6 +35,10 @@ public final class JavaConsumer {
         public final StringBuilder text = new StringBuilder();
         public int bells;
         public int colorRequests;
+        public int colorPushes;
+        public int colorPops;
+        @Override public void pushColors() { colorPushes++; }
+        @Override public void popColors() { colorPops++; }
         @Override public void applyColorRequest(TerminalColorRequest request) {
             if (request.getCount() != 1 || request.target(0) != TerminalColorRequest.FOREGROUND
                     || request.operation(0) != TerminalColorRequest.QUERY) {
@@ -175,10 +179,11 @@ public final class JavaConsumer {
     public static void verify() {
         var sink = new Sink();
         var parser = TerminalParsers.create(sink);
-        byte[] bytes = "Java\007\033]52;c;?\007".getBytes(StandardCharsets.UTF_8);
+        byte[] bytes = "Java\007\033]52;c;?\007\033]30001\007\033]30101\007".getBytes(StandardCharsets.UTF_8);
         parser.accept(bytes, 0, bytes.length);
         parser.endOfInput();
         if (!sink.text.toString().equals("Java") || sink.bells != 1) throw new AssertionError(sink.text);
+        if (sink.colorPushes != 1 || sink.colorPops != 1) throw new AssertionError("Color stack callbacks");
         // OSC 52 is an optional hook; this old implementation intentionally inherits its default.
         sink.requestClipboard("c", "?");
         var events = new Events();

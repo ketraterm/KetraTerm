@@ -268,6 +268,25 @@ internal class TerminalModeControllerImpl(
         }
     }
 
+    override fun pushColors() {
+        state.pushColors()
+    }
+
+    override fun popColors() {
+        val saved = state.popColors() ?: return
+        val current = state.palette
+        // Host presentation preferences are not part of the application's color stack.
+        val restored =
+            if (saved.boldAsBright == current.boldAsBright && saved.isDark == current.isDark) {
+                saved
+            } else {
+                saved.copy(boldAsBright = current.boldAsBright, isDark = current.isDark)
+            }
+        if (restored == current) return
+        state.palette = restored
+        state.markVisibleLinesChanged()
+    }
+
     override fun setPaletteColor(
         index: Int,
         color: Int,

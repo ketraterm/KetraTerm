@@ -59,7 +59,8 @@ and the [changelog](../CHANGELOG.md). Entries here are not release commitments.
 | Owner | Remaining work |
 | --- | --- |
 | `TODO(parser/core/render/ui/policy)` | Sixel and Kitty graphics: decoding, bounded transfer/decompression, retained-image budgets, render contracts, and painting. Kitty graphics requires APC dispatch. |
-| `TODO(parser/core/render/ui/policy)` | Kitty OSC 21 visual-bell and transparent-background color roles. These return `unknown` under the [implemented color protocol](features/terminal.md#appearance); presentation support is needed before advertising them. Kitty color-stack commands remain separate unimplemented protocols. |
+| `TODO(parser/core/render/ui/policy)` | Kitty OSC 21 visual-bell and transparent-background color roles. These return `unknown` under the [implemented color protocol](features/terminal.md#appearance); presentation support is needed before advertising them. |
+| `TODO(parser/core/policy)` | xterm color-stack commands XTPUSHCOLORS, XTPOPCOLORS, and XTREPORTCOLORS. Kitty OSC 30001/30101 save/restore already works. |
 | `TODO(parser/session/ui/policy)` | Additional OSC 22 shapes and Kitty stack/query extensions beyond the [implemented subset](features/terminal.md#appearance). |
 | `TODO(parser/session/ui/host/profile/policy)` | ConEmu progress reports (OSC 9;4), retained progress state, and product presentation with bounded expiry. These subcommands are currently excluded from notification handling; OSC 9/777 notifications already work. |
 | `TODO(parser/core/policy)` | Grapheme-width mode 2027 negotiation and status reporting, with an explicit policy for any legacy-width alternative. Unicode 17 segmentation and grapheme-aware width already work without this mode. |

@@ -1008,6 +1008,12 @@ public interface TerminalCommandSink {
      */
     public fun applyColorRequest(request: TerminalColorRequest)
 
+    /** Saves the current colors on the terminal's bounded color stack (OSC 30001), subject to palette permission. */
+    public fun pushColors()
+
+    /** Restores and removes the most recently saved colors (OSC 30101), subject to palette permission. */
+    public fun popColors()
+
     /**
      * Queries an individual color in the active 256-color palette.
      *

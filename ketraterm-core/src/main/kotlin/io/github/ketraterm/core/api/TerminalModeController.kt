@@ -365,6 +365,23 @@ public interface TerminalModeController {
     public fun setThemePalette(palette: io.github.ketraterm.render.api.TerminalColorPalette)
 
     /**
+     * Saves effective indexed and named colors, including dynamic presentation,
+     * on a terminal-wide stack of ten entries. A full stack discards its oldest
+     * entry. Screen switches, resize, and theme changes preserve saved colors;
+     * hard and soft terminal resets clear the stack. Saving does not repaint.
+     */
+    public fun pushColors()
+
+    /**
+     * Restores and removes the most recently saved colors; an empty stack has no effect.
+     * The latest host theme remains the source for color resets. Host light/dark
+     * preference and bold-as-bright behavior are preserved. An effective change
+     * invalidates visible rows without emitting a color-scheme notification;
+     * unchanged colors preserve palette identity and render generations.
+     */
+    public fun popColors()
+
+    /**
      * Updates an individual color index in the active 256-color palette.
      *
      * @param index the color index in range `0..255`.
