@@ -6,6 +6,7 @@ public final class io/github/ketraterm/host/HostCommandAdapter : io/github/ketra
 	public fun <init> (Lio/github/ketraterm/core/api/TerminalBuffer;Lio/github/ketraterm/host/HostEventSink;Lio/github/ketraterm/host/HostPolicy;II)V
 	public fun <init> (Lio/github/ketraterm/core/api/TerminalBuffer;Lio/github/ketraterm/host/HostEventSink;Lio/github/ketraterm/host/HostPolicy;IIZ)V
 	public synthetic fun <init> (Lio/github/ketraterm/core/api/TerminalBuffer;Lio/github/ketraterm/host/HostEventSink;Lio/github/ketraterm/host/HostPolicy;IIZILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun applyColorRequest (Lio/github/ketraterm/protocol/TerminalColorRequest;)V
 	public fun applyKittyKeyboardFlags (II)V
 	public fun backspace ()V
 	public fun bell ()V
@@ -52,8 +53,10 @@ public final class io/github/ketraterm/host/HostCommandAdapter : io/github/ketra
 	public fun minimizeWindow ()V
 	public fun moveWindow (II)V
 	public fun nextLine ()V
+	public fun popColors ()V
 	public fun popKittyKeyboardFlags (I)V
 	public fun popTitleStack (I)V
+	public fun pushColors ()V
 	public fun pushKittyKeyboardFlags (I)V
 	public fun pushTitleStack (I)V
 	public fun queryDynamicColor (I)V

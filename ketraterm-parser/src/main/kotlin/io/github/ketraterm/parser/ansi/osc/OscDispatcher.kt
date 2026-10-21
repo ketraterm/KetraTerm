@@ -29,6 +29,7 @@ internal class OscDispatcher {
     private val utf8Decoder = Utf8Decoder()
     private val resetColorIndices = IntArray(256)
     private val resetColorSeen = BooleanArray(256)
+    private val kittyColors = KittyColorDispatcher()
 
     fun dispatch(
         sink: TerminalCommandSink,
@@ -50,7 +51,7 @@ internal class OscDispatcher {
         }
 
         val command = ControlStringPolicy.oscCommand(payload, commandEnd)
-        if (separator < 0 && command != 104 && command !in 110..112) return
+        if (separator < 0 && command != 104 && command !in 110..112 && command != 30001 && command != 30101) return
         val dataStart = if (separator >= 0) separator + 1 else length
         val limit =
             when (command) {
@@ -65,7 +66,7 @@ internal class OscDispatcher {
         // Display text deliberately uses replacement decoding. Structured metadata must
         // retain its identity; validate the complete command before emitting any effects.
         when (command) {
-            4, 7, 8, 10, 11, 12, 133 -> {
+            4, 7, 8, 10, 11, 12, 21, 133 -> {
                 if (!isValidUtf8(payload, commandEnd + 1, length)) {
                     if (command == 8) sink.endHyperlink()
                     return
@@ -110,6 +111,7 @@ internal class OscDispatcher {
                 }
             }
             52 -> dispatchClipboard(sink, payload, length, commandEnd + 1)
+            21 -> kittyColors.dispatch(sink, payload, dataStart, length)
             22 -> dispatchPointerShape(sink, payload, dataStart, length)
             7 -> sink.setCurrentWorkingDirectoryUri(decodePayload(payload, commandEnd + 1, length))
             8 -> dispatchHyperlink(sink, payload, length, commandEnd + 1)
@@ -138,6 +140,8 @@ internal class OscDispatcher {
             }
             104 -> dispatchPaletteReset(sink, payload, dataStart, length)
             110, 111, 112 -> if (dataStart == length) sink.resetDynamicColor(command - 100)
+            30001 -> if (dataStart == length) sink.pushColors()
+            30101 -> if (dataStart == length) sink.popColors()
             133 -> dispatchShellIntegrationMarker(sink, payload, length, commandEnd + 1)
             777 -> {
                 val payloadStr = decodePayload(payload, commandEnd + 1, length)

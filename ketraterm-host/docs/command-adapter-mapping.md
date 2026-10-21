@@ -73,7 +73,10 @@ rectangular-checksum, DECRQSS, and XTGETTCAP replies, including supported failur
 replies and subscribed color-scheme/resize reports. Adapter construction and
 policy replacement publish the automatic-report permission to core without
 changing subscriptions or emitting callbacks. OSC color writes, queries, and
-resets are independently gated by `palettePolicy`.
+resets and color-stack push/pop are independently gated by `palettePolicy`.
+Denied stack operations neither save nor consume an entry. OSC 21 additionally requires
+terminal-response permission for all replies, including unknown-key replies;
+its permitted mutations still apply when replies are denied.
 OSC 52 reads require a valid selector, clipboard-read permission, and terminal
 response permission; a valid denied read can still be admitted for an empty
 failure reply when response permission allows it. Response denial suppresses

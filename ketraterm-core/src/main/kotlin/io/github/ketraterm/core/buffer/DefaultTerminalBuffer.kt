@@ -178,6 +178,7 @@ internal class DefaultTerminalBuffer private constructor(
         state.altBuffer.resetLeftRightMargins(state.dimensions.width)
         state.primaryBuffer.clearKittyKeyboardStack()
         state.altBuffer.clearKittyKeyboardStack()
+        state.clearColorStack()
         state.isAttributeChangeExtentRectangle = false
         state.modes.reset()
         if (wasReverseVideo != state.modes.isReverseVideo) {
@@ -203,6 +204,7 @@ internal class DefaultTerminalBuffer private constructor(
         state.altBuffer.resetLeftRightMargins(state.dimensions.width)
         state.primaryBuffer.clearKittyKeyboardStack()
         state.altBuffer.clearKittyKeyboardStack()
+        state.clearColorStack()
         state.primaryBuffer.cursor.pendingWrap = false
         state.altBuffer.cursor.pendingWrap = false
         resetSavedCursorToHome(state.primaryBuffer.savedCursor)

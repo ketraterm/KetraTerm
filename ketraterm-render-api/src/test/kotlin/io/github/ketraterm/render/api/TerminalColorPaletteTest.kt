@@ -36,10 +36,57 @@ class TerminalColorPaletteTest {
             palette.copy(boldAsBright = false),
             palette.copy(isDark = false),
             palette.copy(indexedColors = colors),
+            palette.copyWithColorBehavior(TerminalColorBehavior.DYNAMIC_CURSOR_BACKGROUND),
         )) {
             assertEquals(false, palette == different)
             assertEquals(false, different == palette)
         }
+    }
+
+    @Test
+    fun colorBehaviorIsPreservedByOrdinaryCopiesAndCanBeRestoredIndependently() {
+        val flags =
+            TerminalColorBehavior.DYNAMIC_CURSOR_BACKGROUND or
+                TerminalColorBehavior.DYNAMIC_CURSOR_FOREGROUND or
+                TerminalColorBehavior.DYNAMIC_SELECTION_FOREGROUND or
+                TerminalColorBehavior.OVERRIDE_SELECTION_FOREGROUND or
+                TerminalColorBehavior.DYNAMIC_SELECTION_BACKGROUND or
+                TerminalColorBehavior.OVERRIDE_SELECTION_BACKGROUND
+        val palette = TerminalColorPalette().copyWithColorBehavior(flags, selectionForeground = 0xff123456.toInt())
+        val copy = palette.copy(defaultBackground = 0xff654321.toInt())
+
+        assertEquals(0, TerminalColorPalette().colorBehavior)
+        assertEquals(flags, copy.colorBehavior)
+        assertEquals(palette.selectionForeground, copy.selectionForeground)
+        assertEquals(palette, palette.copy())
+        assertEquals(palette.hashCode(), palette.copy().hashCode())
+        val reset = copy.copyWithColorBehavior(0)
+        assertEquals(0, reset.colorBehavior)
+        assertEquals(copy.selectionForeground, reset.selectionForeground)
+        assertEquals(copy.defaultBackground, reset.defaultBackground)
+    }
+
+    @Test
+    fun colorBehaviorRejectsUnknownBitsAndDynamicSelectionsWithoutOverrides() {
+        val palette = TerminalColorPalette()
+        for (flags in intArrayOf(
+            -1,
+            1 shl 6,
+            TerminalColorBehavior.DYNAMIC_SELECTION_FOREGROUND,
+            TerminalColorBehavior.DYNAMIC_SELECTION_BACKGROUND,
+        )) {
+            assertFailsWith<IllegalArgumentException> { palette.copyWithColorBehavior(flags) }
+        }
+    }
+
+    @Test
+    fun behaviorCopiesDefensivelyOwnTheirIndexedColors() {
+        val colors = TerminalColorPalette.defaultIndexedColors()
+        val palette = TerminalColorPalette().copyWithColorBehavior(TerminalColorBehavior.DYNAMIC_CURSOR_FOREGROUND, indexedColors = colors)
+        val expected = colors[1]
+        colors[1] = 0
+
+        assertEquals(expected, palette.indexedColor(1))
     }
 
     @Test

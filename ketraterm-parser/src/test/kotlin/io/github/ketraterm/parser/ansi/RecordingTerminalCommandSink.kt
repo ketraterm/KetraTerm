@@ -22,6 +22,21 @@ import io.github.ketraterm.protocol.ShellIntegrationEvent
 internal class RecordingTerminalCommandSink : TerminalAsciiCommandSink {
     override var isAlternateScreenActive: Boolean = false
 
+    override fun applyColorRequest(request: io.github.ketraterm.protocol.TerminalColorRequest) {
+        for (i in 0 until request.count) {
+            val key = ByteArray(request.keyLength(i)) { request.keyByte(i, it).toByte() }.decodeToString()
+            events += "color:${request.target(i)}:${request.operation(i)}:${request.color(i)}:$key"
+        }
+    }
+
+    override fun pushColors() {
+        events += "pushColors"
+    }
+
+    override fun popColors() {
+        events += "popColors"
+    }
+
     override fun requestModeStatus(
         mode: Int,
         decPrivate: Boolean,

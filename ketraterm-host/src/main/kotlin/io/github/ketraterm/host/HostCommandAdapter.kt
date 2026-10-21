@@ -1008,6 +1008,17 @@ public class HostCommandAdapter
             }
         }
 
+        override fun pushColors() {
+            if (hostPolicy.palettePolicy.isAllowed) terminal.pushColors()
+        }
+
+        override fun popColors() {
+            if (!hostPolicy.palettePolicy.isAllowed) return
+            val previous = terminal.palette
+            terminal.popColors()
+            publishPaletteChange(previous)
+        }
+
         override fun setPaletteColor(
             index: Int,
             color: Int,
@@ -1057,6 +1068,14 @@ public class HostCommandAdapter
         private fun publishPaletteChange(previous: TerminalColorPalette) {
             val current = terminal.palette
             if (previous != current) hostEvents.paletteChanged(current)
+        }
+
+        override fun applyColorRequest(request: TerminalColorRequest) {
+            val policy = hostPolicy
+            if (!policy.palettePolicy.isAllowed) return
+            val previous = terminal.palette
+            terminal.applyColorRequest(request, policy.terminalResponsePolicy.isAllowed)
+            publishPaletteChange(previous)
         }
 
         override fun queryDynamicColor(target: Int) {

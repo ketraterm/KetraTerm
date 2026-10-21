@@ -19,7 +19,9 @@ import io.github.ketraterm.core.api.TerminalModeController
 import io.github.ketraterm.core.api.XtermKeyResourceBits
 import io.github.ketraterm.core.engine.CursorEngine
 import io.github.ketraterm.core.state.TerminalState
+import io.github.ketraterm.protocol.TerminalColorRequest
 import io.github.ketraterm.protocol.keyboard.XtermKeyResource
+import io.github.ketraterm.render.api.TerminalColorBehavior
 import io.github.ketraterm.render.api.TerminalColorPalette
 import io.github.ketraterm.render.api.TerminalRenderCursorShape
 
@@ -266,6 +268,25 @@ internal class TerminalModeControllerImpl(
         }
     }
 
+    override fun pushColors() {
+        state.pushColors()
+    }
+
+    override fun popColors() {
+        val saved = state.popColors() ?: return
+        val current = state.palette
+        // Host presentation preferences are not part of the application's color stack.
+        val restored =
+            if (saved.boldAsBright == current.boldAsBright && saved.isDark == current.isDark) {
+                saved
+            } else {
+                saved.copy(boldAsBright = current.boldAsBright, isDark = current.isDark)
+            }
+        if (restored == current) return
+        state.palette = restored
+        state.markVisibleLinesChanged()
+    }
+
     override fun setPaletteColor(
         index: Int,
         color: Int,
@@ -283,24 +304,14 @@ internal class TerminalModeControllerImpl(
         target: Int,
         color: Int,
     ) {
-        val current =
+        val role =
             when (target) {
-                10 -> state.palette.defaultForeground
-                11 -> state.palette.defaultBackground
-                12 -> state.palette.cursorBackground
+                10 -> TerminalColorRequest.FOREGROUND
+                11 -> TerminalColorRequest.BACKGROUND
+                12 -> TerminalColorRequest.CURSOR
                 else -> return
             }
-        if (current == color) return
-        mutateMode {
-            state.palette =
-                when (target) {
-                    10 -> state.palette.copy(defaultForeground = color)
-                    11 -> state.palette.copy(defaultBackground = color)
-                    12 -> state.palette.copy(cursorBackground = color)
-                    else -> state.palette
-                }
-            state.markVisibleLinesChanged()
-        }
+        setRoleColor(role, color, state.palette.colorBehavior and roleBehaviorMask(role).inv())
     }
 
     override fun resetPaletteColors(
@@ -326,14 +337,127 @@ internal class TerminalModeControllerImpl(
     }
 
     override fun resetDynamicColor(target: Int) {
-        val theme = state.themePalette
-        val color =
+        val role =
             when (target) {
-                10 -> theme.defaultForeground
-                11 -> theme.defaultBackground
-                12 -> theme.cursorBackground
+                10 -> TerminalColorRequest.FOREGROUND
+                11 -> TerminalColorRequest.BACKGROUND
+                12 -> TerminalColorRequest.CURSOR
                 else -> return
             }
-        setDynamicColor(target, color)
+        resetRoleColor(role)
+    }
+
+    override fun applyColorRequest(
+        request: TerminalColorRequest,
+        allowResponses: Boolean,
+    ) {
+        var responseStarted = false
+        for (index in 0 until request.count) {
+            val target = request.target(index)
+            val operation = request.operation(index)
+            if (target == TerminalColorRequest.UNKNOWN || operation == TerminalColorRequest.QUERY) {
+                if (allowResponses) {
+                    if (!responseStarted) {
+                        responseChannel.beginColorReply()
+                        responseStarted = true
+                    }
+                    responseChannel.appendColorReply(request, index)
+                }
+                continue
+            }
+            if (target in 0..255) {
+                when (operation) {
+                    TerminalColorRequest.SET -> setPaletteColor(target, request.color(index) or OPAQUE_ALPHA)
+                    TerminalColorRequest.RESET -> setPaletteColor(target, state.themePalette.indexedColor(target))
+                }
+                continue
+            }
+            when (operation) {
+                TerminalColorRequest.SET -> {
+                    val behavior =
+                        (state.palette.colorBehavior and roleBehaviorMask(target).inv()) or selectionOverrideFlag(target)
+                    setRoleColor(target, request.color(index) or OPAQUE_ALPHA, behavior)
+                }
+                TerminalColorRequest.RESET -> resetRoleColor(target)
+                TerminalColorRequest.DYNAMIC -> {
+                    val dynamicFlag = roleDynamicFlag(target)
+                    if (dynamicFlag != 0) {
+                        val behavior = state.palette.colorBehavior or dynamicFlag or selectionOverrideFlag(target)
+                        setRoleColor(target, roleColor(state.palette, target), behavior)
+                    }
+                }
+            }
+        }
+        if (responseStarted) responseChannel.endColorReply()
+    }
+
+    private fun resetRoleColor(target: Int) {
+        val mask = roleBehaviorMask(target)
+        val behavior = (state.palette.colorBehavior and mask.inv()) or (state.themePalette.colorBehavior and mask)
+        setRoleColor(target, roleColor(state.themePalette, target), behavior)
+    }
+
+    private fun setRoleColor(
+        target: Int,
+        color: Int,
+        behavior: Int,
+    ) {
+        val palette = state.palette
+        if (roleColor(palette, target) == color && palette.colorBehavior == behavior) return
+        state.palette =
+            when (target) {
+                TerminalColorRequest.FOREGROUND -> palette.copyWithColorBehavior(colorBehavior = behavior, defaultForeground = color)
+                TerminalColorRequest.BACKGROUND -> palette.copyWithColorBehavior(colorBehavior = behavior, defaultBackground = color)
+                TerminalColorRequest.SELECTION_FOREGROUND ->
+                    palette.copyWithColorBehavior(
+                        colorBehavior = behavior,
+                        selectionForeground = color,
+                    )
+                TerminalColorRequest.SELECTION_BACKGROUND ->
+                    palette.copyWithColorBehavior(
+                        colorBehavior = behavior,
+                        selectionBackground = color,
+                    )
+                TerminalColorRequest.CURSOR -> palette.copyWithColorBehavior(colorBehavior = behavior, cursorBackground = color)
+                TerminalColorRequest.CURSOR_TEXT -> palette.copyWithColorBehavior(colorBehavior = behavior, cursorForeground = color)
+                else -> return
+            }
+        state.markVisibleLinesChanged()
+    }
+
+    private fun roleColor(
+        palette: TerminalColorPalette,
+        target: Int,
+    ): Int =
+        when (target) {
+            TerminalColorRequest.FOREGROUND -> palette.defaultForeground
+            TerminalColorRequest.BACKGROUND -> palette.defaultBackground
+            TerminalColorRequest.SELECTION_FOREGROUND -> palette.selectionForeground
+            TerminalColorRequest.SELECTION_BACKGROUND -> palette.selectionBackground
+            TerminalColorRequest.CURSOR -> palette.cursorBackground
+            TerminalColorRequest.CURSOR_TEXT -> palette.cursorForeground
+            else -> 0
+        }
+
+    private fun roleBehaviorMask(target: Int): Int = roleDynamicFlag(target) or selectionOverrideFlag(target)
+
+    private fun roleDynamicFlag(target: Int): Int =
+        when (target) {
+            TerminalColorRequest.SELECTION_FOREGROUND -> TerminalColorBehavior.DYNAMIC_SELECTION_FOREGROUND
+            TerminalColorRequest.SELECTION_BACKGROUND -> TerminalColorBehavior.DYNAMIC_SELECTION_BACKGROUND
+            TerminalColorRequest.CURSOR -> TerminalColorBehavior.DYNAMIC_CURSOR_BACKGROUND
+            TerminalColorRequest.CURSOR_TEXT -> TerminalColorBehavior.DYNAMIC_CURSOR_FOREGROUND
+            else -> 0
+        }
+
+    private fun selectionOverrideFlag(target: Int): Int =
+        when (target) {
+            TerminalColorRequest.SELECTION_FOREGROUND -> TerminalColorBehavior.OVERRIDE_SELECTION_FOREGROUND
+            TerminalColorRequest.SELECTION_BACKGROUND -> TerminalColorBehavior.OVERRIDE_SELECTION_BACKGROUND
+            else -> 0
+        }
+
+    private companion object {
+        const val OPAQUE_ALPHA = -0x1000000
     }
 }

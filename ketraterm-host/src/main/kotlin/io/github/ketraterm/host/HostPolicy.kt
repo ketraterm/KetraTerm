@@ -38,14 +38,16 @@ package io.github.ketraterm.host
  * @property windowManipulationPolicy whether terminal-triggered window movement,
  * resize, minimize, raise, lower, and maximize requests may be forwarded.
  * Logical DECCOLM column switches are independent of this policy.
- * @property palettePolicy whether OSC palette updates and palette query
- * responses may affect core palette state or enqueue terminal-to-host bytes.
+ * @property palettePolicy whether OSC palette updates, color-stack operations,
+ * and palette queries may affect core color state or enqueue terminal-to-host bytes.
  * @property terminalResponsePolicy whether DA, DSR/CPR (including light/dark
  * scheme queries), DECRQM mode reports, window reports, DECRQCRA,
- * DECRQSS, XTGETTCAP, and OSC 52 reads may enqueue terminal-to-host response bytes.
- * DENY also suppresses unsupported-mode and DECRQSS failure replies; no response bytes are permitted.
+ * DECRQSS, XTGETTCAP, OSC 21 colors, and OSC 52 reads may enqueue terminal-to-host response bytes.
+ * DENY also suppresses unsupported-mode and DECRQSS failure replies.
  * OSC 52 reads also require clipboard read permission; denying responses suppresses
  * their empty failure replies too. Clipboard writes are unaffected.
+ * OSC 21 also requires palette permission; response denial suppresses unknown-key replies
+ * while permitted color mutations still apply.
  * @property clipboardPolicy deny-by-default permission and audit policy for
  * terminal-triggered clipboard protocols such as OSC 52.
  * @property maxHyperlinkEntries maximum distinct OSC 8 hyperlink keys retained

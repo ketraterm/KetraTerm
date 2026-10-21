@@ -15,6 +15,8 @@
  */
 package io.github.ketraterm.core.api
 
+import io.github.ketraterm.protocol.TerminalColorRequest
+
 /**
  * Mode-control contract for the terminal buffer.
  *
@@ -363,6 +365,23 @@ public interface TerminalModeController {
     public fun setThemePalette(palette: io.github.ketraterm.render.api.TerminalColorPalette)
 
     /**
+     * Saves effective indexed and named colors, including dynamic presentation,
+     * on a terminal-wide stack of ten entries. A full stack discards its oldest
+     * entry. Screen switches, resize, and theme changes preserve saved colors;
+     * hard and soft terminal resets clear the stack. Saving does not repaint.
+     */
+    public fun pushColors()
+
+    /**
+     * Restores and removes the most recently saved colors; an empty stack has no effect.
+     * The latest host theme remains the source for color resets. Host light/dark
+     * preference and bold-as-bright behavior are preserved. An effective change
+     * invalidates visible rows without emitting a color-scheme notification;
+     * unchanged colors preserve palette identity and render generations.
+     */
+    public fun popColors()
+
+    /**
      * Updates an individual color index in the active 256-color palette.
      *
      * @param index the color index in range `0..255`.
@@ -408,6 +427,21 @@ public interface TerminalModeController {
      * @param target 10 for foreground, 11 for background, or 12 for cursor color.
      */
     public fun resetDynamicColor(target: Int)
+
+    /**
+     * Applies borrowed OSC 21 color operations in order, without retaining [request].
+     * Queries observe preceding operations and share one response in request order.
+     * Resets restore the latest theme; dynamic selection and cursor roles retain
+     * their dynamic behavior until changed or reset. Application changes do not
+     * emit color-scheme notifications.
+     *
+     * The caller enforces palette permission. [allowResponses] suppresses all
+     * query and unknown-key replies without suppressing permitted mutations.
+     */
+    public fun applyColorRequest(
+        request: TerminalColorRequest,
+        allowResponses: Boolean,
+    )
 
     /**
      * Toggles urgent bell mode (?1042).

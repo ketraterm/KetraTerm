@@ -16,6 +16,7 @@
 package io.github.ketraterm.core.state
 
 import io.github.ketraterm.core.model.*
+import io.github.ketraterm.render.api.TerminalColorPalette
 import io.github.ketraterm.render.api.TerminalRenderCursorShape
 
 /**
@@ -44,10 +45,10 @@ internal class TerminalState(
 
     /** `false` for DECSACE stream extent (the terminal default), `true` for exact rectangle. */
     var isAttributeChangeExtentRectangle: Boolean = false
-    var themePalette =
-        io.github.ketraterm.render.api
-            .TerminalColorPalette()
+    var themePalette = TerminalColorPalette()
     var palette = themePalette
+    private val colorStack = arrayOfNulls<TerminalColorPalette>(10)
+    private var colorStackDepth = 0
     var windowPixelWidth: Int = 0
     var windowPixelHeight: Int = 0
 
@@ -276,6 +277,27 @@ internal class TerminalState(
     fun cancelPendingWrap() {
         activeBuffer.cursor.pendingWrap = false
         clearLastPrintableCell()
+    }
+
+    fun pushColors() {
+        if (colorStackDepth == colorStack.size) {
+            System.arraycopy(colorStack, 1, colorStack, 0, colorStack.size - 1)
+            colorStackDepth--
+        }
+        colorStack[colorStackDepth++] = palette
+    }
+
+    fun popColors(): TerminalColorPalette? {
+        if (colorStackDepth == 0) return null
+        val index = --colorStackDepth
+        val saved = colorStack[index]
+        colorStack[index] = null
+        return saved
+    }
+
+    fun clearColorStack() {
+        colorStack.fill(null, 0, colorStackDepth)
+        colorStackDepth = 0
     }
 
     private companion object {

@@ -55,6 +55,19 @@ External sinks must implement `setPointerShape(TerminalPointerShape?)`; null
 restores the host pointer default. Recompile sink implementations and Kotlin
 delegates.
 
+## OSC 21 color migration
+
+Custom `TerminalCommandSink` implementations must implement
+`applyColorRequest(TerminalColorRequest)` and consume the borrowed batch
+synchronously. Custom `TerminalModeController` implementations must implement
+`applyColorRequest(TerminalColorRequest, Boolean)` with ordered mutations and
+permission-controlled replies. Recompile these implementations and Kotlin
+delegates. Existing palette constructor and `copy` signatures remain available.
+
+Color-stack support also requires `pushColors()` and `popColors()` on both
+interfaces. Recompile custom implementations and Kotlin delegates; the core
+methods follow the [color-stack contract](../reference/protocol.md#color-stack).
+
 ## Verification and baseline changes
 
 Supported modules use explicit API mode and checked-in ABI snapshots. Published

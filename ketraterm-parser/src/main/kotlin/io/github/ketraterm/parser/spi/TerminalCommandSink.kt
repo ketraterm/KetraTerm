@@ -1002,6 +1002,19 @@ public interface TerminalCommandSink {
     )
 
     /**
+     * Applies one ordered OSC 21 batch. The request and its key bytes are borrowed
+     * only for this synchronous call. Queries observe preceding mutations and form
+     * one combined reply. Host palette and terminal-response permissions apply.
+     */
+    public fun applyColorRequest(request: TerminalColorRequest)
+
+    /** Saves the current colors on the terminal's bounded color stack (OSC 30001), subject to palette permission. */
+    public fun pushColors()
+
+    /** Restores and removes the most recently saved colors (OSC 30101), subject to palette permission. */
+    public fun popColors()
+
+    /**
      * Queries an individual color in the active 256-color palette.
      *
      * @param index Color index to query.

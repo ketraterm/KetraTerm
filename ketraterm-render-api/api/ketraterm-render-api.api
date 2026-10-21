@@ -1,3 +1,13 @@
+public final class io/github/ketraterm/render/api/TerminalColorBehavior {
+	public static final field DYNAMIC_CURSOR_BACKGROUND I
+	public static final field DYNAMIC_CURSOR_FOREGROUND I
+	public static final field DYNAMIC_SELECTION_BACKGROUND I
+	public static final field DYNAMIC_SELECTION_FOREGROUND I
+	public static final field INSTANCE Lio/github/ketraterm/render/api/TerminalColorBehavior;
+	public static final field OVERRIDE_SELECTION_BACKGROUND I
+	public static final field OVERRIDE_SELECTION_FOREGROUND I
+}
+
 public final class io/github/ketraterm/render/api/TerminalColorPalette {
 	public static final field Companion Lio/github/ketraterm/render/api/TerminalColorPalette$Companion;
 	public fun <init> ()V
@@ -8,10 +18,13 @@ public final class io/github/ketraterm/render/api/TerminalColorPalette {
 	public static synthetic fun copy$default (Lio/github/ketraterm/render/api/TerminalColorPalette;IIIIII[IZZILjava/lang/Object;)Lio/github/ketraterm/render/api/TerminalColorPalette;
 	public final fun copyIndexedColorsInto ([II)V
 	public static synthetic fun copyIndexedColorsInto$default (Lio/github/ketraterm/render/api/TerminalColorPalette;[IIILjava/lang/Object;)V
+	public final fun copyWithColorBehavior (IIIIIII[IZZ)Lio/github/ketraterm/render/api/TerminalColorPalette;
+	public static synthetic fun copyWithColorBehavior$default (Lio/github/ketraterm/render/api/TerminalColorPalette;IIIIIII[IZZILjava/lang/Object;)Lio/github/ketraterm/render/api/TerminalColorPalette;
 	public static final fun defaultIndexedColors ()[I
 	public fun equals (Ljava/lang/Object;)Z
 	public final fun foreground (J)I
 	public final fun getBoldAsBright ()Z
+	public final fun getColorBehavior ()I
 	public final fun getCursorBackground ()I
 	public final fun getCursorForeground ()I
 	public final fun getDefaultBackground ()I

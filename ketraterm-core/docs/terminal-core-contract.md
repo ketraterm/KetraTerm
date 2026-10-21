@@ -89,6 +89,18 @@ remain intact. Effective resets publish one immutable palette and invalidate
 visible rows; unchanged resets preserve palette identity and generations.
 Application color updates and resets never emit mode 2031 reports.
 
+`applyColorRequest` consumes a borrowed OSC 21 batch synchronously in request
+order. Queries capture the state at their position and share one response;
+disabling replies leaves permitted mutations intact. Named resets restore both
+the selected color and its rendering behavior from the latest theme. Setting a
+fixed cursor or selection color clears that role's dynamic behavior; unrelated
+roles remain unchanged.
+
+`pushColors` and `popColors` save and restore immutable effective color snapshots
+without replacing the theme reset baseline or host presentation preferences.
+The stack is shared across screens and cleared by both terminal resets; see
+the [color-stack contract](../../docs/reference/protocol.md#color-stack).
+
 ## Writer contract
 
 ### Printable ingress

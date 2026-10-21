@@ -217,6 +217,33 @@ public final class io/github/ketraterm/protocol/TerminalClipboardSelection$Compa
 	public final fun parse-7BjVm3Y (Ljava/lang/String;)Ljava/lang/String;
 }
 
+public final class io/github/ketraterm/protocol/TerminalColorRequest {
+	public static final field BACKGROUND I
+	public static final field CURSOR I
+	public static final field CURSOR_TEXT I
+	public static final field Companion Lio/github/ketraterm/protocol/TerminalColorRequest$Companion;
+	public static final field DYNAMIC I
+	public static final field FOREGROUND I
+	public static final field QUERY I
+	public static final field RESET I
+	public static final field SELECTION_BACKGROUND I
+	public static final field SELECTION_FOREGROUND I
+	public static final field SET I
+	public static final field UNKNOWN I
+	public fun <init> (I)V
+	public final fun add (IIIII)V
+	public final fun clear ([B)V
+	public final fun color (I)I
+	public final fun getCount ()I
+	public final fun keyByte (II)I
+	public final fun keyLength (I)I
+	public final fun operation (I)I
+	public final fun target (I)I
+}
+
+public final class io/github/ketraterm/protocol/TerminalColorRequest$Companion {
+}
+
 public final class io/github/ketraterm/protocol/TerminalHostModeCapability {
 	public static final field ALL I
 	public static final field INSTANCE Lio/github/ketraterm/protocol/TerminalHostModeCapability;
