@@ -386,9 +386,9 @@ class PtyConnectorTest {
         val failure = if (cancelled) CancellationException("consumer cancelled") else IllegalStateException("consumer failed")
         val input = GatedInputStream("abc".ascii())
         val output = RecordingOutputStream()
-        val processExited = CountDownLatch(1)
-        val process = TestProcess(input = input, output = output, exitCode = 7, waitForCompleted = processExited)
-        val connector = createConnector(process, readBufferSize = 1)
+        val outputDrained = ObservedDrainLatch()
+        val process = TestProcess(input = input, output = output, exitCode = 7)
+        val connector = createConnector(process, readBufferSize = 1, outputDrained = outputDrained)
         val events = mutableListOf<String>()
         val listener =
             object : RecordingListener() {
@@ -417,7 +417,7 @@ class PtyConnectorTest {
         try {
             connector.start(listener)
             assertTrue(input.readEntered.await(10, TimeUnit.SECONDS), "reader did not enter its read")
-            assertTrue(processExited.await(10, TimeUnit.SECONDS), "watcher did not observe process exit")
+            assertTrue(outputDrained.awaitEntered.await(10, TimeUnit.SECONDS), "watcher did not await output drain after process exit")
             input.release()
             assertTrue(connector.joinReader(10_000), "reader did not finish failure handling")
             assertTrue(connector.joinWatcher(10_000), "watcher did not finish")
@@ -562,15 +562,14 @@ class PtyConnectorTest {
     @ValueSource(ints = [1, 4, 8192])
     fun `process exit before the final read still delivers every byte before closure`(readBufferSize: Int) {
         val input = GatedInputStream("LAST LINE\r\n".ascii())
-        val processExited = CountDownLatch(1)
+        val outputDrained = ObservedDrainLatch()
         val process =
             TestProcess(
                 input = input,
                 exitCode = 7,
                 waitForRelease = CountDownLatch(1),
-                waitForCompleted = processExited,
             )
-        val connector = createConnector(process, readBufferSize)
+        val connector = createConnector(process, readBufferSize, outputDrained)
         val events = CopyOnWriteArrayList<String>()
         val listener =
             object : RecordingListener() {
@@ -590,7 +589,7 @@ class PtyConnectorTest {
             connector.start(listener)
             assertTrue(input.readEntered.await(10, TimeUnit.SECONDS), "reader did not enter its final read")
             process.releaseWaitFor()
-            assertTrue(processExited.await(10, TimeUnit.SECONDS), "process exit was not observed")
+            assertTrue(outputDrained.awaitEntered.await(10, TimeUnit.SECONDS), "watcher did not await output drain after process exit")
             input.release()
             assertTrue(connector.joinReader(10_000), "reader did not finish")
             assertTrue(connector.joinWatcher(10_000), "watcher did not finish")
@@ -629,25 +628,28 @@ class PtyConnectorTest {
     }
 
     @Test
-    fun `reader eof waits for watcher instead of emitting null close`() {
+    fun `output drained before process exit waits for the exit code before closure`() {
         val process =
             TestProcess(
-                input = ByteArrayInputStream(ByteArray(0)),
+                input = ByteArrayInputStream("LAST LINE\r\n".ascii()),
                 exitCode = 7,
                 waitForRelease = CountDownLatch(1),
             )
         val connector = createConnector(process)
         val listener = RecordingListener()
 
-        connector.start(listener)
-
-        assertTrue(connector.joinReader(10_000), "reader did not stop")
-        assertEquals(emptyList<Int?>(), listener.closed)
-
-        process.releaseWaitFor()
-
-        assertTrue(connector.joinWatcher(10_000), "watcher did not stop")
-        assertEquals(listOf<Int?>(7), listener.closed)
+        try {
+            connector.start(listener)
+            assertTrue(connector.joinReader(10_000), "reader did not stop")
+            assertEquals("LAST LINE\r\n", listener.byteEvents.single().asciiText())
+            assertEquals(emptyList<Int?>(), listener.closed)
+            process.releaseWaitFor()
+            assertTrue(connector.joinWatcher(10_000), "watcher did not stop")
+            assertEquals(listOf<Int?>(7), listener.closed)
+        } finally {
+            process.releaseWaitFor()
+            connector.close()
+        }
     }
 
     @Test
@@ -702,7 +704,6 @@ class PtyConnectorTest {
         private val exitCode: Int = 0,
         private val blockWaitFor: Boolean = false,
         private val waitForRelease: CountDownLatch? = null,
-        private val waitForCompleted: CountDownLatch? = null,
         private val readForegroundName: () -> String? = { null },
     ) : PtyProcess {
         private val destroyedSignal = CountDownLatch(1)
@@ -723,7 +724,6 @@ class PtyConnectorTest {
                 destroyedSignal.await()
             }
             waitForRelease?.await()
-            waitForCompleted?.countDown()
             return exitCode
         }
 
@@ -765,6 +765,15 @@ class PtyConnectorTest {
         }
 
         fun text(): String = toString(StandardCharsets.US_ASCII)
+    }
+
+    private class ObservedDrainLatch : CountDownLatch(1) {
+        val awaitEntered = CountDownLatch(1)
+
+        override fun await() {
+            awaitEntered.countDown()
+            super.await()
+        }
     }
 
     private class BlockingInputStream : InputStream() {
@@ -846,7 +855,16 @@ class PtyConnectorTest {
     private fun createConnector(
         process: PtyProcess,
         readBufferSize: Int = 8192,
-    ): PtyConnector = PtyConnector(process, readBufferSize).also(connectors::add)
+        outputDrained: CountDownLatch? = null,
+    ): PtyConnector {
+        val connector =
+            if (outputDrained == null) {
+                PtyConnector(process, readBufferSize)
+            } else {
+                PtyConnector(process, readBufferSize, outputDrained = outputDrained)
+            }
+        return connector.also(connectors::add)
+    }
 
     private fun String.ascii(): ByteArray = toByteArray(StandardCharsets.US_ASCII)
 

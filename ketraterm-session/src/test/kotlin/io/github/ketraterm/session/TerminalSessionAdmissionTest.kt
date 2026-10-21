@@ -436,12 +436,16 @@ class TerminalSessionAdmissionTest {
                     assertSame(TerminalSessionState.Running, session.state.value)
                     assertEquals(CLOSED, session.submitBytes("x".toByteArray()))
                     assertEquals(CLOSED, session.submitInput(listOf(TerminalKeyEvent.text("x"))))
+                    assertEquals(0, delegate.closeCount)
+                    release.countDown()
+                    closing.awaitCompletion()
                 } finally {
                     release.countDown()
                     closing.close()
                 }
                 runCurrent()
                 assertTrue(session.state.value is TerminalSessionState.Closed)
+                assertEquals(1, delegate.closeCount)
                 assertArrayEquals(byteArrayOf(), delegate.writtenBytes)
             }
         }

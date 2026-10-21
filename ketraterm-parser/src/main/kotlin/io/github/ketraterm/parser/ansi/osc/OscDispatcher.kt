@@ -23,6 +23,7 @@ import io.github.ketraterm.parser.utf8.Utf8Decoder
 import io.github.ketraterm.protocol.NotificationLevel
 import io.github.ketraterm.protocol.ShellIntegrationEvent
 import io.github.ketraterm.protocol.ShellIntegrationMarker
+import io.github.ketraterm.protocol.TerminalPointerShape
 
 internal class OscDispatcher {
     private val utf8Decoder = Utf8Decoder()
@@ -109,6 +110,7 @@ internal class OscDispatcher {
                 }
             }
             52 -> dispatchClipboard(sink, payload, length, commandEnd + 1)
+            22 -> dispatchPointerShape(sink, payload, dataStart, length)
             7 -> sink.setCurrentWorkingDirectoryUri(decodePayload(payload, commandEnd + 1, length))
             8 -> dispatchHyperlink(sink, payload, length, commandEnd + 1)
             9 -> {
@@ -164,6 +166,30 @@ internal class OscDispatcher {
                 }
             }
             else -> customOscHandler?.handle(command, payload, commandEnd + 1, length - commandEnd - 1)
+        }
+    }
+
+    private fun dispatchPointerShape(
+        sink: TerminalCommandSink,
+        payload: ByteArray,
+        start: Int,
+        end: Int,
+    ) {
+        val nameStart = if (start < end && payload[start].toInt() == '='.code) start + 1 else start
+        if (nameStart == end) {
+            sink.setPointerShape(null)
+            return
+        }
+        for (shapeIndex in 0 until TerminalPointerShape.entries.size) {
+            val shape = TerminalPointerShape.entries[shapeIndex]
+            val name = shape.wireName
+            if (end - nameStart != name.length) continue
+            var index = 0
+            while (index < name.length && payload[nameStart + index].toInt() == name[index].code) index++
+            if (index == name.length) {
+                sink.setPointerShape(shape)
+                return
+            }
         }
     }
 

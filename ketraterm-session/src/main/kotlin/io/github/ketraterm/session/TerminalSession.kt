@@ -30,6 +30,7 @@ import io.github.ketraterm.parser.api.TerminalOutputParserFactory
 import io.github.ketraterm.parser.api.TerminalParsers
 import io.github.ketraterm.protocol.NotificationLevel
 import io.github.ketraterm.protocol.ShellIntegrationEvent
+import io.github.ketraterm.protocol.TerminalPointerShape
 import io.github.ketraterm.protocol.keyboard.KittyKeyboardProgressiveFlag
 import io.github.ketraterm.render.api.*
 import io.github.ketraterm.render.cache.TerminalRenderCache
@@ -312,6 +313,15 @@ public class TerminalSession private constructor(
      * first frame is available.
      */
     public val renderGeneration: StateFlow<Long> = mutableRenderGeneration.asStateFlow()
+
+    /**
+     * Current OSC 22 pointer override, or null for host defaults.
+     * Safe from any thread; closed sessions and custom pipelines without a
+     * [HostCommandAdapter] expose no override. Updated presentation is observed
+     * with render publication, including output that changes only host metadata.
+     */
+    public val pointerShape: TerminalPointerShape?
+        get() = if (isSessionClosed()) null else hostCommandAdapter?.pointerShape
 
     /**
      * Revision of the active shell command line, tracked only while collected.

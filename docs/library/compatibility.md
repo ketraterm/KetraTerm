@@ -49,6 +49,12 @@ that runtime separately.
 - During a stable major version, deprecate with a replacement before removal;
   incompatible removal belongs in a new major release.
 
+## OSC 22 sink migration
+
+External sinks must implement `setPointerShape(TerminalPointerShape?)`; null
+restores the host pointer default. Recompile sink implementations and Kotlin
+delegates.
+
 ## Verification and baseline changes
 
 Supported modules use explicit API mode and checked-in ABI snapshots. Published

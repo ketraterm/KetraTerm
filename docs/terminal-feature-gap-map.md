@@ -60,7 +60,7 @@ and the [changelog](../CHANGELOG.md). Entries here are not release commitments.
 | --- | --- |
 | `TODO(parser/core/render/ui/policy)` | Sixel and Kitty graphics: decoding, bounded transfer/decompression, retained-image budgets, render contracts, and painting. Kitty graphics requires APC dispatch. |
 | `TODO(parser/core/policy)` | Kitty color protocol (OSC 21), including bounded key/value parsing, color queries, and the color/reply security allowlists. OSC 4/10/11/12 and their implemented resets remain separate supported protocols. |
-| `TODO(parser/session/ui/policy)` | Application-requested pointer shapes (OSC 22), with supported-name validation and host permission. The built-in link-hover pointer does not implement this protocol. |
+| `TODO(parser/session/ui/policy)` | Additional OSC 22 shapes and Kitty stack/query extensions beyond the [implemented subset](features/terminal.md#appearance). |
 | `TODO(parser/session/ui/host/profile/policy)` | ConEmu progress reports (OSC 9;4), retained progress state, and product presentation with bounded expiry. These subcommands are currently excluded from notification handling; OSC 9/777 notifications already work. |
 | `TODO(parser/core/policy)` | Grapheme-width mode 2027 negotiation and status reporting, with an explicit policy for any legacy-width alternative. Unicode 17 segmentation and grapheme-aware width already work without this mode. |
 | `TODO(core/policy)` | Broader XTGETTCAP replies for concrete TUI capability discovery, backed by an authoritative capability table and explicit reply allowlist. Current replies cover terminal name, color count, and truecolor aliases only. |

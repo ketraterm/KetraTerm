@@ -108,6 +108,22 @@ public class HostCommandAdapter
             get() = hostPolicy
 
         @Volatile
+        private var requestedPointerShape: TerminalPointerShape? = null
+
+        /**
+         * Accepted OSC 22 pointer override, or null for host defaults.
+         * Safe to read from any thread. Pointer presentation is independent of
+         * window-manipulation and terminal-response permission.
+         */
+        public val pointerShape: TerminalPointerShape?
+            get() = requestedPointerShape
+
+        override fun setPointerShape(shape: TerminalPointerShape?) {
+            if (requestedPointerShape == shape) return
+            requestedPointerShape = shape
+        }
+
+        @Volatile
         private var currentWorkingDirectory: String? = null
 
         /**
@@ -213,6 +229,7 @@ public class HostCommandAdapter
             val previousPalette = terminal.palette
             val hadHyperlinks = hyperlinkIds.isNotEmpty()
             terminal.reset()
+            requestedPointerShape = null
             activeHyperlinkUri = null
             activeHyperlinkId = null
             activeHyperlinkNumericId = 0

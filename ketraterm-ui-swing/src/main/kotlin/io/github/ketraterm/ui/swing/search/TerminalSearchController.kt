@@ -186,7 +186,7 @@ internal class TerminalSearchController(
 
     private fun startAnalysis() {
         releaseWorkingStorageIfIdle()
-        if (job != null || !pending || !scope.isActive) return
+        if (job != null || !pending || !scope.isActive || !host.renderCache.hasFrame) return
         val session = host.session ?: return
         val requestEpoch = epoch
         val requestQuery = query

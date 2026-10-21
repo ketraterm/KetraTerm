@@ -102,6 +102,7 @@ public final class io/github/ketraterm/session/TerminalSession : io/github/ketra
 	public fun getInputModeBits ()J
 	public final fun getModeSnapshot ()Lio/github/ketraterm/core/api/TerminalModeSnapshot;
 	public final fun getPalette ()Lio/github/ketraterm/render/api/TerminalColorPalette;
+	public final fun getPointerShape ()Lio/github/ketraterm/protocol/TerminalPointerShape;
 	public final fun getPromptMarkersExpected ()Z
 	public final fun getRenderGeneration ()Lkotlinx/coroutines/flow/StateFlow;
 	public final fun getShellIntegrationState ()Lio/github/ketraterm/session/TerminalShellIntegrationView;

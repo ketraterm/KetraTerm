@@ -15,10 +15,7 @@
  */
 package io.github.ketraterm.parser.spi
 
-import io.github.ketraterm.protocol.AnsiMode
-import io.github.ketraterm.protocol.DecPrivateMode
-import io.github.ketraterm.protocol.NotificationLevel
-import io.github.ketraterm.protocol.ShellIntegrationEvent
+import io.github.ketraterm.protocol.*
 
 /**
  * Parser-facing terminal command sink.
@@ -929,6 +926,12 @@ public interface TerminalCommandSink {
      * @param title The new window title.
      */
     public fun setWindowTitle(title: String)
+
+    /**
+     * Requests a validated OSC 22 mouse pointer shape. A null shape restores the
+     * host default. Presentation precedence belongs downstream.
+     */
+    public fun setPointerShape(shape: TerminalPointerShape?)
 
     /**
      * Sets the icon title.

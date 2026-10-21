@@ -16,6 +16,8 @@
 package io.github.ketraterm.ui.swing.api
 
 import io.github.ketraterm.core.TerminalBuffers
+import io.github.ketraterm.host.HostControlPolicy
+import io.github.ketraterm.host.HostPolicy
 import io.github.ketraterm.session.TerminalSession
 import io.github.ketraterm.session.TerminalShellIntegrationFactory
 import io.github.ketraterm.session.TerminalShellIntegrationState
@@ -43,6 +45,7 @@ internal class SwingTerminalHyperlinkLifecycleFixture(
     presentation: SwingHyperlinkPresentation = SwingHyperlinkPresentation(isVisible = true),
     activation: SwingHyperlinkActivation = SwingHyperlinkActivation.DIRECT,
     private var osc8Presentation: SwingHyperlinkPresentation? = null,
+    hostPolicy: HostPolicy = HostPolicy(),
 ) : AutoCloseable {
     private val worker = StandardTestDispatcher()
     private val uiTasks = LinkedBlockingQueue<Runnable>()
@@ -58,6 +61,7 @@ internal class SwingTerminalHyperlinkLifecycleFixture(
         TerminalSession.create(
             terminal = TerminalBuffers.create(width = 40, height = 2, maxHistory = 10),
             connector = NoOpConnector,
+            hostPolicy = hostPolicy,
             workerDispatcher = worker,
             ioDispatcher = worker,
             shellIntegration = if (gutterWidth == 0) null else TerminalShellIntegrationFactory.host(shellState),
@@ -232,6 +236,18 @@ internal class SwingTerminalHyperlinkLifecycleFixture(
     fun setMouseReporting(enabled: Boolean) = writeOutput("\u001b[?1003" + if (enabled) "h" else "l")
 
     fun setShiftMouseCapture(enabled: Boolean) = writeOutput("\u001b[>" + (if (enabled) "1" else "0") + "s")
+
+    fun setPointerShape(name: String) = writeOutput("\u001b]22;$name\u0007")
+
+    fun allowWindowManipulation(enabled: Boolean) {
+        session.setHostPolicy(HostPolicy(windowManipulationPolicy = if (enabled) HostControlPolicy.ALLOW else HostControlPolicy.DENY))
+        settle()
+    }
+
+    fun closeSession() {
+        session.close()
+        settle()
+    }
 
     fun markFirstRowAsPrompt() {
         onEdt {

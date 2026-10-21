@@ -233,6 +233,27 @@ public final class io/github/ketraterm/protocol/TerminalModeStatus {
 	public static final field UNRECOGNIZED I
 }
 
+public final class io/github/ketraterm/protocol/TerminalPointerShape : java/lang/Enum {
+	public static final field CROSSHAIR Lio/github/ketraterm/protocol/TerminalPointerShape;
+	public static final field DEFAULT Lio/github/ketraterm/protocol/TerminalPointerShape;
+	public static final field E_RESIZE Lio/github/ketraterm/protocol/TerminalPointerShape;
+	public static final field MOVE Lio/github/ketraterm/protocol/TerminalPointerShape;
+	public static final field NE_RESIZE Lio/github/ketraterm/protocol/TerminalPointerShape;
+	public static final field NW_RESIZE Lio/github/ketraterm/protocol/TerminalPointerShape;
+	public static final field N_RESIZE Lio/github/ketraterm/protocol/TerminalPointerShape;
+	public static final field POINTER Lio/github/ketraterm/protocol/TerminalPointerShape;
+	public static final field SE_RESIZE Lio/github/ketraterm/protocol/TerminalPointerShape;
+	public static final field SW_RESIZE Lio/github/ketraterm/protocol/TerminalPointerShape;
+	public static final field S_RESIZE Lio/github/ketraterm/protocol/TerminalPointerShape;
+	public static final field TEXT Lio/github/ketraterm/protocol/TerminalPointerShape;
+	public static final field WAIT Lio/github/ketraterm/protocol/TerminalPointerShape;
+	public static final field W_RESIZE Lio/github/ketraterm/protocol/TerminalPointerShape;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public final fun getWireName ()Ljava/lang/String;
+	public static fun valueOf (Ljava/lang/String;)Lio/github/ketraterm/protocol/TerminalPointerShape;
+	public static fun values ()[Lio/github/ketraterm/protocol/TerminalPointerShape;
+}
+
 public final class io/github/ketraterm/protocol/TerminalTextLimits {
 	public static final field INSTANCE Lio/github/ketraterm/protocol/TerminalTextLimits;
 	public static final field MAX_CLUSTER_CODEPOINTS I

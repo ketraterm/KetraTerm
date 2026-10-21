@@ -2,6 +2,7 @@
 
 ## [Unreleased]
 
+- Terminal applications can change the mouse pointer shape (OSC 22).
 - Made the search bar more compact and responsive in narrow windows and split panes, collapsing search options into a popup when needed.
 - Added whole-word and regular-expression search, including invalid-pattern feedback, alongside literal and case-sensitive matching.
 - Improved search responsiveness and reduced memory use for large scrollback. Results appear during scanning, unchanged text can reuse previous results, and obsolete searches are cancelled when the query changes.

@@ -211,6 +211,8 @@ internal class NoOpCommandSink : TerminalAsciiCommandSink {
         enable: Boolean,
     ) {}
 
+    override fun setPointerShape(shape: io.github.ketraterm.protocol.TerminalPointerShape?) { }
+
     override fun setShiftMouseCaptureEnabled(enabled: Boolean) {}
 
     override fun setKeyModifierOption(

@@ -39,6 +39,7 @@ import com.pty4j.PtyProcess as Pty4jNativeProcess
  * @param readBufferSize size of the read buffer in bytes.
  * @param readerThreadName name for the daemon PTY stdout reader thread.
  * @param watcherThreadName name for the daemon process exit watcher thread.
+ * @param outputDrained lifecycle latch completed by the reader and awaited after process exit.
  * @property failure Original read or byte-listener exception, or `null` when no reader failure occurred.
  * @property exitCode Process exit code after the watcher observes process termination.
  * @property isAlive Returns true while the underlying PTY process reports it is alive.
@@ -48,11 +49,11 @@ public class PtyConnector internal constructor(
     private val readBufferSize: Int = DEFAULT_READ_BUFFER_SIZE,
     private val readerThreadName: String = DEFAULT_READER_THREAD_NAME,
     private val watcherThreadName: String = DEFAULT_WATCHER_THREAD_NAME,
+    private val outputDrained: CountDownLatch = CountDownLatch(1),
 ) : TerminalConnector {
     private val started = AtomicBoolean(false)
     private val localCloseRequested = AtomicBoolean(false)
     private val closedNotified = AtomicBoolean(false)
-    private val outputDrained = CountDownLatch(1)
     private val lifecycleLock = Any()
     private val writeLock = Any()
 

@@ -20,6 +20,7 @@ import io.github.ketraterm.input.event.TerminalKeyEvent
 import io.github.ketraterm.input.event.TerminalModifiers
 import io.github.ketraterm.input.event.TerminalMouseEvent
 import io.github.ketraterm.input.event.TerminalPasteEvent
+import io.github.ketraterm.protocol.TerminalPointerShape
 import io.github.ketraterm.render.api.TerminalRenderBufferKind
 import io.github.ketraterm.render.cache.TerminalRenderCache
 import io.github.ketraterm.session.TerminalInputAdmission
@@ -710,10 +711,18 @@ public class SwingTerminal
             } else {
                 hyperlinkController.refreshHyperlinkHover()
             }
+            updatePointerCursor()
         }
 
         private fun updatePointerCursor() {
-            val next = if (hoveredPromptMarkerRow != NO_PROMPT_MARKER_ROW) HAND_CURSOR else hyperlinkCursor
+            val shape = session?.pointerShape
+            val next =
+                when {
+                    hoveredPromptMarkerRow != NO_PROMPT_MARKER_ROW -> HAND_CURSOR
+                    hyperlinkCursor === HAND_CURSOR -> HAND_CURSOR
+                    shape != null -> APPLICATION_POINTER_CURSORS[shape.ordinal]
+                    else -> hyperlinkCursor
+                }
             if (cursor !== next) cursor = next
         }
 
@@ -3166,6 +3175,27 @@ public class SwingTerminal
 
             private val HAND_CURSOR: Cursor = Cursor.getPredefinedCursor(Cursor.HAND_CURSOR)
             private val DEFAULT_CURSOR: Cursor = Cursor.getDefaultCursor()
+            private val APPLICATION_POINTER_CURSORS: Array<Cursor> =
+                Array(TerminalPointerShape.entries.size) { index ->
+                    val type =
+                        when (TerminalPointerShape.entries[index]) {
+                            TerminalPointerShape.DEFAULT -> Cursor.DEFAULT_CURSOR
+                            TerminalPointerShape.CROSSHAIR -> Cursor.CROSSHAIR_CURSOR
+                            TerminalPointerShape.TEXT -> Cursor.TEXT_CURSOR
+                            TerminalPointerShape.WAIT -> Cursor.WAIT_CURSOR
+                            TerminalPointerShape.SW_RESIZE -> Cursor.SW_RESIZE_CURSOR
+                            TerminalPointerShape.SE_RESIZE -> Cursor.SE_RESIZE_CURSOR
+                            TerminalPointerShape.NW_RESIZE -> Cursor.NW_RESIZE_CURSOR
+                            TerminalPointerShape.NE_RESIZE -> Cursor.NE_RESIZE_CURSOR
+                            TerminalPointerShape.N_RESIZE -> Cursor.N_RESIZE_CURSOR
+                            TerminalPointerShape.S_RESIZE -> Cursor.S_RESIZE_CURSOR
+                            TerminalPointerShape.W_RESIZE -> Cursor.W_RESIZE_CURSOR
+                            TerminalPointerShape.E_RESIZE -> Cursor.E_RESIZE_CURSOR
+                            TerminalPointerShape.POINTER -> Cursor.HAND_CURSOR
+                            TerminalPointerShape.MOVE -> Cursor.MOVE_CURSOR
+                        }
+                    Cursor.getPredefinedCursor(type)
+                }
             private val CLEAR_SCREEN_KEY_EVENT = TerminalKeyEvent.codepoint('L'.code, TerminalModifiers.CTRL)
 
             private fun cursorTimerDelay(settings: SwingSettings): Int = maxOf(MIN_TIMER_DELAY_MILLIS, settings.cursorBlinkMillis)

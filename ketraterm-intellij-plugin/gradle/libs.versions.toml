@@ -1,5 +1,8 @@
 [versions]
 junit = "4.13.2"
+# Match the 1.10.2-intellij-4 runtime bundled with IntelliJ IDEA 2026.2.
+coroutines = "1.10.2"
 
 [libraries]
 junit = { module = "junit:junit", version.ref = "junit" }
+coroutines-test = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-test-jvm", version.ref = "coroutines" }
