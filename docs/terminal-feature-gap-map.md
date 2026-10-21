@@ -58,7 +58,7 @@ and the [changelog](../CHANGELOG.md). Entries here are not release commitments.
 
 | Owner | Remaining work |
 | --- | --- |
-| `TODO(parser/core/session/render/ui/policy)` | Kitty graphics: runtime implementation remains missing. The [planned initial scope](development/kitty-graphics-contract.md) covers inline static RGB/RGBA/PNG, zlib, ordinary placements and lifecycle. Indexed wire formats (`f=8/16`), PNG profile/gamma color management, Unicode placeholders, animation, relative placements, file and shared-memory media follow separately. |
+| `TODO(parser/core/session/render/ui/policy)` | Kitty graphics: the inline raw RGB/RGBA path is implemented through Swing with pinned sender replay. PNG/zlib, the ordered decoder handoff and its EDT caller adaptations, broader conformance and release verification remain under the [implementation contract](development/kitty-graphics-contract.md). Indexed wire formats (`f=8/16`), PNG profile/gamma color management, Unicode placeholders, animation, relative placements, file and shared-memory media follow separately. |
 | `TODO(parser/core/render/ui/policy)` | Sixel decoding, bounded transfer/decompression, retained-image budgets, render contracts, and painting. |
 | `TODO(parser/core/render/ui/policy)` | Kitty OSC 21 visual-bell and transparent-background color roles. These return `unknown` under the [implemented color protocol](features/terminal.md#appearance); presentation support is needed before advertising them. |
 | `TODO(parser/core/policy)` | xterm color-stack commands XTPUSHCOLORS, XTPOPCOLORS, and XTREPORTCOLORS. Kitty OSC 30001/30101 save/restore already works. |

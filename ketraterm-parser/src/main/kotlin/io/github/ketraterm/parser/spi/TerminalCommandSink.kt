@@ -29,6 +29,34 @@ import io.github.ketraterm.protocol.*
  */
 public interface TerminalCommandSink {
     /**
+     * Invalidation token for incomplete graphics uploads. Change it synchronously
+     * when reset, destructive clearing or an effective screen switch invalidates
+     * staging, including mutations performed outside this sink. The parser checks
+     * the token at APC entry and termination, covering partial headers and payloads
+     * across reads. Repeated no-op screen requests do not require a new token.
+     */
+    public val graphicsTransferGeneration: Long
+
+    /**
+     * Consumes a complete graphics command or a transfer validation failure.
+     * [data] contains Base64-decoded payload bytes in `0 until length`; image
+     * format decoding and admission belong downstream. [result] is the transfer
+     * result, not a permission decision. A failure must not commit partial data.
+     * Both [command] and [data] are borrowed for this synchronous callback only.
+     *
+     * @param command controls of the completed command or rejected transfer.
+     * @param data borrowed Base64-decoded payload; only its used prefix is valid.
+     * @param length used payload bytes, in `0..data.size`.
+     * @param result transfer validation outcome; failures must not admit [data].
+     */
+    public fun applyGraphicsCommand(
+        command: TerminalGraphicsCommand,
+        data: ByteArray,
+        length: Int,
+        result: TerminalGraphicsResult,
+    )
+
+    /**
      * Actual active screen, observed synchronously on the parser's serialized command thread.
      * Must reflect effective transitions before [setDecMode] returns, including rejected or
      * repeated requests. Parser uses it for screen-local charset saves; do not shadow host state.

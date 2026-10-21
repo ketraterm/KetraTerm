@@ -236,7 +236,8 @@ public interface TerminalWriter {
      * region (IL, `CSI n L`).
      *
      * Lines shifted past the bottom margin are discarded. Ignored when the
-     * cursor is outside the active scroll region.
+     * cursor is outside the active scroll region. Ordinary image placements
+     * retain their position and clipping independently of the edited text.
      *
      * @param count Number of blank lines to insert. Non-positive values are ignored.
      */
@@ -247,7 +248,8 @@ public interface TerminalWriter {
      * region (DL, `CSI n M`).
      *
      * Blank lines are exposed at the bottom margin. Ignored when the cursor is
-     * outside the active scroll region.
+     * outside the active scroll region. Ordinary image placements retain their
+     * position and clipping independently of the edited text.
      *
      * @param count Number of lines to delete. Non-positive values are ignored.
      */

@@ -8,7 +8,10 @@ The public types in `io.github.ketraterm.render.cache` have distinct roles:
 
 - `TerminalRenderCache` is a mutable, caller-owned frame copy. It retains cell
   planes, packed cluster codepoints, row metadata, cursor primitives, and source
-  generations. Reader identity qualifies incremental copies.
+  generations. Reader identity qualifies incremental copies. Its `images` view
+  retains immutable pixel resources and copied primitive placement metadata.
+- `TerminalRenderImages` provides indexed placement reads and synchronous sink
+  copying. Pixel resources are shared across caches; placement storage is not.
 - `TerminalRenderPublisher` owns three caches. A serialized writer publishes a
   copied frame; readers borrow the latest cache through `readCurrent`.
 - `TerminalRenderRangeCopy` makes bounded retained-range copies for worker-side

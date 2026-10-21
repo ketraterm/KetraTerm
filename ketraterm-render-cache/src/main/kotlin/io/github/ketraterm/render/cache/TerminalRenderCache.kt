@@ -283,6 +283,19 @@ public class TerminalRenderCache(
     public var cursorChangedOnLastUpdate: Boolean = false
         private set
 
+    /**
+     * Copied placements borrowed with this cache and replaced on update or reset.
+     * Individual [TerminalRenderImage] resources are immutable and may be retained.
+     */
+    public val images: TerminalRenderImages = TerminalRenderImages()
+
+    /**
+     * Last copied image/placement generation, meaningful only while [hasFrame] is true.
+     * Compare for equality and qualify it by source identity and viewport mapping.
+     */
+    public var graphicsGeneration: Long = UNINITIALIZED_GENERATION
+        private set
+
     private var clusterCodepointCount: Int = 0
     private var nextClusterCodepoints: IntArray = IntArray(INITIAL_CLUSTER_CODEPOINT_CAPACITY)
     private var nextClusterCodepointCount: Int = 0
@@ -350,6 +363,7 @@ public class TerminalRenderCache(
      * including owners that deliver frames directly through [accept].
      */
     public fun reset() {
+        images.clear()
         sourceReader = null
         codeWords.fill(0)
         attrWords.fill(TerminalRenderAttrs.DEFAULT)
@@ -460,6 +474,7 @@ public class TerminalRenderCache(
      */
     public fun updateFrom(source: TerminalRenderCache) {
         require(source !== this) { "source cache must differ from destination cache" }
+        images.clear()
         hasFrame = false
 
         val previousColumns = columns
@@ -525,6 +540,8 @@ public class TerminalRenderCache(
         }
         clusterCodepointCount = source.clusterCodepointCount
 
+        images.copyFrom(source.images)
+        graphicsGeneration = source.graphicsGeneration
         historySize = source.historySize
         scrollbackOffset = source.scrollbackOffset
         discardedCount = source.discardedCount
@@ -566,6 +583,7 @@ public class TerminalRenderCache(
      * @param frame the short-lived render frame snapshot to copy from.
      */
     override fun accept(frame: TerminalRenderFrame) {
+        images.clear()
         val previouslyHadFrame = hasFrame
         hasFrame = false
         shapeChangedOnLastUpdate = false
@@ -655,7 +673,13 @@ public class TerminalRenderCache(
         outputEndAbsoluteRow = frame.outputEndAbsoluteRow
         structureGeneration = frame.structureGeneration
         discardedCount = frame.discardedCount
-        hasFrame = true
+        try {
+            images.copyFrom(frame)
+            graphicsGeneration = frame.graphicsGeneration
+            hasFrame = true
+        } finally {
+            if (!hasFrame) images.clear()
+        }
     }
 
     private fun resizeStorage(
@@ -696,6 +720,8 @@ public class TerminalRenderCache(
     }
 
     private fun resetMetadata() {
+        images.clear()
+        graphicsGeneration = UNINITIALIZED_GENERATION
         hasFrame = false
         hasBlinkingText = false
         clusterCodepointCount = 0

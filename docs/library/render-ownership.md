@@ -15,6 +15,12 @@ Frame callbacks must not modify or retain cache storage, close the session, or
 reenter mutation/publication. A read does not request a fresh frame; publication
 is controlled by render requests and generation observation.
 
+`TerminalRenderImage` is an explicit lifetime exception: immutable pixel resources
+may be retained, while placement metadata and `cache.images` remain borrowed.
+Retaining an image also retains its pixel storage after deletion or replacement;
+prepare renderer rasters outside the frame callback. See the
+[image lifetime contract](../../ketraterm-render-api/docs/render-frame-lifecycle.md#critical-lifespan-rule).
+
 Use scoped readers. The publisher's acquire/release bridges exist for cross-module
 use and must be paired exactly once in `finally`. Inline readers preserve that
 cleanup and Kotlin non-local returns without exposing buffer indexing. A cache

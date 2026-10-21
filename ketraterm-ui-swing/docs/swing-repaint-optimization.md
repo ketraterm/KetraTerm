@@ -18,7 +18,7 @@ state when the next projection is built.
 - Cursor changes damage old and new visual cell bounds, except where row damage
   already covers them. Focus changes damage the current cursor; inactive cursors
   do not receive cursor-only blink damage. Text blink damage remains independent.
-- Grid shape, buffer, and viewport mapping changes require a full repaint.
+- Grid shape, buffer, viewport mapping, and graphics-generation changes require a full repaint.
   Chrome or settings changes may force one explicitly.
 
 Search refresh precedes frame damage planning. Query changes and result navigation
@@ -29,6 +29,31 @@ row becomes `xef`, because the first row loses its highlight too.
 Row metadata capacity is retained across overscan transitions and resets.
 `TerminalBidiLayout` likewise retains row permutations and scratch capacity for
 unchanged content.
+
+### Image composition
+
+`GridPainter` composes images in three z-index bands: below nondefault cell
+backgrounds, above backgrounds but below text, and above text. The final band
+also covers row-level selection, search and hyperlink backgrounds; the cursor,
+scrollbar and visual-bell overlays paint afterward. This is the current overlap
+behavior when an image obscures selected or matched text.
+
+Image positions use physical viewport cells and the installed row geometry.
+Contiguous rows share one image draw; prompt dividers split it into separate
+runs. Fractional scrolling and content padding use the same translation as text.
+Image pixels are copied into EDT-owned rasters during frame installation, never
+during painting. Placements
+sharing an immutable resource share its raster. Fully opaque resources use an
+RGB view of the same pixel storage to enable Java2D's opaque scaling path.
+The view releases unused rasters on the next installation and all raster
+references on unbinding or disposal.
+See the [render lifetime contract](../../ketraterm-render-api/docs/render-frame-lifecycle.md)
+for the distinction between borrowed placements and retainable image resources.
+
+The image-paint benchmark measures the actual Java2D path separately from frame
+copying, including alpha, scaling, divider clipping and fractional translation.
+Java2D may allocate for scaling translucent images or changing clips; raster
+reuse alone does not establish allocation-free painting on every backend.
 
 ### Smooth viewport ownership
 

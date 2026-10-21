@@ -16,6 +16,7 @@
 package io.github.ketraterm.parser.ansi
 
 import io.github.ketraterm.parser.ansi.dcs.DcsDispatcher
+import io.github.ketraterm.parser.ansi.graphics.GraphicsParser
 import io.github.ketraterm.parser.ansi.osc.OscDispatcher
 import io.github.ketraterm.parser.api.TerminalCustomOscHandler
 import io.github.ketraterm.parser.runtime.ParserState
@@ -40,6 +41,9 @@ internal class ActionEngine(
     private val customOscPayloadLimitBytes: Int = ControlStringPolicy.MAX_PAYLOAD_BYTES,
 ) {
     private val oscDispatcher = OscDispatcher()
+    private var graphicsParser: GraphicsParser? = null
+
+    fun cancelGraphics() = graphicsParser?.cancel()
 
     /**
      * Executes one FSM action.
@@ -58,6 +62,29 @@ internal class ActionEngine(
         require(byteValue in 0..255) { "byteValue out of range: $byteValue" }
 
         when (action) {
+            FsmAction.APC_START -> {
+                flushPrintable(state)
+                val graphics = graphicsParser ?: GraphicsParser(sink).also { graphicsParser = it }
+                graphics.start()
+                state.fsmState = nextState
+            }
+            FsmAction.APC_PUT -> {
+                checkNotNull(graphicsParser).put(byteValue)
+                state.fsmState = nextState
+            }
+            FsmAction.APC_END -> {
+                checkNotNull(graphicsParser).finish()
+                state.fsmState = nextState
+            }
+            FsmAction.APC_ABORT -> {
+                graphicsParser?.cancel()
+                state.fsmState = nextState
+            }
+            FsmAction.APC_INVALID -> {
+                graphicsParser?.discard()
+                state.fsmState = nextState
+            }
+
             FsmAction.IGNORE -> {
                 state.fsmState = nextState
             }
@@ -195,6 +222,7 @@ internal class ActionEngine(
             }
 
             FsmAction.STRING_END -> {
+                if (byteValue == 0x18 || byteValue == 0x1a) graphicsParser?.cancel()
                 state.clearPayloadState()
                 state.clearSequenceState()
                 state.fsmState = nextState
@@ -210,6 +238,7 @@ internal class ActionEngine(
         byteValue: Int,
         clearAfter: Boolean,
     ) {
+        if (byteValue == 0x18 || byteValue == 0x1a) graphicsParser?.cancel()
         // Controls are structural in this path.
         flushPrintable(state)
         dispatcher.executeControl(

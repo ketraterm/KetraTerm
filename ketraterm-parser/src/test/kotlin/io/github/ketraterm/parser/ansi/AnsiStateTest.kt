@@ -36,12 +36,14 @@ class AnsiStateTest {
             AnsiState.OSC_STRING,
             AnsiState.DCS_ENTRY,
             AnsiState.DCS_PASSTHROUGH,
-            AnsiState.SOS_PM_APC_STRING,
+            AnsiState.SOS_PM_STRING,
             AnsiState.IGNORE_UNTIL_ST,
             AnsiState.OSC_ESCAPE,
             AnsiState.DCS_ESCAPE,
-            AnsiState.SOS_PM_APC_ESCAPE,
+            AnsiState.SOS_PM_ESCAPE,
             AnsiState.IGNORE_UNTIL_ST_ESCAPE,
+            AnsiState.APC_STRING,
+            AnsiState.APC_ESCAPE,
         )
 
     private val stringStates: Set<Int> =
@@ -50,10 +52,12 @@ class AnsiStateTest {
             AnsiState.OSC_ESCAPE,
             AnsiState.DCS_PASSTHROUGH,
             AnsiState.DCS_ESCAPE,
-            AnsiState.SOS_PM_APC_STRING,
-            AnsiState.SOS_PM_APC_ESCAPE,
+            AnsiState.SOS_PM_STRING,
+            AnsiState.SOS_PM_ESCAPE,
             AnsiState.IGNORE_UNTIL_ST,
             AnsiState.IGNORE_UNTIL_ST_ESCAPE,
+            AnsiState.APC_STRING,
+            AnsiState.APC_ESCAPE,
         )
 
     private val csiStates: Set<Int> =
@@ -125,10 +129,12 @@ class AnsiStateTest {
                     AnsiState.OSC_ESCAPE,
                     AnsiState.DCS_PASSTHROUGH,
                     AnsiState.DCS_ESCAPE,
-                    AnsiState.SOS_PM_APC_STRING,
-                    AnsiState.SOS_PM_APC_ESCAPE,
+                    AnsiState.SOS_PM_STRING,
+                    AnsiState.SOS_PM_ESCAPE,
                     AnsiState.IGNORE_UNTIL_ST,
                     AnsiState.IGNORE_UNTIL_ST_ESCAPE,
+                    AnsiState.APC_STRING,
+                    AnsiState.APC_ESCAPE,
                 ),
                 stringStates,
             )
@@ -156,8 +162,8 @@ class AnsiStateTest {
         }
 
         @Test
-        fun `returns true for SOS PM APC string state`() {
-            assertTrue(AnsiState.isStringState(AnsiState.SOS_PM_APC_STRING))
+        fun `returns true for SOS PM string state`() {
+            assertTrue(AnsiState.isStringState(AnsiState.SOS_PM_STRING))
         }
 
         @Test
@@ -238,7 +244,7 @@ class AnsiStateTest {
                 { assertFalse(AnsiState.isCsiState(AnsiState.OSC_STRING)) },
                 { assertFalse(AnsiState.isCsiState(AnsiState.DCS_ENTRY)) },
                 { assertFalse(AnsiState.isCsiState(AnsiState.DCS_PASSTHROUGH)) },
-                { assertFalse(AnsiState.isCsiState(AnsiState.SOS_PM_APC_STRING)) },
+                { assertFalse(AnsiState.isCsiState(AnsiState.SOS_PM_STRING)) },
                 { assertFalse(AnsiState.isCsiState(AnsiState.IGNORE_UNTIL_ST)) },
             )
         }

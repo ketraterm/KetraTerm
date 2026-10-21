@@ -78,7 +78,8 @@ class ByteClassTest {
             0x3B -> ByteClass.PARAM_SEP
             in 0x3C..0x3F -> ByteClass.PRIVATE_MARKER
             'P'.code -> ByteClass.DCS_INTRO
-            'X'.code, '^'.code, '_'.code -> ByteClass.SOS_PM_APC_INTRO
+            'X'.code, '^'.code -> ByteClass.SOS_PM_INTRO
+            '_'.code -> ByteClass.APC_INTRO
             '['.code -> ByteClass.CSI_INTRO
             '\\'.code -> ByteClass.ST_INTRO
             ']'.code -> ByteClass.OSC_INTRO
@@ -110,14 +111,15 @@ class ByteClassTest {
                     ByteClass.CSI_INTRO,
                     ByteClass.ST_INTRO,
                     ByteClass.OSC_INTRO,
-                    ByteClass.SOS_PM_APC_INTRO,
+                    ByteClass.SOS_PM_INTRO,
                     ByteClass.FINAL_BYTE,
                     ByteClass.DEL,
+                    ByteClass.APC_INTRO,
                 )
 
             assertAll(
                 { assertEquals(ByteClass.COUNT, asciiClasses.size) },
-                { assertEquals((0 until ByteClass.COUNT).toList(), asciiClasses) },
+                { assertEquals(asciiClasses, (0 until ByteClass.COUNT).toList()) },
                 { assertEquals(asciiClasses.size, asciiClasses.toSet().size, "class ids must be unique") },
             )
         }
@@ -286,11 +288,11 @@ class ByteClassTest {
         }
 
         @Test
-        fun `SOS PM and APC introducers share one class`() {
+        fun `SOS and PM share a class while APC has its own class`() {
             assertAll(
-                { assertClass('X'.code, ByteClass.SOS_PM_APC_INTRO) },
-                { assertClass('^'.code, ByteClass.SOS_PM_APC_INTRO) },
-                { assertClass('_'.code, ByteClass.SOS_PM_APC_INTRO) },
+                { assertClass('X'.code, ByteClass.SOS_PM_INTRO) },
+                { assertClass('^'.code, ByteClass.SOS_PM_INTRO) },
+                { assertClass('_'.code, ByteClass.APC_INTRO) },
             )
         }
 

@@ -42,8 +42,8 @@ package io.github.ketraterm.host
  * and palette queries may affect core color state or enqueue terminal-to-host bytes.
  * @property terminalResponsePolicy whether DA, DSR/CPR (including light/dark
  * scheme queries), DECRQM mode reports, window reports, DECRQCRA,
- * DECRQSS, XTGETTCAP, OSC 21 colors, and OSC 52 reads may enqueue terminal-to-host response bytes.
- * DENY also suppresses unsupported-mode and DECRQSS failure replies.
+ * DECRQSS, XTGETTCAP, OSC 21 colors, Kitty graphics, and OSC 52 reads may enqueue terminal-to-host response bytes.
+ * DENY also suppresses unsupported-mode, DECRQSS, and graphics failure replies.
  * OSC 52 reads also require clipboard read permission; denying responses suppresses
  * their empty failure replies too. Clipboard writes are unaffected.
  * OSC 21 also requires palette permission; response denial suppresses unknown-key replies

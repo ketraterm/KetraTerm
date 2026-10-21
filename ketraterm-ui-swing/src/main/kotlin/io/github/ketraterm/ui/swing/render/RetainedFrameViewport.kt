@@ -91,6 +91,35 @@ internal class RetainedFrameViewport(
     override val columns get() = frame.columns
     override val rows get() = minOf(requestedRows, frame.rows - skippedRows)
     override val discardedCount get() = frame.discardedCount
+    override val graphicsGeneration get() = frame.graphicsGeneration
+    private var imageSink: TerminalRenderImageSink? = null
+    private val shiftedImageSink =
+        TerminalRenderImageSink { image, column, row, width, height, sx, sy, sw, sh, top, bottom, z ->
+            checkNotNull(imageSink).accept(
+                image,
+                column,
+                row - skippedRows,
+                width,
+                height,
+                sx,
+                sy,
+                sw,
+                sh,
+                top - skippedRows,
+                bottom - skippedRows,
+                z,
+            )
+        }
+
+    override fun copyImages(sink: TerminalRenderImageSink) {
+        imageSink = sink
+        try {
+            frame.copyImages(shiftedImageSink)
+        } finally {
+            imageSink = null
+        }
+    }
+
     override val frameGeneration get() = frame.frameGeneration
     override val contentGeneration get() = frame.contentGeneration
     override val historyContentGeneration get() = frame.historyContentGeneration

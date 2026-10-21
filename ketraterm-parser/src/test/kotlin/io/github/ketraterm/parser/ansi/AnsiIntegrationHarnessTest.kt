@@ -695,10 +695,10 @@ internal class AnsiIntegrationHarnessTest {
     // ----- Ignored strings --------------------------------------------------
 
     @Nested
-    @DisplayName("ignored SOS PM APC strings")
+    @DisplayName("ignored SOS PM and unknown APC strings")
     inner class IgnoredStrings {
         @Test
-        fun `SOS PM and APC ignore payload until ST`() {
+        fun `SOS PM and unknown APC ignore payload until ST`() {
             for (intro in listOf('X', '^', '_')) {
                 val h = AnsiHarness()
 

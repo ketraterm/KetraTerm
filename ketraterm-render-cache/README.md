@@ -53,6 +53,14 @@ Use `rowOffset(row)` and the reported dimensions, not array capacity, for indexi
 Interpret `codeWords` together with `TerminalRenderCellFlags`; clustered cells
 use `clusterRefs` and `clusterCodepoints`, and wide trailing cells carry no glyph.
 
+`images` contains placements in back-to-front order. Its indexed getters expose
+fractional destination cells and pixel source crops; `copyTo` delivers the same
+metadata through a sink. Updates copy metadata and share immutable
+`TerminalRenderImage` references, without copying pixels. Keep backend raster
+preparation outside the source callback and reuse rasters by resource identity.
+The [frame lifecycle](../ketraterm-render-api/docs/render-frame-lifecycle.md#critical-lifespan-rule)
+defines the resource's retainable lifetime and placement clipping.
+
 ## Ownership and validity
 
 A cache is mutable and requires thread confinement or external serialization.
@@ -80,6 +88,10 @@ history metadata still describes the source. A `false` result means no requested
 row remains and `cache.hasFrame` is false. Assemble strings and perform analysis
 after `read` returns. The optional cancellation check runs during source copying
 and must be cheap and non-suspending.
+
+Image placements intersecting a render range are translated into its local rows.
+The row/cell limits do not bound image pixels: the copy retains references to full
+immutable resources. `TerminalTextRangeCopy` does not copy images.
 
 `TerminalTextRangeCopy` uses the same range and batch limits for text analysis.
 It requests `copyTextLine` and retains only code words, cell flags, cluster data,

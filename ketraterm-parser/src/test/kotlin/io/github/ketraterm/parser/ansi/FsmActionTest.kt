@@ -47,6 +47,11 @@ class FsmActionTest {
             FsmAction.OSC_END,
             FsmAction.DCS_END,
             FsmAction.STRING_END,
+            FsmAction.APC_START,
+            FsmAction.APC_PUT,
+            FsmAction.APC_END,
+            FsmAction.APC_ABORT,
+            FsmAction.APC_INVALID,
         )
 
     @Nested
@@ -63,7 +68,7 @@ class FsmActionTest {
 
         @Test
         fun `COUNT is one past the highest action id`() {
-            assertEquals(allActions.max() + 1, FsmAction.COUNT)
+            assertEquals(FsmAction.COUNT, allActions.max() + 1)
         }
 
         @Test

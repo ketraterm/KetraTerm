@@ -152,10 +152,12 @@ internal class TerminalParser(
      */
     override fun endOfInput() {
         checkCustomOscReentry()
+        actionEngine.cancelGraphics()
         val utf8Result = utf8Decoder.flushEndOfInput()
         emitUtf8Output(utf8Result)
         printableProcessor.flush(state)
         when (state.fsmState) {
+            AnsiState.APC_STRING, AnsiState.APC_ESCAPE,
             AnsiState.OSC_STRING, AnsiState.OSC_ESCAPE,
             AnsiState.DCS_ENTRY, AnsiState.DCS_PASSTHROUGH, AnsiState.DCS_ESCAPE,
             -> {
@@ -174,6 +176,7 @@ internal class TerminalParser(
      */
     override fun reset() {
         checkCustomOscReentry()
+        actionEngine.cancelGraphics()
         utf8Decoder.reset()
         printableProcessor.reset(state)
         state.resetAll()

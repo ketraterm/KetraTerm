@@ -2953,6 +2953,7 @@ public class SwingTerminal
             }
 
         private fun resetRenderCaches() {
+            painter.clearImages()
             renderCache.reset()
             searchCache.reset()
         }
@@ -2990,6 +2991,7 @@ public class SwingTerminal
                     renderCache.updateFrom(published)
                 } ?: return
             }
+            painter.prepareImages(renderCache)
             selectionController.updateFrame(renderCache)
             hyperlinkDiscoveryController.scheduleForFrame()
             selectionController.publishChange()

@@ -36,6 +36,7 @@ package io.github.ketraterm.core.api
  * composes the complete core contract for direct embedders.
  */
 public interface TerminalBuffer :
+    TerminalGraphics,
     TerminalWriter,
     TerminalCursor,
     TerminalModeController,
@@ -57,6 +58,10 @@ public interface TerminalBuffer :
      * newly exposed columns receive the default 8-column VT rhythm. Saved-cursor
      * state is clamped to the new bounds.
      *
+     * Invalid dimensions are rejected before allocation or state mutation.
+     * An unchanged grid preserves known pixel dimensions. A changed grid makes
+     * them unknown; use the pixel-aware overload when the host can supply them.
+     *
      * @param newWidth New terminal width in cells. Must be at least [io.github.ketraterm.core.TerminalBuffers.MIN_WIDTH].
      * @param newHeight New terminal height in rows. Must be > 0.
      * @param oldScrollbackOffset The active scrollback offset before the resize.
@@ -66,9 +71,6 @@ public interface TerminalBuffer :
      *   to its history. An active alternate screen returns zero for both values.
      * @throws IllegalArgumentException if [newWidth] is below the minimum, [newHeight] is <= 0, or adding
      * [newHeight] to the configured primary history capacity would overflow [Int].
-     * Invalid dimensions are rejected before allocation or state mutation.
-     * An unchanged grid preserves known pixel dimensions. A changed grid makes
-     * them unknown; use the pixel-aware overload when the host can supply them.
      */
     public fun resize(
         newWidth: Int,
@@ -81,16 +83,22 @@ public interface TerminalBuffer :
      *
      * Grid semantics and the returned viewport anchor match the three-argument
      * overload. Pixel-only changes preserve grid content, history, cursor,
-     * margins, tab stops, and render generations. A changed grid or pixel size
+     * margins, tab stops, and text-row generations. Image geometry changes may
+     * advance graphics and frame generations. A changed grid or pixel size
      * emits one mode 2048 report when subscribed and permitted.
+     * If either pixel dimension is zero, both become unknown. Invalid dimensions
+     * are rejected before allocation or state mutation.
      *
      * @param newWidth width in cells, at least [io.github.ketraterm.core.TerminalBuffers.MIN_WIDTH].
      * @param newHeight positive height in rows.
      * @param oldScrollbackOffset active scrollback offset before the resize.
      * @param pixelWidth text-area width excluding host padding; zero means unknown.
      * @param pixelHeight text-area height excluding host padding; zero means unknown.
-     * If either pixel dimension is zero, both become unknown. Negative pixels
-     * are rejected before allocation or state mutation.
+     * @return `(newScrollbackOffset, newHistorySize)` for the active buffer;
+     * the offset is clamped to retained history, and alternate returns `(0, 0)`.
+     * @throws IllegalArgumentException if [newWidth] is below the minimum, [newHeight]
+     * is nonpositive, either pixel dimension is negative, or [newHeight] plus
+     * configured primary history capacity would overflow [Int].
      */
     public fun resize(
         newWidth: Int,
@@ -107,7 +115,8 @@ public interface TerminalBuffer :
      * defaults; homes the cursor; restores the scroll region to the full
      * viewport; resets all mode flags to their VT defaults; and restores tab
      * stops to the standard 8-column VT100 spacing. If the alternate buffer is
-     * active, exits it first.
+     * active, exits it first. Releases images and placements on both screens
+     * and invalidates incomplete graphics transfers.
      */
     public fun reset()
 
@@ -119,7 +128,8 @@ public interface TerminalBuffer :
      * subsequent output/input coordination: insert, origin, application
      * cursor/keypad, cursor presentation, modify-other-keys, margins, pen
      * attributes, selective-erase write protection, and pending wrap. The saved
-     * cursor slots are replaced with a home/default restore target.
+     * cursor slots are replaced with a home/default restore target. Retained
+     * images and placements survive; incomplete graphics transfers are invalidated.
      */
     public fun softReset()
 

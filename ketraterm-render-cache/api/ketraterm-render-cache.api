@@ -24,11 +24,13 @@ public final class io/github/ketraterm/render/cache/TerminalRenderCache : io/git
 	public final fun getExtraAttrWords ()[J
 	public final fun getFlags ()[I
 	public final fun getFrameGeneration ()J
+	public final fun getGraphicsGeneration ()J
 	public final fun getHasBlinkingText ()Z
 	public final fun getHasFrame ()Z
 	public final fun getHistoryContentGeneration ()J
 	public final fun getHistorySize ()I
 	public final fun getHyperlinkIds ()[I
+	public final fun getImages ()Lio/github/ketraterm/render/cache/TerminalRenderImages;
 	public final fun getLineGenerations ()[J
 	public final fun getLineHasBlinkingText ()[Z
 	public final fun getLineIds ()[J
@@ -46,6 +48,24 @@ public final class io/github/ketraterm/render/cache/TerminalRenderCache : io/git
 	public final fun updateFrom (Lio/github/ketraterm/render/api/TerminalRenderFrameReader;II)V
 	public final fun updateFrom (Lio/github/ketraterm/render/cache/TerminalRenderCache;)V
 	public final fun updateFromAbsoluteRange (Lio/github/ketraterm/render/api/TerminalRenderFrameReader;JJ)V
+}
+
+public final class io/github/ketraterm/render/cache/TerminalRenderImages {
+	public final fun clipBottom (I)D
+	public final fun clipTop (I)D
+	public final fun column (I)D
+	public final fun copyTo (Lio/github/ketraterm/render/api/TerminalRenderImageSink;D)V
+	public static synthetic fun copyTo$default (Lio/github/ketraterm/render/cache/TerminalRenderImages;Lio/github/ketraterm/render/api/TerminalRenderImageSink;DILjava/lang/Object;)V
+	public final fun getSize ()I
+	public final fun height (I)D
+	public final fun image (I)Lio/github/ketraterm/render/api/TerminalRenderImage;
+	public final fun row (I)D
+	public final fun sourceHeight (I)I
+	public final fun sourceWidth (I)I
+	public final fun sourceX (I)I
+	public final fun sourceY (I)I
+	public final fun width (I)D
+	public final fun zIndex (I)I
 }
 
 public final class io/github/ketraterm/render/cache/TerminalRenderPublisher {

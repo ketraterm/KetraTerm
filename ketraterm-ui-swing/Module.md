@@ -24,6 +24,12 @@ frame. Search, selection extraction, and discovery may take synchronized source
 reads. Background search and hyperlink workers publish results through binding
 and revision checks; they never access Swing state directly.
 
+`GridPainter` owns image composition and its raster cache. Installing a frame
+prepares rasters by immutable resource identity; paint reuses them. Rebinding,
+unbinding and disposal release the view's raster references, while session closure
+keeps the final published images available for retained presentation. See the
+[composition contract](docs/swing-repaint-optimization.md#image-composition).
+
 The EDT owns components, settings installation, painters, and UI controllers.
 Public methods document any asynchronous dispatch or snapshot exceptions.
 Binding applies view settings and geometry to the session. One controlling view

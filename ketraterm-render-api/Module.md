@@ -7,6 +7,8 @@ Its only production dependency is the Kotlin standard library.
 
 - `TerminalRenderFrameReader`, `TerminalRenderFrame`, and callback sinks define
   synchronous borrowed reads and primitive row/cluster/cursor copying.
+- `TerminalRenderImage` defines immutable pixels that may outlive a frame;
+  `TerminalRenderImageSink` delivers borrowed placement geometry and source crops.
 - `TerminalRenderAttrs`, `TerminalRenderExtraAttrs`, and
   `TerminalRenderCellFlags` define the public cell encoding, independently of
   core storage.

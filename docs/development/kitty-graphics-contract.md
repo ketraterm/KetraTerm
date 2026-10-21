@@ -1,7 +1,6 @@
 # Kitty graphics implementation contract
 
-This document defines the planned graphics implementation contract, not current
-runtime support. The [gap map](../terminal-feature-gap-map.md#optional-protocol-work)
+This document defines the graphics implementation contract, including later stages. The [gap map](../terminal-feature-gap-map.md#optional-protocol-work)
 owns delivery scope and support status. Sender provenance, exact input bytes and
 regeneration instructions live with the [fixture corpus](../../tools/kitty-graphics/README.md).
 
@@ -44,6 +43,10 @@ below deliberately accommodates that writer's 128 KiB payload chunks, despite
 the specification's older 4096-byte guidance. It does not raise OSC/DCS limits.
 
 Retain one incomplete upload per session, recording its originating screen.
+Capture the transfer generation when each APC begins and validate it at ST,
+before either retaining a nonfinal chunk or dispatching a command. Invalidation
+also covers a header or payload split across ingress reads, not just completed
+APCs; discard stale input through its terminator without a reply.
 No image or placement becomes visible before complete validation. A valid delete,
 cancellation, reset, EOF, screen switch, collection overflow or malformed graphics
 continuation discards staging. Unknown non-graphics APC strings drain without
@@ -145,7 +148,8 @@ Required cursor cases for the implementation tests, on a 10-column, 6-row grid:
 
 Composition has three bands: `z >= 0` above text; `-1073741824 <= z < 0` below
 text but above cell backgrounds; lower values below nondefault cell backgrounds.
-Equal z-order follows the reference image-ID ordering. Selection, cursor and
+Equal z-order follows internal image creation order, then placement creation
+order, as in the reference; reusable client IDs do not determine this order. Selection, cursor and
 host overlays remain renderer-owned. Reuse existing viewport geometry for
 padding, fractional scrolling and clipping.
 
@@ -153,10 +157,27 @@ Lowercase deletion removes selected placements while retaining reusable image
 data. Uppercase also releases selected data once no placements reference it;
 ID/number/range deletion must handle images with no placements. Deleting visible
 placements must not accidentally remove retained history placements.
+ID and ID-range selectors require a nonzero image identity; omitted/zero IDs
+and ranges containing zero cannot select anonymous images.
 
-Scroll graphics with text. Margin scrolling moves only fully contained
-placements and clips them when they cross the scrolling region. ED2 clears
-visible images; ordinary partial text erasure leaves ordinary graphics intact.
+Actual screen scrolling (`SU`/`SD`, or index/reverse index and linefeed at a
+scrolling boundary) moves graphics with text. Margin scrolling moves only fully
+contained placements and clips them when they cross the scrolling region, as
+required by the [protocol's terminal-action rules](https://github.com/kovidgoyal/kitty/blob/1c5a4829ae4dd472017f592b1424381d5ece7575/docs/graphics-protocol.rst#L1240).
+Full-screen downward scrolling retains ordinary placements below the viewport;
+later full-screen upward scrolling can reveal them again. Margin scrolling
+clips ordinary images at the region even when outgoing text enters history,
+and leaves existing ordinary history anchors in place. Preserve the surviving
+source crop and adjusted placement geometry across subsequent scrolling and
+cell-size changes.
+`IL`/`DL` edit text lines without moving, clipping or deleting ordinary image
+placements, even when the edited range covers them. This follows the reference
+[`screen_insert_lines` and `screen_delete_lines`](https://github.com/kovidgoyal/kitty/blob/1c5a4829ae4dd472017f592b1424381d5ece7575/kitty/screen.c#L3037).
+Their `screen_dirty_line_graphics` call invalidates only derived
+[Unicode-placeholder cell images](https://github.com/kovidgoyal/kitty/blob/1c5a4829ae4dd472017f592b1424381d5ece7575/kitty/graphics.c#L2492);
+future placeholder support must follow the edited text cells rather than apply
+the ordinary-placement rule. ED2 clears visible images; ordinary partial text
+erasure leaves ordinary graphics intact.
 KetraTerm's RIS policy clears both graphics namespaces and transfer state,
 including primary history images; the reference can preserve history images.
 DECSTR preserves retained images while discarding an incomplete transfer.
@@ -200,8 +221,10 @@ constant-time branch in existing structural operations.
 Swing prepares a bounded `BufferedImage` cache outside painting. Copy each new
 resource once into its raster, premultiply there if needed, and reuse it for
 every placement. Painting performs no decoding, image construction or per-placement
-wrapper allocation. Splitting background/text/image composition must preserve
-existing text, selection and cursor ordering.
+wrapper allocation. Draw contiguous geometry runs once, splitting at prompt
+dividers only where needed; do not redraw every image row. Opaque rasters may use
+an RGB view sharing their pixel storage. Splitting background/text/image
+composition must preserve existing text, selection and cursor ordering.
 
 Closing a session discards incomplete transfers but retains the final image state
 for frozen-terminal presentation. Rebinding/disposal drops the view's raster
@@ -344,6 +367,8 @@ Subsequent implementation tests must assert exact queries/quiet replies, command
 ordering, transfer recovery, invalid/oversized data, unsigned IDs, identity reuse,
 placement geometry, all deletion selectors, scroll/margin/resize behavior, screen
 lifecycle, pinned-frame stability, failed-copy cleanup and frozen presentation.
+Contrast `IL`/`DL` preserving ordinary placements with actual scrolling moving
+them, including bounded regions and oversized counts.
 Exercise the cursor cases above plus pending wrap, DECAWM off, horizontal margins,
 large spans and failure atomicity. For each EDT entry family above, hold decode
 behind an entered/release handshake, submit the UI request, and observe a later
@@ -354,6 +379,9 @@ failure. Use controlled schedulers or explicit handshakes, never elapsed-time as
 Replay the pinned senders through the complete pipeline and run real application
 smoke tests before declaring support. Benchmark text without graphics, unchanged
 image frames, dense Yazi placements, scrolling and replacement separately.
-Warmed frame processing must avoid new allocations; upload/decode allocation and
-retained heap have separate bounds. Review any new public API and ABI snapshots,
-then run the affected module, published-consumer and formatting checks.
+Warmed KetraTerm frame copying and renderer bookkeeping must avoid new allocations;
+upload/decode allocation and retained heap have separate bounds. Java2D's internal
+allocations are permitted and measured separately, including alpha scaling,
+clip changes and fractional translation. Passing frame-copy measurements alone
+does not establish allocation-free painting. Review any new public API and ABI
+snapshots, then run the affected module, published-consumer and formatting checks.

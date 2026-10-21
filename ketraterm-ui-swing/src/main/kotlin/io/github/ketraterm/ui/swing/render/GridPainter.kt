@@ -57,6 +57,11 @@ internal class GridPainter(
     private val textPainter = TerminalTextPainter(colorCache, decorationPainter, fontResolver = fontResolver, cellGeometry = cellGeometry)
     private val cursorPainter = TerminalCursorPainter(colorCache, textPainter)
     private val clipScratch = Rectangle()
+    private val graphicsPainter = GraphicsPainter()
+
+    fun prepareImages(cache: TerminalRenderCache) = graphicsPainter.prepare(cache.images)
+
+    fun clearImages() = graphicsPainter.clear()
 
     /**
      * Clears [width] x [height] with the terminal default background.
@@ -131,6 +136,28 @@ internal class GridPainter(
         g.clipRect(0, paddingTop, width, gridPaintHeight)
         g.translate(paddingLeft.toDouble(), paddingTop.toDouble() + contentOriginY)
         try {
+            if (cache.images.size != 0) {
+                graphicsPainter.paint(g, cache.images, metrics, geometry, 0, cache.columns, cache.rows)
+                for (backgroundRow in firstRow until rows) {
+                    val shift = (geometry?.rowTop(backgroundRow)
+                        ?: (backgroundRow * metrics.cellHeight)) - backgroundRow * metrics.cellHeight
+                    if (shift != 0) g.translate(0, shift)
+                    try {
+                        backgroundPainter.paintRow(
+                            g,
+                            cache,
+                            palette,
+                            metrics,
+                            backgroundRow,
+                            cellGeometry.row(cache, backgroundRow),
+                            skipDefault = true,
+                        )
+                    } finally {
+                        if (shift != 0) g.translate(0, -shift)
+                    }
+                }
+                graphicsPainter.paint(g, cache.images, metrics, geometry, 1, cache.columns, cache.rows)
+            }
             var row = firstRow
             while (row < rows) {
                 val rowOffset = (geometry?.rowTop(row) ?: (row * metrics.cellHeight)) - row * metrics.cellHeight
@@ -147,7 +174,7 @@ internal class GridPainter(
                         )
                     }
                     val bidi = cellGeometry.row(cache, row)
-                    backgroundPainter.paintRow(g, cache, palette, metrics, row, bidi)
+                    if (cache.images.size == 0) backgroundPainter.paintRow(g, cache, palette, metrics, row, bidi)
                     if (hyperlinkPresentations != null || settings.osc8HyperlinkPresentation != null) {
                         paintHyperlinkBackgrounds(
                             g,
@@ -201,6 +228,8 @@ internal class GridPainter(
                 }
                 row++
             }
+
+            graphicsPainter.paint(g, cache.images, metrics, geometry, 2, cache.columns, cache.rows)
 
             val cursorOffset =
                 (geometry?.rowTop(cache.cursorRow) ?: (cache.cursorRow * metrics.cellHeight)) - cache.cursorRow * metrics.cellHeight

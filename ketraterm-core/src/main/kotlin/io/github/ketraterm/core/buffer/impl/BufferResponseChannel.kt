@@ -256,6 +256,13 @@ internal class BufferResponseChannel(
         val known = width > 0 && height > 0
         val newWidth = if (known) width else 0
         val newHeight = if (known) height else 0
+        if (state.graphics.geometryChanged(
+                newWidth / state.dimensions.width,
+                newHeight / state.dimensions.height,
+            )
+        ) {
+            state.markVisualChanged()
+        }
         if (state.windowPixelWidth == newWidth && state.windowPixelHeight == newHeight) return false
         state.windowPixelWidth = newWidth
         state.windowPixelHeight = newHeight

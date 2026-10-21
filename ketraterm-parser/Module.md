@@ -17,7 +17,8 @@ and session synchronization belong outside this module.
 | `TerminalParser` | Validates input ranges, coordinates UTF-8/FSM routing, and publishes printable prefixes at call boundaries. |
 | `ByteClass` / `AnsiStateMachine` | Classify bytes and select an action plus next state. |
 | `ActionEngine` | Collects bounded sequence state, applies parser actions, and flushes text before structural commands. |
-| ESC/CSI, SGR, OSC, and DCS dispatchers | Translate completed sequences into semantic sink calls. |
+| ESC/CSI, SGR, OSC and DCS dispatchers | Translate completed sequences into semantic sink calls. |
+| `GraphicsParser` / `GraphicsHeader` | Collect APC controls, decode bounded Base64 chunks, and deliver complete uploads or transfer failures. |
 | `PrintableProcessor` / `GraphemeAssembler` | Apply charset mapping, retain grapheme text, and publish initial writes or complete-prefix updates. |
 | `ParserState` | Stores reusable parameters, payloads, graphemes, and parser-owned charset context. |
 
@@ -27,6 +28,11 @@ payloads. Invalid continuation handling can replay the current byte through the
 normal route once, preserving a following control sequence.
 
 ## Ownership and Resource Contracts
+
+Graphics APC has its own bounded header and incremental Base64 collector. It
+assembles one incomplete upload and borrows the completed controls/bytes to the
+sink. Reset, EOF, cancellation and the sink's reset/screen epoch invalidate staging.
+It neither decodes image codecs nor retains display resources.
 
 The parser never calculates cell width, clamps coordinates, mutates a grid
 directly, or chooses response/clipboard permissions. These decisions remain with
