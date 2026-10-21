@@ -132,6 +132,14 @@ placement can depend on input chunk boundaries. See the
 <td>OSC 4/10/11/12 palette and foreground/background/cursor changes and queries; OSC 104 and 110/111/112 restore configured theme colors.</td>
 </tr>
 <tr>
+<td>Kitty colors</td>
+<td>OSC 21 ordered set/reset/query batches for indexed, foreground/background, cursor, and selection colors; dynamic cursor/selection colors. <a href="../reference/protocol.html#kitty-colors">Protocol details</a>.</td>
+</tr>
+<tr>
+<td>Color stack</td>
+<td>Kitty OSC 30001/30101 save and restore effective colors and dynamic behavior in a bounded stack. <a href="../reference/protocol.html#color-stack">Protocol details</a>.</td>
+</tr>
+<tr>
 <td>Hyperlinks</td>
 <td>OSC 8 links with bounded retention.</td>
 </tr>
@@ -252,7 +260,7 @@ checks apply to all output in a session, including remote programs.</p>
 <p>See the <a href="../reference/protocol.html">protocol reference</a> for collection
 limits and query allowlists, and the <a href="../terminal-feature-gap-map.html">gap map</a>
 for unsupported protocols.</p>
-</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/e58b7d04f64054bb20c483f74b19b734da677b62/docs/features/terminal.md">View source on GitHub ↗</a></div></div></main></div>
+</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/dc685a5c7cd7e4da1bf2381f8891dc9f6777b13b/docs/features/terminal.md">View source on GitHub ↗</a></div></div></main></div>
   <footer>
     <a class="brand" href="../../../../index.html"><img class="brand-mark" src="../../../../assets/logo.svg" alt="" width="34" height="34">KetraTerm Library</a>
     <p>Open source · Apache 2.0</p>

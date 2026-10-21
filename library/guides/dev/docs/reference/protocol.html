@@ -22,7 +22,7 @@
     <details class="site-navigation" open><summary>Menu</summary><nav aria-label="Library navigation"><a aria-current="true"  href="../README.html">Guides</a><a   href="../../modules.html">Modules</a><a   href="../../../../versions.html">API & versions</a><a   href="../../CHANGELOG.html">Changelog</a><a  class="nav-primary" href="../../README.html">Get started</a></nav></details>
     <button class="theme-toggle" type="button" aria-label="Switch to light theme">Light</button>
   </header>
-  <div class="docs-shell"><aside class="sidebar" aria-label="Documentation navigation"><details class="nav-disclosure" open><summary class="mobile-nav-toggle">Browse library guides</summary><div><label class="search-label">Find a library guide<input type="search" data-doc-search placeholder="Search library docs" autocomplete="off" data-index="../../search.json"></label><div class="search-results" aria-live="polite"></div><details open><summary>Start here</summary><a  href="../README.html">Documentation</a><a  href="../../README.html">Installation</a><a  href="../../modules.html">Module guides</a><a  href="../../CHANGELOG.html">Changelog</a></details><details open><summary>Capabilities</summary><a  href="../terminal-feature-map.html">Feature map</a><a  href="../features/terminal.html">Terminal</a><a  href="../features/shells.html">Shell integration</a><a  href="../features/desktop.html">Swing view & hosts</a><a  href="../features/completion.html">Completion</a><a  href="../features/embedding.html">Embedding</a><a  href="../terminal-feature-gap-map.html">Known limits</a></details><details open><summary>Embedding guides</summary><a  href="../library/configuration.html">Configuration</a><a  href="../library/compatibility.html">Compatibility</a><a  href="../library/render-ownership.html">Render ownership</a></details><details open><summary>Reference</summary><a aria-current="page" href="protocol.html">Protocols</a><a  href="notifications.html">Notifications</a><a  href="storage.html">Storage & privacy</a></details><details open><summary>Development</summary><a  href="../../ARCHITECTURE.html">Architecture</a><a  href="../../CONTRIBUTING.html">Contributing</a><a  href="../development/conformance-testing.html">Conformance testing</a></details></div></details></aside><main id="main" tabindex="-1" class="article article-with-outline"><div class="article-top"><nav class="breadcrumb" aria-label="Breadcrumb"><ol><li><a href="../../../../index.html">Library</a></li><li><span>Reference</span></li><li><span aria-current="page">Protocol limits and replies</span></li></ol></nav><div class="doc-version"><span>Development</span><a href="../../../../versions.html">All versions</a></div></div><details class="page-outline" open><summary>On this page</summary><nav aria-label="On this page"><a class="depth-2" href="#csi-parameters">CSI parameters</a><a class="depth-2" href="#osc-encoding">OSC encoding</a><a class="depth-2" href="#pointer-shapes">Pointer shapes</a><a class="depth-2" href="#payload-limits">Payload limits</a><a class="depth-2" href="#query-allowlists">Query allowlists</a><a class="depth-2" href="#color-resets">Color resets</a><a class="depth-2" href="#change-reports">Change reports</a><a class="depth-2" href="#mode-status-reports">Mode status reports</a><a class="depth-2" href="#streaming-grapheme-placement">Streaming grapheme placement</a></nav></details><div class="article-content"><div class="prose"><h1 id="protocol-limits-and-replies">Protocol limits and replies</h1>
+  <div class="docs-shell"><aside class="sidebar" aria-label="Documentation navigation"><details class="nav-disclosure" open><summary class="mobile-nav-toggle">Browse library guides</summary><div><label class="search-label">Find a library guide<input type="search" data-doc-search placeholder="Search library docs" autocomplete="off" data-index="../../search.json"></label><div class="search-results" aria-live="polite"></div><details open><summary>Start here</summary><a  href="../README.html">Documentation</a><a  href="../../README.html">Installation</a><a  href="../../modules.html">Module guides</a><a  href="../../CHANGELOG.html">Changelog</a></details><details open><summary>Capabilities</summary><a  href="../terminal-feature-map.html">Feature map</a><a  href="../features/terminal.html">Terminal</a><a  href="../features/shells.html">Shell integration</a><a  href="../features/desktop.html">Swing view & hosts</a><a  href="../features/completion.html">Completion</a><a  href="../features/embedding.html">Embedding</a><a  href="../terminal-feature-gap-map.html">Known limits</a></details><details open><summary>Embedding guides</summary><a  href="../library/configuration.html">Configuration</a><a  href="../library/compatibility.html">Compatibility</a><a  href="../library/render-ownership.html">Render ownership</a></details><details open><summary>Reference</summary><a aria-current="page" href="protocol.html">Protocols</a><a  href="notifications.html">Notifications</a><a  href="storage.html">Storage & privacy</a></details><details open><summary>Development</summary><a  href="../../ARCHITECTURE.html">Architecture</a><a  href="../../CONTRIBUTING.html">Contributing</a><a  href="../development/conformance-testing.html">Conformance testing</a></details></div></details></aside><main id="main" tabindex="-1" class="article article-with-outline"><div class="article-top"><nav class="breadcrumb" aria-label="Breadcrumb"><ol><li><a href="../../../../index.html">Library</a></li><li><span>Reference</span></li><li><span aria-current="page">Protocol limits and replies</span></li></ol></nav><div class="doc-version"><span>Development</span><a href="../../../../versions.html">All versions</a></div></div><details class="page-outline" open><summary>On this page</summary><nav aria-label="On this page"><a class="depth-2" href="#csi-parameters">CSI parameters</a><a class="depth-2" href="#osc-encoding">OSC encoding</a><a class="depth-2" href="#pointer-shapes">Pointer shapes</a><a class="depth-2" href="#payload-limits">Payload limits</a><a class="depth-2" href="#query-allowlists">Query allowlists</a><a class="depth-2" href="#kitty-colors">Kitty colors</a><a class="depth-2" href="#color-stack">Color stack</a><a class="depth-2" href="#color-resets">Color resets</a><a class="depth-2" href="#change-reports">Change reports</a><a class="depth-2" href="#mode-status-reports">Mode status reports</a><a class="depth-2" href="#streaming-grapheme-placement">Streaming grapheme placement</a></nav></details><div class="article-content"><div class="prose"><h1 id="protocol-limits-and-replies">Protocol limits and replies</h1>
 <p>This reference records boundary behavior for parser and host implementers.
 For a capability overview, see <a href="../features/terminal.html">terminal features</a>.</p>
 <h2 id="csi-parameters">CSI parameters</h2>
@@ -46,12 +46,16 @@ state. Ordinary C0 handling continues during rejection.</p>
 <td>Replacement decoding; repaired text still passes host policy and length checks.</td>
 </tr>
 <tr>
-<td>Directory (7), palette (4/10/11/12), shell markers (133)</td>
+<td>Directory (7), palette (4/10/11/12/21), shell markers (133)</td>
 <td>Strict UTF-8; reject malformed commands without updating state.</td>
 </tr>
 <tr>
 <td>Color resets (104/110/111/112)</td>
 <td>ASCII decimal indices or an empty payload; non-ASCII input rejects the complete reset.</td>
+</tr>
+<tr>
+<td>Color stack (30001/30101)</td>
+<td>Bare command or an empty semicolon; nonempty arguments reject the command.</td>
 </tr>
 <tr>
 <td>Hyperlinks (8)</td>
@@ -97,7 +101,7 @@ introducers, terminators, and ignored control bytes.</p>
 </tr>
 </thead>
 <tbody><tr>
-<td>Titles, directory, hyperlinks, notifications, palette 4/104, shell markers</td>
+<td>Titles, directory, hyperlinks, notifications, palette 4/21/104, shell markers</td>
 <td>4,096 bytes.</td>
 </tr>
 <tr>
@@ -107,6 +111,10 @@ introducers, terminators, and ignored control bytes.</p>
 <tr>
 <td>Pointer shape 22</td>
 <td>32 bytes.</td>
+</tr>
+<tr>
+<td>Color stack 30001/30101</td>
+<td>6 bytes, including the command number and optional empty semicolon.</td>
 </tr>
 <tr>
 <td>DECRQSS</td>
@@ -149,6 +157,10 @@ Permissions and decoded-size limits are checked again before execution.</p>
 <td>Terminal name (<code>TN</code>/<code>name</code>), color count (<code>Co</code>/<code>colors</code>), and true-color support (<code>RGB</code>/<code>Tc</code>).</td>
 </tr>
 <tr>
+<td>Kitty colors (OSC 21)</td>
+<td>Indices 0–255, <code>foreground</code>, <code>background</code>, <code>cursor</code>, <code>cursor_text</code>, <code>selection_foreground</code>, <code>selection_background</code>. Unknown keys receive <code>unknown=</code> plus unpadded Base64 of the original key. Palette permission gates the command; terminal-response permission additionally gates every reply.</td>
+</tr>
+<tr>
 <td>Device identity</td>
 <td><code>TERM=xterm-256color</code>, <code>COLORTERM=truecolor</code>, VT420-class primary DA, and secondary DA. No DA3 unique identity.</td>
 </tr>
@@ -172,6 +184,34 @@ Permissions and decoded-size limits are checked again before execution.</p>
 <p>Denying terminal responses suppresses success and failure replies alike.
 Unsupported queries with defined failure responses use those responses rather
 than echoing request text.</p>
+<h2 id="kitty-colors">Kitty colors</h2>
+<p><code>OSC 21;key=value;… ST</code> processes fields in order and combines query results
+into one reply. <code>key=?</code> queries, bare <code>key</code> restores the current host theme, and
+<code>key=</code> requests dynamic behavior. Keys are exact and case-sensitive; decimal
+indices accept leading zeros. Empty keys and invalid color values are ignored.
+Unknown keys receive encoded replies for set, reset, and query operations.</p>
+<p>Colors accept Kitty&#39;s named colors, <code>#RGB</code>/6/9/12-digit forms, scaled <code>rgb:</code>
+channels, and clipped <code>rgbi:</code> channels. The short <code>#RGB</code> form uses the most
+significant bits (<code>#3a7</code> becomes <code>#30a070</code>). Optional <code>@alpha</code> is validated but
+has no effect on these opaque color roles. This syntax is independent of the
+older OSC 4/10/11/12 parser.</p>
+<p>Dynamic cursor colors resolve the underlying cell&#39;s foreground/background;
+dynamic selection colors reverse those cell colors. Fixed selection overrides
+use the requested colors; resetting restores host selection presentation.
+Foreground, background, and indexed colors do not accept dynamic requests.
+Queries return <code>rgb:rrrr/gggg/bbbb</code>, or an empty value for dynamic colors and
+host-controlled selection styling without a fixed color override.
+See the <a href="https://sw.kovidgoyal.net/kitty/color-stack/">Kitty specification</a>.</p>
+<h2 id="color-stack">Color stack</h2>
+<p>Kitty <code>OSC 30001 ST</code> pushes effective indexed and named colors, including
+dynamic cursor/selection behavior; <code>OSC 30101 ST</code> restores and removes the last
+entry. An empty semicolon is also accepted. Both commands require palette
+permission and emit no replies or color-scheme notifications.</p>
+<p>The terminal-wide stack holds ten entries, dropping the oldest on overflow;
+an empty pop has no effect. Hard and soft reset clear it. Screen switches,
+resize, and host theme changes preserve snapshots. Pop restores saved effective
+color values while retaining the current host light/dark and bold-as-bright
+settings; subsequent color resets still use the latest host theme.</p>
 <h2 id="color-resets">Color resets</h2>
 <p>OSC 104 restores the specified palette entries to the current host theme&#39;s
 configured values. Bare <code>OSC 104 ST</code> or <code>OSC 104; ST</code> restores all 256 entries;
@@ -264,7 +304,7 @@ A rejected initial write has no continuation target.</p>
 occupied cells, and on tiny grids. Retained text, cell integrity, and following
 text must still be preserved. See <a href="../../ketraterm-parser/docs/grapheme-segmentation.html#bounded-retention">grapheme retention</a>
 and <a href="../development/conformance-testing.html#streaming-placement">verification</a>.</p>
-</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/e58b7d04f64054bb20c483f74b19b734da677b62/docs/reference/protocol.md">View source on GitHub ↗</a></div></div></main></div>
+</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/dc685a5c7cd7e4da1bf2381f8891dc9f6777b13b/docs/reference/protocol.md">View source on GitHub ↗</a></div></div></main></div>
   <footer>
     <a class="brand" href="../../../../index.html"><img class="brand-mark" src="../../../../assets/logo.svg" alt="" width="34" height="34">KetraTerm Library</a>
     <p>Open source · Apache 2.0</p>

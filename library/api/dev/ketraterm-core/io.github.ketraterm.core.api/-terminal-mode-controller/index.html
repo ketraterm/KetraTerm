@@ -109,7 +109,22 @@
     <div class="tabs-section-body">
       <div data-togglable="FUNCTION">
         <h2 class="tableheader">Functions</h2>
-        <div class="table"><a data-name="-86227552%2FFunctions%2F-1402815689" anchor-label="enterAltBuffer" id="-86227552%2FFunctions%2F-1402815689" data-filterable-set=":ketraterm-core/main"></a>
+        <div class="table"><a data-name="-1838267789%2FFunctions%2F-1402815689" anchor-label="applyColorRequest" id="-1838267789%2FFunctions%2F-1402815689" data-filterable-set=":ketraterm-core/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-core/main" data-filterable-set=":ketraterm-core/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="apply-color-request.html"><span>apply</span><wbr><span>Color</span><wbr><span><span>Request</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-1838267789%2FFunctions%2F-1402815689"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-core/main"><div class="symbol monospace"><span class="token keyword">abstract </span><span class="token keyword">fun </span><a href="apply-color-request.html"><span class="token function">applyColorRequest</span></a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">request<span class="token operator">: </span><a href="../../../ketraterm-protocol/io.github.ketraterm.protocol/-terminal-color-request/index.html">TerminalColorRequest</a><span class="token punctuation">, </span></span><span class="parameter ">allowResponses<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-boolean/index.html">Boolean</a></span></span><span class="token punctuation">)</span></div><div class="brief "><p class="paragraph">Applies borrowed OSC 21 color operations in order, without retaining <a href="apply-color-request.html">request</a>. Queries observe preceding operations and share one response in request order. Resets restore the latest theme; dynamic selection and cursor roles retain their dynamic behavior until changed or reset. Application changes do not emit color-scheme notifications.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-86227552%2FFunctions%2F-1402815689" anchor-label="enterAltBuffer" id="-86227552%2FFunctions%2F-1402815689" data-filterable-set=":ketraterm-core/main"></a>
           <div class="table-row table-row_content" data-filterable-current=":ketraterm-core/main" data-filterable-set=":ketraterm-core/main">
             <div class="main-subrow keyValue ">
               <div class=""><span class="inline-flex">
@@ -169,6 +184,21 @@
               </div>
             </div>
           </div>
+<a data-name="-1747203288%2FFunctions%2F-1402815689" anchor-label="popColors" id="-1747203288%2FFunctions%2F-1402815689" data-filterable-set=":ketraterm-core/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-core/main" data-filterable-set=":ketraterm-core/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="pop-colors.html"><span>pop</span><wbr><span><span>Colors</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-1747203288%2FFunctions%2F-1402815689"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-core/main"><div class="symbol monospace"><span class="token keyword">abstract </span><span class="token keyword">fun </span><a href="pop-colors.html"><span class="token function">popColors</span></a><span class="token punctuation">(</span><span class="token punctuation">)</span></div><div class="brief "><p class="paragraph">Restores and removes the most recently saved colors; an empty stack has no effect. The latest host theme remains the source for color resets. Host light/dark preference and bold-as-bright behavior are preserved. An effective change invalidates visible rows without emitting a color-scheme notification; unchanged colors preserve palette identity and render generations.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
 <a data-name="-947824431%2FFunctions%2F-1402815689" anchor-label="popKittyKeyboardFlags" id="-947824431%2FFunctions%2F-1402815689" data-filterable-set=":ketraterm-core/main"></a>
           <div class="table-row table-row_content" data-filterable-current=":ketraterm-core/main" data-filterable-set=":ketraterm-core/main">
             <div class="main-subrow keyValue ">
@@ -180,6 +210,21 @@
               <div>
                 <div class="title">
                   <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-core/main"><div class="symbol monospace"><span class="token keyword">abstract </span><span class="token keyword">fun </span><a href="pop-kitty-keyboard-flags.html"><span class="token function">popKittyKeyboardFlags</span></a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">count<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a></span></span><span class="token punctuation">)</span></div><div class="brief "><p class="paragraph">Pops up to <a href="pop-kitty-keyboard-flags.html">count</a> entries from the active screen's Kitty keyboard stack. A positive count that empties the stack (or finds it empty) resets all flags to zero. Otherwise, restores the last popped flags. Work is independent of <a href="pop-kitty-keyboard-flags.html">count</a>; nonpositive counts leave flags and stack unchanged.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="981961703%2FFunctions%2F-1402815689" anchor-label="pushColors" id="981961703%2FFunctions%2F-1402815689" data-filterable-set=":ketraterm-core/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-core/main" data-filterable-set=":ketraterm-core/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="push-colors.html"><span>push</span><wbr><span><span>Colors</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="981961703%2FFunctions%2F-1402815689"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-core/main"><div class="symbol monospace"><span class="token keyword">abstract </span><span class="token keyword">fun </span><a href="push-colors.html"><span class="token function">pushColors</span></a><span class="token punctuation">(</span><span class="token punctuation">)</span></div><div class="brief "><p class="paragraph">Saves effective indexed and named colors, including dynamic presentation, on a terminal-wide stack of ten entries. A full stack discards its oldest entry. Screen switches, resize, and theme changes preserve saved colors; hard and soft terminal resets clear the stack. Saving does not repaint.</p></div></div></div>
                 </div>
               </div>
             </div>
