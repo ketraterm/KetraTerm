@@ -89,6 +89,7 @@ public final class io/github/ketraterm/protocol/DecPrivateMode {
 	public static final field CURSOR_VISIBLE I
 	public static final field DECCOLM I
 	public static final field FOCUS_REPORTING I
+	public static final field GRAPHEME_CLUSTER I
 	public static final field INSTANCE Lio/github/ketraterm/protocol/DecPrivateMode;
 	public static final field IN_BAND_RESIZE_REPORTING I
 	public static final field LEFT_RIGHT_MARGIN I

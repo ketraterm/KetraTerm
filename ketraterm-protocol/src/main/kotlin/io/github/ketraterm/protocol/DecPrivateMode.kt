@@ -111,6 +111,9 @@ public object DecPrivateMode {
     /** Synchronized output mode, DECSET/DECRST `?2026`. */
     public const val SYNCHRONIZED_OUTPUT: Int = 2026
 
+    /** Grapheme cluster processing mode, queried with DECRQM `?2027`. */
+    public const val GRAPHEME_CLUSTER: Int = 2027
+
     /** Host color-scheme change reporting, DECSET/DECRST `?2031`. */
     public const val COLOR_SCHEME_REPORTING: Int = 2031
 

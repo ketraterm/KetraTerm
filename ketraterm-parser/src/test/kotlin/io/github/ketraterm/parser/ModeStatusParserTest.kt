@@ -27,6 +27,8 @@ class ModeStatusParserTest {
             mapOf(
                 "\u001B[4\$p" to "requestModeStatus:4:false",
                 "\u001B[?2004\$p" to "requestModeStatus:2004:true",
+                "\u001B[?2027\$p" to "requestModeStatus:2027:true",
+                "\u001B[2027\$p" to "requestModeStatus:2027:false",
                 "\u001B[\$p" to "requestModeStatus:0:false",
                 "\u001B[?\$p" to "requestModeStatus:0:true",
                 "\u001B[?0\$p" to "requestModeStatus:0:true",

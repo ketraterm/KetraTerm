@@ -83,6 +83,7 @@ every encoding is enabled by the encoder's policy.
 | `BELL_IS_URGENT` | `1042` | Request host attention on BEL. |
 | `POP_ON_BELL` | `1043` | Request that the host raise its window on BEL. |
 | `SYNCHRONIZED_OUTPUT` | `2026` | Hold render publication while a group of updates is applied. |
+| `GRAPHEME_CLUSTER` | `2027` | Process extended grapheme clusters as terminal cells. |
 | `COLOR_SCHEME_REPORTING` | `2031` | Subscribe to host color-scheme reports (`CSI ?997;Ps n`). |
 | `IN_BAND_RESIZE_REPORTING` | `2048` | Subscribe to text-area size reports (`CSI 48;rows;columns;heightPixels;widthPixels t`). |
 

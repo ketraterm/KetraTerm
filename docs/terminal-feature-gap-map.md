@@ -63,7 +63,6 @@ and the [changelog](../CHANGELOG.md). Entries here are not release commitments.
 | `TODO(parser/core/policy)` | xterm color-stack commands XTPUSHCOLORS, XTPOPCOLORS, and XTREPORTCOLORS. Kitty OSC 30001/30101 save/restore already works. |
 | `TODO(parser/session/ui/policy)` | Additional OSC 22 shapes and Kitty stack/query extensions beyond the [implemented subset](features/terminal.md#appearance). |
 | `TODO(parser/session/ui/host/profile/policy)` | ConEmu progress reports (OSC 9;4), retained progress state, and product presentation with bounded expiry. These subcommands are currently excluded from notification handling; OSC 9/777 notifications already work. |
-| `TODO(parser/core/policy)` | Grapheme-width mode 2027 negotiation and status reporting, with an explicit policy for any legacy-width alternative. Unicode 17 segmentation and grapheme-aware width already work without this mode. |
 | `TODO(core/policy)` | Broader XTGETTCAP replies for concrete TUI capability discovery, backed by an authoritative capability table and explicit reply allowlist. Current replies cover terminal name, color count, and truecolor aliases only. |
 | `TODO(parser/core/policy)` | XTVERSION terminal-version queries with a bounded, policy-controlled identity reply. Primary/secondary device attributes already work; version queries are a separate protocol. |
 | `TODO(parser/core/policy)` | xterm XTCHECKSUM extensions beyond the implemented base VT420 checksum. |
@@ -74,6 +73,10 @@ and the [changelog](../CHANGELOG.md). Entries here are not release commitments.
 
 - Terminal grids require at least two columns so wide occupants remain intact.
   Creation and resize reject smaller widths; pixel-based viewport layout clamps to two columns.
+- Grapheme processing is always enabled (mode 2027 reports permanently set).
+  There is no application-selectable legacy per-codepoint width mode. The
+  [width policy](../ketraterm-core/docs/terminal-core-contract.md#unicode-scalar-and-width-policy)
+  permits VS15 narrowing, unlike the original Unicode Core draft.
 - Streaming grapheme updates do not roll back published wraps, scrolling,
   overwrites, or insert shifts. Placement can depend on chunk boundaries; see the
   [placement contract](reference/protocol.md#streaming-grapheme-placement)

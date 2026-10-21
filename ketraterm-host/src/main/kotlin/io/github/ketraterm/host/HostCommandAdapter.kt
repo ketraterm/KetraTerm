@@ -597,6 +597,8 @@ public class HostCommandAdapter
                 }
                 DecPrivateMode.BRACKETED_PASTE -> terminal.setBracketedPasteEnabled(enable)
                 DecPrivateMode.SYNCHRONIZED_OUTPUT -> terminal.setSynchronizedOutput(enable)
+                // Grapheme processing is permanent; neither DECSET nor DECRST selects legacy widths.
+                DecPrivateMode.GRAPHEME_CLUSTER -> Unit
                 DecPrivateMode.COLOR_SCHEME_REPORTING -> terminal.setColorSchemeReportingEnabled(enable)
                 DecPrivateMode.IN_BAND_RESIZE_REPORTING -> terminal.setInBandResizeReportingEnabled(enable)
                 DecPrivateMode.BELL_IS_URGENT -> terminal.setBellIsUrgent(enable)

@@ -85,6 +85,7 @@ Permissions and decoded-size limits are checked again before execution.
 | Kitty colors (OSC 21) | Indices 0–255, `foreground`, `background`, `cursor`, `cursor_text`, `selection_foreground`, `selection_background`. Unknown keys receive `unknown=` plus unpadded Base64 of the original key. Palette permission gates the command; terminal-response permission additionally gates every reply. |
 | Device identity | `TERM=xterm-256color`, `COLORTERM=truecolor`, VT420-class primary DA, and secondary DA. No DA3 unique identity. |
 | Cursor position | One-based coordinates, relative to active origin/margins when origin mode is enabled. |
+| Mode status | ANSI/DEC DECRQM replies for the [listed modes](#mode-status-reports), including permanently enabled grapheme mode 2027. Unknown modes report `0`. |
 | Color scheme | `CSI ?996n` reports dark/light host preference; mode 2031 permits automatic reports for host theme changes. Application color overrides and resets do not change that preference or emit change reports. |
 | In-band resize | Mode 2048 permits `CSI 48;rows;columns;heightPixels;widthPixels t` reports on enable and after text-area size changes. |
 | Rectangle checksum | Active page only, base VT420 16-bit algorithm; no xterm XTCHECKSUM extensions. |
@@ -168,13 +169,14 @@ zero when unavailable. See the
 
 ## Mode status reports
 
-DECRQM returns set (`1`), reset (`2`), or unsupported (`0`). ANSI and DEC namespaces
-are independent; no modes claim permanent-set/reset status.
+DECRQM returns set (`1`), reset (`2`), permanently set (`3`), or unsupported (`0`).
+ANSI and DEC namespaces are independent.
 
 | Namespace | Queryable modes |
 | --- | --- |
 | ANSI | 4, 20. |
 | DEC core | 1, 3, 5, 6, 7, 12, 25, 45, 66, 69, 1004, 1007, 1045, 2004, 2026. |
+| DEC grapheme processing | 2027 always reports permanently set (`3`). |
 | DEC change reports | 2031, 2048. |
 | DEC mouse tracking | 9, 1000, 1002, 1003. |
 | DEC mouse encoding | 1005, 1006, 1015, 1016. |
@@ -187,6 +189,15 @@ is an action and reports unsupported. Standalone declares supported bell actions
 IntelliJ does not. Requests accept one mode parameter; malformed, overflowing,
 cancelled, or incomplete requests receive no reply. Queries do not mutate state.
 See the [mode reference](../../ketraterm-protocol/docs/protocol-modes.md) for names.
+
+`CSI ?2027$p` replies `CSI ?2027;3$y`: grapheme processing is always enabled.
+DECSET/DECRST 2027 leave that policy unchanged, including across RIS, DECSTR,
+screen switches, and resize. ANSI mode 2027 is unsupported. Replies use the
+normal terminal-response permission; no window permission is required.
+This advertises grapheme processing, not complete conformance to the original
+[Unicode Core draft](https://github.com/contour-terminal/terminal-unicode-core/blob/master/spec/terminal-unicode-core.tex):
+KetraTerm retains its documented [VS15/VS16 width policy](../../ketraterm-core/docs/terminal-core-contract.md#unicode-scalar-and-width-policy)
+and [streaming placement](#streaming-grapheme-placement).
 
 ## Streaming grapheme placement
 

@@ -23,6 +23,28 @@ import org.junit.jupiter.api.Test
 
 class TerminalModeStatusTest {
     @Test
+    fun graphemeModeIsPermanentlySetAcrossScreenResizeAndResetLifecycles() {
+        val buffer = TerminalBuffers.create(10, 3)
+
+        fun assertStatus() {
+            buffer.requestModeStatus(2027, true)
+            buffer.requestModeStatus(2027, false)
+            assertEquals("\u001B[?2027;3\$y\u001B[2027;0\$y", drain(buffer))
+        }
+        assertStatus()
+        buffer.enterAltBuffer()
+        assertStatus()
+        buffer.resize(12, 4)
+        assertStatus()
+        buffer.exitAltBuffer()
+        assertStatus()
+        buffer.softReset()
+        assertStatus()
+        buffer.reset()
+        assertStatus()
+    }
+
+    @Test
     fun unsupportedNamespacesAndHostCapabilitiesReturnZero() {
         val buffer = TerminalBuffers.create(10, 3)
         for (mode in listOf(0, 2, 4, 1048, Int.MAX_VALUE)) {

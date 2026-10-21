@@ -96,6 +96,7 @@ internal class BufferResponseChannel(
             DecPrivateMode.FOCUS_REPORTING -> flagStatus(bits, TerminalModeBits.FOCUS_REPORTING)
             DecPrivateMode.BRACKETED_PASTE -> flagStatus(bits, TerminalModeBits.BRACKETED_PASTE)
             DecPrivateMode.SYNCHRONIZED_OUTPUT -> flagStatus(bits, TerminalModeBits.SYNCHRONIZED_OUTPUT)
+            DecPrivateMode.GRAPHEME_CLUSTER -> TerminalModeStatus.PERMANENTLY_SET
             DecPrivateMode.COLOR_SCHEME_REPORTING -> booleanStatus(state.modes.isColorSchemeReportingEnabled)
             DecPrivateMode.IN_BAND_RESIZE_REPORTING -> booleanStatus(state.modes.isInBandResizeReportingEnabled)
             DecPrivateMode.DECCOLM -> flagStatus(bits, TerminalModeBits.COLUMN_MODE_132)

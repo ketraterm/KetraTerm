@@ -19,7 +19,7 @@ headless and Swing hosts. Host actions and replies remain subject to session pol
 | Resets | Hard reset, soft reset, screen/history erase, and DEC alignment test. |
 | Synchronized output | Mode 2026 delays frame publication until completion or timeout. |
 | Character sets | ASCII and DEC Special Graphics, G0–G3 designation, locking and single shifts. |
-| Unicode | UTF-8 decoding, Unicode 17 grapheme segmentation, combining marks, wide characters, and emoji sequences. |
+| Unicode | UTF-8 decoding, Unicode 17 grapheme segmentation, combining marks, wide characters, and emoji sequences. Mode 2027 reports grapheme processing as permanently enabled; see [mode status](../reference/protocol.md#mode-status-reports). |
 | Stream handling | Incremental decoding across byte chunks, malformed UTF-8 recovery, and bounded CSI/OSC/DCS collection with cancellation and overflow recovery. |
 | Width policy | Pinned Unicode width tables, configurable ambiguous width, and base-specific VS15/VS16 cell allocation; unsupported presentation bases retain their ordinary width. See the [core contract](../../ketraterm-core/docs/terminal-core-contract.md#unicode-scalar-and-width-policy). |
 
