@@ -51,7 +51,7 @@ import kotlin.time.Duration.Companion.milliseconds
 class TerminalSessionTest {
     @ParameterizedTest
     @ValueSource(strings = ["start", "close"])
-    fun `concurrent startup and lifecycle operations remain serialized`(operation: String) =
+    fun `startup attempts serialize while close can interrupt connector startup`(operation: String) =
         runTest {
             val recorded = MockConnector()
             val entered = CountDownLatch(1)
@@ -71,6 +71,7 @@ class TerminalSessionTest {
                     connector,
                     workerDispatcher = dispatcher,
                     ioDispatcher = dispatcher,
+                    cleanupDispatcher = dispatcher,
                 ).use { session ->
                     SessionTestThread("session-start") { session.start(10, 3) }.use { starter ->
                         try {
@@ -87,9 +88,14 @@ class TerminalSessionTest {
                                 }
                             }.use { contender ->
                                 try {
-                                    contender.awaitBlockedBy(starter)
-                                    assertEquals(0, recorded.closeCount)
-                                    if (operation == "close") assertTrue(session.isClosed)
+                                    if (operation == "start") {
+                                        contender.awaitBlockedBy(starter)
+                                        assertEquals(0, recorded.closeCount)
+                                    } else {
+                                        contender.awaitCompletion()
+                                        assertTrue(session.isClosed)
+                                        assertEquals(1, recorded.closeCount)
+                                    }
                                 } finally {
                                     release.countDown()
                                 }
@@ -141,6 +147,7 @@ class TerminalSessionTest {
                     connector,
                     workerDispatcher = dispatcher,
                     ioDispatcher = dispatcher,
+                    cleanupDispatcher = dispatcher,
                 )
             session.use {
                 backgroundScope.launch(dispatcher) {
@@ -200,6 +207,7 @@ class TerminalSessionTest {
                     connector,
                     workerDispatcher = dispatcher,
                     ioDispatcher = dispatcher,
+                    cleanupDispatcher = dispatcher,
                 )
             session.use {
                 if (stage == "running") {
@@ -249,6 +257,7 @@ class TerminalSessionTest {
                     connector,
                     workerDispatcher = dispatcher,
                     ioDispatcher = dispatcher,
+                    cleanupDispatcher = dispatcher,
                 )
             session.use {
                 backgroundScope.launch(dispatcher) {
@@ -296,6 +305,7 @@ class TerminalSessionTest {
                     connector = connector,
                     workerDispatcher = dispatcher,
                     ioDispatcher = dispatcher,
+                    cleanupDispatcher = dispatcher,
                 ).use { session ->
                     backgroundScope.launch(dispatcher) {
                         session.state.first { it === TerminalSessionState.Running }
@@ -357,6 +367,7 @@ class TerminalSessionTest {
                     connector = connector,
                     workerDispatcher = StandardTestDispatcher(testScheduler),
                     ioDispatcher = StandardTestDispatcher(testScheduler),
+                    cleanupDispatcher = StandardTestDispatcher(testScheduler),
                 )
             if (stage == "running") {
                 backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) {
@@ -456,6 +467,7 @@ class TerminalSessionTest {
                     connector = connector,
                     workerDispatcher = StandardTestDispatcher(testScheduler),
                     ioDispatcher = StandardTestDispatcher(testScheduler),
+                    cleanupDispatcher = StandardTestDispatcher(testScheduler),
                 )
             val leased = CountDownLatch(1)
             val release = CountDownLatch(1)
@@ -515,6 +527,7 @@ class TerminalSessionTest {
                         },
                     workerDispatcher = StandardTestDispatcher(testScheduler),
                     ioDispatcher = StandardTestDispatcher(testScheduler),
+                    cleanupDispatcher = StandardTestDispatcher(testScheduler),
                 )
             assertSame(connectorFailure, assertThrows(IllegalStateException::class.java) { session.close() })
             assertTrue(eofFailure in connectorFailure.suppressed)
@@ -552,6 +565,7 @@ class TerminalSessionTest {
                     connector = connector,
                     workerDispatcher = StandardTestDispatcher(testScheduler),
                     ioDispatcher = StandardTestDispatcher(testScheduler),
+                    cleanupDispatcher = StandardTestDispatcher(testScheduler),
                 )
             session.use {
                 assertSame(failure, assertThrows(IllegalStateException::class.java) { session.start(10, 3) })
@@ -573,6 +587,7 @@ class TerminalSessionTest {
                     connector = connector,
                     workerDispatcher = StandardTestDispatcher(testScheduler),
                     ioDispatcher = StandardTestDispatcher(testScheduler),
+                    cleanupDispatcher = StandardTestDispatcher(testScheduler),
                 )
             session.use {
                 session.start(10, 3)
@@ -1062,6 +1077,7 @@ class TerminalSessionTest {
                     connector = connector,
                     workerDispatcher = dispatcher,
                     ioDispatcher = dispatcher,
+                    cleanupDispatcher = dispatcher,
                 ).use { session ->
                     session.start(10, 3)
                     when (termination) {
@@ -1114,6 +1130,7 @@ class TerminalSessionTest {
                     connector = connector,
                     workerDispatcher = dispatcher,
                     ioDispatcher = dispatcher,
+                    cleanupDispatcher = dispatcher,
                 )
             session.use {
                 session.start(10, 3)
@@ -1150,6 +1167,7 @@ class TerminalSessionTest {
                 connector = connector,
                 workerDispatcher = dispatcher,
                 ioDispatcher = dispatcher,
+                cleanupDispatcher = dispatcher,
             ).use { session ->
                 session.start(10, 3)
                 session.requestRender(0)
@@ -1194,6 +1212,7 @@ class TerminalSessionTest {
                     connector = connector,
                     workerDispatcher = dispatcher,
                     ioDispatcher = dispatcher,
+                    cleanupDispatcher = dispatcher,
                 ).use { session ->
                     session.start(10, 3)
                     session.requestRender(0)
@@ -1229,6 +1248,7 @@ class TerminalSessionTest {
                     connector = connector,
                     workerDispatcher = dispatcher,
                     ioDispatcher = dispatcher,
+                    cleanupDispatcher = dispatcher,
                 ).use { session ->
                     session.start(10, 3)
                     connector.feedFromHost("LAST LINE\r\n".ascii())

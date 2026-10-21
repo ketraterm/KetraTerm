@@ -22,6 +22,7 @@ import io.github.ketraterm.parser.api.TerminalCustomOscHandler
 import io.github.ketraterm.parser.runtime.ParserState
 import io.github.ketraterm.parser.spi.TerminalCommandSink
 import io.github.ketraterm.protocol.ControlCode
+import io.github.ketraterm.protocol.TerminalGraphicsCommand
 
 /**
  * Executes parser-internal FSM actions against [ParserState].
@@ -42,6 +43,11 @@ internal class ActionEngine(
 ) {
     private val oscDispatcher = OscDispatcher()
     private var graphicsParser: GraphicsParser? = null
+    var yieldGraphics: Boolean = false
+    val hasPendingGraphics: Boolean get() = graphicsParser?.pending == true
+
+    fun consumePendingGraphics(consumer: (TerminalGraphicsCommand, ByteArray, Int) -> Unit) =
+        checkNotNull(graphicsParser).consumePending(consumer)
 
     fun cancelGraphics() = graphicsParser?.cancel()
 
@@ -73,7 +79,7 @@ internal class ActionEngine(
                 state.fsmState = nextState
             }
             FsmAction.APC_END -> {
-                checkNotNull(graphicsParser).finish()
+                checkNotNull(graphicsParser).finish(yieldGraphics)
                 state.fsmState = nextState
             }
             FsmAction.APC_ABORT -> {

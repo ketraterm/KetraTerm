@@ -16,10 +16,6 @@
 package io.github.ketraterm.intellij.services
 
 import io.github.ketraterm.intellij.KetraTermBundle
-import io.github.ketraterm.workspace.TerminalProfile
-import io.github.ketraterm.workspace.TerminalWorkspace
-import io.github.ketraterm.workspace.TerminalWorkspaceOpenOptions
-import io.github.ketraterm.workspace.TerminalWorkspaceTab
 
 /**
  * IntelliJ host adapter for local PTY startup.
@@ -30,27 +26,7 @@ import io.github.ketraterm.workspace.TerminalWorkspaceTab
  * plugin package so the IDE process never loads a second native stack from the
  * plugin classloader.
  */
-internal class IntelliJPtyRuntime {
-    /**
-     * Opens a workspace tab after preparing IntelliJ-hosted native dependencies.
-     *
-     * This method may block while the local shell process starts and must not be
-     * called on the Swing event dispatch thread.
-     *
-     * @param workspace host-neutral workspace to mutate.
-     * @param profile local launch profile.
-     * @param options initial terminal size and policy.
-     * @return opened workspace tab.
-     */
-    fun openWorkspaceTab(
-        workspace: TerminalWorkspace,
-        profile: TerminalProfile,
-        options: TerminalWorkspaceOpenOptions,
-    ): TerminalWorkspaceTab {
-        BundledPty4jRuntime.requireAvailable()
-        return workspace.openTab(profile, options)
-    }
-
+internal object IntelliJPtyRuntime {
     internal object BundledPty4jRuntime {
         /**
          * Fails fast when the IntelliJ Platform Pty4J module is not visible to

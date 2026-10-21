@@ -17,6 +17,7 @@ package io.github.ketraterm.core.api
 
 import io.github.ketraterm.protocol.TerminalGraphicsCommand
 import io.github.ketraterm.protocol.TerminalGraphicsResult
+import io.github.ketraterm.render.api.TerminalRenderImage
 
 /**
  * Caller-serialized image admission and placement on the active terminal screen.
@@ -55,6 +56,25 @@ public interface TerminalGraphics {
         command: TerminalGraphicsCommand,
         data: ByteArray,
         length: Int,
+        result: TerminalGraphicsResult,
+        allowReplies: Boolean,
+    )
+
+    /**
+     * Commits an externally decoded upload or query under the same admission,
+     * placement and reply rules as [applyGraphicsCommand]. The decoder owns payload
+     * validation; core still validates controls, image bounds and placement before
+     * replacing any retained image. PNG dimensions come from [image].
+     *
+     * @param command borrowed original controls for an upload, upload-and-display or query.
+     * @param image immutable normalized pixels; retained without copying on successful
+     * upload. Must be non-null for [TerminalGraphicsResult.OK]; never retained for queries.
+     * @param result completed decoder outcome; failure prevents mutation.
+     * @param allowReplies whether eligible success and failure replies may be queued.
+     */
+    public fun applyDecodedGraphicsCommand(
+        command: TerminalGraphicsCommand,
+        image: TerminalRenderImage?,
         result: TerminalGraphicsResult,
         allowReplies: Boolean,
     )

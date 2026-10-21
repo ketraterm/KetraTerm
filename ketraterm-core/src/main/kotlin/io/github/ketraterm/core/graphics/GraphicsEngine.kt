@@ -36,6 +36,7 @@ import io.github.ketraterm.core.state.TerminalState
 import io.github.ketraterm.protocol.TerminalGraphicsCommand
 import io.github.ketraterm.protocol.TerminalGraphicsLimits
 import io.github.ketraterm.protocol.TerminalGraphicsResult
+import io.github.ketraterm.render.api.TerminalRenderImage
 
 /**
  * Applies completed graphics requests on the caller-serialized core mutation thread.
@@ -49,6 +50,10 @@ internal class GraphicsEngine(
     private val state: TerminalState,
     private val mutation: MutationEngine,
 ) {
+    private companion object {
+        val EMPTY = ByteArray(0)
+    }
+
     private val store get() = state.graphics
     private val placement = IntArray(STRIDE)
 
@@ -65,6 +70,25 @@ internal class GraphicsEngine(
         allowReplies: Boolean,
     ) {
         require(length in 0..data.size)
+        apply(command, data, length, result, allowReplies, null, false)
+    }
+
+    fun applyDecodedGraphicsCommand(
+        command: TerminalGraphicsCommand,
+        image: TerminalRenderImage?,
+        result: TerminalGraphicsResult,
+        allowReplies: Boolean,
+    ) = apply(command, EMPTY, 0, result, allowReplies, image, true)
+
+    private fun apply(
+        command: TerminalGraphicsCommand,
+        data: ByteArray,
+        length: Int,
+        result: TerminalGraphicsResult,
+        allowReplies: Boolean,
+        decodedImage: TerminalRenderImage?,
+        decoded: Boolean,
+    ) {
         val action = command.valueOr('a', 't'.code.toLong()).toInt().toChar()
         val id = command.valueOr('i', 0)
         val number = command.valueOr('I', 0)
@@ -73,7 +97,7 @@ internal class GraphicsEngine(
         var replyId = id
         var outcome = result
         if (outcome == TerminalGraphicsResult.OK) {
-            outcome = validate(command, action, length)
+            outcome = validate(command, action, length, decoded)
             if (outcome == TerminalGraphicsResult.OK) {
                 when (action) {
                     'd' ->
@@ -108,8 +132,8 @@ internal class GraphicsEngine(
                         }
                     }
                     else -> {
-                        val w = command.valueOr('s', 0)
-                        val h = command.valueOr('v', 0)
+                        val w = if (decoded) decodedImage?.width?.toLong() ?: 0L else command.valueOr('s', 0)
+                        val h = if (decoded) decodedImage?.height?.toLong() ?: 0L else command.valueOr('v', 0)
                         val format = command.valueOr('f', 32).toInt()
                         // Check each edge before multiplication, including direct core callers.
                         val pixelCount =
@@ -126,7 +150,7 @@ internal class GraphicsEngine(
                                 w > TerminalGraphicsLimits.DIMENSION ||
                                     h > TerminalGraphicsLimits.DIMENSION ||
                                     pixelCount > TerminalGraphicsLimits.PIXELS -> TerminalGraphicsResult.TOO_LARGE
-                                pixelCount * (format / 8) != length.toLong() -> TerminalGraphicsResult.INVALID
+                                !decoded && pixelCount * (format / 8) != length.toLong() -> TerminalGraphicsResult.INVALID
                                 else -> TerminalGraphicsResult.OK
                             }
                         if (outcome == TerminalGraphicsResult.OK && action == 'T') {
@@ -138,21 +162,11 @@ internal class GraphicsEngine(
                                 outcome = TerminalGraphicsResult.NO_SPACE
                             }
                         }
-                        if (outcome == TerminalGraphicsResult.OK) {
-                            val pixels = IntArray(pixelCount.toInt())
-                            var source = 0
-                            for (i in pixels.indices) {
-                                val red = data[source++].toInt() and 255
-                                val green = data[source++].toInt() and 255
-                                val blue = data[source++].toInt() and 255
-                                val alpha = if (format == 32) data[source++].toInt() and 255 else 255
-                                pixels[i] = (alpha shl 24) or (red shl 16) or (green shl 8) or blue
-                            }
-                            if (action != 'q') {
-                                if (number != 0L) replyId = store.allocateId(state.isAltScreenActive)
-                                val slot = store.retain(state.isAltScreenActive, replyId, number, ArgbImage(w.toInt(), h.toInt(), pixels))
-                                if (action == 'T') place(command, slot)
-                            }
+                        if (outcome == TerminalGraphicsResult.OK && action != 'q') {
+                            val image = decodedImage ?: decodeRaw(data, w.toInt(), h.toInt(), format)
+                            if (number != 0L) replyId = store.allocateId(state.isAltScreenActive)
+                            val slot = store.retain(state.isAltScreenActive, replyId, number, image)
+                            if (action == 'T') place(command, slot)
                         }
                     }
                 }
@@ -169,15 +183,35 @@ internal class GraphicsEngine(
         }
     }
 
+    private fun decodeRaw(
+        data: ByteArray,
+        width: Int,
+        height: Int,
+        format: Int,
+    ): TerminalRenderImage {
+        val pixels = IntArray(width * height)
+        var source = 0
+        for (i in pixels.indices) {
+            val red = data[source++].toInt() and 255
+            val green = data[source++].toInt() and 255
+            val blue = data[source++].toInt() and 255
+            val alpha = if (format == 32) data[source++].toInt() and 255 else 255
+            pixels[i] = (alpha shl 24) or (red shl 16) or (green shl 8) or blue
+        }
+        return ArgbImage(width, height, pixels)
+    }
+
     private fun validate(
         c: TerminalGraphicsCommand,
         action: Char,
         length: Int,
+        decoded: Boolean,
     ): TerminalGraphicsResult {
         if (action !in "tTpqd" ||
+            (decoded && action !in "tTq") ||
             c.valueOr('t', 'd'.code.toLong()) != 'd'.code.toLong() ||
-            (c.valueOr('f', 32) != 24L && c.valueOr('f', 32) != 32L) ||
-            c.valueOr('o', 0) != 0L ||
+            (c.valueOr('f', 32) != 24L && c.valueOr('f', 32) != 32L && !(decoded && c.valueOr('f', 32) == 100L)) ||
+            (c.valueOr('o', 0) != 0L && !(decoded && c.valueOr('o', 0) == 'z'.code.toLong())) ||
             c.valueOr('U', 0) != 0L ||
             c.valueOr('P', 0) != 0L ||
             c.valueOr('Q', 0) != 0L ||

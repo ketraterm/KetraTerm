@@ -49,6 +49,7 @@ class TerminalModeStatusSessionTest {
                     inputPolicy = backspace,
                     workerDispatcher = dispatcher,
                     ioDispatcher = dispatcher,
+                    cleanupDispatcher = dispatcher,
                 ).use { session ->
                     session.start(10, 3)
 
@@ -89,6 +90,7 @@ class TerminalModeStatusSessionTest {
                     connector,
                     workerDispatcher = dispatcher,
                     ioDispatcher = dispatcher,
+                    cleanupDispatcher = dispatcher,
                 ).use { session ->
                     session.start(10, 3)
                     connector.feedFromHost("\u001B[?2026h\u001B[?2026\$p".encodeToByteArray())
@@ -120,6 +122,7 @@ class TerminalModeStatusSessionTest {
                         connector,
                         workerDispatcher = dispatcher,
                         ioDispatcher = dispatcher,
+                        cleanupDispatcher = dispatcher,
                         modeReportCapabilities = capabilities,
                     ).use { session ->
                         session.start(10, 3)

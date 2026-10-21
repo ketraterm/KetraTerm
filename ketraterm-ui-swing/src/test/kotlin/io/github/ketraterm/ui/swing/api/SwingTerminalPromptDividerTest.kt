@@ -18,6 +18,7 @@ package io.github.ketraterm.ui.swing.api
 import io.github.ketraterm.core.TerminalBuffers
 import io.github.ketraterm.render.api.TerminalColorPalette
 import io.github.ketraterm.session.TerminalSession
+import io.github.ketraterm.session.TerminalSessionState
 import io.github.ketraterm.session.TerminalShellIntegrationFactory
 import io.github.ketraterm.session.TerminalShellIntegrationState
 import io.github.ketraterm.shell.integration.OscShellIntegration
@@ -27,22 +28,24 @@ import io.github.ketraterm.ui.swing.settings.SwingPadding
 import io.github.ketraterm.ui.swing.settings.SwingPromptDecoration
 import io.github.ketraterm.ui.swing.settings.SwingSettings
 import io.github.ketraterm.ui.swing.settings.TerminalClipboardHandler
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.StandardTestDispatcher
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.params.ParameterizedTest
+import org.junit.jupiter.params.provider.CsvSource
 import org.junit.jupiter.params.provider.EnumSource
 import org.junit.jupiter.params.provider.ValueSource
 import java.awt.Point
 import java.awt.Rectangle
+import java.awt.event.ComponentEvent
 import java.awt.event.MouseEvent
 import java.awt.image.BufferedImage
+import java.util.concurrent.FutureTask
 import java.util.concurrent.LinkedBlockingQueue
+import java.util.concurrent.TimeUnit
 import javax.swing.SwingUtilities
-import kotlin.test.assertEquals
-import kotlin.test.assertFalse
-import kotlin.test.assertNotEquals
-import kotlin.test.assertTrue
+import kotlin.test.*
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class SwingTerminalPromptDividerTest {
@@ -266,7 +269,7 @@ class SwingTerminalPromptDividerTest {
                 val resizes = f.connector.resizes.toList()
                 f.component.size = f.component.preferredGridSize(8, 1)
                 f.component.componentListeners.forEach {
-                    it.componentResized(java.awt.event.ComponentEvent(f.component, java.awt.event.ComponentEvent.COMPONENT_RESIZED))
+                    it.componentResized(ComponentEvent(f.component, ComponentEvent.COMPONENT_RESIZED))
                 }
                 f.flush()
                 assertEquals(4, f.component.viewportState().historySize)
@@ -390,6 +393,7 @@ class SwingTerminalPromptDividerTest {
                         Connector(),
                         workerDispatcher = worker,
                         ioDispatcher = worker,
+                        cleanupDispatcher = worker,
                     )
                 try {
                     replacement.start(8, 3)
@@ -416,7 +420,7 @@ class SwingTerminalPromptDividerTest {
                 if (metadataAvailable) f.prompt(">one")
                 f.component.setSize(f.component.width + 3, f.component.height + 7)
                 f.component.componentListeners.forEach {
-                    it.componentResized(java.awt.event.ComponentEvent(f.component, java.awt.event.ComponentEvent.COMPONENT_RESIZED))
+                    it.componentResized(ComponentEvent(f.component, ComponentEvent.COMPONENT_RESIZED))
                 }
                 f.flush()
                 var columns = 0
@@ -501,10 +505,7 @@ class SwingTerminalPromptDividerTest {
                 val offset = f.component.viewportState().renderOffset
                 var lineId = 0L
                 f.session.readRenderFrame(offset, 3) { lineId = it.lineId(0) }
-                f.component.size = f.component.preferredGridSize(8, 4)
-                f.component.componentListeners.forEach {
-                    it.componentResized(java.awt.event.ComponentEvent(f.component, java.awt.event.ComponentEvent.COMPONENT_RESIZED))
-                }
+                f.resize(8, 4)
                 f.flush()
                 f.session.readRenderFrame(f.component.viewportState().renderOffset, 4) {
                     assertEquals(lineId, it.lineId(0))
@@ -528,10 +529,7 @@ class SwingTerminalPromptDividerTest {
                 f.session.readRenderFrame(offset, 3) { lineId = it.lineId(0) }
                 assertTrue(offset > 0)
                 for ((columns, rows) in listOf(4 to 3, 8 to 3, 5 to 2, 8 to 4)) {
-                    f.component.size = f.component.preferredGridSize(columns, rows)
-                    f.component.componentListeners.forEach {
-                        it.componentResized(java.awt.event.ComponentEvent(f.component, java.awt.event.ComponentEvent.COMPONENT_RESIZED))
-                    }
+                    f.resize(columns, rows)
                     f.flush()
                     assertTrue(f.component.viewportState().renderOffset > 0, "mode=$mode grid=$columns,$rows")
                     f.session.readRenderFrame(f.component.viewportState().renderOffset, rows) {
@@ -544,9 +542,184 @@ class SwingTerminalPromptDividerTest {
             }
         }
 
+    @ParameterizedTest
+    @CsvSource("NONE,false", "GUTTER,false", "DIVIDER,false", "NONE,true", "GUTTER,true", "DIVIDER,true")
+    fun `resize bursts preserve the viewed line when an earlier reflow awaits installation`(
+        mode: SwingPromptDecoration,
+        admitFirstResize: Boolean,
+    ) = edt {
+        Fixture(mode).use { f ->
+            repeat(8) { index ->
+                f.prompt(">$index abc")
+                f.feed("\r\n")
+            }
+            f.component.scrollFromScrollbar(8, true)
+            f.flush()
+            val originalOffset = f.component.viewportState().renderOffset
+            assertTrue(originalOffset > 0)
+            var originalLine = 0L
+            f.session.readRenderFrame(originalOffset, 3) { originalLine = it.lineId(0) }
+
+            f.resize(4, 3)
+            if (admitFirstResize) {
+                // Reflow has committed, but the view still uses the pre-resize frame and anchor.
+                f.runWorkerBeforeUiInstallation()
+                f.session.readRenderFrame { assertEquals(4, it.columns) }
+            }
+            f.resize(8, 3)
+            f.flush()
+
+            val finalOffset = f.component.viewportState().renderOffset
+            assertTrue(finalOffset > 0)
+            f.session.readRenderFrame(finalOffset, 3) {
+                assertEquals(8, it.columns)
+                assertEquals(originalLine, it.lineId(0))
+            }
+        }
+    }
+
+    @ParameterizedTest
+    @EnumSource(SwingPromptDecoration::class)
+    fun `scrolling after reflow overrides the pending resize anchor before completion`(mode: SwingPromptDecoration) =
+        edt {
+            Fixture(mode).use { f ->
+                repeat(8) { index ->
+                    f.prompt(">$index abc")
+                    f.feed("\r\n")
+                }
+                f.component.scrollFromScrollbar(8, true)
+                f.flush()
+                var originalLine = 0L
+                f.session.readRenderFrame(f.component.viewportState().renderOffset, 3) { originalLine = it.lineId(0) }
+                var laterLine = 0L
+                var completions = 0
+                var completionFailure: Throwable? = null
+                var completionLine = 0L
+                var completionColumns = 0
+
+                f.component.size = f.component.preferredGridSize(4, 3)
+                f.component.resizeSessionToVisibleGrid { failure ->
+                    completionFailure = failure
+                    completions++
+                    f.session.readRenderFrame(f.component.viewportState().renderOffset, 3) {
+                        completionColumns = it.columns
+                        completionLine = it.lineId(0)
+                    }
+                }
+                f.runWorkerBeforeUiInstallation()
+                f.session.readRenderFrame { assertEquals(4, it.columns) }
+                assertEquals(0, completions, "The resize result still awaits EDT installation")
+
+                f.component.scrollFromScrollbar(2, true)
+                f.session.readRenderFrame(f.component.viewportState().renderOffset, 3) { laterLine = it.lineId(0) }
+                assertNotEquals(originalLine, laterLine)
+                f.flush()
+
+                assertEquals(1, completions)
+                assertNull(completionFailure)
+                assertEquals(4, completionColumns)
+                assertEquals(laterLine, completionLine, "Completion must follow the later scroll's reconciliation")
+                f.session.readRenderFrame(f.component.viewportState().renderOffset, 3) { assertEquals(laterLine, it.lineId(0)) }
+                f.flush()
+                assertEquals(1, completions)
+            }
+        }
+
+    @Test
+    fun `viewport notification failure reaches the resize completion before anchor retry ownership transfers`() =
+        edt {
+            val expectedFailure = IllegalStateException("Viewport notification failed")
+            var notificationsUntilFailure = 0
+            val listener =
+                TerminalViewportListener { _, _, _, _, _ ->
+                    if (notificationsUntilFailure > 0 && --notificationsUntilFailure == 0) throw expectedFailure
+                }
+            Fixture(SwingPromptDecoration.NONE, viewportListener = listener).use { f ->
+                repeat(8) { index ->
+                    f.prompt(">$index abc")
+                    f.feed("\r\n")
+                }
+                f.component.scrollFromScrollbar(8, true)
+                f.flush()
+                var completions = 0
+                var completionFailure: Throwable? = null
+                f.component.size = f.component.preferredGridSize(4, 3)
+                f.component.resizeSessionToVisibleGrid {
+                    completions++
+                    completionFailure = it
+                }
+                f.runWorkerBeforeUiInstallation()
+                assertEquals(0, completions)
+                f.component.scrollFromScrollbar(2, true)
+                // Exercise both the original installer notification and the retry's capture notification.
+                notificationsUntilFailure = 2
+                f.flush()
+
+                assertEquals(0, notificationsUntilFailure)
+                assertEquals(1, completions)
+                assertSame(expectedFailure, completionFailure)
+                var nextCompletions = 0
+                var nextFailure: Throwable? = null
+                f.component.size = f.component.preferredGridSize(8, 3)
+                f.component.resizeSessionToVisibleGrid {
+                    nextCompletions++
+                    nextFailure = it
+                }
+                f.flush()
+                assertEquals(1, completions)
+                assertEquals(1, nextCompletions)
+                assertNull(nextFailure)
+                f.session.readRenderFrame { assertEquals(8, it.columns) }
+            }
+        }
+
+    @ParameterizedTest
+    @EnumSource(SwingPromptDecoration::class)
+    fun `closure before anchor retry admission releases the retained frame`(mode: SwingPromptDecoration) =
+        edt {
+            Fixture(mode).use { f ->
+                repeat(8) { index ->
+                    f.prompt(">$index abc")
+                    f.feed("\r\n")
+                }
+                f.component.scrollFromScrollbar(8, true)
+                f.flush()
+                val previousHistory = f.component.viewportState().historySize
+                var completions = 0
+                var completionFailure: Throwable? = null
+                f.component.size = f.component.preferredGridSize(4, 3)
+                f.component.resizeSessionToVisibleGrid {
+                    completions++
+                    completionFailure = it
+                }
+                f.runWorkerBeforeUiInstallation()
+                f.component.scrollFromScrollbar(2, true)
+                f.runUiInstallations()
+                assertEquals(0, completions, "The accepted anchor retry has not entered session admission")
+                val resizes = f.connector.resizes.toList()
+                val finalOutput = ("\r\n".repeat(20) + "DONE").encodeToByteArray()
+                f.session.onBytes(finalOutput, 0, finalOutput.size)
+                f.session.close()
+                f.flush()
+
+                assertTrue(f.session.state.value is TerminalSessionState.Closed)
+                assertEquals(1, completions)
+                assertTrue(completionFailure is CancellationException)
+                assertEquals(resizes, f.connector.resizes)
+                assertTrue(
+                    f.component.viewportState().historySize > previousHistory,
+                    "The final retained frame must replace pre-resize presentation",
+                )
+                f.component.scrollToLiveViewport()
+                f.flush()
+                assertEquals(0, f.component.viewportState().renderOffset)
+            }
+        }
+
     private class Fixture(
         mode: SwingPromptDecoration = SwingPromptDecoration.DIVIDER,
         shellIntegration: TerminalShellIntegrationFactory? = null,
+        viewportListener: TerminalViewportListener = TerminalViewportListener.NONE,
     ) : AutoCloseable {
         private val worker = StandardTestDispatcher()
         private val dispatches = LinkedBlockingQueue<Runnable>()
@@ -558,6 +731,7 @@ class SwingTerminalPromptDividerTest {
                 connector,
                 workerDispatcher = worker,
                 ioDispatcher = worker,
+                cleanupDispatcher = worker,
                 shellIntegration = shellIntegration ?: TerminalShellIntegrationFactory.host(state),
             )
         var settings =
@@ -574,6 +748,7 @@ class SwingTerminalPromptDividerTest {
                 { settings },
                 SwingHostServices.create {
                     it.uiDispatcher = { action -> dispatches += action }
+                    it.viewportListener = viewportListener
                     it.clipboardHandler =
                         object : TerminalClipboardHandler {
                             override fun copyText(text: String) {
@@ -585,6 +760,7 @@ class SwingTerminalPromptDividerTest {
                 },
                 searchDispatcher = worker,
                 hyperlinkDispatcher = worker,
+                mutationDispatcher = worker,
             )
         val cellHeight get() = (component.preferredGridSize(8, 3).height / 3)
 
@@ -621,9 +797,42 @@ class SwingTerminalPromptDividerTest {
             }
         }
 
+        fun resize(
+            columns: Int,
+            rows: Int,
+        ) {
+            component.size = component.preferredGridSize(columns, rows)
+            val event = ComponentEvent(component, ComponentEvent.COMPONENT_RESIZED)
+            component.componentListeners.forEach { it.componentResized(event) }
+        }
+
+        fun runWorker() = worker.scheduler.runCurrent()
+
+        fun runUiInstallations() {
+            while (true) (dispatches.poll() ?: break).run()
+        }
+
+        /** Runs worker jobs off the EDT so their UI installations remain queued. */
+        fun runWorkerBeforeUiInstallation() {
+            val task = FutureTask { runWorker() }
+            val thread =
+                Thread
+                    .ofPlatform()
+                    .daemon()
+                    .name("prompt-divider-worker")
+                    .start(task)
+            try {
+                task.get(10, TimeUnit.SECONDS)
+            } finally {
+                if (!task.isDone) task.cancel(true)
+                thread.join(TimeUnit.SECONDS.toMillis(10))
+                check(!thread.isAlive) { "Controlled worker did not terminate" }
+            }
+        }
+
         fun flush() {
             do {
-                worker.scheduler.runCurrent()
+                runWorker()
                 var dispatched = false
                 while (true) {
                     val action = dispatches.poll() ?: break

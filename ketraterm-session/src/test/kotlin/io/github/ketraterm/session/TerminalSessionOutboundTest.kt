@@ -62,6 +62,7 @@ class TerminalSessionOutboundTest {
                     inputPolicy = policy,
                     workerDispatcher = dispatcher,
                     ioDispatcher = dispatcher,
+                    cleanupDispatcher = dispatcher,
                 ).use { session ->
                     session.start(10, 3)
                     connector.feedFromHost("\u001b[?2004h".toByteArray())
@@ -116,6 +117,7 @@ class TerminalSessionOutboundTest {
                     inputEncoderFactory = if (customEncoder) TerminalInputEncoderFactory(TerminalInputEncoders::create) else null,
                     workerDispatcher = dispatcher,
                     ioDispatcher = dispatcher,
+                    cleanupDispatcher = dispatcher,
                 ).use { session ->
                     session.start(10, 3)
                     delegate.feedFromHost("\u001b[?2004h".toByteArray())
@@ -142,6 +144,7 @@ class TerminalSessionOutboundTest {
                     connector,
                     workerDispatcher = dispatcher,
                     ioDispatcher = dispatcher,
+                    cleanupDispatcher = dispatcher,
                 ).use { session ->
                     session.start(10, 3)
                     session.encodeKey(TerminalKeyEvent.codepoint('a'.code))
@@ -172,6 +175,7 @@ class TerminalSessionOutboundTest {
                     connector,
                     workerDispatcher = dispatcher,
                     ioDispatcher = dispatcher,
+                    cleanupDispatcher = dispatcher,
                 ).use { session ->
                     session.start(10, 3)
                     connector.feedFromHost("\u001b[5n".repeat(800).toByteArray())
@@ -193,6 +197,7 @@ class TerminalSessionOutboundTest {
                     connector,
                     workerDispatcher = dispatcher,
                     ioDispatcher = dispatcher,
+                    cleanupDispatcher = dispatcher,
                 ).use { session ->
                     session.start(10, 3)
                     connector.feedFromHost("\u001b[?2004h".toByteArray())
@@ -204,8 +209,8 @@ class TerminalSessionOutboundTest {
                     }
                     assertInstanceOf(OutboundCapacityException::class.java, session.failure)
                     assertTrue(session.isClosed)
-                    assertEquals(1, connector.closeCount)
                     runCurrent()
+                    assertEquals(1, connector.closeCount)
                     assertArrayEquals(byteArrayOf(), connector.writtenBytes)
                     session.encodeKey(TerminalKeyEvent.codepoint('a'.code))
                     assertArrayEquals(byteArrayOf(), connector.writtenBytes)
@@ -224,6 +229,7 @@ class TerminalSessionOutboundTest {
                     connector,
                     workerDispatcher = dispatcher,
                     ioDispatcher = dispatcher,
+                    cleanupDispatcher = dispatcher,
                 ).use { session ->
                     session.start(10, 3)
                     repeat(OutboundWriter.MAX_BULK_OPERATIONS + 1) {
@@ -261,6 +267,7 @@ class TerminalSessionOutboundTest {
                     inputEncoderFactory = if (customEncoder) TerminalInputEncoderFactory(TerminalInputEncoders::create) else null,
                     workerDispatcher = dispatcher,
                     ioDispatcher = dispatcher,
+                    cleanupDispatcher = dispatcher,
                 )
             session.use {
                 session.start(10, 3)
@@ -313,6 +320,7 @@ class TerminalSessionOutboundTest {
                     inputEncoderFactory = factory,
                     workerDispatcher = dispatcher,
                     ioDispatcher = dispatcher,
+                    cleanupDispatcher = dispatcher,
                 ).use { session ->
                     session.start(10, 3)
                     if (source == "connector") {
@@ -351,6 +359,7 @@ class TerminalSessionOutboundTest {
                     inputEncoderFactory = if (customEncoder) TerminalInputEncoderFactory(TerminalInputEncoders::create) else null,
                     workerDispatcher = dispatcher,
                     ioDispatcher = dispatcher,
+                    cleanupDispatcher = dispatcher,
                 )
             session.start(10, 3)
             session.encodeKey(TerminalKeyEvent.codepoint('a'.code))
@@ -409,6 +418,7 @@ class TerminalSessionOutboundTest {
                     inputEncoderFactory = factory,
                     workerDispatcher = dispatcher,
                     ioDispatcher = dispatcher,
+                    cleanupDispatcher = dispatcher,
                 ).use { session ->
                     session.start(10, 3)
                     if (source == "queued") {
@@ -441,7 +451,7 @@ class TerminalSessionOutboundTest {
 
     @ParameterizedTest
     @ValueSource(strings = ["local", "remote", "error"])
-    fun `writer cancellation during owner cleanup preserves the first termination`(termination: String) =
+    fun `shutdown cancels pending writes before connector cleanup and preserves the first termination`(termination: String) =
         runTest {
             val cancellation = CancellationException("write interrupted by close")
             val firstFailure = IOException("transport failed first")
@@ -460,7 +470,7 @@ class TerminalSessionOutboundTest {
 
                     override fun close() {
                         delegate.close()
-                        // Run the pending writer after termination is claimed but before children are cancelled.
+                        // Try to run pending work while connector cleanup is still active.
                         runCurrent()
                     }
                 }
@@ -471,6 +481,7 @@ class TerminalSessionOutboundTest {
                     connector,
                     workerDispatcher = dispatcher,
                     ioDispatcher = dispatcher,
+                    cleanupDispatcher = dispatcher,
                 ).use { session ->
                     session.start(10, 3)
                     runCurrent()
@@ -482,7 +493,7 @@ class TerminalSessionOutboundTest {
                     }
                     runCurrent()
 
-                    assertEquals(1, writes, "the pending writer must run during connector cleanup")
+                    assertEquals(0, writes, "shutdown must cancel pending writes before connector cleanup")
                     assertEquals(
                         TerminalSessionState.Closed(
                             TerminalSessionCloseEvent(
@@ -501,6 +512,71 @@ class TerminalSessionOutboundTest {
                 }
             assertEquals(1, delegate.closeCount)
         }
+
+    @ParameterizedTest
+    @ValueSource(strings = ["local", "remote", "error"])
+    fun `cancellation of an active write during cleanup preserves the first termination`(termination: String) {
+        val entered = CountDownLatch(1)
+        val release = CountDownLatch(1)
+        val cancellation = CancellationException("write interrupted by close")
+        val firstFailure = IOException("transport failed first")
+        val delegate = MockConnector()
+        val executor = Executors.newSingleThreadExecutor()
+        executor.asCoroutineDispatcher().use { io ->
+            val connector =
+                object : TerminalConnector by delegate {
+                    override fun write(
+                        bytes: ByteArray,
+                        offset: Int,
+                        length: Int,
+                    ) {
+                        entered.countDown()
+                        release.awaitEvent()
+                        throw cancellation
+                    }
+
+                    override fun close() {
+                        delegate.close()
+                        release.countDown()
+                    }
+                }
+            TerminalSession
+                .create(
+                    TerminalBuffers.create(10, 3),
+                    connector,
+                    workerDispatcher = StandardTestDispatcher(),
+                    ioDispatcher = io,
+                ).use { session ->
+                    try {
+                        session.start(10, 3)
+                        session.encodeKey(TerminalKeyEvent.codepoint('a'.code))
+                        entered.awaitEvent()
+                        when (termination) {
+                            "local" -> session.close()
+                            "remote" -> delegate.simulateClosed(7)
+                            "error" -> delegate.simulateCrash(firstFailure)
+                        }
+                        // A barrier on the same executor observes the writer's failure handler.
+                        executor.submit {}.get(SESSION_THREAD_TIMEOUT_SECONDS, TimeUnit.SECONDS)
+                        assertEquals(
+                            TerminalSessionState.Closed(
+                                TerminalSessionCloseEvent(
+                                    exitCode = if (termination == "remote") 7 else null,
+                                    failure = if (termination == "error") firstFailure else null,
+                                    locallyRequested = termination == "local",
+                                ),
+                            ),
+                            session.state.value,
+                        )
+                        assertEquals(1, delegate.closeCount)
+                        assertArrayEquals(byteArrayOf(), delegate.writtenBytes)
+                        assertTrue(firstFailure.suppressed.isEmpty())
+                    } finally {
+                        release.countDown()
+                    }
+                }
+        }
+    }
 
     @ParameterizedTest
     @ValueSource(booleans = [false, true])

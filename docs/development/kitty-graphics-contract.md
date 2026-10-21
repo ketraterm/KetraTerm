@@ -298,11 +298,19 @@ Validate remaining codec headroom with hostile-input tests and profiling. Close
 the input and dispose the reader on every exit. ImageIO does not validate all
 PNG CRCs itself.
 
+Verify the merged IDAT's complete single zlib stream and exact filtered scanline
+byte count, including Adam7 passes, before ImageIO. The bounded second inflate
+prevents a reader that stops after its requested rows from accepting a truncated
+trailer or extra compressed data; it uses fixed scratch rather than another raster.
+
 Read the native raster: forcing an 8-bit destination loses some 16-bit `tRNS`
-transparency in the JDK PNG reader. Normalize samples explicitly: replicate grayscale
-channels, resolve palette entries and alpha, scale sub-byte samples, and take the
-high byte of 16-bit samples. Initially treat samples as sRGB and ignore embedded
-profiles/gamma metadata: this is a KetraTerm fidelity limitation, not Kitty parity,
+transparency in the JDK PNG reader. Sub-byte grayscale `tRNS` also requires comparing
+the transparent key in the native raster's expanded sample range. Mask unused key
+bits for depths below 16 before decoding, after validating the original chunk CRC.
+Normalize samples explicitly: replicate grayscale channels, resolve palette entries and alpha, scale
+sub-byte samples, and take the high byte of 16-bit samples. Initially treat samples
+as sRGB and ignore embedded profiles/gamma metadata: this is a KetraTerm fidelity
+limitation, not Kitty parity,
 and is tracked in the gap map. Do not use generic `BufferedImage.getRGB` for grayscale;
 its color-space conversion changes sample values. Only immutable normalized
 pixels cross into core/render contracts; AWT objects stay inside the decoder/UI.
@@ -319,17 +327,23 @@ Input/paste-policy setters retain their existing outbound serialization; they do
 not acquire this gate. Do not add a graphics decode queue, deferred placement
 model or per-command future.
 
+Conditional command-edit capture is unavailable until the entire output batch
+finishes; a decode yield must not create an editing context with a revision that
+also covers its still-unprocessed suffix. Accepted protocol host callbacks retain
+their synchronous setter mapping, including CSI 8 resize, while their ingress
+thread already owns both admission and mutation.
+
 ### EDT admission and lifecycle
 
 Synchronous gated methods can wait for decoding. **No EDT path may wait for this
 gate**, directly or through a wrapper, failure handler or disposal callback.
-Before enabling decode, adapt all of these entry paths:
+The following entry paths share this requirement:
 
 | Entry path / owner | Required handling |
 | --- | --- |
 | `SwingTerminal.bindOnEdt`, `reloadSettingsOnEdt`, `applySettingsToSession` | Apply captured theme, width-policy and cursor-default updates off the EDT; initial binding is included. Keep component settings/metrics on the EDT. |
 | `SwingTerminal.resizeSessionToVisibleGridOnEdt` | Move both `tryUpdateViewportPixels` and `tryResizeViewport` admission off the EDT. Capture geometry/viewport anchors first; install resize results and selection changes on the EDT. |
-| `TerminalWindowResizeController.request` fallback | The dispatched fallback calls `session.resize`; route it through the same ordered geometry work as the bound view, after capturing the visible size on the EDT. Window resizing itself stays on the EDT. |
+| `TerminalWindowResizeController.request` fallback | Route through the bound view's ordered geometry work after capturing the visible size on the EDT. Window resizing itself stays on the EDT. |
 | Standalone `TerminalPane.reloadSettings`, IDE `KetraTermTerminalPane.reloadSettings`, and `TerminalWorkspace.applySettings` | Move session policy/settings effects to their owning host's work path. Preserve order with view settings; moving only `terminal.reloadSettings` does not cover the subsequent `setHostPolicy`. |
 | `SwingTerminal` window-state listeners and `updateMinimizedStateFromAncestor` | Capture minimization on the EDT and admit `setWindowMinimized` off it, including binding-time synchronization. |
 | Embedded `TerminalSession.clearBuffer` calls | Perform local clear off the EDT and report its result on completion. `SwingTerminal.clearScreen` sends Ctrl+L through ordinary input admission and remains outside the gate. |
@@ -352,9 +366,21 @@ hand off connector closure and lock-taking cleanup; offloading only explicit
 tab-close actions is insufficient. No late image can appear after termination.
 Graphics delivery can block its ingress caller; custom connectors must deliver such output
 off UI threads. The built-in PTY already has a reader thread. This gate/yield is
-a planned API/concurrency change and must be tested against the existing
-[session contract](../../ketraterm-session/docs/session-concurrency-locks.md)
-when implemented, not silently inferred from today's `accept` API.
+implemented through `TerminalGraphicsOutputParser.acceptUntilGraphics` and its
+scoped payload consumer; ordinary `accept` still consumes a whole range. Custom
+parser decorators must preserve that optional interface to retain session decoding.
+The [session contract](../../ketraterm-session/docs/session-concurrency-locks.md)
+defines host admission and shutdown completion.
+
+Shutdown cancellation stops the outbound worker immediately. Asynchronous cleanup
+uses an independent elastic I/O view by default so a blocked writer cannot prevent
+connector closure; custom cleanup dispatchers must retain that independence.
+Blocking workspace startup runs on I/O workers, leaving CPU workers available for
+view binding. Startup completion samples the current host policy on the EDT so
+intervening settings changes cannot be overwritten by a launch snapshot.
+Connector startup must tolerate concurrent closure, including
+while delivering synchronous graphics output. Cleanup retains its own lifetime
+until the final frame and `Closed` event have been attempted.
 
 ## Verification gates
 

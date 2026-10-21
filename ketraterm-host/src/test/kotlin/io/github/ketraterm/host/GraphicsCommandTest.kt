@@ -16,7 +16,9 @@
 package io.github.ketraterm.host
 
 import io.github.ketraterm.core.TerminalBuffers
+import io.github.ketraterm.parser.api.TerminalGraphicsOutputParser
 import io.github.ketraterm.parser.api.TerminalParsers
+import io.github.ketraterm.protocol.TerminalGraphicsResult
 import io.github.ketraterm.render.api.TerminalRenderFrameReader
 import io.github.ketraterm.render.api.TerminalRenderImage
 import org.junit.jupiter.api.Test
@@ -24,6 +26,54 @@ import java.util.*
 import kotlin.test.*
 
 class GraphicsCommandTest {
+    @Test
+    fun `decoded command handoff preserves response policy and suffix ordering`() {
+        for (policy in listOf(HostControlPolicy.ALLOW, HostControlPolicy.DENY)) {
+            val terminal = TerminalBuffers.create(10, 6)
+            terminal.resize(10, 6, 0, 80, 96)
+            val adapter = HostCommandAdapter(terminal, hostPolicy = HostPolicy(terminalResponsePolicy = policy))
+            val parser = TerminalParsers.create(adapter) as TerminalGraphicsOutputParser
+            val bytes = (apc("a=T,f=100,i=7,C=1", "AAEC") + "\u001b[cX").encodeToByteArray()
+            val consumed = parser.acceptUntilGraphics(bytes, 0, bytes.size)
+            assertEquals(0, terminal.pendingResponseBytes)
+            val decoded =
+                object : TerminalRenderImage {
+                    override val width = 1
+                    override val height = 1
+
+                    override fun copyArgb(
+                        destination: IntArray,
+                        offset: Int,
+                    ) {
+                        destination[offset] = 0xffff0000.toInt()
+                    }
+                }
+            // The host consumes an already validated immutable image; codec validation belongs to session.
+            parser.consumePendingGraphics { command, payload, length ->
+                assertEquals(100L, command.value('f'))
+                assertContentEquals(byteArrayOf(0, 1, 2), payload.copyOf(length))
+                adapter.applyDecodedGraphicsCommand(command, decoded, TerminalGraphicsResult.OK)
+            }
+            assertEquals(bytes.size - consumed, parser.acceptUntilGraphics(bytes, consumed, bytes.size - consumed))
+            val response = ByteArray(terminal.pendingResponseBytes)
+            terminal.readResponseBytes(response, 0, response.size)
+            if (policy == HostControlPolicy.ALLOW) {
+                assertTrue(response.decodeToString().startsWith(apc("i=7", "OK") + "\u001b[?"))
+            } else {
+                assertEquals(0, response.size)
+            }
+            terminal.readRenderFrame { frame ->
+                var count = 0
+                frame.copyImages { image, _, _, _, _, _, _, _, _, _, _, _ ->
+                    count++
+                    assertSame(decoded, image)
+                }
+                assertEquals(1, count)
+            }
+            assertEquals('X'.code, terminal.getCodepointAt(0, 0))
+        }
+    }
+
     @Test
     fun `pixel resize recomputes native image span without moving its cell anchor`() {
         val f = Fixture()

@@ -2,6 +2,12 @@ public abstract interface class io/github/ketraterm/parser/api/TerminalCustomOsc
 	public abstract fun handle (I[BII)V
 }
 
+public abstract interface class io/github/ketraterm/parser/api/TerminalGraphicsOutputParser : io/github/ketraterm/parser/api/TerminalOutputParser {
+	public abstract fun acceptUntilGraphics ([BII)I
+	public abstract fun consumePendingGraphics (Lkotlin/jvm/functions/Function3;)V
+	public abstract fun getHasPendingGraphics ()Z
+}
+
 public abstract interface class io/github/ketraterm/parser/api/TerminalOutputParser {
 	public abstract fun accept ([BII)V
 	public static synthetic fun accept$default (Lio/github/ketraterm/parser/api/TerminalOutputParser;[BIIILjava/lang/Object;)V

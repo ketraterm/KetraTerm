@@ -86,6 +86,18 @@ input policy, and host capabilities for new sessions. Use `create`, `copy`, or
 
 `applySettings(palette, treatAmbiguousAsWide)` changes the palette and width policy
 for future writes in open sessions. Other launch options describe new sessions.
+Synchronous startup, settings, and cleanup can wait for session work; call them
+off UI threads. UI hosts use `openTabAsync`, `applySettingsAsync`, `closeTabAsync`
+(or `closeTabsAsync` for a split container), and `closeAsync`. These share one
+ordered I/O worker with 64 pending ordinary slots and one cleanup reservation per
+owned tab. Duplicate pending tab cleanup is rejected. A `true` return means accepted; the callback
+reports completion on the worker. Dispatch UI publication explicitly. Shutdown
+has a reserved slot, drains accepted operations, and survives view disposal.
+The asynchronous profile supplier runs on the worker, allowing launch preparation
+without reading UI state there. The `tabOpened` callback still precedes connector
+startup; finish pane binding and its initial settings before returning from that
+callback when startup output depends on them. Such a handoff must never hold a
+session mutation gate or make the UI wait for the workspace worker.
 Products own preference schemas, persistence, and the host actions permitted by
 `HostPolicy`; advertise only mode capabilities the host implements.
 

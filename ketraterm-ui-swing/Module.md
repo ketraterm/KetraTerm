@@ -32,7 +32,13 @@ keeps the final published images available for retained presentation. See the
 
 The EDT owns components, settings installation, painters, and UI controllers.
 Public methods document any asynchronous dispatch or snapshot exceptions.
-Binding applies view settings and geometry to the session. One controlling view
+Binding captures view settings and geometry on the EDT. `SessionMutationQueue`
+applies them through session admission on one worker, with bounded pending work
+and binding checks before mutation and EDT installation. Only adjacent geometry
+requests awaiting admission coalesce; settings and host policy retain their accepted order.
+The worker awaits EDT installation outside session admission before applying the next request.
+Binding completion reports initial application failures before host startup.
+One controlling view
 per session is supported. Unbinding and disposal release view work without
 closing the session.
 

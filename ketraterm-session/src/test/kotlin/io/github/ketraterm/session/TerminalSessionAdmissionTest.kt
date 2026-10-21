@@ -185,8 +185,9 @@ class TerminalSessionAdmissionTest {
                     }
                 assertEquals(CAPACITY_EXCEEDED, result)
                 assertInstanceOf(OutboundCapacityException::class.java, session.failure)
-                assertTrue(session.state.value is TerminalSessionState.Closed)
+                assertTrue(session.isClosed)
                 runCurrent()
+                assertTrue(session.state.value is TerminalSessionState.Closed)
                 assertArrayEquals(byteArrayOf(), connector.writtenBytes)
                 assertEquals(CLOSED, session.submitBytes(byteArrayOf(1)))
                 assertEquals(1, connector.closeCount)
@@ -399,6 +400,7 @@ class TerminalSessionAdmissionTest {
                     connector,
                     workerDispatcher = StandardTestDispatcher(testScheduler),
                     ioDispatcher = UnconfinedTestDispatcher(testScheduler),
+                    cleanupDispatcher = UnconfinedTestDispatcher(testScheduler),
                 )
             session.use {
                 session.start(10, 3)
@@ -477,6 +479,7 @@ class TerminalSessionAdmissionTest {
                     connector,
                     workerDispatcher = dispatcher,
                     ioDispatcher = dispatcher,
+                    cleanupDispatcher = dispatcher,
                     startupCommand = TerminalStartupCommand("startup"),
                     shellIntegration = TerminalShellIntegrationFactory.host(TerminalShellIntegrationState(), promptReady = ready),
                 ).use { session ->
@@ -508,5 +511,6 @@ class TerminalSessionAdmissionTest {
             inputEncoderFactory = if (customEncoder) TerminalInputEncoderFactory(TerminalInputEncoders::create) else null,
             workerDispatcher = StandardTestDispatcher(testScheduler),
             ioDispatcher = StandardTestDispatcher(testScheduler),
+            cleanupDispatcher = StandardTestDispatcher(testScheduler),
         )
 }

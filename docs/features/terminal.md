@@ -77,7 +77,7 @@ defines event and encoding behavior.
 | Window reports | Minimized state, window pixel dimensions, grid dimensions, and screen-size reports. Pixel dimensions require host data; the current screen-size reply uses the terminal grid. |
 | Color scheme | One-shot light/dark query and mode 2031 subscriptions to host theme changes, including palette changes within the same light/dark preference. |
 | In-band resize | Mode 2048 reports text-area rows, columns, and pixel dimensions on enable and after size changes; unavailable pixel dimensions are zero. |
-| Kitty graphics (partial) | Inline RGB/RGBA, bounded chunked uploads, queries, ordinary cropped/scaled placements, deletion, screen lifecycle and Swing rendering. [Remaining work](../terminal-feature-gap-map.md#optional-protocol-work). |
+| Kitty graphics (partial) | Inline RGB/RGBA and PNG, bounded zlib/chunked uploads, queries, ordinary cropped/scaled placements, deletion, screen lifecycle and Swing rendering. Session decoding preserves stream order while frame reads and ordinary input remain available. [Remaining work](../terminal-feature-gap-map.md#optional-protocol-work). |
 | Custom OSC | Ordered callbacks for unsupported numeric OSC commands. |
 | Host policy | Independent controls for clipboard, titles, links, notifications, window actions, colors, and terminal replies. |
 

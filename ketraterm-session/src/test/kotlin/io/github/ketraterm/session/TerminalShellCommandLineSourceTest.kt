@@ -361,6 +361,7 @@ class TerminalShellCommandLineSourceTest {
                         startupCommand = TerminalStartupCommand("echo startup"),
                         workerDispatcher = dispatcher,
                         ioDispatcher = dispatcher,
+                        cleanupDispatcher = dispatcher,
                     )
                 }
             runCurrent()
@@ -386,6 +387,7 @@ class TerminalShellCommandLineSourceTest {
                 parser = TerminalParsers.create(HostCommandAdapter(terminal)),
                 workerDispatcher = dispatcher,
                 ioDispatcher = dispatcher,
+                cleanupDispatcher = dispatcher,
                 shellIntegration = TerminalShellIntegrationFactory.host(TerminalShellIntegrationState(), source),
             ).use { session ->
                 session.start(30, 3)
@@ -449,6 +451,7 @@ class TerminalShellCommandLineSourceTest {
                 connector = connector,
                 workerDispatcher = dispatcher,
                 ioDispatcher = dispatcher,
+                cleanupDispatcher = dispatcher,
                 shellIntegration = TerminalShellIntegrationFactory.host(model, source),
             )
 

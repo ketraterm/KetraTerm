@@ -48,6 +48,8 @@ internal class GraphicsParser(
     private var groupSize = 0
     private var padding = 0
     private var result = TerminalGraphicsResult.OK
+    var pending: Boolean = false
+        private set
 
     /** Starts one APC envelope, invalidating prior staging when the sink's token changed. */
     fun start() {
@@ -154,7 +156,7 @@ internal class GraphicsParser(
     }
 
     /** Completes a chunk at ST; only a final chunk or validation failure reaches the sink. */
-    fun finish() {
+    fun finish(yieldForDecode: Boolean = false) {
         if (!graphics || discarded) return
         // Core mutations can invalidate even a partial header between ingress reads.
         if (epoch != sink.graphicsTransferGeneration) {
@@ -185,8 +187,27 @@ internal class GraphicsParser(
             }
             result = TerminalGraphicsResult.INVALID
         }
+        val action = transfer.valueOr('a', 't'.code.toLong()).toInt().toChar()
+        if (yieldForDecode &&
+            result == TerminalGraphicsResult.OK &&
+            action in "tTq" &&
+            (action != 'q' || transfer.valueOr('i', 0) != 0L) &&
+            (transfer.valueOr('f', 32) == 100L || transfer.valueOr('o', 0) == 'z'.code.toLong())
+        ) {
+            pending = true
+            return
+        }
         try {
             sink.applyGraphicsCommand(transfer, bytes, length, result)
+        } finally {
+            cancel()
+        }
+    }
+
+    fun consumePending(consumer: (TerminalGraphicsCommand, ByteArray, Int) -> Unit) {
+        check(pending) { "No graphics payload is pending" }
+        try {
+            consumer(transfer, bytes, length)
         } finally {
             cancel()
         }
@@ -200,6 +221,7 @@ internal class GraphicsParser(
 
     /** Drops transfer state and large staging arrays; retains small scratch capacity for reuse. */
     fun cancel() {
+        pending = false
         active = false
         length = 0
         encoded = 0

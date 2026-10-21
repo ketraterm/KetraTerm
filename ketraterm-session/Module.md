@@ -11,6 +11,11 @@ drains terminal responses, and observes one selected shell producer. The
 connector owns inbound threads and ordered byte delivery. Session workers use
 caller-supplied, non-owned dispatchers.
 
+`graphics/GraphicsDecoder` validates raw/zlib payloads; `PngDecoder` validates,
+compacts and decodes PNG using the JDK reader. They return immutable render images.
+The session retains ingress admission across parser yields and commits the decoded
+image through `HostCommandAdapter` before consuming the remaining bytes.
+
 `OutboundWriter` manages transactional byte admission, bounded bulk/reply
 reservations, and ordered connector writes. Ordinary events encode at admission;
 paste, replacement, and compound events capture modes/policy and encode on the
@@ -46,3 +51,9 @@ module from outside it.
   guidance.
 - [Core contract](../ketraterm-core/docs/terminal-core-contract.md) and
   [transport contract](../ketraterm-transport-api/README.md): collaborator behavior.
+
+## Validation
+
+Run `./gradlew :ketraterm-session:test` from the repository root. This includes
+`defaultDispatcherTest` in a separate JVM with one ordinary I/O worker, so cleanup
+independence is checked against actual defaults without changing other tests' schedulers.

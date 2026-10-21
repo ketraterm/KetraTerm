@@ -32,6 +32,22 @@ dependencies {
     testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:$kotlinxCoroutinesVersion")
 }
 
+val defaultDispatcherTest =
+    tasks.register<Test>("defaultDispatcherTest") {
+        description = "Checks default workspace startup dispatch with two CPU workers."
+        group = "verification"
+        testClassesDirs =
+            sourceSets.test
+                .get()
+                .output.classesDirs
+        classpath = sourceSets.test.get().runtimeClasspath
+        useJUnitPlatform()
+        filter { includeTestsMatching("io.github.ketraterm.workspace.TerminalWorkspaceDefaultDispatcherTest") }
+        systemProperty("kotlinx.coroutines.scheduler.core.pool.size", "2")
+    }
+
 tasks.test {
     useJUnitPlatform()
+    exclude("**/TerminalWorkspaceDefaultDispatcherTest.class")
+    dependsOn(defaultDispatcherTest)
 }

@@ -56,6 +56,7 @@ class TerminalSessionCustomOscTest {
                         startupCommand = TerminalStartupCommand("hello"),
                         workerDispatcher = dispatcher,
                         ioDispatcher = dispatcher,
+                        cleanupDispatcher = dispatcher,
                         parserFactory =
                             TerminalOutputParserFactory { sink, budget ->
                                 TerminalParsers.create(sink, budget) { command, payload, offset, length ->
@@ -120,6 +121,7 @@ class TerminalSessionCustomOscTest {
                     connector,
                     workerDispatcher = dispatcher,
                     ioDispatcher = dispatcher,
+                    cleanupDispatcher = dispatcher,
                     hostPolicy = policy,
                     hostEvents =
                         object : HostEventSink by HostEventSink.NONE {
@@ -183,6 +185,7 @@ class TerminalSessionCustomOscTest {
                         connector,
                         workerDispatcher = dispatcher,
                         ioDispatcher = dispatcher,
+                        cleanupDispatcher = dispatcher,
                         parserFactory =
                             TerminalOutputParserFactory { sink, budget ->
                                 TerminalParsers.create(sink, budget) { _, _, _, _ -> throw failure }
@@ -222,6 +225,7 @@ class TerminalSessionCustomOscTest {
                     connector,
                     workerDispatcher = dispatcher,
                     ioDispatcher = dispatcher,
+                    cleanupDispatcher = dispatcher,
                     parserFactory =
                         TerminalOutputParserFactory { sink, budget ->
                             TerminalParsers.create(sink, budget) { _, _, _, _ ->
@@ -267,6 +271,7 @@ class TerminalSessionCustomOscTest {
                     closingConnector,
                     workerDispatcher = dispatcher,
                     ioDispatcher = dispatcher,
+                    cleanupDispatcher = dispatcher,
                     parserFactory =
                         TerminalOutputParserFactory { sink, budget ->
                             TerminalParsers.create(sink, budget) { _, _, _, _ ->

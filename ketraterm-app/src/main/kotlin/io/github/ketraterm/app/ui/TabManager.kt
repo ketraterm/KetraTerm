@@ -40,6 +40,8 @@ import kotlinx.coroutines.swing.Swing
 import java.awt.*
 import java.awt.event.InputEvent
 import java.awt.event.KeyEvent
+import java.util.concurrent.CompletableFuture
+import java.util.concurrent.ExecutionException
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.logging.Level
 import java.util.logging.Logger
@@ -65,9 +67,13 @@ internal class TabManager(
     private val settings: KetraTermSettings,
     private val defaultProfileProvider: () -> TerminalProfile,
     private val closeConfirmation: TerminalCloseConfirmation = SwingTerminalCloseConfirmation(frame),
+    workspaceFactory: (TerminalWorkspaceListener) -> TerminalWorkspace = ::TerminalWorkspace,
 ) {
     private val panes = ArrayList<TerminalPane>(INITIAL_TAB_CAPACITY)
-    private val workspace = TerminalWorkspace(StandaloneWorkspaceListener())
+    private val workspace = workspaceFactory(StandaloneWorkspaceListener())
+
+    // Used only by the serialized startup worker before session output starts.
+    private var publishStartingTab: ((TerminalWorkspaceTab) -> Unit)? = null
     private val cli = KetraTermCli(settings.configPath)
     private val clipboardReader = SwingClipboardReader()
     private val commandOutputExporter = CommandOutputExporter()
@@ -96,6 +102,7 @@ internal class TabManager(
 
     @Volatile private var completionShutdown: Job? = null
     private val shutdownStarted = AtomicBoolean()
+    private val workspaceShutdown = CompletableFuture<Unit>()
     private val windowResizeController = TerminalWindowResizeController(frame)
     private var appliedTheme = settings.theme
     private val settingsListener: () -> Unit = {
@@ -199,6 +206,7 @@ internal class TabManager(
             cleanupFailure = captureCleanupFailure(cleanupFailure, windowResizeController::close)
             cleanupFailure = captureCleanupFailure(cleanupFailure) { settings.removeChangeListener(settingsListener) }
             cleanupFailure = captureCleanupFailure(cleanupFailure) { focusManager.removeKeyEventDispatcher(keyEventDispatcher) }
+            cleanupFailure = captureCleanupFailure(cleanupFailure, workspace::close)
             cleanupFailure = captureCleanupFailure(cleanupFailure, ::closeCompletionLearningWithinBudget)
             throw requireNotNull(cleanupFailure)
         }
@@ -222,34 +230,20 @@ internal class TabManager(
     /**
      * Opens a new terminal tab backed by [profile].
      *
-     * Returns `true` on success, `false` if the PTY failed to start
-     * (an error dialog is shown to the user in that case).
+     * Returns whether startup was accepted. [onComplete] runs on the EDT after pane publication
+     * or failure; an accepted request is not yet an open tab.
      */
-    fun openTab(profile: TerminalProfile): Boolean {
-        val workspaceTab =
-            try {
-                workspace.openTab(
-                    profile = prepareLaunchProfile(profile),
-                    options =
-                        settings.config.let { snapshot ->
-                            TerminalWorkspaceOpenOptions.create { draft ->
-                                draft.columns = snapshot.columns
-                                draft.rows = snapshot.rows
-                                draft.treatAmbiguousAsWide = snapshot.treatAmbiguousAsWide
-                                draft.maxHistory = snapshot.scrollbackLines
-                                draft.pasteControlPolicy = snapshot.pasteControlPolicy
-                                draft.hostPolicy = settings.createHostPolicy()
-                                draft.showForegroundProcessName = settings.config.showForegroundProcessName
-                                draft.modeReportCapabilities = modeReportCapabilities
-                            }
-                        },
-                )
-            } catch (exception: Exception) {
-                showStartError(profile, exception)
-                return false
-            }
+    fun openTab(
+        profile: TerminalProfile,
+        onComplete: (Boolean) -> Unit = {},
+    ): Boolean = startTab(profile, onComplete = onComplete) { workspaceTab, onBound -> installTab(workspaceTab, profile, onBound) }
 
-        val createdPane = createTerminalPane(workspaceTab)
+    private fun installTab(
+        workspaceTab: TerminalWorkspaceTab,
+        profile: TerminalProfile,
+        onBound: (Throwable?) -> Unit,
+    ) {
+        val createdPane = createTerminalPane(workspaceTab, onBound)
         panes += createdPane
 
         val tabId = createdPane.tab.id
@@ -269,44 +263,123 @@ internal class TabManager(
         showPane(tabId)
         updateFrameTitle()
         createdPane.requestFocus()
-        return true
     }
 
-    private fun prepareLaunchProfile(profile: TerminalProfile): TerminalProfile {
-        val prepared = cli.prepare(profile)
-        return if (prepared.startupCommand != null) {
-            prepared
-        } else {
-            prepared.copy(
-                startupCommand =
-                    TerminalStartupCommand.fromText(settings.config.startupCommand),
-            )
+    private fun startTab(
+        profile: TerminalProfile,
+        isCurrent: () -> Boolean = { true },
+        onComplete: (Boolean) -> Unit = {},
+        install: (TerminalWorkspaceTab, (Throwable?) -> Unit) -> Unit,
+    ): Boolean {
+        check(SwingUtilities.isEventDispatchThread())
+        if (shutdownStarted.get()) return false
+        val snapshot = settings.config
+        val startupCommand = TerminalStartupCommand.fromText(snapshot.startupCommand)
+        val options =
+            TerminalWorkspaceOpenOptions.create { draft ->
+                draft.columns = snapshot.columns
+                draft.rows = snapshot.rows
+                draft.treatAmbiguousAsWide = snapshot.treatAmbiguousAsWide
+                draft.maxHistory = snapshot.scrollbackLines
+                draft.pasteControlPolicy = snapshot.pasteControlPolicy
+                draft.hostPolicy = settings.createHostPolicy()
+                draft.showForegroundProcessName = snapshot.showForegroundProcessName
+                draft.modeReportCapabilities = modeReportCapabilities
+            }
+        var publishedTab: TerminalWorkspaceTab? = null
+        val accepted =
+            workspace.openTabAsync(
+                profile = {
+                    check(!shutdownStarted.get()) { "Terminal startup was cancelled" }
+                    val prepared = cli.prepare(profile).let { it.copy(startupCommand = it.startupCommand ?: startupCommand) }
+                    publishStartingTab = { tab ->
+                        val ready = CompletableFuture<Unit>()
+                        SwingUtilities.invokeLater {
+                            try {
+                                check(!shutdownStarted.get() && isCurrent()) { "Terminal startup was cancelled" }
+                                publishedTab = tab
+                                install(tab) { bindingFailure ->
+                                    try {
+                                        if (bindingFailure != null) throw bindingFailure
+                                        val terminal = checkNotNull(panes.firstOrNull { it.tab === tab }).terminal
+                                        terminal.setHostPolicy(settings.createHostPolicy()) { failure ->
+                                            if (failure == null) ready.complete(Unit) else ready.completeExceptionally(failure)
+                                        }
+                                    } catch (failure: Throwable) {
+                                        ready.completeExceptionally(failure)
+                                    }
+                                }
+                            } catch (failure: Throwable) {
+                                ready.completeExceptionally(failure)
+                            }
+                        }
+                        // No session/admission lock is held: output has not started yet.
+                        try {
+                            ready.get()
+                        } catch (failure: ExecutionException) {
+                            throw failure.cause ?: failure
+                        }
+                    }
+                    prepared
+                },
+                options = options,
+            ) { result ->
+                publishStartingTab = null
+                SwingUtilities.invokeLater {
+                    if (shutdownStarted.get() || !isCurrent()) {
+                        result.getOrNull()?.let(::retireUnpublishedTab)
+                        onComplete(false)
+                        return@invokeLater
+                    }
+                    val failure = result.exceptionOrNull()
+                    if (failure != null) {
+                        publishedTab?.let { tab -> panes.firstOrNull { it.tab === tab }?.let(::closePane) }
+                        showStartError(profile, failure)
+                    }
+                    onComplete(failure == null)
+                }
+            }
+        if (!accepted) showStartError(profile, IllegalStateException("Terminal startup queue is full or shutting down"))
+        return accepted
+    }
+
+    private fun retireUnpublishedTab(tab: TerminalWorkspaceTab) {
+        tab.session.requestClose()
+        if (!shutdownStarted.get() && !workspace.closeTabAsync(tab.id, ::reportWorkspaceCleanup)) {
+            LOGGER.fine("Terminal cleanup is already queued or the workspace is shutting down")
         }
+    }
+
+    private fun reportWorkspaceCleanup(result: Result<Unit>) {
+        result.exceptionOrNull()?.let { LOGGER.log(Level.WARNING, "Terminal workspace cleanup failed", it) }
     }
 
     /**
      * Closes the tab identified by [id].
      *
      * @return true when the tab is now closed or was already unknown; false
-     * when the user rejected closing a live process.
+     * when the user rejected closing a live process or cleanup was already queued.
      */
     fun closeTab(id: String): Boolean {
         val root = tabRoots[id] ?: return true
-        if (!confirmClose(root)) return false
-        closeTabWithoutConfirmation(id, root)
-        return true
+        return confirmClose(root) && closeTabWithoutConfirmation(id, root)
     }
 
     private fun closeTabWithoutConfirmation(
         id: String,
         root: SplitNode,
-    ) {
-        windowResizeController.clearTarget()
+    ): Boolean {
         val tabPanes = root.allPanes()
+        val ownedIds = workspace.tabSnapshot().filter { tab -> tabPanes.any { it.tab === tab } }.map { it.id }
+        if (!shutdownStarted.get() && ownedIds.isNotEmpty() && !workspace.closeTabsAsync(ownedIds, ::reportWorkspaceCleanup)) {
+            LOGGER.fine("Terminal tab cleanup is already queued or the workspace is shutting down")
+            return false
+        }
+        windowResizeController.clearTarget()
         var failure: Throwable? = null
         for (pane in tabPanes) {
             panes.remove(pane)
-            failure = captureCleanupFailure(failure) { workspace.closeTab(pane.tab.id) }
+            pane.tab.session.requestClose()
             failure = captureCleanupFailure(failure, pane::close)
         }
         tabRoots.remove(id)
@@ -319,13 +392,14 @@ internal class TabManager(
         failure = captureCleanupFailure(failure) { selectedPane?.let { onTabSelected(it.tab.id) } }
         refreshWindowResizeTarget()
         failure?.let { throw it }
+        return true
     }
 
     /**
      * Closes every open tab and shuts down the workspace after one aggregated
      * confirmation for all live processes.
      *
-     * @return true when shutdown completed; false when the user cancelled.
+     * @return true when shutdown was accepted; false when the user cancelled.
      */
     fun closeAllTabs(): Boolean {
         if (!confirmCloseAllTabs()) return false
@@ -333,8 +407,8 @@ internal class TabManager(
         return true
     }
 
-    /** Closes every open tab and starts bounded completion persistence without blocking the Swing EDT. */
-    fun closeAllTabsWithoutConfirmation() {
+    /** Detaches views immediately; [onComplete] reports completed workspace cleanup from its worker. */
+    fun closeAllTabsWithoutConfirmation(onComplete: (Result<Unit>) -> Unit = ::reportWorkspaceCleanup) {
         if (!shutdownStarted.compareAndSet(false, true)) return
         var failure: Throwable? = null
         failure = captureCleanupFailure(failure, windowResizeController::close)
@@ -350,25 +424,30 @@ internal class TabManager(
                 failure = captureCleanupFailure(failure) { closeTabWithoutConfirmation(tabId, root) }
             }
         }
-        failure = captureCleanupFailure(failure, workspace::close)
-        failure = captureCleanupFailure(failure, ::startCompletionLearningShutdown)
+        workspace.closeAsync { result ->
+            result.fold(workspaceShutdown::complete, workspaceShutdown::completeExceptionally)
+            onComplete(result)
+        }
+        failure = captureCleanupFailure(failure, ::startShutdownCleanup)
         failure?.let { throw it }
     }
 
-    private fun startCompletionLearningShutdown() {
-        if (completionRegistry == null && completionShutdown == null) {
-            completionLifecycle.cancel()
-            return
-        }
+    private fun startShutdownCleanup() {
         Thread
             .ofPlatform()
-            .name("ketraterm-completion-shutdown")
+            .name("ketraterm-shutdown")
             .daemon(false)
             .start {
                 try {
-                    closeCompletionLearningWithinBudget()
+                    workspaceShutdown.get()
                 } catch (failure: Throwable) {
-                    LOGGER.log(Level.WARNING, "Final completion learning persistence failed during shutdown", failure)
+                    LOGGER.log(Level.WARNING, "Terminal workspace shutdown failed", failure)
+                } finally {
+                    try {
+                        closeCompletionLearningWithinBudget()
+                    } catch (failure: Throwable) {
+                        LOGGER.log(Level.WARNING, "Final completion learning persistence failed during shutdown", failure)
+                    }
                 }
             }
     }
@@ -459,32 +538,21 @@ internal class TabManager(
         isVertical: Boolean,
     ) {
         val tabId = tabBar.selectedId() ?: return
-        val root = tabRoots[tabId] ?: return
-
         val profile = defaultProfileProvider()
-        val workspaceTab =
-            try {
-                workspace.openTab(
-                    profile = prepareLaunchProfile(profile),
-                    options =
-                        settings.config.let { snapshot ->
-                            TerminalWorkspaceOpenOptions.create { draft ->
-                                draft.columns = snapshot.columns
-                                draft.rows = snapshot.rows
-                                draft.treatAmbiguousAsWide = snapshot.treatAmbiguousAsWide
-                                draft.maxHistory = snapshot.scrollbackLines
-                                draft.pasteControlPolicy = snapshot.pasteControlPolicy
-                                draft.hostPolicy = settings.createHostPolicy()
-                                draft.showForegroundProcessName = settings.config.showForegroundProcessName
-                                draft.modeReportCapabilities = modeReportCapabilities
-                            }
-                        },
-                )
-            } catch (exception: Exception) {
-                showStartError(profile, exception)
-                return
-            }
-        val createdPane = createTerminalPane(workspaceTab)
+        startTab(profile, isCurrent = { tabRoots[tabId]?.findPane(pane.tab.id) === pane }) { workspaceTab, onBound ->
+            installSplit(tabId, pane, isVertical, workspaceTab, onBound)
+        }
+    }
+
+    private fun installSplit(
+        tabId: String,
+        pane: TerminalPane,
+        isVertical: Boolean,
+        workspaceTab: TerminalWorkspaceTab,
+        onBound: (Throwable?) -> Unit,
+    ) {
+        val root = checkNotNull(tabRoots[tabId])
+        val createdPane = createTerminalPane(workspaceTab, onBound)
 
         windowResizeController.clearTarget()
         panes += createdPane
@@ -504,7 +572,10 @@ internal class TabManager(
         updateFrameTitle()
     }
 
-    private fun createTerminalPane(workspaceTab: TerminalWorkspaceTab): TerminalPane =
+    private fun createTerminalPane(
+        workspaceTab: TerminalWorkspaceTab,
+        onBound: (Throwable?) -> Unit,
+    ): TerminalPane =
         try {
             val registry = ensureCompletionRegistry()
             val completionProvider =
@@ -517,11 +588,12 @@ internal class TabManager(
                 tab = workspaceTab,
                 settings = settings,
                 completionProvider = completionProvider,
+                onBound = onBound,
             ) { pane, request ->
                 showPaneContextMenu(pane, request)
             }
         } catch (failure: Throwable) {
-            val cleanupFailure = captureCleanupFailure(failure) { workspace.closeTab(workspaceTab.id) }
+            val cleanupFailure = captureCleanupFailure(failure) { retireUnpublishedTab(workspaceTab) }
             throw requireNotNull(cleanupFailure)
         }
 
@@ -576,6 +648,10 @@ internal class TabManager(
         }
 
         if (!openReplacementWhenLastPane && !confirmClose(listOf(pane))) return
+        if (workspace.tabSnapshot().any { it === pane.tab } && !workspace.closeTabAsync(pane.tab.id, ::reportWorkspaceCleanup)) {
+            LOGGER.fine("Terminal pane cleanup is already queued or the workspace is shutting down")
+            return
+        }
 
         var failure: Throwable? = null
         val newRoot = root.removePane(pane)
@@ -594,7 +670,7 @@ internal class TabManager(
         }
 
         panes.remove(pane)
-        failure = captureCleanupFailure(failure) { workspace.closeTab(pane.tab.id) }
+        pane.tab.session.requestClose()
         failure = captureCleanupFailure(failure, pane::close)
 
         val newActive = getActivePane(tabId)
@@ -872,7 +948,7 @@ internal class TabManager(
 
     private fun showStartError(
         profile: TerminalProfile,
-        exception: Exception,
+        exception: Throwable,
     ) {
         SwingMessageDialogs.show(
             frame,
@@ -886,6 +962,10 @@ internal class TabManager(
     }
 
     private inner class StandaloneWorkspaceListener : TerminalWorkspaceListener {
+        override fun tabOpened(tab: TerminalWorkspaceTab) {
+            checkNotNull(publishStartingTab) { "Standalone startup must use the workspace worker" }(tab)
+        }
+
         override fun currentWorkingDirectoryChanged(
             tab: TerminalWorkspaceTab,
             uri: String,

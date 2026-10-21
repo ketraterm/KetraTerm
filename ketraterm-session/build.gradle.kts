@@ -42,6 +42,27 @@ dependencies {
     testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:$kotlinxCoroutinesVersion")
 }
 
+val defaultDispatcherTest =
+    tasks.register<Test>("defaultDispatcherTest") {
+        description = "Checks default cleanup dispatch while the shared I/O dispatcher is saturated."
+        group = "verification"
+        testClassesDirs =
+            sourceSets.test
+                .get()
+                .output.classesDirs
+        classpath = sourceSets.test.get().runtimeClasspath
+        useJUnitPlatform()
+        filter { includeTestsMatching("io.github.ketraterm.session.TerminalSessionDefaultDispatcherTest") }
+        systemProperty("kotlinx.coroutines.io.parallelism", "1")
+    }
+
 tasks.test {
     useJUnitPlatform()
+    exclude("**/TerminalSessionDefaultDispatcherTest.class")
+    dependsOn(defaultDispatcherTest)
+}
+
+// Replay the pinned producer corpus without copying binary fixtures between modules.
+sourceSets.test {
+    resources.srcDir(rootProject.layout.projectDirectory.dir("ketraterm-testkit/src/test/resources/kitty-graphics"))
 }

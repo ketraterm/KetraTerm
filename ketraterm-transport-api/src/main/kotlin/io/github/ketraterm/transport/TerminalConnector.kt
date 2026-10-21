@@ -41,6 +41,9 @@ public interface TerminalConnector : AutoCloseable {
      * after failure or closure, throw [IllegalStateException] without replacing
      * the original listener or starting additional workers. Closing before start
      * also prevents startup. Local [close] is idempotent.
+     * Startup and listener delivery must tolerate concurrent [close]. In particular,
+     * closing must not wait for a byte callback to return: it may be decoding an image.
+     * Synchronous listener delivery from this method must run off UI threads.
      *
      * @param listener callback sink for transport events.
      * @throws IllegalStateException if already started or closed.

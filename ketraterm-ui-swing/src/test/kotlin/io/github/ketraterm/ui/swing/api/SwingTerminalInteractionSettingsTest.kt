@@ -16,16 +16,15 @@
 package io.github.ketraterm.ui.swing.api
 
 import io.github.ketraterm.core.TerminalBuffers
+import io.github.ketraterm.host.HostPolicy
 import io.github.ketraterm.input.event.TerminalPasteEvent
 import io.github.ketraterm.input.policy.PasteControlPolicy
+import io.github.ketraterm.render.api.TerminalRenderCursorShape
 import io.github.ketraterm.session.TerminalInputAdmission
 import io.github.ketraterm.session.TerminalSession
 import io.github.ketraterm.transport.TerminalConnector
 import io.github.ketraterm.transport.TerminalConnectorListener
-import io.github.ketraterm.ui.swing.settings.SwingPadding
-import io.github.ketraterm.ui.swing.settings.SwingPasteSource
-import io.github.ketraterm.ui.swing.settings.SwingSettings
-import io.github.ketraterm.ui.swing.settings.TerminalClipboardHandler
+import io.github.ketraterm.ui.swing.settings.*
 import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestion
 import io.github.ketraterm.ui.swing.suggestion.SwingShellSuggestionRequest
 import kotlinx.coroutines.test.StandardTestDispatcher
@@ -47,17 +46,142 @@ import javax.swing.SwingUtilities
 
 class SwingTerminalInteractionSettingsTest {
     @Test
+    fun `reverting rejected settings restores the immediately applied paste policy`() =
+        fixture {
+            val original = settings
+            repeat(64) { view.setHostPolicy(HostPolicy()) }
+            settings =
+                settings.copy {
+                    it.pasteControlPolicy = PasteControlPolicy.PRESERVE
+                    it.palette = TerminalTheme.NORD.createPalette()
+                }
+            assertThrows(IllegalStateException::class.java) { view.reloadSettings() }
+            dispatcher.scheduler.runCurrent()
+            assertTrue(view.pasteText("a\u0003b"))
+            dispatcher.scheduler.runCurrent()
+            assertEquals("a\u0003b", output.toString(Charsets.UTF_8))
+            output.reset()
+
+            settings = original
+            view.reloadSettings()
+            dispatcher.scheduler.runCurrent()
+            assertTrue(view.pasteText("a\u0003b"))
+            dispatcher.scheduler.runCurrent()
+
+            assertEquals("ab", output.toString(Charsets.UTF_8))
+            session.readRenderFrame { frame -> assertEquals(original.palette, frame.palette) }
+        }
+
+    @Test
+    fun `settings listener reload applies the newest snapshot to the session`() =
+        fixture {
+            settings = settings.copy { it.smartSuggestionsEnabled = false }
+            view.reloadSettings()
+            dispatcher.scheduler.runCurrent()
+            var notified = false
+            view.addShellSuggestionEligibilityListener { eligible ->
+                if (eligible) {
+                    notified = true
+                    settings =
+                        settings.copy {
+                            it.palette = TerminalTheme.NORD.createPalette()
+                            it.cursorShape = TerminalRenderCursorShape.UNDERLINE
+                        }
+                    view.reloadSettings()
+                }
+            }
+
+            settings =
+                settings.copy {
+                    it.smartSuggestionsEnabled = true
+                    it.shellSuggestionsEnabled = true
+                    it.palette = TerminalTheme.ONE_DARK.createPalette()
+                    it.cursorShape = TerminalRenderCursorShape.BAR
+                }
+            view.reloadSettings()
+            dispatcher.scheduler.runCurrent()
+
+            assertTrue(notified)
+            session.readRenderFrame { frame ->
+                assertEquals(settings.palette, frame.palette)
+                assertEquals(settings.cursorShape, frame.cursor.shape)
+            }
+        }
+
+    @ParameterizedTest
+    @ValueSource(ints = [63, 64])
+    fun `rejected settings or geometry remain retryable with the same snapshot`(queuedPolicies: Int) =
+        fixture {
+            repeat(queuedPolicies) { view.setHostPolicy(HostPolicy()) }
+            settings =
+                settings.copy {
+                    it.treatAmbiguousAsWide = true
+                    it.palette = TerminalTheme.NORD.createPalette()
+                    it.cursorShape = TerminalRenderCursorShape.UNDERLINE
+                    it.columnSpacing += 4
+                    it.columns = 12
+                    it.rows = 4
+                }
+
+            assertThrows(IllegalStateException::class.java) { view.reloadSettings() }
+            val expectedGrid = view.visibleGridSize()
+            assertTrue(expectedGrid.width < 10)
+            assertEquals(view.preferredGridSize(12, 4), view.preferredSize)
+            dispatcher.scheduler.runCurrent()
+            assertEquals(queuedPolicies == 63, session.modeSnapshot.treatAmbiguousAsWide)
+
+            view.reloadSettings()
+            dispatcher.scheduler.runCurrent()
+            assertTrue(session.modeSnapshot.treatAmbiguousAsWide)
+            session.readRenderFrame { frame ->
+                assertEquals(settings.palette, frame.palette)
+                assertEquals(settings.cursorShape, frame.cursor.shape)
+                assertEquals(expectedGrid.width, frame.columns)
+                assertEquals(expectedGrid.height, frame.rows)
+            }
+        }
+
+    @Test
+    fun `retrying rejected geometry does not reapply already accepted palette and cursor settings`() =
+        fixture {
+            repeat(63) { view.setHostPolicy(HostPolicy()) }
+            settings =
+                settings.copy {
+                    it.palette = TerminalTheme.NORD.createPalette()
+                    it.cursorShape = TerminalRenderCursorShape.UNDERLINE
+                    it.columnSpacing += 4
+                }
+            assertThrows(IllegalStateException::class.java) { view.reloadSettings() }
+            dispatcher.scheduler.runCurrent()
+            session.readRenderFrame { frame ->
+                assertEquals(settings.palette, frame.palette)
+                assertEquals(settings.cursorShape, frame.cursor.shape)
+            }
+            feed("\u001B]4;1;#123456\u0007\u001B[5 q")
+
+            view.reloadSettings()
+            dispatcher.scheduler.runCurrent()
+            session.readRenderFrame { frame ->
+                assertEquals(0xFF123456.toInt(), frame.palette.indexedColor(1))
+                assertEquals(TerminalRenderCursorShape.BAR, frame.cursor.shape)
+                assertEquals(view.visibleGridSize().width, frame.columns)
+            }
+        }
+
+    @Test
     fun pixelChangeAfterExternalHeightResizeAdoptsTheReflowedHistoryBaseline() =
         fixture {
             val cell = Rectangle()
             assertTrue(view.copyCellBounds(0, 0, cell))
             settings = settings.copy { it.columnSpacing = 16 - cell.width }
             view.reloadSettings()
+            dispatcher.scheduler.runCurrent()
             val initialSize = view.preferredGridSize(10, 2)
             view.setSize(initialSize.width + 10, initialSize.height)
             resizeView()
             dispatcher.scheduler.runCurrent()
             view.bind(session)
+            dispatcher.scheduler.runCurrent()
             assertEquals(0, view.viewportState().historySize)
 
             session.resize(10, 5)
@@ -65,6 +189,7 @@ class SwingTerminalInteractionSettingsTest {
             session.onBytes(output, 0, output.size)
             settings = settings.copy { it.columnSpacing += 1 }
             view.reloadSettings()
+            dispatcher.scheduler.runCurrent()
 
             session.readRenderFrame {
                 assertEquals(10, it.columns)
@@ -84,11 +209,13 @@ class SwingTerminalInteractionSettingsTest {
             assertTrue(view.copyCellBounds(0, 0, cell))
             settings = settings.copy { it.columnSpacing = 16 - cell.width }
             view.reloadSettings()
+            dispatcher.scheduler.runCurrent()
             val initialSize = view.preferredGridSize(10, 2)
             view.setSize(initialSize.width + 10, initialSize.height)
             resizeView()
             dispatcher.scheduler.runCurrent()
             view.bind(session)
+            dispatcher.scheduler.runCurrent()
             feed("\u001b[?2048h")
             output.reset()
 
@@ -97,6 +224,7 @@ class SwingTerminalInteractionSettingsTest {
             assertNotNull(view.currentSelectionRange())
             settings = settings.copy { it.columnSpacing += 1 }
             view.reloadSettings()
+            dispatcher.scheduler.runCurrent()
 
             assertEquals(10, view.visibleGridSize().width)
             session.readRenderFrame { assertEquals(10, it.columns) }
@@ -107,6 +235,7 @@ class SwingTerminalInteractionSettingsTest {
                 output.toString(Charsets.UTF_8),
             )
             view.bind(session)
+            dispatcher.scheduler.runCurrent()
             assertTrue(view.selectAll())
             assertEquals("hello", view.selectedText()?.trimEnd())
         }
@@ -116,10 +245,12 @@ class SwingTerminalInteractionSettingsTest {
         fixture {
             settings = settings.copy { it.padding = SwingPadding(top = 3, left = 7, bottom = 2, right = 5) }
             view.reloadSettings()
+            dispatcher.scheduler.runCurrent()
             view.size = view.preferredGridSize(13, 4)
             resizeView()
             dispatcher.scheduler.runCurrent()
             view.bind(session)
+            dispatcher.scheduler.runCurrent()
             val textWidth = view.width - 12
             val textHeight = view.height - 5
 
@@ -147,11 +278,13 @@ class SwingTerminalInteractionSettingsTest {
             assertTrue(view.copyCellBounds(0, 0, originalCell))
             settings = settings.copy { it.columnSpacing = 16 - originalCell.width }
             view.reloadSettings()
+            dispatcher.scheduler.runCurrent()
             val initialSize = view.preferredGridSize(10, 2)
             view.setSize(initialSize.width + 10, initialSize.height)
             resizeView()
             dispatcher.scheduler.runCurrent()
             view.bind(session)
+            dispatcher.scheduler.runCurrent()
             feed("\u001b[?2048h")
             assertEquals("\u001b[48;2;10;${initialSize.height};160t", output.toString(Charsets.UTF_8))
             output.reset()
@@ -162,6 +295,7 @@ class SwingTerminalInteractionSettingsTest {
 
             settings = settings.copy { it.columnSpacing += 1 }
             view.reloadSettings()
+            dispatcher.scheduler.runCurrent()
             dispatcher.scheduler.runCurrent()
 
             assertEquals(10, view.visibleGridSize().width)
@@ -174,6 +308,7 @@ class SwingTerminalInteractionSettingsTest {
 
             resizeView()
             view.reloadSettings()
+            dispatcher.scheduler.runCurrent()
             dispatcher.scheduler.runCurrent()
 
             assertEquals(0, output.size())
@@ -198,6 +333,7 @@ class SwingTerminalInteractionSettingsTest {
             settings = settings.copy { it.mouseReportingEnabled = false }
             view.reloadSettings()
             dispatcher.scheduler.runCurrent()
+            dispatcher.scheduler.runCurrent()
 
             assertEquals(10, view.visibleGridSize().width)
             assertEquals(2, view.visibleGridSize().height)
@@ -216,6 +352,7 @@ class SwingTerminalInteractionSettingsTest {
             val originalFont = view.font
             settings = settings.copy { it.columnSpacing = spacing }
             view.reloadSettings()
+            dispatcher.scheduler.runCurrent()
             val visibleColumns = view.visibleGridSize().width
             assertEquals(originalSize.width + 10 * spacing, view.preferredGridSize(10, 2).width)
             assertEquals(originalSize.height, view.preferredGridSize(10, 2).height)
@@ -226,6 +363,7 @@ class SwingTerminalInteractionSettingsTest {
             assertEquals(0, copies)
             dispatcher.scheduler.runCurrent()
             view.bind(session)
+            dispatcher.scheduler.runCurrent()
             assertTrue(view.selectAll())
             assertTrue(view.copySelectionToClipboard())
             assertEquals("hello", clipboardText.trimEnd())
@@ -271,6 +409,7 @@ class SwingTerminalInteractionSettingsTest {
         fixture(middleClickPasteHandler = { requests += it }) {
             settings = settings.copy { it.middleClickPasteSource = SwingPasteSource.PRIMARY_SELECTION }
             view.reloadSettings()
+            dispatcher.scheduler.runCurrent()
             val press = event(MouseEvent.MOUSE_PRESSED, MouseEvent.BUTTON2, x = 3)
             view.mouseListeners.forEach { it.mousePressed(press) }
             release(MouseEvent.BUTTON2)
@@ -296,6 +435,7 @@ class SwingTerminalInteractionSettingsTest {
         fixture(middleClickPasteHandler = { request = it }) {
             settings = settings.copy { it.middleClickPasteSource = SwingPasteSource.PRIMARY_SELECTION }
             view.reloadSettings()
+            dispatcher.scheduler.runCurrent()
             click(MouseEvent.BUTTON2)
             settings =
                 settings.copy {
@@ -304,6 +444,7 @@ class SwingTerminalInteractionSettingsTest {
                     it.pasteControlPolicy = PasteControlPolicy.PRESERVE
                 }
             view.reloadSettings()
+            dispatcher.scheduler.runCurrent()
             feed("\u001b[?2004h")
 
             assertEquals(SwingPasteSource.PRIMARY_SELECTION, request.source)
@@ -334,6 +475,7 @@ class SwingTerminalInteractionSettingsTest {
         fixture {
             settings = settings.copy { it.middleClickPasteSource = SwingPasteSource.PRIMARY_SELECTION }
             view.reloadSettings()
+            dispatcher.scheduler.runCurrent()
             primaryText = "primary text"
             click(MouseEvent.BUTTON2)
             dispatcher.scheduler.runCurrent()
@@ -348,6 +490,7 @@ class SwingTerminalInteractionSettingsTest {
         fixture {
             settings = settings.copy { it.middleClickPasteSource = SwingPasteSource.PRIMARY_SELECTION }
             view.reloadSettings()
+            dispatcher.scheduler.runCurrent()
             primaryText = if (sourceState == "empty") "" else null
             var invalidations = 0
             view.addShellSuggestionInvalidationListener { invalidations++ }
@@ -368,6 +511,7 @@ class SwingTerminalInteractionSettingsTest {
                 "disabled" -> {
                     settings = settings.copy { it.middleClickPaste = false }
                     view.reloadSettings()
+                    dispatcher.scheduler.runCurrent()
                 }
                 "unbound" -> view.unbind()
                 "closed" -> session.close()
@@ -402,6 +546,7 @@ class SwingTerminalInteractionSettingsTest {
 
             settings = settings.copy { it.mouseReportingEnabled = false }
             view.reloadSettings()
+            dispatcher.scheduler.runCurrent()
             click(MouseEvent.BUTTON2)
             assertEquals(2, requests.size)
             assertFalse(requests.last().forcedByShift)
@@ -435,6 +580,7 @@ class SwingTerminalInteractionSettingsTest {
                     "unbind-rebind" -> {
                         view.unbind()
                         view.bind(session)
+                        dispatcher.scheduler.runCurrent()
                     }
                 }
                 assertFalse(request.complete("stale"))
@@ -490,6 +636,7 @@ class SwingTerminalInteractionSettingsTest {
         fixture(startSession = false, middleClickPasteHandler = { request = it }) {
             feed("hello")
             view.bind(session)
+            dispatcher.scheduler.runCurrent()
             click(MouseEvent.BUTTON2)
             var invalidations = 0
             view.addShellSuggestionInvalidationListener { invalidations++ }
@@ -534,6 +681,7 @@ class SwingTerminalInteractionSettingsTest {
                     "unbind-rebind" -> {
                         view.unbind()
                         view.bind(session)
+                        dispatcher.scheduler.runCurrent()
                     }
                 }
             }
@@ -620,6 +768,7 @@ class SwingTerminalInteractionSettingsTest {
         fixture {
             settings = settings.copy { it.middleClickPasteSource = SwingPasteSource.PRIMARY_SELECTION }
             view.reloadSettings()
+            dispatcher.scheduler.runCurrent()
             onRead = { view.bind(session) }
             click(MouseEvent.BUTTON2)
             dispatcher.scheduler.runCurrent()
@@ -781,6 +930,7 @@ class SwingTerminalInteractionSettingsTest {
         fixture {
             settings = settings.copy { it.smartSuggestionsEnabled = true }
             view.reloadSettings()
+            dispatcher.scheduler.runCurrent()
             feed("\u001b[?2004h")
             clipboardText = "a\u0001b\n"
             view.showSuggestions(
@@ -959,12 +1109,14 @@ class SwingTerminalInteractionSettingsTest {
             output.reset()
             settings = settings.copy { it.mouseReportingEnabled = false }
             view.reloadSettings()
+            dispatcher.scheduler.runCurrent()
             click(MouseEvent.BUTTON2)
             dispatcher.scheduler.runCurrent()
             assertEquals("clipboard", output.toString(Charsets.UTF_8))
             output.reset()
             settings = settings.copy { it.mouseReportingEnabled = true }
             view.reloadSettings()
+            dispatcher.scheduler.runCurrent()
             click(MouseEvent.BUTTON2)
             dispatcher.scheduler.runCurrent()
             assertTrue(output.toString(Charsets.UTF_8).startsWith("\u001b[<1;"))
@@ -983,6 +1135,7 @@ class SwingTerminalInteractionSettingsTest {
             assertTrue(settings.alternateScreenWheelToArrowEnabled)
             feed("\u001b[?1049h" + if (applicationCursor) "\u001b[?1h" else "")
             view.bind(session)
+            dispatcher.scheduler.runCurrent()
 
             repeat(3) { assertTrue(wheel(-0.25).isConsumed) }
             dispatcher.scheduler.runCurrent()
@@ -1022,6 +1175,7 @@ class SwingTerminalInteractionSettingsTest {
             feed("\u001b[>1s")
             settings = settings.copy { it.mouseReportingEnabled = false }
             view.reloadSettings()
+            dispatcher.scheduler.runCurrent()
             click(MouseEvent.BUTTON2, modifiers = InputEvent.SHIFT_DOWN_MASK)
             dispatcher.scheduler.runCurrent()
             assertEquals("clipboard", output.toString(Charsets.UTF_8))
@@ -1045,6 +1199,7 @@ class SwingTerminalInteractionSettingsTest {
             output.reset()
             settings = settings.copy { it.alternateScreenWheelToArrowEnabled = false }
             view.reloadSettings()
+            dispatcher.scheduler.runCurrent()
             feed("\u001b[?1007h")
             wheel(-1.0)
             dispatcher.scheduler.runCurrent()
@@ -1057,8 +1212,10 @@ class SwingTerminalInteractionSettingsTest {
         fixture {
             settings = settings.copy { it.alternateScreenWheelToArrowEnabled = false }
             view.reloadSettings()
+            dispatcher.scheduler.runCurrent()
             feed("\u001b[?1049h")
             view.bind(session)
+            dispatcher.scheduler.runCurrent()
 
             val modifiers = if (shift) InputEvent.SHIFT_DOWN_MASK else 0
             assertFalse(wheel(-0.25, modifiers).isConsumed)
@@ -1074,8 +1231,10 @@ class SwingTerminalInteractionSettingsTest {
         fixture {
             settings = settings.copy { it.alternateScreenWheelToArrowEnabled = false }
             view.reloadSettings()
+            dispatcher.scheduler.runCurrent()
             feed("\u001b[?1049h\u001b[?1000h\u001b[?1006h")
             view.bind(session)
+            dispatcher.scheduler.runCurrent()
 
             assertTrue(wheel(-1.0).isConsumed)
             dispatcher.scheduler.runCurrent()
@@ -1087,6 +1246,7 @@ class SwingTerminalInteractionSettingsTest {
             assertEquals(0, output.size())
             settings = settings.copy { it.alternateScreenWheelToArrowEnabled = true }
             view.reloadSettings()
+            dispatcher.scheduler.runCurrent()
             assertTrue(wheel(-1.0, InputEvent.SHIFT_DOWN_MASK).isConsumed)
             dispatcher.scheduler.runCurrent()
             assertEquals("\u001b[A", output.toString(Charsets.UTF_8))
@@ -1098,6 +1258,7 @@ class SwingTerminalInteractionSettingsTest {
         fixture {
             feed("\u001b[?1049h")
             view.bind(session)
+            dispatcher.scheduler.runCurrent()
             repeat(3) { wheel(-0.25) }
             dispatcher.scheduler.runCurrent()
             assertEquals(0, output.size())
@@ -1112,6 +1273,7 @@ class SwingTerminalInteractionSettingsTest {
                         }
                     }
                 view.reloadSettings()
+                dispatcher.scheduler.runCurrent()
             }
 
             wheel(-0.25)
@@ -1128,9 +1290,11 @@ class SwingTerminalInteractionSettingsTest {
         fixture {
             feed("\u001b[?1049h")
             view.bind(session)
+            dispatcher.scheduler.runCurrent()
             repeat(3) { wheel(-0.25) }
             if (change == "unbind-rebind") view.unbind()
             view.bind(session)
+            dispatcher.scheduler.runCurrent()
 
             wheel(-0.25)
             dispatcher.scheduler.runCurrent()
@@ -1147,6 +1311,7 @@ class SwingTerminalInteractionSettingsTest {
             if (state != "no-frame") {
                 feed("\u001b[?1049h")
                 view.bind(session)
+                dispatcher.scheduler.runCurrent()
                 repeat(3) { wheel(-0.25) }
             }
             when (state) {
@@ -1167,8 +1332,10 @@ class SwingTerminalInteractionSettingsTest {
         fixture {
             settings = settings.copy { it.alternateScreenWheelToArrowEnabled = enabled }
             view.reloadSettings()
+            dispatcher.scheduler.runCurrent()
             feed("\r\nsecond\r\nthird\r\nfourth")
             view.bind(session)
+            dispatcher.scheduler.runCurrent()
             assertTrue(view.viewportState().historySize > 0)
 
             assertTrue(wheel(-0.25).isConsumed)
@@ -1184,6 +1351,7 @@ class SwingTerminalInteractionSettingsTest {
         fixture {
             if (closed) session.onClosed(0)
             view.bind(session)
+            dispatcher.scheduler.runCurrent()
             val range = requireNotNull(view.createSelectionRange(0, 0, 5, 0))
             assertTrue(view.setSelection(range))
             view.clearSelection()
@@ -1231,10 +1399,13 @@ class SwingTerminalInteractionSettingsTest {
         fixture {
             settings = settings.copy { it.columnSpacing = spacing }
             view.reloadSettings()
+            dispatcher.scheduler.runCurrent()
             view.size = view.preferredGridSize(10, 2)
             view.bind(session)
+            dispatcher.scheduler.runCurrent()
             feed("\u001b[Habcdefghij")
             view.bind(session)
+            dispatcher.scheduler.runCurrent()
             val bounds = Rectangle()
             val position = Point()
             assertTrue(view.copyCellBounds(3, 0, bounds))
@@ -1259,10 +1430,13 @@ class SwingTerminalInteractionSettingsTest {
         fixture {
             settings = settings.copy { it.columnSpacing = spacing }
             view.reloadSettings()
+            dispatcher.scheduler.runCurrent()
             view.size = view.preferredGridSize(10, 2)
             view.bind(session)
+            dispatcher.scheduler.runCurrent()
             feed("\u001b[?1000h\u001b[?1006h")
             view.bind(session)
+            dispatcher.scheduler.runCurrent()
             val bounds = Rectangle()
             assertTrue(view.copyCellBounds(7, 0, bounds))
             val x = bounds.x + bounds.width / 2
@@ -1289,7 +1463,9 @@ class SwingTerminalInteractionSettingsTest {
             settings = settings.copy { it.columnSpacing = 1 - originalBounds.width }
             view.reloadSettings()
             dispatcher.scheduler.runCurrent()
+            dispatcher.scheduler.runCurrent()
             view.bind(session)
+            dispatcher.scheduler.runCurrent()
             assertEquals(originalFont, view.font)
             assertEquals(10, view.preferredGridSize(10, 2).width)
             val bounds = Rectangle()
@@ -1308,6 +1484,7 @@ class SwingTerminalInteractionSettingsTest {
         fixture {
             feed("\u001b[?1000h\u001b[?1006h")
             view.bind(session)
+            dispatcher.scheduler.runCurrent()
             assertTrue(view.selectAll())
             val originalSelection = view.currentSelectionRange()
             val originalSettings = settings
@@ -1354,7 +1531,9 @@ class SwingTerminalInteractionSettingsTest {
             settings = originalSettings.copy { it.columnSpacing = -1 }
             view.reloadSettings()
             dispatcher.scheduler.runCurrent()
+            dispatcher.scheduler.runCurrent()
             view.bind(session)
+            dispatcher.scheduler.runCurrent()
             assertEquals(originalSize.width - 10, view.preferredGridSize(10, 2).width)
             assertEquals(originalSize.height, view.preferredGridSize(10, 2).height)
             assertTrue(view.copyCellBounds(3, 0, bounds))
@@ -1437,6 +1616,10 @@ class SwingTerminalInteractionSettingsTest {
             SwingTerminal(
                 { settings },
                 SwingHostServices.create {
+                    it.uiDispatcher =
+                        TerminalUiDispatcher { task ->
+                            if (SwingUtilities.isEventDispatchThread()) task.run() else SwingUtilities.invokeLater(task)
+                        }
                     it.scrollbarOverlayEnabled = true
                     it.middleClickPasteHandler = middleClickPasteHandler
                     it.clipboardHandler =
@@ -1460,6 +1643,8 @@ class SwingTerminalInteractionSettingsTest {
                             }
                         }
                 },
+                searchDispatcher = dispatcher,
+                mutationDispatcher = dispatcher,
             )
 
         init {
@@ -1469,6 +1654,7 @@ class SwingTerminalInteractionSettingsTest {
             }
             view.size = view.preferredGridSize(10, 2)
             view.bind(session)
+            if (startSession) dispatcher.scheduler.runCurrent()
         }
 
         fun feed(text: String) {

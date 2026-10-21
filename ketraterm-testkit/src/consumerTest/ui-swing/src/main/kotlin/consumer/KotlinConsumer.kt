@@ -223,14 +223,18 @@ fun main() =
                     ).apply { size = preferredSize }
                 }
             try {
+                val bound = CompletableDeferred<Unit>()
                 onEdt {
                     val original = SwingSettings()
                     val updated = original.copy { it.cursorBlinkMillis = 0 }
                     check(updated.font == original.font && updated.fallbackFonts == original.fallbackFonts)
                     check(updated.cursorBlinkMillis == 0 && updated.padding == original.padding)
-                    terminal.bind(session)
-                    terminal.dispatchPointer(MouseEvent.MOUSE_MOVED)
+                    terminal.bind(session) { failure ->
+                        if (failure == null) bound.complete(Unit) else bound.completeExceptionally(failure)
+                    }
                 }
+                withTimeout(20_000) { bound.await() }
+                onEdt { terminal.dispatchPointer(MouseEvent.MOUSE_MOVED) }
                 // Entry acknowledges installation in the view, not merely completion of detection.
                 withTimeout(20_000) { detector.initialHover.await() }
                 checkNotNull(

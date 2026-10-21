@@ -16,17 +16,91 @@
 package io.github.ketraterm.parser
 
 import io.github.ketraterm.parser.ansi.RecordingTerminalCommandSink
+import io.github.ketraterm.parser.api.TerminalGraphicsOutputParser
 import io.github.ketraterm.parser.api.TerminalParsers
 import io.github.ketraterm.parser.spi.TerminalCommandSink
 import io.github.ketraterm.protocol.TerminalGraphicsCommand
 import io.github.ketraterm.protocol.TerminalGraphicsLimits
 import io.github.ketraterm.protocol.TerminalGraphicsResult
 import org.junit.jupiter.api.Test
-import kotlin.test.assertContentEquals
-import kotlin.test.assertEquals
-import kotlin.test.assertTrue
+import kotlin.test.*
 
 class GraphicsParserTest {
+    @Test
+    fun `anonymous and number-only queries never request an external decoder`() {
+        for (controls in listOf("a=q,f=100", "a=q,f=100,I=4", "a=q,f=24,o=z")) {
+            val f = Fixture()
+            val parser = f.parser as TerminalGraphicsOutputParser
+            val bytes = apc(controls, "AAAA").encodeToByteArray()
+            assertEquals(bytes.size, parser.acceptUntilGraphics(bytes, 0, bytes.size))
+            assertFalse(parser.hasPendingGraphics)
+            assertEquals(1, f.commands.size)
+        }
+    }
+
+    @Test
+    fun `yield consumes exactly through ST and retains borrowed payload across every ingress split`() {
+        val envelope = apc("a=T,f=100,i=9", "AAEC")
+        val bytes = (envelope + "\u001b[6n").encodeToByteArray()
+        for (split in 0..envelope.length) {
+            val f = Fixture()
+            val parser = f.parser as TerminalGraphicsOutputParser
+            assertEquals(split, parser.acceptUntilGraphics(bytes, 0, split))
+            val consumed = if (parser.hasPendingGraphics) split else split + parser.acceptUntilGraphics(bytes, split, bytes.size - split)
+            assertEquals(envelope.length, consumed, "split=$split")
+            assertTrue(parser.hasPendingGraphics)
+            assertTrue(f.commands.isEmpty())
+            assertTrue(f.text.events.isEmpty())
+            assertFailsWith<IllegalStateException> { parser.accept(bytes, consumed, 0) }
+            parser.consumePendingGraphics { command, data, length ->
+                assertEquals(9L, command.value('i'))
+                assertContentEquals(byteArrayOf(0, 1, 2), data.copyOf(length))
+                data[0] = 42
+                assertFailsWith<IllegalStateException> { parser.reset() }
+                assertFailsWith<IllegalStateException> { parser.acceptByte(65) }
+            }
+            assertFalse(parser.hasPendingGraphics)
+            assertEquals(bytes.size - consumed, parser.acceptUntilGraphics(bytes, consumed, bytes.size - consumed))
+            assertTrue(f.text.events.isNotEmpty())
+        }
+    }
+
+    @Test
+    fun `failed payload consumer releases staging and parser remains usable`() {
+        val f = Fixture()
+        val parser = f.parser as TerminalGraphicsOutputParser
+        val bytes = apc("f=24,o=z,i=2,s=1,v=1", "AAAA").encodeToByteArray()
+        parser.acceptUntilGraphics(bytes, 0, bytes.size)
+        assertFailsWith<IllegalArgumentException> {
+            parser.consumePendingGraphics { _, _, _ -> throw IllegalArgumentException("decoder failure") }
+        }
+        assertFalse(parser.hasPendingGraphics)
+        f.feed(apc("f=24,i=3,s=1,v=1", "/wAA"))
+        assertEquals(3L, f.commands.single().id)
+    }
+
+    @Test
+    fun `invalid and incomplete graphics do not yield and EOF discards pending graphics`() {
+        val f = Fixture()
+        val parser = f.parser as TerminalGraphicsOutputParser
+        for (header in listOf("f=100,i=2", "f=24,o=z,i=2")) {
+            val bytes = apc(header, "A").encodeToByteArray()
+            assertEquals(bytes.size, parser.acceptUntilGraphics(bytes, 0, bytes.size))
+            assertFalse(parser.hasPendingGraphics)
+            assertEquals(TerminalGraphicsResult.INVALID, f.commands.last().result)
+        }
+        val chunk = apc("f=100,i=3,m=1", "AAAA").encodeToByteArray()
+        parser.acceptUntilGraphics(chunk, 0, chunk.size)
+        assertFalse(parser.hasPendingGraphics)
+        val last = apc("m=0", "AAAA").encodeToByteArray()
+        parser.acceptUntilGraphics(last, 0, last.size)
+        assertTrue(parser.hasPendingGraphics)
+        parser.endOfInput()
+        assertFalse(parser.hasPendingGraphics)
+        f.feed(apc("i=4", "AAAA"))
+        assertEquals(4L, f.commands.last().id)
+    }
+
     @Test
     fun `decoded transfer limit rejects the first excess group and recovers on the next command`() {
         val text = RecordingTerminalCommandSink()

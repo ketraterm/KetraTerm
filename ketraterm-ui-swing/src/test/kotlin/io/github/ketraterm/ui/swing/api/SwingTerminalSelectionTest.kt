@@ -125,6 +125,7 @@ class SwingTerminalSelectionTest {
                 )
             component.size = component.preferredGridSize(8, 2)
             component.bind(session)
+            mutationDispatcher.scheduler.runCurrent()
             dispatcher.scheduler.runCurrent()
             val pressed = if (block) mousePressedWithAlt(component, x = 1, y = 1) else mousePressed(component, x = 1, y = 1, clickCount = 3)
             component.mouseListeners.forEach { it.mousePressed(pressed) }
@@ -161,6 +162,7 @@ class SwingTerminalSelectionTest {
                 val resize = ComponentEvent(component, ComponentEvent.COMPONENT_RESIZED)
                 component.componentListeners.forEach { it.componentResized(resize) }
             }
+            mutationDispatcher.scheduler.runCurrent()
             dispatcher.scheduler.runCurrent()
             if (fontSize == null) {
                 assertEquals(resizedColumns, terminal.width)
@@ -234,6 +236,7 @@ class SwingTerminalSelectionTest {
                 })
             component.setSize(120, 40)
             component.bind(session)
+            mutationDispatcher.scheduler.runCurrent()
             dispatcher.scheduler.advanceUntilIdle()
             val move = MouseEvent(component, MouseEvent.MOUSE_MOVED, 0L, hyperlinkNavigationModifierMask, 1, 1, 0, false)
             component.mouseMotionListeners.forEach { it.mouseMoved(move) }
@@ -250,6 +253,7 @@ class SwingTerminalSelectionTest {
         }
     }
 
+    private val mutationDispatcher = StandardTestDispatcher()
     private val components = ArrayList<SwingTerminal>()
     private val sessions = ArrayList<TerminalSession>()
 
@@ -257,12 +261,22 @@ class SwingTerminalSelectionTest {
     fun disposeFixtures() {
         SwingUtilities.invokeAndWait { components.forEach(SwingTerminal::dispose) }
         sessions.forEach(TerminalSession::close)
+        mutationDispatcher.scheduler.runCurrent()
     }
 
     private fun createComponent(
         settingsProvider: SwingSettingsProvider = SwingSettingsProvider { SwingSettings() },
         hostServices: SwingHostServices = SwingHostServices(),
-    ): SwingTerminal = SwingTerminal(settingsProvider = settingsProvider, hostServices = hostServices).also(components::add)
+    ): SwingTerminal =
+        SwingTerminal(
+            settingsProvider = settingsProvider,
+            hostServices =
+                hostServices.copy { draft ->
+                    draft.uiDispatcher = CONTROLLED_SWING_UI_DISPATCHER
+                },
+            searchDispatcher = mutationDispatcher,
+            mutationDispatcher = mutationDispatcher,
+        ).also(components::add)
 
     @ParameterizedTest
     @ValueSource(booleans = [false, true])
@@ -321,12 +335,15 @@ class SwingTerminalSelectionTest {
                     reused.size = reused.preferredGridSize(5, 1)
                     fresh.size = fresh.preferredGridSize(5, 1)
                     reused.bind(previous)
+                    mutationDispatcher.scheduler.runCurrent()
                     assertTrue(reused.selectAll())
                     assertEquals(3 * reused.viewportState().cellHeightPixels, reused.viewportState().contentHeightPixels)
                     val oldPixels = componentPixels(reused)
                     if (unbindFirst) reused.unbind()
                     reused.bind(replacement)
+                    mutationDispatcher.scheduler.runCurrent()
                     fresh.bind(replacement)
+                    mutationDispatcher.scheduler.runCurrent()
 
                     assertNull(
                         replacement.readPublishedFrame { true },
@@ -451,10 +468,13 @@ class SwingTerminalSelectionTest {
                     reused.setSize(120, 40)
                     fresh.setSize(120, 40)
                     reused.bind(first)
+                    mutationDispatcher.scheduler.runCurrent()
                     componentPixels(reused)
                     if (unbindFirst) reused.unbind()
                     reused.bind(second)
+                    mutationDispatcher.scheduler.runCurrent()
                     fresh.bind(second)
+                    mutationDispatcher.scheduler.runCurrent()
 
                     assertArrayEquals(componentPixels(fresh), componentPixels(reused), "Session replacement retained old bidi layout")
                     clickWithCtrl(reused, 1, 1)
@@ -513,6 +533,7 @@ class SwingTerminalSelectionTest {
             SwingUtilities.invokeAndWait {
                 component.setSize(100, 40)
                 component.bind(session)
+                mutationDispatcher.scheduler.runCurrent()
                 session.requestRender(0)
                 clickWithCtrl(component, 1, 1)
             }
@@ -543,6 +564,7 @@ class SwingTerminalSelectionTest {
             SwingUtilities.invokeAndWait {
                 component.setSize(200, 40)
                 component.bind(session)
+                mutationDispatcher.scheduler.runCurrent()
                 session.requestRender(0)
                 val metrics = SwingMetrics.from(component.getFontMetrics(settings.font))
                 val left = (component.width - frame.columns * metrics.cellWidth) / 2
@@ -579,6 +601,7 @@ class SwingTerminalSelectionTest {
             SwingUtilities.invokeAndWait {
                 component.setSize(100, 40)
                 component.bind(session)
+                mutationDispatcher.scheduler.runCurrent()
                 session.requestRender(0)
                 component.mouseListeners.forEach { it.mousePressed(mousePressed(component, 1, 1, 1)) }
                 val event = requireNotNull(input.lastMouseEvent.get())
@@ -610,6 +633,7 @@ class SwingTerminalSelectionTest {
         SwingUtilities.invokeAndWait {
             component.setSize(300, 80)
             component.bind(session)
+            mutationDispatcher.scheduler.runCurrent()
             session.requestRender(0)
             component.mouseListeners.forEach { it.mousePressed(mousePressed(component, x = 8, y = 8, clickCount = 1)) }
         }
@@ -632,6 +656,7 @@ class SwingTerminalSelectionTest {
         SwingUtilities.invokeAndWait {
             component.setSize(300, 80)
             component.bind(session)
+            mutationDispatcher.scheduler.runCurrent()
             session.requestRender(0)
             component.mouseListeners.forEach { it.mousePressed(mousePressed(component, x = 8, y = 8, clickCount = 1)) }
             component.mouseMotionListeners.forEach { it.mouseDragged(mouseDragged(component, x = 299, y = 8)) }
@@ -654,6 +679,7 @@ class SwingTerminalSelectionTest {
             SwingUtilities.invokeAndWait {
                 component.setSize(300, 80)
                 component.bind(session)
+                mutationDispatcher.scheduler.runCurrent()
                 session.requestRender(0)
                 component.mouseListeners.forEach { it.mousePressed(mousePressed(component, x = 8, y = 8, clickCount = 1)) }
                 component.mouseMotionListeners.forEach { it.mouseDragged(mouseDragged(component, x = 299, y = 8)) }
@@ -667,6 +693,7 @@ class SwingTerminalSelectionTest {
                         draft.scrollOnOutput = !settings.scrollOnOutput
                     }
                 component.reloadSettings()
+                mutationDispatcher.scheduler.runCurrent()
 
                 assertEquals(selected, component.currentSelection())
             }
@@ -695,6 +722,7 @@ class SwingTerminalSelectionTest {
         SwingUtilities.invokeAndWait {
             component.setSize(60, 20)
             component.bind(session)
+            mutationDispatcher.scheduler.runCurrent()
             assertEquals(5, component.viewportState().historySize)
             component.mouseListeners.forEach { it.mousePressed(mousePressed(component, x = 8, y = 8, clickCount = 1)) }
             component.mouseMotionListeners.forEach { it.mouseDragged(mouseDragged(component, x = 8, y = -10)) }
@@ -723,6 +751,7 @@ class SwingTerminalSelectionTest {
         SwingUtilities.invokeAndWait {
             component.setSize(300, 80)
             component.bind(session)
+            mutationDispatcher.scheduler.runCurrent()
             session.requestRender(0)
             component.mouseListeners.forEach { it.mousePressed(mousePressedWithAlt(component, x = 8, y = 8)) }
             component.mouseMotionListeners.forEach { it.mouseDragged(mouseDraggedWithAlt(component, x = 80, y = 8)) }
@@ -767,6 +796,7 @@ class SwingTerminalSelectionTest {
             SwingUtilities.invokeAndWait {
                 component.size = component.preferredGridSize(3, 2)
                 component.bind(session)
+                mutationDispatcher.scheduler.runCurrent()
                 val metrics = SwingMetrics.from(component.getFontMetrics(settings.font))
                 val before = componentPixels(component)
                 val startY = (if (upward) metrics.cellHeight else 0) + 1
@@ -898,6 +928,7 @@ class SwingTerminalSelectionTest {
         SwingUtilities.invokeAndWait {
             component.setSize(300, 80)
             component.bind(session)
+            mutationDispatcher.scheduler.runCurrent()
             session.requestRender(0)
             component.mouseListeners.forEach { it.mousePressed(mousePressed(component, x = 8, y = 8, clickCount = 2)) }
             assertTrue(component.copySelectionToClipboard())
@@ -953,6 +984,7 @@ class SwingTerminalSelectionTest {
             SwingUtilities.invokeAndWait {
                 component.size = component.preferredGridSize(5, 3)
                 component.bind(session)
+                mutationDispatcher.scheduler.runCurrent()
                 assertTrue(component.selectAll())
                 assertTrue(component.copySelectionToClipboard())
                 assertTrue(component.pasteClipboardText())
@@ -1000,6 +1032,7 @@ class SwingTerminalSelectionTest {
             SwingUtilities.invokeAndWait {
                 component.size = component.preferredGridSize(5, 2)
                 component.bind(session)
+                mutationDispatcher.scheduler.runCurrent()
                 val metrics = SwingMetrics.from(component.getFontMetrics(settings.font))
                 val startX = metrics.cellWidth + 1
                 val endX = 3 * metrics.cellWidth + 1
@@ -1054,6 +1087,7 @@ class SwingTerminalSelectionTest {
         SwingUtilities.invokeAndWait {
             component.setSize(300, 80)
             component.bind(session)
+            mutationDispatcher.scheduler.runCurrent()
             session.requestRender(0)
             component.mouseListeners.forEach { it.mousePressed(mousePressed(component, x = 8, y = 8, clickCount = 1)) }
             component.mouseMotionListeners.forEach { it.mouseDragged(mouseDragged(component, x = 299, y = 8)) }
@@ -1086,6 +1120,7 @@ class SwingTerminalSelectionTest {
         SwingUtilities.invokeAndWait {
             component.setSize(300, 80)
             component.bind(session)
+            mutationDispatcher.scheduler.runCurrent()
             session.requestRender(0)
             component.mouseListeners.forEach { it.mousePressed(mousePressed(component, x = 8, y = 8, clickCount = 1)) }
             component.mouseMotionListeners.forEach { it.mouseDragged(mouseDragged(component, x = 299, y = 8)) }
@@ -1121,6 +1156,7 @@ class SwingTerminalSelectionTest {
         SwingUtilities.invokeAndWait {
             component.setSize(300, 80)
             component.bind(session)
+            mutationDispatcher.scheduler.runCurrent()
             component.addShellSuggestionInvalidationListener {
                 visibleDuringInvalidation += component.currentShellSuggestionState().visible
             }
@@ -1159,6 +1195,7 @@ class SwingTerminalSelectionTest {
         SwingUtilities.invokeAndWait {
             component.setSize(300, 80)
             component.bind(session)
+            mutationDispatcher.scheduler.runCurrent()
             component.mouseListeners.forEach {
                 it.mousePressed(mousePressedMiddle(component, x = 8, y = 8, clickCount = 1))
             }
@@ -1194,6 +1231,7 @@ class SwingTerminalSelectionTest {
         SwingUtilities.invokeAndWait {
             component.setSize(300, 80)
             component.bind(session)
+            mutationDispatcher.scheduler.runCurrent()
             component.mouseListeners.forEach {
                 it.mousePressed(mousePressedMiddle(component, x = 8, y = 8, clickCount = 1))
             }
@@ -1251,6 +1289,7 @@ class SwingTerminalSelectionTest {
         SwingUtilities.invokeAndWait {
             component.setSize(80, 40)
             component.bind(session)
+            mutationDispatcher.scheduler.runCurrent()
             session.requestRender(0)
             component.mouseListeners.forEach {
                 it.mousePressed(mousePressedWithCtrl(component, x = 8, y = 8))
@@ -1316,6 +1355,7 @@ class SwingTerminalSelectionTest {
         SwingUtilities.invokeAndWait {
             component.setSize(80, 40)
             component.bind(session)
+            mutationDispatcher.scheduler.runCurrent()
             session.requestRender(0)
             val metrics = SwingMetrics.from(component.getFontMetrics(settings.font))
             component.mouseListeners.forEach {

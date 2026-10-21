@@ -22,9 +22,9 @@ import com.intellij.openapi.Disposable
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.components.Service
 import com.intellij.openapi.components.service
+import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.editor.colors.EditorColorsListener
 import com.intellij.openapi.editor.colors.EditorColorsManager
-import com.intellij.openapi.progress.ProcessCanceledException
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.project.ProjectCloseListener
 import com.intellij.openapi.util.Disposer
@@ -53,7 +53,9 @@ import java.awt.BorderLayout
 import java.awt.Component
 import java.nio.file.Path
 import java.util.concurrent.CancellationException
+import java.util.concurrent.CompletableFuture
 import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.ExecutionException
 import java.util.concurrent.atomic.AtomicInteger
 import javax.swing.JPanel
 import javax.swing.SwingUtilities
@@ -72,10 +74,11 @@ import javax.swing.SwingUtilities
 @Service(Service.Level.PROJECT)
 class KetraTermProjectTerminalService internal constructor(
     private val project: Project,
-    private val startWorkspaceTab: (TerminalWorkspace, TerminalProfile, TerminalWorkspaceOpenOptions) -> TerminalWorkspaceTab,
+    workspaceFactory: (TerminalWorkspaceListener) -> TerminalWorkspace = ::TerminalWorkspace,
+    private val prepareStartup: (TerminalProfile) -> Unit,
 ) : Disposable {
     /** Creates the project owner using IntelliJ's bundled PTY runtime. */
-    constructor(project: Project) : this(project, IntelliJPtyRuntime()::openWorkspaceTab)
+    constructor(project: Project) : this(project, prepareStartup = { IntelliJPtyRuntime.BundledPty4jRuntime.requireAvailable() })
 
     private val contentsByTabId = LinkedHashMap<String, Content>()
     private val pendingTabsById = LinkedHashMap<String, PendingTerminalTab>()
@@ -86,8 +89,7 @@ class KetraTermProjectTerminalService internal constructor(
     // Only accessed during serialized workspace creation and its synchronous tabOpened callback.
     private var startingTab: PendingTerminalTab? = null
     private val closeListenersByTabId = LinkedHashMap<String, ContentCloseQueryRegistration>()
-    private val workspace = TerminalWorkspace(IntellijWorkspaceListener())
-    private val workspaceLock = Any()
+    private val workspace = workspaceFactory(IntellijWorkspaceListener())
     private val nextPendingTabNumber = AtomicInteger(1)
     private val settingsChangedListener = { reloadOpenTerminalSettings() }
     private var lastToolWindow: ToolWindow? = null
@@ -301,10 +303,12 @@ class KetraTermProjectTerminalService internal constructor(
         val settingsState = settingsService.state
         val settings = settingsService.current()
         val basePath = project.basePath
-        ApplicationManager.getApplication().executeOnPooledThread {
-            if (disposed || closing || pending.closed) return@executeOnPooledThread
-            val result =
-                try {
+        val startupCommand = project.service<KetraTermProjectSettings>().state.startupCommand
+        val options = openOptions(settings)
+        val accepted =
+            workspace.openTabAsync(
+                profile = {
+                    check(!disposed && !closing && !pending.closed) { "Terminal startup cancelled" }
                     val profile =
                         pending.sourceProfile
                             ?: TerminalTabRestore.profile(basePath, requireNotNull(pending.restoredState), settingsState)
@@ -313,34 +317,26 @@ class KetraTermProjectTerminalService internal constructor(
                             .withProjectSdkEnvironment(project, enabled = settingsState.addProjectJdkToPath)
                             .copy(
                                 startupCommand =
-                                    profile.startupCommand ?: TerminalStartupCommand.fromText(
-                                        project.service<KetraTermProjectSettings>().state.startupCommand,
-                                    ),
+                                    profile.startupCommand ?: TerminalStartupCommand.fromText(startupCommand),
                             )
-                    val tab =
-                        synchronized(workspaceLock) {
-                            if (disposed || closing || pending.closed) return@executeOnPooledThread
-                            startingTab = pending
-                            try {
-                                startWorkspaceTab(workspace, launchProfile, openOptions(settings))
-                            } finally {
-                                startingTab = null
-                            }
-                        }
-                    TerminalStartupResult.Started(tab, profile)
-                } catch (cancelled: ProcessCanceledException) {
-                    throw cancelled
-                } catch (cancelled: CancellationException) {
-                    throw cancelled
-                } catch (exception: Exception) {
-                    TerminalStartupResult.Failed(exception)
-                } catch (error: LinkageError) {
-                    TerminalStartupResult.Failed(error)
+                    prepareStartup(launchProfile)
+                    pending.preparedProfile = profile
+                    startingTab = pending
+                    launchProfile
+                },
+                options = options,
+            ) { outcome ->
+                startingTab = null
+                val result =
+                    outcome.fold(
+                        onSuccess = { TerminalStartupResult.Started(it) },
+                        onFailure = { TerminalStartupResult.Failed(it) },
+                    )
+                invokeLaterIfAlive {
+                    publishTerminalStartupResult(pendingId, result)
                 }
-            invokeLaterIfAlive {
-                publishTerminalStartupResult(pendingId, result)
             }
-        }
+        if (!accepted) showStartupFailure(pending, IllegalStateException("Terminal startup queue is full or shutting down"))
     }
 
     override fun dispose() {
@@ -349,6 +345,10 @@ class KetraTermProjectTerminalService internal constructor(
 
         val panes = panesByTabId.values.toList()
         val closeRegistrations = closeListenersByTabId.values.toList()
+        for (pending in pendingTabsById.values) {
+            pending.closed = true
+            pending.startedTab?.session?.requestClose()
+        }
         panesByTabId.clear()
         contentsByTabId.clear()
         pendingTabsById.clear()
@@ -363,7 +363,8 @@ class KetraTermProjectTerminalService internal constructor(
                 }
         }
         failure = captureCleanupFailure(failure) { KetraTermIntellijSettings.getInstance().removeChangeListener(settingsChangedListener) }
-        failure = captureCleanupFailure(failure) { synchronized(workspaceLock) { workspace.close() } }
+        for (tab in workspace.tabSnapshot()) tab.session.requestClose()
+        workspace.closeAsync(::reportWorkspaceCleanup)
         for (pane in panes) {
             failure = captureCleanupFailure(failure, pane::close)
         }
@@ -377,7 +378,7 @@ class KetraTermProjectTerminalService internal constructor(
         val content = contentsByTabId.remove(tabId)
         var failure = captureCleanupFailure(null) { removeCloseQueryListener(tabId) }
         if (pane != null || content != null) {
-            failure = captureCleanupFailure(failure) { synchronized(workspaceLock) { workspace.closeTab(tabId) } }
+            failure = captureCleanupFailure(failure) { requestWorkspaceTabClose(tabId) }
             failure = captureCleanupFailure(failure) { pane?.close() }
         }
         failure?.let { throw it }
@@ -389,7 +390,7 @@ class KetraTermProjectTerminalService internal constructor(
         val pane = panesByTabId.remove(tab.id) ?: return
         val content = contentsByTabId.remove(tab.id)
         var failure = captureCleanupFailure(null) { removeCloseQueryListener(tab.id) }
-        failure = captureCleanupFailure(failure) { synchronized(workspaceLock) { workspace.closeTab(tab.id) } }
+        failure = captureCleanupFailure(failure) { requestWorkspaceTabClose(tab.id) }
         failure = captureCleanupFailure(failure, pane::close)
         failure = captureCleanupFailure(failure) { content?.manager?.removeContent(content, true) }
         failure?.let { throw it }
@@ -402,7 +403,31 @@ class KetraTermProjectTerminalService internal constructor(
     private fun closePendingTab(pendingId: String) {
         pendingTabsById.remove(pendingId)?.let { pending ->
             pending.closed = true
-            pending.startedTab?.session?.close()
+            pending.startedTab?.let { requestWorkspaceTabClose(it.id) }
+        }
+    }
+
+    private fun requestWorkspaceTabClose(tabId: String) {
+        val pending = pendingTabsById.entries.firstOrNull { it.value.startedTab?.id == tabId }
+        if (pending != null) {
+            pending.value.closed = true
+            pendingTabsById.remove(pending.key)
+        }
+        workspace
+            .tabSnapshot()
+            .firstOrNull { it.id == tabId }
+            ?.session
+            ?.requestClose()
+        if (!disposed && !workspace.closeTabAsync(tabId, ::reportWorkspaceCleanup)) {
+            Logger
+                .getInstance(KetraTermProjectTerminalService::class.java)
+                .debug("Terminal cleanup is already queued or the workspace is shutting down")
+        }
+    }
+
+    private fun reportWorkspaceCleanup(result: Result<Unit>) {
+        result.exceptionOrNull()?.let {
+            Logger.getInstance(KetraTermProjectTerminalService::class.java).warn("Terminal workspace cleanup failed", it)
         }
     }
 
@@ -413,9 +438,7 @@ class KetraTermProjectTerminalService internal constructor(
         val pendingTab = pendingTabsById[pendingId]
         if (pendingTab == null) {
             if (result is TerminalStartupResult.Started) {
-                synchronized(workspaceLock) {
-                    workspace.closeTab(result.tab.id)
-                }
+                requestWorkspaceTabClose(result.tab.id)
             }
             return
         }
@@ -423,18 +446,8 @@ class KetraTermProjectTerminalService internal constructor(
         when (result) {
             is TerminalStartupResult.Started -> {
                 pendingTabsById.remove(pendingId)
-                try {
-                    bindStartedTab(pendingTab, result.tab, result.sourceProfile)
-                } catch (failure: Exception) {
-                    val pane = panesByTabId.remove(result.tab.id)
-                    try {
-                        synchronized(workspaceLock) { workspace.closeTab(result.tab.id) }
-                    } finally {
-                        pane?.close()
-                    }
-                    if (failure is ProcessCanceledException || failure is CancellationException) throw failure
-                    showStartupFailure(pendingTab, failure)
-                }
+                @Suppress("UsePropertyAccessSyntax")
+                pendingTab.content.setDisposer(TerminalTabDisposable(result.tab.id))
             }
             is TerminalStartupResult.Failed -> showStartupFailure(pendingTab, result.error)
         }
@@ -444,6 +457,7 @@ class KetraTermProjectTerminalService internal constructor(
         pendingTab: PendingTerminalTab,
         workspaceTab: TerminalWorkspaceTab,
         sourceProfile: TerminalProfile,
+        onBound: (Throwable?) -> Unit,
     ) {
         workspaceTab.customTitle = pendingTab.restoredState?.customTitle
         val clipboardSession = checkNotNull(clipboardSessions[workspaceTab.id])
@@ -452,6 +466,7 @@ class KetraTermProjectTerminalService internal constructor(
                 project = project,
                 tab = workspaceTab,
                 clipboard = clipboardSession.clipboard,
+                onBound = onBound,
                 hostActions =
                     KetraTermTerminalPaneHostActions(
                         openNewTabAction = ::openDefaultTabFromContextMenu,
@@ -464,8 +479,6 @@ class KetraTermProjectTerminalService internal constructor(
         replaceContent(pendingTab.container, pane.component)
         pendingTab.content.displayName = workspaceTab.title
         pendingTab.content.preferredFocusableComponent = pane.terminal
-        @Suppress("UsePropertyAccessSyntax")
-        pendingTab.content.setDisposer(TerminalTabDisposable(workspaceTab.id))
         installCloseQueryListener(pendingTab.content, workspaceTab)
         contentsByTabId[workspaceTab.id] = pendingTab.content
         clipboardSession.attach(pane.clipboardReadPrompt)
@@ -622,6 +635,31 @@ class KetraTermProjectTerminalService internal constructor(
                 Disposer.dispose(binding)
                 throw CancellationException("Terminal startup cancelled")
             }
+            val ready = CompletableFuture<Unit>()
+            ApplicationManager.getApplication().invokeLater {
+                try {
+                    check(!disposed && !closing && !pending.closed) { "Terminal startup cancelled" }
+                    bindStartedTab(pending, tab, checkNotNull(pending.preparedProfile)) { bindingFailure ->
+                        try {
+                            if (bindingFailure != null) throw bindingFailure
+                            val policy = KetraTermIntellijSettings.getInstance().createHostPolicy()
+                            checkNotNull(panesByTabId[tab.id]).terminal.setHostPolicy(policy) { failure ->
+                                if (failure == null) ready.complete(Unit) else ready.completeExceptionally(failure)
+                            }
+                        } catch (failure: Throwable) {
+                            ready.completeExceptionally(failure)
+                        }
+                    }
+                } catch (failure: Throwable) {
+                    ready.completeExceptionally(failure)
+                }
+            }
+            // Startup owns no session/admission lock and output is still stopped.
+            try {
+                ready.get()
+            } catch (failure: ExecutionException) {
+                throw failure.cause ?: failure
+            }
         }
 
         override suspend fun readClipboard(
@@ -718,7 +756,7 @@ class KetraTermProjectTerminalService internal constructor(
             clipboardSessions.remove(tabId)?.let(Disposer::dispose)
             invokeLaterIfAlive {
                 contentsByTabId.remove(tabId)
-                panesByTabId.remove(tabId)
+                panesByTabId.remove(tabId)?.close()
                 removeCloseQueryListener(tabId)
             }
         }
@@ -764,6 +802,7 @@ class KetraTermProjectTerminalService internal constructor(
     ) {
         @Volatile
         var startedTab: TerminalWorkspaceTab? = null
+        var preparedProfile: TerminalProfile? = null
         var startRequested = false
 
         @Volatile
@@ -778,7 +817,6 @@ class KetraTermProjectTerminalService internal constructor(
     private sealed interface TerminalStartupResult {
         data class Started(
             val tab: TerminalWorkspaceTab,
-            val sourceProfile: TerminalProfile,
         ) : TerminalStartupResult
 
         data class Failed(

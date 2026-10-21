@@ -77,6 +77,7 @@ class SwingTerminalProgrammaticSelectionTest {
             view.unbind()
             assertNull(view.selectedText())
             view.bind(session)
+            dispatcher.scheduler.runCurrent()
             assertTrue(view.setSelection(range(0, 0, 5, 0)))
             view.dispose()
             assertNull(view.selectedText())
@@ -215,7 +216,13 @@ class SwingTerminalProgrammaticSelectionTest {
     fun `restoration rejects another component and a replaced binding`() =
         fixture("hello") {
             val saved = range(0, 0, 5, 0)
-            val other = SwingTerminal()
+            val other =
+                SwingTerminal(
+                    settingsProvider = { settings },
+                    hostServices = SwingHostServices(),
+                    searchDispatcher = dispatcher,
+                    mutationDispatcher = dispatcher,
+                )
             try {
                 other.bind(session)
                 assertFalse(other.setSelection(saved))
@@ -226,6 +233,7 @@ class SwingTerminalProgrammaticSelectionTest {
             assertNull(view.currentSelectionRange())
             assertFalse(view.setSelection(saved))
             view.bind(session)
+            dispatcher.scheduler.runCurrent()
             assertTrue(view.setSelection(range(0, 0, 2, 0)))
             val current = view.currentSelectionRange()
             assertFalse(view.setSelection(saved))
@@ -524,6 +532,7 @@ class SwingTerminalProgrammaticSelectionTest {
                 connector,
                 workerDispatcher = dispatcher,
                 ioDispatcher = dispatcher,
+                cleanupDispatcher = dispatcher,
             )
         var clipboardText = ""
         var clipboardCopies = 0
@@ -538,6 +547,7 @@ class SwingTerminalProgrammaticSelectionTest {
             SwingTerminal(
                 { settings },
                 SwingHostServices.create {
+                    it.uiDispatcher = CONTROLLED_SWING_UI_DISPATCHER
                     it.clipboardHandler =
                         object : TerminalClipboardHandler {
                             override fun copyText(text: String) {
@@ -551,6 +561,8 @@ class SwingTerminalProgrammaticSelectionTest {
                             }
                         }
                 },
+                searchDispatcher = dispatcher,
+                mutationDispatcher = dispatcher,
             )
 
         init {
@@ -560,6 +572,7 @@ class SwingTerminalProgrammaticSelectionTest {
             dispatcher.scheduler.runCurrent()
             view.size = view.preferredGridSize(10, 2)
             view.bind(session)
+            dispatcher.scheduler.runCurrent()
         }
 
         fun range(
@@ -593,6 +606,7 @@ class SwingTerminalProgrammaticSelectionTest {
         ) {
             view.size = view.preferredGridSize(columns, rows)
             view.componentListeners.forEach { it.componentResized(ComponentEvent(view, ComponentEvent.COMPONENT_RESIZED)) }
+            dispatcher.scheduler.runCurrent()
         }
     }
 

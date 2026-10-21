@@ -15,6 +15,7 @@
  */
 package io.github.ketraterm.benchmark
 
+import io.github.ketraterm.parser.api.TerminalGraphicsOutputParser
 import io.github.ketraterm.parser.api.TerminalOutputParser
 import io.github.ketraterm.parser.api.TerminalParsers
 import org.openjdk.jmh.annotations.*
@@ -57,10 +58,12 @@ open class TerminalParserBenchmark {
 
     private lateinit var bytes: ByteArray
     private lateinit var parser: TerminalOutputParser
+    private lateinit var yieldingParser: TerminalGraphicsOutputParser
 
     @Setup(Level.Trial)
     open fun setup() {
         parser = TerminalParsers.create(NoOpCommandSink(), clipboardWriteLimitBytes = { 1024 * 1024 })
+        yieldingParser = parser as TerminalGraphicsOutputParser
         bytes =
             when (workload) {
                 "ascii" -> buildParserAsciiInput()
@@ -86,6 +89,19 @@ open class TerminalParserBenchmark {
     open fun parseIsolated(blackhole: Blackhole) {
         parser.accept(bytes, 0, bytes.size)
         blackhole.consume(bytes.size)
+    }
+
+    /**
+     * Measures the session's yielding entry point with ordinary non-graphics output.
+     *
+     * These workloads contain no completed graphics transfer, so each call consumes
+     * the entire prebuilt range without exercising graphics staging or decode callbacks.
+     *
+     * @param blackhole consumes the count returned at the parser boundary.
+     */
+    @Benchmark
+    open fun parseUntilGraphics(blackhole: Blackhole) {
+        blackhole.consume(yieldingParser.acceptUntilGraphics(bytes, 0, bytes.size))
     }
 }
 

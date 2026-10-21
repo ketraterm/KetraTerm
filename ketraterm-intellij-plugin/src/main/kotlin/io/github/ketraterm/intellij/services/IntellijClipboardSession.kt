@@ -46,7 +46,7 @@ internal class IntellijClipboardSession(
     private val uiContext = Dispatchers.EDT + ModalityState.nonModal().asContextElement() + projectClient.clientId.asContextElement()
     private val paneReady = CompletableDeferred<SwingClipboardReadPrompt>()
     private val disposed = AtomicBoolean()
-    private val applicationLifetime = Disposable { session.close() }
+    private val applicationLifetime = Disposable { session.requestClose() }
 
     val isAlive: Boolean get() = !disposed.get() && projectClient.isAlive && applicationClient.isAlive
 

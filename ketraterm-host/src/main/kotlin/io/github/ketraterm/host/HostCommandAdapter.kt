@@ -94,6 +94,22 @@ public class HostCommandAdapter
             terminal.applyGraphicsCommand(command, data, length, result, hostPolicy.terminalResponsePolicy.isAllowed)
         }
 
+        /**
+         * Commits a session-decoded image under the current response permission.
+         * Caller serialization must cover decoding admission through this commit.
+         *
+         * @param command original borrowed upload or query controls.
+         * @param image immutable normalized pixels, or null on decoder failure.
+         * @param result decoder validation outcome; failure prevents mutation.
+         */
+        public fun applyDecodedGraphicsCommand(
+            command: TerminalGraphicsCommand,
+            image: io.github.ketraterm.render.api.TerminalRenderImage?,
+            result: TerminalGraphicsResult,
+        ) {
+            terminal.applyDecodedGraphicsCommand(command, image, result, hostPolicy.terminalResponsePolicy.isAllowed)
+        }
+
         init {
             require(
                 modeReportCapabilities and

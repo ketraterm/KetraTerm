@@ -24,6 +24,9 @@ import io.github.ketraterm.parser.spi.TerminalCommandSink
  * Return an exclusively owned parser; forward its reset and end-of-input lifecycle
  * when decorating another parser. Session assembly supplies its normal sink, so
  * clipboard, resize, shell metadata, and startup coordination remain installed.
+ * Preserve [TerminalGraphicsOutputParser] when decorating a built-in parser to
+ * retain the session's external image decoding boundary. A plain
+ * [TerminalOutputParser] remains synchronous and uses only its sink's decoding.
  */
 public fun interface TerminalOutputParserFactory {
     /**

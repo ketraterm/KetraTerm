@@ -139,8 +139,11 @@ internal class GridPainter(
             if (cache.images.size != 0) {
                 graphicsPainter.paint(g, cache.images, metrics, geometry, 0, cache.columns, cache.rows)
                 for (backgroundRow in firstRow until rows) {
-                    val shift = (geometry?.rowTop(backgroundRow)
-                        ?: (backgroundRow * metrics.cellHeight)) - backgroundRow * metrics.cellHeight
+                    val shift =
+                        (
+                            geometry?.rowTop(backgroundRow)
+                                ?: (backgroundRow * metrics.cellHeight)
+                        ) - backgroundRow * metrics.cellHeight
                     if (shift != 0) g.translate(0, shift)
                     try {
                         backgroundPainter.paintRow(

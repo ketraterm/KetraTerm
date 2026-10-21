@@ -233,6 +233,19 @@ class IntellijClipboardSessionTest : BasePlatformTestCase() {
         assertEquals("", f.output())
     }
 
+    fun testClientDisposalClaimsTerminationBeforeWorkerCleanupRuns() {
+        val client = Client("async-close", "secret")
+        val f = Fixture(client)
+        Disposer.dispose(client.owner)
+        assertTrue(f.session.isClosed)
+        assertFalse(f.binding.isAlive)
+        assertEquals(0, f.connector.closeCount)
+        assertFalse(f.session.state.value is TerminalSessionState.Closed)
+        runCurrent()
+        assertEquals(1, f.connector.closeCount)
+        assertTrue(f.session.state.value is TerminalSessionState.Closed)
+    }
+
     fun testQueuedWriteIsDiscardedWhenClientIsDisposedBeforeEdtDelivery() {
         val client = Client("closed-write", "old")
         val f = Fixture(client)
@@ -278,6 +291,7 @@ class IntellijClipboardSessionTest : BasePlatformTestCase() {
         try {
             await("native read entered", entered)
             Disposer.dispose(client.owner)
+            runCurrent()
             assertTrue(f.session.state.value is TerminalSessionState.Closed)
         } finally {
             release.countDown()
@@ -455,6 +469,7 @@ class IntellijClipboardSessionTest : BasePlatformTestCase() {
                     },
                 workerDispatcher = dispatcher,
                 ioDispatcher = dispatcher,
+                cleanupDispatcher = dispatcher,
                 clipboardReadTimeSource = scheduler.timeSource,
                 clipboardReader =
                     TerminalClipboardReader { request ->

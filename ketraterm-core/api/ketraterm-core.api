@@ -55,6 +55,7 @@ public final class io/github/ketraterm/core/api/TerminalCursor$DefaultImpls {
 }
 
 public abstract interface class io/github/ketraterm/core/api/TerminalGraphics {
+	public abstract fun applyDecodedGraphicsCommand (Lio/github/ketraterm/protocol/TerminalGraphicsCommand;Lio/github/ketraterm/render/api/TerminalRenderImage;Lio/github/ketraterm/protocol/TerminalGraphicsResult;Z)V
 	public abstract fun applyGraphicsCommand (Lio/github/ketraterm/protocol/TerminalGraphicsCommand;[BILio/github/ketraterm/protocol/TerminalGraphicsResult;Z)V
 	public abstract fun getGraphicsTransferGeneration ()J
 }

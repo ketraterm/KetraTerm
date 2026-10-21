@@ -801,6 +801,7 @@ class SwingTerminalSuggestionContextTest {
         connector: TerminalConnector = NoOpConnector,
         ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
     ) : AutoCloseable {
+        private val mutationDispatcher = StandardTestDispatcher()
         val source = MutableStateFlow<TerminalShellCommandLineSnapshot?>(snapshot())
         val editableSource = TerminalShellCommandLineState(snapshot())
         val session =
@@ -859,10 +860,15 @@ class SwingTerminalSuggestionContextTest {
                             draft.uiDispatcher = uiDispatcher
                             draft.shellSuggestionViewFactory = { listener -> view.apply { this.listener = listener } }
                         },
+                    searchDispatcher = Dispatchers.Default,
+                    mutationDispatcher = mutationDispatcher,
                 ).also { terminal ->
                     terminal.size = terminal.preferredGridSize(30, 4)
                     terminal.setShellSuggestionProvider(suggestionProvider)
-                    if (bind) terminal.bind(session)
+                    if (bind) {
+                        terminal.bind(session)
+                        mutationDispatcher.scheduler.runCurrent()
+                    }
                 }
             }
 

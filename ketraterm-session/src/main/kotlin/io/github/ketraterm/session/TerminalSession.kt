@@ -25,6 +25,7 @@ import io.github.ketraterm.input.event.*
 import io.github.ketraterm.input.policy.BackspacePolicy
 import io.github.ketraterm.input.policy.PasteControlPolicy
 import io.github.ketraterm.input.policy.TerminalInputPolicy
+import io.github.ketraterm.parser.api.TerminalGraphicsOutputParser
 import io.github.ketraterm.parser.api.TerminalOutputParser
 import io.github.ketraterm.parser.api.TerminalOutputParserFactory
 import io.github.ketraterm.parser.api.TerminalParsers
@@ -35,6 +36,7 @@ import io.github.ketraterm.protocol.keyboard.KittyKeyboardProgressiveFlag
 import io.github.ketraterm.render.api.*
 import io.github.ketraterm.render.cache.TerminalRenderCache
 import io.github.ketraterm.render.cache.TerminalRenderPublisher
+import io.github.ketraterm.session.graphics.GraphicsDecoder
 import io.github.ketraterm.transport.TerminalConnector
 import io.github.ketraterm.transport.TerminalConnectorListener
 import io.github.ketraterm.transport.checkBounds
@@ -90,6 +92,12 @@ import kotlin.time.TimeSource
  * open, use its synchronized settings, input, and frame APIs. Direct mutation or
  * frame reads through retained core references bypass that serialization.
  *
+ * Startup, geometry, host-policy/presentation setters, clearing, and [close] are
+ * synchronous operations for non-UI threads. They can wait for an active image
+ * decode. Use [withMutationAdmission] to validate captured UI ownership after
+ * that wait, and [requestClose] for nonblocking disposal. Frame reads and ordinary
+ * input admission remain available while decoding.
+ *
  * @property shellIntegrationState shared host-side prompt and command marker state.
  * @property workerDispatcher non-owned dispatcher used for session background work.
  * @property ioDispatcher non-owned dispatcher for connector writes, metadata queries, and clipboard providers.
@@ -108,6 +116,7 @@ public class TerminalSession private constructor(
     private val workerDispatcher: CoroutineDispatcher = Dispatchers.Default,
     private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
     startupCommand: TerminalStartupCommand? = null,
+    private val cleanupDispatcher: CoroutineDispatcher = DEFAULT_CLEANUP_DISPATCHER,
 ) : TerminalConnectorListener,
     TerminalInputEncoder,
     TerminalInputState,
@@ -130,6 +139,22 @@ public class TerminalSession private constructor(
      * receives session host-policy, theme-palette, and Backarrow-default changes.
      * Custom parsers supplied without this adapter own their host-policy updates
      * and Backarrow-default mode-report wiring.
+     * External image decoding requires both the adapter and a parser implementing
+     * [TerminalGraphicsOutputParser]. Otherwise the supplied sink owns decoding.
+     *
+     * @param terminal exclusively owned mutable terminal state.
+     * @param renderPublisher exclusively owned cache publisher for this terminal.
+     * @param renderReader render projection of the same terminal state.
+     * @param responseReader response channel of the same terminal state.
+     * @param connector exclusively owned transport, closed with the session.
+     * @param parser exclusively owned parser wired to this terminal's sink.
+     * @param inputEncoderFactory independent admission/bulk encoder factory, or the built-in encoder when null.
+     * @param hyperlinkResolver resolver for the parser's hyperlink registry.
+     * @param hostCommandAdapter parser's adapter, or null for caller-owned policy wiring.
+     * @param inputPolicy initial input-encoding policy.
+     * @param workerDispatcher non-owned render, metadata and timeout dispatcher.
+     * @param ioDispatcher non-owned dispatcher for potentially blocking connector writes and providers.
+     * @param shellIntegration optional sole shell metadata producer.
      */
     public constructor(
         terminal: TerminalBuffer,
@@ -146,6 +171,73 @@ public class TerminalSession private constructor(
         ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
         shellIntegration: TerminalShellIntegrationFactory? = null,
     ) : this(
+        terminal = terminal,
+        renderPublisher = renderPublisher,
+        renderReader = renderReader,
+        responseReader = responseReader,
+        connector = connector,
+        parser = parser,
+        inputEncoderFactory = inputEncoderFactory,
+        hyperlinkResolver = hyperlinkResolver,
+        hostCommandAdapter = hostCommandAdapter,
+        inputPolicy = inputPolicy,
+        workerDispatcher = workerDispatcher,
+        ioDispatcher = ioDispatcher,
+        shellIntegration = shellIntegration,
+        cleanupDispatcher = DEFAULT_CLEANUP_DISPATCHER,
+    )
+
+    /**
+     * Assembles a session around a caller-supplied parser and response reader.
+     * The caller owns the parser's host-event wiring, including accepted shell
+     * events if its selected producer interprets protocols. Use [create] for
+     * standard parser assembly and automatic dispatch to that producer.
+     * Host-owned models supplied through [TerminalShellIntegrationFactory.host]
+     * need no parser callbacks.
+     *
+     * [terminal], [renderReader], [responseReader], and [parser] must operate on
+     * the same core state; adapters around that state are permitted. The session
+     * owns their exclusive runtime access, finalizes parser EOF, and closes the connector.
+     * [renderPublisher] must have no other writer. [inputEncoderFactory] creates
+     * separate admission and streaming encoders bound to session-owned output.
+     * A supplied [hostCommandAdapter] must be the adapter used by [parser]; it
+     * receives session host-policy, theme-palette, and Backarrow-default changes.
+     * Custom parsers supplied without this adapter own their host-policy updates
+     * and Backarrow-default mode-report wiring.
+     * External image decoding requires both the adapter and a parser implementing
+     * [TerminalGraphicsOutputParser]. Otherwise the supplied sink owns decoding.
+     *
+     * @param terminal exclusively owned mutable terminal state.
+     * @param renderPublisher exclusively owned cache publisher for this terminal.
+     * @param renderReader render projection of the same terminal state.
+     * @param responseReader response channel of the same terminal state.
+     * @param connector exclusively owned transport, closed with the session.
+     * @param parser exclusively owned parser wired to this terminal's sink.
+     * @param inputEncoderFactory independent admission/bulk encoder factory, or the built-in encoder when null.
+     * @param hyperlinkResolver resolver for the parser's hyperlink registry.
+     * @param hostCommandAdapter parser's adapter, or null for caller-owned policy wiring.
+     * @param inputPolicy initial input-encoding policy.
+     * @param workerDispatcher non-owned render, metadata and timeout dispatcher.
+     * @param ioDispatcher non-owned dispatcher for potentially blocking connector writes and providers.
+     * @param shellIntegration optional sole shell metadata producer.
+     * @param cleanupDispatcher non-owned blocking cleanup dispatcher, independent of connector writes and off UI threads.
+     */
+    public constructor(
+        terminal: TerminalBuffer,
+        renderPublisher: TerminalRenderPublisher,
+        renderReader: TerminalRenderFrameReader,
+        responseReader: TerminalHostResponseReader,
+        connector: TerminalConnector,
+        parser: TerminalOutputParser,
+        inputEncoderFactory: TerminalInputEncoderFactory? = null,
+        hyperlinkResolver: TerminalHyperlinkResolver = TerminalHyperlinkResolver.NONE,
+        hostCommandAdapter: HostCommandAdapter? = null,
+        inputPolicy: TerminalInputPolicy = TerminalInputPolicy(),
+        workerDispatcher: CoroutineDispatcher = Dispatchers.Default,
+        ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
+        shellIntegration: TerminalShellIntegrationFactory? = null,
+        cleanupDispatcher: CoroutineDispatcher,
+    ) : this(
         terminal,
         SessionRuntime(renderReader, renderPublisher, shellIntegration),
         responseReader,
@@ -158,6 +250,7 @@ public class TerminalSession private constructor(
         inputPolicy,
         workerDispatcher,
         ioDispatcher,
+        cleanupDispatcher = cleanupDispatcher,
     )
 
     /**
@@ -202,6 +295,9 @@ public class TerminalSession private constructor(
     private val pendingRenderGeneration = AtomicLong(0)
 
     private val mutationLock: Any get() = runtime.mutationLock
+    private val mutationAdmission = Any()
+    private val graphicsParser = if (hostCommandAdapter != null) parser as? TerminalGraphicsOutputParser else null
+    private val graphicsDecoder = GraphicsDecoder()
     private var processingOutput = false
     private var resizePending = false // Protected by mutationLock; core may precede connector completion.
     private var resizeReportPending = false // A failed resize discarded a subscribed report.
@@ -409,11 +505,12 @@ public class TerminalSession private constructor(
         get() = (state.value as? TerminalSessionState.Closed)?.event?.exitCode
 
     /**
-     * The first startup, transport, or outbound worker failure, including unexpected
-     * writer cancellation; `null` for normal remote closure or local close.
+     * The first startup, transport, outbound worker, or cleanup failure. An initiating
+     * failure is available as soon as shutdown begins; cleanup failures are retained
+     * before [state] reaches [TerminalSessionState.Closed]. Null means no known failure.
      */
     public val failure: Throwable?
-        get() = (state.value as? TerminalSessionState.Closed)?.event?.failure
+        get() = closingEvent.get()?.failure
 
     /**
      * Resolves a primitive render-frame hyperlink id to a target URI.
@@ -426,6 +523,44 @@ public class TerminalSession private constructor(
      * @return target URI, or `null` if none.
      */
     public fun hyperlinkUri(hyperlinkId: Int): String? = synchronized(mutationLock) { hyperlinkResolver.uriForHyperlinkId(hyperlinkId) }
+
+    /**
+     * Runs captured host work only if its owner is still current at mutation admission.
+     * This synchronous boundary can wait for graphics decoding; call it off UI threads.
+     * Nested session setters share the admission. Frame reads and input do not wait
+     * for this gate. The callbacks must be prompt, must not access UI state, and must
+     * never wait for UI work or close the session.
+     *
+     * @param isCurrent thread-safe validity check evaluated after acquiring admission.
+     * @param action captured host mutations executed in order when still current.
+     * @return the action result, or null when closed or no longer current.
+     * @throws IllegalStateException on output reentry or callback reentry that would invert lock order.
+     */
+    public fun <T> withMutationAdmission(
+        isCurrent: () -> Boolean,
+        action: () -> T,
+    ): T? {
+        checkAdmissionReentry()
+        return synchronized(mutationAdmission) {
+            check(!processingOutput) { "Output callbacks must not reenter session mutation" }
+            if (isSessionClosed() || !isCurrent()) null else action()
+        }
+    }
+
+    private fun checkAdmissionReentry() {
+        check(!Thread.holdsLock(mutationLock) || Thread.holdsLock(mutationAdmission)) {
+            "Frame callbacks must not reenter session mutation"
+        }
+    }
+
+    private inline fun <T> mutate(action: () -> T): T {
+        checkAdmissionReentry()
+        return synchronized(mutationAdmission) {
+            // Accepted host requests (such as CSI 8 resize) may synchronously map
+            // back to a setter while their ingress thread already owns both locks.
+            synchronized(mutationLock) { action() }
+        }
+    }
 
     /** Current immutable effective palette, read under the session mutation lock. */
     public val palette: TerminalColorPalette
@@ -442,9 +577,14 @@ public class TerminalSession private constructor(
      */
     override fun getInputModeBits(): Long = synchronized(mutationLock) { terminal.getInputModeBits() }
 
-    /** Records host window minimization for terminal window reports; ignored after closure. */
+    /**
+     * Records host window minimization for terminal window reports; ignored after closure.
+     * Synchronous mutation admission requires a non-UI caller.
+     *
+     * @param minimized whether the owning host window is minimized.
+     */
     public fun setWindowMinimized(minimized: Boolean) {
-        synchronized(mutationLock) {
+        mutate {
             if (!isSessionClosed()) terminal.setWindowMinimized(minimized)
         }
     }
@@ -479,7 +619,7 @@ public class TerminalSession private constructor(
 
     /**
      * Captures a conditional-edit context from the selected authoritative shell
-     * producer. Returns null before start, during shutdown, while the writer has
+     * producer. Returns null before start, during shutdown or output processing, while the writer has
      * pending/active work, when editing is unavailable, or for a producer without
      * atomic revision support (including the legacy StateFlow-only host factory).
      *
@@ -489,6 +629,7 @@ public class TerminalSession private constructor(
      */
     public fun captureCommandEdit(): TerminalCommandEditContext? =
         synchronized(mutationLock) {
+            if (processingOutput) return@synchronized null
             runtime.shellIntegration?.withCommandLine { revision, snapshot ->
                 synchronized(outboundWriteLock) {
                     if (!isAcceptingInput() || snapshot == null || !outboundWriter.isIdle()) {
@@ -551,6 +692,7 @@ public class TerminalSession private constructor(
      *
      * Startup failure closes owned resources, retains the failure in [state],
      * and rethrows it with any cleanup failures suppressed.
+     * Call off UI threads; synchronous startup output may decode images.
      *
      * @param columns initial terminal width; at least [TerminalBuffers.MIN_WIDTH].
      * @param rows initial terminal height count.
@@ -569,14 +711,15 @@ public class TerminalSession private constructor(
 
             try {
                 if (isSessionClosed()) return
-                synchronized(mutationLock) {
+                mutate {
+                    if (isSessionClosed()) return
                     terminal.resize(columns, rows)
                 }
                 if (isSessionClosed()) return
                 resizeConnector(columns, rows)
                 if (!isSessionClosed()) {
-                    synchronized(mutationLock) { completeResizeReporting() }
-                    connector.start(this)
+                    mutate { if (!isSessionClosed()) completeResizeReporting() }
+                    if (!isSessionClosed()) connector.start(this)
                     if (!isSessionClosed()) {
                         drainResponses()
                         mutableState.compareAndSet(TerminalSessionState.Created, TerminalSessionState.Running)
@@ -646,7 +789,7 @@ public class TerminalSession private constructor(
      *
      * Calls serialize with terminal mutation. An admitted core resize can finish during closure.
      * Connector resize and disposal share a separate lock. Closure prevents new connector resize calls.
-     * This method is synchronous and can block in the connector.
+     * Call off UI threads: this synchronous method can wait for decoding or block in the connector.
      *
      * @param columns terminal column count; at least [TerminalBuffers.MIN_WIDTH].
      * @param rows positive terminal row count.
@@ -697,7 +840,7 @@ public class TerminalSession private constructor(
         if (isSessionClosed()) return null
 
         try {
-            return synchronized(mutationLock) {
+            return mutate {
                 if (isSessionClosed()) return null
                 drainResponses()
                 outputRevision++
@@ -784,7 +927,7 @@ public class TerminalSession private constructor(
         require(pixelWidth >= 0 && pixelHeight >= 0) { "pixel dimensions must be nonnegative" }
         if (isSessionClosed()) return false
         try {
-            return synchronized(mutationLock) {
+            return mutate {
                 if (isSessionClosed() || resizePending || terminal.width != columns || terminal.height != rows) return false
                 outputRevision++
                 terminal.setWindowSizePixels(pixelWidth, pixelHeight)
@@ -806,7 +949,7 @@ public class TerminalSession private constructor(
      * @param enabled whether ambiguous codepoints occupy two cells.
      */
     public fun setTreatAmbiguousAsWide(enabled: Boolean) {
-        synchronized(mutationLock) {
+        mutate {
             if (isSessionClosed()) return
             terminal.setTreatAmbiguousAsWide(enabled)
         }
@@ -823,7 +966,7 @@ public class TerminalSession private constructor(
     public fun setThemePalette(palette: TerminalColorPalette) {
         var failedDrain: OutboundCapacityException? = null
         try {
-            synchronized(mutationLock) {
+            mutate {
                 if (isSessionClosed()) return
                 val adapter = hostCommandAdapter
                 try {
@@ -852,9 +995,11 @@ public class TerminalSession private constructor(
 
     /**
      * Updates the current and default cursor shape for the session.
+     *
+     * @param shape host-configured cursor shape, also used by later cursor resets.
      */
     public fun setCursorShape(shape: TerminalRenderCursorShape) {
-        synchronized(mutationLock) {
+        mutate {
             if (isSessionClosed()) return
             terminal.setDefaultCursorShape(shape)
             terminal.setCursorShape(shape)
@@ -868,7 +1013,7 @@ public class TerminalSession private constructor(
      * @param policy new security policy.
      */
     public fun setHostPolicy(policy: HostPolicy) {
-        synchronized(mutationLock) {
+        mutate {
             synchronized(outboundWriteLock) {
                 if (isSessionClosed()) return
                 hostCommandAdapter?.setHostPolicy(policy)
@@ -1091,8 +1236,8 @@ public class TerminalSession private constructor(
     /**
      * Clears the active screen and its history without sending input to the connector.
      *
-     * Call from any thread outside a frame lease or output callback.
-     * The mutation lock orders this operation with output and resize.
+     * Call off UI threads and outside a frame lease or output callback.
+     * Mutation admission orders this operation with output and resize, including active decoding.
      * Admission succeeds before start and while running. Closure returns false without changing retained output.
      * An operation admitted before closure can finish.
      *
@@ -1111,7 +1256,7 @@ public class TerminalSession private constructor(
      */
     public fun clearBuffer(): Boolean {
         try {
-            synchronized(mutationLock) {
+            mutate {
                 if (isSessionClosed()) return false
                 check(!processingOutput) { "Output callbacks must not reenter the session" }
                 outputRevision++
@@ -1168,17 +1313,50 @@ public class TerminalSession private constructor(
         if (isSessionClosed()) return
 
         try {
-            synchronized(mutationLock) {
+            checkAdmissionReentry()
+            synchronized(mutationAdmission) {
                 if (isSessionClosed()) return
                 check(!processingOutput) { "Output callbacks must not reenter the session" }
-                if (length != 0) outputRevision++
-                processingOutput = true
+                synchronized(mutationLock) {
+                    if (length != 0) outputRevision++
+                    processingOutput = true
+                }
                 try {
-                    parser.accept(bytes, offset, length)
-                    runtime.shellIntegration?.outputProcessed()
-                    drainResponses()
+                    val yielding = graphicsParser
+                    if (yielding == null) {
+                        synchronized(mutationLock) { parser.accept(bytes, offset, length) }
+                    } else {
+                        var consumed = 0
+                        do {
+                            synchronized(mutationLock) {
+                                if (isSessionClosed()) return
+                                consumed += yielding.acceptUntilGraphics(bytes, offset + consumed, length - consumed)
+                                drainResponses()
+                            }
+                            if (yielding.hasPendingGraphics) {
+                                yielding.consumePendingGraphics { command, data, used ->
+                                    if (isSessionClosed()) return@consumePendingGraphics
+                                    val decoded = graphicsDecoder.decode(command, data, used)
+                                    synchronized(mutationLock) {
+                                        if (!isSessionClosed()) {
+                                            checkNotNull(
+                                                hostCommandAdapter,
+                                            ).applyDecodedGraphicsCommand(command, decoded.image, decoded.status)
+                                            drainResponses()
+                                        }
+                                    }
+                                }
+                            }
+                        } while (consumed < length && !isSessionClosed())
+                    }
+                    synchronized(mutationLock) {
+                        if (!isSessionClosed()) {
+                            runtime.shellIntegration?.outputProcessed()
+                            drainResponses()
+                        }
+                    }
                 } finally {
-                    processingOutput = false
+                    synchronized(mutationLock) { processingOutput = false }
                 }
                 submitStartupCommand()
             }
@@ -1265,7 +1443,8 @@ public class TerminalSession private constructor(
                 try {
                     delay(SYNCHRONIZED_OUTPUT_TIMEOUT_MS.milliseconds)
                     var changed = false
-                    synchronized(mutationLock) {
+                    mutate {
+                        if (isSessionClosed()) return@mutate
                         if (terminal.getModeSnapshot().isSynchronizedOutput) {
                             terminal.setSynchronizedOutput(false)
                             changed = true
@@ -1440,6 +1619,19 @@ public class TerminalSession private constructor(
         )
     }
 
+    /**
+     * Claims local shutdown immediately and performs cleanup on the cleanup dispatcher.
+     * Suitable for UI disposal: it never waits for graphics mutation admission.
+     * Cleanup has its own lifetime and survives cancellation of session workers.
+     * Observe [state] for completed cleanup and any retained cleanup failure.
+     * The configured cleanup dispatcher must dispatch blocking work off UI threads
+     * independently of potentially blocked connector writes.
+     * Repeated requests are harmless and preserve the first close event.
+     */
+    public fun requestClose() {
+        requestClosure(TerminalSessionCloseEvent(exitCode = null, failure = null, locallyRequested = true))
+    }
+
     private fun drainResponses() {
         synchronized(mutationLock) {
             outboundWriter.submit {
@@ -1453,13 +1645,35 @@ public class TerminalSession private constructor(
     }
 
     private fun failWrite(failure: Exception) {
-        transitionToClosed(
+        requestClosure(
             TerminalSessionCloseEvent(exitCode = null, failure = failure, locallyRequested = false),
         )
     }
 
+    private fun requestClosure(event: TerminalSessionCloseEvent) {
+        if (!closingEvent.compareAndSet(null, event)) return
+        // Stop queued writes immediately; cleanup may wait for an in-flight decode.
+        outboundJob.cancel(CancellationException("Terminal session closing"))
+        val cleanupJob = SupervisorJob()
+        CoroutineScope(cleanupJob + cleanupDispatcher).launch {
+            try {
+                finishClosure(event, propagateFailure = false)
+            } finally {
+                cleanupJob.cancel()
+            }
+        }
+    }
+
     private fun transitionToClosed(event: TerminalSessionCloseEvent) {
         if (!closingEvent.compareAndSet(null, event)) return
+        outboundJob.cancel(CancellationException("Terminal session closing"))
+        finishClosure(event, propagateFailure = true)
+    }
+
+    private fun finishClosure(
+        event: TerminalSessionCloseEvent,
+        propagateFailure: Boolean,
+    ) {
         var failure: Throwable? = event.failure
 
         fun cleanup(action: () -> Unit) {
@@ -1477,9 +1691,7 @@ public class TerminalSession private constructor(
 
         try {
             cleanup {
-                synchronized(connectorLifecycleLock) {
-                    synchronized(connectorResizeLock) { connector.close() }
-                }
+                synchronized(connectorResizeLock) { connector.close() }
             }
             cleanup { clipboardReads?.close() }
             cleanup { outboundWriter.close() }
@@ -1494,18 +1706,22 @@ public class TerminalSession private constructor(
             sessionScope.cancel(CancellationException("Terminal session closed"))
             // Serialize against an in-flight publication so it cannot replace
             // this final frame after EOF has been flushed.
-            synchronized(mutationLock) {
-                cleanup { parser.endOfInput() }
-                cleanup {
-                    val request = pendingRenderRequest.get()
-                    runtime.publisher.updateAndPublish(this, unpackScrollbackOffset(request), unpackViewportRows(request))
-                    mutableRenderGeneration.value = pendingRenderGeneration.incrementAndGet()
+            synchronized(mutationAdmission) {
+                synchronized(mutationLock) {
+                    cleanup { parser.endOfInput() }
+                    cleanup {
+                        val request = pendingRenderRequest.get()
+                        runtime.publisher.updateAndPublish(this, unpackScrollbackOffset(request), unpackViewportRows(request))
+                        mutableRenderGeneration.value = pendingRenderGeneration.incrementAndGet()
+                    }
                 }
             }
         } finally {
-            mutableState.value = TerminalSessionState.Closed(event)
+            val completed = if (event.failure == null && failure != null) event.copy(failure = failure) else event
+            closingEvent.set(completed)
+            mutableState.value = TerminalSessionState.Closed(completed)
         }
-        if (event.failure == null) failure?.let { throw it }
+        if (propagateFailure && event.failure == null) failure?.let { throw it }
     }
 
     private fun isSessionClosed(): Boolean = closingEvent.get() != null
@@ -1513,6 +1729,10 @@ public class TerminalSession private constructor(
     private fun isAcceptingInput(): Boolean = !isSessionClosed() && state.value === TerminalSessionState.Running
 
     public companion object {
+        // A separate elastic I/O view can release connectors even when ordinary
+        // I/O workers are all blocked in writes. Keep cleanup concurrent across sessions.
+        private val DEFAULT_CLEANUP_DISPATCHER =
+            Dispatchers.IO.limitedParallelism(maxOf(64, Runtime.getRuntime().availableProcessors()))
         private val SESSION_COUNTER =
             AtomicInteger(1)
         private const val RESPONSE_BUFFER_SIZE: Int = 1024
@@ -1537,6 +1757,25 @@ public class TerminalSession private constructor(
          * Uses the same services and customization factories as the separate-reader
          * overload. Ownership transfers only after successful construction.
          * Custom factories must not perform I/O or start jobs during construction.
+         *
+         * @param terminal exclusively owned core buffer and matching render projection.
+         * @param connector exclusively owned transport.
+         * @param hostEvents accepted metadata/request receiver.
+         * @param hostPolicy initial host authorization and bounds.
+         * @param inputPolicy initial input-encoding policy.
+         * @param kittyKeyboardSupportedFlags flags the host can implement truthfully.
+         * @param workerDispatcher non-owned render, metadata and timeout dispatcher.
+         * @param startupCommand command deferred until shell prompt readiness, or null.
+         * @param ioDispatcher non-owned dispatcher for connector writes and providers.
+         * @param modeReportCapabilities implemented host-action mask.
+         * @param clipboardReader session-bound clipboard provider, or null.
+         * @param clipboardReadTimeSource monotonic clipboard deadline source.
+         * @param shellIntegration sole metadata producer, or null.
+         * @param inputEncoderFactory creates independent admission and bulk encoders.
+         * @param parserFactory custom parser factory; preserve [TerminalGraphicsOutputParser] for session decoding.
+         * @return the assembled session, which owns the supplied runtime collaborators.
+         * @throws IllegalArgumentException for invalid dimensions, startup without shell integration,
+         * incompatible render state or a factory reusing an encoder instance.
          */
         @JvmStatic
         @JvmOverloads
@@ -1559,6 +1798,71 @@ public class TerminalSession private constructor(
         ): TerminalSession =
             create(
                 terminal = terminal,
+                connector = connector,
+                hostEvents = hostEvents,
+                hostPolicy = hostPolicy,
+                inputPolicy = inputPolicy,
+                kittyKeyboardSupportedFlags = kittyKeyboardSupportedFlags,
+                workerDispatcher = workerDispatcher,
+                startupCommand = startupCommand,
+                ioDispatcher = ioDispatcher,
+                modeReportCapabilities = modeReportCapabilities,
+                clipboardReader = clipboardReader,
+                clipboardReadTimeSource = clipboardReadTimeSource,
+                shellIntegration = shellIntegration,
+                inputEncoderFactory = inputEncoderFactory,
+                parserFactory = parserFactory,
+                cleanupDispatcher = DEFAULT_CLEANUP_DISPATCHER,
+            )
+
+        /**
+         * Assembles a production session from a buffer exposing core and render roles.
+         *
+         * Uses the same services and customization factories as the separate-reader
+         * overload. Ownership transfers only after successful construction.
+         * Custom factories must not perform I/O or start jobs during construction.
+         *
+         * @param terminal exclusively owned core buffer and matching render projection.
+         * @param connector exclusively owned transport.
+         * @param hostEvents accepted metadata/request receiver.
+         * @param hostPolicy initial host authorization and bounds.
+         * @param inputPolicy initial input-encoding policy.
+         * @param kittyKeyboardSupportedFlags flags the host can implement truthfully.
+         * @param workerDispatcher non-owned render, metadata and timeout dispatcher.
+         * @param startupCommand command deferred until shell prompt readiness, or null.
+         * @param ioDispatcher non-owned dispatcher for connector writes and providers.
+         * @param modeReportCapabilities implemented host-action mask.
+         * @param clipboardReader session-bound clipboard provider, or null.
+         * @param clipboardReadTimeSource monotonic clipboard deadline source.
+         * @param shellIntegration sole metadata producer, or null.
+         * @param inputEncoderFactory creates independent admission and bulk encoders.
+         * @param parserFactory custom parser factory; preserve [TerminalGraphicsOutputParser] for session decoding.
+         * @param cleanupDispatcher non-owned off-UI blocking cleanup dispatcher, independent of connector writes.
+         * @return the assembled session, which owns the supplied runtime collaborators.
+         * @throws IllegalArgumentException for invalid dimensions, startup without shell integration,
+         * incompatible render state or a factory reusing an encoder instance.
+         */
+        @JvmStatic
+        public fun create(
+            terminal: TerminalRenderBuffer,
+            connector: TerminalConnector,
+            hostEvents: HostEventSink = HostEventSink.NONE,
+            hostPolicy: HostPolicy = HostPolicy(),
+            inputPolicy: TerminalInputPolicy = TerminalInputPolicy(),
+            kittyKeyboardSupportedFlags: Int = KittyKeyboardProgressiveFlag.DEFAULT_HOST_SUPPORTED_MASK,
+            workerDispatcher: CoroutineDispatcher = Dispatchers.Default,
+            startupCommand: TerminalStartupCommand? = null,
+            ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
+            modeReportCapabilities: Int = 0,
+            clipboardReader: TerminalClipboardReader? = null,
+            clipboardReadTimeSource: TimeSource = TimeSource.Monotonic,
+            shellIntegration: TerminalShellIntegrationFactory? = null,
+            inputEncoderFactory: TerminalInputEncoderFactory? = null,
+            parserFactory: TerminalOutputParserFactory? = null,
+            cleanupDispatcher: CoroutineDispatcher,
+        ): TerminalSession =
+            create(
+                terminal = terminal,
                 renderReader = terminal,
                 connector = connector,
                 hostEvents = hostEvents,
@@ -1574,6 +1878,7 @@ public class TerminalSession private constructor(
                 shellIntegration = shellIntegration,
                 inputEncoderFactory = inputEncoderFactory,
                 parserFactory = parserFactory,
+                cleanupDispatcher = cleanupDispatcher,
             )
 
         /**
@@ -1633,6 +1938,86 @@ public class TerminalSession private constructor(
             shellIntegration: TerminalShellIntegrationFactory? = null,
             inputEncoderFactory: TerminalInputEncoderFactory? = null,
             parserFactory: TerminalOutputParserFactory? = null,
+        ): TerminalSession =
+            create(
+                terminal = terminal,
+                renderReader = renderReader,
+                connector = connector,
+                hostEvents = hostEvents,
+                hostPolicy = hostPolicy,
+                inputPolicy = inputPolicy,
+                kittyKeyboardSupportedFlags = kittyKeyboardSupportedFlags,
+                workerDispatcher = workerDispatcher,
+                startupCommand = startupCommand,
+                ioDispatcher = ioDispatcher,
+                modeReportCapabilities = modeReportCapabilities,
+                clipboardReader = clipboardReader,
+                clipboardReadTimeSource = clipboardReadTimeSource,
+                shellIntegration = shellIntegration,
+                inputEncoderFactory = inputEncoderFactory,
+                parserFactory = parserFactory,
+                cleanupDispatcher = DEFAULT_CLEANUP_DISPATCHER,
+            )
+
+        /**
+         * Assembles core and render collaborators with session-owned host services.
+         *
+         * Width must be at least [TerminalBuffers.MIN_WIDTH] and height must be positive.
+         * Dimensions are validated before factory calls or connector ownership
+         * transfer. The collaborators must describe the same terminal state; equal
+         * dimensions alone cannot establish that relationship. Factory failures
+         * leave the connector with its caller and start no session workers.
+         *
+         * @param terminal core buffer transferred to the session's exclusive runtime ownership.
+         * @param renderReader render projection of the same core state.
+         * @param connector transport connector transferred to the session; closed on every terminal lifecycle path.
+         * @param hostEvents metadata events target.
+         * @param hostPolicy safety policy.
+         * @param inputPolicy key-encoding policy.
+         * @param modeReportCapabilities implemented host actions from TerminalHostModeCapability; defaults to none.
+         * @param kittyKeyboardSupportedFlags progressive Kitty keyboard flags
+         * the active input host can provide truthfully. Defaults to the
+         * conservative portable-host profile.
+         * @param workerDispatcher non-owned dispatcher used for render publication and timeouts.
+         * @param startupCommand optional command submitted once after the selected integration reports prompt readiness.
+         * User input before readiness cancels submission.
+         * @param ioDispatcher non-owned dispatcher for connector writes, metadata queries, and clipboard providers.
+         * @param clipboardReader session-bound clipboard/consent operation, or null for unavailable reads.
+         * @param clipboardReadTimeSource monotonic elapsed-time source for clipboard provider and reply-commit deadline checks.
+         *   Deterministic tests should share its time domain with the worker dispatcher's delay scheduler.
+         *   This does not change the fixed read timeout or other session timers.
+         * @param shellIntegration sole shell metadata producer; null leaves shell features unavailable.
+         * @param inputEncoderFactory creates independent admission and bulk encoders bound to session-owned output.
+         * @param cleanupDispatcher non-owned dispatcher for asynchronous shutdown, independent
+         * of blocked connector writes. Must execute blocking cleanup off UI threads.
+         * @param parserFactory customizes parsing using the assembled host sink and its live clipboard budget.
+         * Pass both to [TerminalParsers.create] when adding a custom OSC handler.
+         * Its callback runs under mutation serialization and may read frames before later output.
+         * It must not call mutating session APIs or close the session.
+         * @throws IllegalArgumentException when [startupCommand] is supplied without [shellIntegration].
+         * @throws IllegalArgumentException when terminal dimensions are invalid, the initial render frame is absent or has incompatible dimensions,
+         * or the input factory reuses one encoder instance.
+         * @return standard production terminal session.
+         */
+        @JvmStatic
+        public fun create(
+            terminal: TerminalBuffer,
+            renderReader: TerminalRenderFrameReader,
+            connector: TerminalConnector,
+            hostEvents: HostEventSink = HostEventSink.NONE,
+            hostPolicy: HostPolicy = HostPolicy(),
+            inputPolicy: TerminalInputPolicy = TerminalInputPolicy(),
+            kittyKeyboardSupportedFlags: Int = KittyKeyboardProgressiveFlag.DEFAULT_HOST_SUPPORTED_MASK,
+            workerDispatcher: CoroutineDispatcher = Dispatchers.Default,
+            startupCommand: TerminalStartupCommand? = null,
+            ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
+            modeReportCapabilities: Int = 0,
+            clipboardReader: TerminalClipboardReader? = null,
+            clipboardReadTimeSource: TimeSource = TimeSource.Monotonic,
+            shellIntegration: TerminalShellIntegrationFactory? = null,
+            inputEncoderFactory: TerminalInputEncoderFactory? = null,
+            parserFactory: TerminalOutputParserFactory? = null,
+            cleanupDispatcher: CoroutineDispatcher,
         ): TerminalSession {
             require(terminal.width >= TerminalBuffers.MIN_WIDTH) {
                 "terminal width must be at least ${TerminalBuffers.MIN_WIDTH}, got ${terminal.width}"
@@ -1686,6 +2071,7 @@ public class TerminalSession private constructor(
                     workerDispatcher = workerDispatcher,
                     ioDispatcher = ioDispatcher,
                     startupCommand = startupCommand,
+                    cleanupDispatcher = cleanupDispatcher,
                 )
             val clipboardReads =
                 ClipboardReadHandler(

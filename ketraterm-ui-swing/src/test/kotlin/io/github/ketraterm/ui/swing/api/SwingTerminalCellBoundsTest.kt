@@ -57,12 +57,19 @@ class SwingTerminalCellBoundsTest {
                     it.useSystemFallbackFonts = false
                     it.cursorBlinkMillis = 0
                 }
-            val terminal = SwingTerminal(settingsProvider = { settings })
+            val terminal =
+                SwingTerminal(
+                    settingsProvider = { settings },
+                    hostServices = SwingHostServices.create { it.uiDispatcher = CONTROLLED_SWING_UI_DISPATCHER },
+                    searchDispatcher = dispatcher,
+                    mutationDispatcher = dispatcher,
+                )
             try {
                 terminal.size = terminal.preferredGridSize(7, 2)
                 session.requestRender(0)
                 dispatcher.scheduler.runCurrent()
                 terminal.bind(session)
+                dispatcher.scheduler.runCurrent()
                 val image =
                     BufferedImage(
                         kotlin.math.ceil(terminal.width * scale).toInt(),
@@ -127,12 +134,19 @@ class SwingTerminalCellBoundsTest {
                     draft.alternateScreenPadding = SwingPadding(3, 4, 8, 10)
                     draft.shellIntegrationDecorationGutterWidth = 9
                 }
-            val terminal = SwingTerminal(settingsProvider = { settings })
+            val terminal =
+                SwingTerminal(
+                    settingsProvider = { settings },
+                    hostServices = SwingHostServices.create { it.uiDispatcher = CONTROLLED_SWING_UI_DISPATCHER },
+                    searchDispatcher = dispatcher,
+                    mutationDispatcher = dispatcher,
+                )
             try {
                 terminal.size = terminal.preferredGridSize(10, 3)
                 session.requestRender(0)
                 dispatcher.scheduler.runCurrent()
                 terminal.bind(session)
+                dispatcher.scheduler.runCurrent()
                 val left = if (alternate) 4 else 7
                 val top = if (alternate) 3 else 5
                 val right = if (alternate) 10 else 13

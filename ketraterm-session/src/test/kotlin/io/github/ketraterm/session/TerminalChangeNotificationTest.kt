@@ -249,6 +249,7 @@ class TerminalChangeNotificationTest {
                     hostPolicy = if (denyInitially) denied else HostPolicy(),
                     workerDispatcher = dispatcher,
                     ioDispatcher = dispatcher,
+                    cleanupDispatcher = dispatcher,
                 ).use { session ->
                     if (!denyInitially) session.setHostPolicy(denied)
                     session.start(8, 2)
@@ -293,6 +294,7 @@ class TerminalChangeNotificationTest {
                     hostEvents = events,
                     workerDispatcher = dispatcher,
                     ioDispatcher = dispatcher,
+                    cleanupDispatcher = dispatcher,
                 ).use { session ->
                     session.start(10, 3)
                     connector.feedFromHost("\u001b[?2031h".encodeToByteArray())
@@ -354,6 +356,7 @@ class TerminalChangeNotificationTest {
                     hostEvents = events,
                     workerDispatcher = dispatcher,
                     ioDispatcher = dispatcher,
+                    cleanupDispatcher = dispatcher,
                 ).use { session ->
                     session.start(10, 3)
                     connector.feedFromHost("\u001b[?2031h".encodeToByteArray())
@@ -363,6 +366,7 @@ class TerminalChangeNotificationTest {
                         assertThrows(IllegalStateException::class.java) { session.setThemePalette(TerminalColorPalette(isDark = false)) },
                     )
                     assertTrue(session.isClosed)
+                    runCurrent()
                     val closed = session.state.value as TerminalSessionState.Closed
                     assertSame(failure.suppressed.single(), closed.event.failure)
                     runCurrent()
@@ -460,6 +464,7 @@ class TerminalChangeNotificationTest {
                     hostPolicy = if (denyInitially) denied else HostPolicy(),
                     workerDispatcher = dispatcher,
                     ioDispatcher = dispatcher,
+                    cleanupDispatcher = dispatcher,
                 ).use { session ->
                     session.start(10, 3)
                     if (!denyInitially) session.setHostPolicy(denied)

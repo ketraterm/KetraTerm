@@ -44,6 +44,7 @@ class TerminalSessionClearTest {
                     connector,
                     workerDispatcher = dispatcher,
                     ioDispatcher = dispatcher,
+                    cleanupDispatcher = dispatcher,
                 ).use { session ->
                     session.start(10, 2)
                     val resizeCalls = connector.resizeCalls.toList()
@@ -78,6 +79,7 @@ class TerminalSessionClearTest {
                     connector,
                     workerDispatcher = dispatcher,
                     ioDispatcher = dispatcher,
+                    cleanupDispatcher = dispatcher,
                 ).use { session ->
                     session.start(12, 4)
                     session.feed("\u001b[3g\u001b[5G\u001bH\u001b[2;4r\u001b[?6h\u001b[?2004h\u001b[31m\u001b[2;3H\u001b7X")
@@ -113,6 +115,7 @@ class TerminalSessionClearTest {
                     MockConnector(),
                     workerDispatcher = dispatcher,
                     ioDispatcher = dispatcher,
+                    cleanupDispatcher = dispatcher,
                 ).use { session ->
                     session.start(10, 2)
                     session.feed("\u001b]8;;https://example.org\u0007\u001b[1\"q界e\u0301\u001b]8;;\u00071234567")
@@ -138,6 +141,7 @@ class TerminalSessionClearTest {
                     MockConnector(),
                     workerDispatcher = dispatcher,
                     ioDispatcher = dispatcher,
+                    cleanupDispatcher = dispatcher,
                 ).use { session ->
                     session.start(10, 2)
                     session.feed("one\r\ntwo\r\nthree")
@@ -161,6 +165,7 @@ class TerminalSessionClearTest {
                     MockConnector(),
                     workerDispatcher = dispatcher,
                     ioDispatcher = dispatcher,
+                    cleanupDispatcher = dispatcher,
                 ).use { session ->
                     session.start(10, 2)
                     session.feed("a")
@@ -191,6 +196,7 @@ class TerminalSessionClearTest {
                     connector,
                     workerDispatcher = dispatcher,
                     ioDispatcher = dispatcher,
+                    cleanupDispatcher = dispatcher,
                 )
             session.use {
                 assertTrue(session.clearBuffer())
@@ -227,6 +233,7 @@ class TerminalSessionClearTest {
                     connector,
                     workerDispatcher = dispatcher,
                     ioDispatcher = dispatcher,
+                    cleanupDispatcher = dispatcher,
                 )
             session.start(10, 2)
             session.feed("retained")
@@ -271,6 +278,7 @@ class TerminalSessionClearTest {
                     connector,
                     workerDispatcher = dispatcher,
                     ioDispatcher = dispatcher,
+                    cleanupDispatcher = dispatcher,
                     shellIntegration = TerminalShellIntegrationFactory { integration },
                 )
             session.start(10, 2)
@@ -328,6 +336,7 @@ class TerminalSessionClearTest {
                     MockConnector(),
                     workerDispatcher = dispatcher,
                     ioDispatcher = dispatcher,
+                    cleanupDispatcher = dispatcher,
                     shellIntegration = TerminalShellIntegrationFactory { integration },
                 ).use { session ->
                     session.start(10, 2)
@@ -365,6 +374,7 @@ class TerminalSessionClearTest {
                     MockConnector(),
                     workerDispatcher = dispatcher,
                     ioDispatcher = dispatcher,
+                    cleanupDispatcher = dispatcher,
                     shellIntegration = TerminalShellIntegrationFactory.host(state, command),
                 ).use { session ->
                     session.start(10, 2)
@@ -410,6 +420,7 @@ class TerminalSessionClearTest {
                     MockConnector(),
                     workerDispatcher = dispatcher,
                     ioDispatcher = dispatcher,
+                    cleanupDispatcher = dispatcher,
                     shellIntegration = TerminalShellIntegrationFactory { integration },
                 )
             session.use {

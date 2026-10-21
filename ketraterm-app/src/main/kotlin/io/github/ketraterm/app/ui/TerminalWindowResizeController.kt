@@ -22,6 +22,7 @@ import io.github.ketraterm.ui.swing.api.SwingTerminal
 import java.awt.Rectangle
 import java.awt.event.ComponentAdapter
 import java.awt.event.ComponentEvent
+import java.util.concurrent.CancellationException
 import javax.swing.JFrame
 import javax.swing.SwingUtilities
 
@@ -81,12 +82,20 @@ internal class TerminalWindowResizeController(
     /**
      * Schedules an eligible window resize without Swing access on the calling thread.
      * [preserveGrid] keeps a logical column switch intact if the queued window update is cancelled.
+     * Accepted work reports completion on the EDT; fallback completion follows session admission.
      */
     fun request(
         session: TerminalSession,
         rows: Int,
         columns: Int,
         preserveGrid: Boolean = false,
+        onComplete: (Throwable?) -> Unit = { failure ->
+            if (failure != null && failure !is CancellationException) {
+                System
+                    .getLogger(TerminalWindowResizeController::class.java.name)
+                    .log(System.Logger.Level.WARNING, "Terminal window resize failed", failure)
+            }
+        },
     ): Boolean {
         val current = snapshot ?: return false
         if (current.session !== session) return false
@@ -94,17 +103,31 @@ internal class TerminalWindowResizeController(
         session.readRenderFrame { alternate = it.activeBuffer == TerminalRenderBufferKind.ALTERNATE }
         if (current.geometry.targetBounds(columns, rows, alternate) == null) return false
         dispatch {
-            if (closed || session.isClosed) return@dispatch
-            // A user layout change after acceptance takes precedence over the queued request.
-            refresh()
-            val latest = snapshot
-            val target = latest?.takeIf { it.session === session }?.geometry?.targetBounds(columns, rows, alternate)
-            if (target != null) {
-                window.resize(target)
-            } else if (!preserveGrid && !session.isClosed) {
-                val visible = current.terminal.visibleGridSize()
-                session.resize(visible.width, visible.height)
+            if (closed || session.isClosed) {
+                onComplete(CancellationException("Terminal window resize cancelled"))
+                return@dispatch
             }
+            // A user layout change after acceptance takes precedence over the queued request.
+            var completionDelivered = false
+            try {
+                refresh()
+                val latest = snapshot
+                val target = latest?.takeIf { it.session === session }?.geometry?.targetBounds(columns, rows, alternate)
+                if (target != null) {
+                    window.resize(target)
+                } else if (!preserveGrid && !session.isClosed) {
+                    current.terminal.resizeSessionToVisibleGrid { failure ->
+                        completionDelivered = true
+                        onComplete(failure)
+                    }
+                    return@dispatch
+                }
+            } catch (failure: Throwable) {
+                if (completionDelivered) throw failure
+                onComplete(failure)
+                return@dispatch
+            }
+            onComplete(null)
         }
         return true
     }

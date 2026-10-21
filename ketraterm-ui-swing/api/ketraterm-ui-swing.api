@@ -273,6 +273,8 @@ public final class io/github/ketraterm/ui/swing/api/SwingTerminal : javax/swing/
 	public final fun beginShellSuggestionInteraction (Lio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionRequest;Lio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionTrigger;Lio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionFeedbackHandler;Lio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionEditTarget;)Lio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionInteraction;
 	public static synthetic fun beginShellSuggestionInteraction$default (Lio/github/ketraterm/ui/swing/api/SwingTerminal;Lio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionRequest;Lio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionTrigger;Lio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionFeedbackHandler;Lio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionEditTarget;ILjava/lang/Object;)Lio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionInteraction;
 	public final fun bind (Lio/github/ketraterm/session/TerminalSession;)V
+	public final fun bind (Lio/github/ketraterm/session/TerminalSession;Lkotlin/jvm/functions/Function1;)V
+	public static synthetic fun bind$default (Lio/github/ketraterm/ui/swing/api/SwingTerminal;Lio/github/ketraterm/session/TerminalSession;Lkotlin/jvm/functions/Function1;ILjava/lang/Object;)V
 	public final fun clearScreen ()Z
 	public final fun clearSearch ()V
 	public final fun clearSelection ()V
@@ -321,6 +323,9 @@ public final class io/github/ketraterm/ui/swing/api/SwingTerminal : javax/swing/
 	public final fun requestShellSuggestions (Ljava/lang/String;IIILio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionTrigger;)V
 	public final fun requestShellSuggestions (Ljava/lang/String;IIILio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionTrigger;Lio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionEditTarget;)V
 	public static synthetic fun requestShellSuggestions$default (Lio/github/ketraterm/ui/swing/api/SwingTerminal;Ljava/lang/String;IIILio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionTrigger;Lio/github/ketraterm/ui/swing/suggestion/SwingShellSuggestionEditTarget;ILjava/lang/Object;)V
+	public final fun resizeSessionToVisibleGrid ()V
+	public final fun resizeSessionToVisibleGrid (Lkotlin/jvm/functions/Function1;)V
+	public static synthetic fun resizeSessionToVisibleGrid$default (Lio/github/ketraterm/ui/swing/api/SwingTerminal;Lkotlin/jvm/functions/Function1;ILjava/lang/Object;)V
 	public fun scrollFromScrollbar (IZ)V
 	public final fun scrollToLiveViewport ()V
 	public final fun scrollToNextCommand ()V
@@ -334,6 +339,9 @@ public final class io/github/ketraterm/ui/swing/api/SwingTerminal : javax/swing/
 	public final fun selectNextSearchResult ()V
 	public final fun selectPreviousSearchResult ()V
 	public final fun selectedText ()Ljava/lang/String;
+	public final fun setHostPolicy (Lio/github/ketraterm/host/HostPolicy;)V
+	public final fun setHostPolicy (Lio/github/ketraterm/host/HostPolicy;Lkotlin/jvm/functions/Function1;)V
+	public static synthetic fun setHostPolicy$default (Lio/github/ketraterm/ui/swing/api/SwingTerminal;Lio/github/ketraterm/host/HostPolicy;Lkotlin/jvm/functions/Function1;ILjava/lang/Object;)V
 	public final fun setSearchCaseSensitive (Z)V
 	public final fun setSearchRegex (Z)V
 	public final fun setSearchWholeWord (Z)V

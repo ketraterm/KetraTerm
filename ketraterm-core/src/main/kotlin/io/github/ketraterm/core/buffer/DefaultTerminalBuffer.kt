@@ -64,6 +64,13 @@ internal class DefaultTerminalBuffer private constructor(
         allowReplies: Boolean,
     ) = graphicsEngine.applyGraphicsCommand(command, data, length, result, allowReplies)
 
+    override fun applyDecodedGraphicsCommand(
+        command: TerminalGraphicsCommand,
+        image: io.github.ketraterm.render.api.TerminalRenderImage?,
+        result: TerminalGraphicsResult,
+        allowReplies: Boolean,
+    ) = graphicsEngine.applyDecodedGraphicsCommand(command, image, result, allowReplies)
+
     constructor(initialWidth: Int, initialHeight: Int, maxHistory: Int = 1000) : this(
         createComponents(initialWidth, initialHeight, maxHistory),
     )

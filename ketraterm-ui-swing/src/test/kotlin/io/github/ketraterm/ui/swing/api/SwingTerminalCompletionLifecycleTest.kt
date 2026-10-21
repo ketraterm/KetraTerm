@@ -46,11 +46,13 @@ class SwingTerminalCompletionLifecycleTest {
             val terminal = terminal(testScheduler)
             try {
                 terminal.bind(first.session)
+                runCurrent()
                 val old = assertNotNull(terminal.beginActiveShellSuggestionInteraction())
                 old.publish(listOf(suggestion))
                 val oldPublication = old.snapshot
 
                 terminal.bind(second.session)
+                runCurrent()
                 assertEquals(SwingShellSuggestionAcceptanceResult.STALE_CONTEXT, old.tryAccept(oldPublication, 0))
                 val current = assertNotNull(terminal.beginActiveShellSuggestionInteraction())
                 current.publish(listOf(suggestion))
@@ -159,6 +161,7 @@ class SwingTerminalCompletionLifecycleTest {
                 val terminal = terminal(testScheduler, view = view)
                 try {
                     terminal.bind(session.session)
+                    runCurrent()
                     terminal.setShellSuggestionProvider { emptyFlow() }
                     val interaction =
                         assertNotNull(terminal.beginShellSuggestionInteraction(request, editTarget = SwingShellSuggestionEditTarget.NONE))
@@ -242,6 +245,7 @@ class SwingTerminalCompletionLifecycleTest {
             try {
                 terminal.setShellSuggestionTarget(target)
                 terminal.bind(session.session)
+                runCurrent()
                 focus(terminal, true)
                 runCurrent()
                 advanceTimeBy(75.milliseconds)
@@ -272,6 +276,7 @@ class SwingTerminalCompletionLifecycleTest {
             try {
                 terminal.setShellSuggestionTarget(target)
                 terminal.bind(first.session)
+                runCurrent()
                 focus(terminal, true)
                 runCurrent()
                 advanceTimeBy(75.milliseconds)
@@ -279,6 +284,7 @@ class SwingTerminalCompletionLifecycleTest {
                 val previous = target.interactions.single()
 
                 terminal.bind(second.session)
+                runCurrent()
                 assertTrue(previous.isClosed)
                 assertFalse(target.visible)
                 runCurrent()
@@ -306,6 +312,7 @@ class SwingTerminalCompletionLifecycleTest {
                     terminal.setShellSuggestionProvider { emptyFlow() }
                     terminal.setShellSuggestionTarget(target)
                     terminal.bind(session.session)
+                    runCurrent()
                     focus(terminal, true)
                     runCurrent()
                     advanceTimeBy(75.milliseconds)
@@ -350,6 +357,7 @@ class SwingTerminalCompletionLifecycleTest {
             try {
                 terminal.setShellSuggestionTarget(original)
                 terminal.bind(session.session)
+                runCurrent()
                 focus(terminal, true)
                 runCurrent()
                 advanceTimeBy(75.milliseconds)
@@ -385,6 +393,7 @@ class SwingTerminalCompletionLifecycleTest {
             try {
                 terminal.setShellSuggestionTarget(target)
                 terminal.bind(session.session)
+                runCurrent()
                 val previous = startAutomatic(terminal, target)
                 var replacement: SwingShellSuggestionInteraction? = null
                 previous.addChangeListener {
@@ -414,6 +423,7 @@ class SwingTerminalCompletionLifecycleTest {
             try {
                 terminal.setShellSuggestionTarget(target)
                 terminal.bind(session.session)
+                runCurrent()
                 val previous = startAutomatic(terminal, target)
                 previous.publish(listOf(suggestion))
                 terminal.presentShellSuggestions(previous)
@@ -443,6 +453,7 @@ class SwingTerminalCompletionLifecycleTest {
             try {
                 terminal.setShellSuggestionTarget(target)
                 terminal.bind(session.session)
+                runCurrent()
                 val previous = startAutomatic(terminal, target)
                 var replacement: SwingShellSuggestionInteraction? = null
                 target.onHide = {
@@ -475,6 +486,7 @@ class SwingTerminalCompletionLifecycleTest {
                 try {
                     terminal.setShellSuggestionTarget(target)
                     terminal.bind(session.session)
+                    runCurrent()
                     focus(terminal, true)
                     runCurrent()
                     advanceTimeBy(75.milliseconds)
@@ -520,6 +532,7 @@ class SwingTerminalCompletionLifecycleTest {
                 connector,
                 workerDispatcher = dispatcher,
                 ioDispatcher = dispatcher,
+                cleanupDispatcher = dispatcher,
                 shellIntegration =
                     if (legacySource == null) {
                         TerminalShellIntegrationFactory.host(TerminalShellIntegrationState(), model)
@@ -622,6 +635,7 @@ class SwingTerminalCompletionLifecycleTest {
                     },
                 searchDispatcher = StandardTestDispatcher(scheduler),
                 suggestionDispatcher = UnconfinedTestDispatcher(scheduler),
+                mutationDispatcher = StandardTestDispatcher(scheduler),
             ).also { it.size = it.preferredGridSize(30, 4) }
 
         fun focus(

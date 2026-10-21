@@ -30,6 +30,7 @@ import io.github.ketraterm.transport.TerminalConnectorListener
 import io.github.ketraterm.ui.swing.render.TestRenderFrame
 import io.github.ketraterm.ui.swing.settings.SwingPadding
 import io.github.ketraterm.ui.swing.settings.SwingSettings
+import io.github.ketraterm.ui.swing.settings.SwingSettingsProvider
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.StandardTestDispatcher
 import org.junit.jupiter.api.Assertions.assertFalse
@@ -70,7 +71,7 @@ class SwingTerminalCursorBlinkTest {
         session.use { session ->
             SwingUtilities.invokeAndWait {
                 val component =
-                    SwingTerminal(settingsProvider = {
+                    controlledTerminal(settingsProvider = {
                         SwingSettings.create { draft ->
                             draft.cursorBlinkMillis = 0
                             draft.padding = SwingPadding()
@@ -96,6 +97,7 @@ class SwingTerminalCursorBlinkTest {
                 try {
                     component.size = component.preferredGridSize(3, 1)
                     component.bind(session)
+                    dispatcher.scheduler.runCurrent()
                     component.cursorBlinkVisible = false
                     RepaintManager.setCurrentManager(manager)
 
@@ -137,7 +139,7 @@ class SwingTerminalCursorBlinkTest {
                         draft.padding = SwingPadding()
                         draft.shellIntegrationDecorationGutterWidth = 0
                     }
-                val component = SwingTerminal(settingsProvider = { settings })
+                val component = controlledTerminal(settingsProvider = { settings })
                 component.size = component.preferredGridSize(3, 1)
                 val cellWidth = component.width / 3
                 val cellHeight = component.height
@@ -166,6 +168,7 @@ class SwingTerminalCursorBlinkTest {
                 }
                 try {
                     component.bind(session)
+                    dispatcher.scheduler.runCurrent()
                     publish()
                     assertEquals(settings.palette.cursorBackground, paint().getRGB(0, 0))
                     assertEquals(settings.palette.defaultBackground, paint().getRGB(cellWidth / 2, cellHeight / 2))
@@ -234,6 +237,7 @@ class SwingTerminalCursorBlinkTest {
         } finally {
             SwingUtilities.invokeAndWait {
                 frame.dispose()
+                component.dispose()
             }
         }
     }
@@ -253,7 +257,7 @@ class SwingTerminalCursorBlinkTest {
                 inputEncoderFactory = { _, _, _ -> object : TerminalInputEncoder by NoOpInputEncoder {} },
                 workerDispatcher = dispatcher,
             )
-        val component = SwingTerminal()
+        val component = controlledTerminal()
 
         val frame = JFrame()
         try {
@@ -261,6 +265,7 @@ class SwingTerminalCursorBlinkTest {
                 frame.add(component)
                 frame.pack()
                 component.bind(session)
+                dispatcher.scheduler.runCurrent()
             }
 
             // Verify cursor timer is started when component is added
@@ -305,10 +310,19 @@ class SwingTerminalCursorBlinkTest {
         } finally {
             SwingUtilities.invokeAndWait {
                 frame.dispose()
+                component.dispose()
             }
             session.close()
         }
     }
+
+    private fun controlledTerminal(settingsProvider: SwingSettingsProvider = SwingSettingsProvider { SwingSettings() }): SwingTerminal =
+        SwingTerminal(
+            settingsProvider = settingsProvider,
+            hostServices = SwingHostServices.create { it.uiDispatcher = CONTROLLED_SWING_UI_DISPATCHER },
+            searchDispatcher = dispatcher,
+            mutationDispatcher = dispatcher,
+        )
 
     private class SimpleFrameReader : TerminalRenderFrameReader {
         override fun readRenderFrame(consumer: TerminalRenderFrameConsumer) {

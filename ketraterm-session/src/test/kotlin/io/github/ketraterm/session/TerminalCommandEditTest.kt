@@ -143,6 +143,7 @@ class TerminalCommandEditTest {
                             ),
                         workerDispatcher = dispatcher,
                         ioDispatcher = dispatcher,
+                        cleanupDispatcher = dispatcher,
                     ).use { legacy ->
                         legacy.start(10, 3)
                         assertEquals(snapshot(), legacy.activeShellCommandLine())
@@ -225,6 +226,7 @@ class TerminalCommandEditTest {
             shellIntegration = TerminalShellIntegrationFactory.host(TerminalShellIntegrationState(), model),
             workerDispatcher = dispatcher,
             ioDispatcher = dispatcher,
+            cleanupDispatcher = dispatcher,
         )
     }
 
