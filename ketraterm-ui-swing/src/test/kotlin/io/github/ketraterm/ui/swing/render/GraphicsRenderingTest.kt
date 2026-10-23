@@ -38,6 +38,52 @@ import kotlin.test.*
 
 class GraphicsRenderingTest {
     @Test
+    fun `height resize after history eviction clips and reveals retained pixels at the shifted anchor`() =
+        onEdt {
+            val terminal = TerminalBuffers.create(10, 6, 2)
+            terminal.resize(10, 6, 0, 20, 24)
+            repeat(40) { terminal.scrollUp(1) }
+            val parser = TerminalParsers.create(HostCommandAdapter(terminal))
+            parser.accept(
+                (
+                    "A\r\nB\r\nC\r\nD\r\nE\r\nF\u001b[5;3H" +
+                        "\u001b_Ga=T,i=1,f=24,s=1,v=1,c=2,r=3,C=1;/wAA\u001b\\"
+                ).encodeToByteArray(),
+            )
+            val cache = TerminalRenderCache(10, 6)
+            val painter = GraphicsPainter()
+            try {
+                cache.updateFrom(terminal as TerminalRenderFrameReader)
+                painter.prepare(cache.images)
+                val original = cache.images.image(0)
+                for ((rows, imageRow) in listOf(6 to 4, 4 to 2, 6 to 2)) {
+                    terminal.resize(10, rows, 0, 20, rows * 4)
+                    cache.updateFrom(terminal)
+                    painter.prepare(cache.images)
+                    assertSame(original, cache.images.image(0), "rows=$rows")
+                    val canvas = BufferedImage(20, rows * 4, BufferedImage.TYPE_INT_ARGB)
+                    val graphics = canvas.createGraphics()
+                    try {
+                        graphics.color = Color.BLUE
+                        graphics.fillRect(0, 0, canvas.width, canvas.height)
+                        graphics.clipRect(0, 0, canvas.width, canvas.height)
+                        painter.paint(graphics, cache.images, IMAGE_METRICS, null, 2, 4, rows)
+                        for (y in 0 until canvas.height) {
+                            for (x in 0 until canvas.width) {
+                                val covered = x in 4 until 8 && y in imageRow * 4 until (imageRow + 3) * 4
+                                assertEquals(if (covered) Color.RED.rgb else Color.BLUE.rgb, canvas.getRGB(x, y), "rows=$rows x=$x y=$y")
+                            }
+                        }
+                    } finally {
+                        graphics.dispose()
+                    }
+                }
+            } finally {
+                painter.clear()
+            }
+        }
+
+    @Test
     fun `retired versions leave the raster cache without invalidating installed pinned frames`() =
         onEdt {
             val terminal = TerminalBuffers.create(10, 4)
@@ -318,10 +364,11 @@ class GraphicsRenderingTest {
             val rasters = GraphicsRasterCache()
             rasters.prepare(cache.images)
             val first = rasters.image(0)
-            repeat(3) {
+            for (rows in intArrayOf(4, 6, 4)) {
+                terminal.resize(10, rows, 0, 80, rows * 16)
                 cache.updateFrom(terminal)
                 rasters.prepare(cache.images)
-                assertSame(first, rasters.image(0))
+                assertSame(first, rasters.image(0), "Height changes must reuse the retained image raster")
             }
             rasters.clear()
             rasters.prepare(cache.images)

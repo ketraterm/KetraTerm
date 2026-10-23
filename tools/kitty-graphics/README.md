@@ -64,6 +64,10 @@ defaults to 40 columns; choose a width that fits the viewport. KetraTerm derives
 height from the image's aspect ratio and its own cell geometry, without native
 PTY pixel-size queries.
 
+The current bundled Windows ConPTY can desynchronize PowerShell's cursor after
+image display or resize. See the [confirmed backend limitations](../../ketraterm-pty/docs/pty4j-backend-limitations.md#windows-graphics-cursor-desynchronization);
+displaying pixels alone does not verify subsequent interactive cursor behavior.
+
 The script accepts PNG files only and sends their bytes in 4096-character
 Base64 chunks. Run it directly without piping or redirecting output. It checks
 the PNG signature; KetraTerm validates the complete image and enforces its

@@ -68,6 +68,10 @@ environment or requested executable is unavailable. Initial dimensions are
 supplied during process creation and propagated again before session delivery
 starts.
 
+The pinned native backend has known pixel-size and graphics cursor constraints.
+See [backend limitations](pty4j-backend-limitations.md) for causes, reproduction
+evidence, and upstream references.
+
 Foreground-process lookup uses the Unix terminal's foreground process group
 when available. Windows selects the newest live descendant, which can be a
 background child. Missing permissions, unavailable metadata, closure, or an

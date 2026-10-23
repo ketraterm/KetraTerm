@@ -193,13 +193,27 @@ removes history graphics while preserving visible placements. History eviction
 drops placements that can no longer be displayed.
 
 Ordinary graphics keep physical cell coordinates on width reflow; they do not
-follow logical text-line IDs. Same-width height shrink adjusts rows by the actual
-content lines removed from the live screen. Recompute geometry on cell-size
+follow logical text-line IDs. Text above an image can therefore unwrap and move
+a later prompt underneath it; images do not reserve text cells. This matches
+Kitty's [`grman_resize`](https://github.com/kovidgoyal/kitty/blob/1c5a4829ae4dd472017f592b1424381d5ece7575/kitty/graphics.c#L2676).
+Same-width height shrink adjusts rows by the actual content lines removed from
+the live screen in that resize, excluding earlier history evictions. Consuming
+trailing blank rows does not move anchors. Recompute geometry on cell-size
 changes. Alternate resize follows KetraTerm's existing alternate-grid recreation
 and clears alternate placements; this is a KetraTerm policy, not reference parity.
-Primary graphics remain attached to their own screen. These resize decisions
-require focused reference and core tests before publication. They do not change
-text reflow policy.
+Primary graphics remain attached to their own screen, including during an
+inactive-primary resize. Viewport clipping does not permanently crop images;
+enlarging the viewport can reveal retained pixels again.
+
+Resize verification uses Kitty 0.45.0 and 0.49.2's headless `Screen` engines alongside the
+pinned implementation above. An 8-column wrapped line widened to 16 columns
+moves a following prompt up one row while retaining the image's cell anchor;
+narrowing restores the text and typing remains beside the prompt. Repeated
+height shrinking and growth after history eviction verify the corresponding
+anchor shifts. Permanent [core regressions](../../ketraterm-core/src/test/kotlin/io/github/ketraterm/core/graphics/GraphicsResizeTest.kt)
+cover these cases and inactive-primary history; [Swing regressions](../../ketraterm-ui-swing/src/test/kotlin/io/github/ketraterm/ui/swing/render/GraphicsRenderingTest.kt)
+check painted clipping, reveal and raster reuse. These checks do not change
+KetraTerm's general text reflow policy or verify native ConPTY cursor tracking.
 
 ## Image lifetime and render publication
 

@@ -152,7 +152,9 @@ internal class DefaultTerminalBuffer private constructor(
             return Pair(state.clampScrollbackOffset(oldScrollbackOffset), state.historySize)
         }
 
-        val oldPrimaryTop = state.primaryBuffer.ring.discardedCount + state.primaryBuffer.ring.size - oldHeight
+        // Height resize starts a new discarded-row epoch. Compare its emitted rows
+        // with the old ring's local top, excluding evictions from earlier operations.
+        val oldPrimaryTop = state.primaryBuffer.ring.size - oldHeight
         val newScrollbackOffset =
             TerminalResizer.resizeBuffer(
                 buffer = state.primaryBuffer,
