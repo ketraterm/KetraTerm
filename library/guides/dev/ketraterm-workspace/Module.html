@@ -42,6 +42,10 @@ The <a href="README.html">README</a> describes construction, listener threading,
 <td>Register and select tabs, launch local sessions, observe closure, and clean up owned sessions.</td>
 </tr>
 <tr>
+<td>Internal <code>WorkspaceOperations</code></td>
+<td>Bound asynchronous admission, preserve FIFO order, and reserve tab/final cleanup until completion.</td>
+</tr>
+<tr>
 <td><code>TerminalWorkspaceTab</code></td>
 <td>Session identity and live title, directory, color, and process-title preferences.</td>
 </tr>
@@ -77,6 +81,14 @@ registrations are detached on tab removal or session closure. Opening publishes
 the tab before session output starts; every open failure cleans up the prepared
 session. Removal and workspace shutdown attempt all required cleanup even when
 callbacks throw. See the <a href="README.html#architectural-role">lifecycle contract</a>.</p>
+<p>Asynchronous operations use a separate owned worker so accepted cleanup survives
+observer or view cancellation. Its default I/O dispatcher accommodates blocking
+startup and publication handoffs without occupying the CPU workers needed by
+host binding. Ordinary pending work is limited to 64 requests;
+each currently owned tab can reserve one cleanup operation, and final shutdown
+has one reserved slot. All entries preserve accepted order. Close completion
+waits for retained session closure, including when <code>requestClose</code> claimed
+termination before the workspace operation reached its worker.</p>
 <h2 id="dependency-boundary">Dependency boundary</h2>
 <p><code>ketraterm-session</code> is the API dependency. PTY, shell integration, render API, and
 coroutines are implementation dependencies. The workspace chooses local launch
@@ -84,12 +96,15 @@ wiring, while PTY owns process mechanics and session owns synchronization. UI
 views, completion services, preference persistence, and product commands stay in
 the launching host.</p>
 <h2 id="validation">Validation</h2>
+<p>The ordinary test task includes <code>defaultDispatcherTest</code>, which runs its scheduler
+regression in a separate JVM with two CPU workers. Other tests retain their
+normal scheduler configuration.</p>
 <p>From the repository root, run <code>./gradlew :ketraterm-workspace:test</code> for the module
 suite. Tests cover profile discovery, tab selection, listener failures, cleanup,
 clipboard routing, and shell bootstrap behavior. Native shell integration and
 startup-command tests are environment-dependent; inspect their assumptions when
 validating changes to launch behavior.</p>
-</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/461979b7271f15e3ba0358137b253b88c18c840a/ketraterm-workspace/Module.md">View source on GitHub ↗</a></div></div></main></div>
+</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/5371b816fb7dc3c3bca6ea24282a4d1b2b657090/ketraterm-workspace/Module.md">View source on GitHub ↗</a></div></div></main></div>
   <footer>
     <a class="brand" href="../../../index.html"><img class="brand-mark" src="../../../assets/logo.svg" alt="" width="34" height="34">KetraTerm Library</a>
     <p>Open source · Apache 2.0</p>

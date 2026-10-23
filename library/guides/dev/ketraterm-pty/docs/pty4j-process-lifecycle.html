@@ -70,9 +70,9 @@ reentrantly.</p>
 remote <code>onClosed</code> callback; the session records its own local termination.
 Exceptions arriving after local close are teardown and do not become remote
 failures.</p>
-<p>Cleanup requests process destruction and closes both streams. A call outside
-the connector workers makes bounded joins of the reader and watcher. A worker
-does not join itself or its peer, which may be waiting for the current callback.
+<p>Cleanup requests process destruction and closes both streams without waiting
+for an active byte callback. The reader retains its borrowed buffer until that
+callback returns, then stops delivery; the watcher exits after the reader.
 Close is idempotent, but native destruction and stream cleanup can block. Keep
 it off a UI thread.</p>
 <h2 id="writes-and-resize">Writes and resize</h2>
@@ -90,6 +90,9 @@ library loading are owned by Pty4J; startup may fail when the local native
 environment or requested executable is unavailable. Initial dimensions are
 supplied during process creation and propagated again before session delivery
 starts.</p>
+<p>The pinned native backend has known pixel-size and graphics cursor constraints.
+See <a href="pty4j-backend-limitations.html">backend limitations</a> for causes, reproduction
+evidence, and upstream references.</p>
 <p>Foreground-process lookup uses the Unix terminal&#39;s foreground process group
 when available. Windows selects the newest live descendant, which can be a
 background child. Missing permissions, unavailable metadata, closure, or an
@@ -106,7 +109,7 @@ Unix, or <code>cmd.exe</code> and <code>powershell.exe</code> on Windows. Its OS
 requires <code>node</code> on PATH and the repository&#39;s <code>tools/osc52/osc52.mjs</code>.
 Tests use explicit output/readiness signals and deadlines; skipped native tests
 do not establish platform support for the current environment.</p>
-</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/461979b7271f15e3ba0358137b253b88c18c840a/ketraterm-pty/docs/pty4j-process-lifecycle.md">View source on GitHub ↗</a></div></div></main></div>
+</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/5371b816fb7dc3c3bca6ea24282a4d1b2b657090/ketraterm-pty/docs/pty4j-process-lifecycle.md">View source on GitHub ↗</a></div></div></main></div>
   <footer>
     <a class="brand" href="../../../../index.html"><img class="brand-mark" src="../../../../assets/logo.svg" alt="" width="34" height="34">KetraTerm Library</a>
     <p>Open source · Apache 2.0</p>

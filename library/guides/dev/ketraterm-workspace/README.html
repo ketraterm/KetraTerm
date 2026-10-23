@@ -79,7 +79,7 @@ or reentrant calls return without waiting for an active close to finish.</li>
 <p>Optional process-title and startup-notification observers are supervised
 separately, so their failures do not stop session-close observation.</p>
 <h2 id="profiles-and-launch-options">Profiles and launch options</h2>
-<p><a href="https://github.com/ketraterm/KetraTerm/blob/461979b7271f15e3ba0358137b253b88c18c840a/ketraterm-workspace/src/main/kotlin/io/github/ketraterm/workspace/TerminalProfile.kt"><code>TerminalProfile</code></a>
+<p><a href="https://github.com/ketraterm/KetraTerm/blob/5371b816fb7dc3c3bca6ea24282a4d1b2b657090/ketraterm-workspace/src/main/kotlin/io/github/ketraterm/workspace/TerminalProfile.kt"><code>TerminalProfile</code></a>
 contains the process command, environment, initial directory, display category,
 and optional shell environment or startup command. Command arguments are passed
 as a list, rather than split from a command string. Keep the supplied collections
@@ -95,6 +95,18 @@ input policy, and host capabilities for new sessions. Use <code>create</code>, <
 <code>TerminalBuffers.MIN_WIDTH</code> (2) columns and one row, before any session is created.</p>
 <p><code>applySettings(palette, treatAmbiguousAsWide)</code> changes the palette and width policy
 for future writes in open sessions. Other launch options describe new sessions.
+Synchronous startup, settings, and cleanup can wait for session work; call them
+off UI threads. UI hosts use <code>openTabAsync</code>, <code>applySettingsAsync</code>, <code>closeTabAsync</code>
+(or <code>closeTabsAsync</code> for a split container), and <code>closeAsync</code>. These share one
+ordered I/O worker with 64 pending ordinary slots and one cleanup reservation per
+owned tab. Duplicate pending tab cleanup is rejected. A <code>true</code> return means accepted; the callback
+reports completion on the worker. Dispatch UI publication explicitly. Shutdown
+has a reserved slot, drains accepted operations, and survives view disposal.
+The asynchronous profile supplier runs on the worker, allowing launch preparation
+without reading UI state there. The <code>tabOpened</code> callback still precedes connector
+startup; finish pane binding and its initial settings before returning from that
+callback when startup output depends on them. Such a handoff must never hold a
+session mutation gate or make the UI wait for the workspace worker.
 Products own preference schemas, persistence, and the host actions permitted by
 <code>HostPolicy</code>; advertise only mode capabilities the host implements.</p>
 <h2 id="shell-metadata-ownership">Shell metadata ownership</h2>
@@ -147,7 +159,7 @@ for reply and cancellation behavior.</p>
 <li><a href="https://ketraterm.github.io/KetraTerm/settings.html">Standalone profile persistence</a></li>
 <li><a href="../ketraterm-shell-integration/README.html">Shell metadata API</a></li>
 </ul>
-</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/461979b7271f15e3ba0358137b253b88c18c840a/ketraterm-workspace/README.md">View source on GitHub ↗</a></div></div></main></div>
+</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/5371b816fb7dc3c3bca6ea24282a4d1b2b657090/ketraterm-workspace/README.md">View source on GitHub ↗</a></div></div></main></div>
   <footer>
     <a class="brand" href="../../../index.html"><img class="brand-mark" src="../../../assets/logo.svg" alt="" width="34" height="34">KetraTerm Library</a>
     <p>Open source · Apache 2.0</p>

@@ -41,9 +41,20 @@ testing share visual geometry; routine painting does not read a live session
 frame. Search, selection extraction, and discovery may take synchronized source
 reads. Background search and hyperlink workers publish results through binding
 and revision checks; they never access Swing state directly.</p>
+<p><code>GridPainter</code> owns image composition and its raster cache. Installing a frame
+prepares rasters by immutable resource identity; paint reuses them. Rebinding,
+unbinding and disposal release the view&#39;s raster references, while session closure
+keeps the final published images available for retained presentation. See the
+<a href="docs/swing-repaint-optimization.html#image-composition">composition contract</a>.</p>
 <p>The EDT owns components, settings installation, painters, and UI controllers.
 Public methods document any asynchronous dispatch or snapshot exceptions.
-Binding applies view settings and geometry to the session. One controlling view
+Binding captures view settings and geometry on the EDT. <code>SessionMutationQueue</code>
+applies them through session admission on one worker, with bounded pending work
+and binding checks before mutation and EDT installation. Only adjacent geometry
+requests awaiting admission coalesce; settings and host policy retain their accepted order.
+The worker awaits EDT installation outside session admission before applying the next request.
+Binding completion reports initial application failures before host startup.
+One controlling view
 per session is supported. Unbinding and disposal release view work without
 closing the session.</p>
 <h2 id="maintainer-entry-points">Maintainer entry points</h2>
@@ -91,12 +102,12 @@ public consumption and ABI checks are described below.</p>
 <a href="../docs/terminal-feature-map.html">feature map</a> and
 <a href="../docs/terminal-feature-gap-map.html">gap map</a>.</p>
 <h2 id="consumer-and-abi-verification">Consumer and ABI verification</h2>
-<p>The <a href="README.html#how-to-use">README example</a> is compiled by the <a href="https://github.com/ketraterm/KetraTerm/blob/461979b7271f15e3ba0358137b253b88c18c840a/ketraterm-testkit/src/consumerTest/README.md">consumer fixtures</a>.</p>
+<p>The <a href="README.html#how-to-use">README example</a> is compiled by the <a href="https://github.com/ketraterm/KetraTerm/blob/5371b816fb7dc3c3bca6ea24282a4d1b2b657090/ketraterm-testkit/src/consumerTest/README.md">consumer fixtures</a>.</p>
 <pre><code class="language-shell">./gradlew :ketraterm-ui-swing:test :ketraterm-ui-swing:checkKotlinAbi
 ./gradlew :ketraterm-testkit:publishedConsumerTest
 </code></pre>
 <p>See the <a href="../docs/library/compatibility.html">compatibility contract</a> before updating ABI baselines.</p>
-</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/461979b7271f15e3ba0358137b253b88c18c840a/ketraterm-ui-swing/Module.md">View source on GitHub ↗</a></div></div></main></div>
+</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/5371b816fb7dc3c3bca6ea24282a4d1b2b657090/ketraterm-ui-swing/Module.md">View source on GitHub ↗</a></div></div></main></div>
   <footer>
     <a class="brand" href="../../../index.html"><img class="brand-mark" src="../../../assets/logo.svg" alt="" width="34" height="34">KetraTerm Library</a>
     <p>Open source · Apache 2.0</p>

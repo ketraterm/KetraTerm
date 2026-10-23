@@ -30,7 +30,10 @@ with terminal mutation belongs to the source reader.</p>
 <ul>
 <li><code>TerminalRenderCache</code> is a mutable, caller-owned frame copy. It retains cell
 planes, packed cluster codepoints, row metadata, cursor primitives, and source
-generations. Reader identity qualifies incremental copies.</li>
+generations. Reader identity qualifies incremental copies. Its <code>images</code> view
+retains immutable pixel resources and copied primitive placement metadata.</li>
+<li><code>TerminalRenderImages</code> provides indexed placement reads and synchronous sink
+copying. Pixel resources are shared across caches; placement storage is not.</li>
 <li><code>TerminalRenderPublisher</code> owns three caches. A serialized writer publishes a
 copied frame; readers borrow the latest cache through <code>readCurrent</code>.</li>
 <li><code>TerminalRenderRangeCopy</code> makes bounded retained-range copies for worker-side
@@ -45,7 +48,7 @@ for construction, capacity growth, and shape changes.</p>
 <p>See the <a href="README.html">consumer guide</a> and
 <a href="docs/triple-buffering-concurrency.html">publication contract</a> for ownership,
 lifetime, failure, and concurrency rules.</p>
-</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/461979b7271f15e3ba0358137b253b88c18c840a/ketraterm-render-cache/Module.md">View source on GitHub ↗</a></div></div></main></div>
+</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/5371b816fb7dc3c3bca6ea24282a4d1b2b657090/ketraterm-render-cache/Module.md">View source on GitHub ↗</a></div></div></main></div>
   <footer>
     <a class="brand" href="../../../index.html"><img class="brand-mark" src="../../../assets/logo.svg" alt="" width="34" height="34">KetraTerm Library</a>
     <p>Open source · Apache 2.0</p>

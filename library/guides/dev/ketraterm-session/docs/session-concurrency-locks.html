@@ -40,6 +40,11 @@ ordered connector writes on the I/O dispatcher.</p>
 </tr>
 </thead>
 <tbody><tr>
+<td>Mutation admission gate</td>
+<td>Complete ingress batches, including decoding, and host/core mutations</td>
+<td>Run synchronous setters, geometry and clear off UI threads; recheck request validity at admission.</td>
+</tr>
+<tr>
 <td><code>mutationLock</code></td>
 <td>Parser/core mutation, resize, and live-frame reads</td>
 <td>Copy borrowed frames inside the callback; do not reenter mutation.</td>
@@ -55,7 +60,9 @@ ordered connector writes on the I/O dispatcher.</p>
 <td>Access published caches only through a scoped read.</td>
 </tr>
 </tbody></table></div>
-<p>When both session monitors are needed, acquire mutation before outbound.
+<p>Acquire mutation admission before mutation, then outbound when all are needed.
+Frame reads and ordinary input do not acquire mutation admission. Input/paste
+policy setters retain outbound serialization only.
 Conditional editing acquires mutation, the producer revision guard, then
 outbound. A custom producer must never acquire terminal mutation while holding
 an independent revision guard.</p>
@@ -63,8 +70,16 @@ an independent revision guard.</p>
 ring bytes into its own scratch under outbound serialization, then releases the
 monitor before calling <code>write</code>. That scratch remains worker-owned until the
 synchronous connector call returns.</p>
-<p>There is no extra inbound monitor: <code>TerminalConnector</code> promises serial, ordered
-delivery of borrowed ranges, and <code>onBytes</code> consumes each range before returning.
+<p><code>TerminalConnector</code> promises serial, ordered delivery of borrowed ranges, and
+<code>onBytes</code> consumes each range before returning. At a graphics decode yield it
+retains mutation admission and the remaining borrowed range, releases mutation,
+decodes synchronously, then reacquires mutation to commit/reply before later bytes.
+No additional ingress copy, graphics queue or deferred placement is involved.
+<code>withMutationAdmission</code> rechecks a host owner&#39;s validity inside this same gate.
+An accepted protocol host callback may map synchronously back to a setter, such
+as applying a CSI 8 window resize: its ingress thread already owns admission and
+mutation. It must not reenter byte parsing or clear the buffer, wait for the EDT,
+or close the session.
 Monitor sections never suspend. Frame/cache callbacks must return promptly,
 retain no borrowed storage, and neither close the session nor reenter mutation
 or publication. Holding a published cache lease can delay recycling and closure.</p>
@@ -106,6 +121,7 @@ per-key markers; bulk bytes themselves do not enter those counters.</p>
 <h2 id="conditional-command-edits">Conditional command edits</h2>
 <p>Capture <code>captureCommandEdit()</code> before requesting or calculating asynchronous
 suggestions. It returns null unless the session is running, the writer is idle,
+no output batch is in progress (including a graphics decode yield),
 an authoritative editing snapshot is available, and the selected producer supports
 synchronized revision checks. Submit the resulting semantic events with
 <code>submitInput(expected, events)</code> using that same context.</p>
@@ -236,7 +252,7 @@ and permission. Retargeting a retry reports the final geometry once.
 the same mutation lock before updating pixel metadata. A mismatch leaves state
 untouched so presentation owners can perform a full resize and adopt its
 viewport/history anchor; matching pixel-only updates do not resize the connector.</p>
-<p>Close claims termination, calls the connector before taking cleanup monitors,
+<p>Close claims termination, cancels the outbound worker, calls the connector before taking cleanup monitors,
 drops pending output, cancels session jobs, finalizes parser EOF, and attempts
 final publication. It does not join a writer blocked in a native call. Connectors
 must tolerate concurrent close; coroutine cancellation alone cannot interrupt
@@ -247,6 +263,17 @@ unwinds; active source ownership lasts until its callback returns.</p>
 and final publication have been attempted. A repeated or concurrent close can
 return before that first shutdown completes. Session flows do not complete on
 closure; their collectors retain responsibility for their own lifetime.</p>
+<p><code>requestClose</code> and failure-triggered closure perform cleanup asynchronously on
+<code>cleanupDispatcher</code>, independently of connector writes and session-worker cancellation.
+The dispatcher must run blocking work off UI threads.
+The default cleanup dispatcher is a shared elastic I/O view with its own parallelism
+limit, so blocked writes cannot exhaust its dispatch capacity. Custom cleanup
+dispatchers must preserve that independence. Cancellation stops queued output
+before cleanup gets scheduled; a native write already entered can finish.
+Cleanup failures are retained in <code>Closed.event.failure</code>, including local asynchronous
+shutdown. Synchronous local <code>close</code> also propagates them. Connector closure can
+interrupt startup&#39;s synchronous output; startup must tolerate that race and never
+publish <code>Running</code> afterward. Decoded images finishing after termination are discarded.</p>
 <h2 id="local-buffer-clear">Local buffer clear</h2>
 <p><code>clearBuffer()</code> synchronously clears the active screen and history under mutation
 serialization. It returns true before start or while running, and false after
@@ -381,7 +408,7 @@ An eager I/O dispatcher is suitable for byte fixtures, but scheduling tests need
 one controlled scheduler or explicit entered/release/completed handshakes.
 Submission return and fake-process exit do not prove queued output was written.
 PTY reply tests must keep the child alive until expected output completes.</p>
-</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/461979b7271f15e3ba0358137b253b88c18c840a/ketraterm-session/docs/session-concurrency-locks.md">View source on GitHub ↗</a></div></div></main></div>
+</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/5371b816fb7dc3c3bca6ea24282a4d1b2b657090/ketraterm-session/docs/session-concurrency-locks.md">View source on GitHub ↗</a></div></div></main></div>
   <footer>
     <a class="brand" href="../../../../index.html"><img class="brand-mark" src="../../../../assets/logo.svg" alt="" width="34" height="34">KetraTerm Library</a>
     <p>Open source · Apache 2.0</p>

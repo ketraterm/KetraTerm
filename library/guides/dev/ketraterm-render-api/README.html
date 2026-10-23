@@ -33,7 +33,8 @@ synchronous callback. Consumers copy the data they need before returning. The
 reader implementation owns synchronization; the interfaces do not provide a lock
 or a thread scheduler.</p>
 <p>The contract includes viewport dimensions, row identities and generations, cursor
-state, packed cell attributes, color palettes, and grapheme cluster callbacks.
+state, packed cell attributes, color palettes, grapheme cluster callbacks, and
+image placements referencing immutable pixel resources.
 Font selection, glyph shaping, painting, and blink timing belong to renderers.
 For a ready-made copied frame, use
 <a href="../ketraterm-render-cache/README.html"><code>ketraterm-render-cache</code></a>.</p>
@@ -95,7 +96,7 @@ frame valid. For full lifetime, generation, and range rules, see the guide below
 <li><a href="docs/attribute-packing.html">Stable attribute and cell encodings</a></li>
 <li><a href="Module.html">Module ownership</a></li>
 </ul>
-</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/461979b7271f15e3ba0358137b253b88c18c840a/ketraterm-render-api/README.md">View source on GitHub ↗</a></div></div></main></div>
+</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/5371b816fb7dc3c3bca6ea24282a4d1b2b657090/ketraterm-render-api/README.md">View source on GitHub ↗</a></div></div></main></div>
   <footer>
     <a class="brand" href="../../../index.html"><img class="brand-mark" src="../../../assets/logo.svg" alt="" width="34" height="34">KetraTerm Library</a>
     <p>Open source · Apache 2.0</p>

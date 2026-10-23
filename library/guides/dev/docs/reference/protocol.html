@@ -91,8 +91,9 @@ pointer. See <a href="https://ghostty.org/docs/vt/osc/22">Ghostty&#39;s basic co
 <a href="https://sw.kovidgoyal.net/kitty/pointer-shapes/">Kitty specification</a>, and
 <a href="../terminal-feature-gap-map.html#optional-protocol-work">remaining extensions</a>.</p>
 <h2 id="payload-limits">Payload limits</h2>
-<p>Limits count collected bytes, including family headers/separators and excluding
-introducers, terminators, and ignored control bytes.</p>
+<p>OSC/DCS limits count collected bytes, including family headers/separators and
+excluding introducers, terminators, and ignored control bytes. Graphics APC uses
+separate header and payload budgets.</p>
 <div class="table-scroll"><table>
 <thead>
 <tr>
@@ -132,11 +133,19 @@ introducers, terminators, and ignored control bytes.</p>
 <td>OSC 52</td>
 <td>Ordinary 4,096-byte limit; eligible writes use a budget derived from the active decoded-text limit.</td>
 </tr>
+<tr>
+<td>Graphics APC</td>
+<td>Separate header, encoded-chunk and decoded-transfer bounds; see <a href="../../ketraterm-parser/docs/ansi-fsm-specification.html#graphics-apc-collection">graphics collection</a> and <a href="../development/kitty-graphics-contract.html#resource-limits">resource limits</a>.</td>
+</tr>
 </tbody></table></div>
 <p>Overflow stops collection and consumes through termination/cancellation without
 dispatching a truncated prefix. An oversized OSC 8 ends active link context;
 other rejected commands preserve prior metadata. Oversized DCS queries receive
 no reply. DCS terminates with ST, not BEL.</p>
+<p>Graphics APC drains rejected payloads through ST. Unknown/malformed headers are
+discarded; identified transfer-limit failures can produce fixed failure replies
+subject to quiet flags and response permission. Its per-chunk accounting excludes
+the APC header, separator and terminator.</p>
 <p>Session-integrated clipboard writes permit up to 1 MiB of decoded text by default.
 Standalone parsers without that integration retain the ordinary collection limit.
 Permissions and decoded-size limits are checked again before execution.</p>
@@ -161,12 +170,20 @@ Permissions and decoded-size limits are checked again before execution.</p>
 <td>Indices 0–255, <code>foreground</code>, <code>background</code>, <code>cursor</code>, <code>cursor_text</code>, <code>selection_foreground</code>, <code>selection_background</code>. Unknown keys receive <code>unknown=</code> plus unpadded Base64 of the original key. Palette permission gates the command; terminal-response permission additionally gates every reply.</td>
 </tr>
 <tr>
+<td>Kitty graphics (APC G)</td>
+<td>Identified inline RGB/RGBA and PNG requests, including zlib transfers, validate actual data before success; unsupported formats/media/actions return fixed <code>ENOTSUP</code> errors. Queries require nonzero <code>i</code>. Quiet flags and terminal-response permission govern every reply; no window-manipulation permission is required.</td>
+</tr>
+<tr>
 <td>Device identity</td>
 <td><code>TERM=xterm-256color</code>, <code>COLORTERM=truecolor</code>, VT420-class primary DA, and secondary DA. No DA3 unique identity.</td>
 </tr>
 <tr>
 <td>Cursor position</td>
 <td>One-based coordinates, relative to active origin/margins when origin mode is enabled.</td>
+</tr>
+<tr>
+<td>Window geometry</td>
+<td><code>CSI 14 t</code> reports text-area pixels and <code>CSI 16 t</code> reports cell pixels as <code>CSI 6;height;width t</code>; pixel reports require known positive dimensions. Cell dimensions use integer text-area pixels divided by grid dimensions, independently of margins. <code>CSI 18 t</code> and <code>CSI 19 t</code> report the terminal grid. These queries require terminal-response permission, not window-manipulation permission.</td>
 </tr>
 <tr>
 <td>Mode status</td>
@@ -320,7 +337,7 @@ A rejected initial write has no continuation target.</p>
 occupied cells, and on tiny grids. Retained text, cell integrity, and following
 text must still be preserved. See <a href="../../ketraterm-parser/docs/grapheme-segmentation.html#bounded-retention">grapheme retention</a>
 and <a href="../development/conformance-testing.html#streaming-placement">verification</a>.</p>
-</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/461979b7271f15e3ba0358137b253b88c18c840a/docs/reference/protocol.md">View source on GitHub ↗</a></div></div></main></div>
+</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/5371b816fb7dc3c3bca6ea24282a4d1b2b657090/docs/reference/protocol.md">View source on GitHub ↗</a></div></div></main></div>
   <footer>
     <a class="brand" href="../../../../index.html"><img class="brand-mark" src="../../../../assets/logo.svg" alt="" width="34" height="34">KetraTerm Library</a>
     <p>Open source · Apache 2.0</p>

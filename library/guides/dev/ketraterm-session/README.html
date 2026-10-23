@@ -95,9 +95,23 @@ for budgets and conditional editing.</p>
 and final-frame publication have been attempted. State flows do not complete on
 closure, so consumers own cancellation of their collectors. Calls to <code>close</code>
 are idempotent, but a concurrent close can return before the first close finishes.</p>
+<p>UI disposal can call <code>requestClose()</code>: it claims termination immediately and runs
+cleanup on <code>cleanupDispatcher</code>, independently of blocked connector writes.
+Its default is a shared elastic I/O view with a separate parallelism limit.
+Observe <code>Closed</code> for completion and cleanup failures. Custom dispatchers must run
+blocking work off the UI thread independently of connector writes. Tests using
+controlled dispatchers should inject this dispatcher as well as the worker and
+I/O dispatchers.</p>
 <p>Retained output remains readable after closure. See
 <a href="docs/session-concurrency-locks.html#closed-session-presentation">closed-session presentation</a>.</p>
 <h2 id="rendering-and-local-operations">Rendering and local operations</h2>
+<p>Terminal settings, host policy, geometry and local <code>clearBuffer()</code> calls are
+synchronous and can wait for image decoding. Run them off UI threads through an
+ordered owner, then report completion to the UI. Use <code>withMutationAdmission</code> to
+recheck a captured binding/request token after the wait. Its callbacks must not
+access UI state or wait for UI work. Frame reads, ordinary input, and input/paste
+policy updates remain available during decode. Connectors must deliver output
+off UI threads, including output delivered synchronously during <code>start</code>.</p>
 <p><code>readRenderFrame</code> borrows live terminal data under mutation serialization.
 <code>readPublishedFrame</code> borrows the latest copied cache and returns null before the
 first publication. Both are safe from any thread, including after closure.
@@ -187,7 +201,7 @@ consent and native access; session owns permission checks, deadlines, and bounde
 reply commitment. A missing provider produces an empty reply when replies are
 permitted. See <a href="docs/session-concurrency-locks.html#clipboard-read-lifetime-and-output-commitment">clipboard lifetime</a>.</p>
 <p>For maintainer ownership and validation entry points, see <a href="Module.html">Module.md</a>.</p>
-</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/461979b7271f15e3ba0358137b253b88c18c840a/ketraterm-session/README.md">View source on GitHub ↗</a></div></div></main></div>
+</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/5371b816fb7dc3c3bca6ea24282a4d1b2b657090/ketraterm-session/README.md">View source on GitHub ↗</a></div></div></main></div>
   <footer>
     <a class="brand" href="../../../index.html"><img class="brand-mark" src="../../../assets/logo.svg" alt="" width="34" height="34">KetraTerm Library</a>
     <p>Open source · Apache 2.0</p>

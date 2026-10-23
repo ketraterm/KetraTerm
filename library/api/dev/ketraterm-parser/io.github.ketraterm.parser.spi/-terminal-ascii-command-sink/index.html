@@ -109,7 +109,22 @@
     <div class="tabs-section-body">
       <div data-togglable="PROPERTY">
         <h2 class="tableheader">Properties</h2>
-        <div class="table"><a data-name="-1174257154%2FProperties%2F257867639" anchor-label="isAlternateScreenActive" id="-1174257154%2FProperties%2F257867639" data-filterable-set=":ketraterm-parser/main"></a>
+        <div class="table"><a data-name="-31554004%2FProperties%2F257867639" anchor-label="graphicsTransferGeneration" id="-31554004%2FProperties%2F257867639" data-filterable-set=":ketraterm-parser/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-parser/main" data-filterable-set=":ketraterm-parser/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="../-terminal-command-sink/graphics-transfer-generation.html"><span>graphics</span><wbr><span>Transfer</span><wbr><span><span>Generation</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-31554004%2FProperties%2F257867639"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-parser/main"><div class="symbol monospace"><span class="token keyword">abstract </span><span class="token keyword">val </span><a href="../-terminal-command-sink/graphics-transfer-generation.html">graphicsTransferGeneration</a><span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-long/index.html">Long</a></div><div class="brief "><p class="paragraph">Invalidation token for incomplete graphics uploads. Change it synchronously when reset, destructive clearing or an effective screen switch invalidates staging, including mutations performed outside this sink. The parser checks the token at APC entry and termination, covering partial headers and payloads across reads. Repeated no-op screen requests do not require a new token.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-1174257154%2FProperties%2F257867639" anchor-label="isAlternateScreenActive" id="-1174257154%2FProperties%2F257867639" data-filterable-set=":ketraterm-parser/main"></a>
           <div class="table-row table-row_content" data-filterable-current=":ketraterm-parser/main" data-filterable-set=":ketraterm-parser/main">
             <div class="main-subrow keyValue ">
               <div class=""><span class="inline-flex">
@@ -139,6 +154,21 @@
               <div>
                 <div class="title">
                   <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-parser/main"><div class="symbol monospace"><span class="token keyword">abstract </span><span class="token keyword">fun </span><a href="../-terminal-command-sink/apply-color-request.html"><span class="token function">applyColorRequest</span></a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">request<span class="token operator">: </span><a href="../../../ketraterm-protocol/io.github.ketraterm.protocol/-terminal-color-request/index.html">TerminalColorRequest</a></span></span><span class="token punctuation">)</span></div><div class="brief "><p class="paragraph">Applies one ordered OSC 21 batch. The request and its key bytes are borrowed only for this synchronous call. Queries observe preceding mutations and form one combined reply. Host palette and terminal-response permissions apply.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="1158445701%2FFunctions%2F257867639" anchor-label="applyGraphicsCommand" id="1158445701%2FFunctions%2F257867639" data-filterable-set=":ketraterm-parser/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-parser/main" data-filterable-set=":ketraterm-parser/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="../-terminal-command-sink/apply-graphics-command.html"><span>apply</span><wbr><span>Graphics</span><wbr><span><span>Command</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="1158445701%2FFunctions%2F257867639"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-parser/main"><div class="symbol monospace"><span class="token keyword">abstract </span><span class="token keyword">fun </span><a href="../-terminal-command-sink/apply-graphics-command.html"><span class="token function">applyGraphicsCommand</span></a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">command<span class="token operator">: </span><a href="../../../ketraterm-protocol/io.github.ketraterm.protocol/-terminal-graphics-command/index.html">TerminalGraphicsCommand</a><span class="token punctuation">, </span></span><span class="parameter ">data<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-byte-array/index.html">ByteArray</a><span class="token punctuation">, </span></span><span class="parameter ">length<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a><span class="token punctuation">, </span></span><span class="parameter ">result<span class="token operator">: </span><a href="../../../ketraterm-protocol/io.github.ketraterm.protocol/-terminal-graphics-result/index.html">TerminalGraphicsResult</a></span></span><span class="token punctuation">)</span></div><div class="brief "><p class="paragraph">Consumes a complete graphics command or a transfer validation failure. <a href="../-terminal-command-sink/apply-graphics-command.html">data</a> contains Base64-decoded payload bytes in <code class="lang-kotlin">0 until length</code>; image format decoding and admission belong downstream. <a href="../-terminal-command-sink/apply-graphics-command.html">result</a> is the transfer result, not a permission decision. A failure must not commit partial data. Both <a href="../-terminal-command-sink/apply-graphics-command.html">command</a> and <a href="../-terminal-command-sink/apply-graphics-command.html">data</a> are borrowed for this synchronous callback only.</p></div></div></div>
                 </div>
               </div>
             </div>

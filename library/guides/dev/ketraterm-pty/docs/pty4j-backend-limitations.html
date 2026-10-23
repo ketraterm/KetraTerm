@@ -1,0 +1,124 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="description" content="A modular Kotlin/JVM terminal emulator library for Swing and headless applications.">
+  <meta name="color-scheme" content="light dark">
+  <title>Pty4j backend limitations · KetraTerm Library</title>
+  <link rel="icon" href="../../../../assets/logo.svg" type="image/svg+xml">
+  <link rel="preload" href="../../../../assets/fonts/manrope-variable.ttf" as="font" type="font/ttf" crossorigin>
+  <link rel="stylesheet" href="../../../../assets/styles.css">
+  <script type="importmap">{"imports":{"mermaid":"../../../../assets/mermaid/mermaid.esm.min.mjs"}}</script>
+  <script type="module" src="../../../../assets/site.js"></script>
+</head>
+<body data-product="library" data-version="Development">
+  <a class="skip" href="#main">Skip to content</a>
+  <header class="site-header">
+    <div class="site-identity">
+      <a class="brand" href="../../../../index.html" aria-label="KetraTerm Library home"><img class="brand-mark" src="../../../../assets/logo.svg" alt="" width="34" height="34">KetraTerm</a>
+      <nav class="product-navigation" aria-label="KetraTerm products"><a href="https://ketraterm.github.io/KetraTerm/">App</a><a href="../../../../index.html" aria-current="true">Library</a></nav>
+    </div>
+    <details class="site-navigation" open><summary>Menu</summary><nav aria-label="Library navigation"><a   href="../../docs/README.html">Guides</a><a aria-current="true"  href="../../modules.html">Modules</a><a   href="../../../../versions.html">API & versions</a><a   href="../../CHANGELOG.html">Changelog</a><a  class="nav-primary" href="../../README.html">Get started</a></nav></details>
+    <button class="theme-toggle" type="button" aria-label="Switch to light theme">Light</button>
+  </header>
+  <div class="docs-shell"><aside class="sidebar" aria-label="Documentation navigation"><details class="nav-disclosure" open><summary class="mobile-nav-toggle">Browse library guides</summary><div><label class="search-label">Find a library guide<input type="search" data-doc-search placeholder="Search library docs" autocomplete="off" data-index="../../search.json"></label><div class="search-results" aria-live="polite"></div><details open><summary>Start here</summary><a  href="../../docs/README.html">Documentation</a><a  href="../../README.html">Installation</a><a  href="../../modules.html">Module guides</a><a  href="../../CHANGELOG.html">Changelog</a></details><details open><summary>Capabilities</summary><a  href="../../docs/terminal-feature-map.html">Feature map</a><a  href="../../docs/features/terminal.html">Terminal</a><a  href="../../docs/features/shells.html">Shell integration</a><a  href="../../docs/features/desktop.html">Swing view & hosts</a><a  href="../../docs/features/completion.html">Completion</a><a  href="../../docs/features/embedding.html">Embedding</a><a  href="../../docs/terminal-feature-gap-map.html">Known limits</a></details><details open><summary>Embedding guides</summary><a  href="../../docs/library/configuration.html">Configuration</a><a  href="../../docs/library/compatibility.html">Compatibility</a><a  href="../../docs/library/render-ownership.html">Render ownership</a></details><details open><summary>Reference</summary><a  href="../../docs/reference/protocol.html">Protocols</a><a  href="../../docs/reference/notifications.html">Notifications</a><a  href="../../docs/reference/storage.html">Storage & privacy</a></details><details open><summary>Development</summary><a  href="../../ARCHITECTURE.html">Architecture</a><a  href="../../CONTRIBUTING.html">Contributing</a><a  href="../../docs/development/conformance-testing.html">Conformance testing</a></details></div></details></aside><main id="main" tabindex="-1" class="article article-with-outline"><div class="article-top"><nav class="breadcrumb" aria-label="Breadcrumb"><ol><li><a href="../../../../index.html">Library</a></li><li><a href="../../modules.html">Modules</a></li><li><a href="../README.html">ketraterm-pty</a></li><li><span aria-current="page">Pty4j backend limitations</span></li></ol></nav><div class="doc-version"><span>Development</span><a href="../../../../versions.html">All versions</a></div></div><details class="page-outline" open><summary>On this page</summary><nav aria-label="On this page"><a class="depth-2" href="#native-pixel-dimensions">Native pixel dimensions</a><a class="depth-2" href="#windows-graphics-cursor-desynchronization">Windows graphics cursor desynchronization</a><a class="depth-2" href="#distinguish-terminal-policy-from-backend-limitations">Distinguish terminal policy from backend limitations</a></nav></details><div class="article-content"><div class="prose"><h1 id="pty4j-backend-limitations">Pty4j backend limitations</h1>
+<p>Confirmed against <code>org.jetbrains.pty4j:pty4j:0.14.0</code> on 2026-10-22. This reference
+records backend constraints and reproduction evidence; open work belongs in the
+<a href="../../docs/terminal-feature-gap-map.html#transports-and-execution-environments">gap map</a>.</p>
+<h2 id="native-pixel-dimensions">Native pixel dimensions</h2>
+<p>Pty4j&#39;s <code>WinSize</code> stores character columns and rows only. Its four-argument
+constructor accepts pixel width and height but discards both. Passing pixel
+dimensions to that constructor does not propagate them to the child PTY.
+This was verified in the pinned
+<a href="https://repo1.maven.org/maven2/org/jetbrains/pty4j/pty4j/0.14.0/pty4j-0.14.0-sources.jar">0.14.0 source artifact</a>,
+including <code>WinSize.kt</code> and the Unix native resize interface.</p>
+<ul>
+<li>Unix PTYs can carry pixels through <code>TIOCSWINSZ</code>. Pty4j&#39;s Unix native structure
+already has pixel fields, but its <code>WinSize</code> mapping leaves them zero on writes
+and discards them on reads. The public API and mapping must preserve these
+values before KetraTerm can use that path.</li>
+<li>Windows <a href="https://learn.microsoft.com/en-us/windows/console/resizepseudoconsole">ConPTY resize</a>
+accepts character dimensions only. Updating pty4j&#39;s <code>WinSize</code> alone cannot add
+Windows pixel-size propagation.</li>
+<li>Windows/WSL additionally needs a path to carry pixels into the guest PTY;
+resizing the outer ConPTY does not supply guest <code>TIOCGWINSZ</code> pixel fields.</li>
+</ul>
+<p>KetraTerm&#39;s in-band text-area and cell-size queries already work when the view
+supplies geometry. Yazi can use these queries. The tested <code>kitten icat</code> instead
+reads native PTY dimensions and needs
+<a href="https://github.com/ketraterm/KetraTerm/blob/5371b816fb7dc3c3bca6ea24282a4d1b2b657090/tools/kitty-graphics/README.md#interactive-icat-on-a-pty-without-pixel-dimensions">explicit dimensions</a>
+when native pixels are unavailable. Image decoding or renderer changes cannot
+repair missing ioctl data.</p>
+<h2 id="windows-graphics-cursor-desynchronization">Windows graphics cursor desynchronization</h2>
+<p>The pinned pty4j bundle used in the native reproduction contains ConPTY and
+OpenConsole <strong>1.24.2607.10001</strong>. This backend forwards Kitty graphics APC strings
+without accounting for their cursor movement in its own console model.
+KetraTerm advances its cursor according to Kitty semantics, while PowerShell&#39;s
+console APIs can still return the earlier position. Resize or a subsequent
+PSReadLine redraw can then place typed text above the visible prompt.</p>
+<p>Microsoft tracks this exact defect in
+<a href="https://github.com/microsoft/terminal/issues/19926">terminal#19926</a>.
+<a href="https://github.com/microsoft/terminal/pull/20009">Fix #20009</a> requests terminal
+cursor position after unknown sequences and was serviced in ConPTY 1.25.
+The installed Windows Terminal application&#39;s version does not replace pty4j&#39;s
+bundled native backend. Falling back to the operating system&#39;s ConPTY is not
+evidence that the fix is present there.</p>
+<p>The controlled native reproduction used PowerShell 7.6.5 on Windows x86-64
+build 10.0.26300.0, 8x20-pixel cells, a 160x80 PNG displayed at 20 columns,
+an 80x30 grid widened to 140x30, and an
+explicit <code>Console.SetCursorPosition</code> before writing <code>TYPED</code>. Phase handshakes
+kept the child alive until output was consumed. Coordinates below are zero-based:</p>
+<div class="table-scroll"><table>
+<thead>
+<tr>
+<th>Phase</th>
+<th>Bundled 1.24: console / KetraTerm cursor row</th>
+<th>Fixed 1.25: console / KetraTerm cursor row</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Image followed by <code>PS&gt; </code></td>
+<td>3 / 6</td>
+<td>6 / 6</td>
+</tr>
+<tr>
+<td>After widening</td>
+<td>2 / 5</td>
+<td>5 / 5</td>
+</tr>
+<tr>
+<td>After absolute cursor positioning and <code>TYPED</code></td>
+<td>2 / 2; prompt remains on row 5</td>
+<td>5 / 5; text follows the prompt</td>
+</tr>
+</tbody></table></div>
+<p>The comparison changed only the native backend, using Microsoft&#39;s stable
+<a href="https://www.nuget.org/packages/Microsoft.Windows.Console.ConPTY/1.25.260930003">ConPTY 1.25.260930003 package</a>.
+The downloaded package&#39;s SHA-256 was
+<code>02b07b349af66d801159bdf9e440d4a1ce78bb951f37fc8609731665afdae7ee</code>.
+Its matching <code>conpty.dll</code> and <code>OpenConsole.exe</code> were tested together through
+pty4j&#39;s <code>pty4j.preferred.native.folder</code> override, with the other required pty4j
+helpers present. These test binaries are not shipped by KetraTerm. The deferred
+upstream change must update the backend pair, rather than changing Kitty cursor
+semantics or parsing graphics in the PTY transport.</p>
+<p>Cursor synchronization is not graphics-aware screen-buffer storage: the upstream
+fix does not make ConPTY understand image pixels or guarantee complete buffer
+consistency for every application. The table records the scenario actually tested.</p>
+<h2 id="distinguish-terminal-policy-from-backend-limitations">Distinguish terminal policy from backend limitations</h2>
+<p>Ordinary Kitty images keep physical cell anchors on width reflow, while text
+rewraps. Collapsing a wrapped command can move a later prompt toward or under an
+image. This is distinct from input jumping away from the prompt; see the pinned
+<a href="../../docs/development/kitty-graphics-contract.html#placement-and-screen-ownership">placement and resize contract</a>.</p>
+<p>Foreground-process names are also best-effort: Windows uses a descendant
+heuristic, and applications inside WSL or SSH are not inspected. This is an
+<a href="pty4j-process-lifecycle.html#2-windows-conpty-considerations">adapter metadata constraint</a>,
+not an image-protocol defect.</p>
+</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/5371b816fb7dc3c3bca6ea24282a4d1b2b657090/ketraterm-pty/docs/pty4j-backend-limitations.md">View source on GitHub ↗</a></div></div></main></div>
+  <footer>
+    <a class="brand" href="../../../../index.html"><img class="brand-mark" src="../../../../assets/logo.svg" alt="" width="34" height="34">KetraTerm Library</a>
+    <p>Open source · Apache 2.0</p>
+    <div><a href="https://github.com/ketraterm/KetraTerm">GitHub ↗</a><a href="https://github.com/ketraterm/KetraTerm/issues">Issues ↗</a><a class="product-switch" href="https://ketraterm.github.io/KetraTerm/">Desktop app ↗</a></div>
+  </footer>
+</body>
+</html>

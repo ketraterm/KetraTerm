@@ -22,7 +22,7 @@
     <details class="site-navigation" open><summary>Menu</summary><nav aria-label="Library navigation"><a   href="../../docs/README.html">Guides</a><a aria-current="true"  href="../../modules.html">Modules</a><a   href="../../../../versions.html">API & versions</a><a   href="../../CHANGELOG.html">Changelog</a><a  class="nav-primary" href="../../README.html">Get started</a></nav></details>
     <button class="theme-toggle" type="button" aria-label="Switch to light theme">Light</button>
   </header>
-  <div class="docs-shell"><aside class="sidebar" aria-label="Documentation navigation"><details class="nav-disclosure" open><summary class="mobile-nav-toggle">Browse library guides</summary><div><label class="search-label">Find a library guide<input type="search" data-doc-search placeholder="Search library docs" autocomplete="off" data-index="../../search.json"></label><div class="search-results" aria-live="polite"></div><details open><summary>Start here</summary><a  href="../../docs/README.html">Documentation</a><a  href="../../README.html">Installation</a><a  href="../../modules.html">Module guides</a><a  href="../../CHANGELOG.html">Changelog</a></details><details open><summary>Capabilities</summary><a  href="../../docs/terminal-feature-map.html">Feature map</a><a  href="../../docs/features/terminal.html">Terminal</a><a  href="../../docs/features/shells.html">Shell integration</a><a  href="../../docs/features/desktop.html">Swing view & hosts</a><a  href="../../docs/features/completion.html">Completion</a><a  href="../../docs/features/embedding.html">Embedding</a><a  href="../../docs/terminal-feature-gap-map.html">Known limits</a></details><details open><summary>Embedding guides</summary><a  href="../../docs/library/configuration.html">Configuration</a><a  href="../../docs/library/compatibility.html">Compatibility</a><a  href="../../docs/library/render-ownership.html">Render ownership</a></details><details open><summary>Reference</summary><a  href="../../docs/reference/protocol.html">Protocols</a><a  href="../../docs/reference/notifications.html">Notifications</a><a  href="../../docs/reference/storage.html">Storage & privacy</a></details><details open><summary>Development</summary><a  href="../../ARCHITECTURE.html">Architecture</a><a  href="../../CONTRIBUTING.html">Contributing</a><a  href="../../docs/development/conformance-testing.html">Conformance testing</a></details></div></details></aside><main id="main" tabindex="-1" class="article article-with-outline"><div class="article-top"><nav class="breadcrumb" aria-label="Breadcrumb"><ol><li><a href="../../../../index.html">Library</a></li><li><a href="../../modules.html">Modules</a></li><li><a href="../README.html">ketraterm-core</a></li><li><span aria-current="page">Terminal Core Contract</span></li></ol></nav><div class="doc-version"><span>Development</span><a href="../../../../versions.html">All versions</a></div></div><details class="page-outline" open><summary>On this page</summary><nav aria-label="On this page"><a class="depth-2" href="#public-api-surfaces">Public API surfaces</a><a class="depth-3" href="#render-frame-generations">Render frame generations</a><a class="depth-2" href="#writer-contract">Writer contract</a><a class="depth-3" href="#printable-ingress">Printable ingress</a><a class="depth-3" href="#erase-and-edit-commands">Erase and edit commands</a><a class="depth-2" href="#cursor-contract">Cursor contract</a><a class="depth-3" href="#decsc--decrc">DECSC / DECRC</a><a class="depth-3" href="#reverse-wrap">Reverse wrap</a><a class="depth-3" href="#tabs">Tabs</a><a class="depth-2" href="#mode-state-contract">Mode-state contract</a><a class="depth-2" href="#unicode-scalar-and-width-policy">Unicode scalar and width policy</a><a class="depth-2" href="#reader-contract">Reader contract</a><a class="depth-2" href="#buffer-lifecycle-contract">Buffer lifecycle contract</a><a class="depth-3" href="#primary-and-alternate-screens">Primary and alternate screens</a><a class="depth-3" href="#resize">Resize</a><a class="depth-3" href="#soft-reset">Soft reset</a><a class="depth-3" href="#hard-reset">Hard reset</a><a class="depth-3" href="#deccolm">DECCOLM</a><a class="depth-2" href="#protection-contract">Protection contract</a><a class="depth-2" href="#terminal-responses">Terminal responses</a><a class="depth-2" href="#invariants">Invariants</a></nav></details><div class="article-content"><div class="prose"><h1 id="terminal-core-contract">Terminal Core Contract</h1>
+  <div class="docs-shell"><aside class="sidebar" aria-label="Documentation navigation"><details class="nav-disclosure" open><summary class="mobile-nav-toggle">Browse library guides</summary><div><label class="search-label">Find a library guide<input type="search" data-doc-search placeholder="Search library docs" autocomplete="off" data-index="../../search.json"></label><div class="search-results" aria-live="polite"></div><details open><summary>Start here</summary><a  href="../../docs/README.html">Documentation</a><a  href="../../README.html">Installation</a><a  href="../../modules.html">Module guides</a><a  href="../../CHANGELOG.html">Changelog</a></details><details open><summary>Capabilities</summary><a  href="../../docs/terminal-feature-map.html">Feature map</a><a  href="../../docs/features/terminal.html">Terminal</a><a  href="../../docs/features/shells.html">Shell integration</a><a  href="../../docs/features/desktop.html">Swing view & hosts</a><a  href="../../docs/features/completion.html">Completion</a><a  href="../../docs/features/embedding.html">Embedding</a><a  href="../../docs/terminal-feature-gap-map.html">Known limits</a></details><details open><summary>Embedding guides</summary><a  href="../../docs/library/configuration.html">Configuration</a><a  href="../../docs/library/compatibility.html">Compatibility</a><a  href="../../docs/library/render-ownership.html">Render ownership</a></details><details open><summary>Reference</summary><a  href="../../docs/reference/protocol.html">Protocols</a><a  href="../../docs/reference/notifications.html">Notifications</a><a  href="../../docs/reference/storage.html">Storage & privacy</a></details><details open><summary>Development</summary><a  href="../../ARCHITECTURE.html">Architecture</a><a  href="../../CONTRIBUTING.html">Contributing</a><a  href="../../docs/development/conformance-testing.html">Conformance testing</a></details></div></details></aside><main id="main" tabindex="-1" class="article article-with-outline"><div class="article-top"><nav class="breadcrumb" aria-label="Breadcrumb"><ol><li><a href="../../../../index.html">Library</a></li><li><a href="../../modules.html">Modules</a></li><li><a href="../README.html">ketraterm-core</a></li><li><span aria-current="page">Terminal Core Contract</span></li></ol></nav><div class="doc-version"><span>Development</span><a href="../../../../versions.html">All versions</a></div></div><details class="page-outline" open><summary>On this page</summary><nav aria-label="On this page"><a class="depth-2" href="#public-api-surfaces">Public API surfaces</a><a class="depth-3" href="#render-frame-generations">Render frame generations</a><a class="depth-2" href="#writer-contract">Writer contract</a><a class="depth-3" href="#printable-ingress">Printable ingress</a><a class="depth-3" href="#erase-and-edit-commands">Erase and edit commands</a><a class="depth-2" href="#cursor-contract">Cursor contract</a><a class="depth-3" href="#decsc--decrc">DECSC / DECRC</a><a class="depth-3" href="#reverse-wrap">Reverse wrap</a><a class="depth-3" href="#tabs">Tabs</a><a class="depth-2" href="#mode-state-contract">Mode-state contract</a><a class="depth-2" href="#unicode-scalar-and-width-policy">Unicode scalar and width policy</a><a class="depth-2" href="#reader-contract">Reader contract</a><a class="depth-3" href="#image-state">Image state</a><a class="depth-2" href="#buffer-lifecycle-contract">Buffer lifecycle contract</a><a class="depth-3" href="#primary-and-alternate-screens">Primary and alternate screens</a><a class="depth-3" href="#resize">Resize</a><a class="depth-3" href="#soft-reset">Soft reset</a><a class="depth-3" href="#hard-reset">Hard reset</a><a class="depth-3" href="#deccolm">DECCOLM</a><a class="depth-2" href="#protection-contract">Protection contract</a><a class="depth-2" href="#terminal-responses">Terminal responses</a><a class="depth-2" href="#invariants">Invariants</a></nav></details><div class="article-content"><div class="prose"><h1 id="terminal-core-contract">Terminal Core Contract</h1>
 <p>Behavioral contract of the standard buffer returned by <code>TerminalBuffers.create</code>.
 Method KDoc defines individual parameters and validation. The
 <a href="../../docs/terminal-feature-map.html">feature map</a> and
@@ -59,6 +59,10 @@ state. Headless implementations may implement <code>TerminalBuffer</code> alone.
 <tr>
 <td><code>TerminalResponseChannel</code></td>
 <td>State-dependent query replies and queued bytes</td>
+</tr>
+<tr>
+<td><code>TerminalGraphics</code></td>
+<td>Complete image-command admission, placements and transfer invalidation</td>
 </tr>
 <tr>
 <td><code>TerminalReader</code></td>
@@ -115,6 +119,10 @@ across overflow; include source and active-buffer identity in retained cache key
 <tr>
 <td><code>historyContentGeneration</code></td>
 <td>Per-buffer retained-history replacement, clear, or resize/reflow</td>
+</tr>
+<tr>
+<td><code>graphicsGeneration</code></td>
+<td>Image resources, placements and image geometry; text-row generations need not change</td>
 </tr>
 </tbody></table></div>
 <p>Ordinary history admission and eviction preserve <code>historyContentGeneration</code>;
@@ -379,6 +387,19 @@ supplies the full length and a borrowed range to copy before returning. Keep
 serialization held for either read path. Render frames expose primitive public
 attributes and cell flags; <code>getAttrAt</code> offers allocating unpacked inspection.
 Raw storage handles and internal arrays are not public APIs.</p>
+<h3 id="image-state">Image state</h3>
+<p><code>TerminalGraphics</code> consumes complete borrowed commands and decoded byte ranges on
+the serialized mutation thread. Uploads are validated before replacing retained
+resources; queries do not store images or move the cursor. Placement requires
+known cell-pixel geometry. Images have separate primary/alternate namespaces and
+share the limits in <code>TerminalGraphicsLimits</code>; they do not occupy text cells.
+<code>IL</code>/<code>DL</code> preserve ordinary image placements; actual screen scrolling moves them
+subject to scrolling-region containment and clipping.</p>
+<p>Render frames expose immutable resources through <code>copyImages</code>. Those resources
+may outlive a callback; placement metadata remains borrowed. See the
+<a href="../../ketraterm-render-api/docs/render-frame-lifecycle.html#critical-lifespan-rule">render lifetime contract</a>
+for consumer ownership and the <a href="../../docs/development/kitty-graphics-contract.html#placement-and-screen-ownership">graphics contract</a>
+for geometry, cursor, scrolling and deletion rules.</p>
 <h2 id="buffer-lifecycle-contract">Buffer lifecycle contract</h2>
 <h3 id="primary-and-alternate-screens">Primary and alternate screens</h3>
 <p>Each screen has its own cursor, margins, save slot, ring, and row-owned cluster payloads.
@@ -413,6 +434,10 @@ and preserve this presentation snapshot. Alternate content survives non-clearing
 switches until a clearing entry or effective resize discards it. Resize and soft
 reset while alternate is active preserve the primary presentation snapshot; RIS
 restores configured default presentation.</p>
+<p>Image namespaces follow screen selection and clearing entry. Pending graphics
+transfers are invalidated by a screen switch. Visible clearing removes visible
+placements; history clearing removes their retained-history portions. Ordinary
+partial text erasure leaves image placements intact.</p>
 <h3 id="resize">Resize</h3>
 <p><code>resize(newWidth, newHeight, oldScrollbackOffset)</code> validates the two-cell minimum
 width, positive height, and retained capacity before allocation or mutation. Identical grid dimensions
@@ -441,6 +466,10 @@ clamps saved cursors, and clears pending wrap on both screens.</li>
 </ul>
 <p>The returned pair is <code>(newScrollbackOffset, newHistorySize)</code> for the active
 screen. Alternate returns <code>(0, 0)</code> while primary is resized in the background.</p>
+<p>Primary image placements retain physical cell coordinates on width reflow;
+height-only resize shifts them with the retained viewport boundary. Effective
+resize clears alternate images. Cell-pixel changes recompute image geometry and
+may advance graphics/frame generations without changing text-row generations.</p>
 <h3 id="soft-reset">Soft reset</h3>
 <p><code>softReset</code> implements DECSTR (<code>CSI ! p</code>). It preserves visible content,
 history, dimensions, tabs, active screen, and cursor position. It resets pen,
@@ -451,7 +480,8 @@ normal cursor/keypad/input behavior. Bracketed paste, focus reporting, mouse
 tracking, synchronized output, color-scheme/resize reporting, and Kitty keyboard state reset; both xterm
 resource families return to defaults. Ambiguous-width policy, mouse encoding,
 the DECCOLM selection, and alternate-scroll/Shift-capture preferences survive.
-Palette and content are preserved.</p>
+Palette, cell content and retained images are preserved. Incomplete graphics
+transfers are invalidated.</p>
 <h3 id="hard-reset">Hard reset</h3>
 <p><code>reset</code> implements RIS (<code>ESC c</code>). It returns to primary, clears primary content
 and history, homes the cursor, resets pen and terminal modes, restores full
@@ -459,7 +489,8 @@ primary scrolling margins and default tabs, clears both Kitty stacks, restores
 default cursor presentation, and restores the host theme palette.</p>
 <p>Retained alternate cells are not cleared by RIS. A later non-clearing mode <code>47</code>
 entry can revisit them; clearing alternate entry or an effective resize discards
-that content.</p>
+that content. Graphics differ: RIS releases images and placements on both
+screens and invalidates incomplete transfers.</p>
 <h3 id="deccolm"><code>DECCOLM</code></h3>
 <p><code>executeDeccolm</code> accepts only widths <code>80</code> or <code>132</code>; other values are ignored.
 It resizes both screens, clears the active screen and history, homes to absolute
@@ -497,7 +528,7 @@ per-screen arena isolation, tab-stop width, and accurate render invalidation.
 Horizontal slices never copy incomplete wide source spans and clear destination
 occupants crossing their boundaries. Pending wrap is cleared by cursor/structural
 operations that cancel it, and preserved by non-cursor mode changes.</p>
-</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/461979b7271f15e3ba0358137b253b88c18c840a/ketraterm-core/docs/terminal-core-contract.md">View source on GitHub ↗</a></div></div></main></div>
+</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/5371b816fb7dc3c3bca6ea24282a4d1b2b657090/ketraterm-core/docs/terminal-core-contract.md">View source on GitHub ↗</a></div></div></main></div>
   <footer>
     <a class="brand" href="../../../../index.html"><img class="brand-mark" src="../../../../assets/logo.svg" alt="" width="34" height="34">KetraTerm Library</a>
     <p>Open source · Apache 2.0</p>

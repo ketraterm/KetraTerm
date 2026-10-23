@@ -37,6 +37,18 @@ clusters, and metadata, then paint or analyze the copied data after the read.</p
 send it to another thread. Readers may reuse a frame instance across calls.
 Caller-owned destination arrays retain the copied values after the read returns;
 the consumer owns their subsequent synchronization.</p>
+<p><code>copyImages</code> delivers primitive placement metadata in stacking order. Placement
+coordinates and clipping are fractional cells in the requested viewport; crops
+use source pixels. <code>TerminalRenderImage</code> is the exception to the borrowed lifetime:
+its immutable ARGB pixels may be retained across frames. Replacement creates a
+new resource identity. Copy resource references and placement metadata during the
+callback; prepare backend rasters afterwards. Caches must release obsolete resource
+references on replacement, failed copying and reset. <code>graphicsGeneration</code>, source
+identity, viewport and structure qualify cached placement geometry.</p>
+<p><code>isRetainedBySource</code> is a thread-visible, monotonic lifetime hint, independent of
+pixel validity. Renderers may release an absent resource&#39;s raster once its source
+retires it; an installed or pinned frame must still render that resource. Providers
+without retirement tracking inherit <code>true</code>, so caches must retain their own bounds.</p>
 <p>Nested reads on the same reader need not be supported. An unsupported nested read
 must throw <code>IllegalStateException</code> without disturbing the enclosing frame. A
 consumer should finish its current read before requesting another viewport.</p>
@@ -71,6 +83,10 @@ cache keys, and reset caches when unrelated content replaces that source.</p>
 <tr>
 <td><code>structureGeneration</code></td>
 <td>Terminal-owned row mapping/shape changes, including scrolling, resize, reset, buffer switches, and reflow.</td>
+</tr>
+<tr>
+<td><code>graphicsGeneration</code></td>
+<td>Image resources, placements or image geometry. Image providers advance this and <code>frameGeneration</code> when image presentation changes; text-row generations need not change. Defaults to zero for providers without images.</td>
 </tr>
 <tr>
 <td><code>lineGeneration(row)</code></td>
@@ -150,7 +166,7 @@ provider must override it to resolve the range and expose the frame atomically.
 <code>TerminalSession</code> provides that serialization for its readers. For bounded copied
 range data, see
 <a href="../../ketraterm-render-cache/README.html"><code>TerminalRenderRangeCopy</code></a>.</p>
-</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/461979b7271f15e3ba0358137b253b88c18c840a/ketraterm-render-api/docs/render-frame-lifecycle.md">View source on GitHub ↗</a></div></div></main></div>
+</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/5371b816fb7dc3c3bca6ea24282a4d1b2b657090/ketraterm-render-api/docs/render-frame-lifecycle.md">View source on GitHub ↗</a></div></div></main></div>
   <footer>
     <a class="brand" href="../../../../index.html"><img class="brand-mark" src="../../../../assets/logo.svg" alt="" width="34" height="34">KetraTerm Library</a>
     <p>Open source · Apache 2.0</p>

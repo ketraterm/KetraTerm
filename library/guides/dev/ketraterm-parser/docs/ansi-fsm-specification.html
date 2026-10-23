@@ -22,7 +22,7 @@
     <details class="site-navigation" open><summary>Menu</summary><nav aria-label="Library navigation"><a   href="../../docs/README.html">Guides</a><a aria-current="true"  href="../../modules.html">Modules</a><a   href="../../../../versions.html">API & versions</a><a   href="../../CHANGELOG.html">Changelog</a><a  class="nav-primary" href="../../README.html">Get started</a></nav></details>
     <button class="theme-toggle" type="button" aria-label="Switch to light theme">Light</button>
   </header>
-  <div class="docs-shell"><aside class="sidebar" aria-label="Documentation navigation"><details class="nav-disclosure" open><summary class="mobile-nav-toggle">Browse library guides</summary><div><label class="search-label">Find a library guide<input type="search" data-doc-search placeholder="Search library docs" autocomplete="off" data-index="../../search.json"></label><div class="search-results" aria-live="polite"></div><details open><summary>Start here</summary><a  href="../../docs/README.html">Documentation</a><a  href="../../README.html">Installation</a><a  href="../../modules.html">Module guides</a><a  href="../../CHANGELOG.html">Changelog</a></details><details open><summary>Capabilities</summary><a  href="../../docs/terminal-feature-map.html">Feature map</a><a  href="../../docs/features/terminal.html">Terminal</a><a  href="../../docs/features/shells.html">Shell integration</a><a  href="../../docs/features/desktop.html">Swing view & hosts</a><a  href="../../docs/features/completion.html">Completion</a><a  href="../../docs/features/embedding.html">Embedding</a><a  href="../../docs/terminal-feature-gap-map.html">Known limits</a></details><details open><summary>Embedding guides</summary><a  href="../../docs/library/configuration.html">Configuration</a><a  href="../../docs/library/compatibility.html">Compatibility</a><a  href="../../docs/library/render-ownership.html">Render ownership</a></details><details open><summary>Reference</summary><a  href="../../docs/reference/protocol.html">Protocols</a><a  href="../../docs/reference/notifications.html">Notifications</a><a  href="../../docs/reference/storage.html">Storage & privacy</a></details><details open><summary>Development</summary><a  href="../../ARCHITECTURE.html">Architecture</a><a  href="../../CONTRIBUTING.html">Contributing</a><a  href="../../docs/development/conformance-testing.html">Conformance testing</a></details></div></details></aside><main id="main" tabindex="-1" class="article article-with-outline"><div class="article-top"><nav class="breadcrumb" aria-label="Breadcrumb"><ol><li><a href="../../../../index.html">Library</a></li><li><a href="../../modules.html">Modules</a></li><li><a href="../README.html">ketraterm-parser</a></li><li><span aria-current="page">ANSI Finite-State Machine &amp; CSI Dispatch Specification</span></li></ol></nav><div class="doc-version"><span>Development</span><a href="../../../../versions.html">All versions</a></div></div><details class="page-outline" open><summary>On this page</summary><nav aria-label="On this page"><a class="depth-2" href="#1-the-state-machine-architecture">1. The State Machine Architecture</a><a class="depth-2" href="#2-csi-command-signatures">2. CSI Command Signatures</a><a class="depth-2" href="#3-dispatch-table">3. Dispatch table</a><a class="depth-2" href="#4-parser-recovery-and-security-safeguards">4. Parser Recovery and Security Safeguards</a><a class="depth-2" href="#validation">Validation</a></nav></details><div class="article-content"><div class="prose"><h1 id="ansi-finite-state-machine--csi-dispatch-specification">ANSI Finite-State Machine &amp; CSI Dispatch Specification</h1>
+  <div class="docs-shell"><aside class="sidebar" aria-label="Documentation navigation"><details class="nav-disclosure" open><summary class="mobile-nav-toggle">Browse library guides</summary><div><label class="search-label">Find a library guide<input type="search" data-doc-search placeholder="Search library docs" autocomplete="off" data-index="../../search.json"></label><div class="search-results" aria-live="polite"></div><details open><summary>Start here</summary><a  href="../../docs/README.html">Documentation</a><a  href="../../README.html">Installation</a><a  href="../../modules.html">Module guides</a><a  href="../../CHANGELOG.html">Changelog</a></details><details open><summary>Capabilities</summary><a  href="../../docs/terminal-feature-map.html">Feature map</a><a  href="../../docs/features/terminal.html">Terminal</a><a  href="../../docs/features/shells.html">Shell integration</a><a  href="../../docs/features/desktop.html">Swing view & hosts</a><a  href="../../docs/features/completion.html">Completion</a><a  href="../../docs/features/embedding.html">Embedding</a><a  href="../../docs/terminal-feature-gap-map.html">Known limits</a></details><details open><summary>Embedding guides</summary><a  href="../../docs/library/configuration.html">Configuration</a><a  href="../../docs/library/compatibility.html">Compatibility</a><a  href="../../docs/library/render-ownership.html">Render ownership</a></details><details open><summary>Reference</summary><a  href="../../docs/reference/protocol.html">Protocols</a><a  href="../../docs/reference/notifications.html">Notifications</a><a  href="../../docs/reference/storage.html">Storage & privacy</a></details><details open><summary>Development</summary><a  href="../../ARCHITECTURE.html">Architecture</a><a  href="../../CONTRIBUTING.html">Contributing</a><a  href="../../docs/development/conformance-testing.html">Conformance testing</a></details></div></details></aside><main id="main" tabindex="-1" class="article article-with-outline"><div class="article-top"><nav class="breadcrumb" aria-label="Breadcrumb"><ol><li><a href="../../../../index.html">Library</a></li><li><a href="../../modules.html">Modules</a></li><li><a href="../README.html">ketraterm-parser</a></li><li><span aria-current="page">ANSI Finite-State Machine &amp; CSI Dispatch Specification</span></li></ol></nav><div class="doc-version"><span>Development</span><a href="../../../../versions.html">All versions</a></div></div><details class="page-outline" open><summary>On this page</summary><nav aria-label="On this page"><a class="depth-2" href="#1-the-state-machine-architecture">1. The State Machine Architecture</a><a class="depth-2" href="#2-csi-command-signatures">2. CSI Command Signatures</a><a class="depth-2" href="#3-dispatch-table">3. Dispatch table</a><a class="depth-2" href="#4-parser-recovery-and-security-safeguards">4. Parser Recovery and Security Safeguards</a><a class="depth-3" href="#graphics-apc-collection">Graphics APC collection</a><a class="depth-2" href="#validation">Validation</a></nav></details><div class="article-content"><div class="prose"><h1 id="ansi-finite-state-machine--csi-dispatch-specification">ANSI Finite-State Machine &amp; CSI Dispatch Specification</h1>
 <p>This document describes parser routing and collection contracts. Protocol support
 is tracked in the <a href="../../docs/terminal-feature-map.html">feature map</a>; the classes
 described here are internal implementation details.</p>
@@ -32,27 +32,27 @@ state machine. A pending printable UTF-8 scalar takes priority. Once resolved,
 normal byte routing resumes, including bounded replay of a non-continuation byte.</p>
 <p>The ANSI route separates three responsibilities:</p>
 <ol>
-<li><a href="https://github.com/ketraterm/KetraTerm/blob/461979b7271f15e3ba0358137b253b88c18c840a/ketraterm-parser/src/main/kotlin/io/github/ketraterm/parser/ansi/ByteClass.kt">ByteClass</a>
-maps <code>0x00..0x7f</code> into 15 control/ASCII classes and <code>0x80..0xff</code> into the
+<li><a href="https://github.com/ketraterm/KetraTerm/blob/5371b816fb7dc3c3bca6ea24282a4d1b2b657090/ketraterm-parser/src/main/kotlin/io/github/ketraterm/parser/ansi/ByteClass.kt">ByteClass</a>
+maps <code>0x00..0x7f</code> into 16 control/ASCII classes and <code>0x80..0xff</code> into the
 <code>UTF8_PAYLOAD</code> routing class. Raw C1 bytes are not 8-bit control introducers.</li>
-<li><a href="https://github.com/ketraterm/KetraTerm/blob/461979b7271f15e3ba0358137b253b88c18c840a/ketraterm-parser/src/main/kotlin/io/github/ketraterm/parser/ansi/AnsiStateMachine.kt">AnsiStateMachine</a>
+<li><a href="https://github.com/ketraterm/KetraTerm/blob/5371b816fb7dc3c3bca6ea24282a4d1b2b657090/ketraterm-parser/src/main/kotlin/io/github/ketraterm/parser/ansi/AnsiStateMachine.kt">AnsiStateMachine</a>
 performs a flat <code>IntArray</code> lookup for the current state and routing class.
 Each entry packs an action in the low eight bits and the next state above it.
-There are 16 states and 32 reserved columns per state, with 16 active routing
+There are 18 states and 32 reserved columns per state, with 17 active routing
 classes. Lookup uses <code>(state shl 5) or byteClass</code>.</li>
-<li><a href="https://github.com/ketraterm/KetraTerm/blob/461979b7271f15e3ba0358137b253b88c18c840a/ketraterm-parser/src/main/kotlin/io/github/ketraterm/parser/ansi/ActionEngine.kt">ActionEngine</a>
+<li><a href="https://github.com/ketraterm/KetraTerm/blob/5371b816fb7dc3c3bca6ea24282a4d1b2b657090/ketraterm-parser/src/main/kotlin/io/github/ketraterm/parser/ansi/ActionEngine.kt">ActionEngine</a>
 updates reusable sequence state and delegates semantic operations to the
 dispatchers or printable processor.</li>
 </ol>
 <p>Non-ASCII bytes are printable ingress only in <code>GROUND</code>. OSC/DCS bodies collect
-them as opaque bytes; ignored strings discard them. In active ESC/CSI grammar,
+them as opaque bytes; graphics APC rejects them and ignored strings discard them. In active ESC/CSI grammar,
 they terminate the incomplete sequence without dispatching a stale final byte.</p>
 <p>The matrix lookup does fixed work per byte. That does not make an entire parser
 call allocation-free: completed metadata commands may decode strings, and
 explicitly permitted larger OSC bodies may grow collection storage.</p>
 <h2 id="2-csi-command-signatures">2. CSI Command Signatures</h2>
 <p>CSI dispatch distinguishes the final byte, private marker, and ordered
-intermediates. <a href="https://github.com/ketraterm/KetraTerm/blob/461979b7271f15e3ba0358137b253b88c18c840a/ketraterm-parser/src/main/kotlin/io/github/ketraterm/parser/ansi/CsiSignature.kt">CsiSignature</a>
+intermediates. <a href="https://github.com/ketraterm/KetraTerm/blob/5371b816fb7dc3c3bca6ea24282a4d1b2b657090/ketraterm-parser/src/main/kotlin/io/github/ketraterm/parser/ansi/CsiSignature.kt">CsiSignature</a>
 packs them into a primitive <code>Long</code>:</p>
 <div class="table-scroll"><table>
 <thead>
@@ -90,7 +90,7 @@ for dispatchers that require exact values. The intermediate collector retains
 the first four bytes; additional intermediate bytes are dropped.</p>
 <p><a id="3-high-speed-dispatch-table"></a></p>
 <h2 id="3-dispatch-table">3. Dispatch table</h2>
-<p><a href="https://github.com/ketraterm/KetraTerm/blob/461979b7271f15e3ba0358137b253b88c18c840a/ketraterm-parser/src/main/kotlin/io/github/ketraterm/parser/ansi/GeneratedCsiDispatchTable.kt">GeneratedCsiDispatchTable</a>
+<p><a href="https://github.com/ketraterm/KetraTerm/blob/5371b816fb7dc3c3bca6ea24282a4d1b2b657090/ketraterm-parser/src/main/kotlin/io/github/ketraterm/parser/ansi/GeneratedCsiDispatchTable.kt">GeneratedCsiDispatchTable</a>
 stores sorted structural signatures in a <code>LongArray</code> and corresponding command
 IDs in an <code>IntArray</code>. Binary search selects the command; the dispatcher then
 interprets its parameters and emits semantic sink operations. An unmatched key
@@ -99,12 +99,13 @@ does not fall back to a final-byte-only command.</p>
 preserves callback order and prevents later text from extending a grapheme across
 a structural operation.</p>
 <h2 id="4-parser-recovery-and-security-safeguards">4. Parser Recovery and Security Safeguards</h2>
-<p>OSC ends with BEL or <code>ESC \</code>; DCS ends with <code>ESC \</code>. CAN/SUB cancel collected
+<p>OSC ends with BEL or <code>ESC \</code>; DCS and APC end with <code>ESC \</code>. CAN/SUB cancel collected
 strings without dispatch. Ordinary C0 controls are ignored in OSC; in a DCS
-body they are retained as payload rather than executed. DEL is ignored. String
+body they are retained as payload rather than executed. DEL is ignored in OSC/DCS.
+Graphics APC rejects ordinary C0 and DEL as invalid header or Base64 data. String
 escape states handle a split <code>ESC \</code> without confusing it with a standalone ESC
 command.</p>
-<p><a href="https://github.com/ketraterm/KetraTerm/blob/461979b7271f15e3ba0358137b253b88c18c840a/ketraterm-parser/src/main/kotlin/io/github/ketraterm/parser/ansi/ControlStringPolicy.kt">ControlStringPolicy</a>
+<p><a href="https://github.com/ketraterm/KetraTerm/blob/5371b816fb7dc3c3bca6ea24282a4d1b2b657090/ketraterm-parser/src/main/kotlin/io/github/ketraterm/parser/ansi/ControlStringPolicy.kt">ControlStringPolicy</a>
 sets collection limits before decoding. Limits count stored bytes, including
 family headers and separators, excluding introducers, terminators, and controls
 ignored by that string&#39;s rules:</p>
@@ -143,15 +144,28 @@ collection grows on demand. Temporary storage is released on completion,
 cancellation, overflow, reset, EOF, and custom callback failure.</p>
 <p>Collection limits do not authorize clipboard changes or terminal replies. The
 sink&#39;s owning layers validate complete requests and apply current permissions.
-<code>endOfInput</code> discards unfinished OSC/DCS commands. <code>reset</code> discards parser-owned
+<code>endOfInput</code> discards unfinished OSC/DCS/APC commands and chunked graphics uploads. <code>reset</code> discards parser-owned
 state without emitting sink commands.</p>
+<h3 id="graphics-apc-collection">Graphics APC collection</h3>
+<p><code>APC_STRING</code> and <code>APC_ESCAPE</code> route <code>ESC _</code> strings separately from ignored
+SOS/PM. The first payload byte selects graphics (<code>G</code>) or draining. A lazy
+<code>GraphicsParser</code> owns the bounded header, incremental Base64 state and one upload
+spanning several APC strings. Its header/chunk/transfer limits are separate from
+<code>ControlStringPolicy</code>; see <a href="https://github.com/ketraterm/KetraTerm/blob/5371b816fb7dc3c3bca6ea24282a4d1b2b657090/ketraterm-protocol/src/main/kotlin/io/github/ketraterm/protocol/TerminalGraphicsLimits.kt">TerminalGraphicsLimits</a>.</p>
+<p><code>APC_END</code> validates a chunk at ST; <code>APC_ABORT</code> cancels on CAN/SUB. An unexpected
+escape suffix uses <code>APC_INVALID</code> to reject and drain the current string rather
+than execute its tail as terminal input. The sink&#39;s invalidation token prevents
+an incomplete upload from surviving a reset or effective screen switch. Completed
+controls and decoded bytes are borrowed synchronously to <code>applyGraphicsCommand</code>.
+See the <a href="../../docs/development/kitty-graphics-contract.html#command-and-transfer-semantics">graphics contract</a>
+for continuation and reply semantics.</p>
 <h2 id="validation">Validation</h2>
 <p><code>AnsiStateMachineTest</code> checks routing, and <code>ActionEngineTest</code> checks collection and
 mutation invariants. <code>ControlStringPayloadPolicyTest</code>, <code>CustomOscHandlerTest</code>,
-<code>CustomOscLimitTest</code>, and <code>TerminalParserTest</code> cover exact bounds, chunking,
+<code>CustomOscLimitTest</code>, <code>GraphicsParserTest</code>, and <code>TerminalParserTest</code> cover exact bounds, chunking,
 cancellation, ordering, and recovery. Run <code>./gradlew :ketraterm-parser:test</code> from
 the repository root; semantic changes also require the affected host tests.</p>
-</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/461979b7271f15e3ba0358137b253b88c18c840a/ketraterm-parser/docs/ansi-fsm-specification.md">View source on GitHub ↗</a></div></div></main></div>
+</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/5371b816fb7dc3c3bca6ea24282a4d1b2b657090/ketraterm-parser/docs/ansi-fsm-specification.md">View source on GitHub ↗</a></div></div></main></div>
   <footer>
     <a class="brand" href="../../../../index.html"><img class="brand-mark" src="../../../../assets/logo.svg" alt="" width="34" height="34">KetraTerm Library</a>
     <p>Open source · Apache 2.0</p>

@@ -80,9 +80,21 @@ Unchanged palette and cursor settings preserve application-controlled values.
 Builders are mutable construction drafts; <code>build</code>, <code>create</code>, and <code>copy</code> freeze
 detached snapshots.</p>
 <p>Access Swing state on the EDT unless a method explicitly documents another
-threading contract. <code>bind</code>, <code>unbind</code>, <code>dispose</code>, and <code>reloadSettings</code> execute
-immediately on the EDT and dispatch asynchronously when called elsewhere. An
-off-EDT call does not mean that the operation has completed.</p>
+threading contract. <code>bind</code>, <code>unbind</code>, <code>dispose</code>, and <code>reloadSettings</code> update view
+state on the EDT and dispatch there when called elsewhere. Captured session
+settings, geometry, and window state run on an ordered worker so session admission
+cannot stall the EDT. Paste policy keeps its immediate input-admission behavior.
+Use <code>bind(session, onComplete)</code> when startup depends on initial settings and
+geometry; its EDT callback receives <code>null</code> after application or the failure.</p>
+<p>Call <code>setHostPolicy(policy, onComplete)</code> on the view to preserve ordering with
+view settings. <code>resizeSessionToVisibleGrid(onComplete)</code> reconciles externally
+changed session dimensions with captured component bounds. Both report completion
+on the EDT; acceptance is not application. Superseded geometry or an obsolete
+binding reports cancellation. The bounded queue rejects overflow synchronously;
+retrying <code>reloadSettings</code> with the same snapshot submits changes not yet accepted,
+including geometry, without resetting already accepted palette/cursor settings.
+Default completion handlers log operational failures. Session closure remains
+the host&#39;s responsibility and must run off the EDT.</p>
 <p>Use one controlling view per session. Settings, dimensions, and the published
 viewport belong to the session; multiple components cannot scroll or configure
 it independently. After session closure, the view retains the final grid and
@@ -129,7 +141,7 @@ press coordinates on the EDT. Finish once with <code>request.complete(text)</cod
 <code>request.cancel()</code> on the EDT; there is no fallback after the handler returns.
 Completion rejects a closed or changed binding. The host owns cancellation and
 supersession of its work. See
-<a href="https://github.com/ketraterm/KetraTerm/blob/461979b7271f15e3ba0358137b253b88c18c840a/ketraterm-ui-swing/src/main/kotlin/io/github/ketraterm/ui/swing/api/SwingTerminalMiddleClickPasteRequest.kt"><code>SwingTerminalMiddleClickPasteRequest</code></a>
+<a href="https://github.com/ketraterm/KetraTerm/blob/5371b816fb7dc3c3bca6ea24282a4d1b2b657090/ketraterm-ui-swing/src/main/kotlin/io/github/ketraterm/ui/swing/api/SwingTerminalMiddleClickPasteRequest.kt"><code>SwingTerminalMiddleClickPasteRequest</code></a>
 for completion and lifetime details.</p>
 <h3 id="selection-and-cell-coordinates">Selection and cell coordinates</h3>
 <p><code>selectedText()</code> reads the complete retained selection on the EDT without
@@ -270,7 +282,7 @@ See <a href="Module.html">Module.md</a> for rendering architecture and maintaine
 </ul>
 <p><a id="consumer-and-abi-verification"></a></p>
 <p>See <a href="Module.html#consumer-and-abi-verification">Module.md</a> for source layout and verification.</p>
-</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/461979b7271f15e3ba0358137b253b88c18c840a/ketraterm-ui-swing/README.md">View source on GitHub ↗</a></div></div></main></div>
+</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/5371b816fb7dc3c3bca6ea24282a4d1b2b657090/ketraterm-ui-swing/README.md">View source on GitHub ↗</a></div></div></main></div>
   <footer>
     <a class="brand" href="../../../index.html"><img class="brand-mark" src="../../../assets/logo.svg" alt="" width="34" height="34">KetraTerm Library</a>
     <p>Open source · Apache 2.0</p>

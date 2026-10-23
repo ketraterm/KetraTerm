@@ -139,6 +139,21 @@
               </div>
             </div>
           </div>
+<a data-name="895719983%2FProperties%2F-1402815689" anchor-label="graphicsTransferGeneration" id="895719983%2FProperties%2F-1402815689" data-filterable-set=":ketraterm-core/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-core/main" data-filterable-set=":ketraterm-core/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="../-terminal-graphics/graphics-transfer-generation.html"><span>graphics</span><wbr><span>Transfer</span><wbr><span><span>Generation</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="895719983%2FProperties%2F-1402815689"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-core/main"><div class="symbol monospace"><span class="token keyword">abstract </span><span class="token keyword">val </span><a href="../-terminal-graphics/graphics-transfer-generation.html">graphicsTransferGeneration</a><span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-long/index.html">Long</a></div><div class="brief "><p class="paragraph">Invalidation token for incomplete transfers, changed by reset, screen switch and destructive clearing. Compare for inequality, not ordering. This is separate from the render frame's graphics generation.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
 <a data-name="928336814%2FProperties%2F-1402815689" anchor-label="height" id="928336814%2FProperties%2F-1402815689" data-filterable-set=":ketraterm-core/main"></a>
           <div class="table-row table-row_content" data-filterable-current=":ketraterm-core/main" data-filterable-set=":ketraterm-core/main">
             <div class="main-subrow keyValue ">
@@ -274,6 +289,36 @@
               <div>
                 <div class="title">
                   <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-core/main"><div class="symbol monospace"><span class="token keyword">abstract </span><span class="token keyword">fun </span><a href="../-terminal-mode-controller/apply-color-request.html"><span class="token function">applyColorRequest</span></a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">request<span class="token operator">: </span><a href="../../../ketraterm-protocol/io.github.ketraterm.protocol/-terminal-color-request/index.html">TerminalColorRequest</a><span class="token punctuation">, </span></span><span class="parameter ">allowResponses<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-boolean/index.html">Boolean</a></span></span><span class="token punctuation">)</span></div><div class="brief "><p class="paragraph">Applies borrowed OSC 21 color operations in order, without retaining <a href="../-terminal-mode-controller/apply-color-request.html">request</a>. Queries observe preceding operations and share one response in request order. Resets restore the latest theme; dynamic selection and cursor roles retain their dynamic behavior until changed or reset. Application changes do not emit color-scheme notifications.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="411839175%2FFunctions%2F-1402815689" anchor-label="applyDecodedGraphicsCommand" id="411839175%2FFunctions%2F-1402815689" data-filterable-set=":ketraterm-core/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-core/main" data-filterable-set=":ketraterm-core/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="../-terminal-graphics/apply-decoded-graphics-command.html"><span>apply</span><wbr><span>Decoded</span><wbr><span>Graphics</span><wbr><span><span>Command</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="411839175%2FFunctions%2F-1402815689"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-core/main"><div class="symbol monospace"><span class="token keyword">abstract </span><span class="token keyword">fun </span><a href="../-terminal-graphics/apply-decoded-graphics-command.html"><span class="token function">applyDecodedGraphicsCommand</span></a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">command<span class="token operator">: </span><a href="../../../ketraterm-protocol/io.github.ketraterm.protocol/-terminal-graphics-command/index.html">TerminalGraphicsCommand</a><span class="token punctuation">, </span></span><span class="parameter ">image<span class="token operator">: </span><a href="../../../ketraterm-render-api/io.github.ketraterm.render.api/-terminal-render-image/index.html">TerminalRenderImage</a><span class="token operator">?</span><span class="token punctuation">, </span></span><span class="parameter ">result<span class="token operator">: </span><a href="../../../ketraterm-protocol/io.github.ketraterm.protocol/-terminal-graphics-result/index.html">TerminalGraphicsResult</a><span class="token punctuation">, </span></span><span class="parameter ">allowReplies<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-boolean/index.html">Boolean</a></span></span><span class="token punctuation">)</span></div><div class="brief "><p class="paragraph">Commits an externally decoded upload or query under the same admission, placement and reply rules as <a href="../-terminal-graphics/apply-graphics-command.html">applyGraphicsCommand</a>. The decoder owns payload validation; core still validates controls, image bounds and placement before replacing any retained image. PNG dimensions come from <a href="../-terminal-graphics/apply-decoded-graphics-command.html">image</a>.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="417273660%2FFunctions%2F-1402815689" anchor-label="applyGraphicsCommand" id="417273660%2FFunctions%2F-1402815689" data-filterable-set=":ketraterm-core/main"></a>
+          <div class="table-row table-row_content" data-filterable-current=":ketraterm-core/main" data-filterable-set=":ketraterm-core/main">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="../-terminal-graphics/apply-graphics-command.html"><span>apply</span><wbr><span>Graphics</span><wbr><span><span>Command</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="417273660%2FFunctions%2F-1402815689"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-core/main"><div class="symbol monospace"><span class="token keyword">abstract </span><span class="token keyword">fun </span><a href="../-terminal-graphics/apply-graphics-command.html"><span class="token function">applyGraphicsCommand</span></a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">command<span class="token operator">: </span><a href="../../../ketraterm-protocol/io.github.ketraterm.protocol/-terminal-graphics-command/index.html">TerminalGraphicsCommand</a><span class="token punctuation">, </span></span><span class="parameter ">data<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-byte-array/index.html">ByteArray</a><span class="token punctuation">, </span></span><span class="parameter ">length<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a><span class="token punctuation">, </span></span><span class="parameter ">result<span class="token operator">: </span><a href="../../../ketraterm-protocol/io.github.ketraterm.protocol/-terminal-graphics-result/index.html">TerminalGraphicsResult</a><span class="token punctuation">, </span></span><span class="parameter ">allowReplies<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-boolean/index.html">Boolean</a></span></span><span class="token punctuation">)</span></div><div class="brief "><p class="paragraph">Applies a complete command using the Base64-decoded prefix <code class="lang-kotlin">data[0 until length]</code>. <a href="../-terminal-graphics/apply-graphics-command.html">command</a> and <a href="../-terminal-graphics/apply-graphics-command.html">data</a> are borrowed for this call. Raw RGB/RGBA pixels are copied into immutable storage before returning; upload-only and query operations do not place an image. Placement uses the current cursor and known cell-pixel geometry.</p></div></div></div>
                 </div>
               </div>
             </div>
@@ -1293,7 +1338,7 @@
                   </span></span></div>
               <div>
                 <div class="title">
-                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-core/main"><div class="symbol monospace"><span class="token keyword">abstract </span><span class="token keyword">fun </span><a href="../-terminal-response-channel/request-window-report.html"><span class="token function">requestWindowReport</span></a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">mode<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a></span></span><span class="token punctuation">)</span></div><div class="brief "><p class="paragraph">Enqueues a window report response.</p></div></div></div>
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-core/main"><div class="symbol monospace"><span class="token keyword">abstract </span><span class="token keyword">fun </span><a href="../-terminal-response-channel/request-window-report.html"><span class="token function">requestWindowReport</span></a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">mode<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a></span></span><span class="token punctuation">)</span></div><div class="brief "><p class="paragraph">Enqueues an allowlisted window report response using current host geometry. Pixel-size query reports remain silent when the host has not supplied usable dimensions. Cell pixel dimensions use the integer text-area pixel size divided by the grid dimensions. Callers must enforce terminal-response permission for application queries.</p></div></div></div>
                 </div>
               </div>
             </div>

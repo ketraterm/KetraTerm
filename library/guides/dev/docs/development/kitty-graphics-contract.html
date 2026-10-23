@@ -1,0 +1,574 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="description" content="A modular Kotlin/JVM terminal emulator library for Swing and headless applications.">
+  <meta name="color-scheme" content="light dark">
+  <title>Kitty graphics implementation contract · KetraTerm Library</title>
+  <link rel="icon" href="../../../../assets/logo.svg" type="image/svg+xml">
+  <link rel="preload" href="../../../../assets/fonts/manrope-variable.ttf" as="font" type="font/ttf" crossorigin>
+  <link rel="stylesheet" href="../../../../assets/styles.css">
+  <script type="importmap">{"imports":{"mermaid":"../../../../assets/mermaid/mermaid.esm.min.mjs"}}</script>
+  <script type="module" src="../../../../assets/site.js"></script>
+</head>
+<body data-product="library" data-version="Development">
+  <a class="skip" href="#main">Skip to content</a>
+  <header class="site-header">
+    <div class="site-identity">
+      <a class="brand" href="../../../../index.html" aria-label="KetraTerm Library home"><img class="brand-mark" src="../../../../assets/logo.svg" alt="" width="34" height="34">KetraTerm</a>
+      <nav class="product-navigation" aria-label="KetraTerm products"><a href="https://ketraterm.github.io/KetraTerm/">App</a><a href="../../../../index.html" aria-current="true">Library</a></nav>
+    </div>
+    <details class="site-navigation" open><summary>Menu</summary><nav aria-label="Library navigation"><a aria-current="true"  href="../README.html">Guides</a><a   href="../../modules.html">Modules</a><a   href="../../../../versions.html">API & versions</a><a   href="../../CHANGELOG.html">Changelog</a><a  class="nav-primary" href="../../README.html">Get started</a></nav></details>
+    <button class="theme-toggle" type="button" aria-label="Switch to light theme">Light</button>
+  </header>
+  <div class="docs-shell"><aside class="sidebar" aria-label="Documentation navigation"><details class="nav-disclosure" open><summary class="mobile-nav-toggle">Browse library guides</summary><div><label class="search-label">Find a library guide<input type="search" data-doc-search placeholder="Search library docs" autocomplete="off" data-index="../../search.json"></label><div class="search-results" aria-live="polite"></div><details open><summary>Start here</summary><a  href="../README.html">Documentation</a><a  href="../../README.html">Installation</a><a  href="../../modules.html">Module guides</a><a  href="../../CHANGELOG.html">Changelog</a></details><details open><summary>Capabilities</summary><a  href="../terminal-feature-map.html">Feature map</a><a  href="../features/terminal.html">Terminal</a><a  href="../features/shells.html">Shell integration</a><a  href="../features/desktop.html">Swing view & hosts</a><a  href="../features/completion.html">Completion</a><a  href="../features/embedding.html">Embedding</a><a  href="../terminal-feature-gap-map.html">Known limits</a></details><details open><summary>Embedding guides</summary><a  href="../library/configuration.html">Configuration</a><a  href="../library/compatibility.html">Compatibility</a><a  href="../library/render-ownership.html">Render ownership</a></details><details open><summary>Reference</summary><a  href="../reference/protocol.html">Protocols</a><a  href="../reference/notifications.html">Notifications</a><a  href="../reference/storage.html">Storage & privacy</a></details><details open><summary>Development</summary><a  href="../../ARCHITECTURE.html">Architecture</a><a  href="../../CONTRIBUTING.html">Contributing</a><a  href="conformance-testing.html">Conformance testing</a></details></div></details></aside><main id="main" tabindex="-1" class="article article-with-outline"><div class="article-top"><nav class="breadcrumb" aria-label="Breadcrumb"><ol><li><a href="../../../../index.html">Library</a></li><li><a href="../README.html">Guides</a></li><li><span aria-current="page">Kitty graphics implementation contract</span></li></ol></nav><div class="doc-version"><span>Development</span><a href="../../../../versions.html">All versions</a></div></div><details class="page-outline" open><summary>On this page</summary><nav aria-label="On this page"><a class="depth-2" href="#command-and-transfer-semantics">Command and transfer semantics</a><a class="depth-2" href="#placement-and-screen-ownership">Placement and screen ownership</a><a class="depth-2" href="#image-lifetime-and-render-publication">Image lifetime and render publication</a><a class="depth-2" href="#resource-limits">Resource limits</a><a class="depth-2" href="#decoder-boundary-and-ordering">Decoder boundary and ordering</a><a class="depth-3" href="#edt-admission-and-lifecycle">EDT admission and lifecycle</a><a class="depth-2" href="#verification-gates">Verification gates</a></nav></details><div class="article-content"><div class="prose"><h1 id="kitty-graphics-implementation-contract">Kitty graphics implementation contract</h1>
+<p>This document defines graphics protocol, resource and lifecycle invariants. The <a href="../terminal-feature-gap-map.html#optional-protocol-work">gap map</a>
+owns delivery scope and support status. Sender provenance, exact input bytes and
+regeneration instructions live with the <a href="https://github.com/ketraterm/KetraTerm/blob/5371b816fb7dc3c3bca6ea24282a4d1b2b657090/tools/kitty-graphics/README.md">fixture corpus</a>.</p>
+<p>The reference is Kitty revision
+<a href="https://github.com/kovidgoyal/kitty/tree/1c5a4829ae4dd472017f592b1424381d5ece7575"><code>1c5a4829ae4dd472017f592b1424381d5ece7575</code></a>.
+The pinned <a href="https://github.com/kovidgoyal/kitty/blob/1c5a4829ae4dd472017f592b1424381d5ece7575/docs/graphics-protocol.rst">specification</a>
+defines the wire vocabulary; its <a href="https://github.com/kovidgoyal/kitty/blob/1c5a4829ae4dd472017f592b1424381d5ece7575/kitty/graphics.c">implementation</a>
+resolves underspecified behavior. KetraTerm choices are identified below rather
+than presented as protocol requirements. A sender capture proves emitted bytes,
+not receiver behavior or complete application compatibility.</p>
+<h2 id="command-and-transfer-semantics">Command and transfer semantics</h2>
+<p>Recognize <code>ESC _ G ... ESC \</code> separately from ignored APC/SOS/PM strings. Preserve
+omitted fields and validate signed values separately from unsigned 32-bit image
+IDs, image numbers and placement IDs. Bound header and transfer storage; upload
+allocation policy is distinct from ordinary text parsing and repeated rendering.</p>
+<div class="table-scroll"><table>
+<thead>
+<tr>
+<th>Operation</th>
+<th>Required behavior</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>a=t</code></td>
+<td>Validate and retain the image without displaying it.</td>
+</tr>
+<tr>
+<td><code>a=T</code></td>
+<td>Validate, retain and place using the cursor at receipt of the final chunk.</td>
+</tr>
+<tr>
+<td><code>a=p</code></td>
+<td>Place an existing image; missing references fail without cursor movement.</td>
+</tr>
+<tr>
+<td><code>a=q</code></td>
+<td>Validate the actual requested format and medium without storing, replacing or displaying an image. Discard queries without nonzero <code>i</code>, without replying; <code>I</code> cannot substitute. Finish eligible replies before later input, including DA1.</td>
+</tr>
+<tr>
+<td><code>a=d</code></td>
+<td>Abort an incomplete upload and apply the selected deletion. Do not manufacture a delete acknowledgment.</td>
+</tr>
+</tbody></table></div>
+<p>Use the specification&#39;s defaults, including omitted action <code>t</code>, format <code>32</code>,
+medium <code>d</code>, and quiet mode <code>0</code>. Preserve full <code>i</code>, <code>I</code> and <code>p</code> ranges through
+<code>4294967295</code>; reject simultaneous nonzero <code>i</code> and <code>I</code>. An image number allocates
+a fresh terminal-assigned ID; later number lookups select the newest match.
+Anonymous images and zero-ID placements can coexist. A nonzero image/placement
+ID pair updates one placement.</p>
+<p>Decode Base64 incrementally into bounded transfer storage. Accept padded and
+unpadded final groups; reject impossible length and invalid alphabet. Nonfinal
+chunks must end on a complete Base64 group. The first chunk establishes metadata;
+continuations may carry <code>m</code>, <code>q</code>, and the same action repeated by the pinned Kitty
+writer. Conflicting continuation metadata rejects the transfer. The wire limit
+below deliberately accommodates that writer&#39;s 128 KiB payload chunks, despite
+the specification&#39;s older 4096-byte guidance. It does not raise OSC/DCS limits.</p>
+<p>Retain one incomplete upload per session, recording its originating screen.
+Capture the transfer generation when each APC begins and validate it at ST,
+before either retaining a nonfinal chunk or dispatching a command. Invalidation
+also covers a header or payload split across ingress reads, not just completed
+APCs; discard stale input through its terminator without a reply.
+No image or placement becomes visible before complete validation. A valid delete,
+cancellation, reset, EOF, screen switch, collection overflow or malformed graphics
+continuation discards staging. Unknown non-graphics APC strings drain without
+affecting a graphics upload. For malformed graphics commands, aborting staging is
+a KetraTerm recovery choice; the reference parser can leave a prior upload pending.
+Drain rejected strings to their terminator so payload never becomes text.</p>
+<p>Replacement is transactional: keep the old image and placements until a complete
+replacement validates, then remove all old placements and install the new resource
+atomically. <code>a=t</code> leaves it undisplayed; <code>a=T</code> creates only the requested new
+placement. Failed replacement preserves the old image. This differs deliberately
+from Kitty&#39;s eager removal at the start of retransmission. Queries never evict
+retained images to obtain working space.</p>
+<p>Named resources remain reusable after their final placement is removed. Anonymous
+resources (<code>i=I=0</code>) retire when their last placement disappears, including through
+scrolling, clearing and lowercase deletion; they cannot be addressed for redisplay.</p>
+<p>Raw RGB/RGBA payloads must have exactly the expected byte count. <code>o=z</code> requires
+one complete zlib stream with bounded output and no trailing compressed data.
+For <code>f=100,o=z</code>, the specification requires positive <code>S</code> giving the exact expanded
+PNG-stream size. Reject missing/zero <code>S</code> and values exceeding the staging bound
+before inflation. PNG IHDR dimensions determine decoded size.</p>
+<p>Unknown header keys and syntactically malformed commands are discarded without
+reflecting input into replies. Recognized but unavailable formats, media or
+actions return a fixed <code>ENOTSUP</code> failure when eligible; this is a KetraTerm error
+choice, not a mandated Kitty code. Known usage hints <code>N</code> may be ignored. Never
+silently reinterpret virtual or relative placement as ordinary placement.</p>
+<p>Use fixed error text: <code>EINVAL</code> for invalid values/data, <code>ENOENT</code> for missing
+references, <code>EFBIG</code> for an individual transfer/dimension limit, and <code>ENOSPC</code> for
+admission after permitted eviction cannot satisfy storage/count limits. Ordinary
+anonymous commands (<code>i=I=0</code>) receive no success/error reply. Replies for eligible
+identified commands retain their image/placement identifiers; <code>q</code> only suppresses
+otherwise eligible replies. <code>q=1</code> suppresses success, <code>q=2</code> suppresses all replies,
+and intermediate chunks have no success reply. Existing
+terminal-response denial suppresses every reply, including failure. Inline
+graphics has no window-manipulation permission dependency. The explicit
+reply allowlist includes these responses; a probe must exercise the configured
+decoder rather than return unconditional success.</p>
+<h2 id="placement-and-screen-ownership">Placement and screen ownership</h2>
+<p>Core owns separate primary and alternate image/placement namespaces, sharing the
+session resource budget. Internal immutable resource identity is independent of
+reusable client IDs. Keep placement fields in reusable primitive arrays and
+pixel resources outside text-cell storage.</p>
+<p>Placements retain source crop, cell position, pixel offsets, requested cell span,
+z-index and IDs. Clip crops against the source image. Apply <code>c</code>/<code>r</code> aspect fitting
+and <code>X</code>/<code>Y</code> offsets as specified; do not assume all placements display the entire
+image. Current Yazi uses many cropped one-cell placements. <code>C=1</code> preserves the
+cursor and pending-wrap state. Missing cell-pixel geometry must produce an eligible
+failure for operations that need it, rather than inventing cell dimensions.</p>
+<p>For default cursor movement, follow the pinned Kitty implementation rather than
+the specification&#39;s conflicting prose about moving down by the row count.
+<a href="https://github.com/kovidgoyal/kitty/blob/1c5a4829ae4dd472017f592b1424381d5ece7575/kitty/graphics.c#L1437"><code>handle_put_command</code></a>
+advances by the <strong>effective</strong> placement columns and <code>max(effective rows - 1, 0)</code>.
+Use the span computed from crop, scaling and cell offsets, not simply the supplied
+<code>c</code>/<code>r</code>. Apply movement only after successful placement, including replacement of
+an existing placement. Upload-only commands, queries and failed placements do not move.</p>
+<p>Match the subsequent
+<a href="https://github.com/kovidgoyal/kitty/blob/1c5a4829ae4dd472017f592b1424381d5ece7575/kitty/screen.c#L1934"><code>screen_handle_graphics_command</code></a>
+boundary handling using checked <code>Long</code> intermediates and zero-based coordinates:</p>
+<ol>
+<li>Compute the candidate column and row using that advance. Record whether the
+candidate row lies within the vertical margins <strong>before</strong> horizontal correction.</li>
+<li>If the candidate column reaches/exceeds the physical grid width, set it to zero
+and add exactly one row. Discard excess columns; this is an immediate graphics
+wrap, independent of DECAWM, not deferred text wrapping or repeated line feeds.</li>
+<li>If the candidate row exceeds the bottom margin, scroll that region up by the
+excess. Scrolling moves text and placements, without subtracting from the
+candidate row. Then clamp the row to the vertical margins only when DECOM is
+enabled and the recorded candidate was inside them; otherwise clamp to the
+physical screen. This matches Kitty&#39;s <code>screen_ensure_bounds</code> call.</li>
+</ol>
+<p>Skip boundary correction when no movement occurred. For pending wrap, use one
+past core&#39;s stored column as the logical starting column, matching Kitty&#39;s
+representation; completed movement clears pending wrap and does not mark a text
+line as soft-wrapped. The graphics wrap boundary is the physical grid width, even
+with DECLRMM. Actual scrolling uses
+KetraTerm&#39;s <a href="../../ketraterm-core/docs/terminal-core-contract.html">existing core policy</a>:
+cap the excess at the scrolling-region height, preserve cells outside horizontal
+margins, and apply the existing primary-history eligibility rules. Those bounded
+scrolling rules are KetraTerm policy, not a claim of complete Kitty boundary parity.</p>
+<p>Required cursor cases for the implementation tests, on a 10-column, 6-row grid:</p>
+<div class="table-scroll"><table>
+<thead>
+<tr>
+<th>Start <code>(column,row)</code></th>
+<th>Effective span <code>columns × rows</code></th>
+<th>Controls / vertical margins</th>
+<th>Final cursor</th>
+<th>Rows scrolled</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>(2,1)</code></td>
+<td><code>1 × 1</code></td>
+<td>Defaults, <code>[0,5]</code></td>
+<td><code>(3,1)</code></td>
+<td>0</td>
+</tr>
+<tr>
+<td><code>(2,1)</code></td>
+<td><code>3 × 2</code></td>
+<td>Defaults, <code>[0,5]</code></td>
+<td><code>(5,2)</code></td>
+<td>0</td>
+</tr>
+<tr>
+<td><code>(8,1)</code></td>
+<td><code>2 × 1</code> or <code>25 × 1</code></td>
+<td>Defaults, <code>[0,5]</code></td>
+<td><code>(0,2)</code></td>
+<td>0</td>
+</tr>
+<tr>
+<td><code>(8,5)</code></td>
+<td><code>2 × 1</code></td>
+<td>Defaults, <code>[0,5]</code></td>
+<td><code>(0,5)</code></td>
+<td>1</td>
+</tr>
+<tr>
+<td><code>(2,4)</code></td>
+<td><code>3 × 3</code></td>
+<td>Defaults, <code>[0,5]</code></td>
+<td><code>(5,5)</code></td>
+<td>1</td>
+</tr>
+<tr>
+<td><code>(8,5)</code></td>
+<td><code>2 × 1</code></td>
+<td><code>C=1</code>, <code>[0,5]</code></td>
+<td><code>(8,5)</code></td>
+<td>0</td>
+</tr>
+<tr>
+<td><code>(8,3)</code></td>
+<td><code>2 × 1</code></td>
+<td>DECOM off, <code>[1,3]</code></td>
+<td><code>(0,4)</code></td>
+<td>1</td>
+</tr>
+<tr>
+<td><code>(8,3)</code></td>
+<td><code>2 × 1</code></td>
+<td>DECOM on, <code>[1,3]</code></td>
+<td><code>(0,3)</code></td>
+<td>1</td>
+</tr>
+<tr>
+<td><code>(2,2)</code></td>
+<td><code>1 × 4</code></td>
+<td>DECOM on, <code>[1,3]</code></td>
+<td><code>(3,5)</code></td>
+<td>2</td>
+</tr>
+</tbody></table></div>
+<p>Composition has three bands: <code>z &gt;= 0</code> above text; <code>-1073741824 &lt;= z &lt; 0</code> below
+text but above cell backgrounds; lower values below nondefault cell backgrounds.
+Equal z-order follows internal image creation order, then placement creation
+order, as in the reference; reusable client IDs do not determine this order. Selection, cursor and
+host overlays remain renderer-owned. Reuse existing viewport geometry for
+padding, fractional scrolling and clipping.</p>
+<p>Lowercase deletion removes selected placements while retaining reusable image
+data. Uppercase also releases selected data once no placements reference it;
+ID/number/range deletion must handle images with no placements. Deleting visible
+placements must not accidentally remove retained history placements.
+ID and ID-range selectors require a nonzero image identity; omitted/zero IDs
+and ranges containing zero cannot select anonymous images.</p>
+<p>Actual screen scrolling (<code>SU</code>/<code>SD</code>, or index/reverse index and linefeed at a
+scrolling boundary) moves graphics with text. Margin scrolling moves only fully
+contained placements and clips them when they cross the scrolling region, as
+required by the <a href="https://github.com/kovidgoyal/kitty/blob/1c5a4829ae4dd472017f592b1424381d5ece7575/docs/graphics-protocol.rst#L1240">protocol&#39;s terminal-action rules</a>.
+Full-screen downward scrolling retains ordinary placements below the viewport;
+later full-screen upward scrolling can reveal them again. Margin scrolling
+clips ordinary images at the region even when outgoing text enters history,
+and leaves existing ordinary history anchors in place. Preserve the surviving
+source crop and adjusted placement geometry across subsequent scrolling and
+cell-size changes.
+<code>IL</code>/<code>DL</code> edit text lines without moving, clipping or deleting ordinary image
+placements, even when the edited range covers them. This follows the reference
+<a href="https://github.com/kovidgoyal/kitty/blob/1c5a4829ae4dd472017f592b1424381d5ece7575/kitty/screen.c#L3037"><code>screen_insert_lines</code> and <code>screen_delete_lines</code></a>.
+Their <code>screen_dirty_line_graphics</code> call invalidates only derived
+<a href="https://github.com/kovidgoyal/kitty/blob/1c5a4829ae4dd472017f592b1424381d5ece7575/kitty/graphics.c#L2492">Unicode-placeholder cell images</a>;
+future placeholder support must follow the edited text cells rather than apply
+the ordinary-placement rule. ED2 clears visible images; ordinary partial text
+erasure leaves ordinary graphics intact.
+KetraTerm&#39;s RIS policy clears both graphics namespaces and transfer state,
+including primary history images; the reference can preserve history images.
+DECSTR preserves retained images while discarding an incomplete transfer.
+Clearing alternate entry clears that screen; non-clearing switches preserve its
+namespace. Local <code>clearScreen</code>
+removes visible placements while preserving history; <code>clearAll</code>/<code>eraseBuffer</code>
+remove both active viewport and history graphics; ED3 (<code>eraseScreenAndHistory</code>)
+removes history graphics while preserving visible placements. History eviction
+drops placements that can no longer be displayed.</p>
+<p>Ordinary graphics keep physical cell coordinates on width reflow; they do not
+follow logical text-line IDs. Text above an image can therefore unwrap and move
+a later prompt underneath it; images do not reserve text cells. This matches
+Kitty&#39;s <a href="https://github.com/kovidgoyal/kitty/blob/1c5a4829ae4dd472017f592b1424381d5ece7575/kitty/graphics.c#L2676"><code>grman_resize</code></a>.
+Same-width height shrink adjusts rows by the actual content lines removed from
+the live screen in that resize, excluding earlier history evictions. Consuming
+trailing blank rows does not move anchors. Recompute geometry on cell-size
+changes. Alternate resize follows KetraTerm&#39;s existing alternate-grid recreation
+and clears alternate placements; this is a KetraTerm policy, not reference parity.
+Primary graphics remain attached to their own screen, including during an
+inactive-primary resize. Viewport clipping does not permanently crop images;
+enlarging the viewport can reveal retained pixels again.</p>
+<p>Resize verification uses Kitty 0.45.0 and 0.49.2&#39;s headless <code>Screen</code> engines alongside the
+pinned implementation above. An 8-column wrapped line widened to 16 columns
+moves a following prompt up one row while retaining the image&#39;s cell anchor;
+narrowing restores the text and typing remains beside the prompt. Repeated
+height shrinking and growth after history eviction verify the corresponding
+anchor shifts. Permanent <a href="https://github.com/ketraterm/KetraTerm/blob/5371b816fb7dc3c3bca6ea24282a4d1b2b657090/ketraterm-core/src/test/kotlin/io/github/ketraterm/core/graphics/GraphicsResizeTest.kt">core regressions</a>
+cover these cases and inactive-primary history; <a href="https://github.com/ketraterm/KetraTerm/blob/5371b816fb7dc3c3bca6ea24282a4d1b2b657090/ketraterm-ui-swing/src/test/kotlin/io/github/ketraterm/ui/swing/render/GraphicsRenderingTest.kt">Swing regressions</a>
+check painted clipping, reveal and raster reuse. These checks do not change
+KetraTerm&#39;s general text reflow policy or verify native ConPTY cursor tracking.</p>
+<h2 id="image-lifetime-and-render-publication">Image lifetime and render publication</h2>
+<p>The render boundary adds one narrow immutable image-resource contract: dimensions,
+a fixed pixel encoding, and bulk pixel copying. The encoding is unassociated
+8-bit sRGB ARGB in 32-bit integers; raw arrays are never exposed for mutation.
+This resource alone may outlive a frame callback. All existing frame and placement
+arrays remain borrowed. No public acquire/release API or general resource registry
+is needed for JVM-owned immutable pixels.</p>
+<p>Publication copies placement metadata and resource references, not bitmap pixels.
+Replacing or deleting an image cannot mutate a resource held by an older frame.
+Clear unused reference-array tails, failed-copy staging, recycled caches and old
+source bindings. Count unique pixel resources once within each cache, regardless
+of placement count. Existing publisher leases protect placement snapshots.</p>
+<p>Graphics changes advance frame and graphics generations without dirtying every
+text row. Cache keys include source identity, resource identity, viewport,
+structure and cell geometry. Begin with conservative repaint on graphics changes;
+add finer damage only if measurements justify it. Empty graphics state takes a
+constant-time branch in existing structural operations.</p>
+<p>Swing prepares a bounded <code>BufferedImage</code> cache outside painting. Copy each newly
+admitted resource into its raster and reuse it for every placement. Keep offscreen
+resources cached while the source still retains them so scrolling out of view and
+back does not recreate rasters. <code>TerminalRenderImage.isRetainedBySource</code> reports
+source retirement without invalidating immutable pixels or existing snapshots.
+Release retired resources and their rasters at the next frame installation when
+absent from that frame. Retired publisher buffers release image references when
+their last reader leaves. Otherwise evict absent resources only when admitting
+another resource would exceed the pixel or record budget; never evict a resource
+used by the frame being installed. A
+resource readmitted after capacity eviction may allocate again. Painting performs no decoding, image construction or per-placement
+wrapper allocation. Draw contiguous geometry runs once, splitting at prompt
+dividers only where needed; do not redraw every image row. Opaque rasters may use
+an RGB view sharing their pixel storage. Splitting background/text/image
+composition must preserve existing text, selection and cursor ordering.</p>
+<p>Closing a session discards incomplete transfers but retains the final image state
+for frozen-terminal presentation. Rebinding/disposal drops the view&#39;s raster
+cache and references. External consumers retaining immutable resources own that
+additional memory; session limits cannot cap arbitrary consumer retention or
+JVM heap commitment.</p>
+<h2 id="resource-limits">Resource limits</h2>
+<p>These are KetraTerm defaults, not wire-protocol constants.
+<code>TerminalGraphicsLimits</code> owns the runtime byte, pixel and record limits; this table
+documents their accounting rather than defining another set of production constants. Use checked <code>Long</code>
+arithmetic before converting to JVM array sizes. Allocate on demand; do not
+reserve maximum capacities for terminals that never receive images.</p>
+<div class="table-scroll"><table>
+<thead>
+<tr>
+<th>Resource</th>
+<th>Limit and accounting</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>APC header</td>
+<td>1024 bytes, excluding introducer/separator/terminator</td>
+</tr>
+<tr>
+<td>One encoded payload chunk</td>
+<td>128 KiB of Base64 bytes</td>
+</tr>
+<tr>
+<td>Encoded upload</td>
+<td>48 MiB across all chunks; counted, never retained as a complete encoded string</td>
+</tr>
+<tr>
+<td>Decoded transfer / expanded PNG stream</td>
+<td>33 MiB each, including container overhead</td>
+</tr>
+<tr>
+<td>Image dimensions</td>
+<td>Each edge at most 8192; at most 8,388,608 pixels / 32 MiB canonical ARGB</td>
+</tr>
+<tr>
+<td>Retained images</td>
+<td>64 MiB canonical pixels and 256 image records across both screens</td>
+</tr>
+<tr>
+<td>Placements</td>
+<td>65,536 records across both screens, including history; enough for Yazi&#39;s per-cell path</td>
+</tr>
+<tr>
+<td>Active transfer/decode</td>
+<td>One operation; 225 MiB admission allowance for bounded staging/native/canonical data and estimated codec headroom; see qualification below</td>
+</tr>
+<tr>
+<td>Each render snapshot</td>
+<td>At most 64 MiB unique referenced pixels and the placement count above</td>
+</tr>
+<tr>
+<td>Swing raster cache</td>
+<td>64 MiB raster pixels and at most 256 resources per bound view, plus at most 64 MiB referenced canonical pixels; retain offscreen entries until admission needs capacity</td>
+</tr>
+</tbody></table></div>
+<p>The image-size limit admits a 3840x2160 RGBA image. Enforce dimensions before
+decoder raster allocation, and byte/count limits before growth or publication.
+Account PNG&#39;s possible 16-bit native samples: at this pixel bound the native
+RGBA raster can occupy 64 MiB before its 32 MiB normalized result exists.</p>
+<p>Evict unplaced images first, then least-recently-used images and their dependent
+placements, using a monotonic operation counter rather than wall time. Validate
+a new image completely before evicting for its commit. Fail if one image can
+never fit, or placement admission cannot satisfy its bound. Replacement must
+reserve transient capacity without destroying the previous image on failure.</p>
+<p>With three publisher caches and one EDT cache, independent old versions can
+retain more memory than the core quota. A conservative built-in payload envelope
+is <code>64 + 3*64 + 64 + 64 + 64 + 225 = 673 MiB</code>: core, published snapshots, EDT snapshot,
+Swing rasters, their retained source resources, and active decode. This is a conservative live payload estimate,
+not a per-session reservation or total-process-memory promise. Primitive metadata,
+JVM object overhead, GC lag and platform graphics surfaces are additional; measure
+them separately. Reusing unchanged resources normally avoids this multiplier.
+ImageIO provides no allocator-budget API: the 225 MiB allowance is not an enforced
+cap on opaque codec allocations. Owned byte/pixel/count limits are hard bounds;
+adversarial heap profiling must validate codec headroom before PNG support ships.
+Do not advertise a total memory ceiling based on this estimate.</p>
+<h2 id="decoder-boundary-and-ordering">Decoder boundary and ordering</h2>
+<p>Use one internal PNG decoder in <code>ketraterm-session</code>, separate from coordination.
+Use the JDK&#39;s PNG <code>ImageReaderSpi</code> from module <code>java.desktop</code>, selected through
+public APIs, with a per-operation reader. No new codec dependency or module is
+required. ImageIO provider initialization may run trusted classpath providers;
+do not describe this as a plugin-free discovery mechanism. Select the JDK PNG
+provider explicitly rather than decoding arbitrary detected formats.</p>
+<p>Use <code>MemoryCacheImageInputStream</code> over a <code>ByteArrayInputStream</code> restricted to the
+compacted prefix. These standard JDK streams replace custom read/seek bookkeeping;
+no file cache, global ImageIO settings or internal JDK exports are needed. First validate signature, IHDR, chunk
+lengths/order, CRCs, known critical chunks and final IEND; reject truncated/trailing
+streams. Then compact the exclusively owned staging array in place to
+<code>IHDR</code>/<code>PLTE</code>/<code>tRNS</code>/<code>IDAT</code>/<code>IEND</code>, merging consecutive IDAT payloads and recomputing
+their combined length/CRC. Enforce format-defined palette/transparency lengths.
+The reader receives this bounded logical length. Its memory cache may retain up
+to another 33 MiB of payload, included in the active-decode allowance above.
+This prevents compressed metadata and tiny-chunk object floods; <code>ignoreMetadata=true</code>
+alone does not. The stream byte limit bounds the validation pass.
+Validate remaining codec headroom with hostile-input tests and profiling. Close
+the input and dispose the reader on every exit. ImageIO does not validate all
+PNG CRCs itself.</p>
+<p>Verify the merged IDAT&#39;s complete single zlib stream and exact filtered scanline
+byte count, including Adam7 passes, before ImageIO. The bounded second inflate
+prevents a reader that stops after its requested rows from accepting a truncated
+trailer or extra compressed data; it uses fixed scratch rather than another raster.</p>
+<p>Read the native raster: forcing an 8-bit destination loses some 16-bit <code>tRNS</code>
+transparency in the JDK PNG reader. Sub-byte grayscale <code>tRNS</code> also requires comparing
+the transparent key in the native raster&#39;s expanded sample range. Mask unused key
+bits for depths below 16 before decoding, after validating the original chunk CRC.
+Normalize samples explicitly: replicate grayscale channels, resolve palette entries and alpha, scale
+sub-byte samples, and take the high byte of 16-bit samples. Initially treat samples
+as sRGB and ignore embedded profiles/gamma metadata: this is a KetraTerm fidelity
+limitation, not Kitty parity,
+and is tracked in the gap map. Do not use generic <code>BufferedImage.getRGB</code> for grayscale;
+its color-space conversion changes sample values. Only immutable normalized
+pixels cross into core/render contracts; AWT objects stay inside the decoder/UI.</p>
+<p>The parser must stop immediately after a graphics command needing decode and
+report the consumed byte count. The session keeps the remaining borrowed input
+on the same ingress call. A narrow mutation-admission gate serializes that input
+batch with other parser/core and host-policy mutations: geometry, clear, theme,
+width policy, cursor defaults and window state. Its lock order is admission gate,
+then mutation lock, then outbound lock. Release the mutation lock during
+synchronous decoding, then reacquire it to commit/reply before parsing later bytes.
+Frame/mode reads and ordinary input admission remain available during decode.
+Input/paste-policy setters retain their existing outbound serialization; they do
+not acquire this gate. Do not add a graphics decode queue, deferred placement
+model or per-command future.</p>
+<p>Conditional command-edit capture is unavailable until the entire output batch
+finishes; a decode yield must not create an editing context with a revision that
+also covers its still-unprocessed suffix. Accepted protocol host callbacks retain
+their synchronous setter mapping, including CSI 8 resize, while their ingress
+thread already owns both admission and mutation.</p>
+<h3 id="edt-admission-and-lifecycle">EDT admission and lifecycle</h3>
+<p>Synchronous gated methods can wait for decoding. <strong>No EDT path may wait for this
+gate</strong>, directly or through a wrapper, failure handler or disposal callback.
+The following entry paths share this requirement:</p>
+<div class="table-scroll"><table>
+<thead>
+<tr>
+<th>Entry path / owner</th>
+<th>Required handling</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>SwingTerminal.bindOnEdt</code>, <code>reloadSettingsOnEdt</code>, <code>applySettingsToSession</code></td>
+<td>Apply captured theme, width-policy and cursor-default updates off the EDT; initial binding is included. Keep component settings/metrics on the EDT.</td>
+</tr>
+<tr>
+<td><code>SwingTerminal.resizeSessionToVisibleGridOnEdt</code></td>
+<td>Move both <code>tryUpdateViewportPixels</code> and <code>tryResizeViewport</code> admission off the EDT. Capture geometry/viewport anchors first; install resize results and selection changes on the EDT.</td>
+</tr>
+<tr>
+<td><code>TerminalWindowResizeController.request</code> fallback</td>
+<td>Route through the bound view&#39;s ordered geometry work after capturing the visible size on the EDT. Window resizing itself stays on the EDT.</td>
+</tr>
+<tr>
+<td>Standalone <code>TerminalPane.reloadSettings</code>, IDE <code>KetraTermTerminalPane.reloadSettings</code>, and <code>TerminalWorkspace.applySettings</code></td>
+<td>Move session policy/settings effects to their owning host&#39;s work path. Preserve order with view settings; moving only <code>terminal.reloadSettings</code> does not cover the subsequent <code>setHostPolicy</code>.</td>
+</tr>
+<tr>
+<td><code>SwingTerminal</code> window-state listeners and <code>updateMinimizedStateFromAncestor</code></td>
+<td>Capture minimization on the EDT and admit <code>setWindowMinimized</code> off it, including binding-time synchronization.</td>
+</tr>
+<tr>
+<td>Embedded <code>TerminalSession.clearBuffer</code> calls</td>
+<td>Perform local clear off the EDT and report its result on completion. <code>SwingTerminal.clearScreen</code> sends Ctrl+L through ordinary input admission and remains outside the gate.</td>
+</tr>
+<tr>
+<td>Tab/project/window closure, pending-tab/startup cleanup, and <code>IntellijClipboardSession</code> disposal</td>
+<td>Detach UI on the EDT; run session/workspace cleanup under a product lifetime owner off it. Cover <code>TabManager</code>, <code>KetraTermProjectTerminalService</code> and indirect <code>TerminalWorkspace.closeTab</code>/<code>close</code> calls. Cleanup must survive cancellation of the disposed view. Startup/connector delivery also stays off the EDT.</td>
+</tr>
+</tbody></table></div>
+<p>Use the existing binding/product work owners with an explicit non-EDT dispatcher.
+Keep pending work bounded and preserve accepted mutation order per session; launching
+independent coroutines is not an ordering guarantee. Coalesce superseded geometry,
+but do not drop accepted clear operations or policy transitions. Recheck captured
+binding/request validity at actual gate admission, not only before waiting, and
+again before installing results on the EDT. Report completion/failure without
+blocking the EDT or treating a queued request as an applied change. Workers must
+not read Swing state, and gate holders must never wait for EDT callbacks.</p>
+<p>Preserve reentry rejection across the yield. Closure first claims termination
+and closes the connector, then takes cleanup locks; decode commit rechecks closure
+and discards a stale result. Failure-triggered closure from EDT input admission
+(for example outbound-capacity exhaustion) must claim termination promptly and
+hand off connector closure and lock-taking cleanup; offloading only explicit
+tab-close actions is insufficient. No late image can appear after termination.
+Graphics delivery can block its ingress caller; custom connectors must deliver such output
+off UI threads. The built-in PTY already has a reader thread. This gate/yield is
+implemented through <code>TerminalGraphicsOutputParser.acceptUntilGraphics</code> and its
+scoped payload consumer; ordinary <code>accept</code> still consumes a whole range. Custom
+parser decorators must preserve that optional interface to retain session decoding.
+The <a href="../../ketraterm-session/docs/session-concurrency-locks.html">session contract</a>
+defines host admission and shutdown completion.</p>
+<p>Shutdown cancellation stops the outbound worker immediately. Asynchronous cleanup
+uses an independent elastic I/O view by default so a blocked writer cannot prevent
+connector closure; custom cleanup dispatchers must retain that independence.
+Blocking workspace startup runs on I/O workers, leaving CPU workers available for
+view binding. Startup completion samples the current host policy on the EDT so
+intervening settings changes cannot be overwritten by a launch snapshot.
+Connector startup must tolerate concurrent closure, including
+while delivering synchronous graphics output. Cleanup retains its own lifetime
+until the final frame and <code>Closed</code> event have been attempted.</p>
+<h2 id="verification-gates">Verification gates</h2>
+<p>The sender corpus tests verify immutable source revisions, fixture hashes,
+exact APC metadata/chunks and decoded input pixels independently of production
+parsing. Decoder-boundary tests pin native PNG sample behavior. Neither is a
+graphics conformance test for KetraTerm.</p>
+<p>Subsequent implementation tests must assert exact queries/quiet replies, command
+ordering, transfer recovery, invalid/oversized data, unsigned IDs, identity reuse,
+placement geometry, all deletion selectors, scroll/margin/resize behavior, screen
+lifecycle, pinned-frame stability, failed-copy cleanup and frozen presentation.
+Contrast <code>IL</code>/<code>DL</code> preserving ordinary placements with actual scrolling moving
+them, including bounded regions and oversized counts.
+Exercise the cursor cases above plus pending wrap, DECAWM off, horizontal margins,
+large spans and failure atomicity. For each EDT entry family above, hold decode
+behind an entered/release handshake, submit the UI request, and observe a later
+EDT marker before releasing decode. Then verify exact mutation/completion order,
+policy revocation, stale-binding rejection and cleanup after disposal or capacity
+failure. Use controlled schedulers or explicit handshakes, never elapsed-time assertions.</p>
+<p>Replay the pinned senders through the complete pipeline and run real application
+smoke tests before declaring support. Include non-square images and a PTY with
+unknown pixel dimensions: senders such as Yazi must obtain actual cell geometry
+through <code>CSI 16 t</code> instead of stretching to a fallback rectangle. Check placement
+extent as well as decoded pixels. Benchmark text without graphics, unchanged
+image frames, dense Yazi placements, scrolling and replacement separately.
+Image reception, decoding, upload and replacement are allocation-permitted operations.
+Prefer standard library types and straightforward owned objects when they simplify
+these paths; do not introduce pooling or reusable scratch solely to avoid occasional
+upload allocations. Keep their memory bounded and preserve the ordinary text hot path.
+Once an image is installed and capacity is established, repeated frame copying,
+scrolling, mouse interaction and painting must reuse pixels, rasters and metadata
+buffers without new KetraTerm-owned allocations. Retained heap has separate bounds. Java2D&#39;s internal
+allocations are permitted and measured separately, including alpha scaling,
+clip changes and fractional translation. Passing frame-copy measurements alone
+does not establish allocation-free painting. Review any new public API and ABI
+snapshots, then run the affected module, published-consumer and formatting checks.</p>
+</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/5371b816fb7dc3c3bca6ea24282a4d1b2b657090/docs/development/kitty-graphics-contract.md">View source on GitHub ↗</a></div></div></main></div>
+  <footer>
+    <a class="brand" href="../../../../index.html"><img class="brand-mark" src="../../../../assets/logo.svg" alt="" width="34" height="34">KetraTerm Library</a>
+    <p>Open source · Apache 2.0</p>
+    <div><a href="https://github.com/ketraterm/KetraTerm">GitHub ↗</a><a href="https://github.com/ketraterm/KetraTerm/issues">Issues ↗</a><a class="product-switch" href="https://ketraterm.github.io/KetraTerm/">Desktop app ↗</a></div>
+  </footer>
+</body>
+</html>

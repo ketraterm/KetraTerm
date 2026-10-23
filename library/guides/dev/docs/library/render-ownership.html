@@ -53,16 +53,21 @@ publication authority from the session.</p>
 <p>Frame callbacks must not modify or retain cache storage, close the session, or
 reenter mutation/publication. A read does not request a fresh frame; publication
 is controlled by render requests and generation observation.</p>
+<p><code>TerminalRenderImage</code> is an explicit lifetime exception: immutable pixel resources
+may be retained, while placement metadata and <code>cache.images</code> remain borrowed.
+Retaining an image also retains its pixel storage after deletion or replacement;
+prepare renderer rasters outside the frame callback. See the
+<a href="../../ketraterm-render-api/docs/render-frame-lifecycle.html#critical-lifespan-rule">image lifetime contract</a>.</p>
 <p>Use scoped readers. The publisher&#39;s acquire/release bridges exist for cross-module
 use and must be paired exactly once in <code>finally</code>. Inline readers preserve that
 cleanup and Kotlin non-local returns without exposing buffer indexing. A cache
 reference cannot detect every duplicate-release misuse by concurrent callers.</p>
 <p>The <a href="../../ketraterm-render-cache/docs/triple-buffering-concurrency.html">publication contract</a>
 defines leasing and concurrency; the <a href="../../ketraterm-session/docs/session-concurrency-locks.html">session contract</a>
-defines synchronization. <a href="https://github.com/ketraterm/KetraTerm/blob/461979b7271f15e3ba0358137b253b88c18c840a/ketraterm-testkit/src/consumerTest/README.md">Consumer fixtures</a>
+defines synchronization. <a href="https://github.com/ketraterm/KetraTerm/blob/5371b816fb7dc3c3bca6ea24282a4d1b2b657090/ketraterm-testkit/src/consumerTest/README.md">Consumer fixtures</a>
 verify the supported binary boundary. Lease measurements belong to
 <a href="../../ketraterm-benchmarks/README.html">the benchmark suite</a>, not an API performance guarantee.</p>
-</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/461979b7271f15e3ba0358137b253b88c18c840a/docs/library/render-ownership.md">View source on GitHub ↗</a></div></div></main></div>
+</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/5371b816fb7dc3c3bca6ea24282a4d1b2b657090/docs/library/render-ownership.md">View source on GitHub ↗</a></div></div></main></div>
   <footer>
     <a class="brand" href="../../../../index.html"><img class="brand-mark" src="../../../../assets/logo.svg" alt="" width="34" height="34">KetraTerm Library</a>
     <p>Open source · Apache 2.0</p>

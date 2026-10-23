@@ -68,12 +68,21 @@ Only <code>columns * rows</code> cells and <code>rows</code> row entries belong 
 Use <code>rowOffset(row)</code> and the reported dimensions, not array capacity, for indexing.
 Interpret <code>codeWords</code> together with <code>TerminalRenderCellFlags</code>; clustered cells
 use <code>clusterRefs</code> and <code>clusterCodepoints</code>, and wide trailing cells carry no glyph.</p>
+<p><code>images</code> contains placements in back-to-front order. Its indexed getters expose
+fractional destination cells and pixel source crops; <code>copyTo</code> delivers the same
+metadata through a sink. Updates copy metadata and share immutable
+<code>TerminalRenderImage</code> references, without copying pixels. Keep backend raster
+preparation outside the source callback and reuse rasters by resource identity.
+The <a href="../ketraterm-render-api/docs/render-frame-lifecycle.html#critical-lifespan-rule">frame lifecycle</a>
+defines the resource&#39;s retainable lifetime and placement clipping.</p>
 <h2 id="ownership-and-validity">Ownership and validity</h2>
 <p>A cache is mutable and requires thread confinement or external serialization.
 Publisher leases make a published cache read-only for the duration of
 <code>readCurrent</code>. Do not retain a borrowed cache or its arrays, update it, or reenter
 the publisher from that callback. The publisher uses three caches and may wait
-for readers when no non-front buffer is available for writing.</p>
+for readers when no non-front buffer is available for writing.
+Retired publisher buffers release image references once their last reader leaves,
+while keeping primitive storage available for reuse.</p>
 <p><code>hasFrame</code> is false initially, after <code>reset</code>, and after an incomplete copy. Reset
 clears source data and metadata while retaining dimensions and storage capacity.
 Reader-based updates detect replacement readers and force a complete copy;
@@ -90,6 +99,9 @@ history metadata still describes the source. A <code>false</code> result means n
 row remains and <code>cache.hasFrame</code> is false. Assemble strings and perform analysis
 after <code>read</code> returns. The optional cancellation check runs during source copying
 and must be cheap and non-suspending.</p>
+<p>Image placements intersecting a render range are translated into its local rows.
+The row/cell limits do not bound image pixels: the copy retains references to full
+immutable resources. <code>TerminalTextRangeCopy</code> does not copy images.</p>
 <p><code>TerminalTextRangeCopy</code> uses the same range and batch limits for text analysis.
 It requests <code>copyTextLine</code> and retains only code words, cell flags, cluster data,
 row identities/generations, wrapping and source generations. Every batch replaces
@@ -110,7 +122,7 @@ should use the primitive cursor fields and packed cluster storage directly.</p>
 <li><a href="../ketraterm-render-api/README.html">Render contracts</a></li>
 <li><a href="../ketraterm-session/README.html">Session lifecycle and synchronized access</a></li>
 </ul>
-</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/461979b7271f15e3ba0358137b253b88c18c840a/ketraterm-render-cache/README.md">View source on GitHub ↗</a></div></div></main></div>
+</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/5371b816fb7dc3c3bca6ea24282a4d1b2b657090/ketraterm-render-cache/README.md">View source on GitHub ↗</a></div></div></main></div>
   <footer>
     <a class="brand" href="../../../index.html"><img class="brand-mark" src="../../../assets/logo.svg" alt="" width="34" height="34">KetraTerm Library</a>
     <p>Open source · Apache 2.0</p>

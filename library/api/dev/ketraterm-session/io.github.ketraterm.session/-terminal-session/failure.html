@@ -103,7 +103,7 @@
   <div class="cover ">
     <h1 class="cover"><span><span>failure</span></span></h1>
   </div>
-  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-session/main"><div class="symbol monospace"><span class="token keyword">val </span><a href="failure.html">failure</a><span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-throwable/index.html">Throwable</a><span class="token operator">?</span></div><p class="paragraph">The first startup, transport, or outbound worker failure, including unexpected writer cancellation; <code class="lang-kotlin">null</code> for normal remote closure or local close.</p></div></div>
+  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":ketraterm-session/main"><div class="symbol monospace"><span class="token keyword">val </span><a href="failure.html">failure</a><span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-throwable/index.html">Throwable</a><span class="token operator">?</span></div><p class="paragraph">The first startup, transport, outbound worker, or cleanup failure. An initiating failure is available as soon as shutdown begins; cleanup failures are retained before <a href="state.html">state</a> reaches <a href="../-terminal-session-state/-closed/index.html">TerminalSessionState.Closed</a>. Null means no known failure.</p></div></div>
 </div>
     <div class="footer">
         <div class="footer--container">

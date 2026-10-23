@@ -29,6 +29,8 @@ Its only production dependency is the Kotlin standard library.</p>
 <ul>
 <li><code>TerminalRenderFrameReader</code>, <code>TerminalRenderFrame</code>, and callback sinks define
 synchronous borrowed reads and primitive row/cluster/cursor copying.</li>
+<li><code>TerminalRenderImage</code> defines immutable pixels that may outlive a frame;
+<code>TerminalRenderImageSink</code> delivers borrowed placement geometry and source crops.</li>
 <li><code>TerminalRenderAttrs</code>, <code>TerminalRenderExtraAttrs</code>, and
 <code>TerminalRenderCellFlags</code> define the public cell encoding, independently of
 core storage.</li>
@@ -43,7 +45,7 @@ retained copies; UI modules own fonts, layout, shaping, painting, and blink time
 <li><a href="docs/render-frame-lifecycle.html">Frame lifecycle</a></li>
 <li><a href="docs/attribute-packing.html">Attribute packing</a></li>
 </ul>
-</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/461979b7271f15e3ba0358137b253b88c18c840a/ketraterm-render-api/Module.md">View source on GitHub ↗</a></div></div></main></div>
+</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/5371b816fb7dc3c3bca6ea24282a4d1b2b657090/ketraterm-render-api/Module.md">View source on GitHub ↗</a></div></div></main></div>
   <footer>
     <a class="brand" href="../../../index.html"><img class="brand-mark" src="../../../assets/logo.svg" alt="" width="34" height="34">KetraTerm Library</a>
     <p>Open source · Apache 2.0</p>

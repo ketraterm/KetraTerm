@@ -52,8 +52,12 @@ and session synchronization belong outside this module.</p>
 <td>Collects bounded sequence state, applies parser actions, and flushes text before structural commands.</td>
 </tr>
 <tr>
-<td>ESC/CSI, SGR, OSC, and DCS dispatchers</td>
+<td>ESC/CSI, SGR, OSC and DCS dispatchers</td>
 <td>Translate completed sequences into semantic sink calls.</td>
+</tr>
+<tr>
+<td><code>GraphicsParser</code> / <code>GraphicsHeader</code></td>
+<td>Collect APC controls, decode bounded Base64 chunks, and deliver complete uploads or transfer failures.</td>
 </tr>
 <tr>
 <td><code>PrintableProcessor</code> / <code>GraphemeAssembler</code></td>
@@ -69,6 +73,10 @@ the FSM routes ASCII/control bytes, printable UTF-8 ingress, and opaque string
 payloads. Invalid continuation handling can replay the current byte through the
 normal route once, preserving a following control sequence.</p>
 <h2 id="ownership-and-resource-contracts">Ownership and Resource Contracts</h2>
+<p>Graphics APC has its own bounded header and incremental Base64 collector. It
+assembles one incomplete upload and borrows the completed controls/bytes to the
+sink. Reset, EOF, cancellation and the sink&#39;s reset/screen epoch invalidate staging.
+It neither decodes image codecs nor retains display resources.</p>
 <p>The parser never calculates cell width, clamps coordinates, mutates a grid
 directly, or chooses response/clipboard permissions. These decisions remain with
 the sink and its owning layers. Effective screen selection is observed through
@@ -84,7 +92,7 @@ borrow storage only for their synchronous duration.</p>
 <li><a href="docs/ansi-fsm-specification.html">ANSI state machine</a>: byte classification and dispatch.</li>
 <li><a href="docs/grapheme-segmentation.html">Grapheme segmentation</a>: incremental text assembly.</li>
 </ul>
-</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/461979b7271f15e3ba0358137b253b88c18c840a/ketraterm-parser/Module.md">View source on GitHub ↗</a></div></div></main></div>
+</div><div class="source-link"><a href="https://github.com/ketraterm/KetraTerm/blob/5371b816fb7dc3c3bca6ea24282a4d1b2b657090/ketraterm-parser/Module.md">View source on GitHub ↗</a></div></div></main></div>
   <footer>
     <a class="brand" href="../../../index.html"><img class="brand-mark" src="../../../assets/logo.svg" alt="" width="34" height="34">KetraTerm Library</a>
     <p>Open source · Apache 2.0</p>
